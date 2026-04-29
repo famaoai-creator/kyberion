@@ -129,6 +129,26 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/src/types/booking-preference-profile.ts',
   },
   {
+    schemaPath: 'knowledge/public/schemas/narrated-video-preference-profile.schema.json',
+    outputPath: 'libs/core/src/types/narrated-video-preference-profile.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/narrated-video-publish-plan.schema.json',
+    outputPath: 'libs/core/src/types/narrated-video-publish-plan.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/narrated-video-upload-package.schema.json',
+    outputPath: 'libs/core/src/types/narrated-video-upload-package.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/meeting-operations-profile.schema.json',
+    outputPath: 'libs/core/src/types/meeting-operations-profile.ts',
+  },
+  {
+    schemaPath: 'knowledge/public/schemas/meeting-operations-brief.schema.json',
+    outputPath: 'libs/core/src/types/meeting-operations-brief.ts',
+  },
+  {
     schemaPath: 'knowledge/public/schemas/points-portal-clickout-usecase.schema.json',
     outputPath: 'libs/core/src/types/points-portal-clickout-usecase.ts',
   },

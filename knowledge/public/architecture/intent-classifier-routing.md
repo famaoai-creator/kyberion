@@ -88,6 +88,125 @@ The routing result should also emit an explainable trace with at least:
 - chosen work shape
 - policy outcome
 
+## 4. What Should Route Through `compileUserIntentFlow`
+
+The brief-first compiler should own the requests where the user is describing a desired outcome and the system needs to choose a governed work shape.
+
+### 4.1 Should route through `compileUserIntentFlow`
+
+- booking, reservation, purchase, renewal, cancellation, or other structured lifestyle workflows
+- presentation, report, workbook, or other document-generation work
+- service inspection and service-operation requests that may require clarification or approval
+- project bootstrap, remediation, incident review, or other durable work
+- browser workflows where the user wants the system to learn the intent, not just perform one click
+- any request where the system should first produce an execution brief, ask only outcome-changing questions, then compile the contract
+
+### 4.2 Should not route through `compileUserIntentFlow`
+
+- active browser conversation step commands such as `それ`, `1つ目`, `押して`, `入力して`
+- lightweight direct answers such as weather, time, simple knowledge lookup, and trivial status checks
+- low-level runtime or operator commands such as mission controller control flow
+- browser-actuator execution itself after the session has already been normalized into a task session
+
+### 4.3 Why This Split Matters
+
+If a request is routed too early into a low-level classifier, the system can skip the brief, skip the reusable contract, and skip the learning hook.
+
+If a request is routed too late into the compiler, the system becomes over-verbose and loses the low-latency behavior that direct replies and active browser steps need.
+
+The practical rule is:
+
+```text
+Goal-level request -> compileUserIntentFlow
+step-level command -> local session classifier
+```
+
+## 5. Browser Learning Loop
+
+Browser work should learn in layers, not only by keeping a conversation log.
+
+Recommended loop:
+
+1. user requests a browser workflow at the goal level
+2. `compileUserIntentFlow()` creates the execution brief and contract
+3. browser execution records action trail and trace
+4. trace-derived hints are extracted
+5. distill candidates are created when a reusable pattern or SOP is visible
+6. approved candidates are promoted into governed memory
+7. later requests can reuse the promoted memory and contract memory
+
+The important distinction is:
+
+- session history preserves what happened
+- trace preserves what was executed
+- distill / promote preserves what should be reused
+
+Without the distill/promotion step, the system has history but not learning.
+
+## 6. Distill Candidate Policy
+
+Distill candidates are not the same as every completed execution.
+
+Candidate creation should only happen when the output is likely to be reused as a governed pattern, SOP candidate, report template, or knowledge hint.
+
+### 6.1 Browser candidates
+
+Browser workflows should be considered for distillation only when:
+
+- the workflow has a recorded trace
+- the workflow performed at least one interactive `apply` action
+- the workflow has enough action trail to show a reusable sequence
+- the target context is concrete, such as a URL or window title
+- the result is more than a bare `open_site` navigation
+
+Browser workflows should not be distilled when they are only:
+
+- one-click navigation
+- generic session opening
+- step-level command handling inside an active browser conversation
+
+### 6.2 Task session candidates
+
+Task sessions should be considered for distillation only when:
+
+- the session produced a governed artifact
+- the session has a work loop or equivalent governed execution context
+- the task type exposes a reusable structure
+- the result is not just a generic completion string
+
+Examples that are usually eligible:
+
+- `presentation_deck`
+- `report_document`
+- `workbook_wbs`
+- `service_operation`
+- `analysis` when the analysis is specifically a project bootstrap
+
+Examples that should usually not auto-promote:
+
+- generic analysis output
+- generic document completions with no reusable structure
+- thin success messages that do not expose a repeatable procedure
+
+### 6.3 Promotion boundary
+
+Candidate creation is not promotion.
+
+Promotion should require a separate governed review step, especially when:
+
+- the candidate may cross tiers
+- the candidate might leak restricted references
+- the pattern is useful but still noisy
+- the system is not yet confident that the candidate is stable
+
+The practical progression should be:
+
+```text
+execution -> candidate assessment -> proposed candidate -> governed review -> promotion
+```
+
+This keeps learning useful without turning every execution into a permanent memory entry.
+
 ## 4. Why This Matters
 
 This model gives Kyberion:

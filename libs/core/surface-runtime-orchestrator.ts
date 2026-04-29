@@ -13,7 +13,11 @@ import {
 } from './agent-runtime-supervisor-client.js';
 import { compileUserIntentFlow, formatClarificationPacket } from './intent-contract.js';
 import { logger } from './core.js';
-import { buildMissionTeamView, loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
+import {
+  buildMissionTeamView,
+  loadMissionTeamPlan,
+  resolveMissionTeamReceiver,
+} from './mission-team-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
@@ -34,7 +38,11 @@ import {
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
 import { resolveSurfaceIntent } from './router-contract.js';
-import { recordIntentContractOutcome, selectContractCandidates, type ContractCandidate } from './intent-contract-learning.js';
+import {
+  recordIntentContractOutcome,
+  selectContractCandidates,
+  type ContractCandidate,
+} from './intent-contract-learning.js';
 
 import type {
   NerveRoutingProposal,
@@ -73,19 +81,23 @@ function formatExecutionReceipt(params: {
   status: 'ok' | 'error';
   candidateSelection?: ContractCandidate[];
 }): string {
-  return JSON.stringify({
-    kind: 'execution-receipt',
-    ts: new Date().toISOString(),
-    intent_id: params.intentId || 'unknown',
-    execution_shape: params.shape || 'unknown',
-    command: params.command || '',
-    status: params.status,
-    candidate_selection: (params.candidateSelection || []).map((candidate) => ({
-      contract_ref: candidate.contract_ref,
-      score: candidate.score,
-      source: candidate.source,
-    })),
-  }, null, 2);
+  return JSON.stringify(
+    {
+      kind: 'execution-receipt',
+      ts: new Date().toISOString(),
+      intent_id: params.intentId || 'unknown',
+      execution_shape: params.shape || 'unknown',
+      command: params.command || '',
+      status: params.status,
+      candidate_selection: (params.candidateSelection || []).map((candidate) => ({
+        contract_ref: candidate.contract_ref,
+        score: candidate.score,
+        source: candidate.source,
+      })),
+    },
+    null,
+    2
+  );
 }
 
 function ensureMissionId(context: SurfaceRuntimeRouteContext): string {
@@ -93,7 +105,9 @@ function ensureMissionId(context: SurfaceRuntimeRouteContext): string {
   throw new Error('mission_id is required for this mission action');
 }
 
-function recordLearningOutcomeSafely(params: Parameters<typeof recordIntentContractOutcome>[0]): void {
+function recordLearningOutcomeSafely(
+  params: Parameters<typeof recordIntentContractOutcome>[0]
+): void {
   try {
     recordIntentContractOutcome(params);
   } catch {
@@ -101,7 +115,10 @@ function recordLearningOutcomeSafely(params: Parameters<typeof recordIntentContr
   }
 }
 
-function missionActionGuidance(action: NonNullable<ReturnType<typeof resolveSurfaceIntent>['missionAction']>, missionId: string): string {
+function missionActionGuidance(
+  action: NonNullable<ReturnType<typeof resolveSurfaceIntent>['missionAction']>,
+  missionId: string
+): string {
   const commandHints: Record<string, string> = {
     classify: `node dist/scripts/mission_controller.js status ${missionId}`,
     workflow: `node dist/scripts/compose_mission_team.js --mission-id ${missionId} --execution-shape mission --request "select workflow"`,
@@ -122,7 +139,9 @@ function directIntentCommand(intentId?: string): { command: string; args: string
   return intentId && map[intentId] ? map[intentId] : null;
 }
 
-async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext): Promise<SurfaceConversationResult> {
+async function handleGovernedExecutionHint(
+  context: SurfaceRuntimeRouteContext
+): Promise<SurfaceConversationResult> {
   const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
   const intentId = resolved.intentId;
   const candidates = intentId ? selectContractCandidates(intentId, 3) : [];
@@ -156,7 +175,7 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
           }),
           '',
           output.trim() || '(no output)',
-        ].join('\n'),
+        ].join('\n')
       );
     } catch (error: any) {
       if (intentId) {
@@ -225,7 +244,7 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
         }),
         '',
         output.trim() || '(no output)',
-      ].join('\n'),
+      ].join('\n')
     );
   }
 
@@ -238,9 +257,13 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
     const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
     let output = '';
     try {
-      output = safeExec('node', ['dist/scripts/mission_controller.js', 'create', missionId, 'public'], {
-        cwd: pathResolver.rootDir(),
-      });
+      output = safeExec(
+        'node',
+        ['dist/scripts/mission_controller.js', 'create', missionId, 'public'],
+        {
+          cwd: pathResolver.rootDir(),
+        }
+      );
       if (intentId) {
         recordLearningOutcomeSafely({
           intent_id: intentId,
@@ -282,7 +305,7 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
         }),
         '',
         output.trim() || '(no output)',
-      ].join('\n'),
+      ].join('\n')
     );
   }
 
@@ -293,8 +316,18 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
     inspect_state: ['status', missionId],
     compose_team: ['team', missionId],
     prewarm_team: ['prewarm', missionId],
-    delegate_task: ['delegate', missionId, 'generalist', context.input.surfaceText || context.structuredQuery],
-    review_output: ['review-worker-output', missionId, 'verified', 'worker output reviewed from surface intent'],
+    delegate_task: [
+      'delegate',
+      missionId,
+      'generalist',
+      context.input.surfaceText || context.structuredQuery,
+    ],
+    review_output: [
+      'review-worker-output',
+      missionId,
+      'verified',
+      'worker output reviewed from surface intent',
+    ],
     handoff: ['handoff', missionId, 'surface_operator', 'handoff requested from surface intent'],
     distill: ['distill', missionId],
     close: ['finish', missionId],
@@ -313,7 +346,10 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
       recordLearningOutcomeSafely({
         intent_id: intentId,
         execution_shape: resolved.shape || 'mission',
-        contract_ref: { kind: 'mission_command', ref: `mission_controller ${resolved.missionAction}` },
+        contract_ref: {
+          kind: 'mission_command',
+          ref: `mission_controller ${resolved.missionAction}`,
+        },
         success: true,
         context_fingerprint: {
           execution_shape: resolved.shape,
@@ -326,7 +362,10 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
       recordLearningOutcomeSafely({
         intent_id: intentId,
         execution_shape: resolved.shape || 'mission',
-        contract_ref: { kind: 'mission_command', ref: `mission_controller ${resolved.missionAction}` },
+        contract_ref: {
+          kind: 'mission_command',
+          ref: `mission_controller ${resolved.missionAction}`,
+        },
         success: false,
         error: error?.message || String(error),
         context_fingerprint: {
@@ -350,7 +389,7 @@ async function handleGovernedExecutionHint(context: SurfaceRuntimeRouteContext):
       }),
       '',
       output.trim() || '(no output)',
-    ].join('\n'),
+    ].join('\n')
   );
 }
 
@@ -361,11 +400,15 @@ function buildMissionTeamPromptContext(missionId: string): string {
   return [
     '',
     'Mission team context:',
-    JSON.stringify({
-      mission_id: plan.mission_id,
-      mission_type: plan.mission_type,
-      team: teamView,
-    }, null, 2),
+    JSON.stringify(
+      {
+        mission_id: plan.mission_id,
+        mission_type: plan.mission_type,
+        team: teamView,
+      },
+      null,
+      2
+    ),
     '',
     'If delegation is needed, choose a team_role from the team object and emit a ```nerve_route``` JSON block.',
   ].join('\n');
@@ -402,9 +445,7 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
   }
 
   try {
-    const snapshot = await ensureAgentRuntimeViaDaemon(
-      toSupervisorEnsurePayload(spawnOptions),
-    );
+    const snapshot = await ensureAgentRuntimeViaDaemon(toSupervisorEnsurePayload(spawnOptions));
     return createSupervisorBackedAgentHandle(agentId, spawnOptions.requestedBy, snapshot);
   } catch (_) {
     return ensureAgentRuntime(spawnOptions);
@@ -459,7 +500,11 @@ function normalizeDelegationPayload(payload: any, fallbackText: string): any {
   };
 }
 
-async function processDelegations(a2aMessages: A2AMessage[], senderAgentId: string, fallbackText: string): Promise<SurfaceDelegationResult[]> {
+async function processDelegations(
+  a2aMessages: A2AMessage[],
+  senderAgentId: string,
+  fallbackText: string
+): Promise<SurfaceDelegationResult[]> {
   const delegationResults: SurfaceDelegationResult[] = [];
 
   for (const msg of a2aMessages) {
@@ -497,12 +542,13 @@ async function routeForcedDelegation(
   receiver: string,
   query: string,
   senderAgentId: string,
-  missionId?: string,
+  missionId?: string
 ): Promise<SurfaceDelegationResult[]> {
   try {
-    const enrichedQuery = receiver === 'nerve-agent' && missionId
-      ? `${query}\n${buildMissionTeamPromptContext(missionId)}`
-      : query;
+    const enrichedQuery =
+      receiver === 'nerve-agent' && missionId
+        ? `${query}\n${buildMissionTeamPromptContext(missionId)}`
+        : query;
     const response = await a2aBridge.route({
       a2a_version: '1.0',
       header: {
@@ -518,15 +564,19 @@ async function routeForcedDelegation(
       },
     });
 
-    return [{
-      receiver,
-      response: response.payload?.text || JSON.stringify(response.payload),
-    }];
+    return [
+      {
+        receiver,
+        response: response.payload?.text || JSON.stringify(response.payload),
+      },
+    ];
   } catch (err: any) {
-    return [{
-      receiver,
-      error: err.message,
-    }];
+    return [
+      {
+        receiver,
+        error: err.message,
+      },
+    ];
   }
 }
 
@@ -535,7 +585,7 @@ async function routeSlackForcedDelegation(
   query: string,
   senderAgentId: string,
   parsedSlackPrompt?: ParsedSlackSurfacePrompt | null,
-  missionId?: string,
+  missionId?: string
 ): Promise<SurfaceDelegationResult[]> {
   const parsed = parsedSlackPrompt || parseSlackSurfacePrompt(query);
   if (!parsed) {
@@ -566,17 +616,21 @@ async function routeSlackForcedDelegation(
       },
     });
 
-    return [{
-      receiver,
-      response: response.payload?.text || JSON.stringify(response.payload),
-      bypassedSurfaceAgent: true,
-    }];
+    return [
+      {
+        receiver,
+        response: response.payload?.text || JSON.stringify(response.payload),
+        bypassedSurfaceAgent: true,
+      },
+    ];
   } catch (err: any) {
-    return [{
-      receiver,
-      error: err.message,
-      bypassedSurfaceAgent: true,
-    }];
+    return [
+      {
+        receiver,
+        error: err.message,
+        bypassedSurfaceAgent: true,
+      },
+    ];
   }
 }
 
@@ -584,14 +638,16 @@ async function routeMissionTeamDelegation(
   missionId: string,
   teamRole: string,
   query: string,
-  senderAgentId: string,
+  senderAgentId: string
 ): Promise<SurfaceDelegationResult[]> {
   const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
   if (!assignment?.agent_id) {
-    return [{
-      receiver: `${missionId}:${teamRole}`,
-      error: `No assigned agent for team role ${teamRole} in mission ${missionId}`,
-    }];
+    return [
+      {
+        receiver: `${missionId}:${teamRole}`,
+        error: `No assigned agent for team role ${teamRole} in mission ${missionId}`,
+      },
+    ];
   }
 
   const results = await routeForcedDelegation(assignment.agent_id, query, senderAgentId, missionId);
@@ -606,7 +662,7 @@ async function routeMissionTeamDelegation(
 async function routeNerveRoutingProposals(
   proposals: NerveRoutingProposal[],
   senderAgentId: string,
-  missionId?: string,
+  missionId?: string
 ): Promise<SurfaceDelegationResult[]> {
   if (!missionId) return [];
   const results: SurfaceDelegationResult[] = [];
@@ -616,20 +672,22 @@ async function routeNerveRoutingProposals(
       proposal.mission_id || missionId,
       proposal.team_role,
       proposal.task_summary || proposal.why || 'Delegated task from nerve-agent',
-      senderAgentId,
+      senderAgentId
     );
     results.push(...delegated);
   }
   return results;
 }
 
-async function handleSlackConversationBypass(context: SurfaceRuntimeRouteContext): Promise<SurfaceConversationResult> {
+async function handleSlackConversationBypass(
+  context: SurfaceRuntimeRouteContext
+): Promise<SurfaceConversationResult> {
   const delegationResults = await routeSlackForcedDelegation(
     context.computedReceiver!,
     context.structuredQuery,
     context.input.senderAgentId,
     context.parsedSlackPrompt,
-    context.input.missionId,
+    context.input.missionId
   );
   const successful = delegationResults.filter((result) => !result.error);
   const firstResponse = successful[0]?.response || '';
@@ -646,12 +704,14 @@ async function handleSlackConversationBypass(context: SurfaceRuntimeRouteContext
   };
 }
 
-async function handlePresenceForcedBypass(context: SurfaceRuntimeRouteContext): Promise<SurfaceConversationResult> {
+async function handlePresenceForcedBypass(
+  context: SurfaceRuntimeRouteContext
+): Promise<SurfaceConversationResult> {
   const delegationResults = await routeForcedDelegation(
     context.computedReceiver!,
     context.structuredQuery,
     context.input.senderAgentId,
-    context.input.missionId,
+    context.input.missionId
   );
   const successful = delegationResults.filter((result) => !result.error);
   const firstResponse = successful[0]?.response || '';
@@ -684,28 +744,47 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
     },
   },
   {
-    matches: (context) => Boolean(context.parsedSlackPrompt && context.parsedSlackPrompt.executionMode === 'conversation' && context.computedReceiver),
+    matches: (context) =>
+      Boolean(
+        context.parsedSlackPrompt &&
+        context.parsedSlackPrompt.executionMode === 'conversation' &&
+        context.computedReceiver
+      ),
     handle: handleSlackConversationBypass,
   },
   {
-    matches: (context) => context.input.agentId === 'presence-surface-agent' && Boolean(context.computedReceiver),
+    matches: (context) =>
+      context.input.agentId === 'presence-surface-agent' && Boolean(context.computedReceiver),
     handle: handlePresenceForcedBypass,
   },
 ];
 
-export async function runSurfaceConversation(input: SurfaceConversationInput): Promise<SurfaceConversationResult> {
+export async function runSurfaceConversation(
+  input: SurfaceConversationInput
+): Promise<SurfaceConversationResult> {
   const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
-  const ruleBasedReceiver = forcedReceiver || deriveSurfaceDelegationReceiver(routedSurfaceInput.text, surface);
-  const compiledFlow: UserIntentFlow | null = shouldCompileSurfaceIntent(input, routedSurfaceInput.text, ruleBasedReceiver)
+  const ruleBasedReceiver =
+    forcedReceiver || deriveSurfaceDelegationReceiver(routedSurfaceInput.text, surface);
+  const compiledFlow: UserIntentFlow | null = shouldCompileSurfaceIntent(
+    input,
+    routedSurfaceInput.text,
+    ruleBasedReceiver
+  )
     ? await compileUserIntentFlow({
-      text: routedSurfaceInput.text,
-      channel: input.agentId.includes('slack') ? 'slack' : input.agentId.includes('presence') ? 'presence' : 'surface',
-    }).catch((error: any) => {
-      logger.warn(`[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`);
-      return null;
-    })
+        text: routedSurfaceInput.text,
+        channel: input.agentId.includes('slack')
+          ? 'slack'
+          : input.agentId.includes('presence')
+            ? 'presence'
+            : 'surface',
+      }).catch((error: any) => {
+        logger.warn(
+          `[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`
+        );
+        return null;
+      })
     : null;
 
   if (compiledFlow?.clarificationPacket) {
@@ -721,7 +800,8 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     };
   }
 
-  const computedReceiver: SurfaceDelegationReceiver | undefined = forcedReceiver ||
+  const computedReceiver: SurfaceDelegationReceiver | undefined =
+    forcedReceiver ||
     ruleBasedReceiver ||
     (!forcedReceiver && compiledFlow
       ? resolveSurfaceConversationReceiver(undefined, compiledFlow, surface)
@@ -729,19 +809,23 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
 
   const structuredQuery = compiledFlow
     ? [
-      input.query,
-      '',
-      'Governed intent contract:',
-      JSON.stringify(compiledFlow.intentContract, null, 2),
-      '',
-      'Governed work loop:',
-      JSON.stringify(compiledFlow.workLoop, null, 2),
-    ].join('\n')
+        input.query,
+        '',
+        'Governed execution brief:',
+        JSON.stringify(compiledFlow.executionBrief, null, 2),
+        '',
+        'Governed intent contract:',
+        JSON.stringify(compiledFlow.intentContract, null, 2),
+        '',
+        'Governed work loop:',
+        JSON.stringify(compiledFlow.workLoop, null, 2),
+      ].join('\n')
     : input.query;
 
   const parsedSlackPrompt =
     input.agentId === 'slack-surface-agent' && computedReceiver
-      ? routedSurfaceInput.parsedSlackPrompt || (!input.surfaceText ? parseSlackSurfacePrompt(structuredQuery) : null)
+      ? routedSurfaceInput.parsedSlackPrompt ||
+        (!input.surfaceText ? parseSlackSurfacePrompt(structuredQuery) : null)
       : null;
 
   const routeContext: SurfaceRuntimeRouteContext = {
@@ -751,7 +835,9 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     structuredQuery,
     parsedSlackPrompt,
   };
-  const matchedRouteHandler = SURFACE_RUNTIME_ROUTE_HANDLERS.find((handler) => handler.matches(routeContext));
+  const matchedRouteHandler = SURFACE_RUNTIME_ROUTE_HANDLERS.find((handler) =>
+    handler.matches(routeContext)
+  );
   if (matchedRouteHandler) {
     return matchedRouteHandler.handle(routeContext);
   }
@@ -763,20 +849,24 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
   const delegationFallbackText = buildDelegationFallbackText(structuredQuery);
 
   if (firstBlocks.a2aMessages.length > 0) {
-    delegationResults = await processDelegations(firstBlocks.a2aMessages, input.senderAgentId, delegationFallbackText);
+    delegationResults = await processDelegations(
+      firstBlocks.a2aMessages,
+      input.senderAgentId,
+      delegationFallbackText
+    );
   } else if (input.missionId && input.teamRole) {
     delegationResults = await routeMissionTeamDelegation(
       input.missionId,
       input.teamRole,
       structuredQuery,
-      input.senderAgentId,
+      input.senderAgentId
     );
   } else if (computedReceiver) {
     delegationResults = await routeForcedDelegation(
       computedReceiver,
       structuredQuery,
       input.senderAgentId,
-      input.missionId,
+      input.missionId
     );
   }
 
@@ -789,9 +879,10 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     const text = typeof result.response === 'string' ? result.response : '';
     return extractSurfaceBlocks(text).routingProposals || [];
   });
-  const routedDelegationResults = routingProposals.length > 0
-    ? await routeNerveRoutingProposals(routingProposals, input.senderAgentId, input.missionId)
-    : [];
+  const routedDelegationResults =
+    routingProposals.length > 0
+      ? await routeNerveRoutingProposals(routingProposals, input.senderAgentId, input.missionId)
+      : [];
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
@@ -826,11 +917,19 @@ export async function runSurfaceConversation(input: SurfaceConversationInput): P
     delegationResults: finalDelegationResults,
     approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
     routingProposals,
-    missionProposals: [...(firstBlocks.missionProposals || []), ...(followUpBlocks.missionProposals || [])],
-    planningPackets: [...(firstBlocks.planningPackets || []), ...(followUpBlocks.planningPackets || [])],
+    missionProposals: [
+      ...(firstBlocks.missionProposals || []),
+      ...(followUpBlocks.missionProposals || []),
+    ],
+    planningPackets: [
+      ...(firstBlocks.planningPackets || []),
+      ...(followUpBlocks.planningPackets || []),
+    ],
   };
 }
 
-export async function runSurfaceMessageConversation(input: SurfaceConversationMessageInput): Promise<SurfaceConversationResult> {
+export async function runSurfaceMessageConversation(
+  input: SurfaceConversationMessageInput
+): Promise<SurfaceConversationResult> {
   return runSurfaceConversation(buildSurfaceConversationInput(input));
 }

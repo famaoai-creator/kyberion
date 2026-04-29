@@ -57,6 +57,20 @@
       "downloadable": false,
       "previewable": true
     },
+    "meeting_operations_summary": {
+      "label": "Meeting operations summary",
+      "description": "A concise meeting summary with decisions, action items, owners, deadlines, and follow-up channel is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "schedule_coordination_summary": {
+      "label": "Schedule coordination summary",
+      "description": "A concise schedule adjustment summary with scope, constraints, updated slots, and follow-up path is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
     "knowledge_answer": {
       "label": "Knowledge answer",
       "description": "A concise answer grounded in governed knowledge is returned.",

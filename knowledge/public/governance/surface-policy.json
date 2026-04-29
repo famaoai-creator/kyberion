@@ -85,7 +85,14 @@
       {
         "id": "heavy-task-types",
         "receiver": "nerve-agent",
-        "task_types": ["analysis", "presentation_deck", "report_document", "workbook_wbs", "service_operation"]
+        "task_types": [
+          "analysis",
+          "presentation_deck",
+          "report_document",
+          "workbook_wbs",
+          "service_operation",
+          "meeting_operations"
+        ]
       }
     ]
   },
@@ -159,7 +166,10 @@
     "surface_rules": {
       "execution_mode": {
         "feasibility_patterns": [
-          { "type": "regex", "value": "可能[?？。]?$|可能かな|可能ですか|できますか|できる[?？。]?$" },
+          {
+            "type": "regex",
+            "value": "可能[?？。]?$|可能かな|可能ですか|できますか|できる[?？。]?$"
+          },
           { "type": "contains", "value": "お願いしても良い" },
           { "type": "contains", "value": "お願いできますか" },
           { "type": "contains", "value": "どうですか" },

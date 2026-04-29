@@ -79,6 +79,9 @@
     "points_portal_policy": {
       "$ref": "#/definitions/pointsPortalPolicy"
     },
+    "site_selection_policy": {
+      "$ref": "#/definitions/siteSelectionPolicy"
+    },
     "receipt_policy": {
       "type": "object",
       "additionalProperties": false,
@@ -115,7 +118,20 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["hotel", "restaurant", "flight", "rail", "activity", "package"]
+            "enum": [
+              "hotel",
+              "restaurant",
+              "flight",
+              "rail",
+              "activity",
+              "package",
+              "shopping",
+              "medical",
+              "subscription",
+              "home_service",
+              "family",
+              "gifts"
+            ]
           },
           "uniqueItems": true
         },
@@ -320,6 +336,187 @@
         "fallback_rule": {
           "type": "string",
           "enum": ["direct_booking", "manual_review", "skip_candidate"]
+        }
+      }
+    },
+    "siteSelectionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_mode", "compare_dimensions", "ask_user_when"],
+      "properties": {
+        "decision_mode": {
+          "type": "string",
+          "enum": ["auto_with_preflight", "ask_when_uncertain", "always_confirm_site_group"]
+        },
+        "compare_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "price",
+              "points",
+              "coupon",
+              "login_friction",
+              "cancellation",
+              "receipt_support",
+              "speed",
+              "familiarity",
+              "privacy"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "ask_user_when": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "sale_possible",
+              "price_gap_unclear",
+              "points_advantage_unclear",
+              "multiple_top_candidates",
+              "login_friction_tradeoff",
+              "new_service_category",
+              "user_requested_precheck"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "max_questions_per_turn": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "default": 2
+        },
+        "favorite_site_groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "categories", "preferred_sites"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "hotel",
+                    "restaurant",
+                    "flight",
+                    "rail",
+                    "activity",
+                    "package",
+                    "shopping",
+                    "medical",
+                    "subscription",
+                    "home_service",
+                    "family",
+                    "gifts"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "preferred_sites": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "backup_sites": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "preflight_question_sets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "categories", "questions"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "hotel",
+                    "restaurant",
+                    "flight",
+                    "rail",
+                    "activity",
+                    "package",
+                    "shopping",
+                    "medical",
+                    "subscription",
+                    "home_service",
+                    "family",
+                    "gifts"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "questions": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "sale_signal_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["check_sales_before_decision", "recheck_if_material"],
+          "properties": {
+            "check_sales_before_decision": {
+              "type": "boolean"
+            },
+            "recheck_if_material": {
+              "type": "boolean"
+            },
+            "material_threshold": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?%$"
+            },
+            "preferred_sale_sources": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
         }
       }
     }

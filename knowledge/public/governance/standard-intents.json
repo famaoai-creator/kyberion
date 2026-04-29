@@ -21,9 +21,7 @@
         "create a governed project record",
         "prepare the first work items"
       ],
-      "outcome_ids": [
-        "project_created"
-      ],
+      "outcome_ids": ["project_created"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
         "プロジェクト",
@@ -59,18 +57,9 @@
         "capture the governed image artifact",
         "return the stored result"
       ],
-      "outcome_ids": [
-        "artifact:image"
-      ],
+      "outcome_ids": ["artifact:image"],
       "specialist_id": "surface-concierge",
-      "trigger_keywords": [
-        "写真",
-        "撮影",
-        "photo",
-        "picture",
-        "camera",
-        "OCR"
-      ],
+      "trigger_keywords": ["写真", "撮影", "photo", "picture", "camera", "OCR"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "capture_photo",
@@ -89,28 +78,15 @@
       "id": "open-site",
       "category": "outcome_execution",
       "description": "Open a website or navigate the active browser session to a requested destination.",
-      "surface_examples": [
-        "日経新聞を開いて",
-        "Open OpenAI docs",
-        "このサイトを見せて"
-      ],
+      "surface_examples": ["日経新聞を開いて", "Open OpenAI docs", "このサイトを見せて"],
       "plan_outline": [
         "resolve destination",
         "open or focus browser",
         "navigate and confirm the page"
       ],
-      "outcome_ids": [
-        "browser_navigation"
-      ],
+      "outcome_ids": ["browser_navigation"],
       "specialist_id": "browser-operator",
-      "trigger_keywords": [
-        "open",
-        "site",
-        "browser",
-        "開いて",
-        "サイト",
-        "見せて"
-      ],
+      "trigger_keywords": ["open", "site", "browser", "開いて", "サイト", "見せて"],
       "resolution": {
         "shape": "browser_session",
         "result_shape": "browser_navigation"
@@ -128,28 +104,15 @@
       "id": "browser-step",
       "category": "outcome_execution",
       "description": "Continue an active browser conversation session with a step command or confirmation.",
-      "surface_examples": [
-        "左下の承認ボタンを押して",
-        "1つ目",
-        "それで進めて"
-      ],
+      "surface_examples": ["左下の承認ボタンを押して", "1つ目", "それで進めて"],
       "plan_outline": [
         "understand the active browser step",
         "pick the intended target",
         "execute and report the outcome"
       ],
-      "outcome_ids": [
-        "browser_step"
-      ],
+      "outcome_ids": ["browser_step"],
       "specialist_id": "browser-operator",
-      "trigger_keywords": [
-        "押して",
-        "クリック",
-        "1つ目",
-        "2つ目",
-        "それ",
-        "進めて"
-      ],
+      "trigger_keywords": ["押して", "クリック", "1つ目", "2つ目", "それ", "進めて"],
       "resolution": {
         "shape": "browser_session",
         "result_shape": "browser_step"
@@ -170,25 +133,20 @@
       "surface_examples": [
         "このPDFをパワポにして",
         "提案資料のパワーポイントを書いて",
-        "3枚の要約スライドを作って"
+        "3枚の要約スライドを作って",
+        "営業資料をパワポで作って",
+        "社内共有のスライドを作って",
+        "この要件定義を説明する資料を作って",
+        "新機能の告知用スライドを作って"
       ],
       "plan_outline": [
         "gather required source material",
         "shape the deck outline",
         "generate the presentation artifact"
       ],
-      "outcome_ids": [
-        "artifact:pptx"
-      ],
+      "outcome_ids": ["artifact:pptx"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": [
-        "pptx",
-        "powerpoint",
-        "slides",
-        "スライド",
-        "パワポ",
-        "パワーポイント"
-      ],
+      "trigger_keywords": ["pptx", "powerpoint", "slides", "スライド", "パワポ", "パワーポイント"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "presentation_deck",
@@ -207,26 +165,15 @@
       "id": "generate-report",
       "category": "outcome_execution",
       "description": "Create a report artifact such as docx or pdf output.",
-      "surface_examples": [
-        "今週の進捗レポートを作って",
-        "会議の報告書をdocxで作って"
-      ],
+      "surface_examples": ["今週の進捗レポートを作って", "会議の報告書をdocxで作って"],
       "plan_outline": [
         "collect the reporting context",
         "draft the document structure",
         "generate the report artifact"
       ],
-      "outcome_ids": [
-        "artifact:docx"
-      ],
+      "outcome_ids": ["artifact:docx"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": [
-        "report",
-        "docx",
-        "pdf",
-        "レポート",
-        "報告書"
-      ],
+      "trigger_keywords": ["report", "docx", "pdf", "レポート", "報告書"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "report_document",
@@ -245,25 +192,15 @@
       "id": "generate-workbook",
       "category": "outcome_execution",
       "description": "Create a workbook artifact such as an Excel WBS or structured sheet.",
-      "surface_examples": [
-        "プロジェクトのWBSをエクセルで作って",
-        "座席表をxlsxにして"
-      ],
+      "surface_examples": ["プロジェクトのWBSをエクセルで作って", "座席表をxlsxにして"],
       "plan_outline": [
         "collect the source structure",
         "map it into rows and columns",
         "generate the workbook artifact"
       ],
-      "outcome_ids": [
-        "artifact:xlsx"
-      ],
+      "outcome_ids": ["artifact:xlsx"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": [
-        "xlsx",
-        "excel",
-        "wbs",
-        "エクセル"
-      ],
+      "trigger_keywords": ["xlsx", "excel", "wbs", "エクセル"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "workbook_wbs",
@@ -282,27 +219,15 @@
       "id": "inspect-service",
       "category": "system_observability",
       "description": "Inspect service state or logs and return a concise summary.",
-      "surface_examples": [
-        "voice-hub の状態を見て",
-        "presence-studio のログを見て"
-      ],
+      "surface_examples": ["voice-hub の状態を見て", "presence-studio のログを見て"],
       "plan_outline": [
         "inspect runtime state or logs",
         "distill the relevant signal",
         "return a concise summary"
       ],
-      "outcome_ids": [
-        "service_summary",
-        "approval_request"
-      ],
+      "outcome_ids": ["service_summary", "approval_request"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "status",
-        "logs",
-        "state",
-        "状態",
-        "ログ"
-      ],
+      "trigger_keywords": ["status", "logs", "state", "状態", "ログ"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "service_operation",
@@ -321,29 +246,16 @@
       "id": "knowledge-query",
       "category": "knowledge_lifecycle",
       "description": "Search accumulated governed knowledge and return a concise answer with relevant sources.",
-      "surface_examples": [
-        "mission authority を教えて",
-        "ナレッジで planner を調べて"
-      ],
+      "surface_examples": ["mission authority を教えて", "ナレッジで planner を調べて"],
       "plan_outline": [
         "search governed knowledge",
         "rank the relevant sources",
         "return a concise answer with citations"
       ],
-      "intake_requirements": [
-        "knowledge scope",
-        "question or topic"
-      ],
-      "outcome_ids": [
-        "knowledge_answer"
-      ],
+      "intake_requirements": ["knowledge scope", "question or topic"],
+      "outcome_ids": ["knowledge_answer"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "knowledge",
-        "ナレッジ",
-        "調べて",
-        "教えて"
-      ],
+      "trigger_keywords": ["knowledge", "ナレッジ", "調べて", "教えて"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "knowledge_answer"
@@ -371,14 +283,8 @@
         "identify likely propagation gaps",
         "prepare a governed remediation plan and follow-up work"
       ],
-      "intake_requirements": [
-        "source corpus",
-        "target scope",
-        "known issue or gap"
-      ],
-      "outcome_ids": [
-        "remediation_plan"
-      ],
+      "intake_requirements": ["source corpus", "target scope", "known issue or gap"],
+      "outcome_ids": ["remediation_plan"],
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": [
         "横断",
@@ -427,9 +333,7 @@
         "review target",
         "expected decision or release scope"
       ],
-      "outcome_ids": [
-        "review_findings"
-      ],
+      "outcome_ids": ["review_findings"],
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": [
         "インシデント",
@@ -471,14 +375,8 @@
         "cluster failure modes and choose one general improvement",
         "rerun evaluation and record keep or discard evidence"
       ],
-      "intake_requirements": [
-        "target harness",
-        "evaluation corpus or benchmark",
-        "success metric"
-      ],
-      "outcome_ids": [
-        "harness_experiment_report"
-      ],
+      "intake_requirements": ["target harness", "evaluation corpus or benchmark", "success metric"],
+      "outcome_ids": ["harness_experiment_report"],
       "specialist_id": "harness-engineer",
       "trigger_keywords": [
         "harness",
@@ -510,6 +408,158 @@
       "risk_profile": "review_required"
     },
     {
+      "id": "lifestyle-booking",
+      "category": "outcome_execution",
+      "description": "Coordinate a personal-life booking or reservation workflow by capturing preferences, comparing options, and returning an approval-ready plan before execution.",
+      "surface_examples": [
+        "6/6-6/8で沖縄のホテルを探して",
+        "来週のレストラン予約を手配して",
+        "サブスクの解約を相談したい",
+        "今夜のレストランを予約したい",
+        "週末の美容院を予約して",
+        "歯医者の予約を取りたい",
+        "日用品をまとめて買って",
+        "家事代行を手配して"
+      ],
+      "plan_outline": [
+        "capture the booking goal and constraints",
+        "perform the site-selection or reservation preflight",
+        "compare candidates and prepare an approval-ready plan"
+      ],
+      "intake_requirements": ["booking_path_preference"],
+      "outcome_ids": ["approval_request"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": [
+        "予約",
+        "手配",
+        "ホテル",
+        "レストラン",
+        "美容院",
+        "病院",
+        "歯医者",
+        "サブスク",
+        "解約",
+        "更新",
+        "配送",
+        "家事代行",
+        "ギフト",
+        "子ども",
+        "子供",
+        "送迎",
+        "習い事",
+        "保育",
+        "誕生日",
+        "家族",
+        "日用品",
+        "購入",
+        "買って",
+        "探して"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "booking_planning",
+        "result_shape": "plan"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "prepare",
+      "object": "booking_plan",
+      "execution_shape": "task_session",
+      "mission_class": "customer_engagement",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "meeting-operations",
+      "category": "outcome_execution",
+      "description": "Run, facilitate, or proxy a live online meeting while tracking decisions, owners, and follow-up work.",
+      "surface_examples": [
+        "このTeams会議を進行して",
+        "オンラインミーティングに代わりに参加して",
+        "会議の決定事項とアクションアイテムを整理して",
+        "打ち合わせをファシリテートして"
+      ],
+      "plan_outline": [
+        "capture the meeting purpose and authority boundary",
+        "prepare the meeting brief and role expectations",
+        "facilitate the session, track action items, and produce a summary"
+      ],
+      "intake_requirements": ["meeting_url", "meeting_role_boundary"],
+      "outcome_ids": ["meeting_operations_summary"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": [
+        "会議",
+        "ミーティング",
+        "打ち合わせ",
+        "Teams",
+        "Zoom",
+        "Meet",
+        "ファシリテート",
+        "進行",
+        "議事録",
+        "アクションアイテム",
+        "参加"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "meeting_operations",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "meeting_session",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "schedule-coordination",
+      "category": "outcome_execution",
+      "description": "Adjust, reschedule, or coordinate a calendar or schedule while preserving constraints and follow-up.",
+      "surface_examples": [
+        "スケジュールを調整して",
+        "来週の予定を変更したい",
+        "会議の日程を調整して",
+        "打ち合わせをリスケしたい",
+        "打ち合わせの日程をずらしたい",
+        "カレンダーを組み直して",
+        "リスケして",
+        "予定を整えて"
+      ],
+      "plan_outline": [
+        "capture whose schedule is being changed and the time window",
+        "identify fixed constraints and allowed changes",
+        "propose or apply the new schedule and record follow-up"
+      ],
+      "intake_requirements": ["schedule_scope", "date_range"],
+      "outcome_ids": ["schedule_coordination_summary"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": [
+        "スケジュール",
+        "予定",
+        "日程",
+        "リスケ",
+        "calendar",
+        "reschedule",
+        "カレンダー"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "change",
+      "object": "calendar_schedule",
+      "execution_shape": "task_session",
+      "mission_class": "customer_engagement",
+      "risk_profile": "approval_required"
+    },
+    {
       "id": "live-query",
       "category": "system_observability",
       "description": "Return live information such as weather, location, or web search results.",
@@ -523,19 +573,9 @@
         "fetch the current information",
         "summarize the answer for the surface"
       ],
-      "outcome_ids": [
-        "live_answer"
-      ],
+      "outcome_ids": ["live_answer"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "weather",
-        "location",
-        "web",
-        "search",
-        "天気",
-        "場所",
-        "検索"
-      ],
+      "trigger_keywords": ["weather", "location", "web", "search", "天気", "場所", "検索"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "live_answer"
@@ -553,11 +593,7 @@
       "id": "reconcile-ecosystem",
       "category": "governance_control",
       "description": "Perform full ecosystem reconciliation (dates, docs, integrity).",
-      "trigger_keywords": [
-        "sync",
-        "reconcile",
-        "update all"
-      ],
+      "trigger_keywords": ["sync", "reconcile", "update all"],
       "pipeline": [
         {
           "op": "wisdom:reconcile",
@@ -580,20 +616,13 @@
       "execution_shape": "pipeline",
       "mission_class": "environment_and_recovery",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "service_summary"
-      ]
+      "outcome_ids": ["service_summary"]
     },
     {
       "id": "audit-security",
       "category": "governance_control",
       "description": "Scan for PII and check pulse integrity.",
-      "trigger_keywords": [
-        "security",
-        "audit",
-        "pii",
-        "check"
-      ],
+      "trigger_keywords": ["security", "audit", "pii", "check"],
       "pipeline": [
         {
           "op": "wisdom:scan_pii",
@@ -620,19 +649,13 @@
       "execution_shape": "pipeline",
       "mission_class": "environment_and_recovery",
       "risk_profile": "high_stakes",
-      "outcome_ids": [
-        "service_summary"
-      ]
+      "outcome_ids": ["service_summary"]
     },
     {
       "id": "rebuild-env",
       "category": "environment_setup",
       "description": "Rebuild all actuators and redeploy ecosystem.",
-      "trigger_keywords": [
-        "rebuild",
-        "deploy",
-        "setup"
-      ],
+      "trigger_keywords": ["rebuild", "deploy", "setup"],
       "pipeline": [
         {
           "op": "orchestrator:deploy",
@@ -653,18 +676,13 @@
       "execution_shape": "pipeline",
       "mission_class": "platform_onboarding",
       "risk_profile": "high_stakes",
-      "outcome_ids": [
-        "service_summary"
-      ]
+      "outcome_ids": ["service_summary"]
     },
     {
       "id": "validate-all",
       "category": "governance_control",
       "description": "Validate all schemas and metadata.",
-      "trigger_keywords": [
-        "validate",
-        "verify"
-      ],
+      "trigger_keywords": ["validate", "verify"],
       "pipeline": [
         {
           "op": "modeling:reconcile",
@@ -687,19 +705,13 @@
       "execution_shape": "pipeline",
       "mission_class": "platform_onboarding",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "service_summary"
-      ]
+      "outcome_ids": ["service_summary"]
     },
     {
       "id": "maintenance-routine",
       "category": "environment_setup",
       "description": "Run routine maintenance tasks (fix shebangs, sanitize deps).",
-      "trigger_keywords": [
-        "maintenance",
-        "sanitize",
-        "fix"
-      ],
+      "trigger_keywords": ["maintenance", "sanitize", "fix"],
       "pipeline": [
         {
           "op": "code:reconcile",
@@ -722,33 +734,21 @@
       "execution_shape": "pipeline",
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "service_summary"
-      ]
+      "outcome_ids": ["service_summary"]
     },
     {
       "id": "bootstrap-kyberion-runtime",
       "category": "environment_setup",
       "description": "Kyberion runtime baseline and surfaces are prepared for operation.",
-      "surface_examples": [
-        "Kyberionの実行環境を初期化して",
-        "ランタイムを立ち上げて"
-      ],
+      "surface_examples": ["Kyberionの実行環境を初期化して", "ランタイムを立ち上げて"],
       "plan_outline": [
         "inspect current runtime baseline",
         "bootstrap required runtime services",
         "verify readiness and report state"
       ],
-      "outcome_ids": [
-        "environment_bootstrapped"
-      ],
+      "outcome_ids": ["environment_bootstrapped"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "bootstrap",
-        "runtime",
-        "環境",
-        "起動"
-      ],
+      "trigger_keywords": ["bootstrap", "runtime", "環境", "起動"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "environment_bootstrapped"
@@ -766,25 +766,15 @@
       "id": "verify-environment-readiness",
       "category": "environment_setup",
       "description": "Environment readiness is verified against declared manifests.",
-      "surface_examples": [
-        "環境の準備状態を確認して",
-        "readinessを検証して"
-      ],
+      "surface_examples": ["環境の準備状態を確認して", "readinessを検証して"],
       "plan_outline": [
         "select target environment manifest set",
         "run readiness probes",
         "return readiness report and blockers"
       ],
-      "outcome_ids": [
-        "environment_readiness_report"
-      ],
+      "outcome_ids": ["environment_readiness_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "verify",
-        "readiness",
-        "環境",
-        "manifest"
-      ],
+      "trigger_keywords": ["verify", "readiness", "環境", "manifest"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "environment_readiness_report"
@@ -802,25 +792,15 @@
       "id": "configure-reasoning-backend",
       "category": "llm_reasoning_setup",
       "description": "Configure or switch reasoning backend according to policy and availability.",
-      "surface_examples": [
-        "推論バックエンドを設定して",
-        "Claude CLIを優先に切り替えて"
-      ],
+      "surface_examples": ["推論バックエンドを設定して", "Claude CLIを優先に切り替えて"],
       "plan_outline": [
         "inspect available backends",
         "apply backend policy and parameters",
         "verify backend health"
       ],
-      "outcome_ids": [
-        "reasoning_backend_configured"
-      ],
+      "outcome_ids": ["reasoning_backend_configured"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "reasoning",
-        "backend",
-        "model",
-        "設定"
-      ],
+      "trigger_keywords": ["reasoning", "backend", "model", "設定"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "reasoning_backend_configured"
@@ -838,24 +818,15 @@
       "id": "register-actuator-adapter",
       "category": "actuator_management",
       "description": "Register a new actuator adapter into governed actuator inventory.",
-      "surface_examples": [
-        "actuatorを登録して",
-        "新しいadapterを追加して"
-      ],
+      "surface_examples": ["actuatorを登録して", "新しいadapterを追加して"],
       "plan_outline": [
         "validate adapter metadata and constraints",
         "register adapter record",
         "verify discoverability and policy fit"
       ],
-      "outcome_ids": [
-        "actuator_adapter_registered"
-      ],
+      "outcome_ids": ["actuator_adapter_registered"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "actuator",
-        "register",
-        "adapter"
-      ],
+      "trigger_keywords": ["actuator", "register", "adapter"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "actuator_adapter_registered"
@@ -873,24 +844,15 @@
       "id": "verify-actuator-capability",
       "category": "actuator_management",
       "description": "Verify declared actuator capability against executable probes.",
-      "surface_examples": [
-        "actuator capabilityを検証して",
-        "アダプタの動作確認をして"
-      ],
+      "surface_examples": ["actuator capabilityを検証して", "アダプタの動作確認をして"],
       "plan_outline": [
         "resolve target actuator capability set",
         "run capability probes",
         "report verification status and gaps"
       ],
-      "outcome_ids": [
-        "actuator_capability_report"
-      ],
+      "outcome_ids": ["actuator_capability_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "actuator",
-        "capability",
-        "verify"
-      ],
+      "trigger_keywords": ["actuator", "capability", "verify"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "actuator_capability_report"
@@ -908,24 +870,15 @@
       "id": "rotate-integration-secret",
       "category": "governance_control",
       "description": "Rotate integration secret under governance controls.",
-      "surface_examples": [
-        "連携シークレットをローテーションして",
-        "secretを更新して"
-      ],
+      "surface_examples": ["連携シークレットをローテーションして", "secretを更新して"],
       "plan_outline": [
         "resolve secret scope and blast radius",
         "rotate and verify secret",
         "record audit evidence"
       ],
-      "outcome_ids": [
-        "secret_rotation_completed"
-      ],
+      "outcome_ids": ["secret_rotation_completed"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "secret",
-        "rotate",
-        "token"
-      ],
+      "trigger_keywords": ["secret", "rotate", "token"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "secret_rotation_completed"
@@ -943,24 +896,15 @@
       "id": "run-system-upgrade-check",
       "category": "system_observability",
       "description": "Run system upgrade readiness diagnostics before execution.",
-      "surface_examples": [
-        "システムアップグレード前チェックを実行して",
-        "upgrade checkして"
-      ],
+      "surface_examples": ["システムアップグレード前チェックを実行して", "upgrade checkして"],
       "plan_outline": [
         "execute upgrade check pipeline",
         "collect compatibility diagnostics",
         "return operator-safe summary"
       ],
-      "outcome_ids": [
-        "system_upgrade_check_report"
-      ],
+      "outcome_ids": ["system_upgrade_check_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "upgrade",
-        "check",
-        "diagnostics"
-      ],
+      "trigger_keywords": ["upgrade", "check", "diagnostics"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "system_upgrade_check_report"
@@ -978,24 +922,15 @@
       "id": "query-knowledge",
       "category": "knowledge_lifecycle",
       "description": "Query governed knowledge corpora and return concise answers.",
-      "surface_examples": [
-        "ナレッジを検索して",
-        "過去知見を教えて"
-      ],
+      "surface_examples": ["ナレッジを検索して", "過去知見を教えて"],
       "plan_outline": [
         "identify scope and tier constraints",
         "retrieve governed knowledge",
         "synthesize answer with citations"
       ],
-      "outcome_ids": [
-        "knowledge_answer"
-      ],
+      "outcome_ids": ["knowledge_answer"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "knowledge",
-        "検索",
-        "query"
-      ],
+      "trigger_keywords": ["knowledge", "検索", "query"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "knowledge_answer"
@@ -1013,24 +948,15 @@
       "id": "distill-mission-knowledge",
       "category": "knowledge_lifecycle",
       "description": "Distill mission outputs into reusable knowledge assets.",
-      "surface_examples": [
-        "ミッション結果を知識化して",
-        "distillして"
-      ],
+      "surface_examples": ["ミッション結果を知識化して", "distillして"],
       "plan_outline": [
         "collect mission evidence and outcomes",
         "distill reusable knowledge units",
         "emit promotion candidates"
       ],
-      "outcome_ids": [
-        "knowledge_distill_report"
-      ],
+      "outcome_ids": ["knowledge_distill_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "distill",
-        "knowledge",
-        "mission"
-      ],
+      "trigger_keywords": ["distill", "knowledge", "mission"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "knowledge_distill_report"
@@ -1048,24 +974,15 @@
       "id": "organize-knowledge-assets",
       "category": "knowledge_lifecycle",
       "description": "Organize knowledge assets across taxonomy and project scopes.",
-      "surface_examples": [
-        "ナレッジ資産を整理して",
-        "知識を分類して"
-      ],
+      "surface_examples": ["ナレッジ資産を整理して", "知識を分類して"],
       "plan_outline": [
         "scan target knowledge assets",
         "apply taxonomy and scope organization",
         "report reindex actions"
       ],
-      "outcome_ids": [
-        "knowledge_organization_report"
-      ],
+      "outcome_ids": ["knowledge_organization_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "knowledge",
-        "organize",
-        "taxonomy"
-      ],
+      "trigger_keywords": ["knowledge", "organize", "taxonomy"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "knowledge_organization_report"
@@ -1083,24 +1000,15 @@
       "id": "promote-memory-candidate",
       "category": "knowledge_lifecycle",
       "description": "Promote approved memory candidate into governed tier.",
-      "surface_examples": [
-        "memory候補を昇格して",
-        "候補をpublic tierに上げて"
-      ],
+      "surface_examples": ["memory候補を昇格して", "候補をpublic tierに上げて"],
       "plan_outline": [
         "evaluate candidate evidence",
         "apply tier governance checks",
         "promote or reject with rationale"
       ],
-      "outcome_ids": [
-        "memory_promotion_result"
-      ],
+      "outcome_ids": ["memory_promotion_result"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "memory",
-        "promote",
-        "knowledge"
-      ],
+      "trigger_keywords": ["memory", "promote", "knowledge"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "memory_promotion_result"
@@ -1127,15 +1035,9 @@
         "apply sanitization and redaction policy",
         "emit sanitize evidence package"
       ],
-      "outcome_ids": [
-        "knowledge_sanitization_report"
-      ],
+      "outcome_ids": ["knowledge_sanitization_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "sanitize",
-        "public",
-        "tier"
-      ],
+      "trigger_keywords": ["sanitize", "public", "tier"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "knowledge_sanitization_report"
@@ -1153,24 +1055,15 @@
       "id": "retire-stale-knowledge",
       "category": "knowledge_lifecycle",
       "description": "Retire stale or superseded knowledge entries with traceable rationale.",
-      "surface_examples": [
-        "古いナレッジを廃棄して",
-        "陳腐化した知識をretireして"
-      ],
+      "surface_examples": ["古いナレッジを廃棄して", "陳腐化した知識をretireして"],
       "plan_outline": [
         "detect stale knowledge candidates",
         "apply retirement policy and approval gates",
         "record retirement receipt"
       ],
-      "outcome_ids": [
-        "knowledge_retirement_report"
-      ],
+      "outcome_ids": ["knowledge_retirement_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "retire",
-        "stale",
-        "knowledge"
-      ],
+      "trigger_keywords": ["retire", "stale", "knowledge"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "knowledge_retirement_report"
@@ -1188,24 +1081,15 @@
       "id": "reconcile-knowledge-index",
       "category": "knowledge_lifecycle",
       "description": "Reconcile knowledge index consistency and missing links.",
-      "surface_examples": [
-        "ナレッジインデックスを整合して",
-        "indexを再構築して"
-      ],
+      "surface_examples": ["ナレッジインデックスを整合して", "indexを再構築して"],
       "plan_outline": [
         "scan index and corpus drift",
         "reconcile index records",
         "return consistency report"
       ],
-      "outcome_ids": [
-        "knowledge_reconciliation_report"
-      ],
+      "outcome_ids": ["knowledge_reconciliation_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "reconcile",
-        "index",
-        "knowledge"
-      ],
+      "trigger_keywords": ["reconcile", "index", "knowledge"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "knowledge_reconciliation_report"
@@ -1223,24 +1107,15 @@
       "id": "check-kyberion-baseline",
       "category": "system_observability",
       "description": "Run baseline check and summarize platform readiness state.",
-      "surface_examples": [
-        "Kyberionのベースライン状態を確認して",
-        "baseline checkして"
-      ],
+      "surface_examples": ["Kyberionのベースライン状態を確認して", "baseline checkして"],
       "plan_outline": [
         "run baseline pipeline",
         "classify status and blockers",
         "return state summary and next action"
       ],
-      "outcome_ids": [
-        "kyberion_baseline_status"
-      ],
+      "outcome_ids": ["kyberion_baseline_status"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "baseline",
-        "health",
-        "status"
-      ],
+      "trigger_keywords": ["baseline", "health", "status"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "kyberion_baseline_status"
@@ -1258,24 +1133,15 @@
       "id": "check-kyberion-vital",
       "category": "system_observability",
       "description": "Run vital check and summarize critical system health.",
-      "surface_examples": [
-        "Kyberionのvitalを確認して",
-        "vital checkして"
-      ],
+      "surface_examples": ["Kyberionのvitalを確認して", "vital checkして"],
       "plan_outline": [
         "run vital diagnostics",
         "extract critical health signal",
         "return concise vital summary"
       ],
-      "outcome_ids": [
-        "kyberion_vital_status"
-      ],
+      "outcome_ids": ["kyberion_vital_status"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "vital",
-        "health",
-        "診断"
-      ],
+      "trigger_keywords": ["vital", "health", "診断"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "kyberion_vital_status"
@@ -1293,24 +1159,15 @@
       "id": "diagnose-kyberion-system",
       "category": "system_observability",
       "description": "Run full system diagnostics and provide operator guidance.",
-      "surface_examples": [
-        "Kyberionを診断して",
-        "システム診断を実行して"
-      ],
+      "surface_examples": ["Kyberionを診断して", "システム診断を実行して"],
       "plan_outline": [
         "execute diagnostic pipeline",
         "classify findings by severity",
         "return operator intervention guidance"
       ],
-      "outcome_ids": [
-        "kyberion_diagnostics_report"
-      ],
+      "outcome_ids": ["kyberion_diagnostics_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "diagnose",
-        "system",
-        "kyberion"
-      ],
+      "trigger_keywords": ["diagnose", "system", "kyberion"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "kyberion_diagnostics_report"
@@ -1328,24 +1185,15 @@
       "id": "inspect-mission-state",
       "category": "system_observability",
       "description": "Inspect mission lifecycle state and blockers.",
-      "surface_examples": [
-        "このmissionの状態を見て",
-        "ミッション進捗を確認して"
-      ],
+      "surface_examples": ["このmissionの状態を見て", "ミッション進捗を確認して"],
       "plan_outline": [
         "resolve mission context",
         "inspect lifecycle state and evidence",
         "return state summary and blockers"
       ],
-      "outcome_ids": [
-        "mission_state_summary"
-      ],
+      "outcome_ids": ["mission_state_summary"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "mission",
-        "state",
-        "status"
-      ],
+      "trigger_keywords": ["mission", "state", "status"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_state_summary"
@@ -1363,24 +1211,15 @@
       "id": "inspect-runtime-supervisor",
       "category": "system_observability",
       "description": "Inspect runtime supervisor status and active workers.",
-      "surface_examples": [
-        "runtime supervisorの状態を確認して",
-        "ワーカー監督状態を見て"
-      ],
+      "surface_examples": ["runtime supervisorの状態を確認して", "ワーカー監督状態を見て"],
       "plan_outline": [
         "inspect supervisor channels and workers",
         "summarize active and failed workers",
         "return runtime supervisor state"
       ],
-      "outcome_ids": [
-        "runtime_supervisor_summary"
-      ],
+      "outcome_ids": ["runtime_supervisor_summary"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "supervisor",
-        "runtime",
-        "workers"
-      ],
+      "trigger_keywords": ["supervisor", "runtime", "workers"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "runtime_supervisor_summary"
@@ -1398,24 +1237,15 @@
       "id": "verify-audit-chain",
       "category": "system_observability",
       "description": "Verify audit chain integrity and completeness.",
-      "surface_examples": [
-        "監査チェーンの整合性を確認して",
-        "audit chainを検証して"
-      ],
+      "surface_examples": ["監査チェーンの整合性を確認して", "audit chainを検証して"],
       "plan_outline": [
         "collect audit records and hashes",
         "verify chain integrity constraints",
         "report integrity result and anomalies"
       ],
-      "outcome_ids": [
-        "audit_chain_verification_result"
-      ],
+      "outcome_ids": ["audit_chain_verification_result"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "audit",
-        "chain",
-        "verify"
-      ],
+      "trigger_keywords": ["audit", "chain", "verify"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "audit_chain_verification_result"
@@ -1433,24 +1263,15 @@
       "id": "inspect-environment-readiness",
       "category": "system_observability",
       "description": "Inspect environment readiness state without applying changes.",
-      "surface_examples": [
-        "環境readinessの状態を見て",
-        "現状の準備状態を確認して"
-      ],
+      "surface_examples": ["環境readinessの状態を見て", "現状の準備状態を確認して"],
       "plan_outline": [
         "inspect environment readiness evidence",
         "summarize readiness and blockers",
         "return state-focused summary"
       ],
-      "outcome_ids": [
-        "environment_readiness_report"
-      ],
+      "outcome_ids": ["environment_readiness_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "environment",
-        "inspect",
-        "readiness"
-      ],
+      "trigger_keywords": ["environment", "inspect", "readiness"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "environment_readiness_report"
@@ -1468,24 +1289,15 @@
       "id": "create-mission",
       "category": "mission_process",
       "description": "Create a governed mission from user intent and scope.",
-      "surface_examples": [
-        "ミッションを作成して",
-        "新しいmissionを開始して"
-      ],
+      "surface_examples": ["ミッションを作成して", "新しいmissionを開始して"],
       "plan_outline": [
         "capture mission goal and scope",
         "create mission record with owner",
         "initialize governance artifacts"
       ],
-      "outcome_ids": [
-        "mission_created"
-      ],
+      "outcome_ids": ["mission_created"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "mission",
-        "create",
-        "start"
-      ],
+      "trigger_keywords": ["mission", "create", "start"],
       "resolution": {
         "shape": "mission",
         "result_shape": "mission_created"
@@ -1503,24 +1315,15 @@
       "id": "classify-mission",
       "category": "mission_process",
       "description": "Classify mission into mission class, risk, and workflow hints.",
-      "surface_examples": [
-        "ミッション分類をして",
-        "mission classを判定して"
-      ],
+      "surface_examples": ["ミッション分類をして", "mission classを判定して"],
       "plan_outline": [
         "analyze mission scope and risk",
         "assign mission class and risk profile",
         "emit classification rationale"
       ],
-      "outcome_ids": [
-        "mission_classification_result"
-      ],
+      "outcome_ids": ["mission_classification_result"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "mission",
-        "classify",
-        "risk"
-      ],
+      "trigger_keywords": ["mission", "classify", "risk"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_classification_result"
@@ -1538,24 +1341,15 @@
       "id": "select-mission-workflow",
       "category": "mission_process",
       "description": "Select appropriate mission workflow template for execution.",
-      "surface_examples": [
-        "ミッションのワークフローを選定して",
-        "workflow templateを決めて"
-      ],
+      "surface_examples": ["ミッションのワークフローを選定して", "workflow templateを決めて"],
       "plan_outline": [
         "evaluate mission constraints and class",
         "select workflow template",
         "record decision and rationale"
       ],
-      "outcome_ids": [
-        "mission_workflow_selected"
-      ],
+      "outcome_ids": ["mission_workflow_selected"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "workflow",
-        "mission",
-        "select"
-      ],
+      "trigger_keywords": ["workflow", "mission", "select"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_workflow_selected"
@@ -1573,24 +1367,15 @@
       "id": "compose-mission-team",
       "category": "mission_process",
       "description": "Compose mission team blueprint based on workflow and authority model.",
-      "surface_examples": [
-        "ミッションチームを編成して",
-        "team blueprintを作って"
-      ],
+      "surface_examples": ["ミッションチームを編成して", "team blueprintを作って"],
       "plan_outline": [
         "resolve required mission roles",
         "compose team blueprint and assignments",
         "verify single-owner rule compliance"
       ],
-      "outcome_ids": [
-        "mission_team_composed"
-      ],
+      "outcome_ids": ["mission_team_composed"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "team",
-        "compose",
-        "mission"
-      ],
+      "trigger_keywords": ["team", "compose", "mission"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_team_composed"
@@ -1608,24 +1393,15 @@
       "id": "prewarm-mission-team",
       "category": "mission_process",
       "description": "Prewarm mission team runtime and capability readiness.",
-      "surface_examples": [
-        "ミッションチームをプリウォームして",
-        "teamを事前起動して"
-      ],
+      "surface_examples": ["ミッションチームをプリウォームして", "teamを事前起動して"],
       "plan_outline": [
         "resolve team members and runtime profiles",
         "prewarm required workers and channels",
         "verify readiness evidence"
       ],
-      "outcome_ids": [
-        "mission_team_prewarmed"
-      ],
+      "outcome_ids": ["mission_team_prewarmed"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "prewarm",
-        "team",
-        "mission"
-      ],
+      "trigger_keywords": ["prewarm", "team", "mission"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_team_prewarmed"
@@ -1643,24 +1419,15 @@
       "id": "delegate-mission-task",
       "category": "mission_process",
       "description": "Delegate scoped tasks from owner to workers under contracts.",
-      "surface_examples": [
-        "ミッションタスクを委譲して",
-        "workerに割り当てて"
-      ],
+      "surface_examples": ["ミッションタスクを委譲して", "workerに割り当てて"],
       "plan_outline": [
         "create scoped task contract",
         "delegate to selected worker",
         "track execution and receipts"
       ],
-      "outcome_ids": [
-        "mission_task_delegated"
-      ],
+      "outcome_ids": ["mission_task_delegated"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "delegate",
-        "worker",
-        "task"
-      ],
+      "trigger_keywords": ["delegate", "worker", "task"],
       "resolution": {
         "shape": "mission",
         "result_shape": "mission_task_delegated"
@@ -1678,24 +1445,15 @@
       "id": "review-worker-output",
       "category": "mission_process",
       "description": "Review worker outputs before merge into mission state.",
-      "surface_examples": [
-        "workerの成果をレビューして",
-        "出力内容を検証して"
-      ],
+      "surface_examples": ["workerの成果をレビューして", "出力内容を検証して"],
       "plan_outline": [
         "collect worker output artifacts",
         "review against acceptance contract",
         "accept or request rework with reasons"
       ],
-      "outcome_ids": [
-        "worker_output_reviewed"
-      ],
+      "outcome_ids": ["worker_output_reviewed"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "worker",
-        "review",
-        "output"
-      ],
+      "trigger_keywords": ["worker", "review", "output"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "worker_output_reviewed"
@@ -1713,24 +1471,15 @@
       "id": "handoff-mission",
       "category": "mission_process",
       "description": "Handoff mission ownership with governed continuity records.",
-      "surface_examples": [
-        "ミッションを引き継いで",
-        "ownerをhandoffして"
-      ],
+      "surface_examples": ["ミッションを引き継いで", "ownerをhandoffして"],
       "plan_outline": [
         "validate handoff prerequisites",
         "transfer owner authority and context",
         "record handoff evidence and status"
       ],
-      "outcome_ids": [
-        "mission_handoff_completed"
-      ],
+      "outcome_ids": ["mission_handoff_completed"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "handoff",
-        "mission",
-        "owner"
-      ],
+      "trigger_keywords": ["handoff", "mission", "owner"],
       "resolution": {
         "shape": "mission",
         "result_shape": "mission_handoff_completed"
@@ -1748,24 +1497,15 @@
       "id": "distill-mission",
       "category": "mission_process",
       "description": "Distill mission learnings and outcomes into reusable assets.",
-      "surface_examples": [
-        "ミッションをdistillして",
-        "学びを抽出して"
-      ],
+      "surface_examples": ["ミッションをdistillして", "学びを抽出して"],
       "plan_outline": [
         "collect mission receipts and outcomes",
         "distill reusable learnings",
         "register promotion candidates"
       ],
-      "outcome_ids": [
-        "mission_distilled"
-      ],
+      "outcome_ids": ["mission_distilled"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "mission",
-        "distill",
-        "learning"
-      ],
+      "trigger_keywords": ["mission", "distill", "learning"],
       "resolution": {
         "shape": "mission",
         "result_shape": "mission_distilled"
@@ -1783,24 +1523,15 @@
       "id": "close-mission",
       "category": "mission_process",
       "description": "Close mission with governance checks and final evidence bundle.",
-      "surface_examples": [
-        "ミッションをクローズして",
-        "missionを終了して"
-      ],
+      "surface_examples": ["ミッションをクローズして", "missionを終了して"],
       "plan_outline": [
         "validate closure gates",
         "archive evidence and outcomes",
         "emit closure receipt and final state"
       ],
-      "outcome_ids": [
-        "mission_closed"
-      ],
+      "outcome_ids": ["mission_closed"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "close",
-        "mission",
-        "archive"
-      ],
+      "trigger_keywords": ["close", "mission", "archive"],
       "resolution": {
         "shape": "mission",
         "result_shape": "mission_closed"
@@ -1826,22 +1557,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "approval_required",
       "description": "Deprecate an actuator adapter under governance controls.",
-      "surface_examples": [
-        "actuatorを非推奨化して"
-      ],
+      "surface_examples": ["actuatorを非推奨化して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "actuator_adapter_deprecated"
-      ],
+      "outcome_ids": ["actuator_adapter_deprecated"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "deprecate",
-        "actuatorを非推奨化して"
-      ],
+      "trigger_keywords": ["deprecate", "actuatorを非推奨化して"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -1859,22 +1583,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "approval_required",
       "description": "Rollback an actuator adapter to a known good state.",
-      "surface_examples": [
-        "actuatorをロールバックして"
-      ],
+      "surface_examples": ["actuatorをロールバックして"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "actuator_adapter_rolled_back"
-      ],
+      "outcome_ids": ["actuator_adapter_rolled_back"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "rollback",
-        "actuatorをロールバックして"
-      ],
+      "trigger_keywords": ["rollback", "actuatorをロールバックして"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -1892,22 +1609,15 @@
       "mission_class": "environment_and_recovery",
       "risk_profile": "approval_required",
       "description": "Recover environment from a degraded state.",
-      "surface_examples": [
-        "環境を復旧して"
-      ],
+      "surface_examples": ["環境を復旧して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "environment_recovered"
-      ],
+      "outcome_ids": ["environment_recovered"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "recover",
-        "環境を復旧して"
-      ],
+      "trigger_keywords": ["recover", "環境を復旧して"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -1925,22 +1635,15 @@
       "mission_class": "environment_and_recovery",
       "risk_profile": "high_stakes",
       "description": "Reset environment state under guarded procedures.",
-      "surface_examples": [
-        "環境状態をリセットして"
-      ],
+      "surface_examples": ["環境状態をリセットして"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "environment_state_reset"
-      ],
+      "outcome_ids": ["environment_state_reset"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "reset",
-        "環境状態をリセットして"
-      ],
+      "trigger_keywords": ["reset", "環境状態をリセットして"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -1958,22 +1661,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Audit knowledge tier boundary violations and risks.",
-      "surface_examples": [
-        "ナレッジtier境界を監査して"
-      ],
+      "surface_examples": ["ナレッジtier境界を監査して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "knowledge_tier_audit_report"
-      ],
+      "outcome_ids": ["knowledge_tier_audit_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "audit",
-        "ナレッジtier境界を監査して"
-      ],
+      "trigger_keywords": ["audit", "ナレッジtier境界を監査して"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -1991,22 +1687,15 @@
       "mission_class": "research_and_absorption",
       "risk_profile": "review_required",
       "description": "Trace why memory candidates were promoted or rejected.",
-      "surface_examples": [
-        "memory昇格判断を追跡して"
-      ],
+      "surface_examples": ["memory昇格判断を追跡して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "memory_promotion_trace"
-      ],
+      "outcome_ids": ["memory_promotion_trace"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "trace",
-        "memory昇格判断を追跡して"
-      ],
+      "trigger_keywords": ["trace", "memory昇格判断を追跡して"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -2024,22 +1713,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "approval_required",
       "description": "Reassign mission owner with governance checks.",
-      "surface_examples": [
-        "ミッションオーナーを再割当てして"
-      ],
+      "surface_examples": ["ミッションオーナーを再割当てして"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "mission_owner_reassigned"
-      ],
+      "outcome_ids": ["mission_owner_reassigned"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "reassign",
-        "ミッションオーナーを再割当てして"
-      ],
+      "trigger_keywords": ["reassign", "ミッションオーナーを再割当てして"],
       "resolution": {
         "shape": "mission",
         "result_shape": "summary"
@@ -2057,22 +1739,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "approval_required",
       "description": "Cancel mission execution and record rationale.",
-      "surface_examples": [
-        "ミッションをキャンセルして"
-      ],
+      "surface_examples": ["ミッションをキャンセルして"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "mission_canceled"
-      ],
+      "outcome_ids": ["mission_canceled"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "cancel",
-        "ミッションをキャンセルして"
-      ],
+      "trigger_keywords": ["cancel", "ミッションをキャンセルして"],
       "resolution": {
         "shape": "mission",
         "result_shape": "summary"
@@ -2090,22 +1765,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Pause mission execution safely.",
-      "surface_examples": [
-        "ミッションを一時停止して"
-      ],
+      "surface_examples": ["ミッションを一時停止して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "mission_paused"
-      ],
+      "outcome_ids": ["mission_paused"],
       "specialist_id": "project-lead",
-      "trigger_keywords": [
-        "pause",
-        "ミッションを一時停止して"
-      ],
+      "trigger_keywords": ["pause", "ミッションを一時停止して"],
       "resolution": {
         "shape": "mission",
         "result_shape": "summary"
@@ -2123,22 +1791,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Create a governance approval request.",
-      "surface_examples": [
-        "承認を依頼して"
-      ],
+      "surface_examples": ["承認を依頼して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "approval_request_created"
-      ],
+      "outcome_ids": ["approval_request_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "request",
-        "承認を依頼して"
-      ],
+      "trigger_keywords": ["request", "承認を依頼して"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -2156,22 +1817,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Resolve an existing approval request.",
-      "surface_examples": [
-        "承認依頼を解決して"
-      ],
+      "surface_examples": ["承認依頼を解決して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "approval_resolved"
-      ],
+      "outcome_ids": ["approval_resolved"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "resolve",
-        "承認依頼を解決して"
-      ],
+      "trigger_keywords": ["resolve", "承認依頼を解決して"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -2189,22 +1843,15 @@
       "mission_class": "operations_and_release",
       "risk_profile": "high_stakes",
       "description": "Escalate governance issues to operator intervention.",
-      "surface_examples": [
-        "ガバナンス問題をエスカレーションして"
-      ],
+      "surface_examples": ["ガバナンス問題をエスカレーションして"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
         "return evidence-backed result"
       ],
-      "outcome_ids": [
-        "governance_issue_escalated"
-      ],
+      "outcome_ids": ["governance_issue_escalated"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "escalate",
-        "ガバナンス問題をエスカレーションして"
-      ],
+      "trigger_keywords": ["escalate", "ガバナンス問題をエスカレーションして"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"

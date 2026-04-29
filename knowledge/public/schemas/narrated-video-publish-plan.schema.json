@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/narrated-video-publish-plan.schema.json",
+  "title": "Narrated Video Publish Plan",
+  "description": "Publish-side contract for narrated videos prior to YouTube upload or public release.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "target",
+    "title",
+    "visibility",
+    "approval_boundary",
+    "video_artifact_ref"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "narrated-video-publish-plan"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "string",
+      "enum": ["youtube", "draft_only"]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["private", "unlisted", "public"]
+    },
+    "approval_boundary": {
+      "type": "string",
+      "enum": ["before_upload", "before_public_release"]
+    },
+    "video_artifact_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "thumbnail_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "caption_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "scheduled_publish_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

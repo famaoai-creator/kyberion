@@ -1,0 +1,23 @@
+{
+  "kind": "narrated-video-upload-package",
+  "version": "1.0.0",
+  "publish_plan_ref": "knowledge/public/schemas/narrated-video-publish-plan.example.json",
+  "target_url": "https://studio.youtube.com",
+  "video_artifact_ref": "active/shared/exports/kyberion-intro.mp4",
+  "thumbnail_ref": "active/shared/exports/kyberion-intro-thumb.png",
+  "caption_ref": "active/shared/exports/kyberion-intro-captions.srt",
+  "title": "Kyberionの使い方",
+  "description": "Kyberionの基本的な頼み方と、brief-first workflow を紹介します。",
+  "visibility": "unlisted",
+  "approval_boundary": "before_public_release",
+  "checklist": [
+    "Open YouTube Studio upload page",
+    "Select the rendered video artifact",
+    "Attach thumbnail and captions",
+    "Confirm title, description, and tags",
+    "Stop before public release unless approval is granted"
+  ],
+  "tags": ["kyberion", "workflow", "automation"],
+  "scheduled_publish_at": "2026-05-01T03:00:00Z",
+  "notes": "Prepared for browser-driven upload or manual upload review."
+}

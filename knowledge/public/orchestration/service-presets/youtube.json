@@ -1,0 +1,20 @@
+{
+  "service_id": "youtube",
+  "name": "YouTube upload staging presets",
+  "operations": {
+    "prepare_upload_package": {
+      "type": "cli",
+      "command": "node",
+      "args": [
+        "dist/scripts/stage_youtube_upload_package.js",
+        "{{publish_plan_path}}",
+        "{{output_path}}"
+      ],
+      "description": "Stages a narrated video upload package for browser-driven or manual YouTube upload.",
+      "parameters": {
+        "publish_plan_path": { "required": true, "type": "string" },
+        "output_path": { "required": false, "type": "string" }
+      }
+    }
+  }
+}

@@ -23,6 +23,13 @@
       }
     },
     {
+      "id": "log_brief",
+      "op": "system:log",
+      "params": {
+        "message": "🧭 Meeting brief: {{meeting_brief_summary}} (role={{meeting_brief_primary_role}}, follow_up={{meeting_brief_follow_up_channel}})"
+      }
+    },
+    {
       "id": "join",
       "type": "apply",
       "op": "system:shell",

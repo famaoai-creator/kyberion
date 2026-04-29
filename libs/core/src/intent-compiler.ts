@@ -9,7 +9,7 @@ import { pathResolver } from '../path-resolver.js';
 
 export interface CompiledIntent {
   intentId: string;
-  confidence: number;          // 0-1
+  confidence: number; // 0-1
   source: 'template' | 'llm' | 'hint';
   steps: any[];
   explanation: string;
@@ -33,21 +33,70 @@ function synthesizeDeterministicSteps(intentDef: any): any[] {
   if (shape === 'pipeline' || pipelineByIntentId[intentId]) {
     const pipelineId = pipelineByIntentId[intentId];
     if (!pipelineId) return [];
-    return [{
-      op: 'system:shell',
-      params: {
-        cmd: `node dist/scripts/run_pipeline.js --input pipelines/${pipelineId}.json`,
+    return [
+      {
+        op: 'system:shell',
+        params: {
+          cmd: `node dist/scripts/run_pipeline.js --input pipelines/${pipelineId}.json`,
+        },
       },
-    }];
+    ];
   }
 
   if (shape === 'task_session') {
     const commandByIntentId: Record<string, string> = {
       'verify-actuator-capability': 'pnpm capabilities',
       'inspect-runtime-supervisor': 'node dist/scripts/agent_runtime_supervisor_status.js',
-      'verify-environment-readiness': 'node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json',
-      'inspect-environment-readiness': 'node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json',
+      'verify-environment-readiness':
+        'node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json',
+      'inspect-environment-readiness':
+        'node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json',
     };
+    if (intentId === 'meeting-operations') {
+      return [
+        {
+          op: 'core:if',
+          params: {
+            condition: { from: 'mission_id', operator: 'exists' },
+            then: [
+              {
+                op: 'core:if',
+                params: {
+                  condition: { from: 'meeting_url', operator: 'exists' },
+                  then: [
+                    {
+                      op: 'system:shell',
+                      params: {
+                        cmd: 'node dist/scripts/meeting_orchestrator.js --mission "{{mission_id}}" --meeting-url "{{meeting_url}}"',
+                        export_as: 'meeting_orchestrator_output',
+                      },
+                    },
+                  ],
+                  else: [
+                    {
+                      op: 'system:log',
+                      params: {
+                        message:
+                          'meeting-operations needs meeting_url before live execution. Compile the meeting brief first.',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            else: [
+              {
+                op: 'system:log',
+                params: {
+                  message:
+                    'meeting-operations needs mission_id before live execution. Provide a governed mission context.',
+                },
+              },
+            ],
+          },
+        },
+      ];
+    }
     const cmd = commandByIntentId[intentId];
     if (!cmd) return [];
     return [{ op: 'system:shell', params: { cmd } }];
@@ -76,17 +125,19 @@ export function compileIntent(
     try {
       const raw = safeReadFile(intentsPath, { encoding: 'utf8' }) as string;
       const parsed = JSON.parse(raw);
-      standardIntents = Array.isArray(parsed) ? parsed : (parsed.intents || []);
-    } catch { /* ignore */ }
+      standardIntents = Array.isArray(parsed) ? parsed : parsed.intents || [];
+    } catch {
+      /* ignore */
+    }
   }
 
   const intentLower = intent.toLowerCase();
 
   // 1. Exact ID match
-  const exactMatch = standardIntents.find(si => si.id === intent || si.id === intentLower);
+  const exactMatch = standardIntents.find((si) => si.id === intent || si.id === intentLower);
   if (exactMatch) {
     const steps = exactMatch.pipeline
-      ? (exactMatch.pipeline.steps || exactMatch.pipeline)
+      ? exactMatch.pipeline.steps || exactMatch.pipeline
       : synthesizeDeterministicSteps(exactMatch);
     if (!steps.length) return null;
     logger.info(`[INTENT_COMPILER] Exact match: ${exactMatch.id}`);
@@ -105,7 +156,7 @@ export function compileIntent(
     const matched = triggers.some((t: string) => intentLower.includes(t.toLowerCase()));
     if (matched) {
       const steps = si.pipeline
-        ? (si.pipeline.steps || si.pipeline)
+        ? si.pipeline.steps || si.pipeline
         : synthesizeDeterministicSteps(si);
       if (!steps.length) continue;
       logger.info(`[INTENT_COMPILER] Keyword match: ${si.id}`);
@@ -123,8 +174,11 @@ export function compileIntent(
   const hints = options?.knowledgeHints || [];
   const matchedHints = hints.filter((h: any) => {
     const words = intentLower.split(/\s+/);
-    return words.some(w => (h.topic || '').toLowerCase().includes(w) ||
-                          (h.tags || []).some((t: string) => t.toLowerCase().includes(w)));
+    return words.some(
+      (w) =>
+        (h.topic || '').toLowerCase().includes(w) ||
+        (h.tags || []).some((t: string) => t.toLowerCase().includes(w))
+    );
   });
 
   if (matchedHints.length > 0) {
@@ -133,7 +187,7 @@ export function compileIntent(
       intentId: `hint-${Date.now()}`,
       confidence: 0.6,
       source: 'hint',
-      steps: [],   // No steps generated - caller should use LLM with these hints
+      steps: [], // No steps generated - caller should use LLM with these hints
       explanation: `Found ${matchedHints.length} knowledge hints. Use LLM to generate pipeline steps.`,
       warnings: ['No pre-defined pipeline. Hints available for LLM-based generation.'],
     };

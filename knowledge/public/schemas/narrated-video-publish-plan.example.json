@@ -1,0 +1,15 @@
+{
+  "kind": "narrated-video-publish-plan",
+  "version": "1.0.0",
+  "target": "youtube",
+  "title": "Kyberionの使い方",
+  "description": "Kyberionの基本的な依頼方法と、brief-first workflow の使い方を紹介します。",
+  "visibility": "unlisted",
+  "approval_boundary": "before_public_release",
+  "video_artifact_ref": "active/shared/exports/kyberion-intro.mp4",
+  "thumbnail_ref": "active/shared/exports/kyberion-intro-thumb.png",
+  "caption_ref": "active/shared/exports/kyberion-intro-captions.srt",
+  "tags": ["kyberion", "ai", "workflow", "automation"],
+  "scheduled_publish_at": "2026-05-01T03:00:00Z",
+  "notes": "Upload as unlisted first. Public release requires explicit approval."
+}

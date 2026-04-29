@@ -38,7 +38,7 @@ export interface BookingPreferenceProfile {
         | 'cancellation'
         | 'profile_mutation'
         | 'credential_use'
-      )[]
+      )[],
     ];
   };
   /**
@@ -48,6 +48,7 @@ export interface BookingPreferenceProfile {
   login_methods?: LoginMethod[];
   payment_policy: PaymentPolicy;
   points_portal_policy?: PointsPortalPolicy;
+  site_selection_policy?: SiteSelectionPolicy;
   receipt_policy?: {
     required?: boolean;
     default_usage?: 'personal' | 'business' | 'mixed';
@@ -57,7 +58,20 @@ export interface BookingPreferenceProfile {
 export interface BookingSite {
   site: string;
   priority: number;
-  categories?: ('hotel' | 'restaurant' | 'flight' | 'rail' | 'activity' | 'package')[];
+  categories?: (
+    | 'hotel'
+    | 'restaurant'
+    | 'flight'
+    | 'rail'
+    | 'activity'
+    | 'package'
+    | 'shopping'
+    | 'medical'
+    | 'subscription'
+    | 'home_service'
+    | 'family'
+    | 'gifts'
+  )[];
   reason?: string;
   prefer_official_when_equal?: boolean;
 }
@@ -110,7 +124,7 @@ export interface PaymentPolicy {
       | 'card_change'
       | 'points_terms_unclear'
       | 'no_free_cancellation'
-    )[]
+    )[],
   ];
 }
 export interface PointsPortalPolicy {
@@ -149,4 +163,79 @@ export interface PointsPortalPolicy {
     | 'tracking_warning'
   )[];
   fallback_rule: 'direct_booking' | 'manual_review' | 'skip_candidate';
+}
+export interface SiteSelectionPolicy {
+  decision_mode: 'auto_with_preflight' | 'ask_when_uncertain' | 'always_confirm_site_group';
+  /**
+   * @minItems 1
+   */
+  compare_dimensions: (
+    | 'price'
+    | 'points'
+    | 'coupon'
+    | 'login_friction'
+    | 'cancellation'
+    | 'receipt_support'
+    | 'speed'
+    | 'familiarity'
+    | 'privacy'
+  )[];
+  /**
+   * @minItems 1
+   */
+  ask_user_when: (
+    | 'sale_possible'
+    | 'price_gap_unclear'
+    | 'points_advantage_unclear'
+    | 'multiple_top_candidates'
+    | 'login_friction_tradeoff'
+    | 'new_service_category'
+    | 'user_requested_precheck'
+  )[];
+  max_questions_per_turn?: number;
+  favorite_site_groups?: {
+    label: string;
+    categories?: (
+      | 'hotel'
+      | 'restaurant'
+      | 'flight'
+      | 'rail'
+      | 'activity'
+      | 'package'
+      | 'shopping'
+      | 'medical'
+      | 'subscription'
+      | 'home_service'
+      | 'family'
+      | 'gifts'
+    )[];
+    preferred_sites: [string, ...string[]];
+    backup_sites?: string[];
+    notes?: string;
+  }[];
+  sale_signal_policy?: {
+    check_sales_before_decision: boolean;
+    recheck_if_material: boolean;
+    material_threshold?: string;
+    preferred_sale_sources?: string[];
+  };
+  preflight_question_sets?: {
+    label: string;
+    categories?: (
+      | 'hotel'
+      | 'restaurant'
+      | 'flight'
+      | 'rail'
+      | 'activity'
+      | 'package'
+      | 'shopping'
+      | 'medical'
+      | 'subscription'
+      | 'home_service'
+      | 'family'
+      | 'gifts'
+    )[];
+    questions: [string, ...string[]];
+    notes?: string;
+  }[];
 }
