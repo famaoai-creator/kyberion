@@ -930,18 +930,18 @@
     }
   ],
   "cross_cutting_gaps": [
-    "catalog-first resolver now covers task_session and project_bootstrap classification, but browser_session and direct_reply routes still keep route-local resolution logic",
+    "catalog-first resolver now covers task_session and project_bootstrap classification, and browser_session/direct_reply dispatch now share a route-family brief; remaining route-local logic is in handler payloads",
     "outcome catalog normalization is incomplete",
     "super-nerve action taxonomy is still hand-maintained",
-    "service-binding-aware execution is partial",
+    "service-binding-aware execution now flows through shared brief, execution brief, and task-session context; browser_session and direct_reply remain partially route-local in handler payloads",
     "freeform generative image capability is not yet first-class",
     "benchmark and experiment loops are still mostly modeled as governed analysis rather than first-class executable contracts"
   ],
   "next_priorities": [
-    "unify browser_session and direct_reply paths behind the same catalog-first resolver",
+    "unify browser_session and direct_reply handler payloads behind the same catalog-first resolver",
     "outcome catalog normalization",
     "shared op registry for orchestrator routing",
-    "binding-aware execution",
+    "binding-aware execution for browser_session and direct_reply handler payloads",
     "coverage contract tests per surface intent"
   ]
 }

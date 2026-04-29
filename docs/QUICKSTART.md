@@ -163,7 +163,19 @@ Use when:
 - you want conversational browser or task assistance
 - you want to inspect live task details and artifacts
 
-## 7. Direct Operator Commands
+## 7. Reasoning Backends
+
+If you need to understand or change which reasoning backend is used for distillation or other structured LLM work, start here:
+
+- [`knowledge/public/governance/wisdom-policy-guide.md`](../knowledge/public/governance/wisdom-policy-guide.md)
+
+The policy guide explains:
+
+- how `wisdom-policy.json` selects a profile
+- how `adapter` maps to a runtime runner
+- how to add a new local LLM without hardcoding a provider branch
+
+## 8. Direct Operator Commands
 
 When you need to operate internals directly:
 
@@ -206,3 +218,4 @@ Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next R
 - [docs/OPERATOR_UX_GUIDE.md](OPERATOR_UX_GUIDE.md)
 - [docs/GLOSSARY.md](GLOSSARY.md)
 - [CAPABILITIES_GUIDE.md](../CAPABILITIES_GUIDE.md)
+- [knowledge/public/governance/wisdom-policy-guide.md](../knowledge/public/governance/wisdom-policy-guide.md)

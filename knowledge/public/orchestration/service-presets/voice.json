@@ -7,7 +7,7 @@
       "alternatives": [
         {
           "type": "cli",
-          "command": "/Users/famao/k/a/kyberion-runtimes/voice/venv/bin/python3",
+          "command": "/Users/famao/kyberion-runtimes/voice/venv/bin/python3",
           "args": ["libs/actuators/voice-actuator/voice-bridge.py", "{\"action\": \"speak\", \"params\": {{params}} }"],
           "description": "Local Generative TTS via Python Bridge"
         },

@@ -8,16 +8,16 @@ This path is for deterministic scene composition, not prompt-led model generatio
 
 For single-action scenario execution (`brief -> compile -> prepare`), use:
 
-- [`create-narrated-intro-movie.md`](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
+- [`create-narrated-intro-movie.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
 
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
-- **Schema**: [`video-composition-adf.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/video-composition-adf.schema.json)
-- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
+- **Schema**: [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-composition-adf.schema.json)
+- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
 - **Governance**:
-  - [`video-composition-template-registry.json`](/Users/famaoai/k/d/kyberion/knowledge/public/governance/video-composition-template-registry.json)
-  - [`video-render-runtime-policy.json`](/Users/famaoai/k/d/kyberion/knowledge/public/governance/video-render-runtime-policy.json)
+  - [`video-composition-template-registry.json`](/Users/famao/kyberion/knowledge/public/governance/video-composition-template-registry.json)
+  - [`video-render-runtime-policy.json`](/Users/famao/kyberion/knowledge/public/governance/video-render-runtime-policy.json)
 
 ## 3. Contract Shape
 
@@ -34,16 +34,19 @@ The current implementation prepares deterministic source artifacts:
 - `render-plan.json`
 - per-scene `compositions/*.html`
 
+When backend rendering is enabled and a narration reference is present, the renderer should mux the audio track into the final output artifact instead of stopping at a silent bundle.
+
 ## 4. Execution
 
 Example input:
 
-- [`prepare-product-explainer.json`](/Users/famaoai/k/d/kyberion/libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
-- [`compile-kyberion-intro-brief.json`](/Users/famaoai/k/d/kyberion/libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
+- [`prepare-product-explainer.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
+- [`compile-kyberion-intro-brief.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
 
 Run the actuator directly:
 
 ```bash
+pnpm build
 node dist/libs/actuators/video-composition-actuator/src/index.js \
   --input libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json
 ```
@@ -51,9 +54,12 @@ node dist/libs/actuators/video-composition-actuator/src/index.js \
 Compile a narrated brief first:
 
 ```bash
+pnpm build
 node dist/libs/actuators/video-composition-actuator/src/index.js \
   --input libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json
 ```
+
+Use the built JS entrypoint in shell-driven scenarios. Avoid `ts-node` unless you are intentionally debugging the source tree.
 
 Job control actions (for long-running mode in the same actuator process):
 
@@ -73,6 +79,7 @@ When backend rendering is enabled and `await_completion` is omitted, the actuato
 - progress packets for validation/template resolution/bundle assembly
 - queued packets include `queue` metadata (position, queued count, running count, concurrency)
 - governed source bundle under `active/shared/tmp/video-composition/`
+- final rendered artifact with narration muxed when `audio.narration_ref` is supplied and backend rendering is enabled
 
 ## 6. Design Rule
 

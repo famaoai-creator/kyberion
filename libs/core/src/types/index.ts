@@ -35,3 +35,4 @@ export * from './diagram-adf.js';
 export * from './mission-contract.js';
 export * from './skill-input.js';
 export * from './skill-output.js';
+export * from './guided-coordination-brief.js';

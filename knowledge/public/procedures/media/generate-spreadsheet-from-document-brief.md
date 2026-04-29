@@ -38,5 +38,5 @@ Separate the spreadsheet into:
 7. `document_spreadsheet_design_from_brief` remains available only as a compatibility adapter for older flows.
 
 ## 5. Example
-- [`document-brief-wbs-spreadsheet.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-actuator/examples/document-brief-wbs-spreadsheet.json)
-- [`document-brief-semantic-tracker-spreadsheet.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-actuator/examples/document-brief-semantic-tracker-spreadsheet.json)
+- [`document-brief-wbs-spreadsheet.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-wbs-spreadsheet.json)
+- [`document-brief-semantic-tracker-spreadsheet.json`](/Users/famao/kyberion/libs/actuators/media-actuator/examples/document-brief-semantic-tracker-spreadsheet.json)

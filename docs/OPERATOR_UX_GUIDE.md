@@ -182,6 +182,12 @@ Examples:
 - cross-agent work
 - auditable workflows
 
+For distillation and other structured reasoning tasks, see:
+
+- [`knowledge/public/governance/wisdom-policy-guide.md`](../knowledge/public/governance/wisdom-policy-guide.md)
+
+Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
+
 ## 5. Chronos Mental Model
 
 Chronos is easiest to understand as a control tower.
@@ -287,6 +293,14 @@ $MC finish MY-TASK
 
 Direct mission commands are for operators.
 They are not the primary UX you should teach first.
+
+### Reasoning policy
+
+```bash
+cat knowledge/public/governance/wisdom-policy.json
+```
+
+Use this when you need to inspect or update which backend profile and adapter is used for distillation.
 
 ### Control plane CLI
 

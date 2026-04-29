@@ -1,6 +1,7 @@
 # Presentation Authoring Playbook
 
 Use this playbook when the user asks for a PowerPoint deck, slides, a briefing pack, or a presentation artifact.
+It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for deck and briefing work.
 
 ## Kyberion Fit
 
@@ -16,7 +17,7 @@ Use Kyberion when the task has at least one of these properties:
 
 ## Brief And Theme Separation
 
-Keep two layers distinct:
+Keep two layers distinct inside the shared coordination flow:
 
 1. Brief layer: what the deck is about, who it is for, and what decision it supports.
 2. Theme layer: how the deck should look and feel.

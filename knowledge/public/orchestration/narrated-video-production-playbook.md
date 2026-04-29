@@ -1,6 +1,7 @@
 # Narrated Video Production Playbook
 
 Use this playbook when the user asks for a narrated product video, a tutorial clip, a promotional video, or a video that may later be uploaded to YouTube.
+It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for narrated media work.
 
 ## Kyberion Fit
 
@@ -16,7 +17,7 @@ Use Kyberion when the task has at least one of these properties:
 
 ## Brief And Theme Separation
 
-Keep two layers distinct:
+Keep two layers distinct inside the shared coordination flow:
 
 1. Brief layer: what the video is about, who it is for, and what action it should drive.
 2. Theme layer: how the video should look and move.
@@ -73,6 +74,6 @@ Full output:
 1. Narrated video brief.
 2. Theme selection summary.
 3. Composition summary.
-4. Final video artifact.
+4. Final video artifact, with narration muxed when available.
 5. Publish package and approval preview.
 6. Personal preference update proposal.

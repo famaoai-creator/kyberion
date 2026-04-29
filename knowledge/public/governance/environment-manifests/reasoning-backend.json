@@ -2,7 +2,7 @@
   "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
   "manifest_id": "reasoning-backend",
   "version": "2026-04-29",
-  "description": "At least one reasoning backend is reachable: claude-cli authenticated, or ANTHROPIC_API_KEY set, or gemini-cli / codex-cli available. Stub backend is always available; this manifest distinguishes 'real backend present' from 'falling back to stub'.",
+  "description": "At least one reasoning backend is reachable through a policy-driven adapter: codex-cli, gemini-cli, shell-backed claude-cli, anthropic, or any future adapter registered in wisdom policy. Stub backend is always available; this manifest distinguishes 'real backend present' from 'falling back to stub'.",
   "capabilities": [
     {
       "capability_id": "reasoning-backend.any-real",
@@ -12,7 +12,7 @@
       "probe": { "kind": "probe", "probe_id": "reasoning-backend.any-real" },
       "install": {
         "operator_confirmed": true,
-        "instruction": "Pick one and authenticate it. Recommended: `claude` CLI logged in (`claude auth login`). Alternates: set `ANTHROPIC_API_KEY`, install + auth `gemini` CLI, or install + auth `codex` CLI. Then set `KYBERION_REASONING_BACKEND` to the corresponding id (`claude-cli` / `anthropic` / `gemini-cli` / `codex-cli`). Setting it to `stub` is also valid for offline / deterministic-test deployments.",
+        "instruction": "Pick one and authenticate it. Recommended: configure a policy-backed adapter for `codex`, `gemini`, or any other supported local runner, or use `claude` CLI logged in (`claude auth login`). Alternates: set `ANTHROPIC_API_KEY`. Then set `KYBERION_REASONING_BACKEND` to the corresponding id (`codex-cli` / `gemini-cli` / `claude-cli` / `anthropic`). Setting it to `stub` is also valid for offline / deterministic-test deployments.",
         "docs_url": "https://docs.anthropic.com/en/api/getting-started"
       }
     },
@@ -25,7 +25,7 @@
       "probe": { "kind": "env", "name": "KYBERION_REASONING_BACKEND", "require_non_empty": true },
       "install": {
         "operator_confirmed": false,
-        "instruction": "Set `KYBERION_REASONING_BACKEND` to one of `claude-cli` / `anthropic` / `gemini-cli` / `codex-cli` / `claude-agent` / `stub`. Without it, the bootstrap auto-discovers and may pick a different backend across runs."
+        "instruction": "Set `KYBERION_REASONING_BACKEND` to one of `codex-cli` / `gemini-cli` / `claude-cli` / `anthropic` / `claude-agent` / `stub`. Without it, the bootstrap auto-discovers from registered adapters and may pick a different backend across runs."
       }
     }
   ]

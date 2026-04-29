@@ -61,7 +61,7 @@ These are good candidates for localization:
 UI- and operator-facing wording should not be localized by scattering translated strings across surfaces.
 Instead, surfaces should prefer governed catalogs such as:
 
-- [`knowledge/public/orchestration/user-facing-vocabulary.json`](/Users/famaoai/k/a/kyberion/knowledge/public/orchestration/user-facing-vocabulary.json)
+- [`knowledge/public/orchestration/user-facing-vocabulary.json`](/Users/famao/kyberion/knowledge/public/orchestration/user-facing-vocabulary.json)
 
 This rule applies mainly to `fixed labels`, `section headers`, and short status words.
 It does not require every free-form explanation or clarification sentence to be pre-translated.

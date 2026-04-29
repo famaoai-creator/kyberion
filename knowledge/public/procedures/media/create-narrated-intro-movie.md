@@ -5,16 +5,16 @@
 Execute a single top-level scenario that:
 
 - compiles a `narrated-video-brief` into `video-composition-adf`
-- enqueues or runs composed-video preparation
+- renders a composed video bundle and, when narration is present, muxes the audio track into the final output
 
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
 - **Schemas**:
-  - [`narrated-video-brief.schema.json`](/Users/famaoai/k/d/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
-  - [`video-composition-action.schema.json`](/Users/famaoai/k/d/kyberion/schemas/video-composition-action.schema.json)
+  - [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
+  - [`video-composition-action.schema.json`](/Users/famao/kyberion/schemas/video-composition-action.schema.json)
 - **Procedure**:
-  - [`compose-video-from-adf.md`](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
+  - [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
 
 ## 3. Contract Shape
 
@@ -35,14 +35,17 @@ Optional:
 
 Example input:
 
-- [`create-kyberion-intro-movie.json`](/Users/famaoai/k/d/kyberion/libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json)
+- [`create-kyberion-intro-movie.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json)
 
 Run:
 
 ```bash
+pnpm build
 node dist/libs/actuators/video-composition-actuator/src/index.js \
   --input libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json
 ```
+
+Use the built JS entrypoint in shell-driven runs. Avoid `ts-node` here unless you are explicitly debugging the source tree.
 
 ## 5. Expected Output
 
@@ -51,5 +54,7 @@ The response contains:
 - `kind: narrated_intro_movie_run`
 - `video_composition_adf` (compiled contract)
 - `execution` (same shape as `prepare_video_composition` result)
+- final rendered video artifact when backend rendering is enabled
+- audio-muxed MP4/MOV/WebM when `narration_ref` is present and the renderer can run
 
 When backend rendering is enabled and `await_completion` is omitted, `execution.status` will default to `queued`.
