@@ -39,6 +39,11 @@ export interface ControlPlaneMissionSeedRecord {
   metadata?: {
     template_ref?: string;
     skeleton_path?: string;
+    mission_seed_assessment?: {
+      eligible?: boolean;
+      reason?: string;
+      shouldPromote?: boolean;
+    };
   };
 }
 
@@ -85,18 +90,38 @@ export interface ChronosOverviewRecord {
   accessRole?: string;
   projects?: ControlPlaneProjectRecord[];
   projectTracks?: ControlPlaneProjectTrackRecord[];
-  gateReadiness?: Array<ControlPlaneProjectTrackRecord["gate_readiness"] & { track_id: string }>;
+  gateReadiness?: Array<ControlPlaneProjectTrackRecord['gate_readiness'] & { track_id: string }>;
   missionSeeds?: ControlPlaneMissionSeedRecord[];
+  missionSeedAssessment?: {
+    total?: number;
+    eligible?: number;
+    flagged?: number;
+    unassessed?: number;
+    promotable?: number;
+    flagged_seed_ids?: string[];
+    eligible_seed_ids?: string[];
+    promoted_seed_ids?: string[];
+  };
   pendingApprovals?: Array<Record<string, unknown>>;
   distillCandidates?: Array<Record<string, unknown>>;
   memoryCandidates?: Array<Record<string, unknown>>;
   nextActions?: Array<{
     action_id: string;
-    next_action_type: 'request_clarification' | 'approve' | 'inspect_evidence' | 'retry_delivery' | 'promote_mission_seed' | 'resume_mission';
+    next_action_type:
+      | 'request_clarification'
+      | 'approve'
+      | 'inspect_evidence'
+      | 'retry_delivery'
+      | 'promote_mission_seed'
+      | 'resume_mission';
     reason: string;
     risk: 'low' | 'medium' | 'high';
     suggested_command?: string;
-    suggested_surface_action?: 'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
+    suggested_surface_action?:
+      | 'approvals'
+      | 'mission-seeds'
+      | 'memory-promotion-queue'
+      | 'next-actions';
     approval_required: boolean;
   }>;
 }
@@ -164,7 +189,9 @@ function resolveToken(surface: ControlPlaneSurface, override?: string): string {
   return '';
 }
 
-export function getControlPlaneRemediationPlan(surface: ControlPlaneSurface): ControlPlaneRemediationPlan {
+export function getControlPlaneRemediationPlan(
+  surface: ControlPlaneSurface
+): ControlPlaneRemediationPlan {
   return DEFAULT_REMEDIATION_PLANS[surface];
 }
 
@@ -172,10 +199,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function inferSurfaceMismatchMessage(surface: ControlPlaneSurface, pathname: string, text: string): string | null {
+function inferSurfaceMismatchMessage(
+  surface: ControlPlaneSurface,
+  pathname: string,
+  text: string
+): string | null {
   const normalized = String(text || '');
   const isExpressMismatch = normalized.includes('Cannot GET') && normalized.includes(pathname);
-  const isNextNotFound = /404[:\s]/i.test(normalized) && normalized.includes('This page could not be found.');
+  const isNextNotFound =
+    /404[:\s]/i.test(normalized) && normalized.includes('This page could not be found.');
   if (!isExpressMismatch && !isNextNotFound) {
     return null;
   }
@@ -190,7 +222,7 @@ async function requestControlPlane(
   surface: ControlPlaneSurface,
   pathname: string,
   init?: RequestInit,
-  options?: ControlPlaneClientOptions,
+  options?: ControlPlaneClientOptions
 ): Promise<Response> {
   const token = resolveToken(surface, options?.token);
   const timeoutMs = options?.timeoutMs ?? 5000;
@@ -199,16 +231,22 @@ async function requestControlPlane(
 
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(new Error(`control-plane request timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timeout = setTimeout(
+      () => controller.abort(new Error(`control-plane request timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
     try {
-      const response = await fetch(`${getControlPlaneBaseUrl(surface, options?.baseUrl)}${pathname}`, {
-        ...init,
-        signal: controller.signal,
-        headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-          ...(init?.headers || {}),
-        },
-      });
+      const response = await fetch(
+        `${getControlPlaneBaseUrl(surface, options?.baseUrl)}${pathname}`,
+        {
+          ...init,
+          signal: controller.signal,
+          headers: {
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+            ...(init?.headers || {}),
+          },
+        }
+      );
       clearTimeout(timeout);
       return response;
     } catch (error) {
@@ -229,15 +267,20 @@ export async function requestControlPlaneJson(
   surface: ControlPlaneSurface,
   pathname: string,
   init?: RequestInit,
-  options?: ControlPlaneClientOptions,
+  options?: ControlPlaneClientOptions
 ): Promise<any> {
-  const response = await requestControlPlane(surface, pathname, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...(init?.headers || {}),
+  const response = await requestControlPlane(
+    surface,
+    pathname,
+    {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        ...(init?.headers || {}),
+      },
     },
-  }, options);
+    options
+  );
   const text = await response.text();
   let body: any = null;
   try {
@@ -253,7 +296,7 @@ export async function requestControlPlaneJson(
         surface,
         pathname,
         suggestedCommand: mismatch ? suggestedCommandFor(surface) : undefined,
-      },
+      }
     );
   }
   if (body && typeof body === 'object' && typeof body.raw === 'string') {
@@ -273,7 +316,7 @@ export async function requestControlPlaneText(
   surface: ControlPlaneSurface,
   pathname: string,
   init?: RequestInit,
-  options?: ControlPlaneClientOptions,
+  options?: ControlPlaneClientOptions
 ): Promise<string> {
   const response = await requestControlPlane(surface, pathname, init, options);
   const text = await response.text();
@@ -288,7 +331,10 @@ export async function requestControlPlaneText(
   return text;
 }
 
-export function createControlPlaneClient(surface: ControlPlaneSurface, options?: ControlPlaneClientOptions) {
+export function createControlPlaneClient(
+  surface: ControlPlaneSurface,
+  options?: ControlPlaneClientOptions
+) {
   function sanitizeNextActions(value: unknown): ChronosOverviewRecord['nextActions'] {
     if (!Array.isArray(value)) return [];
     const sanitized = value.filter((candidate) => validateNextActionContract(candidate).valid);
@@ -302,21 +348,31 @@ export function createControlPlaneClient(surface: ControlPlaneSurface, options?:
       return requestControlPlaneJson(surface, pathname, undefined, options) as Promise<T>;
     },
     async postJson<T = any>(pathname: string, payload: unknown): Promise<T> {
-      return requestControlPlaneJson(surface, pathname, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }, options) as Promise<T>;
+      return requestControlPlaneJson(
+        surface,
+        pathname,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+        options
+      ) as Promise<T>;
     },
     async getText(pathname: string) {
       return requestControlPlaneText(surface, pathname, undefined, options);
     },
     async listProjects(): Promise<ControlPlaneProjectRecord[]> {
-      const body = await requestControlPlaneJson(surface, '/api/projects', undefined, options) as ControlPlaneListResponse<ControlPlaneProjectRecord>;
+      const body = (await requestControlPlaneJson(
+        surface,
+        '/api/projects',
+        undefined,
+        options
+      )) as ControlPlaneListResponse<ControlPlaneProjectRecord>;
       return Array.isArray(body?.items) ? body.items : [];
     },
     async listApprovals(): Promise<ControlPlaneApprovalRecord[]> {
       const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/approvals';
-      const body = await requestControlPlaneJson(surface, pathname, undefined, options) as any;
+      const body = (await requestControlPlaneJson(surface, pathname, undefined, options)) as any;
       if (surface === 'chronos') {
         return Array.isArray(body?.pendingApprovals) ? body.pendingApprovals : [];
       }
@@ -324,7 +380,7 @@ export function createControlPlaneClient(surface: ControlPlaneSurface, options?:
     },
     async listMissionSeeds(): Promise<ControlPlaneMissionSeedRecord[]> {
       const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/mission-seeds';
-      const body = await requestControlPlaneJson(surface, pathname, undefined, options) as any;
+      const body = (await requestControlPlaneJson(surface, pathname, undefined, options)) as any;
       if (surface === 'chronos') {
         return Array.isArray(body?.missionSeeds) ? body.missionSeeds : [];
       }
@@ -332,29 +388,47 @@ export function createControlPlaneClient(surface: ControlPlaneSurface, options?:
     },
     async listProjectTracks(): Promise<ControlPlaneProjectTrackRecord[]> {
       const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/project-tracks';
-      const body = await requestControlPlaneJson(surface, pathname, undefined, options) as any;
+      const body = (await requestControlPlaneJson(surface, pathname, undefined, options)) as any;
       if (surface === 'chronos') {
         const tracks = Array.isArray(body?.projectTracks) ? body.projectTracks : [];
         const readiness = new Map(
-          (Array.isArray(body?.gateReadiness) ? body.gateReadiness : []).map((item: any) => [String(item.track_id || ""), item]),
+          (Array.isArray(body?.gateReadiness) ? body.gateReadiness : []).map((item: any) => [
+            String(item.track_id || ''),
+            item,
+          ])
         );
         return tracks.map((track: any) => ({
           ...track,
-          gate_readiness: track?.gate_readiness || readiness.get(String(track?.track_id || "")),
+          gate_readiness: track?.gate_readiness || readiness.get(String(track?.track_id || '')),
         }));
       }
       return Array.isArray(body?.items) ? body.items : [];
     },
     async listOutcomes(): Promise<ControlPlaneOutcomeRecord[]> {
-      const body = await requestControlPlaneJson(surface, '/api/outcomes', undefined, options) as ControlPlaneListResponse<ControlPlaneOutcomeRecord>;
+      const body = (await requestControlPlaneJson(
+        surface,
+        '/api/outcomes',
+        undefined,
+        options
+      )) as ControlPlaneListResponse<ControlPlaneOutcomeRecord>;
       return Array.isArray(body?.items) ? body.items : [];
     },
     async listTaskSessions(): Promise<ControlPlaneTaskSessionRecord[]> {
-      const body = await requestControlPlaneJson(surface, '/api/task-sessions', undefined, options) as ControlPlaneListResponse<ControlPlaneTaskSessionRecord>;
+      const body = (await requestControlPlaneJson(
+        surface,
+        '/api/task-sessions',
+        undefined,
+        options
+      )) as ControlPlaneListResponse<ControlPlaneTaskSessionRecord>;
       return Array.isArray(body?.items) ? body.items : [];
     },
     async getChronosOverview(): Promise<ChronosOverviewRecord> {
-      const body = await requestControlPlaneJson('chronos', '/api/intelligence', undefined, options) as ChronosOverviewRecord;
+      const body = (await requestControlPlaneJson(
+        'chronos',
+        '/api/intelligence',
+        undefined,
+        options
+      )) as ChronosOverviewRecord;
       return {
         ...body,
         nextActions: sanitizeNextActions(body?.nextActions),

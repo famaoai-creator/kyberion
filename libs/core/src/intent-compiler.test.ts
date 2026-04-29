@@ -31,9 +31,16 @@ describe('intent-compiler', () => {
       id: 'health-check',
       triggers: ['health', 'status check'],
       pipeline: {
-        steps: [
-          { id: 'check', op: 'evaluate', params: { expression: 'true' } },
-        ],
+        steps: [{ id: 'check', op: 'evaluate', params: { expression: 'true' } }],
+      },
+    },
+    {
+      id: 'meeting-operations',
+      triggers: ['meeting', 'Teams', 'Zoom', 'ミーティング'],
+      resolution: {
+        shape: 'task_session',
+        task_kind: 'meeting_operations',
+        result_shape: 'summary',
       },
     },
   ];
@@ -76,6 +83,19 @@ describe('intent-compiler', () => {
       expect(result!.steps).toEqual([]); // hints don't produce steps
       expect(result!.warnings).toBeDefined();
     });
+
+    it('synthesizes a deterministic meeting orchestration step', () => {
+      const result = compileIntent(
+        'Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる',
+        {
+          standardIntents,
+        }
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.intentId).toBe('meeting-operations');
+      expect(result!.steps.some((step) => step.op === 'core:if')).toBe(true);
+    });
   });
 
   describe('buildPipelineGenerationPrompt', () => {
@@ -85,11 +105,10 @@ describe('intent-compiler', () => {
         { topic: 'screencapture', hint: 'Use vision actuator', tags: ['vision'] },
       ];
 
-      const prompt = buildPipelineGenerationPrompt(
-        'automate browser testing',
-        hints,
-        ['browser-actuator', 'vision-actuator'],
-      );
+      const prompt = buildPipelineGenerationPrompt('automate browser testing', hints, [
+        'browser-actuator',
+        'vision-actuator',
+      ]);
 
       expect(prompt).toContain('automate browser testing');
       expect(prompt).toContain('browser automation');

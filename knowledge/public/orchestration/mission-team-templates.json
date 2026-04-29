@@ -10,12 +10,27 @@
       "optional_roles": ["operator", "surface_liaison"]
     },
     "product_development": {
-      "required_roles": ["owner", "product_strategist", "planner", "implementer", "reviewer", "tester"],
+      "required_roles": [
+        "owner",
+        "product_strategist",
+        "planner",
+        "implementer",
+        "reviewer",
+        "tester"
+      ],
       "optional_roles": ["experience_designer", "operator", "surface_liaison"]
     },
     "operations": {
       "required_roles": ["owner", "planner", "operator", "reviewer"],
       "optional_roles": ["tester", "surface_liaison"]
+    },
+    "surface_concierge": {
+      "required_roles": ["owner", "planner", "operator", "reviewer"],
+      "optional_roles": ["tester", "surface_liaison", "experience_designer"]
+    },
+    "meeting_operations": {
+      "required_roles": ["owner", "planner", "facilitator", "scribe", "tracker", "reviewer"],
+      "optional_roles": ["executor", "decision_maker", "surface_liaison"]
     },
     "system_query": {
       "required_roles": ["owner", "planner", "operator"],

@@ -5,17 +5,32 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { classifyTaskSessionIntent } from './task-session.js';
-import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
+import {
+  buildOrganizationWorkLoopSummary,
+  type OrganizationWorkLoopSummary,
+} from './work-design.js';
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import {
+  buildFallbackExecutionBrief,
+  normalizeExecutionBrief,
+  type ExecutionBriefSeed,
+} from './execution-brief.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
+import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-contract.schema.json');
-const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge('public/schemas/organization-work-loop.schema.json');
-const INTENT_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-policy.schema.json');
+const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/intent-contract.schema.json'
+);
+const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/organization-work-loop.schema.json'
+);
+const INTENT_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/intent-policy.schema.json'
+);
 const INTENT_POLICY_PATH = pathResolver.knowledge('public/governance/intent-policy.json');
 
 type ExecutionShape = 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
@@ -55,6 +70,7 @@ export interface IntentDeliveryDecision {
 }
 
 export interface UserIntentFlow {
+  executionBrief: ActuatorExecutionBrief;
   intentContract: IntentContract;
   workLoop: OrganizationWorkLoopSummary;
   clarificationPacket?: OperatorInteractionPacket;
@@ -140,7 +156,9 @@ function ensureIntentPolicyValidator(): ValidateFunction {
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
 }
 
 function validateIntentContract(value: unknown): ValidationResult<IntentContract> {
@@ -184,8 +202,8 @@ function summarizeRelevantIntents(text: string): string {
   const policy = loadIntentPolicy();
   const intents = loadStandardIntentCatalog();
   const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
-  const scored = resolveIntentResolutionPacket(text).candidates
-    .slice(0, policy.compiler.relevant_intent_limit)
+  const scored = resolveIntentResolutionPacket(text)
+    .candidates.slice(0, policy.compiler.relevant_intent_limit)
     .map((candidate) => catalogById.get(candidate.intent_id))
     .filter((intent): intent is NonNullable<typeof intent> => Boolean(intent))
     .map((intent) => ({
@@ -203,133 +221,303 @@ function summarizeRelevantIntents(text: string): string {
 }
 
 function normalizeShape(shape?: string): ExecutionShape {
-  if (shape === 'project_bootstrap' || shape === 'mission' || shape === 'direct_reply') return shape;
+  if (shape === 'project_bootstrap' || shape === 'mission' || shape === 'direct_reply')
+    return shape;
   return 'task_session';
 }
 
 function loadIntentPolicy(): IntentPolicyFile {
-  const value = JSON.parse(safeReadFile(INTENT_POLICY_PATH, { encoding: 'utf8' }) as string) as IntentPolicyFile;
+  const value = JSON.parse(
+    safeReadFile(INTENT_POLICY_PATH, { encoding: 'utf8' }) as string
+  ) as IntentPolicyFile;
   const validate = ensureIntentPolicyValidator();
   if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid intent-policy: ${errors}`);
   }
   return value;
 }
 
-function deliveryRuleMatches(context: DeliveryModeRuleContext, rule: DeliveryModeDecisionRule): boolean {
+function deliveryRuleMatches(
+  context: DeliveryModeRuleContext,
+  rule: DeliveryModeDecisionRule
+): boolean {
   const shapeMatch = !rule.shapes?.length || rule.shapes.includes(context.shape);
-  const minRequiredInputsMatch = rule.min_required_inputs === undefined || context.requiredInputs.length >= rule.min_required_inputs;
-  const textMatch = !rule.text_patterns?.length || matchesAnyTextRule(context.text, rule.text_patterns);
+  const minRequiredInputsMatch =
+    rule.min_required_inputs === undefined ||
+    context.requiredInputs.length >= rule.min_required_inputs;
+  const textMatch =
+    !rule.text_patterns?.length || matchesAnyTextRule(context.text, rule.text_patterns);
   return shapeMatch && minRequiredInputsMatch && textMatch;
 }
 
-export function inferGovernedDeliveryMode(text: string, shape: ExecutionShape, requiredInputs: string[]): IntentDeliveryMode {
+export function inferGovernedDeliveryMode(
+  text: string,
+  shape: ExecutionShape,
+  requiredInputs: string[]
+): IntentDeliveryMode {
   const context: DeliveryModeRuleContext = { text, shape, requiredInputs };
-  return loadIntentPolicy().delivery.rules.find((rule) => deliveryRuleMatches(context, rule))?.mode || 'one_shot';
+  return (
+    loadIntentPolicy().delivery.rules.find((rule) => deliveryRuleMatches(context, rule))?.mode ||
+    'one_shot'
+  );
 }
 
-function buildFallbackIntentContract(input: CompileUserIntentFlowInput): IntentContract {
+function toExecutionBriefSeed(
+  input: CompileUserIntentFlowInput,
+  extras: Partial<ExecutionBriefSeed> = {}
+): ExecutionBriefSeed {
+  return {
+    requestText: input.text,
+    intentId: extras.intentId,
+    goalSummary: extras.goalSummary,
+    taskType: extras.taskType,
+    executionShape: extras.executionShape,
+    requiredInputs: extras.requiredInputs,
+    outcomeIds: extras.outcomeIds,
+    confidence: extras.confidence,
+    tier: input.tier,
+    locale: input.locale,
+    projectName: input.projectName,
+    trackName: input.trackName,
+    serviceBindings: input.serviceBindings,
+    summaryHint: extras.summaryHint,
+  };
+}
+
+function buildFallbackIntentContract(
+  input: CompileUserIntentFlowInput,
+  executionBrief?: ActuatorExecutionBrief
+): IntentContract {
   const classified = classifyTaskSessionIntent(input.text);
   if (classified) {
-    const shape = classified.payload?.bootstrap_kind === 'project_bootstrap' ? 'project_bootstrap' : 'task_session';
+    const shape =
+      classified.payload?.bootstrap_kind === 'project_bootstrap'
+        ? 'project_bootstrap'
+        : 'task_session';
     return {
       kind: 'intent-contract',
       source_text: input.text,
-      intent_id: classified.intentId || classified.taskType,
-      goal: classified.goal,
+      intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
+      goal: {
+        summary: executionBrief?.summary || classified.goal.summary,
+        success_condition: classified.goal.success_condition,
+      },
       resolution: {
         execution_shape: normalizeShape(shape),
-        task_type: classified.taskType,
+        task_type: executionBrief?.target_actuators?.includes('pptx-generator')
+          ? 'presentation_deck'
+          : classified.taskType,
       },
-      required_inputs: classified.requirements?.missing || [],
-      outcome_ids: [],
+      required_inputs: executionBrief?.missing_inputs || classified.requirements?.missing || [],
+      outcome_ids: executionBrief?.deliverables || [],
       approval: {
         requires_approval: Boolean(classified.payload?.approval_required),
       },
-      delivery_mode: shape === 'project_bootstrap' ? 'managed_program' : inferGovernedDeliveryMode(input.text, normalizeShape(shape), classified.requirements?.missing || []),
-      clarification_needed: Boolean(classified.requirements?.missing?.length),
+      delivery_mode:
+        shape === 'project_bootstrap'
+          ? 'managed_program'
+          : inferGovernedDeliveryMode(
+              input.text,
+              normalizeShape(shape),
+              executionBrief?.missing_inputs || classified.requirements?.missing || []
+            ),
+      clarification_needed: Boolean(
+        (executionBrief?.missing_inputs || classified.requirements?.missing || []).length
+      ),
       confidence: 0.55,
-      why: 'Fallback classifier mapped the request to the nearest governed task session contract.',
+      why: executionBrief
+        ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
+        : 'Fallback classifier mapped the request to the nearest governed task session contract.',
     };
   }
 
   return {
     kind: 'intent-contract',
     source_text: input.text,
-    intent_id: 'general_request',
+    intent_id: executionBrief?.archetype_id || 'general_request',
     goal: {
-      summary: 'Clarify and respond to the current request',
-      success_condition: 'The request is either clarified or answered without violating governance constraints.',
+      summary: executionBrief?.summary || 'Clarify and respond to the current request',
+      success_condition:
+        'The request is either clarified or answered without violating governance constraints.',
     },
     resolution: {
-      execution_shape: 'direct_reply',
+      execution_shape: executionBrief ? 'task_session' : 'direct_reply',
+      task_type: executionBrief?.target_actuators?.includes('pptx-generator')
+        ? 'presentation_deck'
+        : undefined,
     },
-    required_inputs: ['goal_or_target'],
-    outcome_ids: [],
+    required_inputs: executionBrief?.missing_inputs || ['goal_or_target'],
+    outcome_ids: executionBrief?.deliverables || [],
     approval: {
       requires_approval: false,
     },
-    delivery_mode: inferGovernedDeliveryMode(input.text, 'direct_reply', ['goal_or_target']),
-    clarification_needed: true,
+    delivery_mode: inferGovernedDeliveryMode(
+      input.text,
+      executionBrief ? 'task_session' : 'direct_reply',
+      executionBrief?.missing_inputs || ['goal_or_target']
+    ),
+    clarification_needed: Boolean((executionBrief?.missing_inputs || ['goal_or_target']).length),
     confidence: 0.25,
-    why: 'Fallback could not derive a safe execution contract from the current request.',
+    why: executionBrief
+      ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
+      : 'Fallback could not derive a safe execution contract from the current request.',
   };
 }
 
-function buildIntentContractPrompt(input: CompileUserIntentFlowInput): string {
-  const policy = loadIntentPolicy();
+function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
   return [
-    'You are the Kyberion Intent Contract Compiler.',
-    'Convert the user request into a governed JSON contract.',
+    'You are the Kyberion Execution Brief Compiler.',
+    'Extract a governed execution brief before any contract or work-loop compilation.',
     'Return JSON only. No markdown. No prose.',
     '',
     'Rules:',
-    ...policy.compiler.intent_contract_rules.map((rule) => `- ${rule}`),
-    '',
-    'Output schema:',
-    JSON.stringify({
-      kind: 'intent-contract',
-      source_text: 'string',
-      intent_id: 'string',
-      goal: { summary: 'string', success_condition: 'string' },
-      resolution: { execution_shape: 'direct_reply|task_session|mission|project_bootstrap', task_type: 'string?' },
-      required_inputs: ['string'],
-      outcome_ids: ['string'],
-      approval: { requires_approval: true },
-      delivery_mode: 'one_shot|managed_program',
-      clarification_needed: true,
-      confidence: 0.0,
-      why: 'string',
-    }, null, 2),
+    '- Prefer semantic structure over literal keyword matching.',
+    '- Make missing inputs explicit.',
+    '- Identify likely target actuators and deliverables.',
+    '- Keep the brief human-readable and minimal.',
     '',
     'Relevant governed intents:',
     summarizeRelevantIntents(input.text),
     '',
     'Request context:',
-    JSON.stringify({
-      text: input.text,
-      channel: input.channel,
-      locale: input.locale,
-      project_id: input.projectId,
-      project_name: input.projectName,
-      track_id: input.trackId,
-      track_name: input.trackName,
-      tier: input.tier || 'confidential',
-      service_bindings: input.serviceBindings || [],
-    }, null, 2),
+    JSON.stringify(
+      {
+        text: input.text,
+        channel: input.channel,
+        locale: input.locale,
+        project_id: input.projectId,
+        project_name: input.projectName,
+        track_id: input.trackId,
+        track_name: input.trackName,
+        tier: input.tier || 'confidential',
+        service_bindings: input.serviceBindings || [],
+      },
+      null,
+      2
+    ),
+    '',
+    'Output schema:',
+    JSON.stringify(
+      {
+        kind: 'actuator-execution-brief',
+        request_text: 'string',
+        archetype_id: 'string',
+        confidence: 0.0,
+        summary: 'string',
+        user_facing_summary: 'string',
+        normalized_scope: ['string'],
+        target_actuators: ['string'],
+        deliverables: ['string'],
+        missing_inputs: ['string'],
+        assumptions: ['string'],
+        clarification_questions: [
+          {
+            id: 'string',
+            question: 'string',
+            reason: 'string',
+            default_assumption: 'string',
+            impact: 'string',
+          },
+        ],
+        readiness: 'fully_automatable|needs_clarification|needs_external_asset|blocked_by_runtime',
+        readiness_reason: 'string',
+        llm_touchpoints: [
+          {
+            stage: 'string',
+            purpose: 'string',
+            output_contract: 'string',
+          },
+        ],
+        recommended_next_step: 'string',
+      },
+      null,
+      2
+    ),
   ].join('\n');
 }
 
-function buildWorkLoopPrompt(input: CompileUserIntentFlowInput, contract: IntentContract): string {
+function buildIntentContractPrompt(
+  input: CompileUserIntentFlowInput,
+  executionBrief: ActuatorExecutionBrief
+): string {
+  const policy = loadIntentPolicy();
+  return [
+    'You are the Kyberion Intent Contract Compiler.',
+    'Convert the user request into a governed JSON contract.',
+    'Use the execution brief as the source of truth for meaning, scope, and missing inputs.',
+    'Return JSON only. No markdown. No prose.',
+    '',
+    'Rules:',
+    ...policy.compiler.intent_contract_rules.map((rule) => `- ${rule}`),
+    '',
+    'Execution brief:',
+    JSON.stringify(executionBrief, null, 2),
+    '',
+    'Output schema:',
+    JSON.stringify(
+      {
+        kind: 'intent-contract',
+        source_text: 'string',
+        intent_id: 'string',
+        goal: { summary: 'string', success_condition: 'string' },
+        resolution: {
+          execution_shape: 'direct_reply|task_session|mission|project_bootstrap',
+          task_type: 'string?',
+        },
+        required_inputs: ['string'],
+        outcome_ids: ['string'],
+        approval: { requires_approval: true },
+        delivery_mode: 'one_shot|managed_program',
+        clarification_needed: true,
+        confidence: 0.0,
+        why: 'string',
+      },
+      null,
+      2
+    ),
+    '',
+    'Relevant governed intents:',
+    summarizeRelevantIntents(input.text),
+    '',
+    'Request context:',
+    JSON.stringify(
+      {
+        text: input.text,
+        channel: input.channel,
+        locale: input.locale,
+        project_id: input.projectId,
+        project_name: input.projectName,
+        track_id: input.trackId,
+        track_name: input.trackName,
+        tier: input.tier || 'confidential',
+        service_bindings: input.serviceBindings || [],
+      },
+      null,
+      2
+    ),
+  ].join('\n');
+}
+
+function buildWorkLoopPrompt(
+  input: CompileUserIntentFlowInput,
+  executionBrief: ActuatorExecutionBrief,
+  contract: IntentContract
+): string {
   const policy = loadIntentPolicy();
   return [
     'You are the Kyberion Work Loop Compiler.',
     'Produce a governed Organization Work Loop Summary JSON.',
+    'Use the execution brief and intent contract as the source of truth.',
     'Return JSON only. No markdown. No prose.',
     '',
     'Rules:',
     ...policy.compiler.work_loop_rules.map((rule) => `- ${rule}`),
+    '',
+    'Execution brief:',
+    JSON.stringify(executionBrief, null, 2),
     '',
     'Intent contract:',
     JSON.stringify(contract, null, 2),
@@ -378,7 +566,10 @@ async function defaultAsk(prompt: string, target = resolveIntentCompilerTarget()
     systemPrompt: 'Return only valid JSON. Do not include markdown fences.',
     model: target.model,
     modelProvider: target.modelProvider,
-    approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
+    approvalMode:
+      (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
+        ? 'relaxed'
+        : 'strict',
   });
   await adapter.boot();
   try {
@@ -389,11 +580,19 @@ async function defaultAsk(prompt: string, target = resolveIntentCompilerTarget()
   }
 }
 
-export function resolveIntentCompilerTarget(options: Pick<LlmCompileOptions, 'provider' | 'model' | 'modelProvider'> = {}): IntentCompilerTarget {
-  const rawProvider = (options.provider || process.env.KYBERION_INTENT_COMPILER_PROVIDER || 'codex').toLowerCase();
-  const provider: IntentCompilerProvider = rawProvider === 'claude' || rawProvider === 'gemini' ? rawProvider : 'codex';
+export function resolveIntentCompilerTarget(
+  options: Pick<LlmCompileOptions, 'provider' | 'model' | 'modelProvider'> = {}
+): IntentCompilerTarget {
+  const rawProvider = (
+    options.provider ||
+    process.env.KYBERION_INTENT_COMPILER_PROVIDER ||
+    'codex'
+  ).toLowerCase();
+  const provider: IntentCompilerProvider =
+    rawProvider === 'claude' || rawProvider === 'gemini' ? rawProvider : 'codex';
   const explicitModel = options.model || process.env.KYBERION_INTENT_COMPILER_MODEL;
-  const explicitModelProvider = options.modelProvider || process.env.KYBERION_INTENT_COMPILER_MODEL_PROVIDER;
+  const explicitModelProvider =
+    options.modelProvider || process.env.KYBERION_INTENT_COMPILER_MODEL_PROVIDER;
 
   if (provider === 'claude') {
     return {
@@ -416,12 +615,25 @@ export function resolveIntentCompilerTarget(options: Pick<LlmCompileOptions, 'pr
   };
 }
 
+async function compileExecutionBriefWithLlm(
+  input: CompileUserIntentFlowInput,
+  options: LlmCompileOptions = {}
+): Promise<ActuatorExecutionBrief | null> {
+  const ask =
+    options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
+  const raw = await ask(buildExecutionBriefPrompt(input));
+  const parsed = parseJsonObject<ActuatorExecutionBrief>(raw);
+  return parsed ? normalizeExecutionBrief(parsed, toExecutionBriefSeed(input)) : null;
+}
+
 async function compileIntentContractWithLlm(
   input: CompileUserIntentFlowInput,
-  options: LlmCompileOptions = {},
+  executionBrief: ActuatorExecutionBrief,
+  options: LlmCompileOptions = {}
 ): Promise<IntentContract | null> {
-  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
-  const raw = await ask(buildIntentContractPrompt(input));
+  const ask =
+    options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
+  const raw = await ask(buildIntentContractPrompt(input, executionBrief));
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
   const result = validateIntentContract(parsed);
@@ -430,18 +642,23 @@ async function compileIntentContractWithLlm(
 
 async function compileWorkLoopWithLlm(
   input: CompileUserIntentFlowInput,
+  executionBrief: ActuatorExecutionBrief,
   contract: IntentContract,
-  options: LlmCompileOptions = {},
+  options: LlmCompileOptions = {}
 ): Promise<OrganizationWorkLoopSummary | null> {
-  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
-  const raw = await ask(buildWorkLoopPrompt(input, contract));
+  const ask =
+    options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
+  const raw = await ask(buildWorkLoopPrompt(input, executionBrief, contract));
   const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
   if (!parsed) return null;
   const result = validateWorkLoop(parsed);
   return result.valid ? result.value! : null;
 }
 
-function buildFallbackWorkLoop(input: CompileUserIntentFlowInput, contract: IntentContract): OrganizationWorkLoopSummary {
+function buildFallbackWorkLoop(
+  input: CompileUserIntentFlowInput,
+  contract: IntentContract
+): OrganizationWorkLoopSummary {
   return buildOrganizationWorkLoopSummary({
     intentId: contract.intent_id,
     taskType: contract.resolution.task_type,
@@ -459,21 +676,39 @@ function buildFallbackWorkLoop(input: CompileUserIntentFlowInput, contract: Inte
   });
 }
 
-function buildClarificationPacket(contract: IntentContract, workLoop: OrganizationWorkLoopSummary): OperatorInteractionPacket | undefined {
+function buildClarificationPacket(
+  contract: IntentContract,
+  workLoop: OrganizationWorkLoopSummary,
+  executionBrief?: ActuatorExecutionBrief
+): OperatorInteractionPacket | undefined {
   if (!contract.clarification_needed) return undefined;
+  const briefQuestions = executionBrief?.clarification_questions || [];
   return {
     kind: 'operator-interaction-packet',
     interaction_type: 'clarification',
     headline: 'More context is required before execution',
     summary: contract.goal.summary,
+    execution_brief_summary: executionBrief?.user_facing_summary || executionBrief?.summary,
     confidence: contract.confidence,
-    questions: contract.required_inputs.map((item) => ({
-      id: item,
-      question: `Please provide ${item.replace(/_/g, ' ')}.`,
-      reason: 'The request cannot be executed safely without this input.',
-    })),
+    questions:
+      briefQuestions.length > 0
+        ? briefQuestions.map((question, index) => ({
+            id: question.id || contract.required_inputs[index] || `missing_input_${index + 1}`,
+            question: question.question,
+            reason: question.reason,
+          }))
+        : contract.required_inputs.map((item) => ({
+            id: item,
+            question: `Please provide ${item.replace(/_/g, ' ')}.`,
+            reason: 'The request cannot be executed safely without this input.',
+          })),
     suggested_response_style: 'clarify-first',
     llm_touchpoints: [
+      {
+        stage: 'execution_brief',
+        purpose: 'Extract the request into a governed execution brief',
+        output_contract: 'actuator-execution-brief',
+      },
       {
         stage: 'intent_contract',
         purpose: 'Resolve the request into a governed execution contract',
@@ -498,12 +733,16 @@ function buildClarificationPacket(contract: IntentContract, workLoop: Organizati
 }
 
 export function formatClarificationPacket(packet: OperatorInteractionPacket): string {
-  const lines = [
-    packet.headline,
-    packet.summary,
-    '',
-    'Required inputs:',
-  ];
+  const briefSummary =
+    typeof (packet as any).execution_brief_summary === 'string' &&
+    (packet as any).execution_brief_summary.trim().length > 0
+      ? (packet as any).execution_brief_summary
+      : undefined;
+  const lines = [packet.headline, packet.summary];
+  if (briefSummary) {
+    lines.push('', `Brief: ${briefSummary}`);
+  }
+  lines.push('', 'Required inputs:');
   for (const question of packet.questions || []) {
     lines.push(`- ${question.id}: ${question.question}`);
   }
@@ -511,9 +750,14 @@ export function formatClarificationPacket(packet: OperatorInteractionPacket): st
 }
 
 export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDeliveryDecision {
-  const durableShape = contract.resolution.execution_shape === 'project_bootstrap' || contract.resolution.execution_shape === 'mission';
+  const durableShape =
+    contract.resolution.execution_shape === 'project_bootstrap' ||
+    contract.resolution.execution_shape === 'mission';
   const managedProgram = contract.delivery_mode === 'managed_program';
-  const askHumanToConfirm = managedProgram && contract.resolution.execution_shape === 'task_session' && !contract.clarification_needed;
+  const askHumanToConfirm =
+    managedProgram &&
+    contract.resolution.execution_shape === 'task_session' &&
+    !contract.clarification_needed;
 
   const decisionRules: Array<{
     when: () => boolean;
@@ -522,7 +766,8 @@ export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDe
   }> = [
     {
       when: () => askHumanToConfirm,
-      rationale: 'The request implies durable program management, but the current execution shape still needs a human confirmation before bootstrap.',
+      rationale:
+        'The request implies durable program management, but the current execution shape still needs a human confirmation before bootstrap.',
       decision: {
         shouldBootstrapProject: true,
         shouldStartMission: true,
@@ -532,7 +777,8 @@ export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDe
     },
     {
       when: () => managedProgram,
-      rationale: 'The request appears to require durable governance across revisions, work items, or staged outcomes.',
+      rationale:
+        'The request appears to require durable governance across revisions, work items, or staged outcomes.',
       decision: {
         shouldBootstrapProject: contract.resolution.execution_shape === 'project_bootstrap',
         shouldStartMission: true,
@@ -542,7 +788,8 @@ export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDe
     },
     {
       when: () => true,
-      rationale: 'The request appears satisfiable as a single direct outcome without durable project scaffolding.',
+      rationale:
+        'The request appears satisfiable as a single direct outcome without durable project scaffolding.',
       decision: {
         shouldBootstrapProject: false,
         shouldStartMission: false,
@@ -563,16 +810,22 @@ export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDe
 
 export async function compileUserIntentFlow(
   input: CompileUserIntentFlowInput,
-  options: LlmCompileOptions = {},
+  options: LlmCompileOptions = {}
 ): Promise<UserIntentFlow> {
+  let executionBrief: ActuatorExecutionBrief | null = null;
   let intentContract: IntentContract | null = null;
   let workLoop: OrganizationWorkLoopSummary | null = null;
   let source: 'llm' | 'fallback' = 'llm';
 
   try {
-    intentContract = await compileIntentContractWithLlm(input, options);
+    executionBrief = await compileExecutionBriefWithLlm(input, options);
+    if (!executionBrief) {
+      source = 'fallback';
+      executionBrief = buildFallbackExecutionBrief(toExecutionBriefSeed(input));
+    }
+    intentContract = await compileIntentContractWithLlm(input, executionBrief, options);
     if (intentContract) {
-      workLoop = await compileWorkLoopWithLlm(input, intentContract, options);
+      workLoop = await compileWorkLoopWithLlm(input, executionBrief, intentContract, options);
     }
   } catch (error: any) {
     logger.warn(`[INTENT_CONTRACT] LLM compilation failed: ${error?.message || String(error)}`);
@@ -580,7 +833,7 @@ export async function compileUserIntentFlow(
 
   if (!intentContract) {
     source = 'fallback';
-    intentContract = buildFallbackIntentContract(input);
+    intentContract = buildFallbackIntentContract(input, executionBrief);
   }
   if (!workLoop) {
     source = 'fallback';
@@ -588,9 +841,10 @@ export async function compileUserIntentFlow(
   }
 
   return {
+    executionBrief,
     intentContract,
     workLoop,
-    clarificationPacket: buildClarificationPacket(intentContract, workLoop),
+    clarificationPacket: buildClarificationPacket(intentContract, workLoop, executionBrief),
     source,
   };
 }

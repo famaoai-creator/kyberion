@@ -2,7 +2,14 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import { resolveSurfaceIntent } from './router-contract.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
@@ -48,7 +55,15 @@ export interface BrowserConversationCandidateTarget {
 
 export interface BrowserConversationHistoryEntry {
   ts: string;
-  type: 'instruction' | 'ack' | 'observation' | 'execution' | 'verification' | 'feedback' | 'error' | 'control';
+  type:
+    | 'instruction'
+    | 'ack'
+    | 'observation'
+    | 'execution'
+    | 'verification'
+    | 'feedback'
+    | 'error'
+    | 'control';
   text: string;
 }
 
@@ -70,7 +85,17 @@ export interface BrowserConversationSession {
   };
   active_step?: {
     step_id: string;
-    kind: 'observe' | 'click' | 'fill' | 'press' | 'scroll' | 'select' | 'extract' | 'confirm' | 'navigate' | 'wait';
+    kind:
+      | 'observe'
+      | 'click'
+      | 'fill'
+      | 'press'
+      | 'scroll'
+      | 'select'
+      | 'extract'
+      | 'confirm'
+      | 'navigate'
+      | 'wait';
     description: string;
     status: 'pending' | 'running' | 'completed' | 'blocked' | 'failed' | 'cancelled';
   };
@@ -102,7 +127,17 @@ export interface BrowserConversationCommand {
   utterance: string;
   issued_at: string;
   resolution?: {
-    action?: 'click' | 'fill' | 'press' | 'scroll' | 'observe' | 'navigate' | 'confirm' | 'cancel' | 'resume' | 'pause';
+    action?:
+      | 'click'
+      | 'fill'
+      | 'press'
+      | 'scroll'
+      | 'observe'
+      | 'navigate'
+      | 'confirm'
+      | 'cancel'
+      | 'resume'
+      | 'pause';
     input_text?: string;
     target_hint?: {
       text?: string;
@@ -135,7 +170,7 @@ export interface BrowserConversationExecutionResult {
 
 function resolveConfirmationCandidateIndex(
   utterance: string,
-  candidateCount: number,
+  candidateCount: number
 ): number | null {
   const trimmed = utterance.trim();
   if (!trimmed || candidateCount <= 0) return null;
@@ -168,9 +203,15 @@ interface ValidationResult<T> {
   value?: T;
 }
 
-const SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/browser-conversation-session.schema.json');
-const COMMAND_SCHEMA_PATH = pathResolver.knowledge('public/schemas/browser-conversation-command.schema.json');
-const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge('public/schemas/browser-conversation-feedback.schema.json');
+const SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/browser-conversation-session.schema.json'
+);
+const COMMAND_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/browser-conversation-command.schema.json'
+);
+const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/browser-conversation-feedback.schema.json'
+);
 const SESSION_DIR = pathResolver.shared('runtime/browser/conversation-sessions');
 const BROWSER_SESSION_DIR = pathResolver.shared('runtime/browser/sessions');
 const BROWSER_SNAPSHOT_DIR = pathResolver.shared('runtime/browser/snapshots');
@@ -203,7 +244,9 @@ function ensureFeedbackValidator(): ValidateFunction {
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
 }
 
 function sessionPath(sessionId: string): string {
@@ -256,7 +299,9 @@ function loadBrowserSnapshot(sessionId: string): BrowserSnapshotRecord | null {
   return JSON.parse(raw) as BrowserSnapshotRecord;
 }
 
-function loadBrowserSnapshotForConversationSession(sessionId: string): BrowserSnapshotRecord | null {
+function loadBrowserSnapshotForConversationSession(
+  sessionId: string
+): BrowserSnapshotRecord | null {
   const directSnapshot = loadBrowserSnapshot(sessionId);
   if (directSnapshot) return directSnapshot;
 
@@ -267,12 +312,16 @@ function loadBrowserSnapshotForConversationSession(sessionId: string): BrowserSn
   return loadBrowserSnapshot(browserSessionId);
 }
 
-function refreshBrowserSnapshotForConversationSession(session: BrowserConversationSession): BrowserSnapshotRecord | null {
+function refreshBrowserSnapshotForConversationSession(
+  session: BrowserConversationSession
+): BrowserSnapshotRecord | null {
   const browserSessionId = session.target?.browser_session_id;
   if (!browserSessionId) return null;
 
   const browserRuntimeSession = loadBrowserRuntimeSession(browserSessionId);
-  const tmpPath = pathResolver.sharedTmp(`browser-conversation/refresh-${session.session_id}-${Date.now().toString(36)}.json`);
+  const tmpPath = pathResolver.sharedTmp(
+    `browser-conversation/refresh-${session.session_id}-${Date.now().toString(36)}.json`
+  );
   const steps: Array<Record<string, unknown>> = [];
   if (session.target?.tab_id) {
     steps.push({
@@ -291,25 +340,28 @@ function refreshBrowserSnapshotForConversationSession(session: BrowserConversati
       max_elements: 200,
     },
   });
-  safeWriteFile(tmpPath, JSON.stringify({
-    action: 'pipeline',
-    session_id: browserSessionId,
-    options: {
-      headless: false,
-      keep_alive: false,
-      connect_over_cdp: Boolean(browserRuntimeSession?.cdp_url),
-      cdp_url: browserRuntimeSession?.cdp_url,
-      cdp_port: browserRuntimeSession?.cdp_port,
-    },
-    steps,
-  }, null, 2));
+  safeWriteFile(
+    tmpPath,
+    JSON.stringify(
+      {
+        action: 'pipeline',
+        session_id: browserSessionId,
+        options: {
+          headless: false,
+          keep_alive: false,
+          connect_over_cdp: Boolean(browserRuntimeSession?.cdp_url),
+          cdp_url: browserRuntimeSession?.cdp_url,
+          cdp_port: browserRuntimeSession?.cdp_port,
+        },
+        steps,
+      },
+      null,
+      2
+    )
+  );
 
   try {
-    safeExec('node', [
-      'dist/libs/actuators/browser-actuator/src/index.js',
-      '--input',
-      tmpPath,
-    ], {
+    safeExec('node', ['dist/libs/actuators/browser-actuator/src/index.js', '--input', tmpPath], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 60_000,
     });
@@ -339,11 +391,16 @@ function normalizeRegionHint(text?: string): string | undefined {
 
 function resolveCandidateTargets(
   sessionId: string,
-  resolution?: BrowserConversationCommandResolution,
+  resolution?: BrowserConversationCommandResolution
 ): BrowserConversationCandidateTarget[] {
   const session = loadBrowserConversationSession(sessionId);
   let snapshot = loadBrowserSnapshotForConversationSession(sessionId);
-  if (session && (!snapshot || snapshot.element_count === 0 || (session.target?.tab_id && snapshot.tab_id !== session.target.tab_id))) {
+  if (
+    session &&
+    (!snapshot ||
+      snapshot.element_count === 0 ||
+      (session.target?.tab_id && snapshot.tab_id !== session.target.tab_id))
+  ) {
     snapshot = refreshBrowserSnapshotForConversationSession(session);
   }
   if (!snapshot) return [];
@@ -386,7 +443,9 @@ export function createBrowserConversationSession(input: {
 }): BrowserConversationSession {
   const now = new Date().toISOString();
   return {
-    session_id: input.sessionId || `BRS-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    session_id:
+      input.sessionId ||
+      `BRS-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     surface: input.surface,
     status: 'awaiting_instruction',
     mode: input.mode || 'interactive',
@@ -419,42 +478,54 @@ export function bootstrapBrowserConversationSession(params: {
   }
 
   if (!loadBrowserSnapshot(params.browserSessionId)) {
-    const tmpPath = pathResolver.sharedTmp(`browser-conversation/bootstrap-${params.browserSessionId}.json`);
-    safeWriteFile(tmpPath, JSON.stringify({
-      action: 'pipeline',
-      session_id: params.browserSessionId,
-      options: {
-        headless: false,
-        keep_alive: true,
-        lease_ms: 5 * 60 * 1000,
-      },
-      steps: [
-        {
-          type: 'capture',
-          op: 'snapshot',
-          params: {
-            export_as: 'last_snapshot',
-            max_elements: 200,
-          },
-        },
-      ],
-    }, null, 2));
-    safeExec('node', [
-      'dist/libs/actuators/browser-actuator/src/index.js',
-      '--input',
+    const tmpPath = pathResolver.sharedTmp(
+      `browser-conversation/bootstrap-${params.browserSessionId}.json`
+    );
+    safeWriteFile(
       tmpPath,
-    ], {
+      JSON.stringify(
+        {
+          action: 'pipeline',
+          session_id: params.browserSessionId,
+          options: {
+            headless: false,
+            keep_alive: true,
+            lease_ms: 5 * 60 * 1000,
+          },
+          steps: [
+            {
+              type: 'capture',
+              op: 'snapshot',
+              params: {
+                export_as: 'last_snapshot',
+                max_elements: 200,
+              },
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+    safeExec('node', ['dist/libs/actuators/browser-actuator/src/index.js', '--input', tmpPath], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 60_000,
     });
   }
 
-  const activeTab = (browserSession.tabs || []).find((tab) => tab.active) || browserSession.tabs?.[0];
+  const activeTab =
+    (browserSession.tabs || []).find((tab) => tab.active) || browserSession.tabs?.[0];
   const session = createBrowserConversationSession({
-    sessionId: params.conversationSessionId || `BCS-${params.surface || 'presence'}-${params.browserSessionId}`,
+    sessionId:
+      params.conversationSessionId ||
+      `BCS-${params.surface || 'presence'}-${params.browserSessionId}`,
     surface: params.surface || 'presence',
     goal: {
-      summary: params.goalSummary || activeTab?.title || activeTab?.url || `Operate browser session ${params.browserSessionId}`,
+      summary:
+        params.goalSummary ||
+        activeTab?.title ||
+        activeTab?.url ||
+        `Operate browser session ${params.browserSessionId}`,
       success_condition: params.successCondition || 'Complete the requested browser step safely.',
     },
     target: {
@@ -469,7 +540,9 @@ export function bootstrapBrowserConversationSession(params: {
   return session;
 }
 
-export function validateBrowserConversationSession(session: unknown): ValidationResult<BrowserConversationSession> {
+export function validateBrowserConversationSession(
+  session: unknown
+): ValidationResult<BrowserConversationSession> {
   const validate = ensureSessionValidator();
   const valid = validate(session);
   return {
@@ -479,7 +552,9 @@ export function validateBrowserConversationSession(session: unknown): Validation
   };
 }
 
-export function validateBrowserConversationCommand(command: unknown): ValidationResult<BrowserConversationCommand> {
+export function validateBrowserConversationCommand(
+  command: unknown
+): ValidationResult<BrowserConversationCommand> {
   const validate = ensureCommandValidator();
   const valid = validate(command);
   return {
@@ -489,7 +564,9 @@ export function validateBrowserConversationCommand(command: unknown): Validation
   };
 }
 
-export function validateBrowserConversationFeedback(feedback: unknown): ValidationResult<BrowserConversationFeedback> {
+export function validateBrowserConversationFeedback(
+  feedback: unknown
+): ValidationResult<BrowserConversationFeedback> {
   const validate = ensureFeedbackValidator();
   const valid = validate(feedback);
   return {
@@ -510,14 +587,18 @@ export function saveBrowserConversationSession(session: BrowserConversationSessi
   return filePath;
 }
 
-export function loadBrowserConversationSession(sessionId: string): BrowserConversationSession | null {
+export function loadBrowserConversationSession(
+  sessionId: string
+): BrowserConversationSession | null {
   const filePath = sessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(raw) as BrowserConversationSession;
   const result = validateBrowserConversationSession(parsed);
   if (!result.valid) {
-    logger.warn(`[BROWSER_CONVERSATION_SESSION] Invalid session ${sessionId}: ${result.errors.join('; ')}`);
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid session ${sessionId}: ${result.errors.join('; ')}`
+    );
     return null;
   }
   return parsed;
@@ -534,7 +615,7 @@ export function listBrowserConversationSessions(): BrowserConversationSession[] 
 
 export function recordBrowserConversationHistory(
   sessionId: string,
-  entry: BrowserConversationHistoryEntry,
+  entry: BrowserConversationHistoryEntry
 ): BrowserConversationSession | null {
   const session = loadBrowserConversationSession(sessionId);
   if (!session) return null;
@@ -544,12 +625,15 @@ export function recordBrowserConversationHistory(
   return session;
 }
 
-export function getActiveBrowserConversationSession(surface?: BrowserConversationSurface): BrowserConversationSession | null {
-  const sessions = listBrowserConversationSessions().filter((session) =>
-    session.status !== 'completed' &&
-    session.status !== 'failed' &&
-    session.status !== 'released' &&
-    session.status !== 'idle',
+export function getActiveBrowserConversationSession(
+  surface?: BrowserConversationSurface
+): BrowserConversationSession | null {
+  const sessions = listBrowserConversationSessions().filter(
+    (session) =>
+      session.status !== 'completed' &&
+      session.status !== 'failed' &&
+      session.status !== 'released' &&
+      session.status !== 'idle'
   );
   if (surface) {
     return sessions.find((session) => session.surface === surface) || null;
@@ -557,12 +641,18 @@ export function getActiveBrowserConversationSession(surface?: BrowserConversatio
   return sessions[0] || null;
 }
 
-export function classifyBrowserConversationCommand(utterance: string): BrowserConversationCommandResolution | null {
+export function classifyBrowserConversationCommand(
+  utterance: string
+): BrowserConversationCommandResolution | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
   const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed);
 
-  if (/^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\b/i.test(trimmed)) {
+  if (
+    /^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\b/i.test(
+      trimmed
+    )
+  ) {
     return {
       commandType: 'control_command',
       action: /resume|続けて|再開/i.test(trimmed)
@@ -575,13 +665,17 @@ export function classifyBrowserConversationCommand(utterance: string): BrowserCo
     };
   }
 
-  const region =
-    /左下|bottom left/i.test(trimmed) ? 'bottom-left' :
-      /右下|bottom right/i.test(trimmed) ? 'bottom-right' :
-        /左上|top left/i.test(trimmed) ? 'top-left' :
-          /右上|top right/i.test(trimmed) ? 'top-right' :
-            /中央|center|真ん中/i.test(trimmed) ? 'center' :
-              undefined;
+  const region = /左下|bottom left/i.test(trimmed)
+    ? 'bottom-left'
+    : /右下|bottom right/i.test(trimmed)
+      ? 'bottom-right'
+      : /左上|top left/i.test(trimmed)
+        ? 'top-left'
+        : /右上|top right/i.test(trimmed)
+          ? 'top-right'
+          : /中央|center|真ん中/i.test(trimmed)
+            ? 'center'
+            : undefined;
 
   const targetTextMatch =
     trimmed.match(/「(.+?)」/) ||
@@ -704,7 +798,10 @@ export function classifyBrowserConversationCommand(utterance: string): BrowserCo
     };
   }
 
-  if (/開いて|open|表示して|show/i.test(trimmed) && /(ページ|tab|タブ|ブラウザ|chrome|サイト|url|画面)/i.test(trimmed)) {
+  if (
+    /開いて|open|表示して|show/i.test(trimmed) &&
+    /(ページ|tab|タブ|ブラウザ|chrome|サイト|url|画面)/i.test(trimmed)
+  ) {
     return {
       commandType: 'task_command',
       action: 'navigate',
@@ -753,7 +850,10 @@ export function createBrowserConversationFeedback(params: {
   };
 }
 
-export function applyBrowserConversationCommand(sessionId: string, command: BrowserConversationCommand): BrowserConversationFeedback | null {
+export function applyBrowserConversationCommand(
+  sessionId: string,
+  command: BrowserConversationCommand
+): BrowserConversationFeedback | null {
   const session = loadBrowserConversationSession(sessionId);
   if (!session) return null;
 
@@ -773,9 +873,10 @@ export function applyBrowserConversationCommand(sessionId: string, command: Brow
     return createBrowserConversationFeedback({
       sessionId,
       status: 'progress',
-      message: command.resolution?.action === 'resume'
-        ? 'ブラウザ操作を再開します。'
-        : 'ブラウザ操作をいったん停止しました。',
+      message:
+        command.resolution?.action === 'resume'
+          ? 'ブラウザ操作を再開します。'
+          : 'ブラウザ操作をいったん停止しました。',
     });
   }
 
@@ -786,18 +887,21 @@ export function applyBrowserConversationCommand(sessionId: string, command: Brow
     action: command.resolution?.action,
     targetHint: command.resolution?.target_hint,
   });
-  session.conversation_context.pending_confirmation = Boolean(command.command_type === 'step_command' && session.candidate_targets.length > 1);
+  session.conversation_context.pending_confirmation = Boolean(
+    command.command_type === 'step_command' && session.candidate_targets.length > 1
+  );
   session.active_step = {
     step_id: `step-${Date.now().toString(36)}`,
-    kind: command.resolution?.action === 'navigate'
-      ? 'navigate'
-      : command.resolution?.action === 'fill'
-        ? 'fill'
-        : command.resolution?.action === 'press'
-          ? 'press'
-        : command.resolution?.action === 'scroll'
-          ? 'scroll'
-          : 'click',
+    kind:
+      command.resolution?.action === 'navigate'
+        ? 'navigate'
+        : command.resolution?.action === 'fill'
+          ? 'fill'
+          : command.resolution?.action === 'press'
+            ? 'press'
+            : command.resolution?.action === 'scroll'
+              ? 'scroll'
+              : 'click',
     description: command.utterance,
     status: 'pending',
   };
@@ -840,13 +944,16 @@ export function applyBrowserConversationCommand(sessionId: string, command: Brow
   return createBrowserConversationFeedback({
     sessionId,
     status: 'progress',
-    message: command.command_type === 'task_command'
-      ? 'ブラウザ操作の準備を始めます。'
-      : '対象を確認して操作を進めます。',
+    message:
+      command.command_type === 'task_command'
+        ? 'ブラウザ操作の準備を始めます。'
+        : '対象を確認して操作を進めます。',
   });
 }
 
-export function executeBrowserConversationAction(sessionId: string): BrowserConversationExecutionResult | null {
+export function executeBrowserConversationAction(
+  sessionId: string
+): BrowserConversationExecutionResult | null {
   const session = loadBrowserConversationSession(sessionId);
   if (!session || !session.active_step || session.candidate_targets.length === 0) return null;
 
@@ -856,16 +963,20 @@ export function executeBrowserConversationAction(sessionId: string): BrowserConv
 
 export function executeBrowserConversationCandidateAction(
   sessionId: string,
-  elementId: string,
+  elementId: string
 ): BrowserConversationExecutionResult | null {
   const session = loadBrowserConversationSession(sessionId);
   if (!session || !session.active_step || session.candidate_targets.length === 0) return null;
 
-  const selected = session.candidate_targets.find((candidate) => candidate.element_id === elementId);
+  const selected = session.candidate_targets.find(
+    (candidate) => candidate.element_id === elementId
+  );
   if (!selected) return null;
   const browserSessionId = session.target?.browser_session_id || session.session_id;
   const browserRuntimeSession = loadBrowserRuntimeSession(browserSessionId);
-  const tmpPath = pathResolver.sharedTmp(`browser-conversation/${sessionId}-${Date.now().toString(36)}.json`);
+  const tmpPath = pathResolver.sharedTmp(
+    `browser-conversation/${sessionId}-${Date.now().toString(36)}.json`
+  );
   const steps: Array<Record<string, unknown>> = [];
 
   if (session.target?.tab_id) {
@@ -897,9 +1008,14 @@ export function executeBrowserConversationCandidateAction(
       },
     });
   } else if (session.active_step.kind === 'fill') {
-    const inputText = session.conversation_context.last_user_instruction?.match(/「(.+?)」を.*(?:入力|入れて)/)?.[1]
-      || session.conversation_context.last_user_instruction?.match(/"(.+?)".*(?:input|type|fill)/i)?.[1]
-      || session.conversation_context.last_user_instruction?.match(/(.+?)\s*と入力/)?.[1];
+    const inputText =
+      session.conversation_context.last_user_instruction?.match(
+        /「(.+?)」を.*(?:入力|入れて)/
+      )?.[1] ||
+      session.conversation_context.last_user_instruction?.match(
+        /"(.+?)".*(?:input|type|fill)/i
+      )?.[1] ||
+      session.conversation_context.last_user_instruction?.match(/(.+?)\s*と入力/)?.[1];
     if (!inputText) {
       return {
         ok: false,
@@ -955,6 +1071,7 @@ export function executeBrowserConversationCandidateAction(
     options: {
       headless: false,
       keep_alive: false,
+      record_trace: true,
       connect_over_cdp: Boolean(browserRuntimeSession?.cdp_url),
       cdp_url: browserRuntimeSession?.cdp_url,
       cdp_port: browserRuntimeSession?.cdp_port,
@@ -962,16 +1079,16 @@ export function executeBrowserConversationCandidateAction(
     steps,
   };
 
-    safeWriteFile(tmpPath, JSON.stringify(payload, null, 2));
+  safeWriteFile(tmpPath, JSON.stringify(payload, null, 2));
   try {
-    const stdout = safeExec('node', [
-      'dist/libs/actuators/browser-actuator/src/index.js',
-      '--input',
-      tmpPath,
-    ], {
-      cwd: pathResolver.rootDir(),
-      timeoutMs: 60_000,
-    });
+    const stdout = safeExec(
+      'node',
+      ['dist/libs/actuators/browser-actuator/src/index.js', '--input', tmpPath],
+      {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 60_000,
+      }
+    );
     const parsed = JSON.parse(stdout) as Record<string, unknown>;
     session.status = 'completed';
     session.active_step.status = 'completed';
@@ -1018,14 +1135,21 @@ export function executeBrowserConversationCandidateAction(
 
 export function confirmBrowserConversationCandidate(
   sessionId: string,
-  utterance: string,
+  utterance: string
 ): BrowserConversationExecutionResult | null {
   const session = loadBrowserConversationSession(sessionId);
-  if (!session || !session.conversation_context.pending_confirmation || session.candidate_targets.length === 0) {
+  if (
+    !session ||
+    !session.conversation_context.pending_confirmation ||
+    session.candidate_targets.length === 0
+  ) {
     return null;
   }
 
-  const candidateIndex = resolveConfirmationCandidateIndex(utterance, session.candidate_targets.length);
+  const candidateIndex = resolveConfirmationCandidateIndex(
+    utterance,
+    session.candidate_targets.length
+  );
   if (candidateIndex === null) {
     return {
       ok: false,

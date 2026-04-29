@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/meeting-operations-profile.schema.json",
+  "title": "Meeting Operations Profile",
+  "description": "Reusable preferences for meeting roles, brief questions, facilitation policy, and tracking policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "profile_id",
+    "brief_question_sets",
+    "role_sets",
+    "facilitation_policy",
+    "tracking_policy",
+    "exit_policy"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "meeting-operations-profile"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "brief_question_sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "questions"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "meeting_purposes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+            }
+          },
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "role_sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "primary_role"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "meeting_purposes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+            }
+          },
+          "primary_role": {
+            "type": "string",
+            "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+          },
+          "support_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+            }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "facilitation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ask_before_join", "ask_before_speaking", "ask_before_shared_decision"],
+      "properties": {
+        "ask_before_join": { "type": "boolean" },
+        "ask_before_speaking": { "type": "boolean" },
+        "ask_before_shared_decision": { "type": "boolean" },
+        "prefer_written_summary": { "type": "boolean" },
+        "capture_transcript": { "type": "boolean" }
+      }
+    },
+    "tracking_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_follow_up_channel", "default_tracking_cadence"],
+      "properties": {
+        "default_follow_up_channel": {
+          "type": "string",
+          "enum": ["slack", "email", "teams", "task_session"]
+        },
+        "default_tracking_cadence": {
+          "type": "string",
+          "enum": ["immediate", "daily", "weekly", "ad_hoc"]
+        },
+        "require_owner": { "type": "boolean" },
+        "require_deadline": { "type": "boolean" },
+        "track_until_closed": { "type": "boolean" }
+      }
+    },
+    "exit_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stop_after_agenda_complete", "stop_on_missing_authority"],
+      "properties": {
+        "stop_after_agenda_complete": { "type": "boolean" },
+        "stop_on_missing_authority": { "type": "boolean" },
+        "capture_final_summary": { "type": "boolean" },
+        "capture_action_items": { "type": "boolean" }
+      }
+    }
+  }
+}

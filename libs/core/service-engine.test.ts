@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./index.js', async () => {
-  const actual = await vi.importActual('./index.js') as any;
+  const actual = (await vi.importActual('./index.js')) as any;
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
@@ -58,7 +58,9 @@ describe('executeServicePreset', () => {
     mocks.checkBinary.mockResolvedValue(false);
     mocks.secureFetch.mockResolvedValue({ data: { id: 'api-success' } });
 
-    await expect(executeServicePreset('test-service', 'do_action', {}, 'none')).resolves.toEqual({ res: 'api-success' });
+    await expect(executeServicePreset('test-service', 'do_action', {}, 'none')).resolves.toEqual({
+      res: 'api-success',
+    });
   });
 
   it('supports media-generation workflow prompts through structured API payloads', async () => {
@@ -93,15 +95,22 @@ describe('executeServicePreset', () => {
     mocks.secureFetch.mockResolvedValue({ prompt_id: 'vid-123' });
 
     await expect(
-      executeServicePreset('media-generation', 'generate_video', { workflow: { nodeA: { class_type: 'KSampler' } } }, 'none'),
+      executeServicePreset(
+        'media-generation',
+        'generate_video',
+        { workflow: { nodeA: { class_type: 'KSampler' } } },
+        'none'
+      )
     ).resolves.toEqual({ prompt_id: 'vid-123' });
 
-    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'http://127.0.0.1:8188/prompt',
-      data: {
-        prompt: { nodeA: { class_type: 'KSampler' } },
-      },
-    }));
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'http://127.0.0.1:8188/prompt',
+        data: {
+          prompt: { nodeA: { class_type: 'KSampler' } },
+        },
+      })
+    );
   });
 
   it('returns raw output when no output mapping is configured', async () => {
@@ -131,7 +140,7 @@ describe('executeServicePreset', () => {
     mocks.safeExec.mockReturnValue('/tmp/screen.jpg');
 
     await expect(
-      executeServicePreset('vision', 'capture_screen', { output: '/tmp/screen.jpg' }, 'none'),
+      executeServicePreset('vision', 'capture_screen', { output: '/tmp/screen.jpg' }, 'none')
     ).resolves.toBe('/tmp/screen.jpg');
   });
 
@@ -199,18 +208,25 @@ describe('executeServicePreset', () => {
     });
     mocks.secureFetch.mockResolvedValue({ ok: true });
 
-    await executeServicePreset('notion', 'create_page', { database_id: 'db1', title: 'hello' }, 'secret-guard');
+    await executeServicePreset(
+      'notion',
+      'create_page',
+      { database_id: 'db1', title: 'hello' },
+      'secret-guard'
+    );
 
-    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'https://api.notion.com/v1/pages',
-      data: {
-        parent: { database_id: 'db1' },
-        properties: { Name: { title: [{ text: { content: 'hello' } }] } },
-      },
-      headers: expect.objectContaining({
-        Authorization: 'Bearer test-token',
-      }),
-    }));
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.notion.com/v1/pages',
+        data: {
+          parent: { database_id: 'db1' },
+          properties: { Name: { title: [{ text: { content: 'hello' } }] } },
+        },
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-token',
+        }),
+      })
+    );
   });
 
   it('builds basic auth headers from client credentials and encodes form payloads', async () => {
@@ -254,18 +270,77 @@ describe('executeServicePreset', () => {
     });
     mocks.secureFetch.mockResolvedValue({ access_token: 'new-token' });
 
-    await executeServicePreset('canva', 'exchange_oauth_code', {
-      code: 'auth-code',
-      code_verifier: 'verifier',
-    }, 'secret-guard');
+    await executeServicePreset(
+      'canva',
+      'exchange_oauth_code',
+      {
+        code: 'auth-code',
+        code_verifier: 'verifier',
+      },
+      'secret-guard'
+    );
 
-    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'https://api.canva.com/rest/v1/oauth/token',
-      headers: expect.objectContaining({
-        Authorization: `Basic ${Buffer.from('client-id:cnvca-test-secret', 'utf8').toString('base64')}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      }),
-      data: 'grant_type=authorization_code&code=auth-code&code_verifier=verifier',
-    }));
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.canva.com/rest/v1/oauth/token',
+        headers: expect.objectContaining({
+          Authorization: `Basic ${Buffer.from('client-id:cnvca-test-secret', 'utf8').toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }),
+        data: 'grant_type=authorization_code&code=auth-code&code_verifier=verifier',
+      })
+    );
+  });
+
+  it('stages a youtube upload package through the youtube service preset', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('service-endpoints.json')) {
+        return JSON.stringify({
+          services: {
+            youtube: { preset_path: 'knowledge/public/orchestration/service-presets/youtube.json' },
+          },
+        });
+      }
+      if (filePath.includes('youtube.json')) {
+        return JSON.stringify({
+          operations: {
+            prepare_upload_package: {
+              type: 'cli',
+              command: 'node',
+              args: [
+                'dist/scripts/stage_youtube_upload_package.js',
+                '{{publish_plan_path}}',
+                '{{output_path}}',
+              ],
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeExec.mockReturnValue(
+      JSON.stringify({
+        status: 'succeeded',
+        output: 'active/shared/runtime/youtube/upload-packages/kyberion.json',
+      })
+    );
+
+    await expect(
+      executeServicePreset('youtube', 'prepare_upload_package', {
+        publish_plan_path: 'knowledge/public/schemas/narrated-video-publish-plan.example.json',
+        output_path: 'active/shared/runtime/youtube/upload-packages/kyberion.json',
+      })
+    ).resolves.toEqual({
+      status: 'succeeded',
+      output: 'active/shared/runtime/youtube/upload-packages/kyberion.json',
+    });
+
+    expect(mocks.safeExec).toHaveBeenCalledWith('node', [
+      'dist/scripts/stage_youtube_upload_package.js',
+      'knowledge/public/schemas/narrated-video-publish-plan.example.json',
+      'active/shared/runtime/youtube/upload-packages/kyberion.json',
+    ]);
   });
 });

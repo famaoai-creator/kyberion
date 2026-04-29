@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/meeting-operations-brief.schema.json",
+  "title": "Meeting Operations Brief",
+  "description": "Brief contract for a meeting operation, including role, goals, authority, and tracking expectations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "intent",
+    "meeting_title",
+    "meeting_url",
+    "platform",
+    "purpose",
+    "primary_role",
+    "desired_outcomes",
+    "exit_conditions"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "meeting-operations-brief"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "meeting_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "meeting_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["teams", "zoom", "meet", "auto"]
+    },
+    "purpose": {
+      "type": "string",
+      "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+    },
+    "primary_role": {
+      "type": "string",
+      "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+    },
+    "support_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+      }
+    },
+    "agenda": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "person_slug": { "type": "string" },
+          "channel_handle": { "type": "string" },
+          "role_hint": {
+            "type": "string",
+            "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+          }
+        }
+      }
+    },
+    "desired_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "authority_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "may_facilitate": { "type": "boolean" },
+        "may_speak": { "type": "boolean" },
+        "may_make_shared_decisions": { "type": "boolean" },
+        "may_assign_action_items": { "type": "boolean" },
+        "may_track_action_items": { "type": "boolean" }
+      }
+    },
+    "own_tasks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "tracking_expectations": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "exit_conditions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "follow_up_channel": {
+      "type": "string",
+      "enum": ["slack", "email", "teams", "task_session"]
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

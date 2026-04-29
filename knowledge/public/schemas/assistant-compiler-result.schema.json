@@ -7,6 +7,7 @@
     "kind",
     "request_id",
     "compiled_at",
+    "execution_brief",
     "intent_contract",
     "work_loop",
     "source"
@@ -21,6 +22,9 @@
     },
     "compiled_at": {
       "type": "string"
+    },
+    "execution_brief": {
+      "type": "object"
     },
     "intent_contract": {
       "type": "object"

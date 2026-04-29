@@ -1,0 +1,41 @@
+{
+  "kind": "meeting-operations-brief",
+  "version": "1.0.0",
+  "intent": "meeting_operations",
+  "meeting_title": "Weekly planning sync",
+  "meeting_url": "https://example.microsoft.com/teams/join/abc",
+  "platform": "teams",
+  "purpose": "planning",
+  "primary_role": "facilitator",
+  "support_roles": ["planner", "scribe", "tracker"],
+  "agenda": ["Goals", "Blockers", "Decisions", "Action items"],
+  "participants": [
+    {
+      "name": "Aki",
+      "person_slug": "aki",
+      "channel_handle": "@aki",
+      "role_hint": "decision_maker"
+    }
+  ],
+  "desired_outcomes": [
+    "Align on the next milestone",
+    "Capture owners and deadlines",
+    "Clarify escalation paths"
+  ],
+  "authority_scope": {
+    "may_facilitate": true,
+    "may_speak": true,
+    "may_make_shared_decisions": false,
+    "may_assign_action_items": true,
+    "may_track_action_items": true
+  },
+  "own_tasks": ["Prepare the agenda", "Summarize the meeting"],
+  "tracking_expectations": ["Track all owner/deadline pairs until closed"],
+  "exit_conditions": [
+    "Agenda is complete",
+    "Action items have owners",
+    "No missing authority remains"
+  ],
+  "follow_up_channel": "task_session",
+  "notes": "Stop before making final decisions unless explicitly authorized."
+}

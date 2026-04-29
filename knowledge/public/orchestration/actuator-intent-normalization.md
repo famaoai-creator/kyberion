@@ -1,6 +1,7 @@
 # Actuator Intent Normalization
 
 曖昧な依頼をそのまま actuator 実行へ落とさず、まず `execution brief` に正規化するための考え方です。
+この brief は booking や presentation だけでなく、全ての intent の最初の共通層として扱います。
 
 ## Core Rule
 
@@ -15,17 +16,21 @@
 ## Two-Step Contract
 
 1. `actuator-execution-brief`
+
 - request の正規化
 - archetype 判定
 - missing input と assumption の明示
+- LLM が最初に作る semantic brief
 
 2. `actuator-resolution-plan`
+
 - 実行 phase
 - 使用 actuator
 - 期待 artifact
 - exit criteria
 
 3. `operator-interaction-packet`
+
 - LLM が人間に返すための対話契約
 - clarification / execution-preview / status-summary を分離
 - 内部 plan をそのまま見せず、必要な説明だけを返す
@@ -34,10 +39,11 @@
 
 1. request text を archetype へ分類
 2. brief を生成
-3. missing input が重大なら clarification
-4. plan へ落とす
-5. `pipeline bundle` を生成する
-6. その後に individual actuator template を埋めて実行する
+3. brief を元に intent contract を生成する
+4. missing input が重大なら clarification
+5. plan へ落とす
+6. `pipeline bundle` を生成する
+7. その後に individual actuator template を埋めて実行する
 
 ## Pipeline Bundle Rule
 
@@ -60,4 +66,5 @@
   - readiness
   - 足りない入力
   - 次の一手
+- 可能なら LLM は `execution brief` を先に作り、その brief を intent contract / work loop の根拠にする
 - 内部の `pipeline bundle` や `execution plan set` は必要に応じて要約し、対話では平文化する

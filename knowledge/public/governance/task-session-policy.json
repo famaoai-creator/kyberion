@@ -9,9 +9,7 @@
         "success_condition": "A project record, kickoff context, and first work items are prepared."
       },
       "requirements": {
-        "default_missing": [
-          "project_brief"
-        ]
+        "default_missing": ["project_brief"]
       },
       "payload": {
         "static": {
@@ -246,6 +244,22 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "id": "lifestyle-booking",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Capture booking constraints, compare preferred site groups, and prepare an approval-ready plan before execution",
+        "success_condition": "The booking path is clarified, the preflight questions are answered, and a safe recommendation is prepared."
+      },
+      "requirements": {
+        "default_missing": ["booking_path_preference"]
+      },
+      "payload": {
+        "static": {
+          "booking_flow_kind": "lifestyle_booking"
+        }
       }
     },
     {
@@ -519,9 +533,7 @@
         "success_condition": "The requested service operation completes and the result is reported back."
       },
       "requirements": {
-        "default_missing": [
-          "service_name"
-        ]
+        "default_missing": ["service_name"]
       },
       "payload": {
         "fields": [
@@ -568,6 +580,45 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "id": "schedule-coordination",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Coordinate or reschedule a calendar within declared authority boundaries",
+        "success_condition": "The updated schedule, constraints, and follow-up path are recorded."
+      },
+      "requirements": {
+        "default_missing": [
+          "schedule_scope",
+          "date_range",
+          "fixed_constraints",
+          "calendar_action_boundary"
+        ]
+      },
+      "payload": {
+        "static": {
+          "intent_id": "schedule-coordination",
+          "execution_shape": "task_session"
+        }
+      }
+    },
+    {
+      "id": "meeting-operations",
+      "task_type": "meeting_operations",
+      "goal": {
+        "summary": "Facilitate or proxy a live online meeting",
+        "success_condition": "The meeting is joined or facilitated according to the declared role, decisions and action items are captured with owners and deadlines, and the follow-up path is recorded."
+      },
+      "requirements": {
+        "default_missing": ["meeting_url", "meeting_role_boundary", "meeting_purpose"]
+      },
+      "payload": {
+        "static": {
+          "intent_id": "meeting-operations",
+          "execution_shape": "task_session"
+        }
       }
     },
     {

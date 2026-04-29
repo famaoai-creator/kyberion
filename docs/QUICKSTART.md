@@ -55,6 +55,29 @@ Examples:
 - `日経新聞を開いて`
 - `voice-hub のログを見て`
 - `今日の天気を教えて`
+- `Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる`
+- `スケジュールを調整して`
+
+### How To Ask Well
+
+Ask for the outcome first, then add only the constraints that change the result.
+
+Good prompts usually include:
+
+- what you want to achieve
+- when or where it applies
+- important constraints
+- what should happen if something is missing
+
+Examples:
+
+- `6/6-6/8で沖縄に行くのでおすすめのホテルを探して。予算は1泊2万円前後で、那覇寄りが希望。`
+- `今夜のレストランを予約したい。2名で、静かな店を優先して。`
+- `この要件定義を説明する資料を作って。役員向け、10枚前後、かっちりしたトーンで。`
+
+If the request needs clarification, Kyberion should ask for the missing inputs before proceeding.
+If the request is a booking, reservation, presentation, narrated video, or another structured task, Kyberion may first create a short brief and then ask only the questions that change the outcome.
+If the request is a meeting, Kyberion should first decide the role, authority boundary, and follow-up tracking plan before joining.
 
 Kyberion should respond with one of these:
 
@@ -93,6 +116,18 @@ If you only remember a few things, remember these:
 3. Approvals appear only for risky actions.
 4. Results come back as answers, artifacts, or task/mission state.
 5. Missions are the durable backend model, not the primary UI.
+
+Practical rule:
+
+- say `ホテルを探して` rather than `booking-preference-profile を使って`
+- say `説明資料を作って` rather than `presentation-preference-profile を使って`
+- say `使い方の動画を作って` rather than `narrated-video-preference-profile を使って`
+- say `このTeams会議を進行して` rather than `meeting-operations-profile を使って`
+- say `Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる` when you want Kyberion to enter the meeting-operations path
+- say `スケジュールを調整して` when you want Kyberion to enter the schedule-coordination path
+- say `状態を見て` rather than `mission controller を確認して`
+
+Kyberion will decide whether to answer directly, ask for a brief clarification, or start a task session or mission.
 
 ## 6. When To Use Each Surface
 
@@ -167,7 +202,7 @@ Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next R
 
 ## 8. Where To Read Next
 
-- [README.md](/Users/famao/kyberion/README.md)
-- [docs/OPERATOR_UX_GUIDE.md](/Users/famao/kyberion/docs/OPERATOR_UX_GUIDE.md)
-- [docs/GLOSSARY.md](/Users/famao/kyberion/docs/GLOSSARY.md)
-- [CAPABILITIES_GUIDE.md](/Users/famao/kyberion/CAPABILITIES_GUIDE.md)
+- [README.md](../README.md)
+- [docs/OPERATOR_UX_GUIDE.md](OPERATOR_UX_GUIDE.md)
+- [docs/GLOSSARY.md](GLOSSARY.md)
+- [CAPABILITIES_GUIDE.md](../CAPABILITIES_GUIDE.md)

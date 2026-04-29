@@ -1,0 +1,82 @@
+{
+  "kind": "meeting-operations-profile",
+  "profile_id": "kyberion-meeting-default",
+  "brief_question_sets": [
+    {
+      "label": "Planning / decision meeting",
+      "meeting_purposes": ["planning", "decision", "default"],
+      "questions": [
+        "What is the meeting trying to decide?",
+        "What are the expected outputs?",
+        "Who can make the final call?",
+        "Should Kyberion stop before speaking or can it facilitate?"
+      ],
+      "notes": "Use when the meeting is about a concrete decision or a plan."
+    },
+    {
+      "label": "Status / tracking meeting",
+      "meeting_purposes": ["status_update", "review", "one_on_one"],
+      "questions": [
+        "What should be tracked after the meeting?",
+        "Which action items belong to Kyberion to complete?",
+        "Which items need owner and deadline assignment?",
+        "Should the output prioritize a written summary or live facilitation?"
+      ],
+      "notes": "Use when the meeting is about updates, reviews, or follow-up tracking."
+    },
+    {
+      "label": "Incident / workshop",
+      "meeting_purposes": ["incident", "facilitation", "workshop"],
+      "questions": [
+        "What is the incident or workshop goal?",
+        "What authority does Kyberion have during the meeting?",
+        "What is the escalation path if consensus is not reached?",
+        "Should Kyberion capture transcript, summary, and action items?"
+      ],
+      "notes": "Use when the meeting needs live coordination and fast tracking."
+    }
+  ],
+  "role_sets": [
+    {
+      "label": "Planner / facilitator",
+      "meeting_purposes": ["planning", "decision", "workshop", "default"],
+      "primary_role": "facilitator",
+      "support_roles": ["planner", "scribe", "tracker"],
+      "notes": "Best when Kyberion should guide the agenda and keep decisions moving."
+    },
+    {
+      "label": "Scribe / tracker",
+      "meeting_purposes": ["status_update", "review", "one_on_one"],
+      "primary_role": "scribe",
+      "support_roles": ["tracker", "executor"],
+      "notes": "Best when Kyberion should primarily capture actions and follow-ups."
+    },
+    {
+      "label": "Incident lead",
+      "meeting_purposes": ["incident", "facilitation"],
+      "primary_role": "planner",
+      "support_roles": ["facilitator", "scribe", "tracker"],
+      "notes": "Best when Kyberion must keep the group focused and produce immediate follow-ups."
+    }
+  ],
+  "facilitation_policy": {
+    "ask_before_join": true,
+    "ask_before_speaking": true,
+    "ask_before_shared_decision": true,
+    "prefer_written_summary": true,
+    "capture_transcript": true
+  },
+  "tracking_policy": {
+    "default_follow_up_channel": "task_session",
+    "default_tracking_cadence": "daily",
+    "require_owner": true,
+    "require_deadline": true,
+    "track_until_closed": true
+  },
+  "exit_policy": {
+    "stop_after_agenda_complete": true,
+    "stop_on_missing_authority": true,
+    "capture_final_summary": true,
+    "capture_action_items": true
+  }
+}

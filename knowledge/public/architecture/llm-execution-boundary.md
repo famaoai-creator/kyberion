@@ -61,6 +61,10 @@ Actuators and runtime components are responsible for:
 - evidence retention
 - governed-path persistence
 
+This zone also includes deterministic post-execution assessment for learning candidates.
+For example, browser and task-session outcomes can be screened for reuse potential before any distill or promotion step runs.
+That screening should remain deterministic and rule-governed, even if the original request was interpreted by an LLM.
+
 In this zone, behavior should be as reproducible as possible.
 
 ## Approved Flow

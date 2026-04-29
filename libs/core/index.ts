@@ -15,17 +15,17 @@ export * from './error-codes.js';
 
 // Secure IO & Filesystem (Shield Layer)
 export * as secureIo from './secure-io.js';
-export { 
-  safeReadFile, 
-  safeWriteFile, 
-  safeAppendFileSync, 
+export {
+  safeReadFile,
+  safeWriteFile,
+  safeAppendFileSync,
   safeCopyFileSync,
   safeMoveSync,
   safeSymlinkSync,
   safeRmSync,
-  safeUnlinkSync, 
-  safeMkdir, 
-  safeExistsSync, 
+  safeUnlinkSync,
+  safeMkdir,
+  safeExistsSync,
   safeExec,
   buildSafeExecEnv,
   safeReaddir,
@@ -34,36 +34,33 @@ export {
   safeReadlink,
   safeOpenAppendFile,
   safeFsyncFile,
-  safeCreateExclusiveFileSync
+  safeCreateExclusiveFileSync,
 } from './secure-io.js';
 
 // Backward compatibility aliases
-export { 
-  safeAppendFileSync as safeAppendFile,
-  safeUnlinkSync as safeUnlink
-} from './secure-io.js';
+export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } from './secure-io.js';
 
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
-export { 
-  rootDir, 
-  knowledge, 
-  scripts, 
-  active, 
-  vault, 
+export {
+  rootDir,
+  knowledge,
+  scripts,
+  active,
+  vault,
   capabilityAssets,
   shared,
   sharedTmp,
   sharedExports,
-  isProtected, 
+  isProtected,
   capabilityEntry,
   capabilityDir,
-  skillDir, 
+  skillDir,
   missionDir,
   missionEvidenceDir,
   findMissionPath,
   resolve,
-  rootResolve
+  rootResolve,
 } from './path-resolver.js';
 
 // Utils
@@ -95,7 +92,14 @@ export { generateNativePdf } from './src/native-pdf-engine/engine.js';
 export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
-export { protocolToMarkdown, pdfToMarkdown, docxToMarkdown, xlsxToMarkdown, pptxToMarkdown, extractTablesFromPage } from './src/protocol-to-markdown.js';
+export {
+  protocolToMarkdown,
+  pdfToMarkdown,
+  docxToMarkdown,
+  xlsxToMarkdown,
+  pptxToMarkdown,
+  extractTablesFromPage,
+} from './src/protocol-to-markdown.js';
 export type {
   XlsxCell,
   XlsxCellStyle,
@@ -107,7 +111,12 @@ export type {
   XlsxMergeCell,
   XlsxWorksheet,
 } from './src/types/xlsx-protocol.js';
-export type { PdfDesignProtocol, PdfAesthetic, PdfLayoutElement, PdfPage } from './src/types/pdf-protocol.js';
+export type {
+  PdfDesignProtocol,
+  PdfAesthetic,
+  PdfLayoutElement,
+  PdfPage,
+} from './src/types/pdf-protocol.js';
 
 // Document Design Protocol (Generic Base)
 export type {
@@ -132,10 +141,15 @@ export { matchCronField, getZonedDateParts, matchesCron } from './src/cron-utils
 export type { ZonedDateParts } from './src/cron-utils.js';
 
 // Intent Compiler
-export { compileIntent, buildPipelineGenerationPrompt, resolveIntentToSteps } from './src/intent-compiler.js';
+export {
+  compileIntent,
+  buildPipelineGenerationPrompt,
+  resolveIntentToSteps,
+} from './src/intent-compiler.js';
 export type { CompiledIntent } from './src/intent-compiler.js';
 export * from './intent-contract.js';
 export * from './intent-contract-learning.js';
+export * from './execution-brief.js';
 export * from './tool-actuator-routing.js';
 export * from './delegation-request.js';
 export * from './assistant-compiler-request.js';
@@ -145,16 +159,22 @@ export * from './assistant-compiler-request.js';
 
 // Governance & Security (Shield Layer)
 export * as tierGuard from './tier-guard.js';
-export { 
-  detectTier, 
-  validateReadPermission, 
-  validateWritePermission, 
-  scanForConfidentialMarkers, 
-  validateSovereignBoundary 
+export {
+  detectTier,
+  validateReadPermission,
+  validateWritePermission,
+  scanForConfidentialMarkers,
+  validateSovereignBoundary,
 } from './tier-guard.js';
 
 export * as authority from './authority.js';
-export { resolveIdentityContext, hasAuthority, inferPersonaFromRole, buildExecutionEnv, withExecutionContext } from './authority.js';
+export {
+  resolveIdentityContext,
+  hasAuthority,
+  inferPersonaFromRole,
+  buildExecutionEnv,
+  withExecutionContext,
+} from './authority.js';
 
 export * as transformer from './transformer.js';
 export { transform, getValueByPath } from './transformer.js';
@@ -162,10 +182,19 @@ export { transform, getValueByPath } from './transformer.js';
 export * as serviceEngine from './service-engine.js';
 export { executeServicePreset } from './service-engine.js';
 export { compileMusicGenerationADF } from './music-workflow-compiler.js';
-export { compileImageGenerationADF, compileVideoGenerationADF } from './visual-workflow-compiler.js';
+export {
+  compileImageGenerationADF,
+  compileVideoGenerationADF,
+} from './visual-workflow-compiler.js';
 
 export * as secretGuard from './secret-guard.js';
-export { getSecret, getActiveSecrets, grantAccess, grantAccessGuarded, isSecretPath } from './secret-guard.js';
+export {
+  getSecret,
+  getActiveSecrets,
+  grantAccess,
+  grantAccessGuarded,
+  isSecretPath,
+} from './secret-guard.js';
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
@@ -222,7 +251,6 @@ export * from './agent-mediator.js';
 export * from './acp-mediator.js';
 export * from './agent-adapter.js';
 
-
 // Agent Registry & Lifecycle
 export * from './agent-registry.js';
 export * from './agent-lifecycle.js';
@@ -261,10 +289,7 @@ export {
   mapStageToLoopPhase,
   reclassifyDrift,
 } from './intent-snapshot-store.js';
-export type {
-  EmitSnapshotParams,
-  IntentDriftGateResult,
-} from './intent-snapshot-store.js';
+export type { EmitSnapshotParams, IntentDriftGateResult } from './intent-snapshot-store.js';
 export {
   getTrustLevel,
   listNgTopics,
@@ -368,18 +393,9 @@ export {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
 } from './distill-knowledge-injector.js';
-export type {
-  DistilledKnowledgeEntry,
-  FindRelevantInput,
-} from './distill-knowledge-injector.js';
-export {
-  loadRestrictedActionRules,
-  matchRestrictedAction,
-} from './restricted-action-policy.js';
-export type {
-  RestrictedActionMatch,
-  RestrictedActionRule,
-} from './restricted-action-policy.js';
+export type { DistilledKnowledgeEntry, FindRelevantInput } from './distill-knowledge-injector.js';
+export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-action-policy.js';
+export type { RestrictedActionMatch, RestrictedActionRule } from './restricted-action-policy.js';
 export { loadMeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
 export type { MeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
 export { MissionEvidenceDoc } from './mission-evidence-doc.js';
@@ -523,7 +539,10 @@ export { AnthropicIntentExtractor } from './anthropic-intent-extractor.js';
 export type { AnthropicIntentExtractorOptions } from './anthropic-intent-extractor.js';
 export { AnthropicVoiceBridge } from './anthropic-voice-bridge.js';
 export type { AnthropicVoiceBridgeOptions } from './anthropic-voice-bridge.js';
-export { CodexCliReasoningBackend, buildCodexCliBackendFromEnv } from './codex-cli-reasoning-backend.js';
+export {
+  CodexCliReasoningBackend,
+  buildCodexCliBackendFromEnv,
+} from './codex-cli-reasoning-backend.js';
 export type { CodexCliReasoningBackendOptions } from './codex-cli-reasoning-backend.js';
 export { CodexCliIntentExtractor } from './codex-cli-intent-extractor.js';
 export type { CodexCliIntentExtractorOptions } from './codex-cli-intent-extractor.js';
@@ -559,7 +578,11 @@ export {
   resetReasoningBootstrap,
   getInstalledReasoningMode,
 } from './reasoning-bootstrap.js';
-export type { InstallAnthropicOptions, InstallReasoningOptions, ReasoningBackendMode } from './reasoning-bootstrap.js';
+export type {
+  InstallAnthropicOptions,
+  InstallReasoningOptions,
+  ReasoningBackendMode,
+} from './reasoning-bootstrap.js';
 export type {
   BranchForkInput,
   CritiqueInput,
@@ -647,6 +670,13 @@ export * from './slack-onboarding.js';
 export type * from './channel-surface-types.js';
 
 export * from './browser-conversation-session.js';
+export * from './browser-distill-candidate.js';
+export * from './narrated-video-preference-profile.js';
+export * from './narrated-video-upload-package.js';
+export * from './meeting-operations-profile.js';
+export * from './mission-seed-assessment.js';
+export * from './mission-assessment.js';
+export * from './task-distill-candidate.js';
 export * from './presence-surface.js';
 export * from './presence-avatar.js';
 export * from './presence-bridge.js';
@@ -668,6 +698,8 @@ export * from './analysis-impact-bands.js';
 export * from './analysis-findings.js';
 export * from './analysis-execution-contract.js';
 export * from './work-design.js';
+export * from './booking-preference-profile.js';
+export * from './presentation-preference-profile.js';
 export * from './project-registry.js';
 export * from './project-track-registry.js';
 export * from './sdlc-gate-readiness.js';
@@ -691,14 +723,17 @@ export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
 
-
 // Shared Business Types
 export * from './shared-business-types.js';
 export * from './types.js';
 // export * as visionJudge from './vision-judge.js';
 
 // Actuator Capability Contracts (Dynamic Runtime Detection)
-export { checkActuatorCapabilities, checkAllActuatorCapabilities, registerCapabilityProbe } from './src/actuator-capability.js';
+export {
+  checkActuatorCapabilities,
+  checkAllActuatorCapabilities,
+  registerCapabilityProbe,
+} from './src/actuator-capability.js';
 export type { ActuatorCapability, ActuatorStatus } from './src/actuator-capability.js';
 
 // Pre-Flight Check (Sovereign Sentinel)
@@ -712,4 +747,10 @@ export { TraceContext } from './src/trace.js';
 export type { Trace, TraceSpan, TraceEvent, TraceArtifact } from './src/trace.js';
 
 // Feedback Loop (Closed-Loop Automation)
-export { extractHintsFromTrace, persistHints, checkScheduleHealth, recordPipelineResult, runFeedbackLoop } from './src/feedback-loop.js';
+export {
+  extractHintsFromTrace,
+  persistHints,
+  checkScheduleHealth,
+  recordPipelineResult,
+  runFeedbackLoop,
+} from './src/feedback-loop.js';

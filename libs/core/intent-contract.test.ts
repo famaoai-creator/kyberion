@@ -3,7 +3,13 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core';
 import { describe, expect, it } from 'vitest';
-import { compileUserIntentFlow, deriveIntentDeliveryDecision, formatClarificationPacket, inferGovernedDeliveryMode, resolveIntentCompilerTarget } from './intent-contract.js';
+import {
+  compileUserIntentFlow,
+  deriveIntentDeliveryDecision,
+  formatClarificationPacket,
+  inferGovernedDeliveryMode,
+  resolveIntentCompilerTarget,
+} from './intent-contract.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -11,6 +17,30 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 describe('intent-contract compiler', () => {
   it('accepts LLM-produced contract and work loop JSON when valid', async () => {
     const responses = [
+      JSON.stringify({
+        kind: 'actuator-execution-brief',
+        request_text: '提案資料を作って',
+        archetype_id: 'generate-presentation',
+        confidence: 0.84,
+        summary: '提案資料の作成',
+        user_facing_summary: '提案用のスライドを作る',
+        normalized_scope: ['presentation_deck'],
+        target_actuators: ['presentation-outline-compiler', 'pptx-generator'],
+        deliverables: ['artifact:pptx'],
+        missing_inputs: [],
+        assumptions: ['Use standard proposal defaults.'],
+        clarification_questions: [],
+        readiness: 'fully_automatable',
+        readiness_reason: 'No missing inputs.',
+        llm_touchpoints: [
+          {
+            stage: 'execution_brief',
+            purpose: 'Extract the request into a governed execution brief',
+            output_contract: 'actuator-execution-brief',
+          },
+        ],
+        recommended_next_step: 'Compile the intent contract and work loop.',
+      }),
       JSON.stringify({
         kind: 'intent-contract',
         source_text: '提案資料を作って',
@@ -113,10 +143,11 @@ describe('intent-contract compiler', () => {
       { text: '提案資料を作って' },
       {
         askFn: async () => responses.shift() || '',
-      },
+      }
     );
 
     expect(flow.source).toBe('llm');
+    expect(flow.executionBrief.kind).toBe('actuator-execution-brief');
     expect(flow.intentContract.intent_id).toBe('generate-presentation');
     expect(flow.workLoop.resolution.task_type).toBe('presentation_deck');
     expect(flow.clarificationPacket).toBeUndefined();
@@ -127,13 +158,52 @@ describe('intent-contract compiler', () => {
       { text: 'Webサービスを作って' },
       {
         askFn: async () => 'not json',
-      },
+      }
     );
 
     expect(flow.source).toBe('fallback');
+    expect(flow.executionBrief.kind).toBe('actuator-execution-brief');
     expect(flow.intentContract.intent_id).toBe('bootstrap-project');
     expect(flow.clarificationPacket?.interaction_type).toBe('clarification');
     expect(formatClarificationPacket(flow.clarificationPacket!)).toContain('project brief');
+  });
+
+  it('falls back to the meeting operations path when the request is clearly about a meeting', async () => {
+    const flow = await compileUserIntentFlow(
+      { text: 'Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる' },
+      {
+        askFn: async () => 'not json',
+      }
+    );
+
+    expect(flow.executionBrief.archetype_id).toBe('meeting-operations');
+    expect(flow.executionBrief.missing_inputs).toEqual([
+      'meeting_url',
+      'meeting_role_boundary',
+      'meeting_purpose',
+    ]);
+    expect(flow.intentContract.resolution.task_type).toBe('meeting_operations');
+    expect(flow.intentContract.delivery_mode).toBe('managed_program');
+  });
+
+  it('falls back to the schedule coordination path when the request is about general schedule adjustment', async () => {
+    const flow = await compileUserIntentFlow(
+      { text: 'スケジュールを調整して' },
+      {
+        askFn: async () => 'not json',
+      }
+    );
+
+    expect(flow.executionBrief.archetype_id).toBe('schedule-coordination');
+    expect(flow.executionBrief.missing_inputs).toEqual([
+      'schedule_scope',
+      'date_range',
+      'fixed_constraints',
+      'calendar_action_boundary',
+    ]);
+    expect(flow.intentContract.intent_id).toBe('schedule-coordination');
+    expect(flow.intentContract.resolution.task_type).toBe('service_operation');
+    expect(flow.intentContract.delivery_mode).toBe('managed_program');
   });
 
   it('marks durable requests as managed programs for dispatcher decisions', async () => {
@@ -141,7 +211,7 @@ describe('intent-contract compiler', () => {
       { text: 'この要件定義を長期的に継続改善しながら運行管理したい' },
       {
         askFn: async () => 'not json',
-      },
+      }
     );
 
     const decision = deriveIntentDeliveryDecision(flow.intentContract);
@@ -192,7 +262,24 @@ describe('intent-contract compiler', () => {
   });
 
   it('infers delivery mode from governed rules', () => {
-    expect(inferGovernedDeliveryMode('この要件定義を長期的に継続改善したい', 'task_session', [])).toBe('managed_program');
+    expect(
+      inferGovernedDeliveryMode('この要件定義を長期的に継続改善したい', 'task_session', [])
+    ).toBe('managed_program');
+    expect(
+      inferGovernedDeliveryMode('6/6-6/8で沖縄のホテルを探して', 'task_session', [
+        'booking_path_preference',
+      ])
+    ).toBe('managed_program');
+    expect(
+      inferGovernedDeliveryMode('今夜のレストランを予約したい', 'task_session', [
+        'booking_path_preference',
+      ])
+    ).toBe('managed_program');
+    expect(
+      inferGovernedDeliveryMode('歯医者の予約を取りたい', 'task_session', [
+        'booking_path_preference',
+      ])
+    ).toBe('managed_program');
     expect(inferGovernedDeliveryMode('提案資料を作って', 'task_session', [])).toBe('one_shot');
   });
 
@@ -200,58 +287,68 @@ describe('intent-contract compiler', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json')
+    );
 
-    expect(validate({
-      kind: 'intent-contract',
-      source_text: '提案資料を作って',
-      intent_id: 'generate-presentation',
-      goal: {
-        summary: 'Create a presentation deck',
-        success_condition: 'A governed PPTX draft is prepared.',
-      },
-      resolution: {
-        execution_shape: 'task_session',
-        task_type: 'presentation_deck',
-      },
-      required_inputs: [],
-      outcome_ids: ['artifact:pptx'],
-      approval: {
-        requires_approval: false,
-      },
-      delivery_mode: 'one_shot',
-      clarification_needed: false,
-      confidence: 0.92,
-      why: 'The request is a governed presentation generation task.',
-    })).toBe(true);
+    expect(
+      validate({
+        kind: 'intent-contract',
+        source_text: '提案資料を作って',
+        intent_id: 'generate-presentation',
+        goal: {
+          summary: 'Create a presentation deck',
+          success_condition: 'A governed PPTX draft is prepared.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'presentation_deck',
+        },
+        required_inputs: [],
+        outcome_ids: ['artifact:pptx'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.92,
+        why: 'The request is a governed presentation generation task.',
+      })
+    ).toBe(true);
   });
 
   it('rejects invalid intent-contract payloads', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json')
+    );
 
-    expect(validate({
-      kind: 'intent-contract',
-      source_text: '提案資料を作って',
-      intent_id: 'generate-presentation',
-      goal: {
-        summary: 'Create a presentation deck',
-        success_condition: 'A governed PPTX draft is prepared.',
-      },
-      resolution: {
-        execution_shape: 'invalid_shape',
-      },
-      required_inputs: [],
-      outcome_ids: ['artifact:pptx'],
-      approval: {
-        requires_approval: false,
-      },
-      delivery_mode: 'one_shot',
-      clarification_needed: false,
-      confidence: 0.92,
-      why: 'The request is a governed presentation generation task.',
-    })).toBe(false);
+    expect(
+      validate({
+        kind: 'intent-contract',
+        source_text: '提案資料を作って',
+        intent_id: 'generate-presentation',
+        goal: {
+          summary: 'Create a presentation deck',
+          success_condition: 'A governed PPTX draft is prepared.',
+        },
+        resolution: {
+          execution_shape: 'invalid_shape',
+        },
+        required_inputs: [],
+        outcome_ids: ['artifact:pptx'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.92,
+        why: 'The request is a governed presentation generation task.',
+      })
+    ).toBe(false);
   });
 });
