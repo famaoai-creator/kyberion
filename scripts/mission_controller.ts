@@ -18,7 +18,9 @@
 import * as path from 'node:path';
 import {
   auditChain,
+  discoverProviders,
   findMissionPath,
+  getInstalledReasoningMode,
   listMemoryPromotionCandidates,
   loadProjectRecord,
   loadProjectTrackRecord,
@@ -708,6 +710,24 @@ function showMissionStatus(id: string) {
   console.log('');
 }
 
+function showReasoningBackendStatus() {
+  const selectedMode = getInstalledReasoningMode();
+  const providers = discoverProviders(true).filter((provider) =>
+    ['claude', 'gemini', 'codex'].includes(provider.provider)
+  );
+
+  console.log('');
+  console.log('  Reasoning Backend:');
+  console.log(`    Selected: ${selectedMode || process.env.KYBERION_REASONING_BACKEND || 'auto'}`);
+  console.log(`    Wisdom profile: ${process.env.KYBERION_WISDOM_LLM_PROFILE || 'distill policy default'}`);
+  for (const provider of providers) {
+    const state = provider.installed ? (provider.healthy ? 'ready' : 'installed-unhealthy' ) : 'missing';
+    const version = provider.version || 'n/a';
+    console.log(`    ${provider.provider.padEnd(6)} ${state.padEnd(18)} ${version}`);
+  }
+  console.log('');
+}
+
 function showHelp() {
   console.log(`
 Kyberion Sovereign Mission Controller (KSMC)
@@ -748,7 +768,7 @@ Queue Commands:
 
 Visibility Commands:
   list     [status]              List all missions (optionally filter by status)
-  status   <ID>                  Show detailed status of a specific mission
+  status   <ID>                  Show detailed status of a specific mission and backend availability
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
@@ -1100,6 +1120,7 @@ async function main() {
       break;
     case 'status':
       showMissionStatus(arg1);
+      showReasoningBackendStatus();
       break;
     case 'sync-project-ledger':
       await syncProjectLedger(arg1);

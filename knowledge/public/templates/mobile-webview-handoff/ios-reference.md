@@ -12,20 +12,20 @@ debug scheme または internal simulator build で、authenticated WebView stat
 
 ## Shared Stub Files
 
-- [`KyberionHandoffModels.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffModels.swift)
-- [`KyberionHandoffStorage.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffStorage.swift)
-- [`KyberionHandoffExporter.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffExporter.swift)
-- [`KyberionHandoffCoordinator.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffCoordinator.swift)
+- [`KyberionHandoffModels.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffModels.swift)
+- [`KyberionHandoffStorage.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffStorage.swift)
+- [`KyberionHandoffExporter.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffExporter.swift)
+- [`KyberionHandoffCoordinator.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-webview-handoff/ios/KyberionHandoffCoordinator.swift)
 
 ## Profile Alignment
 
-- [`example-ios-login-passkey.json`](/Users/famaoai/k/a/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json)
+- [`example-ios-login-passkey.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json)
 
 ## Orchestration
 
 - capture:
-  [`ios-runtime-webview-handoff-template.json`](/Users/famaoai/k/a/kyberion/libs/actuators/ios-actuator/examples/ios-runtime-webview-handoff-template.json)
+  [`ios-runtime-webview-handoff-template.json`](/Users/famao/kyberion/libs/actuators/ios-actuator/examples/ios-runtime-webview-handoff-template.json)
 - browser import:
-  [`ios-runtime-session-handoff-import.json`](/Users/famaoai/k/a/kyberion/libs/actuators/browser-actuator/examples/ios-runtime-session-handoff-import.json)
+  [`ios-runtime-session-handoff-import.json`](/Users/famao/kyberion/libs/actuators/browser-actuator/examples/ios-runtime-session-handoff-import.json)
 - end-to-end runner:
-  [`mobile-webview-handoff-runner-ios.json`](/Users/famaoai/k/a/kyberion/pipelines/mobile-webview-handoff-runner-ios.json)
+  [`mobile-webview-handoff-runner-ios.json`](/Users/famao/kyberion/pipelines/mobile-webview-handoff-runner-ios.json)

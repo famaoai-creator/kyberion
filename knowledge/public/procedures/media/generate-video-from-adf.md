@@ -6,7 +6,7 @@ Generate a governed video artifact from a `video-generation-adf` contract while 
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with a compatible video workflow
-- **Schema**: [`video-generation-adf.schema.json`](/Users/famaoai/k/a/kyberion/knowledge/public/schemas/video-generation-adf.schema.json)
+- **Schema**: [`video-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-generation-adf.schema.json)
 
 ## 3. Contract Shape
 `video-generation-adf` is the stable public interface.
@@ -21,8 +21,8 @@ Current implementation hydrates typed placeholders into a named or embedded work
 ## 4. Execution
 Example inputs:
 
-- [`video-adf-drive-clip.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json)
-- [`submit-video-generation-job.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json)
+- [`video-adf-drive-clip.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json)
+- [`submit-video-generation-job.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json)
 
 Run the direct example:
 
@@ -46,9 +46,9 @@ Follow-up job actions:
 
 Orchestrator-ready bundle:
 
-- [`video-generation-pipeline-bundle.json`](/Users/famaoai/k/a/kyberion/libs/actuators/orchestrator-actuator/examples/video-generation-pipeline-bundle.json)
-- [`video-bundle-to-execution-plan-set.json`](/Users/famaoai/k/a/kyberion/libs/actuators/orchestrator-actuator/examples/video-bundle-to-execution-plan-set.json)
-- [`video-bundle-to-run-execution-plan-set.json`](/Users/famaoai/k/a/kyberion/libs/actuators/orchestrator-actuator/examples/video-bundle-to-run-execution-plan-set.json)
+- [`video-generation-pipeline-bundle.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/video-generation-pipeline-bundle.json)
+- [`video-bundle-to-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/video-bundle-to-execution-plan-set.json)
+- [`video-bundle-to-run-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/video-bundle-to-run-execution-plan-set.json)
 
 ## 5. Expected Output
 - ComfyUI `prompt_id`

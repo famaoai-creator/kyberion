@@ -13,7 +13,7 @@ This is the step that makes a registered profile usable for:
 ## Input
 
 - registration receipt produced by:
-  - [register-voice-profile.md](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
+  - [register-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
 - explicit approver identity
 
 ## CLI

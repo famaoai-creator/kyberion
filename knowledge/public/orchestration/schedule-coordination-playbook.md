@@ -1,4 +1,5 @@
 # Schedule Coordination Playbook
+This playbook specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for calendar reshuffling work.
 
 ## Intent
 

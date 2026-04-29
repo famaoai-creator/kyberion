@@ -45,6 +45,7 @@ import { installShellSpeechToTextBridgeIfAvailable } from './speech-to-text-brid
 import { installShellDeploymentAdapterIfAvailable } from './deployment-adapter.js';
 import { installAuditForwarderIfAvailable } from './audit-forwarder.js';
 import { installSecretResolverIfAvailable } from './secret-resolver.js';
+import { discoverProviders } from './provider-discovery.js';
 
 export type ReasoningBackendMode =
   | 'claude-cli'
@@ -90,8 +91,19 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   // Auto-selection logic
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
   if (process.env.GEMINI_API_KEY) return 'gemini-api';
-  
-  // Default to CLI-based backends if keys are missing
+
+  const providers = discoverProviders(true);
+  if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
+    return 'codex-cli';
+  }
+  if (providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy)) {
+    return 'gemini-cli';
+  }
+  if (providers.some((provider) => provider.provider === 'claude' && provider.installed && provider.healthy)) {
+    return 'claude-cli';
+  }
+
+  // Default to Claude CLI when discovery cannot prove another backend.
   return 'claude-cli';
 }
 
@@ -142,6 +154,9 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   if (mode === 'claude-cli') {
     const cliBackend = buildShellClaudeCliBackendFromEnv();
     if (!cliBackend) {
+      logger.warn(
+        '[reasoning-bootstrap] mode=claude-cli selected but the Claude CLI is not usable — keeping stubs.',
+      );
       installed = true;
       installedMode = 'stub';
       return false;
@@ -156,6 +171,14 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   }
 
   if (mode === 'codex-cli') {
+    const providers = discoverProviders(true);
+    const codexHealthy = providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy);
+    if (!codexHealthy && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=codex-cli selected but Codex CLI is not usable — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
     const codexOptions = buildCodexCliQueryOptionsFromEnv();
     const mergedCodexOptions = {
       ...codexOptions,
@@ -185,6 +208,14 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   }
 
   if (mode === 'gemini-cli') {
+    const providers = discoverProviders(true);
+    const geminiHealthy = providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy);
+    if (!geminiHealthy && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=gemini-cli selected but Gemini CLI is not usable — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
     const geminiBackend = buildGeminiCliBackendFromEnv(process.env, options.model);
     if (!geminiBackend) {
       installed = true;

@@ -78,6 +78,24 @@ function emptySurfaceResult(text: string): SurfaceConversationResult {
   };
 }
 
+function buildDelegatedSurfaceConversationResult(
+  delegationResults: SurfaceDelegationResult[]
+): SurfaceConversationResult {
+  const successful = delegationResults.filter((result) => !result.error);
+  const firstResponse = successful[0]?.response || '';
+  const parsed = extractSurfaceBlocks(firstResponse);
+  return {
+    text: firstResponse,
+    a2uiMessages: [],
+    a2aMessages: [],
+    delegationResults,
+    approvalRequests: [],
+    routingProposals: [],
+    missionProposals: parsed.missionProposals || [],
+    planningPackets: parsed.planningPackets || [],
+  };
+}
+
 function formatExecutionReceipt(params: {
   intentId?: string;
   shape?: string;
@@ -106,6 +124,10 @@ function formatExecutionReceipt(params: {
 
 function structuredSurfaceQueryText(context: SurfaceRuntimeRouteContext): string {
   return (context.input.surfaceText || context.input.query || context.structuredQuery || '').trim();
+}
+
+function resolvedSurfaceIntent(context: SurfaceRuntimeRouteContext): ReturnType<typeof resolveSurfaceIntent> {
+  return context.resolvedIntent || resolveSurfaceIntent(structuredSurfaceQueryText(context));
 }
 
 function deriveSurfaceQueryRole(context: SurfaceRuntimeRouteContext): string | undefined {
@@ -478,6 +500,33 @@ function missionActionGuidance(
   return hint
     ? `Mission action '${action}' has no dedicated direct binding yet. Recommended command:\n${hint}`
     : `Mission action '${action}' has no direct binding yet.`;
+}
+
+function buildSurfaceDelegationRequest(params: {
+  senderAgentId: string;
+  receiver: string;
+  query: string;
+  intent: string;
+  context?: Record<string, unknown>;
+}): Parameters<typeof a2aBridge.route>[0] {
+  const payload: Record<string, unknown> = {
+    intent: params.intent,
+    text: params.query,
+  };
+  if (params.context && Object.keys(params.context).length > 0) {
+    payload.context = params.context;
+  }
+  return {
+    a2a_version: '1.0',
+    header: {
+      msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`,
+      sender: params.senderAgentId,
+      receiver: params.receiver,
+      performative: 'request',
+      timestamp: new Date().toISOString(),
+    },
+    payload,
+  };
 }
 
 function directIntentCommand(intentId?: string): { command: string; args: string[] } | null {
@@ -899,20 +948,14 @@ async function routeForcedDelegation(
       receiver === 'nerve-agent' && missionId
         ? `${query}\n${buildMissionTeamPromptContext(missionId)}`
         : query;
-    const response = await a2aBridge.route({
-      a2a_version: '1.0',
-      header: {
-        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`,
-        sender: senderAgentId,
+    const response = await a2aBridge.route(
+      buildSurfaceDelegationRequest({
+        senderAgentId,
         receiver,
-        performative: 'request',
-        timestamp: new Date().toISOString(),
-      },
-      payload: {
+        query: enrichedQuery,
         intent: 'surface_handoff',
-        text: enrichedQuery,
-      },
-    });
+      })
+    );
 
     return [
       {
@@ -943,18 +986,12 @@ async function routeSlackForcedDelegation(
   }
 
   try {
-    const response = await a2aBridge.route({
-      a2a_version: '1.0',
-      header: {
-        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6)}`,
-        sender: senderAgentId,
+    const response = await a2aBridge.route(
+      buildSurfaceDelegationRequest({
+        senderAgentId,
         receiver,
-        performative: 'request',
-        timestamp: new Date().toISOString(),
-      },
-      payload: {
+        query: parsed.userMessage,
         intent: deriveSlackIntentLabel(parsed.userMessage),
-        text: parsed.userMessage,
         context: {
           channel: 'slack',
           slack_channel: parsed.channel,
@@ -963,8 +1000,8 @@ async function routeSlackForcedDelegation(
           user_language: parsed.derivedLanguage,
           execution_mode: parsed.executionMode || 'conversation',
         },
-      },
-    });
+      })
+    );
 
     return [
       {
@@ -1039,19 +1076,7 @@ async function handleSlackConversationBypass(
     context.parsedSlackPrompt,
     context.input.missionId
   );
-  const successful = delegationResults.filter((result) => !result.error);
-  const firstResponse = successful[0]?.response || '';
-  const parsed = extractSurfaceBlocks(firstResponse);
-  return {
-    text: firstResponse,
-    a2uiMessages: [],
-    a2aMessages: [],
-    delegationResults,
-    approvalRequests: [],
-    routingProposals: [],
-    missionProposals: parsed.missionProposals || [],
-    planningPackets: parsed.planningPackets || [],
-  };
+  return buildDelegatedSurfaceConversationResult(delegationResults);
 }
 
 async function handlePresenceForcedBypass(
@@ -1063,27 +1088,15 @@ async function handlePresenceForcedBypass(
     context.input.senderAgentId,
     context.input.missionId
   );
-  const successful = delegationResults.filter((result) => !result.error);
-  const firstResponse = successful[0]?.response || '';
-  const parsed = extractSurfaceBlocks(firstResponse);
-  return {
-    text: firstResponse,
-    a2uiMessages: [],
-    a2aMessages: [],
-    delegationResults,
-    approvalRequests: [],
-    routingProposals: [],
-    missionProposals: parsed.missionProposals || [],
-    planningPackets: parsed.planningPackets || [],
-  };
+  return buildDelegatedSurfaceConversationResult(delegationResults);
 }
 
 const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   {
     matches: (context) => {
       if (!context.compiledFlow) return false;
-      const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
-      return Boolean(resolved.pipelineId || resolved.missionAction);
+      const resolved = resolvedSurfaceIntent(context);
+      return Boolean(resolved.routeFamily === 'pipeline' || resolved.routeFamily === 'mission');
     },
     handle: async (context) => {
       try {
@@ -1095,15 +1108,11 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   },
   {
     matches: (context) => {
-      const resolved = resolveSurfaceIntent(structuredSurfaceQueryText(context));
-      return (
-        resolved.intentId === 'knowledge-query' ||
-        resolved.intentId === 'query-knowledge' ||
-        resolved.intentId === 'live-query'
-      );
+      const resolved = resolvedSurfaceIntent(context);
+      return resolved.routeFamily === 'direct_reply';
     },
     handle: async (context) => {
-      const resolved = resolveSurfaceIntent(structuredSurfaceQueryText(context));
+      const resolved = resolvedSurfaceIntent(context);
       try {
         return await handleSurfaceQueryRoute(context, resolved);
       } catch (error: any) {
@@ -1113,8 +1122,8 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   },
   {
     matches: (context) => {
-      const resolved = resolveSurfaceIntent(structuredSurfaceQueryText(context));
-      return resolved.intentId === 'open-site' || resolved.intentId === 'browser-step';
+      const resolved = resolvedSurfaceIntent(context);
+      return resolved.routeFamily === 'browser_session';
     },
     handle: async (context) => {
       const query = structuredSurfaceQueryText(context);
@@ -1125,19 +1134,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
           context.input.senderAgentId,
           context.input.missionId
         );
-        const successful = delegationResults.filter((result) => !result.error);
-        const firstResponse = successful[0]?.response || '';
-        const parsed = extractSurfaceBlocks(firstResponse);
-        return {
-          text: firstResponse,
-          a2uiMessages: [],
-          a2aMessages: [],
-          delegationResults,
-          approvalRequests: [],
-          routingProposals: [],
-          missionProposals: parsed.missionProposals || [],
-          planningPackets: parsed.planningPackets || [],
-        };
+        return buildDelegatedSurfaceConversationResult(delegationResults);
       } catch (error: any) {
         return emptySurfaceResult(`Browser route failed: ${error?.message || String(error)}`);
       }
@@ -1241,6 +1238,7 @@ export async function runSurfaceConversation(
   const routeContext: SurfaceRuntimeRouteContext = {
     input,
     compiledFlow,
+    resolvedIntent: resolveSurfaceIntent(routedSurfaceInput.text),
     computedReceiver,
     structuredQuery,
     parsedSlackPrompt,

@@ -171,6 +171,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'check-kyberion-baseline',
       shape: 'pipeline',
+      routeFamily: 'pipeline',
       pipelineId: 'baseline-check',
     });
     const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
@@ -192,6 +193,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'classify-mission',
       shape: 'mission',
+      routeFamily: 'mission',
       missionAction: 'classify',
     });
     const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
@@ -214,6 +216,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'knowledge-query',
       shape: 'direct_reply',
+      routeFamily: 'direct_reply',
       queryType: 'knowledge_search',
       queryText: 'mission authority',
     });
@@ -238,6 +241,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'live-query',
       shape: 'direct_reply',
+      routeFamily: 'direct_reply',
       queryType: 'weather',
       queryText: '東京の天気を教えて',
     });
@@ -267,6 +271,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'live-query',
       shape: 'direct_reply',
+      routeFamily: 'direct_reply',
       queryType: 'web_search',
       queryText: 'OpenAI Responses API',
     });
@@ -353,6 +358,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'open-site',
       shape: 'browser_session',
+      routeFamily: 'browser_session',
       browserCommandKind: 'open_site',
     });
     const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
@@ -380,6 +386,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'browser-step',
       shape: 'browser_session',
+      routeFamily: 'browser_session',
       browserCommandKind: 'browser_step',
     });
     const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');

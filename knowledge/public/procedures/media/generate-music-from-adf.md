@@ -6,7 +6,7 @@ Generate a governed music artifact from a human-readable `music-generation-adf` 
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with ACE-Step models available
-- **Schema**: [`music-generation-adf.schema.json`](/Users/famaoai/k/a/kyberion/knowledge/public/schemas/music-generation-adf.schema.json)
+- **Schema**: [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/music-generation-adf.schema.json)
 
 ## 3. Contract Shape
 `music-generation-adf` is the stable public interface.
@@ -23,9 +23,9 @@ The actuator compiles this contract into an ACE-Step ComfyUI workflow internally
 ## 4. Execution
 Example input:
 
-- [`music-adf-anniversary-country-ja.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json)
-- [`submit-music-generation-job.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json)
-- [`music-generation-schedule-anniversary.json`](/Users/famaoai/k/a/kyberion/libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json)
+- [`music-adf-anniversary-country-ja.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json)
+- [`submit-music-generation-job.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json)
+- [`music-generation-schedule-anniversary.json`](/Users/famao/kyberion/libs/actuators/media-generation-actuator/examples/music-generation-schedule-anniversary.json)
 
 Run:
 
@@ -64,9 +64,9 @@ If the latest job has completed successfully and `delivery_policy.latest_alias_p
 
 Orchestrator-ready bundle:
 
-- [`music-generation-pipeline-bundle.json`](/Users/famaoai/k/a/kyberion/libs/actuators/orchestrator-actuator/examples/music-generation-pipeline-bundle.json)
-- [`music-bundle-to-execution-plan-set.json`](/Users/famaoai/k/a/kyberion/libs/actuators/orchestrator-actuator/examples/music-bundle-to-execution-plan-set.json)
-- [`music-bundle-to-run-execution-plan-set.json`](/Users/famaoai/k/a/kyberion/libs/actuators/orchestrator-actuator/examples/music-bundle-to-run-execution-plan-set.json)
+- [`music-generation-pipeline-bundle.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/music-generation-pipeline-bundle.json)
+- [`music-bundle-to-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/music-bundle-to-execution-plan-set.json)
+- [`music-bundle-to-run-execution-plan-set.json`](/Users/famao/kyberion/libs/actuators/orchestrator-actuator/examples/music-bundle-to-run-execution-plan-set.json)
 
 ## 5. Expected Output
 - ComfyUI `prompt_id`

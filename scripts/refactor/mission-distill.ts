@@ -4,6 +4,7 @@
  */
 
 import * as path from 'node:path';
+import { z } from 'zod';
 import {
   ledger,
   logger,
@@ -19,7 +20,51 @@ import { type MissionState } from './mission-types.js';
 import { findMissionPath } from '@agent/core';
 import { loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
-import { invokeLlm, parseLlmResponse, resolveLlmConfig, type LlmPolicyConfig } from './mission-llm.js';
+import {
+  inspectLlmResolution,
+  resolveLlmConfig,
+  runStructuredLlmProfile,
+  type LlmPolicyConfig,
+} from './mission-llm.js';
+
+const WISDOM_SCHEMA = z.object({
+  title: z.string(),
+  category: z.enum(['Evolution', 'Incident', 'Operations']),
+  tags: z.array(z.string()),
+  importance: z.number(),
+  sections: z.object({
+    summary: z.string(),
+    key_learnings: z.array(z.string()),
+    patterns_discovered: z.array(z.string()),
+    failures_and_recoveries: z.array(z.string()),
+    reusable_artifacts: z.array(z.string()),
+  }),
+});
+
+const WISDOM_POLICY_SCHEMA = z.object({
+  version: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  llm: z
+    .object({
+      profiles: z.record(
+        z.string(),
+        z.object({
+          description: z.string().optional(),
+          command: z.string(),
+          args: z.array(z.string()),
+          timeout_ms: z.number().optional(),
+          response_format: z.string().optional(),
+          adapter: z.string().optional(),
+        }),
+      ).optional(),
+      purpose_map: z.record(z.string(), z.string()).optional(),
+      default_profile: z.string().optional(),
+    })
+    .optional(),
+  rules: z.array(z.unknown()).optional(),
+  tier_mapping: z.record(z.string(), z.string()).optional(),
+});
 
 export function gatherDistillContext(missionId: string, state: MissionState, missionPath: string): string {
   const parts: string[] = [];
@@ -78,7 +123,7 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
         '(Automatic distillation — manual review recommended)',
         hasFailures ? `Last detected friction: ${lastError}` : 'No significant friction detected.'
       ],
-      patterns_discovered: ['None extracted (Claude CLI unavailable)'],
+      patterns_discovered: ['None extracted automatically (policy fallback)'],
       failures_and_recoveries: hasFailures
         ? failureEvents.map(e => `${e.ts}: ${e.note}`)
         : ['None'],
@@ -190,16 +235,32 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   let wisdomPolicy: any = {};
   if (safeExistsSync(wisdomPolicyPath)) {
     try {
-      wisdomPolicy = JSON.parse(safeReadFile(wisdomPolicyPath, { encoding: 'utf8' }) as string);
-    } catch (_) {}
+      const parsed = JSON.parse(safeReadFile(wisdomPolicyPath, { encoding: 'utf8' }) as string);
+      const validated = WISDOM_POLICY_SCHEMA.safeParse(parsed);
+      if (validated.success) {
+        wisdomPolicy = validated.data;
+      } else {
+        logger.warn(`⚠️ wisdom-policy.json failed validation: ${validated.error.message}`);
+      }
+    } catch (err: any) {
+      logger.warn(`⚠️ Failed to load wisdom-policy.json: ${err.message}`);
+    }
   }
 
   let wisdom: any = null;
   try {
     const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy.llm;
-    const raw = invokeLlm(fullPrompt, 'distill', llmPolicy);
+    const llmStatus = inspectLlmResolution('distill', llmPolicy);
+    logger.info(
+      `🤖 Distill LLM check: profile=${llmStatus.selectedProfile ?? 'none'} command=${llmStatus.selectedCommand ?? 'none'}`,
+    );
     const resolvedProfile = resolveLlmConfig('distill', llmPolicy);
-    wisdom = parseLlmResponse(raw, resolvedProfile.response_format);
+    wisdom = await runStructuredLlmProfile(
+      resolvedProfile,
+      fullPrompt,
+      WISDOM_SCHEMA,
+      { systemPrompt: 'You are Kyberion\'s Wisdom Distiller. Return exactly one JSON object matching the schema.' },
+    );
   } catch (err: any) {
     logger.warn(`⚠️ LLM distillation failed: ${err.message}`);
     logger.info('Falling back to structural distillation (no LLM)...');

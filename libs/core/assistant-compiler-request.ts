@@ -405,8 +405,13 @@ function normalizeClarificationPacket(
     suggested_response_style: 'clarify-first',
     llm_touchpoints: [
       {
+        stage: 'guided_coordination_brief',
+        purpose: 'Extract the request into a shared coordination brief before execution planning.',
+        output_contract: 'guided-coordination-brief',
+      },
+      {
         stage: 'execution_brief',
-        purpose: 'Extract the request into a governed execution brief',
+        purpose: 'Refine the shared coordination brief into a governed execution brief',
         output_contract: 'actuator-execution-brief',
       },
       {

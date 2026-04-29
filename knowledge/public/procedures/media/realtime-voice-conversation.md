@@ -51,5 +51,5 @@ It does not itself train or promote a voice profile.
 
 If the user says `use my voice`, registration and promotion still have to happen first via:
 
-- [register-voice-profile.md](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
-- [promote-voice-profile.md](/Users/famaoai/k/d/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)
+- [register-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
+- [promote-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)

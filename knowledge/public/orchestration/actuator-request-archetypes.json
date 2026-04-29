@@ -2,6 +2,15 @@
   "default_archetype": "structured-delivery",
   "archetypes": [
     {
+      "id": "guided-coordination",
+      "trigger_keywords": ["meeting", "presentation", "deck", "brief", "booking", "schedule", "onboarding", "video", "proposal", "coordination", "会議", "資料", "予約", "日程", "オンボーディング"],
+      "summary_template": "Repeated coordination request resolved through a shared brief, overlay, preflight, and execution flow.",
+      "normalized_scope": ["request-capture", "shared-brief", "domain-overlay", "preflight", "execution-plan"],
+      "target_actuators": ["orchestrator-actuator", "media-actuator", "browser-actuator"],
+      "deliverables": ["coordination brief", "execution plan", "approval preview", "result package"],
+      "required_inputs": ["objective", "audience or counterpart", "approval boundary", "domain overlay", "expected output"]
+    },
+    {
       "id": "web-design-clone-delivery",
       "trigger_keywords": ["web", "website", "lp", "landing page", "design", "踏襲", "サイト"],
       "summary_template": "Reference Web experience plus new concept, with implementation and validation artifacts.",

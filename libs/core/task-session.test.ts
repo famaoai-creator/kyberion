@@ -151,6 +151,22 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('ちょっと写真をとって')?.taskType).toBe('capture_photo');
     expect(classifyTaskSessionIntent('Webサービスを作って')?.intentId).toBe('bootstrap-project');
     expect(classifyTaskSessionIntent('Webサービスを作って')?.taskType).toBe('analysis');
+    expect(classifyTaskSessionIntent('初回セットアップを始めて')?.intentId).toBe(
+      'launch-first-run-onboarding'
+    );
+    expect(classifyTaskSessionIntent('初回セットアップを始めて')?.taskType).toBe(
+      'service_operation'
+    );
+    expect(classifyTaskSessionIntent('CI/CDを設定して')?.intentId).toBe(
+      'configure-organization-toolchain'
+    );
+    expect(classifyTaskSessionIntent('CI/CDを設定して')?.taskType).toBe('service_operation');
+    expect(classifyTaskSessionIntent('デザインテーマを登録して')?.intentId).toBe(
+      'register-presentation-preference-profile'
+    );
+    expect(classifyTaskSessionIntent('デザインテーマを登録して')?.taskType).toBe(
+      'service_operation'
+    );
     expect(classifyTaskSessionIntent('プロジェクトのWBSをエクセルで作成して')?.taskType).toBe(
       'workbook_wbs'
     );

@@ -40,4 +40,5 @@ Return a **single JSON object** with this exact structure:
    - **Operations**: Routine completions, maintenance, deployments
 5. Keep each learning concise (1-2 sentences). Avoid vague statements.
 6. Tags should include: mission type, domain area, and any technologies involved.
-7. Return ONLY the JSON object. No markdown fences, no explanation.
+7. The executor is policy-driven. The active profile already selects the adapter/runner; do not assume a specific CLI provider unless the prompt or evidence explicitly requires it.
+8. Return ONLY the JSON object. No markdown fences, no explanation.

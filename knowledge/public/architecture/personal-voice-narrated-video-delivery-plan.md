@@ -280,6 +280,7 @@ Replace the current timeout-prone render bridge with a real producer path.
   - file size threshold
   - media metadata probe
   - optional frame count validation
+- mux narration into the final video artifact instead of leaving audio as a detached reference
 - persist render logs and backend diagnostics
 
 ### Deliverables
@@ -292,6 +293,7 @@ Replace the current timeout-prone render bridge with a real producer path.
 ### Acceptance Criteria
 
 - final `mp4` creation does not depend on a short synchronous CLI wait loop
+- the final artifact is audio-muxed when narration is available
 - render jobs survive long-running execution and expose observable status until completion
 
 ## Track 6. End-To-End Operator Scenario

@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/guided-coordination-brief.schema.json",
+  "title": "Guided Coordination Brief",
+  "description": "Shared coordination brief for repeated outcome-driven work before it is specialized into a domain brief or execution brief.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "request_text",
+    "coordination_kind",
+    "objective",
+    "domain_overlay_id",
+    "missing_inputs",
+    "expected_outputs",
+    "suggested_target_actuators",
+    "suggested_deliverables"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "guided-coordination-brief"
+    },
+    "request_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "coordination_kind": {
+      "type": "string",
+      "enum": [
+        "meeting",
+        "presentation",
+        "narrated_video",
+        "booking",
+        "travel",
+        "schedule",
+        "onboarding",
+        "proposal",
+        "decision_support",
+        "service_operation",
+        "general"
+      ]
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain_overlay_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audience_or_counterpart": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approval_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "missing_inputs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "expected_outputs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "suggested_target_actuators": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "suggested_deliverables": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "preference_profile_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "service_binding_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "clarification_questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "question", "reason"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "question": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "default_assumption": { "type": "string" },
+          "impact": { "type": "string" }
+        }
+      }
+    },
+    "recommended_next_step": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -100,6 +100,8 @@ The brief-first compiler should own the requests where the user is describing a 
 - project bootstrap, remediation, incident review, or other durable work
 - browser workflows where the user wants the system to learn the intent, not just perform one click
 - any request where the system should first produce an execution brief, ask only outcome-changing questions, then compile the contract
+- repeated coordination work that fits the shared `guided-coordination` archetype, such as meetings, decks, narrated videos, schedule reshuffles, and onboarding flows
+- any request where the system should first produce a `guided-coordination-brief`, ask only outcome-changing questions, then specialize into an execution brief and contract
 
 ### 4.2 Should not route through `compileUserIntentFlow`
 

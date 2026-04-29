@@ -1,0 +1,72 @@
+{
+  "action": "pipeline",
+  "name": "Trial Narrated Executive Report",
+  "description": "Enterprise-grade narrated report pipeline using pre-built JS actuators, runtime preflight checks, and final audio-muxed MP4 rendering.",
+  "context": {
+    "mission_id": "trial-voice-video-1",
+    "report_summary": "Kyberion Ecosystem Vitals are all green. Development productivity has increased by 15 percent this month.",
+    "audio_path": "active/shared/tmp/trial-narration.aiff",
+    "video_output_path": "active/shared/tmp/executive-summary.mp4",
+    "voice_action_json": "active/shared/tmp/voice-action.json",
+    "video_action_json": "active/shared/tmp/video-action.json",
+    "video_render_policy_json": "active/shared/tmp/video-render-runtime-policy.full-render.json",
+    "profile_id": "operator-ja-default"
+  },
+  "steps": [
+    {
+      "id": "preflight_runtime",
+      "op": "system:shell",
+      "params": {
+        "cmd": "mkdir -p active/shared/tmp && test -f dist/libs/actuators/voice-actuator/src/index.js || { echo 'missing build artifact: dist/libs/actuators/voice-actuator/src/index.js'; exit 1; } && test -f dist/libs/actuators/video-composition-actuator/src/index.js || { echo 'missing build artifact: dist/libs/actuators/video-composition-actuator/src/index.js'; exit 1; } && if [ \"$(uname -s)\" = \"Darwin\" ]; then command -v say >/dev/null || { echo 'missing runtime tool: say'; exit 1; }; else command -v espeak >/dev/null || { echo 'missing runtime tool: espeak'; exit 1; }; fi && command -v ffmpeg >/dev/null || { echo 'missing runtime tool: ffmpeg'; exit 1; } && command -v ffprobe >/dev/null || { echo 'missing runtime tool: ffprobe'; exit 1; }",
+        "export_as": "preflight_result"
+      }
+    },
+    {
+      "id": "prepare_action_json",
+      "op": "system:shell",
+      "params": {
+        "cmd": "cat > {{voice_action_json}} <<'EOF'\n{\"action\":\"generate_voice\",\"request_id\":\"trial-narrated-report-audio\",\"text\":\"{{report_summary}}\",\"profile_ref\":{\"profile_id\":\"{{profile_id}}\"},\"engine\":{\"engine_id\":\"local_say\"},\"rendering\":{\"language\":\"ja\",\"chunking\":{\"max_chunk_chars\":4000,\"crossfade_ms\":50,\"preserve_paralinguistic_tags\":true}},\"delivery\":{\"mode\":\"artifact\",\"format\":\"aiff\",\"artifact_path\":\"{{audio_path}}\",\"emit_progress_packets\":true},\"routing\":{\"personal_voice_mode\":\"allow_fallback\"}}\nEOF\ncat > {{video_action_json}} <<'EOF'\n{\"action\":\"create_narrated_intro_movie\",\"params\":{\"narrated_video_brief\":{\"kind\":\"narrated-video-brief\",\"version\":\"1.0.0\",\"intent\":\"executive-summary\",\"title\":\"Kyberion Monthly Strategic Update\",\"script\":{\"hook\":\"Greetings.\",\"feature\":\"{{report_summary}}\",\"cta\":\"Details in full report.\"},\"narration\":{\"artifact_ref\":\"{{audio_path}}\"},\"design_system\":{\"brand_name\":\"Kyberion Sovereign\",\"theme_tokens\":{\"background_color\":\"#000000\"}},\"output\":{\"format\":\"mp4\",\"target_path\":\"{{video_output_path}}\",\"await_completion\":true}}}}\nEOF\ncat > {{video_render_policy_json}} <<'EOF'\n{\"version\":\"1.0.0\",\"queue\":{\"concurrency\":1,\"cancellation\":\"queued_or_running\"},\"progress\":{\"throttle_ms\":250,\"min_percent_delta\":2,\"emit_heartbeat\":true},\"bundle\":{\"default_bundle_root\":\"active/shared/tmp/video-composition\",\"copy_declared_assets\":false},\"render\":{\"allowed_output_formats\":[\"mp4\",\"mov\",\"webm\"],\"enable_backend_rendering\":true,\"backend\":\"hyperframes_cli\",\"quality\":\"standard\",\"command_timeout_ms\":300000}}\nEOF",
+        "export_as": "json_prep_result"
+      }
+    },
+    {
+      "id": "generate_audio",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{voice_action_json}}",
+        "export_as": "audio_gen_result"
+      }
+    },
+    {
+      "id": "verify_audio_after_generation",
+      "op": "system:shell",
+      "params": {
+        "cmd": "test -f {{audio_path}} || { echo 'missing audio artifact after generate_audio: {{audio_path}}'; exit 1; } && echo 'audio artifact verified after generation'",
+        "export_as": "audio_verify_result"
+      }
+    },
+    {
+      "id": "create_video_action",
+      "op": "system:shell",
+      "params": {
+        "cmd": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--require=$(pwd)/scripts/hyperframes-localhost-preload.cjs\" KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH={{video_render_policy_json}} node dist/libs/actuators/video-composition-actuator/src/index.js --input {{video_action_json}}",
+        "export_as": "video_gen_result"
+      }
+    },
+    {
+      "id": "verify_outputs",
+      "op": "system:shell",
+      "params": {
+        "cmd": "test -f {{audio_path}} || { echo 'missing audio artifact: {{audio_path}}'; exit 1; } && test -f {{video_output_path}} || { echo 'missing rendered video artifact: {{video_output_path}}'; exit 1; } && test -f active/shared/tmp/video-composition/executive-summary/index.html || { echo 'missing video bundle index'; exit 1; } && test -f active/shared/tmp/video-composition/executive-summary/render-plan.json || { echo 'missing video bundle render plan'; exit 1; } && test -n \"$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 {{video_output_path}})\" || { echo 'missing audio stream in rendered video'; exit 1; } && echo 'outputs verified with audio-muxed mp4'",
+        "export_as": "verify_result"
+      }
+    },
+    {
+      "id": "final_log",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Narrated report generation attempted. Preflight: {{preflight_result}} JSON prep: {{json_prep_result}} Audio: {{audio_gen_result}} Audio verify: {{audio_verify_result}} Video: {{video_gen_result}} Verify: {{verify_result}}"
+      }
+    }
+  ]
+}

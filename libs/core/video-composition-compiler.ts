@@ -48,6 +48,7 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
     composition_id: compositionId,
     source_kind: 'video-composition-adf',
     title: adf.title || adf.intent || 'Kyberion Video Composition',
+    narration_ref: adf.audio?.narration_ref ? path.resolve(process.cwd(), adf.audio.narration_ref) : undefined,
     duration_sec: adf.composition.duration_sec,
     fps: adf.composition.fps,
     width: adf.composition.width,
@@ -132,10 +133,23 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   const eyebrow = sceneText(scene, 'eyebrow');
   const supporting = resolveAsset(scene.asset_refs, 'supporting');
   const hfScript = `<script>
+  const __hfTimeline = {
+    duration: () => ${scene.duration_sec},
+    time: () => 0,
+    pause: () => {},
+    play: () => {},
+    seek: (time) => { console.log('[HF] seek', time); },
+    totalTime: (time) => { console.log('[HF] totalTime', time); },
+    isPlaying: () => false,
+    setPlaybackRate: () => {},
+    getPlaybackRate: () => 1,
+  };
   window.__hf = {
     duration: ${scene.duration_sec},
     seek: (time) => { console.log('[HF] seek', time); }
   };
+  window.__timelines = window.__timelines || {};
+  window.__timelines["${scene.scene_id}"] = __hfTimeline;
 </script>`;
 
   if (scene.template_id === 'split-highlight') {
@@ -229,7 +243,21 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       }
     </style>
   </head>
-  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}">
+  <body
+    data-composition-id="${scene.scene_id}"
+    data-width="${adf.composition.width}"
+    data-height="${adf.composition.height}"
+    data-duration="${scene.duration_sec}"
+    data-start="0"
+  >
+    <div
+      class="composition-root"
+      data-composition-id="${scene.scene_id}"
+      data-width="${adf.composition.width}"
+      data-height="${adf.composition.height}"
+      data-duration="${scene.duration_sec}"
+      data-start="0"
+    >
     <div class="grid"></div>
     <div class="container">
       <div class="content">
@@ -240,6 +268,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       <div class="visual">
         ${supporting ? `<img src="${escapeHtml(supporting.path)}" alt="visual">` : '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.2)">[Architecture Vision]</div>'}
       </div>
+    </div>
     </div>
     ${hfScript}
   </body>
@@ -281,11 +310,26 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       }
     </style>
   </head>
-  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}">
+  <body
+    data-composition-id="${scene.scene_id}"
+    data-width="${adf.composition.width}"
+    data-height="${adf.composition.height}"
+    data-duration="${scene.duration_sec}"
+    data-start="0"
+  >
+    <div
+      class="composition-root"
+      data-composition-id="${scene.scene_id}"
+      data-width="${adf.composition.width}"
+      data-height="${adf.composition.height}"
+      data-duration="${scene.duration_sec}"
+      data-start="0"
+    >
     <div class="glow"></div>
     <div class="center">
       <h1>${escapeHtml(title || 'Kyberion')}</h1>
       <p>Initialize Your Mission.</p>
+    </div>
     </div>
     ${hfScript}
   </body>
@@ -317,9 +361,24 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       @keyframes reveal { from { opacity: 0; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
     </style>
   </head>
-  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}">
+  <body
+    data-composition-id="${scene.scene_id}"
+    data-width="${adf.composition.width}"
+    data-height="${adf.composition.height}"
+    data-duration="${scene.duration_sec}"
+    data-start="0"
+  >
+    <div
+      class="composition-root"
+      data-composition-id="${scene.scene_id}"
+      data-width="${adf.composition.width}"
+      data-height="${adf.composition.height}"
+      data-duration="${scene.duration_sec}"
+      data-start="0"
+    >
     <div class="hero-text">
       <h1>${escapeHtml(title || 'Kyberion')}</h1>
+    </div>
     </div>
     ${hfScript}
   </body>
@@ -359,8 +418,21 @@ function renderBundleIndexHtml(plan: VideoCompositionRenderPlan, adf: VideoCompo
       }
     </style>
   </head>
-  <body data-composition-id="${plan.composition_id}" data-width="${plan.width}" data-height="${plan.height}">
-    <div class="shell">
+  <body
+    data-composition-id="${plan.composition_id}"
+    data-width="${plan.width}"
+    data-height="${plan.height}"
+    data-duration="${plan.duration_sec}"
+    data-start="0"
+  >
+    <div
+      class="shell"
+      data-composition-id="${plan.composition_id}"
+      data-width="${plan.width}"
+      data-height="${plan.height}"
+      data-duration="${plan.duration_sec}"
+      data-start="0"
+    >
       <h1>${escapeHtml(plan.title)}</h1>
       <div class="meta">${plan.width}x${plan.height} • ${plan.fps}fps • ${plan.duration_sec}s • ${escapeHtml(plan.output_format)}</div>
       <p>This bundle contains governed composed-video source artifacts prepared by Kyberion. The generated scene HTML files are deterministic input artifacts for a future renderer backend.</p>
@@ -368,17 +440,28 @@ function renderBundleIndexHtml(plan: VideoCompositionRenderPlan, adf: VideoCompo
         ${sceneLinks}
       </ul>
       <div class="note">
-        <strong>Audio refs:</strong> <code>${escapeHtml(JSON.stringify(adf.audio || {}, null, 0))}</code>
+        <strong>Audio refs:</strong> <code>${escapeHtml(JSON.stringify(adf.audio || {}, null, 0))}</code><br>
+        When backend rendering is enabled, narration will be muxed into the final output artifact.
       </div>
     </div>
     <script>
+      const __hfTimeline = {
+        duration: () => ${plan.duration_sec},
+        time: () => 0,
+        pause: () => {},
+        play: () => {},
+        seek: (time) => { console.log('[HF] root seek to', time); },
+        totalTime: (time) => { console.log('[HF] root totalTime to', time); },
+        isPlaying: () => false,
+        setPlaybackRate: () => {},
+        getPlaybackRate: () => 1,
+      };
       window.__hf = {
         duration: ${plan.duration_sec},
         seek: (time) => { console.log('[HF] root seek to', time); }
       };
-      window.__timelines = {
-        "${plan.composition_id}": { duration: ${plan.duration_sec} }
-      };
+      window.__timelines = window.__timelines || {};
+      window.__timelines["${plan.composition_id}"] = __hfTimeline;
     </script>
   </body>
 </html>`;
@@ -407,6 +490,8 @@ Audio references:
 \`\`\`json
 ${JSON.stringify(adf.audio || {}, null, 2)}
 \`\`\`
+
+When backend rendering is enabled, narration is muxed into the final output artifact rather than left as a separate reference.
 `;
 }
 

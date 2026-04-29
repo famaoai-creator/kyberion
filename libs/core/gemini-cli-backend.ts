@@ -6,6 +6,7 @@
 import { spawn } from 'node:child_process';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { buildSafeExecEnv } from './secure-io.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -297,4 +298,75 @@ export function buildGeminiCliBackendFromEnv(
   });
   logger.info(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model ?? 'gemini-2.0-flash-exp'})`);
   return backend;
+}
+
+export async function runGeminiCliQuery<T>(params: {
+  systemPrompt: string;
+  userPrompt: string;
+  schema: ZodType<T>;
+  options?: GeminiCliBackendOptions;
+}): Promise<T> {
+  const backendOptions = params.options || {};
+  const bin = backendOptions.bin ?? 'gemini';
+  const model = backendOptions.model ?? '';
+  const timeoutMs = backendOptions.timeoutMs ?? 5 * 60 * 1000;
+  const extraArgs = backendOptions.extraArgs ?? [];
+
+  const args = [
+    '-p',
+    `${params.systemPrompt}\n\n${params.userPrompt}`,
+    '-o',
+    'json',
+    '-y',
+    ...(model ? ['--model', model] : []),
+    ...extraArgs,
+  ];
+
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const child = spawn(bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: buildSafeExecEnv(),
+    });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`[gemini-cli] timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.stdout.on('data', (chunk) => (out += chunk.toString()));
+    child.stderr.on('data', (chunk) => (err += chunk.toString()));
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(`[gemini-cli] CLI exited with code ${code}. stderr: ${err}`));
+        return;
+      }
+      resolve(out);
+    });
+    child.on('error', (spawnErr) => {
+      clearTimeout(timer);
+      reject(new Error(`[gemini-cli] spawn failed: ${(spawnErr as Error).message}`));
+    });
+    child.stdin.end();
+  });
+
+  const lines = stdout.split('\n');
+  const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
+  if (jsonStartIdx === -1) {
+    throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
+  }
+  const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+  const cliResult = JSON.parse(cleanStdout);
+  const responseStr = cliResult.response;
+  if (!responseStr) {
+    throw new Error(`[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`);
+  }
+  const jsonMatch = responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
+  const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
+  const structured = JSON.parse(cleanJson);
+  const parsed = params.schema.safeParse(structured);
+  if (!parsed.success) {
+    throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);
+  }
+  return parsed.data;
 }

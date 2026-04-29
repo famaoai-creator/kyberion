@@ -17,15 +17,17 @@
  */
 
 import * as path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import {
   safeExistsSync,
   safeReadFile,
+  safeReaddir,
   safeStat,
+  safeExec,
 } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
+import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
 
 export function installCoreEnvironmentProbes(): void {
   registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
@@ -43,7 +45,7 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
       name: 'claude-cli',
       check: () =>
         process.env.CLAUDE_API_KEY !== undefined ||
-        binaryAvailable('claude', ['--version']),
+        probeShellClaudeCliAvailability().available,
     },
     {
       name: 'anthropic',
@@ -125,15 +127,6 @@ async function probeRepoBuild(): Promise<{ available: boolean; reason?: string }
  * Helpers                                                             *
  * ------------------------------------------------------------------ */
 
-function binaryAvailable(command: string, args: readonly string[]): boolean {
-  try {
-    const result = spawnSync(command, [...args], { stdio: 'ignore' });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
-
 function newestTsMtimeUnder(dir: string): number | null {
   try {
     if (!safeExistsSync(dir)) return null;
@@ -160,9 +153,20 @@ function newestTsMtimeUnder(dir: string): number | null {
 }
 
 function listDir(dir: string): string[] {
-  const result = spawnSync('ls', ['-1A', dir], { encoding: 'utf8' });
-  if (result.status !== 0) return [];
-  return result.stdout.split('\n').filter((s) => s.length > 0);
+  try {
+    return safeReaddir(dir);
+  } catch {
+    return [];
+  }
+}
+
+function binaryAvailable(command: string, args: readonly string[]): boolean {
+  try {
+    safeExec(command, [...args], { timeoutMs: 5_000, maxOutputMB: 1 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Module-load-time side effect.

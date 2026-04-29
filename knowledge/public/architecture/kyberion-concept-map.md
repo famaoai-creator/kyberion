@@ -127,7 +127,7 @@ Kyberion preserves consistency at the boundaries between layers.
 ### Intent -> Control
 
 Never pass an ambiguous request directly to a mission or actuator.
-Normalize it first into an `execution brief` or `status brief`.
+Normalize it first into a `guided-coordination-brief`, `execution brief`, or `status brief` as appropriate.
 
 ### Control -> Knowledge
 

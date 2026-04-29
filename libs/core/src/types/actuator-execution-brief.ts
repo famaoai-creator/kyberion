@@ -17,6 +17,7 @@ export interface ActuatorExecutionBrief {
   target_actuators: string[];
   deliverables: string[];
   missing_inputs: string[];
+  service_binding_refs?: string[];
   assumptions?: string[];
   clarification_questions?: {
     id: string;

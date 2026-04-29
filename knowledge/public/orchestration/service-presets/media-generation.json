@@ -18,7 +18,7 @@
         },
         {
           "type": "cli",
-          "command": "/Users/famao/k/a/kyberion-runtimes/vision/venv/bin/comfy",
+          "command": "/Users/famao/kyberion-runtimes/vision/venv/bin/comfy",
           "args": ["run", "--workflow", "{{workflow_path}}", "--wait"],
           "description": "Local ComfyUI image workflow via CLI"
         }
@@ -40,7 +40,7 @@
         },
         {
           "type": "cli",
-          "command": "/Users/famao/k/a/kyberion-runtimes/vision/venv/bin/comfy",
+          "command": "/Users/famao/kyberion-runtimes/vision/venv/bin/comfy",
           "args": ["run", "--workflow", "{{workflow_path}}", "--wait"],
           "description": "Local ComfyUI video workflow via CLI"
         }
@@ -62,7 +62,7 @@
         },
         {
           "type": "cli",
-          "command": "/Users/famao/k/a/kyberion-runtimes/vision/venv/bin/comfy",
+          "command": "/Users/famao/kyberion-runtimes/vision/venv/bin/comfy",
           "args": ["run", "--workflow", "{{workflow_path}}", "--wait"],
           "description": "Local ComfyUI audio/music workflow via CLI"
         }
@@ -84,7 +84,7 @@
         },
         {
           "type": "cli",
-          "command": "/Users/famao/k/a/kyberion-runtimes/vision/venv/bin/comfy",
+          "command": "/Users/famao/kyberion-runtimes/vision/venv/bin/comfy",
           "args": ["run", "--workflow", "{{workflow_path}}", "--wait"],
           "description": "Generic ComfyUI workflow via CLI"
         }

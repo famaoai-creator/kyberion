@@ -2,7 +2,7 @@
 
 debug-only session handoff route を組み込んだ Web sample app skeleton 集です。
 
-- [`web-session-handoff-skeleton/README.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/web-sample-apps/web-session-handoff-skeleton/README.md)
+- [`web-session-handoff-skeleton/README.md`](/Users/famao/kyberion/knowledge/public/templates/web-sample-apps/web-session-handoff-skeleton/README.md)
 
 位置づけは次です。
 

@@ -76,6 +76,7 @@ export * from './validators.js';
 export * from './mobile-profile-validators.js';
 export * from './schema-loader.js';
 export * from './operator-learning.js';
+export * from './guided-coordination-brief.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
@@ -551,6 +552,7 @@ export type { CodexCliIntentExtractorOptions } from './codex-cli-intent-extracto
 export { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
 export type { CodexCliVoiceBridgeOptions } from './codex-cli-voice-bridge.js';
 export { runCodexCliQuery, buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
+export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
 export type { CodexCliQueryOptions, RunCodexCliQueryParams } from './codex-cli-query.js';
 export { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
 export type { ClaudeAgentReasoningBackendOptions } from './claude-agent-reasoning-backend.js';

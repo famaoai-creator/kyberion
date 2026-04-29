@@ -1,4 +1,5 @@
 {
+  "$schema": "https://kyberion.local/schemas/wisdom-policy.schema.json",
   "version": "2.0.0",
   "name": "Global Wisdom Distillation Policy",
   "description": "Rules for automated insight extraction and knowledge evolution.",
@@ -6,21 +7,24 @@
     "profiles": {
       "heavy": {
         "description": "Deep reasoning — distillation, architectural review",
-        "command": "claude",
-        "args": ["-p", "{prompt}", "--model", "opus", "--output-format", "json"],
+        "command": "codex",
+        "adapter": "codex-cli",
+        "args": [],
         "timeout_ms": 180000,
         "response_format": "json_envelope"
       },
       "standard": {
         "description": "General purpose — validation, summarization",
-        "command": "claude",
-        "args": ["-p", "{prompt}", "--output-format", "json"],
+        "command": "gemini",
+        "adapter": "gemini-cli",
+        "args": [],
         "timeout_ms": 120000,
         "response_format": "json_envelope"
       },
       "light": {
         "description": "Fast, low-cost — tagging, classification",
         "command": "claude",
+        "adapter": "shell-json",
         "args": ["-p", "{prompt}", "--model", "haiku", "--output-format", "json"],
         "timeout_ms": 30000,
         "response_format": "json_envelope"

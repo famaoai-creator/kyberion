@@ -139,8 +139,8 @@ Hardening the decision-support layer (judgment, consensus, rehearsal) so it part
 
 Reference:
 
-- [Decision-Support Design Rationale](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/decision-support-design-rationale.md)
-- [Intent Loop Concept](/Users/famaoai/k/d/kyberion/docs/INTENT_LOOP_CONCEPT.md)
+- [Decision-Support Design Rationale](/Users/famao/kyberion/knowledge/public/architecture/decision-support-design-rationale.md)
+- [Intent Loop Concept](/Users/famao/kyberion/docs/INTENT_LOOP_CONCEPT.md)
 
 ## Priority 4
 
@@ -153,9 +153,10 @@ Reference:
 
 Reference:
 
-- [LLM Execution Boundary](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/llm-execution-boundary.md)
-- [Voice Generation Absorption Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/voice-generation-absorption-plan.md)
-- [Personal Voice Narrated Video Delivery Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/personal-voice-narrated-video-delivery-plan.md)
-- [Model and Harness Adaptation Phase](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
-- [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
-- [Studio Agent Orchestration Absorption Plan](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/studio-agent-orchestration-absorption-plan.md)
+- [LLM Execution Boundary](/Users/famao/kyberion/knowledge/public/architecture/llm-execution-boundary.md)
+- [Voice Generation Absorption Plan](/Users/famao/kyberion/knowledge/public/architecture/voice-generation-absorption-plan.md)
+- [Personal Voice Narrated Video Delivery Plan](/Users/famao/kyberion/knowledge/public/architecture/personal-voice-narrated-video-delivery-plan.md)
+- [Model and Harness Adaptation Phase](/Users/famao/kyberion/knowledge/public/architecture/model-adaptation-phase.md)
+- [CLI Harness Coordination Model](/Users/famao/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
+- [Wisdom Policy Adapter Guide](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy-guide.md)
+- [Studio Agent Orchestration Absorption Plan](/Users/famao/kyberion/knowledge/public/architecture/studio-agent-orchestration-absorption-plan.md)
