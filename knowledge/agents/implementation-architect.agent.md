@@ -1,7 +1,5 @@
 ---
 agentId: implementation-architect
-provider: gemini
-modelId: auto-gemini-3
 capabilities: [architecture, code, review, planning, a2a]
 auto_spawn: false
 trust_required: 5.0

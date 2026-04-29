@@ -1,7 +1,5 @@
 ---
 agentId: slack-surface-agent
-provider: gemini
-modelId: gemini-2.5-flash
 capabilities: [slack, surface, conversation, delegation]
 auto_spawn: false
 trust_required: 0

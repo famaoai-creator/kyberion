@@ -186,14 +186,24 @@ class AgentLifecycleManagerImpl {
   }
 
   private async spawnInternal(agentId: string, options: SpawnOptions): Promise<AgentHandle> {
-    const resolvedTarget = resolveAgentProviderTarget({
-      preferredProvider: options.provider,
-      preferredModelId: options.modelId,
-      providerStrategy: String((options as any)?.runtimeMetadata?.provider_strategy || 'adaptive') as 'strict' | 'preferred' | 'adaptive',
-      fallbackProviders: Array.isArray((options as any)?.runtimeMetadata?.fallback_providers)
-        ? ((options as any).runtimeMetadata.fallback_providers as string[])
-        : undefined,
-    });
+    const runtimeMetadata = (options as any)?.runtimeMetadata || {};
+    const shouldResolveProvider = !runtimeMetadata.skip_provider_resolution;
+    const resolvedTarget = shouldResolveProvider
+      ? resolveAgentProviderTarget({
+          preferredProvider: options.provider,
+          preferredModelId: options.modelId,
+          providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as 'strict' | 'preferred' | 'adaptive',
+          fallbackProviders: Array.isArray(runtimeMetadata.fallback_providers)
+            ? (runtimeMetadata.fallback_providers as string[])
+            : undefined,
+          requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : undefined,
+        })
+      : {
+          provider: options.provider,
+          modelId: options.modelId || options.provider,
+          strategy: 'preferred' as const,
+          availableProviders: [options.provider],
+        };
     const resolvedOptions: SpawnOptions = {
       ...options,
       agentId,
@@ -236,15 +246,16 @@ class AgentLifecycleManagerImpl {
       threadId: agentId,
       parentAgentId: resolvedOptions.parentAgentId,
       missionId: resolvedOptions.missionId,
-      metadata: {
-        provider_resolution: {
-          preferredProvider: options.provider,
-          preferredModelId: options.modelId || null,
-          strategy: resolvedTarget.strategy,
-          availableProviders: resolvedTarget.availableProviders,
+        metadata: {
+          provider_resolution: {
+            preferredProvider: options.provider,
+            preferredModelId: options.modelId || null,
+            strategy: resolvedTarget.strategy,
+            availableProviders: resolvedTarget.availableProviders,
+            requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : [],
+          },
         },
-      },
-    });
+      });
 
     agentRegistry.updateStatus(agentId, 'booting');
 

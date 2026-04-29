@@ -1,7 +1,5 @@
 ---
 agentId: slack-gateway
-provider: gemini
-modelId: gemini-2.5-flash
 capabilities: [slack, gateway, conversation]
 auto_spawn: false
 trust_required: 0

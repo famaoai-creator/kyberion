@@ -1,5 +1,5 @@
 import { a2aBridge } from './a2a-bridge.js';
-import { buildMissionTeamView, resolveMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-composer.js';
+import { buildMissionTeamView, resolveMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { validateDelegatedTaskPreflight } from './delegation-preflight.js';
 import {
   emitChannelSurfaceEvent,

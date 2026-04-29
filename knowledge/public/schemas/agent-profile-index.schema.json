@@ -8,13 +8,18 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["authority_roles", "team_roles", "provider", "modelId", "capabilities"],
+        "required": ["authority_roles", "team_roles", "capabilities"],
         "properties": {
           "authority_roles": { "type": "array", "items": { "type": "string" } },
           "team_roles": { "type": "array", "items": { "type": "string" } },
-          "provider": { "type": "string" },
-          "modelId": { "type": "string" },
           "capabilities": { "type": "array", "items": { "type": "string" } },
+          "selection_hints": {
+            "type": "object",
+            "properties": {
+              "preferred_provider": { "type": "string" },
+              "preferred_modelId": { "type": "string" }
+            }
+          },
           "provider_strategy": { "type": "string", "enum": ["strict", "preferred", "adaptive"] },
           "fallback_providers": { "type": "array", "items": { "type": "string" } }
         }

@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadAgentManifests, type AgentManifest } from './agent-manifest.js';
+import { loadAgentManifests, resolveAgentSelectionHints, type AgentManifest } from './agent-manifest.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
@@ -23,9 +23,11 @@ export interface SurfaceAgentCatalogEntry {
 interface AgentProfileIndexEntry {
   authority_roles?: string[];
   team_roles?: string[];
-  provider?: string;
-  modelId?: string;
   capabilities?: string[];
+  selection_hints?: {
+    preferred_provider?: string;
+    preferred_modelId?: string;
+  };
 }
 
 interface AgentProfileIndex {
@@ -126,11 +128,12 @@ export function listSurfaceAgentCatalog(): SurfaceAgentCatalogEntry[] {
     .map((manifest) => {
       const profile = profileIndex[manifest.agentId] || {};
       const body = loadAgentBody(manifest.agentId);
+      const { provider: selectionProvider, modelId: selectionModel } = resolveAgentSelectionHints(manifest);
       return {
         agentId: manifest.agentId,
         displayName: body.match(/^#\s+(.+)$/m)?.[1]?.trim() || titleCaseAgentId(manifest.agentId),
-        provider: profile.provider || manifest.provider,
-        modelId: profile.modelId || manifest.modelId,
+        provider: selectionProvider,
+        modelId: selectionModel,
         capabilities: profile.capabilities || manifest.capabilities || [],
         authorityRoles: profile.authority_roles || [],
         teamRoles: profile.team_roles || [],
