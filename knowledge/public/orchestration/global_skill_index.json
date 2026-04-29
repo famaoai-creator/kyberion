@@ -52,6 +52,14 @@
       "capability_count": 2
     },
     {
+      "n": "meeting-actuator",
+      "path": "libs/actuators/meeting-actuator",
+      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6
+    },
+    {
       "n": "code-actuator",
       "path": "libs/actuators/code-actuator",
       "d": "ADF-driven code analysis and refactoring pipeline engine",

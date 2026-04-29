@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/narrated-video-preference-profile.schema.json",
+  "title": "Narrated Video Preference Profile",
+  "description": "Reusable preferences for narrated video briefs, visual theme selection, and publish gating.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "profile_id", "brief_question_sets", "theme_sets", "publish_policy"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "narrated-video-preference-profile"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "brief_question_sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "questions"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "video_purposes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tutorial",
+                "announcement",
+                "product_demo",
+                "marketing",
+                "onboarding",
+                "default"
+              ]
+            }
+          },
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "theme_sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "theme_hint"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "video_purposes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tutorial",
+                "announcement",
+                "product_demo",
+                "marketing",
+                "onboarding",
+                "default"
+              ]
+            }
+          },
+          "theme_hint": { "type": "string", "minLength": 1 },
+          "visual_traits": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "publish_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_target", "default_visibility", "require_human_approval_before_publish"],
+      "properties": {
+        "default_target": {
+          "type": "string",
+          "enum": ["youtube", "draft_only"]
+        },
+        "default_visibility": {
+          "type": "string",
+          "enum": ["private", "unlisted", "public"]
+        },
+        "require_human_approval_before_publish": { "type": "boolean" },
+        "allow_auto_upload": { "type": "boolean" },
+        "require_thumbnail": { "type": "boolean" },
+        "require_description": { "type": "boolean" },
+        "require_tags": { "type": "boolean" },
+        "require_caption": { "type": "boolean" }
+      }
+    },
+    "asset_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prefer_first_party_assets": { "type": "boolean" },
+        "require_licensed_assets": { "type": "boolean" },
+        "allow_generated_thumbnails": { "type": "boolean" }
+      }
+    }
+  }
+}

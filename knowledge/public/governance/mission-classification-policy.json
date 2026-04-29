@@ -35,7 +35,40 @@
     {
       "id": "class-operations-release",
       "match": {
-        "task_types": ["service_operation"]
+        "task_types": ["service_operation", "meeting_operations"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-operations-release-schedule-intent",
+      "match": {
+        "intent_ids": ["schedule-coordination"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-operations-release-meeting-utterance",
+      "match": {
+        "utterance_patterns": [
+          "会議",
+          "ミーティング",
+          "打ち合わせ",
+          "Teams",
+          "Zoom",
+          "Meet",
+          "ファシリテート",
+          "進行して",
+          "議事録",
+          "アクションアイテム",
+          "代理参加"
+        ]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-operations-release-meeting-intent",
+      "match": {
+        "intent_ids": ["meeting-operations"]
       },
       "mission_class": "operations_and_release"
     },
@@ -56,14 +89,23 @@
     {
       "id": "class-research-absorption-intent",
       "match": {
-        "intent_ids": ["cross-project-remediation", "incident-informed-review", "evolve-agent-harness"]
+        "intent_ids": [
+          "cross-project-remediation",
+          "incident-informed-review",
+          "evolve-agent-harness"
+        ]
       },
       "mission_class": "research_and_absorption"
     },
     {
       "id": "class-content-media",
       "match": {
-        "task_types": ["presentation_deck", "report_document", "document_generation", "capture_photo"]
+        "task_types": [
+          "presentation_deck",
+          "report_document",
+          "document_generation",
+          "capture_photo"
+        ]
       },
       "mission_class": "content_and_media"
     },
@@ -91,63 +133,145 @@
     {
       "id": "class-decision-support",
       "match": {
-        "task_types": ["decision_support", "consensus_building", "hypothesis_exploration", "counterfactual_analysis", "negotiation_prep", "rehearsal", "intuition_capture"]
+        "task_types": [
+          "decision_support",
+          "consensus_building",
+          "hypothesis_exploration",
+          "counterfactual_analysis",
+          "negotiation_prep",
+          "rehearsal",
+          "intuition_capture"
+        ]
       },
       "mission_class": "decision_support"
     },
     {
       "id": "class-decision-support-utterance",
       "match": {
-        "utterance_patterns": ["迷って", "落とし所", "反対され", "根回し", "nemawashi", "リハーサル", "意思決定", "交渉準備", "直観", "もしこうしていたら", "decision", "dilemma", "rehearse", "counterfactual"]
+        "utterance_patterns": [
+          "迷って",
+          "落とし所",
+          "反対され",
+          "根回し",
+          "nemawashi",
+          "リハーサル",
+          "意思決定",
+          "交渉準備",
+          "直観",
+          "もしこうしていたら",
+          "decision",
+          "dilemma",
+          "rehearse",
+          "counterfactual"
+        ]
       },
       "mission_class": "decision_support"
     },
     {
       "id": "class-decision-support-intent",
       "match": {
-        "intent_ids": ["explore-hypotheses", "build-stakeholder-consensus", "prepare-negotiation", "rehearse-session", "capture-intuition", "analyze-counterfactual"]
+        "intent_ids": [
+          "explore-hypotheses",
+          "build-stakeholder-consensus",
+          "prepare-negotiation",
+          "rehearse-session",
+          "capture-intuition",
+          "analyze-counterfactual"
+        ]
       },
       "mission_class": "decision_support"
     },
     {
       "id": "class-customer-engagement",
       "match": {
-        "task_types": ["customer_engagement", "requirements_elicitation", "customer_meeting", "customer_followup"]
+        "task_types": [
+          "customer_engagement",
+          "requirements_elicitation",
+          "customer_meeting",
+          "customer_followup"
+        ]
       },
       "mission_class": "customer_engagement"
     },
     {
       "id": "class-customer-engagement-utterance",
       "match": {
-        "utterance_patterns": ["要件定義", "要件ヒアリング", "要件整理", "顧客ヒアリング", "お客さん.*打ち合わせ", "お客様.*打ち合わせ", "客先ミーティング", "kickoff meeting", "discovery call", "elicit requirements", "requirements gathering", "customer interview"]
+        "utterance_patterns": [
+          "要件定義",
+          "要件ヒアリング",
+          "要件整理",
+          "顧客ヒアリング",
+          "お客さん.*打ち合わせ",
+          "お客様.*打ち合わせ",
+          "客先ミーティング",
+          "kickoff meeting",
+          "discovery call",
+          "elicit requirements",
+          "requirements gathering",
+          "customer interview"
+        ]
       },
       "mission_class": "customer_engagement"
     },
     {
       "id": "class-customer-engagement-intent",
       "match": {
-        "intent_ids": ["elicit-requirements", "run-customer-meeting", "draft-requirements", "schedule-customer-followup"]
+        "intent_ids": [
+          "elicit-requirements",
+          "run-customer-meeting",
+          "draft-requirements",
+          "schedule-customer-followup"
+        ]
       },
       "mission_class": "customer_engagement"
     },
     {
       "id": "class-platform-onboarding",
       "match": {
-        "task_types": ["platform_onboarding", "organization_setup", "integration_setup", "secrets_rotation", "governance_configuration"]
+        "task_types": [
+          "platform_onboarding",
+          "organization_setup",
+          "integration_setup",
+          "secrets_rotation",
+          "governance_configuration"
+        ]
       },
       "mission_class": "platform_onboarding"
     },
     {
       "id": "class-platform-onboarding-utterance",
       "match": {
-        "utterance_patterns": ["組織統合", "組織導入", "Kyberion を.*導入", "Kyberion を.*入れる", "前提条件を整える", "前提整備", "オンボーディング設定", "組織固有.*設定", "CI/CD.*連携", "CI/CD.*統合", "SIEM.*連携", "シークレット.*整備", "platform onboarding", "organization setup", "integration setup", "wire up.*CI", "configure.*(secrets|STT|voice engine)"]
+        "utterance_patterns": [
+          "組織統合",
+          "組織導入",
+          "Kyberion を.*導入",
+          "Kyberion を.*入れる",
+          "前提条件を整える",
+          "前提整備",
+          "オンボーディング設定",
+          "組織固有.*設定",
+          "CI/CD.*連携",
+          "CI/CD.*統合",
+          "SIEM.*連携",
+          "シークレット.*整備",
+          "platform onboarding",
+          "organization setup",
+          "integration setup",
+          "wire up.*CI",
+          "configure.*(secrets|STT|voice engine)"
+        ]
       },
       "mission_class": "platform_onboarding"
     },
     {
       "id": "class-platform-onboarding-intent",
       "match": {
-        "intent_ids": ["onboard-organization", "configure-integrations", "rotate-secrets", "register-adapter"]
+        "intent_ids": [
+          "onboard-organization",
+          "configure-integrations",
+          "rotate-secrets",
+          "register-adapter"
+        ]
       },
       "mission_class": "platform_onboarding"
     }
@@ -173,6 +297,13 @@
         "intent_ids": ["inspect-service"]
       },
       "delivery_shape": "long_running_job"
+    },
+    {
+      "id": "delivery-meeting-operations",
+      "match": {
+        "task_types": ["meeting_operations"]
+      },
+      "delivery_shape": "interactive_exploration"
     },
     {
       "id": "delivery-pipeline",
@@ -226,14 +357,25 @@
     {
       "id": "delivery-customer-engagement",
       "match": {
-        "task_types": ["customer_engagement", "requirements_elicitation", "customer_meeting", "customer_followup"]
+        "task_types": [
+          "customer_engagement",
+          "requirements_elicitation",
+          "customer_meeting",
+          "customer_followup"
+        ]
       },
       "delivery_shape": "single_artifact"
     },
     {
       "id": "delivery-platform-onboarding",
       "match": {
-        "task_types": ["platform_onboarding", "organization_setup", "integration_setup", "secrets_rotation", "governance_configuration"]
+        "task_types": [
+          "platform_onboarding",
+          "organization_setup",
+          "integration_setup",
+          "secrets_rotation",
+          "governance_configuration"
+        ]
       },
       "delivery_shape": "cross_system_change"
     }
@@ -261,6 +403,13 @@
       "risk_profile": "approval_required"
     },
     {
+      "id": "risk-meeting-operations",
+      "match": {
+        "task_types": ["meeting_operations"]
+      },
+      "risk_profile": "review_required"
+    },
+    {
       "id": "risk-approval-required-bootstrap",
       "match": {
         "intent_ids": ["bootstrap-project"]
@@ -285,7 +434,12 @@
     {
       "id": "risk-customer-engagement",
       "match": {
-        "task_types": ["customer_engagement", "requirements_elicitation", "customer_meeting", "customer_followup"]
+        "task_types": [
+          "customer_engagement",
+          "requirements_elicitation",
+          "customer_meeting",
+          "customer_followup"
+        ]
       },
       "risk_profile": "review_required"
     },

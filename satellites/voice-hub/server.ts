@@ -27,6 +27,7 @@ import {
   buildPresenceVoiceIngressTimeline,
   createSurfaceAsyncRequest,
   createPresenceVoiceStimulus,
+  compileUserIntentFlow,
   deriveSurfaceDelegationReceiver,
   enqueueSurfaceNotification,
   estimateSpeechDurationMs,
@@ -80,7 +81,13 @@ import {
   saveTaskSession,
   recordTaskSessionHistory,
   createBrowserConversationSession,
+  type BrowserConversationSession,
+  assessBrowserDistillCandidate,
+  assessMissionSeedCandidate,
+  assessTaskDistillCandidate,
+  recordBrowserConversationHistory,
   saveBrowserConversationSession,
+  formatClarificationPacket,
   type TaskSession,
 } from '@agent/core';
 
@@ -93,7 +100,11 @@ interface VoiceHubRecord {
   ts: string;
 }
 
-function buildIntentPatternHint(intentId: string | undefined, language: 'ja' | 'en', section: 'completion' | 'follow_up'): string {
+function buildIntentPatternHint(
+  intentId: string | undefined,
+  language: 'ja' | 'en',
+  section: 'completion' | 'follow_up'
+): string {
   const pattern = findIntentOutcomePattern(intentId);
   const items = section === 'completion' ? pattern?.completion_criteria : pattern?.follow_up;
   if (!items || items.length === 0) return '';
@@ -146,21 +157,30 @@ interface WebSearchResult {
 
 type TaskSessionShape = TaskSession;
 
-function inferDistillTargetKind(taskType: string): 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' {
+function inferDistillTargetKind(
+  taskType: string
+): 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' {
   if (taskType === 'presentation_deck' || taskType === 'workbook_wbs') return 'pattern';
   if (taskType === 'report_document') return 'report_template';
   if (taskType === 'service_operation') return 'sop_candidate';
   return 'knowledge_hint';
 }
 
-function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: string, artifactId: string): Record<string, unknown> {
+function buildDistillCandidateMetadata(
+  session: TaskSessionShape,
+  previewText: string,
+  artifactId: string
+): Record<string, unknown> {
   const payload = session.payload || {};
   const projectName = session.project_context?.project_name || 'current project';
   if (session.task_type === 'analysis' && payload.bootstrap_kind === 'project_bootstrap') {
     const projectId = String(session.project_context?.project_id || '').trim();
     const project = projectId ? loadProjectRecord(projectId) : null;
-    const workItems = Array.isArray(project?.bootstrap_work_items) ? project.bootstrap_work_items : [];
-    const nextWork = workItems.find((item) => item.status === 'active') || workItems[1] || workItems[0] || null;
+    const workItems = Array.isArray(project?.bootstrap_work_items)
+      ? project.bootstrap_work_items
+      : [];
+    const nextWork =
+      workItems.find((item) => item.status === 'active') || workItems[1] || workItems[0] || null;
     const seedTitles = workItems
       .filter((item) => item.kind === 'mission_seed')
       .map((item) => item.title)
@@ -173,11 +193,9 @@ function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: s
       project_name: projectName,
       project_brief: kickoffBrief,
       hint_scope: 'project bootstrap',
-      hint_triggers: [
-        session.goal?.summary || 'project kickoff',
-        kickoffBrief,
-        projectName,
-      ].filter(Boolean),
+      hint_triggers: [session.goal?.summary || 'project kickoff', kickoffBrief, projectName].filter(
+        Boolean
+      ),
       recommended_refs: [
         `task_session:${session.session_id}`,
         `artifact:${artifactId}`,
@@ -214,11 +232,7 @@ function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: s
       preview_text: previewText,
       task_type: session.task_type,
       project_name: projectName,
-      applicability: [
-        'presentation delivery',
-        purpose,
-        projectName,
-      ],
+      applicability: ['presentation delivery', purpose, projectName],
       reusable_steps: [
         'Capture the user goal, audience, and success condition.',
         'Translate the request into an executive slide storyline.',
@@ -252,13 +266,14 @@ function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: s
       preview_text: previewText,
       task_type: session.task_type,
       project_name: projectName,
-      template_sections: reportKind === 'status'
-        ? ['Summary', 'Current Status', 'Risks', 'Next Actions']
-        : reportKind === 'spec'
-          ? ['Overview', 'Requirements', 'Constraints', 'Acceptance Criteria']
-          : reportKind === 'proposal'
-            ? ['Summary', 'Context', 'Recommendation', 'Next Step']
-            : ['Summary', 'Findings', 'Implications', 'Next Actions'],
+      template_sections:
+        reportKind === 'status'
+          ? ['Summary', 'Current Status', 'Risks', 'Next Actions']
+          : reportKind === 'spec'
+            ? ['Overview', 'Requirements', 'Constraints', 'Acceptance Criteria']
+            : reportKind === 'proposal'
+              ? ['Summary', 'Context', 'Recommendation', 'Next Step']
+              : ['Summary', 'Findings', 'Implications', 'Next Actions'],
       audience: reportKind === 'proposal' ? 'decision makers' : 'internal stakeholders',
       output_format: format,
     };
@@ -270,23 +285,24 @@ function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: s
       preview_text: previewText,
       task_type: session.task_type,
       project_name: projectName,
-      procedure_steps: operation === 'logs'
-        ? [
-            `Resolve the managed surface for ${serviceName}.`,
-            'Read the latest governed logs.',
-            'Summarize the most relevant operational signal.',
-          ]
-        : operation === 'status'
+      procedure_steps:
+        operation === 'logs'
           ? [
               `Resolve the managed surface for ${serviceName}.`,
-              'Inspect runtime state and health evidence.',
-              'Summarize the observed service status.',
+              'Read the latest governed logs.',
+              'Summarize the most relevant operational signal.',
             ]
-          : [
-              `Resolve the managed surface for ${serviceName}.`,
-              `Request the controlled ${operation} action.`,
-              'Confirm the post-action state and report the outcome.',
-            ],
+          : operation === 'status'
+            ? [
+                `Resolve the managed surface for ${serviceName}.`,
+                'Inspect runtime state and health evidence.',
+                'Summarize the observed service status.',
+              ]
+            : [
+                `Resolve the managed surface for ${serviceName}.`,
+                `Request the controlled ${operation} action.`,
+                'Confirm the post-action state and report the outcome.',
+              ],
       safety_notes: [
         'Require explicit approval for start, stop, or restart actions.',
         'Capture before/after evidence and keep the summary concise.',
@@ -308,26 +324,48 @@ function buildDistillCandidateMetadata(session: TaskSessionShape, previewText: s
       session.goal?.summary || session.task_type,
       session.history[0]?.text || '',
     ].filter(Boolean),
-    recommended_refs: [
-      `task_session:${session.session_id}`,
-      `artifact:${artifactId}`,
-    ],
+    recommended_refs: [`task_session:${session.session_id}`, `artifact:${artifactId}`],
   };
 }
 
-function maybeCreateDistillCandidate(session: TaskSessionShape, artifactId: string, previewText: string) {
-  const title = session.task_type === 'presentation_deck'
-    ? 'Promote reusable presentation workflow'
-    : session.task_type === 'report_document'
-      ? 'Promote reusable reporting workflow'
-      : session.task_type === 'workbook_wbs'
-        ? 'Promote reusable workbook workflow'
-        : session.task_type === 'service_operation'
-          ? 'Promote operational service handling guidance'
-          : 'Promote reusable work pattern';
-  const summary = session.task_type === 'service_operation'
-    ? `${session.goal?.summary || session.task_type} produced operational output that may be worth promoting into a governed SOP candidate.`
-    : `${session.goal?.summary || session.task_type} completed successfully and may be reusable as a governed ${inferDistillTargetKind(session.task_type)}.`;
+function maybeCreateDistillCandidate(
+  session: TaskSessionShape,
+  artifactId: string,
+  previewText: string
+) {
+  const assessment = assessTaskDistillCandidate({
+    taskType: session.task_type,
+    goalSummary: session.goal?.summary,
+    previewText,
+    artifactId,
+    hasWorkLoop: Boolean(session.work_loop),
+    bootstrapKind: String(session.payload?.bootstrap_kind || ''),
+  });
+  if (!assessment.eligible) {
+    logger.info(
+      `[voice-hub] distill candidate skipped: ${JSON.stringify({
+        sessionId: session.session_id,
+        taskType: session.task_type,
+        reason: assessment.reason,
+        artifactId,
+      })}`
+    );
+    return;
+  }
+  const title =
+    session.task_type === 'presentation_deck'
+      ? 'Promote reusable presentation workflow'
+      : session.task_type === 'report_document'
+        ? 'Promote reusable reporting workflow'
+        : session.task_type === 'workbook_wbs'
+          ? 'Promote reusable workbook workflow'
+          : session.task_type === 'service_operation'
+            ? 'Promote operational service handling guidance'
+            : 'Promote reusable work pattern';
+  const summary =
+    session.task_type === 'service_operation'
+      ? `${session.goal?.summary || session.task_type} produced operational output that may be worth promoting into a governed SOP candidate.`
+      : `${session.goal?.summary || session.task_type} completed successfully and may be reusable as a governed ${inferDistillTargetKind(session.task_type)}.`;
   const candidate = createDistillCandidateRecord({
     source_type: 'task_session',
     tier: session.project_context?.tier || 'confidential',
@@ -348,9 +386,128 @@ function maybeCreateDistillCandidate(session: TaskSessionShape, artifactId: stri
     locale: session.project_context?.locale,
     work_loop: session.work_loop,
     evidence_refs: [`task_session:${session.session_id}`, `artifact:${artifactId}`],
-    metadata: buildDistillCandidateMetadata(session, previewText, artifactId),
+    metadata: {
+      ...buildDistillCandidateMetadata(session, previewText, artifactId),
+      task_promotion_assessment: assessment,
+    },
   });
   saveDistillCandidateRecord(candidate);
+}
+
+function maybeCreateBrowserDistillCandidate(params: {
+  session: BrowserConversationSession;
+  runtimeSession?: Record<string, any> | null;
+  compiledFlow?: Awaited<ReturnType<typeof compileUserIntentFlow>>;
+  previewText: string;
+  origin: 'open_site' | 'conversation_action';
+}): string | null {
+  const goalSummary = String(params.session.goal?.summary || '').trim();
+  const targetUrl = String(params.session.target?.url || '').trim();
+  const windowTitle = String(params.session.target?.window_title || '').trim();
+  const browserSessionId = String(params.session.target?.browser_session_id || '').trim();
+  const tracePath = String(params.runtimeSession?.last_trace_path || '').trim();
+  const recentActions = Array.isArray(params.runtimeSession?.recent_actions)
+    ? params.runtimeSession.recent_actions.slice(-8)
+    : [];
+  const assessment = assessBrowserDistillCandidate({
+    origin: params.origin,
+    goalSummary,
+    previewText: params.previewText,
+    tracePath,
+    actionTrailCount: Number(params.runtimeSession?.action_trail_count || 0),
+    recentActions: recentActions.map((action: any) => ({
+      kind: action.kind,
+      op: action.op,
+    })),
+    targetUrl,
+    windowTitle,
+  });
+  if (!assessment.eligible) {
+    logger.info(
+      `[voice-hub] browser distill candidate skipped: ${JSON.stringify({
+        origin: params.origin,
+        sessionId: params.session.session_id,
+        reason: assessment.reason,
+        actionTrailCount: params.runtimeSession?.action_trail_count || 0,
+        recentActions: recentActions.map((action: any) => ({ kind: action.kind, op: action.op })),
+      })}`
+    );
+    return null;
+  }
+
+  const browserBrief = params.compiledFlow?.executionBrief;
+  const browserIntentId = params.compiledFlow?.intentContract?.intent_id || '';
+  const candidate = createDistillCandidateRecord({
+    source_type: 'artifact',
+    tier: 'confidential',
+    project_id: params.compiledFlow?.workLoop?.context?.project_id,
+    track_id: params.compiledFlow?.workLoop?.context?.track_id,
+    track_name: params.compiledFlow?.workLoop?.context?.track_name,
+    task_session_id: params.session.session_id,
+    title:
+      goalSummary.slice(0, 96) ||
+      params.previewText.trim().slice(0, 96) ||
+      'Promote reusable browser workflow',
+    summary: `${goalSummary || 'Browser goal'} completed in browser session ${params.session.session_id}. ${params.previewText.trim()} This may be reusable as a governed browser pattern.`,
+    status: 'proposed',
+    target_kind: 'pattern',
+    locale: detectReplyLanguage(goalSummary || params.previewText),
+    evidence_refs: [
+      `browser_session:${params.session.session_id}`,
+      browserSessionId ? `browser_runtime:${browserSessionId}` : '',
+      tracePath ? `trace:${tracePath}` : '',
+      targetUrl ? `url:${targetUrl}` : '',
+      windowTitle ? `title:${windowTitle}` : '',
+    ].filter(Boolean),
+    metadata: {
+      browser_session_id: params.session.session_id,
+      browser_runtime_session_id: browserSessionId || undefined,
+      browser_trace_path: tracePath || undefined,
+      browser_target_url: targetUrl || undefined,
+      browser_window_title: windowTitle || undefined,
+      browser_origin: params.origin,
+      browser_goal_summary: goalSummary || undefined,
+      browser_preview_text: params.previewText.trim() || undefined,
+      browser_recent_actions: recentActions,
+      browser_action_trail_count: params.runtimeSession?.action_trail_count ?? 0,
+      browser_compiled_intent_id: browserIntentId || undefined,
+      browser_brief_kind: browserBrief?.kind || undefined,
+      browser_brief_summary:
+        browserBrief?.user_facing_summary || browserBrief?.summary || undefined,
+      browser_promotion_assessment: assessment,
+    },
+  });
+  saveDistillCandidateRecord(candidate);
+  return candidate.candidate_id;
+}
+
+function saveMissionSeedWithAssessment(record: Parameters<typeof saveMissionSeedRecord>[0]): void {
+  const assessment = assessMissionSeedCandidate({
+    projectId: record.project_id,
+    missionTypeHint: record.mission_type_hint,
+    title: record.title,
+    summary: record.summary,
+    sourceTaskSessionId: record.source_task_session_id,
+    sourceWorkId: record.source_work_id,
+    status: record.status,
+  });
+  if (!assessment.eligible) {
+    logger.info(
+      `[voice-hub] mission seed assessment flagged: ${JSON.stringify({
+        seedId: record.seed_id,
+        reason: assessment.reason,
+        projectId: record.project_id,
+        missionTypeHint: record.mission_type_hint,
+      })}`
+    );
+  }
+  saveMissionSeedRecord({
+    ...record,
+    metadata: {
+      ...(record.metadata || {}),
+      mission_seed_assessment: assessment,
+    },
+  });
 }
 
 function buildLearnedHintText(input: {
@@ -392,8 +549,12 @@ const server = createServer(app);
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NATIVE_STT_SCRIPT = pathResolver.resolve('satellites/voice-hub/native-stt.swift');
 const WHISPER_CPP_DIR = pathResolver.resolve('active/shared/tmp/whisper.cpp');
-const WHISPER_CLI_PATH = pathResolver.resolve('active/shared/tmp/whisper.cpp/build/bin/whisper-cli');
-const WHISPER_MODEL_PATH = pathResolver.resolve('active/shared/tmp/whisper.cpp/models/ggml-small.bin');
+const WHISPER_CLI_PATH = pathResolver.resolve(
+  'active/shared/tmp/whisper.cpp/build/bin/whisper-cli'
+);
+const WHISPER_MODEL_PATH = pathResolver.resolve(
+  'active/shared/tmp/whisper.cpp/models/ggml-small.bin'
+);
 const PORT = Number(process.env.VOICE_HUB_PORT || 3032);
 const HOST = process.env.VOICE_HUB_HOST || '127.0.0.1';
 const PRESENCE_STUDIO_URL = process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031';
@@ -423,39 +584,50 @@ function shouldSuppressEchoTranscript(text: string): boolean {
   if (!normalizedInput) return false;
 
   const activeSpeechText = normalizeSpeechEchoText(activeSpeechState.text || '');
-  if (activeSpeechState.status === 'speaking' && activeSpeechText && (
-    normalizedInput === activeSpeechText ||
-    activeSpeechText.includes(normalizedInput) ||
-    normalizedInput.includes(activeSpeechText)
-  )) {
+  if (
+    activeSpeechState.status === 'speaking' &&
+    activeSpeechText &&
+    (normalizedInput === activeSpeechText ||
+      activeSpeechText.includes(normalizedInput) ||
+      normalizedInput.includes(activeSpeechText))
+  ) {
     return true;
   }
 
   const recentSpeechText = normalizeSpeechEchoText(recentSpeechGuardState.text || '');
   const finishedAt = recentSpeechGuardState.finishedAt || 0;
-  if (recentSpeechText && finishedAt > 0 && Date.now() - finishedAt < 8000 && (
-    normalizedInput === recentSpeechText ||
-    recentSpeechText.includes(normalizedInput) ||
-    normalizedInput.includes(recentSpeechText)
-  )) {
+  if (
+    recentSpeechText &&
+    finishedAt > 0 &&
+    Date.now() - finishedAt < 8000 &&
+    (normalizedInput === recentSpeechText ||
+      recentSpeechText.includes(normalizedInput) ||
+      normalizedInput.includes(recentSpeechText))
+  ) {
     return true;
   }
 
   return false;
 }
 
-function requestFingerprint(input: { text: string; intent: string; sourceId: string; speaker: string }): string {
-  return createHash('sha256')
-    .update(JSON.stringify(input))
-    .digest('hex')
-    .slice(0, 16);
+function requestFingerprint(input: {
+  text: string;
+  intent: string;
+  sourceId: string;
+  speaker: string;
+}): string {
+  return createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 16);
 }
 
 function conversationSessionKey(sourceId: string, speaker: string): string {
   return `${sourceId}::${speaker}`;
 }
 
-function rememberConversationTurn(sessionKey: string, role: 'user' | 'assistant', text: string): void {
+function rememberConversationTurn(
+  sessionKey: string,
+  role: 'user' | 'assistant',
+  text: string
+): void {
   const trimmed = text.trim();
   if (!trimmed) return;
   const turns = conversationMemory.get(sessionKey) || [];
@@ -495,7 +667,7 @@ function buildPresenceConversationPrompt(userText: string, sessionKey: string): 
 function buildSurfaceRoutingPrompt(
   userText: string,
   context: SurfaceRouterContext,
-  candidates: HeuristicSurfaceRoutingCandidate[],
+  candidates: HeuristicSurfaceRoutingCandidate[]
 ): string {
   const browserSession = getActiveBrowserConversationSession('presence');
   const taskSession = getActiveTaskSession('presence') as TaskSessionShape | null;
@@ -527,7 +699,9 @@ function buildSurfaceRoutingPrompt(
     taskContext,
     'Heuristic candidates:',
     candidates.length > 0
-      ? candidates.map((entry, index) => `${index + 1}. ${entry.decision?.intent} because ${entry.reason}`).join('\n')
+      ? candidates
+          .map((entry, index) => `${index + 1}. ${entry.decision?.intent} because ${entry.reason}`)
+          .join('\n')
       : 'none',
     'Recent conversation:',
     formatConversationHistory(context.sessionKey),
@@ -539,7 +713,7 @@ function buildSurfaceRoutingPrompt(
 async function routeSurfaceActionWithLlm(
   userText: string,
   context: SurfaceRouterContext,
-  candidates: HeuristicSurfaceRoutingCandidate[],
+  candidates: HeuristicSurfaceRoutingCandidate[]
 ) {
   try {
     const response = await Promise.race([
@@ -553,11 +727,13 @@ async function routeSurfaceActionWithLlm(
       }),
     ]);
     const parsed = parseSurfaceActionRoutingDecision(response.text || '');
-    logger.info(`[voice-hub] surface action router result: ${JSON.stringify({
-      userText,
-      candidates: candidates.map((entry) => entry.decision?.intent),
-      parsed,
-    })}`);
+    logger.info(
+      `[voice-hub] surface action router result: ${JSON.stringify({
+        userText,
+        candidates: candidates.map((entry) => entry.decision?.intent),
+        parsed,
+      })}`
+    );
     return parsed;
   } catch (error: any) {
     logger.warn(`[voice-hub] surface action routing failed: ${error?.message || error}`);
@@ -595,7 +771,12 @@ function buildFallbackSurfaceRoutingDecision(userText: string) {
   }
 
   const activeBrowserSession = getActiveBrowserConversationSession('presence');
-  if (activeBrowserSession && /(クリック|押して|開いて|入力|入れて|選んで|1つ目|一つ目|それ|続けて|enter|click|press|fill|type|open that)/i.test(trimmed)) {
+  if (
+    activeBrowserSession &&
+    /(クリック|押して|開いて|入力|入れて|選んで|1つ目|一つ目|それ|続けて|enter|click|press|fill|type|open that)/i.test(
+      trimmed
+    )
+  ) {
     return {
       kind: 'surface_action_routing' as const,
       intent: 'browser_step' as const,
@@ -604,7 +785,11 @@ function buildFallbackSurfaceRoutingDecision(userText: string) {
     };
   }
 
-  if (/(ブラウザ|browser).*(開いて|立ち上げ|表示|見て)|サイトを見て|サイトを開いて|webサイト|website|open .*site|show .*site|go to/i.test(trimmed)) {
+  if (
+    /(ブラウザ|browser).*(開いて|立ち上げ|表示|見て)|サイトを見て|サイトを開いて|webサイト|website|open .*site|show .*site|go to/i.test(
+      trimmed
+    )
+  ) {
     const urlMatch = trimmed.match(/https?:\/\/\S+/i)?.[0];
     const siteQuery = normalizeBrowserSiteQuery(trimmed);
     return {
@@ -635,7 +820,9 @@ function buildFallbackSurfaceRoutingDecision(userText: string) {
   return null;
 }
 
-function buildHeuristicSurfaceRoutingCandidates(userText: string): HeuristicSurfaceRoutingCandidate[] {
+function buildHeuristicSurfaceRoutingCandidates(
+  userText: string
+): HeuristicSurfaceRoutingCandidate[] {
   const candidates: HeuristicSurfaceRoutingCandidate[] = [];
   const fallback = buildFallbackSurfaceRoutingDecision(userText);
   if (fallback) {
@@ -664,7 +851,10 @@ function buildHeuristicSurfaceRoutingCandidates(userText: string): HeuristicSurf
   }
 
   const activeBrowserSession = getActiveBrowserConversationSession('presence');
-  if (activeBrowserSession && /(押して|クリック|それ|1つ目|一つ目|入力|enter|click|press|type|fill)/i.test(trimmed)) {
+  if (
+    activeBrowserSession &&
+    /(押して|クリック|それ|1つ目|一つ目|入力|enter|click|press|type|fill)/i.test(trimmed)
+  ) {
     candidates.unshift({
       decision: {
         kind: 'surface_action_routing',
@@ -696,7 +886,12 @@ function pruneRecentResponses(now = Date.now()): void {
   }
 }
 
-async function listNativeInputDevices(): Promise<{ ok: boolean; devices: Array<{ id: number; uid: string; name: string; isDefault: boolean }>; defaultDeviceUID?: string; error?: string }> {
+async function listNativeInputDevices(): Promise<{
+  ok: boolean;
+  devices: Array<{ id: number; uid: string; name: string; isDefault: boolean }>;
+  defaultDeviceUID?: string;
+  error?: string;
+}> {
   return new Promise((resolve, reject) => {
     const child = spawn('swift', [NATIVE_STT_SCRIPT, '--list-devices'], {
       cwd: pathResolver.rootDir(),
@@ -706,8 +901,12 @@ async function listNativeInputDevices(): Promise<{ ok: boolean; devices: Array<{
 
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-    child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
     child.on('error', (error) => reject(error));
     child.on('close', (code) => {
       const raw = stdout.trim();
@@ -721,7 +920,11 @@ async function listNativeInputDevices(): Promise<{ ok: boolean; devices: Array<{
   });
 }
 
-async function runNativeStt(locale: string, timeoutSeconds: number, deviceId?: string): Promise<{ ok: boolean; text?: string; error?: string; isFinal?: boolean; locale: string }> {
+async function runNativeStt(
+  locale: string,
+  timeoutSeconds: number,
+  deviceId?: string
+): Promise<{ ok: boolean; text?: string; error?: string; isFinal?: boolean; locale: string }> {
   return new Promise((resolve, reject) => {
     const args = [NATIVE_STT_SCRIPT, '--locale', locale, '--timeout', String(timeoutSeconds)];
     if (deviceId) {
@@ -757,9 +960,23 @@ async function runNativeStt(locale: string, timeoutSeconds: number, deviceId?: s
   });
 }
 
-async function recordNativeWav(locale: string, timeoutSeconds: number, deviceId: string | undefined, outputPath: string): Promise<{ ok: boolean; outputPath: string; error?: string; elapsedMs?: number }> {
+async function recordNativeWav(
+  locale: string,
+  timeoutSeconds: number,
+  deviceId: string | undefined,
+  outputPath: string
+): Promise<{ ok: boolean; outputPath: string; error?: string; elapsedMs?: number }> {
   return new Promise((resolve, reject) => {
-    const args = [NATIVE_STT_SCRIPT, '--record-wav', '--locale', locale, '--timeout', String(timeoutSeconds), '--output', outputPath];
+    const args = [
+      NATIVE_STT_SCRIPT,
+      '--record-wav',
+      '--locale',
+      locale,
+      '--timeout',
+      String(timeoutSeconds),
+      '--output',
+      outputPath,
+    ];
     if (deviceId) {
       args.push('--device-id', deviceId);
     }
@@ -771,8 +988,12 @@ async function recordNativeWav(locale: string, timeoutSeconds: number, deviceId:
 
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-    child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
     child.on('error', (error) => reject(error));
     child.on('close', (code) => {
       const raw = stdout.trim();
@@ -788,13 +1009,19 @@ async function recordNativeWav(locale: string, timeoutSeconds: number, deviceId:
 
 async function convertWavForWhisper(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn('/usr/bin/afconvert', ['-f', 'WAVE', '-d', 'LEI16@16000', '-c', '1', inputPath, outputPath], {
-      cwd: pathResolver.rootDir(),
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const child = spawn(
+      '/usr/bin/afconvert',
+      ['-f', 'WAVE', '-d', 'LEI16@16000', '-c', '1', inputPath, outputPath],
+      {
+        cwd: pathResolver.rootDir(),
+        env: process.env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
     let stderr = '';
-    child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
     child.on('error', (error) => reject(error));
     child.on('close', (code) => {
       if (code === 0) return resolve();
@@ -816,26 +1043,42 @@ function parseWhisperText(raw: string): string {
     .trim();
 }
 
-async function transcribeWithWhisperCpp(inputPath: string, locale: string): Promise<{ ok: boolean; text?: string; error?: string }> {
+async function transcribeWithWhisperCpp(
+  inputPath: string,
+  locale: string
+): Promise<{ ok: boolean; text?: string; error?: string }> {
   return new Promise((resolve, reject) => {
     const lang = locale.toLowerCase().startsWith('ja') ? 'ja' : 'auto';
-    const child = spawn(WHISPER_CLI_PATH, [
-      '-m', WHISPER_MODEL_PATH,
-      '-f', inputPath,
-      '-l', lang,
-      '--no-timestamps',
-      '--suppress-nst',
-      '-nth', '0.8',
-      '-bs', '8',
-    ], {
-      cwd: WHISPER_CPP_DIR,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const child = spawn(
+      WHISPER_CLI_PATH,
+      [
+        '-m',
+        WHISPER_MODEL_PATH,
+        '-f',
+        inputPath,
+        '-l',
+        lang,
+        '--no-timestamps',
+        '--suppress-nst',
+        '-nth',
+        '0.8',
+        '-bs',
+        '8',
+      ],
+      {
+        cwd: WHISPER_CPP_DIR,
+        env: process.env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-    child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
     child.on('error', (error) => reject(error));
     child.on('close', (code) => {
       const text = parseWhisperText(`${stdout}\n${stderr}`);
@@ -849,7 +1092,7 @@ async function transcribeWithWhisperCpp(inputPath: string, locale: string): Prom
 
 async function transcribeWithOpenAiCompatibleServer(
   inputPath: string,
-  locale: string,
+  locale: string
 ): Promise<{ ok: boolean; text?: string; error?: string; backend: string }> {
   const serverConfig = resolveVoiceSttServerConfig(process.env);
   if (!serverConfig) {
@@ -888,7 +1131,7 @@ async function transcribeWithOpenAiCompatibleServer(
     };
   }
 
-  const payload = await response.json() as { text?: string };
+  const payload = (await response.json()) as { text?: string };
   const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
   return {
     ok: text.length > 0,
@@ -909,7 +1152,7 @@ function getAvailableSttBackends() {
 async function transcribeRecordedAudio(
   inputPath: string,
   locale: string,
-  backendOrder: string[],
+  backendOrder: string[]
 ): Promise<{ ok: boolean; text?: string; error?: string; backend?: string }> {
   let lastError = 'no_stt_backend_available';
   for (const backend of backendOrder) {
@@ -945,7 +1188,9 @@ function getSpeechPlaybackState(): SpeechPlaybackState {
   return { status: 'idle' };
 }
 
-async function stopSpeechPlayback(reason: string): Promise<{ ok: boolean; stopped: boolean; reason: string }> {
+async function stopSpeechPlayback(
+  reason: string
+): Promise<{ ok: boolean; stopped: boolean; reason: string }> {
   if (!activeSpeechProcess) {
     activeSpeechState = { status: 'idle' };
     return { ok: true, stopped: false, reason };
@@ -987,7 +1232,9 @@ async function speakReplyManaged(text: string): Promise<void> {
     };
 
     let stderr = '';
-    child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
     child.on('error', (error) => {
       if (activeSpeechProcess === child) {
         activeSpeechProcess = null;
@@ -1104,19 +1351,25 @@ async function processIngest(input: {
         rememberConversationTurn(sessionKey, 'assistant', replyText);
         const speakingMs = estimateSpeechDurationMs(replyText);
         try {
-          await reflectTimeline(buildPresenceAssistantReplyTimeline({
-            agentId: 'presence-surface-agent',
-            text: replyText,
-            speaking_ms: speakingMs,
-          }));
+          await reflectTimeline(
+            buildPresenceAssistantReplyTimeline({
+              agentId: 'presence-surface-agent',
+              text: replyText,
+              speaking_ms: speakingMs,
+            })
+          );
         } catch (timelineError: any) {
-          logger.warn(`[voice-hub] Failed to dispatch assistant reply timeline: ${timelineError?.message || timelineError}`);
+          logger.warn(
+            `[voice-hub] Failed to dispatch assistant reply timeline: ${timelineError?.message || timelineError}`
+          );
         }
-        speakReplyManaged(replyText).then(() => {
-          logger.info('[voice-hub] assistant reply spoken successfully');
-        }).catch((error: any) => {
-          logger.warn(`[voice-hub] speech playback failed: ${error?.message || error}`);
-        });
+        speakReplyManaged(replyText)
+          .then(() => {
+            logger.info('[voice-hub] assistant reply spoken successfully');
+          })
+          .catch((error: any) => {
+            logger.warn(`[voice-hub] speech playback failed: ${error?.message || error}`);
+          });
         replied = true;
         spoken = true;
       } catch (error: any) {
@@ -1194,17 +1447,24 @@ function warmPresenceSurfaceAgent(): void {
     agentId: 'presence-surface-agent',
     query: PRESENCE_SURFACE_WARMUP_QUERY,
     senderAgentId: 'kyberion:voice-hub',
-  }).then((result) => {
-    logger.info(`[voice-hub] presence surface warmup completed: ${JSON.stringify((result.text || '').trim())}`);
-  }).catch((error: any) => {
-    logger.warn(`[voice-hub] presence surface warmup failed: ${error?.message || error}`);
-  });
+  })
+    .then((result) => {
+      logger.info(
+        `[voice-hub] presence surface warmup completed: ${JSON.stringify((result.text || '').trim())}`
+      );
+    })
+    .catch((error: any) => {
+      logger.warn(`[voice-hub] presence surface warmup failed: ${error?.message || error}`);
+    });
 }
 
-function buildPresenceSurfaceConversationMessageInput(text: string, options?: {
-  forcedReceiver?: string;
-  delegationSummaryInstruction?: string;
-}): Parameters<typeof runSurfaceMessageConversation>[0] {
+function buildPresenceSurfaceConversationMessageInput(
+  text: string,
+  options?: {
+    forcedReceiver?: string;
+    delegationSummaryInstruction?: string;
+  }
+): Parameters<typeof runSurfaceMessageConversation>[0] {
   return {
     surface: 'presence',
     text,
@@ -1226,7 +1486,10 @@ function normalizeTextForTts(text: string, language: 'ja' | 'en'): string {
   const profile = getVoiceTtsLanguageConfig(language);
   const compact = text
     .replace(/\s+/g, ' ')
-    .replace(/REQ-[A-Z0-9-]+/g, profile.requestIdToken || (language === 'ja' ? 'リクエストID' : 'request id'))
+    .replace(
+      /REQ-[A-Z0-9-]+/g,
+      profile.requestIdToken || (language === 'ja' ? 'リクエストID' : 'request id')
+    )
     .replace(/https?:\/\/\S+/g, profile.urlToken || (language === 'ja' ? 'URL' : 'link'))
     .trim();
 
@@ -1250,7 +1513,9 @@ function normalizeTextForTts(text: string, language: 'ja' | 'en'): string {
 
 function buildCapabilityReply(language: 'ja' | 'en'): string {
   const profile = getSurfaceAgentCatalogEntry('presence-surface-agent');
-  const capabilities = (profile?.capabilities || ['presence', 'surface', 'conversation', 'realtime']).join(', ');
+  const capabilities = (
+    profile?.capabilities || ['presence', 'surface', 'conversation', 'realtime']
+  ).join(', ');
   if (language === 'ja') {
     return `この surface では短い会話、リアルタイム応答、状態案内ができます。主な capability は ${capabilities} です。重い実行や durable な作業は Chronos など別の runtime に回します。`;
   }
@@ -1301,7 +1566,7 @@ function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, '\'')
+    .replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&#x2F;/g, '/');
@@ -1325,8 +1590,11 @@ function normalizeSearchResultUrl(rawUrl: string): string {
 
 function normalizeBrowserSiteQuery(text: string): string {
   return text
-    .replace(/https?:\/\/\S+/ig, '')
-    .replace(/(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show|欲しい|ほしい|もらっていい|してもらえる|見たい|アクセス|移動|行って)/ig, ' ')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(
+      /(ブラウザ|browser|サイト|site|webサイト|website|web|開いて|立ち上げて|立ち上げ|表示して|表示|見せて|見て|開く|go to|open|show|欲しい|ほしい|もらっていい|してもらえる|見たい|アクセス|移動|行って)/gi,
+      ' '
+    )
     .replace(/[のをへにで]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -1338,9 +1606,10 @@ async function fetchPresenceLocationContext(): Promise<PresenceLocationContext |
       signal: withTimeoutSignal(2500),
     });
     if (!response.ok) return null;
-    const payload = await response.json() as { location?: PresenceLocationContext | null };
+    const payload = (await response.json()) as { location?: PresenceLocationContext | null };
     if (!payload?.location) return null;
-    if (!Number.isFinite(payload.location.latitude) || !Number.isFinite(payload.location.longitude)) return null;
+    if (!Number.isFinite(payload.location.latitude) || !Number.isFinite(payload.location.longitude))
+      return null;
     return payload.location;
   } catch {
     return null;
@@ -1388,7 +1657,7 @@ function weatherCodeLabel(code: number, language: 'ja' | 'en'): string {
     95: ['雷雨', 'thunderstorm'],
   };
   const found = table[code];
-  return found ? found[language === 'ja' ? 0 : 1] : (language === 'ja' ? '不明' : 'unknown');
+  return found ? found[language === 'ja' ? 0 : 1] : language === 'ja' ? '不明' : 'unknown';
 }
 
 async function tryBuildWeatherReply(userText: string): Promise<string | null> {
@@ -1407,14 +1676,17 @@ async function tryBuildWeatherReply(userText: string): Promise<string | null> {
   url.searchParams.set('latitude', String(location.latitude));
   url.searchParams.set('longitude', String(location.longitude));
   url.searchParams.set('current', 'temperature_2m,weather_code');
-  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max');
+  url.searchParams.set(
+    'daily',
+    'temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+  );
   url.searchParams.set('forecast_days', '1');
   url.searchParams.set('timezone', 'auto');
 
   try {
     const response = await fetch(url, { signal: withTimeoutSignal(timeoutMs) });
     if (!response.ok) throw new Error(`weather_http_${response.status}`);
-    const payload = await response.json() as any;
+    const payload = (await response.json()) as any;
     const currentTemp = payload?.current?.temperature_2m;
     const weatherCode = Number(payload?.current?.weather_code ?? -1);
     const maxTemp = payload?.daily?.temperature_2m_max?.[0];
@@ -1448,11 +1720,15 @@ async function searchWeb(query: string): Promise<WebSearchResult[]> {
     throw new Error(`web_search_http_${response.status}`);
   }
   const html = await response.text();
-  const matches = Array.from(html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)).slice(0, maxResults);
-  return matches.map((match) => ({
-    url: normalizeSearchResultUrl(match[1]),
-    title: decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim()),
-  })).filter((entry) => entry.title && entry.url);
+  const matches = Array.from(
+    html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)
+  ).slice(0, maxResults);
+  return matches
+    .map((match) => ({
+      url: normalizeSearchResultUrl(match[1]),
+      title: decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim()),
+    }))
+    .filter((entry) => entry.title && entry.url);
 }
 
 async function tryBuildWebSearchReply(userText: string): Promise<string | null> {
@@ -1526,15 +1802,20 @@ async function resolveBrowserSessionForOpen(preferredSessionId?: string): Promis
   const preferredRuntimeSession = preferredSessionId
     ? loadBrowserRuntimeSessionForVoiceHub(preferredSessionId)
     : null;
-  if (preferredSessionId && preferredRuntimeSession && await isReachableBrowserCdpUrl(preferredRuntimeSession.cdp_url)) {
+  if (
+    preferredSessionId &&
+    preferredRuntimeSession &&
+    (await isReachableBrowserCdpUrl(preferredRuntimeSession.cdp_url))
+  ) {
     return {
       browserSessionId: preferredSessionId,
       runtimeSession: preferredRuntimeSession,
     };
   }
 
-  const sessions = listBrowserRuntimeSessionsForVoiceHub()
-    .sort((a, b) => scoreBrowserRuntimeSessionForVoiceHub(b) - scoreBrowserRuntimeSessionForVoiceHub(a));
+  const sessions = listBrowserRuntimeSessionsForVoiceHub().sort(
+    (a, b) => scoreBrowserRuntimeSessionForVoiceHub(b) - scoreBrowserRuntimeSessionForVoiceHub(a)
+  );
   for (const session of sessions) {
     if (await isReachableBrowserCdpUrl(session.cdp_url)) {
       return {
@@ -1555,48 +1836,74 @@ async function executeBrowserOpenSite(params: {
   url?: string;
   siteQuery?: string;
 }): Promise<string | null> {
+  const compiledFlow = await compileUserIntentFlow({
+    text: params.userText,
+    channel: 'presence',
+    locale: detectReplyLanguage(params.userText),
+    tier: 'public',
+  });
   const activeConversation = getActiveBrowserConversationSession('presence');
-  const resolvedBrowserSession = await resolveBrowserSessionForOpen(activeConversation?.target?.browser_session_id || 'default');
+  const resolvedBrowserSession = await resolveBrowserSessionForOpen(
+    activeConversation?.target?.browser_session_id || 'default'
+  );
   const browserSessionId = resolvedBrowserSession.browserSessionId;
+  const browserBrief = compiledFlow.executionBrief;
   let targetUrl = params.url?.trim();
-  logger.info(`[voice-hub] browser_open_site start: ${JSON.stringify({
-    userText: params.userText,
-    browserSessionId,
-    activeConversationId: activeConversation?.session_id,
-    activeConversationTarget: activeConversation?.target,
-    url: params.url,
-    siteQuery: params.siteQuery,
-  })}`);
+  logger.info(
+    `[voice-hub] browser_open_site start: ${JSON.stringify({
+      userText: params.userText,
+      browserSessionId,
+      activeConversationId: activeConversation?.session_id,
+      activeConversationTarget: activeConversation?.target,
+      url: params.url,
+      siteQuery: params.siteQuery,
+      compiledBrief: browserBrief,
+      compiledIntent: compiledFlow.intentContract,
+    })}`
+  );
 
   if (!targetUrl && params.siteQuery?.trim()) {
     const results = await searchWeb(params.siteQuery.trim());
-    logger.info(`[voice-hub] browser_open_site search results: ${JSON.stringify({
-      siteQuery: params.siteQuery.trim(),
-      resultCount: results.length,
-      topResult: results[0] || null,
-    })}`);
+    logger.info(
+      `[voice-hub] browser_open_site search results: ${JSON.stringify({
+        siteQuery: params.siteQuery.trim(),
+        resultCount: results.length,
+        topResult: results[0] || null,
+      })}`
+    );
     targetUrl = results[0]?.url;
   }
   if (!targetUrl) {
-    logger.warn(`[voice-hub] browser_open_site could not resolve target URL for: ${JSON.stringify({
-      userText: params.userText,
-      siteQuery: params.siteQuery,
-    })}`);
+    logger.warn(
+      `[voice-hub] browser_open_site could not resolve target URL for: ${JSON.stringify({
+        userText: params.userText,
+        siteQuery: params.siteQuery,
+      })}`
+    );
+    if (compiledFlow.clarificationPacket) {
+      return formatClarificationPacket(compiledFlow.clarificationPacket);
+    }
     return null;
   }
 
-  const runtimeSession = resolvedBrowserSession.runtimeSession || loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
-  logger.info(`[voice-hub] browser_open_site runtime session before goto: ${JSON.stringify({
-    browserSessionId,
-    runtimeSession,
-  })}`);
-  const tmpPath = pathResolver.sharedTmp(`browser-conversation/open-site-${Date.now().toString(36)}.json`);
+  const runtimeSession =
+    resolvedBrowserSession.runtimeSession || loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
+  logger.info(
+    `[voice-hub] browser_open_site runtime session before goto: ${JSON.stringify({
+      browserSessionId,
+      runtimeSession,
+    })}`
+  );
+  const tmpPath = pathResolver.sharedTmp(
+    `browser-conversation/open-site-${Date.now().toString(36)}.json`
+  );
   const payload = {
     action: 'pipeline',
     session_id: browserSessionId,
     options: {
       headless: false,
       keep_alive: false,
+      record_trace: true,
       connect_over_cdp: Boolean(runtimeSession?.cdp_url),
       cdp_url: runtimeSession?.cdp_url,
       cdp_port: runtimeSession?.cdp_port,
@@ -1627,11 +1934,7 @@ async function executeBrowserOpenSite(params: {
   };
   safeWriteFile(tmpPath, JSON.stringify(payload, null, 2));
   try {
-    safeExec('node', [
-      'dist/libs/actuators/browser-actuator/src/index.js',
-      '--input',
-      tmpPath,
-    ], {
+    safeExec('node', ['dist/libs/actuators/browser-actuator/src/index.js', '--input', tmpPath], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 60_000,
     });
@@ -1641,39 +1944,54 @@ async function executeBrowserOpenSite(params: {
   }
 
   const updatedRuntimeSession = loadBrowserRuntimeSessionForVoiceHub(browserSessionId);
-  const activeTab = (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.active)
-    || (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.url === targetUrl)
-    || updatedRuntimeSession?.tabs?.[0];
-  logger.info(`[voice-hub] browser_open_site runtime session after goto: ${JSON.stringify({
-    browserSessionId,
-    updatedRuntimeSession,
-    activeTab,
-    targetUrl,
-  })}`);
-  if (!activeTab?.url || activeTab.url === 'about:blank' || activeTab.url === 'chrome://new-tab-page/') {
-    logger.warn(`[voice-hub] browser_open_site navigation incomplete: ${JSON.stringify({
+  const activeTab =
+    (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.active) ||
+    (updatedRuntimeSession?.tabs || []).find((tab: any) => tab.url === targetUrl) ||
+    updatedRuntimeSession?.tabs?.[0];
+  logger.info(
+    `[voice-hub] browser_open_site runtime session after goto: ${JSON.stringify({
       browserSessionId,
+      updatedRuntimeSession,
       activeTab,
       targetUrl,
-    })}`);
+    })}`
+  );
+  if (
+    !activeTab?.url ||
+    activeTab.url === 'about:blank' ||
+    activeTab.url === 'chrome://new-tab-page/'
+  ) {
+    logger.warn(
+      `[voice-hub] browser_open_site navigation incomplete: ${JSON.stringify({
+        browserSessionId,
+        activeTab,
+        targetUrl,
+      })}`
+    );
     throw new Error(`browser_open_site_navigation_incomplete:${targetUrl}`);
   }
 
-  const nextConversation = activeConversation || createBrowserConversationSession({
-    sessionId: `BCS-presence-${browserSessionId}`,
-    surface: 'presence',
-    goal: {
-      summary: activeTab?.title || params.siteQuery || 'Browser session',
-      success_condition: 'Complete the requested browser step safely.',
-    },
-    target: {
-      app: 'browser',
-      browser_session_id: browserSessionId,
-      tab_id: activeTab?.tab_id,
-      url: activeTab?.url || targetUrl,
-      window_title: activeTab?.title,
-    },
-  });
+  const nextConversation =
+    activeConversation ||
+    createBrowserConversationSession({
+      sessionId: `BCS-presence-${browserSessionId}`,
+      surface: 'presence',
+      goal: {
+        summary:
+          browserBrief?.user_facing_summary ||
+          activeTab?.title ||
+          params.siteQuery ||
+          'Browser session',
+        success_condition: 'Complete the requested browser step safely.',
+      },
+      target: {
+        app: 'browser',
+        browser_session_id: browserSessionId,
+        tab_id: activeTab?.tab_id,
+        url: activeTab?.url || targetUrl,
+        window_title: activeTab?.title,
+      },
+    });
   nextConversation.target = {
     app: 'browser',
     browser_session_id: browserSessionId,
@@ -1681,15 +1999,42 @@ async function executeBrowserOpenSite(params: {
     url: activeTab?.url || targetUrl,
     window_title: activeTab?.title || nextConversation.target?.window_title,
   };
-  nextConversation.goal.summary = activeTab?.title || params.siteQuery || nextConversation.goal.summary;
+  nextConversation.goal.summary =
+    browserBrief?.user_facing_summary ||
+    activeTab?.title ||
+    params.siteQuery ||
+    nextConversation.goal.summary;
   nextConversation.status = 'awaiting_instruction';
   nextConversation.updated_at = new Date().toISOString();
   saveBrowserConversationSession(nextConversation);
-  logger.info(`[voice-hub] browser_open_site conversation updated: ${JSON.stringify({
-    sessionId: nextConversation.session_id,
-    target: nextConversation.target,
-    goal: nextConversation.goal,
-  })}`);
+  recordBrowserConversationHistory(nextConversation.session_id, {
+    ts: new Date().toISOString(),
+    type: 'ack',
+    text: browserBrief?.user_facing_summary
+      ? `Execution brief: ${browserBrief.user_facing_summary}`
+      : `Execution brief: ${params.userText}`,
+  });
+  const browserDistillCandidateId = maybeCreateBrowserDistillCandidate({
+    session: nextConversation,
+    runtimeSession: updatedRuntimeSession,
+    compiledFlow,
+    previewText: `Opened ${targetUrl}.`,
+    origin: 'open_site',
+  });
+  if (browserDistillCandidateId) {
+    recordBrowserConversationHistory(nextConversation.session_id, {
+      ts: new Date().toISOString(),
+      type: 'feedback',
+      text: `Created browser distill candidate ${browserDistillCandidateId} for reuse.`,
+    });
+  }
+  logger.info(
+    `[voice-hub] browser_open_site conversation updated: ${JSON.stringify({
+      sessionId: nextConversation.session_id,
+      target: nextConversation.target,
+      goal: nextConversation.goal,
+    })}`
+  );
 
   const label = activeTab?.title || params.siteQuery || targetUrl;
   return detectReplyLanguage(params.userText) === 'ja'
@@ -1704,19 +2049,30 @@ async function tryBuildKnowledgeReply(userText: string): Promise<string | null> 
   if (config?.enabled === false) return null;
   const query = extracted;
   try {
-    const output = safeExec('node', [
-      'dist/scripts/context_ranker.js',
-      '--intent', query,
-      '--role', config?.role || 'presence_surface_agent',
-      '--phase', config?.phase || 'alignment',
-      '--scope', config?.scope || 'repository',
-      '--limit', String(config?.limit || 4),
-      '--json',
-    ], {
-      cwd: pathResolver.rootDir(),
-      timeoutMs: 12_000,
-    });
-    const payload = JSON.parse(output) as { results?: Array<{ path: string; title: string; score: number }> };
+    const output = safeExec(
+      'node',
+      [
+        'dist/scripts/context_ranker.js',
+        '--intent',
+        query,
+        '--role',
+        config?.role || 'presence_surface_agent',
+        '--phase',
+        config?.phase || 'alignment',
+        '--scope',
+        config?.scope || 'repository',
+        '--limit',
+        String(config?.limit || 4),
+        '--json',
+      ],
+      {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 12_000,
+      }
+    );
+    const payload = JSON.parse(output) as {
+      results?: Array<{ path: string; title: string; score: number }>;
+    };
     const results = Array.isArray(payload.results) ? payload.results.slice(0, 3) : [];
     if (results.length === 0) {
       return detectReplyLanguage(userText) === 'ja'
@@ -1724,19 +2080,21 @@ async function tryBuildKnowledgeReply(userText: string): Promise<string | null> 
         : `I could not find stored knowledge closely matching "${query}".`;
     }
 
-    const knowledgeBlocks = results.map((entry) => {
-      const absolutePath = pathResolver.knowledge(entry.path);
-      const raw = safeReadFile(absolutePath, { encoding: 'utf8' }) as string;
-      const excerpt = raw
-        .replace(/^---[\s\S]*?---\n?/, '')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .slice(0, 12)
-        .join('\n')
-        .slice(0, 900);
-      return `Source: knowledge/${entry.path}\nTitle: ${entry.title}\nExcerpt:\n${excerpt}`;
-    }).join('\n\n');
+    const knowledgeBlocks = results
+      .map((entry) => {
+        const absolutePath = pathResolver.knowledge(entry.path);
+        const raw = safeReadFile(absolutePath, { encoding: 'utf8' }) as string;
+        const excerpt = raw
+          .replace(/^---[\s\S]*?---\n?/, '')
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .slice(0, 12)
+          .join('\n')
+          .slice(0, 900);
+        return `Source: knowledge/${entry.path}\nTitle: ${entry.title}\nExcerpt:\n${excerpt}`;
+      })
+      .join('\n\n');
 
     const prompt = [
       'You are answering a live voice query using retrieved Kyberion knowledge.',
@@ -1750,7 +2108,9 @@ async function tryBuildKnowledgeReply(userText: string): Promise<string | null> 
       'Retrieved knowledge:',
       knowledgeBlocks,
     ].join('\n');
-    const response = await runSurfaceMessageConversation(buildPresenceSurfaceConversationMessageInput(prompt));
+    const response = await runSurfaceMessageConversation(
+      buildPresenceSurfaceConversationMessageInput(prompt)
+    );
     const text = (response.text || '').trim();
     if (text) return text;
     const fallbackTitles = results.map((entry) => entry.title).join('、');
@@ -1786,8 +2146,34 @@ function tryHandleBrowserConversation(userText: string): string | null {
   if (!feedback) return null;
   if (feedback.status === 'progress' && session.candidate_targets?.length !== undefined) {
     const refreshed = getActiveBrowserConversationSession('presence');
-    if (refreshed && refreshed.session_id === session.session_id && refreshed.candidate_targets.length === 1 && refreshed.active_step?.kind === 'click') {
+    if (
+      refreshed &&
+      refreshed.session_id === session.session_id &&
+      refreshed.candidate_targets.length === 1 &&
+      refreshed.active_step?.kind === 'click'
+    ) {
       const executed = executeBrowserConversationAction(session.session_id);
+      if (executed?.ok) {
+        const currentSession = getActiveBrowserConversationSession('presence');
+        const browserRuntimeSession = loadBrowserRuntimeSessionForVoiceHub(
+          currentSession?.target?.browser_session_id || session.session_id
+        );
+        const browserDistillCandidateId = currentSession
+          ? maybeCreateBrowserDistillCandidate({
+              session: currentSession,
+              runtimeSession: browserRuntimeSession,
+              previewText: executed.feedback.message,
+              origin: 'conversation_action',
+            })
+          : null;
+        if (browserDistillCandidateId) {
+          recordBrowserConversationHistory(session.session_id, {
+            ts: new Date().toISOString(),
+            type: 'feedback',
+            text: `Created browser distill candidate ${browserDistillCandidateId} for reuse.`,
+          });
+        }
+      }
       return executed?.feedback.message || feedback.message;
     }
   }
@@ -1795,13 +2181,21 @@ function tryHandleBrowserConversation(userText: string): string | null {
 }
 
 function extractQuotedValue(text: string): string | undefined {
-  return text.match(/「(.+?)」|\"(.+?)\"|『(.+?)』/)?.slice(1).find(Boolean)?.trim();
+  return text
+    .match(/「(.+?)」|\"(.+?)\"|『(.+?)』/)
+    ?.slice(1)
+    .find(Boolean)
+    ?.trim();
 }
 
 function extractServiceName(text: string): string | undefined {
-  return text.match(/([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i)?.[1]
-    || text.match(/service\s+([A-Za-z0-9._-]+)/i)?.[1]
-    || undefined;
+  return (
+    text.match(
+      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i
+    )?.[1] ||
+    text.match(/service\s+([A-Za-z0-9._-]+)/i)?.[1] ||
+    undefined
+  );
 }
 
 function isAffirmativeApproval(text: string): boolean {
@@ -1812,7 +2206,10 @@ function isNegativeApproval(text: string): boolean {
   return /^(いいえ|no|cancel|stop|やめて|中止|見送り)/i.test(text.trim());
 }
 
-function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string): {
+function inferTaskRequirementUpdate(
+  session: TaskSessionShape,
+  utterance: string
+): {
   requirements?: TaskSessionShape['requirements'];
   payload?: Record<string, unknown>;
 } | null {
@@ -1822,7 +2219,11 @@ function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string
   const collected = { ...(session.requirements?.collected || {}) };
   const payload = { ...(session.payload || {}) };
 
-  if (session.task_type === 'analysis' && payload.bootstrap_kind === 'project_bootstrap' && missing.has('project_brief')) {
+  if (
+    session.task_type === 'analysis' &&
+    payload.bootstrap_kind === 'project_bootstrap' &&
+    missing.has('project_brief')
+  ) {
     payload.project_brief = trimmed;
     collected.project_brief = trimmed;
     missing.delete('project_brief');
@@ -1839,7 +2240,12 @@ function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string
   }
 
   if (session.task_type === 'workbook_wbs' && missing.has('project_name')) {
-    const projectName = extractQuotedValue(trimmed) || trimmed.replace(/^(この|その)?\s*(プロジェクト|案件|project)(の)?/i, '').replace(/(で|を).*/, '').trim();
+    const projectName =
+      extractQuotedValue(trimmed) ||
+      trimmed
+        .replace(/^(この|その)?\s*(プロジェクト|案件|project)(の)?/i, '')
+        .replace(/(で|を).*/, '')
+        .trim();
     if (projectName) {
       payload.project_name = projectName;
       collected.project_name = projectName;
@@ -1848,12 +2254,15 @@ function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string
   }
 
   if (session.task_type === 'presentation_deck' && missing.has('deck_purpose')) {
-    const purpose =
-      /営業|marketing/i.test(trimmed) ? 'marketing' :
-        /社内共有|internal/i.test(trimmed) ? 'internal_share' :
-          /briefing|説明/i.test(trimmed) ? 'briefing' :
-            /提案|proposal/i.test(trimmed) ? 'proposal' :
-              undefined;
+    const purpose = /営業|marketing/i.test(trimmed)
+      ? 'marketing'
+      : /社内共有|internal/i.test(trimmed)
+        ? 'internal_share'
+        : /briefing|説明/i.test(trimmed)
+          ? 'briefing'
+          : /提案|proposal/i.test(trimmed)
+            ? 'proposal'
+            : undefined;
     if (purpose) {
       payload.deck_purpose = purpose;
       collected.deck_purpose = purpose;
@@ -1862,12 +2271,15 @@ function inferTaskRequirementUpdate(session: TaskSessionShape, utterance: string
   }
 
   if (session.task_type === 'report_document' && missing.has('report_kind')) {
-    const reportKind =
-      /仕様|spec/i.test(trimmed) ? 'spec' :
-        /提案|proposal/i.test(trimmed) ? 'proposal' :
-          /進捗|status/i.test(trimmed) ? 'status' :
-            /要約|summary/i.test(trimmed) ? 'summary' :
-              undefined;
+    const reportKind = /仕様|spec/i.test(trimmed)
+      ? 'spec'
+      : /提案|proposal/i.test(trimmed)
+        ? 'proposal'
+        : /進捗|status/i.test(trimmed)
+          ? 'status'
+          : /要約|summary/i.test(trimmed)
+            ? 'summary'
+            : undefined;
     if (reportKind) {
       payload.report_kind = reportKind;
       collected.report_kind = reportKind;
@@ -1918,15 +2330,16 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
   const workDesign = resolveWorkDesign({
     taskType: session.task_type,
     shape: 'task_session',
-    outcomeIds: session.task_type === 'presentation_deck'
-      ? ['artifact:pptx']
-      : session.task_type === 'report_document'
-        ? ['artifact:docx']
-        : session.task_type === 'workbook_wbs'
-          ? ['artifact:xlsx']
-          : session.task_type === 'service_operation'
-            ? ['service_summary']
-            : [],
+    outcomeIds:
+      session.task_type === 'presentation_deck'
+        ? ['artifact:pptx']
+        : session.task_type === 'report_document'
+          ? ['artifact:docx']
+          : session.task_type === 'workbook_wbs'
+            ? ['artifact:xlsx']
+            : session.task_type === 'service_operation'
+              ? ['service_summary']
+              : [],
   });
   const specialistLabel = workDesign.primary_specialist?.label || 'Kyberion';
   const learnedHint = buildLearnedHintText({
@@ -1935,7 +2348,9 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
     projectId: session.project_context?.project_id,
   });
   const suggestedRefs = Array.isArray(session.payload?.suggested_refs)
-    ? session.payload?.suggested_refs.filter((value): value is string => typeof value === 'string').slice(0, 3)
+    ? session.payload?.suggested_refs
+        .filter((value): value is string => typeof value === 'string')
+        .slice(0, 3)
     : [];
   const suggestedRefHintJa = suggestedRefs.length
     ? ` 参照候補は ${suggestedRefs.join('、')} です。`
@@ -1943,18 +2358,31 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
   const suggestedRefHintEn = suggestedRefs.length
     ? ` Suggested references: ${suggestedRefs.join(', ')}.`
     : '';
-  const completionHint = buildIntentPatternHint(session.work_loop?.intent?.label, language, 'completion');
+  const completionHint = buildIntentPatternHint(
+    session.work_loop?.intent?.label,
+    language,
+    'completion'
+  );
   if (language === 'ja') {
-    if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
+    if (
+      session.task_type === 'analysis' &&
+      session.payload?.bootstrap_kind === 'project_bootstrap'
+    ) {
       return `${session.project_context?.project_name || 'プロジェクト'} の立ち上げを受け取りました。${specialistLabel} が担当します。${learnedHint}まず、何を作るか、誰向けか、最初の成果物をまとめて教えてください。`;
     }
-    if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'cross_project_remediation') {
+    if (
+      session.task_type === 'analysis' &&
+      session.payload?.analysis_kind === 'cross_project_remediation'
+    ) {
       if (missing.length > 0) {
         return `横断 remediation 依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}${suggestedRefHintJa}進めるには ${missing.join('、')} が必要です。`;
       }
       return `横断 remediation 依頼を受け取りました。${specialistLabel} が要件・incident・既存知見を横断して未展開箇所を洗い出します。${learnedHint}${suggestedRefHintJa}${completionHint}`.trim();
     }
-    if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'incident_informed_review') {
+    if (
+      session.task_type === 'analysis' &&
+      session.payload?.analysis_kind === 'incident_informed_review'
+    ) {
       if (missing.length > 0) {
         return `incident-aware review を受け取りました。${specialistLabel} が担当します。${learnedHint}${suggestedRefHintJa}進めるには ${missing.join('、')} が必要です。`;
       }
@@ -1971,13 +2399,19 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
   if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
     return `I started the project kickoff. ${specialistLabel} will handle it. ${learnedHint}Tell me what you want to build, who it is for, and the first deliverable.`;
   }
-  if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'cross_project_remediation') {
+  if (
+    session.task_type === 'analysis' &&
+    session.payload?.analysis_kind === 'cross_project_remediation'
+  ) {
     if (missing.length > 0) {
       return `I received the cross-project remediation request. ${specialistLabel} will handle it. ${learnedHint}${suggestedRefHintEn}I still need ${missing.join(', ')}.`;
     }
     return `I received the cross-project remediation request. ${specialistLabel} will review requirements, incidents, and reusable findings to identify propagation gaps. ${learnedHint}${suggestedRefHintEn}${completionHint}`.trim();
   }
-  if (session.task_type === 'analysis' && session.payload?.analysis_kind === 'incident_informed_review') {
+  if (
+    session.task_type === 'analysis' &&
+    session.payload?.analysis_kind === 'incident_informed_review'
+  ) {
     if (missing.length > 0) {
       return `I received the incident-informed review request. ${specialistLabel} will handle it. ${learnedHint}${suggestedRefHintEn}I still need ${missing.join(', ')}.`;
     }
@@ -2005,16 +2439,31 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
     projectId: session.project_context?.project_id,
   });
   const suggestedRefs = Array.isArray(session.payload?.suggested_refs)
-    ? session.payload?.suggested_refs.filter((value): value is string => typeof value === 'string').slice(0, 3)
+    ? session.payload?.suggested_refs
+        .filter((value): value is string => typeof value === 'string')
+        .slice(0, 3)
     : [];
-  const suggestedRefHintJa = suggestedRefs.length ? ` 参照候補は ${suggestedRefs.join('、')} です。` : '';
-  const suggestedRefHintEn = suggestedRefs.length ? ` Suggested references: ${suggestedRefs.join(', ')}.` : '';
+  const suggestedRefHintJa = suggestedRefs.length
+    ? ` 参照候補は ${suggestedRefs.join('、')} です。`
+    : '';
+  const suggestedRefHintEn = suggestedRefs.length
+    ? ` Suggested references: ${suggestedRefs.join(', ')}.`
+    : '';
   if (language === 'ja') {
-    if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap' && missing.length === 0) {
+    if (
+      session.task_type === 'analysis' &&
+      session.payload?.bootstrap_kind === 'project_bootstrap' &&
+      missing.length === 0
+    ) {
       return `初期要件を受け取りました。${learnedHint}ここから最初の work plan を固めて返します。`;
     }
-    if (session.task_type === 'analysis' && (session.payload?.analysis_kind === 'cross_project_remediation' || session.payload?.analysis_kind === 'incident_informed_review')) {
-      if (missing.length > 0) return `依頼内容を更新しました。残りは ${missing.join('、')} です。${suggestedRefHintJa}`.trim();
+    if (
+      session.task_type === 'analysis' &&
+      (session.payload?.analysis_kind === 'cross_project_remediation' ||
+        session.payload?.analysis_kind === 'incident_informed_review')
+    ) {
+      if (missing.length > 0)
+        return `依頼内容を更新しました。残りは ${missing.join('、')} です。${suggestedRefHintJa}`.trim();
       return `依頼内容が揃いました。${learnedHint}${suggestedRefHintJa}ここから横断分析を進めます。`.trim();
     }
     if (missing.includes('approval_confirmation')) {
@@ -2025,11 +2474,20 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
     }
     return `依頼内容が揃いました。${learnedHint}ここから実行して、終わったら結果を返します。`;
   }
-  if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap' && missing.length === 0) {
+  if (
+    session.task_type === 'analysis' &&
+    session.payload?.bootstrap_kind === 'project_bootstrap' &&
+    missing.length === 0
+  ) {
     return `I captured the kickoff requirements. ${learnedHint}I will turn them into the first work plan now.`;
   }
-  if (session.task_type === 'analysis' && (session.payload?.analysis_kind === 'cross_project_remediation' || session.payload?.analysis_kind === 'incident_informed_review')) {
-    if (missing.length > 0) return `Updated. Remaining requirements: ${missing.join(', ')}.${suggestedRefHintEn}`.trim();
+  if (
+    session.task_type === 'analysis' &&
+    (session.payload?.analysis_kind === 'cross_project_remediation' ||
+      session.payload?.analysis_kind === 'incident_informed_review')
+  ) {
+    if (missing.length > 0)
+      return `Updated. Remaining requirements: ${missing.join(', ')}.${suggestedRefHintEn}`.trim();
     return `I have enough to proceed with the cross-cutting analysis now. ${learnedHint}${suggestedRefHintEn}`.trim();
   }
   if (missing.includes('approval_confirmation')) {
@@ -2055,11 +2513,15 @@ function resolvePreferredLocale(input: {
   session?: TaskSessionShape;
   project?: { primary_locale?: string | null } | null;
 }): string {
-  const sessionLocale = String(input.session?.payload?.locale || input.session?.project_context?.locale || '').trim();
+  const sessionLocale = String(
+    input.session?.payload?.locale || input.session?.project_context?.locale || ''
+  ).trim();
   if (sessionLocale) return sessionLocale;
   const projectLocale = String(input.project?.primary_locale || '').trim();
   if (projectLocale) return projectLocale;
-  return String(process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US');
+  return String(
+    process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US'
+  );
 }
 
 function buildPresentationDeckBrief(session: TaskSessionShape): any {
@@ -2084,24 +2546,29 @@ function buildPresentationDeckBrief(session: TaskSessionShape): any {
       title: session.goal.summary || 'Presentation Deck',
       client: 'Kyberion',
       objective: session.goal.success_condition || 'Summarize the requested proposal clearly.',
-      audience: purpose === 'marketing' ? ['Prospective Customer', 'Executive Buyer'] : ['Project Stakeholder', 'Decision Maker'],
+      audience:
+        purpose === 'marketing'
+          ? ['Prospective Customer', 'Executive Buyer']
+          : ['Project Stakeholder', 'Decision Maker'],
       story: {
-        core_message: purpose === 'marketing'
-          ? 'This deck explains the value proposition and next action clearly.'
-          : 'This deck explains the proposal, rationale, and next action clearly.',
+        core_message:
+          purpose === 'marketing'
+            ? 'This deck explains the value proposition and next action clearly.'
+            : 'This deck explains the proposal, rationale, and next action clearly.',
         chapters: ['Overview', 'Current context', 'Recommended approach', 'Next steps'],
-        tone: purpose === 'internal_share' ? 'concise and operational' : 'executive and evidence-based',
-        closing_cta: 'Review the proposal and confirm the next step.'
+        tone:
+          purpose === 'internal_share' ? 'concise and operational' : 'executive and evidence-based',
+        closing_cta: 'Review the proposal and confirm the next step.',
       },
       evidence: [
         { title: 'Request Source', point: session.history[0]?.text || session.goal.summary },
         { title: 'Purpose', point: purpose },
         { title: 'Success Condition', point: session.goal.success_condition },
-        { title: 'Session', point: session.session_id }
+        { title: 'Session', point: session.session_id },
       ],
       required_sections: ['executive-summary', 'recommendation', 'plan'],
       reusable_refs: reusableRefs,
-    }
+    },
   };
 }
 
@@ -2131,25 +2598,25 @@ function buildReportDocumentBrief(session: TaskSessionShape): any {
         {
           heading: 'Request',
           body: [session.history[0]?.text || session.goal.summary],
-          bullets: [
-            `report kind: ${reportKind}`,
-            `session id: ${session.session_id}`,
-          ]
+          bullets: [`report kind: ${reportKind}`, `session id: ${session.session_id}`],
         },
         {
           heading: 'Current Understanding',
-          body: [
-            session.goal.summary,
-            session.goal.success_condition,
-          ],
-          bullets: Object.entries(session.requirements?.collected || {}).map(([key, value]) => `${key}: ${String(value)}`)
-        }
-      ]
-    }
+          body: [session.goal.summary, session.goal.success_condition],
+          bullets: Object.entries(session.requirements?.collected || {}).map(
+            ([key, value]) => `${key}: ${String(value)}`
+          ),
+        },
+      ],
+    },
   };
 }
 
-function buildMediaPipelineForBrief(briefPath: string, outputPath: string, kind: 'presentation_deck' | 'report_document'): any {
+function buildMediaPipelineForBrief(
+  briefPath: string,
+  outputPath: string,
+  kind: 'presentation_deck' | 'report_document'
+): any {
   return {
     action: 'pipeline',
     steps: [
@@ -2178,15 +2645,24 @@ function buildMediaPipelineForBrief(briefPath: string, outputPath: string, kind:
 }
 
 function normalizeSurfaceName(value: string): string {
-  return value.trim().toLowerCase().replace(/[\s_]+/g, '-');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
 }
 
 function resolveManagedSurfaceId(serviceName: string): string | null {
   const normalizedRequested = normalizeSurfaceName(serviceName);
   const manifest = loadSurfaceManifest();
-  const exact = manifest.surfaces.find((surface) => normalizeSurfaceName(surface.id) === normalizedRequested);
+  const exact = manifest.surfaces.find(
+    (surface) => normalizeSurfaceName(surface.id) === normalizedRequested
+  );
   if (exact) return exact.id;
-  const fuzzy = manifest.surfaces.find((surface) => normalizeSurfaceName(surface.id).includes(normalizedRequested) || normalizedRequested.includes(normalizeSurfaceName(surface.id)));
+  const fuzzy = manifest.surfaces.find(
+    (surface) =>
+      normalizeSurfaceName(surface.id).includes(normalizedRequested) ||
+      normalizedRequested.includes(normalizeSurfaceName(surface.id))
+  );
   return fuzzy?.id || null;
 }
 
@@ -2199,10 +2675,7 @@ function buildServiceOperationSummary(params: {
   pid?: number;
   logTail?: string[];
 }): string {
-  const lines = [
-    `surface: ${params.surfaceId}`,
-    `operation: ${params.operation}`,
-  ];
+  const lines = [`surface: ${params.surfaceId}`, `operation: ${params.operation}`];
   if (params.status) lines.push(`status: ${params.status}`);
   if (params.health) lines.push(`health: ${params.health}`);
   if (params.pid) lines.push(`pid: ${params.pid}`);
@@ -2228,7 +2701,9 @@ function buildProjectBootstrapSummary(params: {
     params.brief,
     '',
     'bootstrap_work_items:',
-    ...params.workItems.map((item) => `- ${item.work_id} [${item.status}] ${item.kind}: ${item.title}`),
+    ...params.workItems.map(
+      (item) => `- ${item.work_id} [${item.status}] ${item.kind}: ${item.title}`
+    ),
     '',
   ].join('\n');
 }
@@ -2246,8 +2721,12 @@ function buildAnalysisExecutionSummary(session: TaskSessionShape): string {
     refs: suggestedRefs,
     projectId: session.project_context?.project_id,
     trackId: session.project_context?.track_id,
-    reviewTarget: typeof session.payload?.review_target === 'string' ? session.payload.review_target : undefined,
-    targetScope: typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
+    reviewTarget:
+      typeof session.payload?.review_target === 'string'
+        ? session.payload.review_target
+        : undefined,
+    targetScope:
+      typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
   });
   const collected = session.requirements?.collected || {};
   const payload = session.payload || {};
@@ -2274,11 +2753,21 @@ function buildAnalysisExecutionSummary(session: TaskSessionShape): string {
     '',
     'execution_boundary:',
     `- rule: ${session.work_loop?.execution_boundary?.rule || ''}`,
-    ...((session.work_loop?.execution_boundary?.llm_zone?.allowed || []).map((item) => `- llm_allowed: ${item}`)),
-    ...((session.work_loop?.execution_boundary?.llm_zone?.forbidden || []).map((item) => `- llm_forbidden: ${item}`)),
-    ...((session.work_loop?.execution_boundary?.knowledge_zone?.owns || []).map((item) => `- knowledge_owns: ${item}`)),
-    ...((session.work_loop?.execution_boundary?.compiler_zone?.responsibilities || []).map((item) => `- compiler: ${item}`)),
-    ...((session.work_loop?.execution_boundary?.executor_zone?.responsibilities || []).map((item) => `- executor: ${item}`)),
+    ...(session.work_loop?.execution_boundary?.llm_zone?.allowed || []).map(
+      (item) => `- llm_allowed: ${item}`
+    ),
+    ...(session.work_loop?.execution_boundary?.llm_zone?.forbidden || []).map(
+      (item) => `- llm_forbidden: ${item}`
+    ),
+    ...(session.work_loop?.execution_boundary?.knowledge_zone?.owns || []).map(
+      (item) => `- knowledge_owns: ${item}`
+    ),
+    ...(session.work_loop?.execution_boundary?.compiler_zone?.responsibilities || []).map(
+      (item) => `- compiler: ${item}`
+    ),
+    ...(session.work_loop?.execution_boundary?.executor_zone?.responsibilities || []).map(
+      (item) => `- executor: ${item}`
+    ),
     '',
     'intake_requirements:',
     ...(session.work_loop?.process_design?.intake_requirements || []).map((item) => `- ${item}`),
@@ -2287,11 +2776,15 @@ function buildAnalysisExecutionSummary(session: TaskSessionShape): string {
     ...Object.entries(collected).map(([key, value]) => `- ${key}: ${String(value)}`),
     '',
     'analysis_payload:',
-    ...Object.entries(payload).map(([key, value]) => `- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`),
+    ...Object.entries(payload).map(
+      ([key, value]) => `- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`
+    ),
     '',
     'review_execution_target:',
     ...(payload.review_execution_target && typeof payload.review_execution_target === 'object'
-      ? Object.entries(payload.review_execution_target as Record<string, unknown>).map(([key, value]) => `- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+      ? Object.entries(payload.review_execution_target as Record<string, unknown>).map(
+          ([key, value]) => `- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`
+        )
       : ['- none']),
     '',
     'suggested_refs:',
@@ -2340,10 +2833,10 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
   if (!analysisKind) return [];
   const targetLabel = String(
     session.payload?.review_target ||
-    session.payload?.target_scope ||
-    session.project_context?.track_name ||
-    session.project_context?.project_name ||
-    projectId,
+      session.payload?.target_scope ||
+      session.project_context?.track_name ||
+      session.project_context?.project_name ||
+      projectId
   ).trim();
   const suggestedRefs = listSuggestedRefsFromSession(session);
   const snippets = buildAnalysisCorpusSnippets(suggestedRefs, 5);
@@ -2351,8 +2844,12 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
     refs: suggestedRefs,
     projectId: session.project_context?.project_id,
     trackId: session.project_context?.track_id,
-    reviewTarget: typeof session.payload?.review_target === 'string' ? session.payload.review_target : undefined,
-    targetScope: typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
+    reviewTarget:
+      typeof session.payload?.review_target === 'string'
+        ? session.payload.review_target
+        : undefined,
+    targetScope:
+      typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
   });
   const findings = buildAnalysisFindingCandidates({
     analysisKind,
@@ -2365,7 +2862,9 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
       {
         seedId: `MSD-${session.session_id}-REVIEW`,
         title: `Review follow-up for ${targetLabel}`,
-        summary: findings[0]?.title || 'Convert incident-informed review findings into bounded review tasks and approval-ready findings.',
+        summary:
+          findings[0]?.title ||
+          'Convert incident-informed review findings into bounded review tasks and approval-ready findings.',
         specialistId: 'knowledge-specialist',
         outcomeId: 'review_findings',
         missionTypeHint: 'verification',
@@ -2373,7 +2872,9 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
       {
         seedId: `MSD-${session.session_id}-VERIFY`,
         title: `Verify controls for ${targetLabel}`,
-        summary: findings[1]?.title || 'Turn prior-incident lessons into explicit verification checks against the current target.',
+        summary:
+          findings[1]?.title ||
+          'Turn prior-incident lessons into explicit verification checks against the current target.',
         specialistId: 'service-operator',
         outcomeId: 'review_findings',
         missionTypeHint: 'verification',
@@ -2385,7 +2886,9 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
       {
         seedId: `MSD-${session.session_id}-REMEDIATE`,
         title: `Remediate propagation gaps for ${targetLabel}`,
-        summary: findings[0]?.title || 'Turn cross-project remediation findings into bounded fix missions.',
+        summary:
+          findings[0]?.title ||
+          'Turn cross-project remediation findings into bounded fix missions.',
         specialistId: 'knowledge-specialist',
         outcomeId: 'remediation_plan',
         missionTypeHint: 'implementation',
@@ -2393,7 +2896,9 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
       {
         seedId: `MSD-${session.session_id}-VERIFY`,
         title: `Verify remediation coverage for ${targetLabel}`,
-        summary: findings[1]?.title || 'Confirm that the identified bug or control gap is propagated and fixed across the governed target scope.',
+        summary:
+          findings[1]?.title ||
+          'Confirm that the identified bug or control gap is propagated and fixed across the governed target scope.',
         specialistId: 'service-operator',
         outcomeId: 'remediation_plan',
         missionTypeHint: 'verification',
@@ -2403,7 +2908,9 @@ function buildAnalysisFollowUpSeeds(session: TaskSessionShape): Array<{
   return [];
 }
 
-async function executeAnalysisTask(session: TaskSessionShape): Promise<{ outputPath: string; previewText: string; followUpSeedId?: string }> {
+async function executeAnalysisTask(
+  session: TaskSessionShape
+): Promise<{ outputPath: string; previewText: string; followUpSeedId?: string }> {
   const dir = ensureTaskSessionExecutionDir(session.session_id);
   const outputPath = `${dir}/${session.session_id}.analysis.md`;
   safeWriteFile(outputPath, buildAnalysisExecutionSummary(session));
@@ -2416,8 +2923,14 @@ async function executeAnalysisTask(session: TaskSessionShape): Promise<{ outputP
       refs: listSuggestedRefsFromSession(session),
       projectId: session.project_context?.project_id,
       trackId: session.project_context?.track_id,
-      reviewTarget: typeof session.payload?.review_target === 'string' ? session.payload.review_target : undefined,
-      targetScope: typeof session.payload?.target_scope === 'string' ? session.payload.target_scope : undefined,
+      reviewTarget:
+        typeof session.payload?.review_target === 'string'
+          ? session.payload.review_target
+          : undefined,
+      targetScope:
+        typeof session.payload?.target_scope === 'string'
+          ? session.payload.target_scope
+          : undefined,
     }),
     snippets: buildAnalysisCorpusSnippets(listSuggestedRefsFromSession(session), 5),
     reviewExecutionTarget: session.payload?.review_execution_target as any,
@@ -2428,13 +2941,14 @@ async function executeAnalysisTask(session: TaskSessionShape): Promise<{ outputP
         analysisKind: String(session.payload?.analysis_kind || ''),
         reviewExecutionTarget: session.payload?.review_execution_target as any,
         findings: analysisFindings,
-        actionType: seed.missionTypeHint === 'implementation'
-          ? 'remediation'
-          : seed.specialistId === 'service-operator'
-            ? 'verification'
-            : 'review',
+        actionType:
+          seed.missionTypeHint === 'implementation'
+            ? 'remediation'
+            : seed.specialistId === 'service-operator'
+              ? 'verification'
+              : 'review',
       });
-      saveMissionSeedRecord({
+      saveMissionSeedWithAssessment({
         seed_id: seed.seedId,
         project_id: session.project_context.project_id,
         track_id: session.project_context.track_id,
@@ -2464,14 +2978,19 @@ async function executeAnalysisTask(session: TaskSessionShape): Promise<{ outputP
     followUpSeedId = seeds[0]?.seedId;
   }
 
-  const previewText = session.payload?.analysis_kind === 'incident_informed_review'
-    ? `過去 incident を踏まえた review brief を作成しました。${seeds.length > 0 ? ` follow-up seed を ${seeds.length} 件準備済みです。` : ''}`
-    : `横断 remediation brief を作成しました。${seeds.length > 0 ? ` follow-up seed を ${seeds.length} 件準備済みです。` : ''}`;
+  const previewText =
+    session.payload?.analysis_kind === 'incident_informed_review'
+      ? `過去 incident を踏まえた review brief を作成しました。${seeds.length > 0 ? ` follow-up seed を ${seeds.length} 件準備済みです。` : ''}`
+      : `横断 remediation brief を作成しました。${seeds.length > 0 ? ` follow-up seed を ${seeds.length} 件準備済みです。` : ''}`;
 
   return { outputPath, previewText, followUpSeedId };
 }
 
-function inferMissionTypeHintFromBootstrapWork(item: { title?: string; summary?: string; work_id?: string }): string {
+function inferMissionTypeHintFromBootstrapWork(item: {
+  title?: string;
+  summary?: string;
+  work_id?: string;
+}): string {
   const text = `${item.title || ''} ${item.summary || ''}`.toLowerCase();
   if (/architect|設計/.test(text)) return 'architecture';
   if (/build|実装/.test(text)) return 'implementation';
@@ -2479,7 +2998,9 @@ function inferMissionTypeHintFromBootstrapWork(item: { title?: string; summary?:
   return 'general';
 }
 
-async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Promise<{ outputPath: string; previewText: string }> {
+async function executeProjectBootstrapKickoffTask(
+  session: TaskSessionShape
+): Promise<{ outputPath: string; previewText: string }> {
   const projectId = String(session.project_context?.project_id || '').trim();
   if (!projectId) throw new Error('project_id is required');
   const project = loadProjectRecord(projectId);
@@ -2489,29 +3010,35 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
     ? [...project.bootstrap_work_items]
     : [];
   if (workItems[0]) workItems[0] = { ...workItems[0], status: 'completed' };
-  if (workItems[1] && workItems[1].status === 'planned') workItems[1] = { ...workItems[1], status: 'active' };
+  if (workItems[1] && workItems[1].status === 'planned')
+    workItems[1] = { ...workItems[1], status: 'active' };
 
   const brief = String(session.payload?.project_brief || '').trim();
   const dir = ensureTaskSessionExecutionDir(session.session_id);
   const outputPath = `${dir}/${session.session_id}.project.txt`;
-  safeWriteFile(outputPath, buildProjectBootstrapSummary({
-    projectName: project.name,
-    projectId: project.project_id,
-    brief,
-    workItems: workItems.map((item) => ({
-      work_id: String(item.work_id || ''),
-      title: String(item.title || ''),
-      status: String(item.status || 'planned'),
-      kind: String(item.kind || 'task_session'),
-    })),
-  }));
+  safeWriteFile(
+    outputPath,
+    buildProjectBootstrapSummary({
+      projectName: project.name,
+      projectId: project.project_id,
+      brief,
+      workItems: workItems.map((item) => ({
+        work_id: String(item.work_id || ''),
+        title: String(item.title || ''),
+        status: String(item.status || 'planned'),
+        kind: String(item.kind || 'task_session'),
+      })),
+    })
+  );
 
   saveProjectRecord({
     ...project,
     bootstrap_work_items: workItems,
     kickoff_brief: brief,
     kickoff_completed_at: new Date().toISOString(),
-    proposed_mission_ids: workItems.filter((item) => item.kind === 'mission_seed').map((item) => item.work_id),
+    proposed_mission_ids: workItems
+      .filter((item) => item.kind === 'mission_seed')
+      .map((item) => item.work_id),
     metadata: {
       ...(project.metadata || {}),
     },
@@ -2519,7 +3046,7 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
 
   for (const item of workItems) {
     if (item.kind !== 'mission_seed') continue;
-    saveMissionSeedRecord({
+    saveMissionSeedWithAssessment({
       seed_id: `MSD-${String(item.work_id || '').replace(/^WRK-/, '')}`,
       project_id: project.project_id,
       track_id: session.project_context?.track_id,
@@ -2548,9 +3075,21 @@ async function executeProjectBootstrapKickoffTask(session: TaskSessionShape): Pr
   };
 }
 
-function buildTaskCompletionReply(session: TaskSessionShape, previewText: string, outputPath: string): string {
-  const followUpHintJa = buildIntentPatternHint(session.work_loop?.intent?.label, 'ja', 'follow_up');
-  const followUpHintEn = buildIntentPatternHint(session.work_loop?.intent?.label, 'en', 'follow_up');
+function buildTaskCompletionReply(
+  session: TaskSessionShape,
+  previewText: string,
+  outputPath: string
+): string {
+  const followUpHintJa = buildIntentPatternHint(
+    session.work_loop?.intent?.label,
+    'ja',
+    'follow_up'
+  );
+  const followUpHintEn = buildIntentPatternHint(
+    session.work_loop?.intent?.label,
+    'en',
+    'follow_up'
+  );
   if (session.task_type === 'service_operation') {
     return `${previewText} 詳細はタスク詳細で確認できます。${followUpHintJa}`.trim();
   }
@@ -2566,11 +3105,13 @@ function buildTaskCompletionReply(session: TaskSessionShape, previewText: string
 }
 
 function slugifyProjectId(value: string): string {
-  return value
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'PROJECT';
+  return (
+    value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'PROJECT'
+  );
 }
 
 function inferDefaultTrackNameFromProjectName(projectName: string): string {
@@ -2578,11 +3119,13 @@ function inferDefaultTrackNameFromProjectName(projectName: string): string {
 }
 
 function slugifyProjectRootToken(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'project';
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'project'
+  );
 }
 
 function inferProjectRootPath(projectId: string, projectName: string): string {
@@ -2596,7 +3139,9 @@ function inferDefaultTrackId(projectId: string): string {
 
 function inferProjectNameFromUtterance(text: string): string {
   const trimmed = text.trim();
-  const explicit = trimmed.match(/(?:新しい|新規の?)?\s*([^\s]+(?:\s*[^\s]+){0,5})\s*(?:プロジェクト|Webサービス|サービス)\s*(?:を)?\s*(?:作って|立ち上げて)/i);
+  const explicit = trimmed.match(
+    /(?:新しい|新規の?)?\s*([^\s]+(?:\s*[^\s]+){0,5})\s*(?:プロジェクト|Webサービス|サービス)\s*(?:を)?\s*(?:作って|立ち上げて)/i
+  );
   if (explicit?.[1]) return explicit[1].trim();
   if (/webサービス|web service/i.test(trimmed)) return 'Web Service';
   if (/試験計画/i.test(trimmed)) return 'Test Planning';
@@ -2640,7 +3185,11 @@ function inferBindingDraftsFromUtterance(text: string): Array<{
 }
 
 function tryHandleProjectBootstrap(userText: string): string | null {
-  if (!/(webサービス|web service|新しい.*プロジェクト|新規.*プロジェクト|プロジェクト.*立ち上げ|サービス.*作って)/i.test(userText)) {
+  if (
+    !/(webサービス|web service|新しい.*プロジェクト|新規.*プロジェクト|プロジェクト.*立ち上げ|サービス.*作って)/i.test(
+      userText
+    )
+  ) {
     return null;
   }
   const projectName = inferProjectNameFromUtterance(userText);
@@ -2662,7 +3211,14 @@ function tryHandleProjectBootstrap(userText: string): string | null {
     saveServiceBindingRecord({
       ...draft,
       secret_refs: [],
-      approval_policy: Object.fromEntries(draft.allowed_actions.map((action) => [action, action === 'push_branch' || action === 'pull_request' || action === 'post_message' ? 'allowed' : 'approval_required'])) as Record<string, 'allowed' | 'approval_required' | 'denied'>,
+      approval_policy: Object.fromEntries(
+        draft.allowed_actions.map((action) => [
+          action,
+          action === 'push_branch' || action === 'pull_request' || action === 'post_message'
+            ? 'allowed'
+            : 'approval_required',
+        ])
+      ) as Record<string, 'allowed' | 'approval_required' | 'denied'>,
       auth_mode: 'secret-guard',
       service_id: draft.service_type,
       metadata: {
@@ -2678,7 +3234,9 @@ function tryHandleProjectBootstrap(userText: string): string | null {
   });
   const trackId = inferDefaultTrackId(projectId);
   const trackName = inferDefaultTrackNameFromProjectName(projectName);
-  const projectLocale = String(process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US');
+  const projectLocale = String(
+    process.env.KYBERION_DEFAULT_LOCALE || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US'
+  );
   const projectRootPath = inferProjectRootPath(projectId, projectName);
   if (!safeExistsSync(projectRootPath)) {
     safeMkdir(projectRootPath, { recursive: true });
@@ -2768,33 +3326,42 @@ function tryHandleProjectBootstrap(userText: string): string | null {
       created_from_utterance: userText,
     },
   });
-  const firstSteps = bootstrapWorkItems.slice(0, 3).map((item) => item.title).join('、');
+  const firstSteps = bootstrapWorkItems
+    .slice(0, 3)
+    .map((item) => item.title)
+    .join('、');
   return `${projectName} プロジェクトを作成しました。Project Lead が担当し、まず ${firstSteps} を進めます。最初の kickoff work は ${kickoffSessionId || kickoffWork?.work_id || '作成済み'} です。次に、作りたい内容や最初の成果物を教えてください。`;
 }
 
-function resolveProjectContextForTask(userText: string, intent: ReturnType<typeof classifyTaskSessionIntent>): TaskSessionShape['project_context'] | undefined {
+function resolveProjectContextForTask(
+  userText: string,
+  intent: ReturnType<typeof classifyTaskSessionIntent>
+): TaskSessionShape['project_context'] | undefined {
   if (!intent) return undefined;
   const payload = intent.payload || {};
-  const explicitProjectName = typeof payload.project_name === 'string'
-    ? payload.project_name
-    : typeof payload.project_id === 'string'
-      ? payload.project_id
-      : undefined;
+  const explicitProjectName =
+    typeof payload.project_name === 'string'
+      ? payload.project_name
+      : typeof payload.project_id === 'string'
+        ? payload.project_id
+        : undefined;
   const project = resolveProjectRecordForText({
     utterance: userText,
     projectName: explicitProjectName,
   });
   if (!project) return undefined;
-  const explicitTrackName = typeof payload.track_name === 'string'
-    ? payload.track_name
-    : typeof payload.track_id === 'string'
-      ? payload.track_id
-      : undefined;
-  const track = resolveProjectTrackRecordForText({
-    projectId: project.project_id,
-    utterance: userText,
-    trackName: explicitTrackName,
-  }) || (project.default_track_id ? loadProjectTrackRecord(project.default_track_id) : null);
+  const explicitTrackName =
+    typeof payload.track_name === 'string'
+      ? payload.track_name
+      : typeof payload.track_id === 'string'
+        ? payload.track_id
+        : undefined;
+  const track =
+    resolveProjectTrackRecordForText({
+      projectId: project.project_id,
+      utterance: userText,
+      trackName: explicitTrackName,
+    }) || (project.default_track_id ? loadProjectTrackRecord(project.default_track_id) : null);
   return {
     project_id: project.project_id,
     project_name: project.name,
@@ -2806,7 +3373,12 @@ function resolveProjectContextForTask(userText: string, intent: ReturnType<typeo
   };
 }
 
-function formatServiceHealthSummary(surfaceId: string, isRunning: boolean, healthStatus: string, hasRuntimeRecord: boolean): string {
+function formatServiceHealthSummary(
+  surfaceId: string,
+  isRunning: boolean,
+  healthStatus: string,
+  hasRuntimeRecord: boolean
+): string {
   if (!isRunning) {
     return `${surfaceId} は停止しています。`;
   }
@@ -2829,7 +3401,9 @@ function summarizeLogTail(surfaceId: string, lines: string[]): string {
   const latestMeaningful = [...lines]
     .reverse()
     .map((line) => line.trim())
-    .find((line) => line.length > 0 && !/^\}+$/.test(line) && !/^syscall:|^address:|^port:/i.test(line));
+    .find(
+      (line) => line.length > 0 && !/^\}+$/.test(line) && !/^syscall:|^address:|^port:/i.test(line)
+    );
   if (!latestMeaningful) {
     return `${surfaceId} の最新ログを取得しました。`;
   }
@@ -2856,10 +3430,14 @@ function summarizeLogTail(surfaceId: string, lines: string[]): string {
   return `${surfaceId} の最新ログを取得しました。詳細はタスク詳細で確認できます。`;
 }
 
-async function executeServiceOperationTask(session: TaskSessionShape): Promise<{ outputPath: string; previewText: string }> {
+async function executeServiceOperationTask(
+  session: TaskSessionShape
+): Promise<{ outputPath: string; previewText: string }> {
   const payload = session.payload || {};
   const requestedName = String(payload.service_name || '').trim();
-  const operation = String(payload.operation || 'status').trim().toLowerCase();
+  const operation = String(payload.operation || 'status')
+    .trim()
+    .toLowerCase();
   if (!requestedName) {
     throw new Error('service_name is required');
   }
@@ -2870,7 +3448,9 @@ async function executeServiceOperationTask(session: TaskSessionShape): Promise<{
   }
 
   if (surfaceId === 'voice-hub' && operation === 'restart') {
-    throw new Error('Restarting voice-hub from itself is not supported safely in-band. Use status/logs or restart it externally.');
+    throw new Error(
+      'Restarting voice-hub from itself is not supported safely in-band. Use status/logs or restart it externally.'
+    );
   }
 
   const dir = ensureTaskSessionExecutionDir(session.session_id);
@@ -2885,80 +3465,145 @@ async function executeServiceOperationTask(session: TaskSessionShape): Promise<{
   const logTailLines = Number(payload.log_tail_lines || 40);
 
   if (operation === 'logs') {
-    const logTail = safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, logTailLines) : [];
+    const logTail = safeExistsSync(resolvedLogPath)
+      ? readSurfaceLogTail(resolvedLogPath, logTailLines)
+      : [];
     const previewText = summarizeLogTail(surfaceId, logTail);
-    safeWriteFile(outputPath, buildServiceOperationSummary({
-      surfaceId,
-      operation,
-      status: record ? 'known' : (logTail.length > 0 ? 'log_only' : 'unknown'),
-      pid: record?.pid,
-      detail: safeExistsSync(resolvedLogPath) ? resolvedLogPath : 'no_log_path',
-      logTail,
-    }));
+    safeWriteFile(
+      outputPath,
+      buildServiceOperationSummary({
+        surfaceId,
+        operation,
+        status: record ? 'known' : logTail.length > 0 ? 'log_only' : 'unknown',
+        pid: record?.pid,
+        detail: safeExistsSync(resolvedLogPath) ? resolvedLogPath : 'no_log_path',
+        logTail,
+      })
+    );
     return { outputPath, previewText };
   }
 
   if (operation === 'status') {
-    const health = normalized ? await probeSurfaceHealth(normalized) : { status: 'unknown', detail: 'definition_not_found' };
+    const health = normalized
+      ? await probeSurfaceHealth(normalized)
+      : { status: 'unknown', detail: 'definition_not_found' };
     const hasRuntimeRecord = Boolean(record?.pid);
     const isRunning = hasRuntimeRecord || health.status === 'healthy';
-    const previewText = formatServiceHealthSummary(surfaceId, isRunning, health.status, hasRuntimeRecord);
-    safeWriteFile(outputPath, buildServiceOperationSummary({
+    const previewText = formatServiceHealthSummary(
       surfaceId,
-      operation,
-      status: isRunning ? 'running' : 'stopped',
-      health: `${health.status}:${health.detail}`,
-      pid: record?.pid,
-      detail: safeExistsSync(resolvedLogPath) ? resolvedLogPath : undefined,
-      logTail: safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, 12) : [],
-    }));
+      isRunning,
+      health.status,
+      hasRuntimeRecord
+    );
+    safeWriteFile(
+      outputPath,
+      buildServiceOperationSummary({
+        surfaceId,
+        operation,
+        status: isRunning ? 'running' : 'stopped',
+        health: `${health.status}:${health.detail}`,
+        pid: record?.pid,
+        detail: safeExistsSync(resolvedLogPath) ? resolvedLogPath : undefined,
+        logTail: safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, 12) : [],
+      })
+    );
     return { outputPath, previewText };
   }
 
   const manifestPath = pathResolver.knowledge('public/governance/active-surfaces.json');
   if (operation === 'restart') {
-    safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'stop', '--surface', surfaceId, '--manifest', manifestPath], {
-      cwd: pathResolver.rootDir(),
-      timeoutMs: 20_000,
-    });
-    safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'start', '--surface', surfaceId, '--manifest', manifestPath], {
-      cwd: pathResolver.rootDir(),
-      timeoutMs: 30_000,
-    });
+    safeExec(
+      'node',
+      [
+        'dist/scripts/surface_runtime.js',
+        '--action',
+        'stop',
+        '--surface',
+        surfaceId,
+        '--manifest',
+        manifestPath,
+      ],
+      {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 20_000,
+      }
+    );
+    safeExec(
+      'node',
+      [
+        'dist/scripts/surface_runtime.js',
+        '--action',
+        'start',
+        '--surface',
+        surfaceId,
+        '--manifest',
+        manifestPath,
+      ],
+      {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 30_000,
+      }
+    );
   } else if (operation === 'start' || operation === 'stop') {
-    safeExec('node', ['dist/scripts/surface_runtime.js', '--action', operation, '--surface', surfaceId, '--manifest', manifestPath], {
-      cwd: pathResolver.rootDir(),
-      timeoutMs: 30_000,
-    });
+    safeExec(
+      'node',
+      [
+        'dist/scripts/surface_runtime.js',
+        '--action',
+        operation,
+        '--surface',
+        surfaceId,
+        '--manifest',
+        manifestPath,
+      ],
+      {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 30_000,
+      }
+    );
   } else {
     throw new Error(`Unsupported service operation: ${operation}`);
   }
 
   const nextState = loadSurfaceState();
   const nextRecord = nextState.surfaces[surfaceId];
-  const nextHealth = normalized ? await probeSurfaceHealth(normalized) : { status: 'unknown', detail: 'definition_not_found' };
-  const previewText = operation === 'restart'
-    ? `${surfaceId} を再起動しました。`
-    : operation === 'start'
-      ? `${surfaceId} を起動しました。`
-      : `${surfaceId} を停止しました。`;
-  safeWriteFile(outputPath, buildServiceOperationSummary({
-    surfaceId,
-    operation,
-    status: nextRecord ? 'running' : 'stopped',
-    health: `${nextHealth.status}:${nextHealth.detail}`,
-    pid: nextRecord?.pid,
-    detail: nextRecord?.logPath || (safeExistsSync(resolvedLogPath) ? resolvedLogPath : undefined),
-    logTail: nextRecord?.logPath
-      ? readSurfaceLogTail(nextRecord.logPath, 12)
-      : (safeExistsSync(resolvedLogPath) ? readSurfaceLogTail(resolvedLogPath, 12) : []),
-  }));
+  const nextHealth = normalized
+    ? await probeSurfaceHealth(normalized)
+    : { status: 'unknown', detail: 'definition_not_found' };
+  const previewText =
+    operation === 'restart'
+      ? `${surfaceId} を再起動しました。`
+      : operation === 'start'
+        ? `${surfaceId} を起動しました。`
+        : `${surfaceId} を停止しました。`;
+  safeWriteFile(
+    outputPath,
+    buildServiceOperationSummary({
+      surfaceId,
+      operation,
+      status: nextRecord ? 'running' : 'stopped',
+      health: `${nextHealth.status}:${nextHealth.detail}`,
+      pid: nextRecord?.pid,
+      detail:
+        nextRecord?.logPath || (safeExistsSync(resolvedLogPath) ? resolvedLogPath : undefined),
+      logTail: nextRecord?.logPath
+        ? readSurfaceLogTail(nextRecord.logPath, 12)
+        : safeExistsSync(resolvedLogPath)
+          ? readSurfaceLogTail(resolvedLogPath, 12)
+          : [],
+    })
+  );
   return { outputPath, previewText };
 }
 
 async function processTaskSessionExecution(session: TaskSessionShape): Promise<void> {
   if (activeTaskExecutions.has(session.session_id)) return;
-  if (!['presentation_deck', 'report_document', 'service_operation', 'analysis'].includes(session.task_type)) return;
+  if (
+    !['presentation_deck', 'report_document', 'service_operation', 'analysis'].includes(
+      session.task_type
+    )
+  )
+    return;
   activeTaskExecutions.add(session.session_id);
   try {
     updateTaskSession(session.session_id, {
@@ -2973,7 +3618,10 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
     let artifactKind = 'error';
     let previewText = '';
 
-    if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
+    if (
+      session.task_type === 'analysis' &&
+      session.payload?.bootstrap_kind === 'project_bootstrap'
+    ) {
       const result = await executeProjectBootstrapKickoffTask(session);
       outputPath = result.outputPath;
       artifactKind = 'project_bootstrap';
@@ -2991,31 +3639,41 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
     } else {
       const dir = ensureTaskSessionExecutionDir(session.session_id);
       const briefPath = `${dir}/brief.json`;
-      outputPath = session.task_type === 'presentation_deck'
-        ? `${dir}/${session.session_id}.pptx`
-        : `${dir}/${session.session_id}.${String(session.payload?.format || 'docx') === 'pdf' ? 'pdf' : 'docx'}`;
+      outputPath =
+        session.task_type === 'presentation_deck'
+          ? `${dir}/${session.session_id}.pptx`
+          : `${dir}/${session.session_id}.${String(session.payload?.format || 'docx') === 'pdf' ? 'pdf' : 'docx'}`;
       const pipelinePath = `${dir}/pipeline.json`;
-      const brief = session.task_type === 'presentation_deck'
-        ? buildPresentationDeckBrief(session)
-        : buildReportDocumentBrief(session);
-      const pipeline = buildMediaPipelineForBrief(briefPath, outputPath, session.task_type as 'presentation_deck' | 'report_document');
+      const brief =
+        session.task_type === 'presentation_deck'
+          ? buildPresentationDeckBrief(session)
+          : buildReportDocumentBrief(session);
+      const pipeline = buildMediaPipelineForBrief(
+        briefPath,
+        outputPath,
+        session.task_type as 'presentation_deck' | 'report_document'
+      );
 
       safeWriteFile(briefPath, JSON.stringify(brief, null, 2));
       safeWriteFile(pipelinePath, JSON.stringify(pipeline, null, 2));
-      safeExec('node', [
-        'dist/libs/actuators/media-actuator/src/index.js',
-        '--input',
-        pipelinePath,
-      ], {
-        cwd: pathResolver.rootDir(),
-        timeoutMs: 120_000,
-      });
-      artifactKind = session.task_type === 'presentation_deck'
-        ? 'pptx'
-        : (outputPath.endsWith('.pdf') ? 'pdf' : 'docx');
-      previewText = session.task_type === 'presentation_deck'
-        ? 'PowerPoint 資料を生成しました。'
-        : 'レポート文書を生成しました。';
+      safeExec(
+        'node',
+        ['dist/libs/actuators/media-actuator/src/index.js', '--input', pipelinePath],
+        {
+          cwd: pathResolver.rootDir(),
+          timeoutMs: 120_000,
+        }
+      );
+      artifactKind =
+        session.task_type === 'presentation_deck'
+          ? 'pptx'
+          : outputPath.endsWith('.pdf')
+            ? 'pdf'
+            : 'docx';
+      previewText =
+        session.task_type === 'presentation_deck'
+          ? 'PowerPoint 資料を生成しました。'
+          : 'レポート文書を生成しました。';
     }
 
     const spokenReply = buildTaskCompletionReply(session, previewText, outputPath);
@@ -3056,16 +3714,20 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
       status: 'success',
       requestId: session.session_id,
     });
-    await reflectPresenceAgentReply({
-      agentId: 'presence-surface-agent',
-      speaker: 'Kyberion',
-      text: spokenReply,
-    }, PRESENCE_STUDIO_URL).catch(() => {});
+    await reflectPresenceAgentReply(
+      {
+        agentId: 'presence-surface-agent',
+        speaker: 'Kyberion',
+        text: spokenReply,
+      },
+      PRESENCE_STUDIO_URL
+    ).catch(() => {});
   } catch (error: any) {
     const message = error?.message || String(error);
-    const userFacingError = session.task_type === 'service_operation'
-      ? 'サービス操作に失敗しました。詳細はタスク詳細で確認できます。'
-      : '処理に失敗しました。詳細はタスク詳細で確認できます。';
+    const userFacingError =
+      session.task_type === 'service_operation'
+        ? 'サービス操作に失敗しました。詳細はタスク詳細で確認できます。'
+        : '処理に失敗しました。詳細はタスク詳細で確認できます。';
     updateTaskSession(session.session_id, {
       status: 'failed',
       artifact: {
@@ -3083,11 +3745,14 @@ async function processTaskSessionExecution(session: TaskSessionShape): Promise<v
       status: 'error',
       requestId: session.session_id,
     });
-    await reflectPresenceAgentReply({
-      agentId: 'presence-surface-agent',
-      speaker: 'Kyberion',
-      text: userFacingError,
-    }, PRESENCE_STUDIO_URL).catch(() => {});
+    await reflectPresenceAgentReply(
+      {
+        agentId: 'presence-surface-agent',
+        speaker: 'Kyberion',
+        text: userFacingError,
+      },
+      PRESENCE_STUDIO_URL
+    ).catch(() => {});
   } finally {
     activeTaskExecutions.delete(session.session_id);
   }
@@ -3097,7 +3762,11 @@ function tryHandleTaskSession(userText: string): string | null {
   const language = detectReplyLanguage(userText);
   const active = getActiveTaskSession('presence') as TaskSessionShape | null;
   if (active && active.control.awaiting_user_input) {
-    if (active.task_type === 'service_operation' && active.requirements?.missing?.includes('approval_confirmation') && isNegativeApproval(userText)) {
+    if (
+      active.task_type === 'service_operation' &&
+      active.requirements?.missing?.includes('approval_confirmation') &&
+      isNegativeApproval(userText)
+    ) {
       updateTaskSession(active.session_id, {
         status: 'released',
         control: {
@@ -3117,7 +3786,9 @@ function tryHandleTaskSession(userText: string): string | null {
         payload: inferred.payload,
         status: nextMissing.includes('approval_confirmation')
           ? 'awaiting_confirmation'
-          : (nextMissing.length > 0 ? 'collecting_requirements' : 'planning'),
+          : nextMissing.length > 0
+            ? 'collecting_requirements'
+            : 'planning',
         control: {
           ...active.control,
           requires_approval: Boolean(inferred.payload?.approval_required),
@@ -3153,10 +3824,15 @@ function tryHandleTaskSession(userText: string): string | null {
     surface: 'presence',
     taskType: intent.taskType,
     intentId: intent.intentId,
-    shape: intent.taskType === 'analysis' && intent.payload?.bootstrap_kind === 'project_bootstrap' ? 'project_bootstrap' : 'task_session',
+    shape:
+      intent.taskType === 'analysis' && intent.payload?.bootstrap_kind === 'project_bootstrap'
+        ? 'project_bootstrap'
+        : 'task_session',
     status: analysisSupport.requirements?.missing?.includes('approval_confirmation')
       ? 'awaiting_confirmation'
-      : (analysisSupport.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
+      : analysisSupport.requirements?.missing?.length
+        ? 'collecting_requirements'
+        : 'planning',
     requiresApproval: Boolean(intent.payload?.approval_required),
     goal: intent.goal,
     projectContext,
@@ -3176,7 +3852,13 @@ function tryHandleTaskSession(userText: string): string | null {
   return buildTaskSessionAcceptedReply(session as TaskSessionShape, language);
 }
 
-function parseMissionListSummary(output: string): { total: number; active: number; archived: number; completed: number; planned: number } {
+function parseMissionListSummary(output: string): {
+  total: number;
+  active: number;
+  archived: number;
+  completed: number;
+  planned: number;
+} {
   const lines = output.split('\n');
   const totalMatch = output.match(/(\d+)\s+mission\(s\)\s+found/i);
   let active = 0;
@@ -3198,7 +3880,10 @@ function parseMissionListSummary(output: string): { total: number; active: numbe
   };
 }
 
-function tryBuildChronosFastReply(userText: string, forcedReceiver?: 'chronos-mirror' | 'nerve-agent'): string | null {
+function tryBuildChronosFastReply(
+  userText: string,
+  forcedReceiver?: 'chronos-mirror' | 'nerve-agent'
+): string | null {
   if (forcedReceiver !== 'chronos-mirror') return null;
   const trimmed = userText.trim();
   const isJapanese = detectReplyLanguage(trimmed) === 'ja';
@@ -3240,7 +3925,9 @@ function tryBuildAsyncStatusReply(userText: string): string | null {
     if (requestIdMatch) {
       const record = getSurfaceAsyncRequest('presence', requestIdMatch[0].toUpperCase());
       if (!record) {
-        return isJapanese ? `リクエスト ${requestIdMatch[0].toUpperCase()} は見つかりません。` : `Request ${requestIdMatch[0].toUpperCase()} was not found.`;
+        return isJapanese
+          ? `リクエスト ${requestIdMatch[0].toUpperCase()} は見つかりません。`
+          : `Request ${requestIdMatch[0].toUpperCase()} was not found.`;
       }
       if (record.status === 'completed') {
         return isJapanese
@@ -3277,7 +3964,11 @@ function tryBuildAsyncStatusReply(userText: string): string | null {
   return null;
 }
 
-function buildAsyncAcceptedReply(requestId: string, receiver: 'chronos-mirror' | 'nerve-agent', language: 'ja' | 'en'): string {
+function buildAsyncAcceptedReply(
+  requestId: string,
+  receiver: 'chronos-mirror' | 'nerve-agent',
+  language: 'ja' | 'en'
+): string {
   if (language === 'ja') {
     return `依頼を受け付けました。${receiver} に回しています。リクエストIDは ${requestId} です。完了したらこの surface に通知します。`;
   }
@@ -3319,20 +4010,28 @@ function processAsyncDelegation(params: {
     try {
       const timeoutMs = getAsyncDelegationTimeoutMs(params.receiver);
       const result = await Promise.race([
-        runSurfaceMessageConversation(buildPresenceSurfaceConversationMessageInput([
-            'You are replying on the live voice surface.',
-            'Return only the final spoken reply.',
-            'Answer the user directly in their language.',
-            'Keep it concise, natural, and useful for speech playback.',
-            '',
-            `User: ${params.query}`,
-          ].join('\n'), {
-          forcedReceiver: params.receiver,
-          delegationSummaryInstruction:
-            'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
-        })),
+        runSurfaceMessageConversation(
+          buildPresenceSurfaceConversationMessageInput(
+            [
+              'You are replying on the live voice surface.',
+              'Return only the final spoken reply.',
+              'Answer the user directly in their language.',
+              'Keep it concise, natural, and useful for speech playback.',
+              '',
+              `User: ${params.query}`,
+            ].join('\n'),
+            {
+              forcedReceiver: params.receiver,
+              delegationSummaryInstruction:
+                'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+            }
+          )
+        ),
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error(`async_surface_request_timeout_${timeoutMs}`)), timeoutMs);
+          setTimeout(
+            () => reject(new Error(`async_surface_request_timeout_${timeoutMs}`)),
+            timeoutMs
+          );
         }),
       ]);
       const finalText = extractAsyncCompletionText(result) || 'Completed.';
@@ -3351,11 +4050,14 @@ function processAsyncDelegation(params: {
         status: 'success',
         requestId: params.requestId,
       });
-      await reflectPresenceAgentReply({
-        agentId: params.receiver,
-        speaker: params.receiver,
-        text: `Request ${params.requestId}: ${finalText}`,
-      }, PRESENCE_STUDIO_URL);
+      await reflectPresenceAgentReply(
+        {
+          agentId: params.receiver,
+          speaker: params.receiver,
+          text: `Request ${params.requestId}: ${finalText}`,
+        },
+        PRESENCE_STUDIO_URL
+      );
     } catch (error: any) {
       const message = error?.message || String(error);
       updateSurfaceAsyncRequest('presence', params.requestId, {
@@ -3373,11 +4075,14 @@ function processAsyncDelegation(params: {
         status: 'error',
         requestId: params.requestId,
       });
-      await reflectPresenceAgentReply({
-        agentId: 'presence-surface-agent',
-        speaker: 'Kyberion',
-        text: `Request ${params.requestId} failed: ${message}`,
-      }, PRESENCE_STUDIO_URL).catch(() => {});
+      await reflectPresenceAgentReply(
+        {
+          agentId: 'presence-surface-agent',
+          speaker: 'Kyberion',
+          text: `Request ${params.requestId} failed: ${message}`,
+        },
+        PRESENCE_STUDIO_URL
+      ).catch(() => {});
     }
   })();
 }
@@ -3392,13 +4097,15 @@ async function generateReply(userText: string, context: { sessionKey: string }):
 
     const heuristicCandidates = buildHeuristicSurfaceRoutingCandidates(userText);
     const topHeuristic = heuristicCandidates[0]?.decision || null;
-    logger.info(`[voice-hub] surface routing heuristic candidates: ${JSON.stringify({
-      userText,
-      candidates: heuristicCandidates.map((entry) => ({
-        reason: entry.reason,
-        decision: entry.decision,
-      })),
-    })}`);
+    logger.info(
+      `[voice-hub] surface routing heuristic candidates: ${JSON.stringify({
+        userText,
+        candidates: heuristicCandidates.map((entry) => ({
+          reason: entry.reason,
+          decision: entry.decision,
+        })),
+      })}`
+    );
 
     if (topHeuristic?.intent === 'browser_open_site') {
       const opened = await executeBrowserOpenSite({
@@ -3416,12 +4123,17 @@ async function generateReply(userText: string, context: { sessionKey: string }):
     const taskSessionReply = tryHandleTaskSession(userText);
     if (taskSessionReply) return taskSessionReply;
 
-    const routed = await routeSurfaceActionWithLlm(userText, context, heuristicCandidates) || topHeuristic || buildFallbackSurfaceRoutingDecision(userText);
-    logger.info(`[voice-hub] surface routing final decision: ${JSON.stringify({
-      userText,
-      topHeuristic,
-      routed,
-    })}`);
+    const routed =
+      (await routeSurfaceActionWithLlm(userText, context, heuristicCandidates)) ||
+      topHeuristic ||
+      buildFallbackSurfaceRoutingDecision(userText);
+    logger.info(
+      `[voice-hub] surface routing final decision: ${JSON.stringify({
+        userText,
+        topHeuristic,
+        routed,
+      })}`
+    );
     if (routed?.intent === 'browser_open_site') {
       const opened = await executeBrowserOpenSite({
         userText,
@@ -3439,9 +4151,10 @@ async function generateReply(userText: string, context: { sessionKey: string }):
       if (taskReply) return taskReply;
     }
 
-    const queryIntent = routed?.intent === 'surface_query'
-      ? routed.query?.query_type || classifySurfaceQueryIntent(userText)
-      : classifySurfaceQueryIntent(userText);
+    const queryIntent =
+      routed?.intent === 'surface_query'
+        ? routed.query?.query_type || classifySurfaceQueryIntent(userText)
+        : classifySurfaceQueryIntent(userText);
     if (queryIntent === 'location') {
       const locationReply = await tryBuildLocationReply(userText);
       if (locationReply) return locationReply;
@@ -3459,9 +4172,10 @@ async function generateReply(userText: string, context: { sessionKey: string }):
       if (webReply) return webReply;
     }
 
-    const forcedReceiver = routed?.intent === 'async_delegate'
-      ? routed.delegate?.receiver || deriveSurfaceDelegationReceiver(userText)
-      : deriveSurfaceDelegationReceiver(userText);
+    const forcedReceiver =
+      routed?.intent === 'async_delegate'
+        ? routed.delegate?.receiver || deriveSurfaceDelegationReceiver(userText)
+        : deriveSurfaceDelegationReceiver(userText);
     const statusReply = tryBuildAsyncStatusReply(userText);
     if (statusReply) return statusReply;
     const fastReply = tryBuildChronosFastReply(userText, forcedReceiver);
@@ -3475,28 +4189,42 @@ async function generateReply(userText: string, context: { sessionKey: string }):
         surfaceAgentId: 'presence-surface-agent',
         receiverAgentId: forcedReceiver,
         query: userText,
-        acceptedText: buildAsyncAcceptedReply('PENDING', forcedReceiver, detectReplyLanguage(userText)),
+        acceptedText: buildAsyncAcceptedReply(
+          'PENDING',
+          forcedReceiver,
+          detectReplyLanguage(userText)
+        ),
       });
       updateSurfaceAsyncRequest('presence', accepted.request_id, {
-        accepted_text: buildAsyncAcceptedReply(accepted.request_id, forcedReceiver, detectReplyLanguage(userText)),
+        accepted_text: buildAsyncAcceptedReply(
+          accepted.request_id,
+          forcedReceiver,
+          detectReplyLanguage(userText)
+        ),
       });
       processAsyncDelegation({
         requestId: accepted.request_id,
         query: userText,
         receiver: forcedReceiver,
       });
-      return buildAsyncAcceptedReply(accepted.request_id, forcedReceiver, detectReplyLanguage(userText));
+      return buildAsyncAcceptedReply(
+        accepted.request_id,
+        forcedReceiver,
+        detectReplyLanguage(userText)
+      );
     }
     const timeoutMs = forcedReceiver === 'chronos-mirror' ? 20_000 : 20_000;
     const result = await Promise.race([
-      runSurfaceMessageConversation(buildPresenceSurfaceConversationMessageInput(
-        buildPresenceConversationPrompt(userText, context.sessionKey),
-        {
-          forcedReceiver,
-          delegationSummaryInstruction:
-            'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
-        },
-      )),
+      runSurfaceMessageConversation(
+        buildPresenceSurfaceConversationMessageInput(
+          buildPresenceConversationPrompt(userText, context.sessionKey),
+          {
+            forcedReceiver,
+            delegationSummaryInstruction:
+              'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+          }
+        )
+      ),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('surface_conversation_timeout')), timeoutMs);
       }),
@@ -3548,27 +4276,41 @@ app.post('/api/ingest-text', async (req, res) => {
   const speaker = typeof req.body?.speaker === 'string' ? req.body.speaker : 'User';
   const reflect = req.body?.reflect_to_surface !== false;
   const autoReply = req.body?.auto_reply !== false;
-  const requestId = typeof req.body?.request_id === 'string' && req.body.request_id.trim()
-    ? req.body.request_id.trim()
-    : `vh-${requestFingerprint({ text, intent, sourceId, speaker })}-${randomUUID().slice(0, 8)}`;
+  const requestId =
+    typeof req.body?.request_id === 'string' && req.body.request_id.trim()
+      ? req.body.request_id.trim()
+      : `vh-${requestFingerprint({ text, intent, sourceId, speaker })}-${randomUUID().slice(0, 8)}`;
 
-  const result = await processIngest({ requestId, text, intent, sourceId, speaker, reflect, autoReply });
+  const result = await processIngest({
+    requestId,
+    text,
+    intent,
+    sourceId,
+    speaker,
+    reflect,
+    autoReply,
+  });
   return res.status(result.statusCode).json(result.body);
 });
 
 app.post('/api/listen-once', async (req, res) => {
-  const requestId = typeof req.body?.request_id === 'string' && req.body.request_id.trim()
-    ? req.body.request_id.trim()
-    : randomUUID();
-  const locale = typeof req.body?.locale === 'string' && req.body.locale.trim()
-    ? req.body.locale.trim()
-    : 'ja-JP';
-  const timeoutSeconds = Number.isFinite(req.body?.timeout_seconds) ? Number(req.body.timeout_seconds) : 8;
+  const requestId =
+    typeof req.body?.request_id === 'string' && req.body.request_id.trim()
+      ? req.body.request_id.trim()
+      : randomUUID();
+  const locale =
+    typeof req.body?.locale === 'string' && req.body.locale.trim()
+      ? req.body.locale.trim()
+      : 'ja-JP';
+  const timeoutSeconds = Number.isFinite(req.body?.timeout_seconds)
+    ? Number(req.body.timeout_seconds)
+    : 8;
   const intent = typeof req.body?.intent === 'string' ? req.body.intent : 'conversation';
   const speaker = typeof req.body?.speaker === 'string' ? req.body.speaker : 'User';
-  const deviceId = typeof req.body?.device_id === 'string' && req.body.device_id.trim()
-    ? req.body.device_id.trim()
-    : undefined;
+  const deviceId =
+    typeof req.body?.device_id === 'string' && req.body.device_id.trim()
+      ? req.body.device_id.trim()
+      : undefined;
   const reflect = req.body?.reflect_to_surface !== false;
   const autoReply = req.body?.auto_reply !== false;
   const requestedBackend = req.body?.backend;
@@ -3577,10 +4319,12 @@ app.post('/api/listen-once', async (req, res) => {
   const backendOrder = resolveVoiceSttBackendOrder(
     parseVoiceSttBackend(requestedBackend),
     availability,
-    process.env,
+    process.env
   );
 
-  logger.info(`[voice-hub] native STT start request=${requestId} locale=${locale} device=${deviceId || 'default'} timeout=${timeoutSeconds}s`);
+  logger.info(
+    `[voice-hub] native STT start request=${requestId} locale=${locale} device=${deviceId || 'default'} timeout=${timeoutSeconds}s`
+  );
 
   try {
     if (backendOrder[0] === 'native_speech') {
@@ -3626,7 +4370,9 @@ app.post('/api/listen-once', async (req, res) => {
 
     const record = await recordNativeWav(locale, timeoutSeconds, deviceId, rawWavPath);
     if (!record.ok) {
-      logger.info(`[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=record_error error=${record.error || 'record_failed'} elapsed_ms=${Date.now() - startedAt}`);
+      logger.info(
+        `[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=record_error error=${record.error || 'record_failed'} elapsed_ms=${Date.now() - startedAt}`
+      );
       return res.status(422).json({
         ok: false,
         request_id: requestId,
@@ -3641,10 +4387,12 @@ app.post('/api/listen-once', async (req, res) => {
     const stt = await transcribeRecordedAudio(
       normalizedWavPath,
       locale,
-      backendOrder.filter((backend) => backend !== 'native_speech'),
+      backendOrder.filter((backend) => backend !== 'native_speech')
     );
     if (!stt.ok || !stt.text?.trim()) {
-      logger.info(`[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=empty_or_error error=${stt.error || 'empty_transcript'} elapsed_ms=${Date.now() - startedAt}`);
+      logger.info(
+        `[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=empty_or_error error=${stt.error || 'empty_transcript'} elapsed_ms=${Date.now() - startedAt}`
+      );
       return res.status(422).json({
         ok: false,
         request_id: requestId,
@@ -3665,7 +4413,9 @@ app.post('/api/listen-once', async (req, res) => {
       reflect,
       autoReply,
     });
-    logger.info(`[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=ok text=${JSON.stringify(stt.text.trim())} elapsed_ms=${Date.now() - startedAt}`);
+    logger.info(
+      `[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=ok text=${JSON.stringify(stt.text.trim())} elapsed_ms=${Date.now() - startedAt}`
+    );
     return res.status(result.statusCode).json({
       ...result.body,
       stt: {
@@ -3700,11 +4450,13 @@ app.get('/api/stt/backends', (_req, res) => {
     ok: true,
     available,
     selected,
-    server: serverConfig ? {
-      base_url: serverConfig.baseUrl,
-      model: serverConfig.model,
-      provider: serverConfig.provider,
-    } : null,
+    server: serverConfig
+      ? {
+          base_url: serverConfig.baseUrl,
+          model: serverConfig.model,
+          provider: serverConfig.provider,
+        }
+      : null,
   });
 });
 

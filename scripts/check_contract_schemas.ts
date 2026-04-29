@@ -19,7 +19,7 @@ function readGovernanceJson(relativePath: string): unknown {
   return JSON.parse(
     safeReadFile(pathResolver.rootResolve(relativePath), {
       encoding: 'utf8',
-    }) as string,
+    }) as string
   ) as unknown;
 }
 
@@ -34,69 +34,80 @@ function createChecks(): ContractCheck[] {
   const workPolicy = JSON.parse(
     safeReadFile(pathResolver.rootResolve('knowledge/public/governance/work-policy.json'), {
       encoding: 'utf8',
-    }) as string,
+    }) as string
   );
   const surfaceProviderManifests = JSON.parse(
-    safeReadFile(pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifests.json'), {
-      encoding: 'utf8',
-    }) as string,
+    safeReadFile(
+      pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifests.json'),
+      {
+        encoding: 'utf8',
+      }
+    ) as string
   );
   const surfacePolicy = JSON.parse(
     safeReadFile(pathResolver.rootResolve('knowledge/public/governance/surface-policy.json'), {
       encoding: 'utf8',
-    }) as string,
+    }) as string
   );
 
-  const promotedPattern = buildPromotedMemoryRecord(createDistillCandidateRecord({
-    source_type: 'task_session',
-    title: 'Reusable presentation pattern',
-    summary: 'Presentation pattern should be reusable.',
-    status: 'promoted',
-    target_kind: 'pattern',
-    artifact_ids: ['ART-1'],
-    evidence_refs: ['artifact:ART-1'],
-    metadata: {
-      applicability: ['presentation delivery'],
-      reusable_steps: ['Review the deck', 'Adapt the structure'],
-      expected_outcome: 'A reusable presentation artifact.',
-    },
-  }));
-  const promotedSop = buildPromotedMemoryRecord(createDistillCandidateRecord({
-    source_type: 'task_session',
-    title: 'Reusable SOP candidate',
-    summary: 'Operational handling should be reusable.',
-    status: 'promoted',
-    target_kind: 'sop_candidate',
-    metadata: {
-      procedure_steps: ['Check the queue', 'Execute the approval flow'],
-      safety_notes: ['Do not skip ratification'],
-      escalation_conditions: ['Evidence missing'],
-    },
-  }));
-  const promotedHint = buildPromotedMemoryRecord(createDistillCandidateRecord({
-    source_type: 'artifact',
-    title: 'Browser hint',
-    summary: 'Use the browser operator for repeatable site navigation.',
-    status: 'promoted',
-    target_kind: 'knowledge_hint',
-    metadata: {
-      hint_scope: 'browser navigation',
-      hint_triggers: ['open site', 'go to page'],
-      recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
-    },
-  }));
-  const promotedTemplate = buildPromotedMemoryRecord(createDistillCandidateRecord({
-    source_type: 'mission',
-    title: 'Report template',
-    summary: 'Reusable report structure.',
-    status: 'promoted',
-    target_kind: 'report_template',
-    metadata: {
-      template_sections: ['Summary', 'Findings', 'Next Steps'],
-      audience: 'operators',
-      output_format: 'markdown',
-    },
-  }));
+  const promotedPattern = buildPromotedMemoryRecord(
+    createDistillCandidateRecord({
+      source_type: 'task_session',
+      title: 'Reusable presentation pattern',
+      summary: 'Presentation pattern should be reusable.',
+      status: 'promoted',
+      target_kind: 'pattern',
+      artifact_ids: ['ART-1'],
+      evidence_refs: ['artifact:ART-1'],
+      metadata: {
+        applicability: ['presentation delivery'],
+        reusable_steps: ['Review the deck', 'Adapt the structure'],
+        expected_outcome: 'A reusable presentation artifact.',
+      },
+    })
+  );
+  const promotedSop = buildPromotedMemoryRecord(
+    createDistillCandidateRecord({
+      source_type: 'task_session',
+      title: 'Reusable SOP candidate',
+      summary: 'Operational handling should be reusable.',
+      status: 'promoted',
+      target_kind: 'sop_candidate',
+      metadata: {
+        procedure_steps: ['Check the queue', 'Execute the approval flow'],
+        safety_notes: ['Do not skip ratification'],
+        escalation_conditions: ['Evidence missing'],
+      },
+    })
+  );
+  const promotedHint = buildPromotedMemoryRecord(
+    createDistillCandidateRecord({
+      source_type: 'artifact',
+      title: 'Browser hint',
+      summary: 'Use the browser operator for repeatable site navigation.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      metadata: {
+        hint_scope: 'browser navigation',
+        hint_triggers: ['open site', 'go to page'],
+        recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+      },
+    })
+  );
+  const promotedTemplate = buildPromotedMemoryRecord(
+    createDistillCandidateRecord({
+      source_type: 'mission',
+      title: 'Report template',
+      summary: 'Reusable report structure.',
+      status: 'promoted',
+      target_kind: 'report_template',
+      metadata: {
+        template_sections: ['Summary', 'Findings', 'Next Steps'],
+        audience: 'operators',
+        output_format: 'markdown',
+      },
+    })
+  );
 
   const additionalGovernanceChecks: ContractCheck[] = [
     {
@@ -134,7 +145,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'model-adaptation-policy',
       schemaPath: 'knowledge/public/schemas/model-adaptation-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/model-adaptation-policy.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/model-adaptation-policy.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -144,7 +157,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'harness-capability-registry',
       schemaPath: 'knowledge/public/schemas/harness-capability-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/harness-capability-registry.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/harness-capability-registry.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -154,7 +169,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'execution-receipt-policy',
       schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/execution-receipt-policy.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/execution-receipt-policy.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -164,7 +181,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'voice-profile-registry',
       schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/voice-profile-registry.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/voice-profile-registry.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -194,7 +213,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'voice-sample-ingestion-policy',
       schemaPath: 'knowledge/public/schemas/voice-sample-ingestion-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/voice-sample-ingestion-policy.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/voice-sample-ingestion-policy.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -204,7 +225,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'video-composition-template-registry',
       schemaPath: 'knowledge/public/schemas/video-composition-template-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/video-composition-template-registry.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/video-composition-template-registry.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -214,7 +237,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'video-render-runtime-policy',
       schemaPath: 'knowledge/public/schemas/video-render-runtime-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/video-render-runtime-policy.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/video-render-runtime-policy.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -224,7 +249,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'mission-classification-policy',
       schemaPath: 'knowledge/public/schemas/mission-classification-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/mission-classification-policy.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-classification-policy.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -254,7 +281,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'agent-profile-index',
       schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/orchestration/agent-profile-index.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/orchestration/agent-profile-index.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -264,7 +293,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'mission-workflow-catalog',
       schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/mission-workflow-catalog.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-workflow-catalog.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -274,7 +305,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'mission-review-gate-registry',
       schemaPath: 'knowledge/public/schemas/mission-review-gate-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/mission-review-gate-registry.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-review-gate-registry.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -294,7 +327,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'mission-orchestration-scenario-pack',
       schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/mission-orchestration-scenario-pack.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-orchestration-scenario-pack.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -307,9 +342,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'intent-resolution',
       schemaPath: 'schemas/intent-resolution.schema.json',
-      validPayloads: [
-        resolveIntentResolutionContract('今週の進捗レポートを作って'),
-      ],
+      validPayloads: [resolveIntentResolutionContract('今週の進捗レポートを作って')],
       invalidPayloads: [
         {
           request_id: 'ir-invalid-1',
@@ -1763,7 +1796,8 @@ function createChecks(): ContractCheck[] {
               site: 'rakuten_travel',
               priority: 1,
               categories: ['hotel', 'package'],
-              reason: 'Use Rakuten Travel for travel booking while preserving points-portal routing evidence.',
+              reason:
+                'Use Rakuten Travel for travel booking while preserving points-portal routing evidence.',
             },
           ],
           login_methods: [
@@ -1785,6 +1819,107 @@ function createChecks(): ContractCheck[] {
               'payment_execution',
             ],
           },
+          site_selection_policy: {
+            decision_mode: 'ask_when_uncertain',
+            compare_dimensions: [
+              'price',
+              'points',
+              'coupon',
+              'login_friction',
+              'cancellation',
+              'familiarity',
+              'privacy',
+            ],
+            ask_user_when: [
+              'sale_possible',
+              'price_gap_unclear',
+              'points_advantage_unclear',
+              'multiple_top_candidates',
+              'login_friction_tradeoff',
+              'new_service_category',
+              'user_requested_precheck',
+            ],
+            max_questions_per_turn: 2,
+            preflight_question_sets: [
+              {
+                label: 'Restaurant preflight',
+                categories: ['restaurant'],
+                questions: ['人数と希望時間はいつですか?', '苦手食材や個室の要否はありますか?'],
+              },
+            ],
+            favorite_site_groups: [
+              {
+                label: 'Travel default',
+                categories: ['hotel', 'package'],
+                preferred_sites: ['rakuten_travel', 'jalan', 'booking_com'],
+                backup_sites: ['official_site'],
+                notes:
+                  'Check sales and points first, then ask before switching away from the usual favorites.',
+              },
+              {
+                label: 'Restaurant default',
+                categories: ['restaurant'],
+                preferred_sites: ['tabelog', 'yoyaku', 'gurunavi'],
+                backup_sites: ['official_site'],
+                notes:
+                  'Prefer the lowest-friction reservation path unless a campaign changes the decision.',
+              },
+              {
+                label: 'Shopping default',
+                categories: ['shopping'],
+                preferred_sites: ['official_site', 'rakuten', 'amazon'],
+                backup_sites: ['kakaku', 'yodobashi'],
+                notes:
+                  'Prefer official campaigns or familiar shopping portals unless the sale gap is material.',
+              },
+              {
+                label: 'Medical scheduling default',
+                categories: ['medical'],
+                preferred_sites: ['official_site', 'clinic_portal', 'line'],
+                backup_sites: ['phone', 'web_form'],
+                notes:
+                  'Use the most privacy-preserving appointment path and ask before sharing any sensitive details.',
+              },
+              {
+                label: 'Subscription default',
+                categories: ['subscription'],
+                preferred_sites: ['official_site', 'app_store', 'member_portal'],
+                backup_sites: ['phone', 'support_chat'],
+                notes:
+                  'Prefer the official account center and ask before cancellation, downgrade, or payment changes.',
+              },
+              {
+                label: 'Home service default',
+                categories: ['home_service'],
+                preferred_sites: ['official_site', 'local_booking', 'support_chat'],
+                backup_sites: ['phone', 'web_form'],
+                notes:
+                  'Use the clearest scheduling path and compare availability, estimate terms, and access constraints.',
+              },
+              {
+                label: 'Family scheduling default',
+                categories: ['family'],
+                preferred_sites: ['official_site', 'calendar_app', 'support_chat'],
+                backup_sites: ['phone', 'web_form'],
+                notes:
+                  'Use the simplest scheduling path when coordinating family timing, pickups, or school deadlines.',
+              },
+              {
+                label: 'Gifts default',
+                categories: ['gifts'],
+                preferred_sites: ['official_site', 'marketplace', 'local_shop'],
+                backup_sites: ['phone', 'chat'],
+                notes:
+                  'Compare delivery date, wrapping, and message-card options before switching away from the normal favorites.',
+              },
+            ],
+            sale_signal_policy: {
+              check_sales_before_decision: true,
+              recheck_if_material: true,
+              material_threshold: '10%',
+              preferred_sale_sources: ['official_site', 'points_portal', 'site_campaign_page'],
+            },
+          },
           points_portal_policy: {
             enabled: true,
             preferred_portals: [
@@ -1797,7 +1932,8 @@ function createChecks(): ContractCheck[] {
               {
                 merchant: 'rakuten_travel',
                 use_points_portal: true,
-                clickout_usecase_ref: 'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json',
+                clickout_usecase_ref:
+                  'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json',
                 preferred_execution_mode: 'simulation',
               },
             ],
@@ -1837,6 +1973,129 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'presentation-preference-profile',
+      schemaPath: 'knowledge/public/schemas/presentation-preference-profile.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/schemas/presentation-preference-profile.example.json'),
+      ],
+      invalidPayloads: [
+        {
+          kind: 'presentation-preference-profile',
+          profile_id: 'business-deck-default',
+          brief_question_sets: [],
+          theme_sets: [],
+        },
+      ],
+    },
+    {
+      id: 'narrated-video-preference-profile',
+      schemaPath: 'knowledge/public/schemas/narrated-video-preference-profile.schema.json',
+      validPayloads: [
+        readGovernanceJson(
+          'knowledge/public/schemas/narrated-video-preference-profile.example.json'
+        ),
+      ],
+      invalidPayloads: [
+        {
+          kind: 'narrated-video-preference-profile',
+          profile_id: 'video-default',
+          brief_question_sets: [],
+          theme_sets: [],
+          publish_policy: {
+            default_target: 'youtube',
+            default_visibility: 'unlisted',
+            require_human_approval_before_publish: true,
+          },
+        },
+      ],
+    },
+    {
+      id: 'narrated-video-publish-plan',
+      schemaPath: 'knowledge/public/schemas/narrated-video-publish-plan.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/schemas/narrated-video-publish-plan.example.json'),
+      ],
+      invalidPayloads: [
+        {
+          kind: 'narrated-video-publish-plan',
+          version: '1.0.0',
+          target: 'youtube',
+          title: '',
+          visibility: 'unlisted',
+          approval_boundary: 'before_public_release',
+          video_artifact_ref: '',
+        },
+      ],
+    },
+    {
+      id: 'narrated-video-upload-package',
+      schemaPath: 'knowledge/public/schemas/narrated-video-upload-package.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/schemas/narrated-video-upload-package.example.json'),
+      ],
+      invalidPayloads: [
+        {
+          kind: 'narrated-video-upload-package',
+          version: '1.0.0',
+          publish_plan_ref: '',
+          target_url: 'https://studio.youtube.com',
+          video_artifact_ref: '',
+          visibility: 'unlisted',
+          approval_boundary: 'before_public_release',
+          checklist: [],
+        },
+      ],
+    },
+    {
+      id: 'meeting-operations-profile',
+      schemaPath: 'knowledge/public/schemas/meeting-operations-profile.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/schemas/meeting-operations-profile.example.json'),
+      ],
+      invalidPayloads: [
+        {
+          kind: 'meeting-operations-profile',
+          profile_id: 'meeting-default',
+          brief_question_sets: [],
+          role_sets: [],
+          facilitation_policy: {
+            ask_before_join: true,
+            ask_before_speaking: true,
+            ask_before_shared_decision: true,
+          },
+          tracking_policy: {
+            default_follow_up_channel: 'task_session',
+            default_tracking_cadence: 'daily',
+          },
+          exit_policy: {
+            stop_after_agenda_complete: true,
+            stop_on_missing_authority: true,
+          },
+        },
+      ],
+    },
+    {
+      id: 'meeting-operations-brief',
+      schemaPath: 'knowledge/public/schemas/meeting-operations-brief.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/schemas/meeting-operations-brief.example.json'),
+      ],
+      invalidPayloads: [
+        {
+          kind: 'meeting-operations-brief',
+          version: '1.0.0',
+          intent: 'meeting_operations',
+          meeting_title: '',
+          meeting_url: '',
+          platform: 'teams',
+          purpose: 'planning',
+          primary_role: 'facilitator',
+          desired_outcomes: [],
+          exit_conditions: [],
+        },
+      ],
+    },
+    {
       id: 'mobile-app-profile-index',
       schemaPath: 'knowledge/public/schemas/mobile-app-profile-index.schema.json',
       validPayloads: [
@@ -1848,7 +2107,8 @@ function createChecks(): ContractCheck[] {
               platform: 'android',
               title: 'Example Mobile Login + Passkey',
               path: 'knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json',
-              description: 'Example Android app profile covering launch, login form selectors, and passkey trigger selectors.',
+              description:
+                'Example Android app profile covering launch, login form selectors, and passkey trigger selectors.',
               tags: ['android', 'login', 'passkey', 'example'],
             },
           ],
@@ -1880,7 +2140,8 @@ function createChecks(): ContractCheck[] {
               platform: 'browser',
               title: 'Example Web Login + Guarded Routes',
               path: 'knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json',
-              description: 'Shared profile for a Web app with login, guarded routes, and a debug-only session export route.',
+              description:
+                'Shared profile for a Web app with login, guarded routes, and a debug-only session export route.',
               tags: ['browser', 'session-handoff', 'login', 'guarded-routes', 'example'],
             },
           ],
@@ -1995,21 +2256,46 @@ function createChecks(): ContractCheck[] {
           archetypes: [
             {
               id: 'web-design-clone-delivery',
-              trigger_keywords: ['web', 'website', 'lp', 'landing page', 'design', '踏襲', 'サイト'],
-              summary_template: 'Reference Web experience plus new concept, with implementation and validation artifacts.',
-              normalized_scope: ['reference-observation', 'design-clone', 'implementation', 'test-pack'],
+              trigger_keywords: [
+                'web',
+                'website',
+                'lp',
+                'landing page',
+                'design',
+                '踏襲',
+                'サイト',
+              ],
+              summary_template:
+                'Reference Web experience plus new concept, with implementation and validation artifacts.',
+              normalized_scope: [
+                'reference-observation',
+                'design-clone',
+                'implementation',
+                'test-pack',
+              ],
               target_actuators: ['browser-actuator', 'modeling-actuator', 'media-actuator'],
               deliverables: ['web implementation', 'design spec', 'test results'],
-              required_inputs: ['reference source', 'preserved elements', 'new concept', 'target environment'],
+              required_inputs: [
+                'reference source',
+                'preserved elements',
+                'new concept',
+                'target environment',
+              ],
             },
             {
               id: 'structured-delivery',
               trigger_keywords: ['作って', 'やって', 'まとめて', '改善', 'deliver', 'build'],
-              summary_template: 'Generic structured delivery request requiring normalization before execution.',
+              summary_template:
+                'Generic structured delivery request requiring normalization before execution.',
               normalized_scope: ['request-normalization', 'artifact-plan', 'execution-plan'],
               target_actuators: ['orchestrator-actuator', 'modeling-actuator', 'media-actuator'],
               deliverables: ['execution brief', 'resolution plan'],
-              required_inputs: ['objective', 'target artifact', 'environment', 'acceptance criteria'],
+              required_inputs: [
+                'objective',
+                'target artifact',
+                'environment',
+                'acceptance criteria',
+              ],
             },
           ],
         },
@@ -2390,7 +2676,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'intent-domain-ontology',
       schemaPath: 'knowledge/public/schemas/intent-domain-ontology.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/intent-domain-ontology.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/intent-domain-ontology.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -2411,11 +2699,11 @@ function createChecks(): ContractCheck[] {
               outcome_ids: [],
               actuator_requirements: [],
               readiness_required: [],
-              evidence_required: []
-            }
-          ]
-        }
-      ]
+              evidence_required: [],
+            },
+          ],
+        },
+      ],
     },
     {
       id: 'a2a-task-contract',
@@ -2541,6 +2829,29 @@ function createChecks(): ContractCheck[] {
                     ],
                   },
                 ],
+              },
+            },
+            {
+              id: 'schedule-coordination',
+              task_type: 'service_operation',
+              goal: {
+                summary: 'Coordinate or reschedule a calendar within declared authority boundaries',
+                success_condition:
+                  'The updated schedule, constraints, and follow-up path are recorded.',
+              },
+              requirements: {
+                default_missing: [
+                  'schedule_scope',
+                  'date_range',
+                  'fixed_constraints',
+                  'calendar_action_boundary',
+                ],
+              },
+              payload: {
+                static: {
+                  intent_id: 'schedule-coordination',
+                  execution_shape: 'task_session',
+                },
               },
             },
           ],
@@ -2740,7 +3051,7 @@ function main() {
       const ok = validate(payload);
       if (!ok) {
         violations.push(
-          `${check.id}: expected valid payload to pass (${JSON.stringify(validate.errors || [])})`,
+          `${check.id}: expected valid payload to pass (${JSON.stringify(validate.errors || [])})`
         );
       }
     }
@@ -2752,7 +3063,10 @@ function main() {
     }
   }
 
-  const a2uiValidate = compileSchemaFromPath(ajv2020, pathResolver.rootResolve('schemas/a2ui-message.schema.json'));
+  const a2uiValidate = compileSchemaFromPath(
+    ajv2020,
+    pathResolver.rootResolve('schemas/a2ui-message.schema.json')
+  );
   const a2uiMessages = [
     {
       createSurface: {
@@ -2777,7 +3091,9 @@ function main() {
   for (const payload of a2uiMessages) {
     const ok = a2uiValidate(payload);
     if (!ok) {
-      violations.push(`a2ui-message: expected valid payload to pass (${JSON.stringify(a2uiValidate.errors || [])})`);
+      violations.push(
+        `a2ui-message: expected valid payload to pass (${JSON.stringify(a2uiValidate.errors || [])})`
+      );
     }
   }
   const invalidA2ui = a2uiValidate({

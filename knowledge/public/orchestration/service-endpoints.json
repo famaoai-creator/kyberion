@@ -40,6 +40,9 @@
     "canva": {
       "base_url": "https://api.canva.com/rest/v1",
       "preset_path": "knowledge/public/orchestration/service-presets/canva.json"
+    },
+    "youtube": {
+      "preset_path": "knowledge/public/orchestration/service-presets/youtube.json"
     }
   }
 }

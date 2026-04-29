@@ -20,6 +20,15 @@ The intended user experience is simple:
 
 Internally, Kyberion uses missions, task sessions, actuators, ADF pipelines, runtime supervision, and governed knowledge. Those are implementation details of a durable execution model, not the interface you should have to think about first.
 
+For practical request phrasing, use outcome-first prompts:
+
+- `6/6-6/8で沖縄に行くのでおすすめのホテルを探して`
+- `今夜のレストランを予約したい`
+- `この要件定義を説明する資料を作って`
+- `voice-hub の状態を見て`
+
+Kyberion will turn those requests into a brief, ask follow-up questions only when needed, and choose the right execution path itself.
+
 For the operator-oriented view of Slack, Chronos, directories, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md).
 
 CLI operators can also follow the same governed control path directly:
@@ -275,16 +284,16 @@ Intent
 
 Core locations:
 
-| Path | Role |
-| --- | --- |
-| `libs/core/` | shared kernel: secure I/O, resolution, routing, runtime state, governance helpers |
-| `libs/actuators/` | execution capabilities |
-| `knowledge/` | reusable governed knowledge |
-| `scripts/` | operational entry points |
-| `pipelines/` | declarative execution plans |
-| `active/` | runtime state, missions, artifacts, and logs |
-| `satellites/` | channel bridges such as Slack |
-| `presence/displays/` | operator and conversational displays |
+| Path                 | Role                                                                              |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `libs/core/`         | shared kernel: secure I/O, resolution, routing, runtime state, governance helpers |
+| `libs/actuators/`    | execution capabilities                                                            |
+| `knowledge/`         | reusable governed knowledge                                                       |
+| `scripts/`           | operational entry points                                                          |
+| `pipelines/`         | declarative execution plans                                                       |
+| `active/`            | runtime state, missions, artifacts, and logs                                      |
+| `satellites/`        | channel bridges such as Slack                                                     |
+| `presence/displays/` | operator and conversational displays                                              |
 
 ## Getting Started
 

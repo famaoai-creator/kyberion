@@ -3,8 +3,17 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
-import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
+import {
+  buildOrganizationWorkLoopSummary,
+  type OrganizationWorkLoopSummary,
+} from './work-design.js';
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
 import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
@@ -15,6 +24,8 @@ import {
   type OutcomeContract,
 } from './outcome-contract.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
+import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
+import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 
 export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type TaskSessionType =
@@ -42,7 +53,16 @@ export type TaskSessionMode = 'interactive' | 'delegated' | 'shadow';
 
 export interface TaskSessionHistoryEntry {
   ts: string;
-  type: 'instruction' | 'ack' | 'plan' | 'execution' | 'verification' | 'feedback' | 'error' | 'control' | 'artifact';
+  type:
+    | 'instruction'
+    | 'ack'
+    | 'plan'
+    | 'execution'
+    | 'verification'
+    | 'feedback'
+    | 'error'
+    | 'control'
+    | 'artifact';
   text: string;
 }
 
@@ -94,6 +114,7 @@ export interface TaskSessionIntent {
   projectContext?: TaskSession['project_context'];
   requirements?: TaskSession['requirements'];
   payload?: TaskSession['payload'];
+  executionBrief?: ActuatorExecutionBrief;
 }
 
 interface ValidationResult<T> {
@@ -105,8 +126,12 @@ interface ValidationResult<T> {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-session.schema.json');
-const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-session-policy.schema.json');
-const TASK_SESSION_POLICY_PATH = pathResolver.knowledge('public/governance/task-session-policy.json');
+const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'public/schemas/task-session-policy.schema.json'
+);
+const TASK_SESSION_POLICY_PATH = pathResolver.knowledge(
+  'public/governance/task-session-policy.json'
+);
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
@@ -152,7 +177,9 @@ function ensureTaskSessionPolicyValidator(): ValidateFunction {
 }
 
 function loadTaskSessionPolicy(): TaskSessionPolicyFile {
-  const value = JSON.parse(safeReadFile(TASK_SESSION_POLICY_PATH, { encoding: 'utf8' }) as string) as TaskSessionPolicyFile;
+  const value = JSON.parse(
+    safeReadFile(TASK_SESSION_POLICY_PATH, { encoding: 'utf8' }) as string
+  ) as TaskSessionPolicyFile;
   const validate = ensureTaskSessionPolicyValidator();
   if (!validate(value)) {
     throw new Error(`Invalid task-session-policy: ${errorsFrom(validate).join('; ')}`);
@@ -161,7 +188,9 @@ function loadTaskSessionPolicy(): TaskSessionPolicyFile {
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim());
+  return (validate.errors || []).map((error) =>
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
+  );
 }
 
 function taskSessionPath(sessionId: string): string {
@@ -177,10 +206,17 @@ function inferRequiresApproval(input: {
   if (typeof input.requiresApproval === 'boolean') return input.requiresApproval;
   if (input.workLoop?.authority?.requires_approval === true) return true;
   if (input.payload?.approval_required === true) return true;
-  return Array.isArray(input.requirements?.missing) && input.requirements.missing.includes('approval_confirmation');
+  return (
+    Array.isArray(input.requirements?.missing) &&
+    input.requirements.missing.includes('approval_confirmation')
+  );
 }
 
-function applyApprovalPolicy(intentId: string, payload: Record<string, unknown>, requirements: TaskSession['requirements']): {
+function applyApprovalPolicy(
+  intentId: string,
+  payload: Record<string, unknown>,
+  requirements: TaskSession['requirements']
+): {
   payload: Record<string, unknown>;
   requirements: TaskSession['requirements'];
 } {
@@ -221,26 +257,32 @@ export function createTaskSession(input: {
 }): TaskSession {
   const now = new Date().toISOString();
   const requiresApproval = inferRequiresApproval(input);
-  const workLoop = input.workLoop || buildOrganizationWorkLoopSummary({
-    intentId: input.intentId,
-    taskType: input.taskType,
-    shape: input.shape,
-    outcomeIds: input.outcomeIds,
-    projectId: input.projectContext?.project_id,
-    projectName: input.projectContext?.project_name,
-    trackId: input.projectContext?.track_id,
-    trackName: input.projectContext?.track_name,
-    tier: input.projectContext?.tier,
-    locale: input.projectContext?.locale,
-    serviceBindings: input.projectContext?.service_bindings,
-    requiresApproval,
-  });
-  const provisionalSessionId = input.sessionId || `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
-  const outcomeContract = input.outcomeContract || inferTaskSessionOutcomeContract({
-    sessionId: provisionalSessionId,
-    goal: input.goal,
-    taskType: input.taskType,
-  });
+  const workLoop =
+    input.workLoop ||
+    buildOrganizationWorkLoopSummary({
+      intentId: input.intentId,
+      taskType: input.taskType,
+      shape: input.shape,
+      outcomeIds: input.outcomeIds,
+      projectId: input.projectContext?.project_id,
+      projectName: input.projectContext?.project_name,
+      trackId: input.projectContext?.track_id,
+      trackName: input.projectContext?.track_name,
+      tier: input.projectContext?.tier,
+      locale: input.projectContext?.locale,
+      serviceBindings: input.projectContext?.service_bindings,
+      requiresApproval,
+    });
+  const provisionalSessionId =
+    input.sessionId ||
+    `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+  const outcomeContract =
+    input.outcomeContract ||
+    inferTaskSessionOutcomeContract({
+      sessionId: provisionalSessionId,
+      goal: input.goal,
+      taskType: input.taskType,
+    });
   const normalizedOutcomeContract = createOutcomeContract({
     ...outcomeContract,
     outcomeId: outcomeContract.outcome_id,
@@ -296,7 +338,10 @@ function inferMissingRequirements(trimmed: string, policy: TaskSessionIntentPoli
   return missing;
 }
 
-function inferPolicyPayload(trimmed: string, policy: TaskSessionIntentPolicy): Record<string, unknown> {
+function inferPolicyPayload(
+  trimmed: string,
+  policy: TaskSessionIntentPolicy
+): Record<string, unknown> {
   const payload: Record<string, unknown> = { ...(policy.payload?.static || {}) };
   for (const field of policy.payload?.fields || []) {
     let value: PolicyScalar | undefined = field.default;
@@ -313,7 +358,7 @@ function inferPolicyPayload(trimmed: string, policy: TaskSessionIntentPolicy): R
 
 function buildPolicyBackedIntent(intentId: string, trimmed: string): TaskSessionIntent {
   const policy = findTaskSessionIntentPolicy(intentId);
-  return {
+  const intent: TaskSessionIntent = {
     taskType: policy.task_type,
     intentId,
     goal: policy.goal,
@@ -323,6 +368,89 @@ function buildPolicyBackedIntent(intentId: string, trimmed: string): TaskSession
     },
     payload: inferPolicyPayload(trimmed, policy),
   };
+  intent.executionBrief = buildFallbackExecutionBrief({
+    requestText: trimmed,
+    intentId,
+    goalSummary: policy.goal.summary,
+    taskType: policy.task_type,
+    executionShape: 'task_session',
+    requiredInputs: intent.requirements?.missing || [],
+    outcomeIds: [],
+    confidence: 0.72,
+    summaryHint: policy.goal.summary,
+  } satisfies ExecutionBriefSeed);
+  return intent;
+}
+
+function derivePresentationThemeHint(deckPurpose?: unknown): string {
+  switch (String(deckPurpose || 'proposal')) {
+    case 'internal_share':
+      return 'internal_practical';
+    case 'briefing':
+      return 'executive_clean';
+    case 'marketing':
+      return 'marketing_branded';
+    case 'training':
+    case 'comparison':
+      return 'training_structured';
+    default:
+      return 'executive_clean';
+  }
+}
+
+function deriveScheduleCoordinationMode(trimmed: string): string {
+  if (/(リスケ|resched|reschedule)/i.test(trimmed)) return 'reschedule';
+  if (/(変更|修正|直し|adjust|調整)/i.test(trimmed)) return 'adjust';
+  return 'coordinate';
+}
+
+function isMeetingScheduleCoordination(trimmed: string): boolean {
+  return (
+    /(会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call)/i.test(trimmed) &&
+    /(?:スケジュール|予定|日程|リスケ|resched|reschedule|calendar|カレンダー|調整|変更|空き時間|availability)/i.test(
+      trimmed
+    )
+  );
+}
+
+function deriveScheduleCoordinationLeafIntent(trimmed: string): string | undefined {
+  if (isMeetingScheduleCoordination(trimmed)) return 'meeting-operations';
+  return undefined;
+}
+
+function deriveScheduleCalendarHint(trimmed: string): string {
+  if (/(Outlook|Microsoft 365|Microsoft|Teams)/i.test(trimmed)) return 'outlook_calendar';
+  if (/(Google Calendar|Googleカレンダー|calendar\.google\.com|Google)/i.test(trimmed))
+    return 'google_calendar';
+  return 'browser_calendar';
+}
+
+type BookingCategory =
+  | 'hotel'
+  | 'restaurant'
+  | 'activity'
+  | 'shopping'
+  | 'medical'
+  | 'subscription'
+  | 'home_service'
+  | 'family'
+  | 'gifts'
+  | 'package';
+
+function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
+  if (/(ホテル|宿泊|温泉|宿|沖縄|旅行)/i.test(trimmed)) return 'hotel';
+  if (/(レストラン|飲食|居酒屋|寿司|焼肉|ランチ|ディナー|食事|ご飯)/i.test(trimmed))
+    return 'restaurant';
+  if (/(体験|チケット|イベント|アクティビティ|遊び|観光)/i.test(trimmed)) return 'activity';
+  if (/(買って|購入|日用品|shopping|買い物|まとめて買|通販|amazon|楽天)/i.test(trimmed))
+    return 'shopping';
+  if (/(病院|歯医者|クリニック|診療|健診|受診|予約)/i.test(trimmed)) return 'medical';
+  if (/(サブスク|解約|更新|退会|定期)/i.test(trimmed)) return 'subscription';
+  if (/(家事代行|修理|配送|設置|片付け|清掃|水道|電気|引越し)/i.test(trimmed))
+    return 'home_service';
+  if (/(家族|子ども|子供|送迎|学校|習い事|保育)/i.test(trimmed)) return 'family';
+  if (/(ギフト|プレゼント|誕生日|記念日|花|贈り物)/i.test(trimmed)) return 'gifts';
+  return 'default';
 }
 
 // Intent resolution decides "what the user means".
@@ -340,10 +468,36 @@ const TASK_SESSION_INTENT_BUILDERS: Record<string, TaskSessionIntentBuilder> = {
         slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
           ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
           : undefined,
+        theme_hint: derivePresentationThemeHint(base.payload?.deck_purpose),
       },
     };
   },
   'generate-report': (trimmed) => buildPolicyBackedIntent('generate-report', trimmed),
+  'lifestyle-booking': (trimmed) => {
+    const base = buildPolicyBackedIntent('lifestyle-booking', trimmed);
+    return {
+      ...base,
+      payload: {
+        ...(base.payload || {}),
+        booking_category: deriveBookingCategory(trimmed),
+      },
+    };
+  },
+  'schedule-coordination': (trimmed) => {
+    const base = buildPolicyBackedIntent('schedule-coordination', trimmed);
+    return {
+      ...base,
+      payload: {
+        ...(base.payload || {}),
+        coordination_mode: deriveScheduleCoordinationMode(trimmed),
+        calendar_surface_hint: deriveScheduleCalendarHint(trimmed),
+        handoff_intent_id: deriveScheduleCoordinationLeafIntent(trimmed),
+        handoff_reason: isMeetingScheduleCoordination(trimmed)
+          ? 'Meeting schedule changes can be handed off to meeting-operations when role boundary or live meeting handling matters.'
+          : undefined,
+      },
+    };
+  },
   'cross-project-remediation': (trimmed) => {
     const base = buildPolicyBackedIntent('cross-project-remediation', trimmed);
     return {
@@ -377,8 +531,9 @@ const TASK_SESSION_INTENT_BUILDERS: Record<string, TaskSessionIntentBuilder> = {
   'inspect-service': (trimmed) => {
     const base = buildPolicyBackedIntent('inspect-service', trimmed);
     const serviceMatch =
-      trimmed.match(/([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i) ||
-      trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
+      trimmed.match(
+        /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i
+      ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
     const intent: TaskSessionIntent = {
       ...base,
       requirements: {
@@ -391,7 +546,11 @@ const TASK_SESSION_INTENT_BUILDERS: Record<string, TaskSessionIntentBuilder> = {
         log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
       },
     };
-    const approvalApplied = applyApprovalPolicy(intent.intentId!, intent.payload || {}, intent.requirements!);
+    const approvalApplied = applyApprovalPolicy(
+      intent.intentId!,
+      intent.payload || {},
+      intent.requirements!
+    );
     return {
       ...intent,
       requirements: approvalApplied.requirements,
@@ -412,7 +571,21 @@ export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent 
   const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
   if (intent?.resolution?.shape !== 'task_session') return null;
   try {
-    return buildPolicyBackedIntent(intentId, trimmed);
+    const built = buildPolicyBackedIntent(intentId, trimmed);
+    if (!built.executionBrief) {
+      built.executionBrief = buildFallbackExecutionBrief({
+        requestText: trimmed,
+        intentId: built.intentId,
+        goalSummary: built.goal.summary,
+        taskType: built.taskType,
+        executionShape: 'task_session',
+        requiredInputs: built.requirements?.missing || [],
+        outcomeIds: [],
+        confidence: 0.65,
+        summaryHint: built.goal.summary,
+      } satisfies ExecutionBriefSeed);
+    }
+    return built;
   } catch {
     return null;
   }
@@ -475,14 +648,16 @@ export function listTaskSessions(surface?: TaskSessionSurface): TaskSession[] {
 }
 
 export function getActiveTaskSession(surface?: TaskSessionSurface): TaskSession | null {
-  return listTaskSessions(surface).find((session) =>
-    !['completed', 'failed', 'released'].includes(session.status),
-  ) || null;
+  return (
+    listTaskSessions(surface).find(
+      (session) => !['completed', 'failed', 'released'].includes(session.status)
+    ) || null
+  );
 }
 
 export function updateTaskSession(
   sessionId: string,
-  patch: Partial<TaskSession>,
+  patch: Partial<TaskSession>
 ): TaskSession | null {
   const session = loadTaskSession(sessionId);
   if (!session) return null;
@@ -496,7 +671,10 @@ export function updateTaskSession(
   return next;
 }
 
-export function recordTaskSessionHistory(sessionId: string, entry: TaskSessionHistoryEntry): TaskSession | null {
+export function recordTaskSessionHistory(
+  sessionId: string,
+  entry: TaskSessionHistoryEntry
+): TaskSession | null {
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   session.history = [...session.history, entry].slice(-50);
