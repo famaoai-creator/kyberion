@@ -38,6 +38,188 @@
       "payment_execution"
     ]
   },
+  "site_selection_policy": {
+    "decision_mode": "ask_when_uncertain",
+    "compare_dimensions": [
+      "price",
+      "points",
+      "coupon",
+      "login_friction",
+      "cancellation",
+      "familiarity",
+      "privacy"
+    ],
+    "ask_user_when": [
+      "sale_possible",
+      "price_gap_unclear",
+      "points_advantage_unclear",
+      "multiple_top_candidates",
+      "login_friction_tradeoff",
+      "new_service_category",
+      "user_requested_precheck"
+    ],
+    "max_questions_per_turn": 2,
+    "favorite_site_groups": [
+      {
+        "label": "Travel default",
+        "categories": ["hotel", "package"],
+        "preferred_sites": ["rakuten_travel", "jalan", "booking_com"],
+        "backup_sites": ["official_site"],
+        "notes": "Check sales and points first, then ask before switching away from the usual favorites."
+      },
+      {
+        "label": "Restaurant default",
+        "categories": ["restaurant"],
+        "preferred_sites": ["tabelog", "yoyaku", "gurunavi"],
+        "backup_sites": ["official_site"],
+        "notes": "Prefer the lowest-friction reservation path unless a campaign changes the decision."
+      },
+      {
+        "label": "Activity and ticket default",
+        "categories": ["activity", "package"],
+        "preferred_sites": ["asoview", "klook", "jalan"],
+        "backup_sites": ["official_site"],
+        "notes": "Compare campaign pricing, cancellation rules, and date availability before switching from the usual shortlist."
+      },
+      {
+        "label": "Family planning default",
+        "categories": ["hotel", "restaurant", "activity"],
+        "preferred_sites": ["official_site", "rakuten_travel", "tabelog"],
+        "backup_sites": ["jalan", "booking_com", "gurunavi"],
+        "notes": "Use the simplest site when the user is booking for a family schedule or a tight calendar window."
+      },
+      {
+        "label": "Shopping default",
+        "categories": ["shopping"],
+        "preferred_sites": ["official_site", "rakuten", "amazon"],
+        "backup_sites": ["kakaku", "yodobashi"],
+        "notes": "Prefer official campaigns or familiar shopping portals unless the sale gap is material."
+      },
+      {
+        "label": "Medical scheduling default",
+        "categories": ["medical"],
+        "preferred_sites": ["official_site", "clinic_portal", "line"],
+        "backup_sites": ["phone", "web_form"],
+        "notes": "Use the most privacy-preserving appointment path and ask before sharing any sensitive details."
+      },
+      {
+        "label": "Subscription default",
+        "categories": ["subscription"],
+        "preferred_sites": ["official_site", "app_store", "member_portal"],
+        "backup_sites": ["phone", "support_chat"],
+        "notes": "Prefer the official account center and ask before cancellation, downgrade, or payment changes."
+      },
+      {
+        "label": "Home service default",
+        "categories": ["home_service"],
+        "preferred_sites": ["official_site", "local_booking", "support_chat"],
+        "backup_sites": ["phone", "web_form"],
+        "notes": "Use the clearest scheduling path and compare availability, estimate terms, and access constraints."
+      },
+      {
+        "label": "Family scheduling default",
+        "categories": ["family"],
+        "preferred_sites": ["official_site", "calendar_app", "support_chat"],
+        "backup_sites": ["phone", "web_form"],
+        "notes": "Use the simplest scheduling path when coordinating family timing, pickups, or school deadlines."
+      },
+      {
+        "label": "Gifts default",
+        "categories": ["gifts"],
+        "preferred_sites": ["official_site", "marketplace", "local_shop"],
+        "backup_sites": ["phone", "chat"],
+        "notes": "Compare delivery date, wrapping, and message-card options before switching away from the normal favorites."
+      }
+    ],
+    "sale_signal_policy": {
+      "check_sales_before_decision": true,
+      "recheck_if_material": true,
+      "material_threshold": "10%",
+      "preferred_sale_sources": ["official_site", "points_portal", "site_campaign_page"]
+    },
+    "preflight_question_sets": [
+      {
+        "label": "Travel booking preflight",
+        "categories": ["hotel", "package"],
+        "questions": [
+          "何名で泊まりますか?",
+          "1泊あたりの予算はいくらですか?",
+          "那覇・北谷・恩納のどのエリアを優先しますか?"
+        ],
+        "notes": "Use this set before comparing hotel or package site groups."
+      },
+      {
+        "label": "Restaurant preflight",
+        "categories": ["restaurant"],
+        "questions": [
+          "人数と希望時間はいつですか?",
+          "苦手食材や個室の要否はありますか?",
+          "価格重視か予約のしやすさ重視か、どちらですか?"
+        ],
+        "notes": "Keep it short and decide the reservation path quickly."
+      },
+      {
+        "label": "Medical scheduling preflight",
+        "categories": ["medical"],
+        "questions": [
+          "初診か再診か分かりますか?",
+          "希望日時と保険カードの有無はどうですか?",
+          "共有してよい範囲は予約情報だけで十分ですか?"
+        ],
+        "notes": "Keep the conversation limited to scheduling logistics and privacy."
+      },
+      {
+        "label": "Shopping preflight",
+        "categories": ["shopping"],
+        "questions": [
+          "欲しい商品名やブランドは決まっていますか?",
+          "最優先は価格、配送速度、在庫のどれですか?",
+          "受け取り期限はありますか?"
+        ],
+        "notes": "Use this set when comparing merchants or campaign pages."
+      },
+      {
+        "label": "Subscription preflight",
+        "categories": ["subscription"],
+        "questions": [
+          "更新、解約、ダウングレードのどれを検討していますか?",
+          "締切日や違約金の確認は必要ですか?",
+          "公式アカウントセンターを優先してよいですか?"
+        ],
+        "notes": "Prefer the official path unless the profile says otherwise."
+      },
+      {
+        "label": "Home service preflight",
+        "categories": ["home_service"],
+        "questions": [
+          "修理、設置、清掃、配送のどれですか?",
+          "現場の写真や型番を共有できますか?",
+          "訪問時間や見積条件に制約はありますか?"
+        ],
+        "notes": "Check access constraints before comparing providers."
+      },
+      {
+        "label": "Family scheduling preflight",
+        "categories": ["family"],
+        "questions": [
+          "誰の予定を合わせますか?",
+          "送迎や学校の締切はありますか?",
+          "親の承認や持ち物の確認が必要ですか?"
+        ],
+        "notes": "Use this set for family coordination, pickup/dropoff, or school deadlines."
+      },
+      {
+        "label": "Gifts preflight",
+        "categories": ["gifts"],
+        "questions": [
+          "誰へのギフトですか?",
+          "予算と渡したい日付はいつですか?",
+          "配送、ラッピング、メッセージカードのどれを優先しますか?"
+        ],
+        "notes": "Keep it focused on occasion, delivery date, and presentation options."
+      }
+    ]
+  },
   "points_portal_policy": {
     "enabled": true,
     "preferred_portals": [

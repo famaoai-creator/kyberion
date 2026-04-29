@@ -9,17 +9,90 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('intent-resolution-contract', () => {
   it('resolves core surface intents into deterministic shapes', () => {
-    const fixtures: Array<{ utterance: string; shape: string; outcomeKind: string; authority: string }> = [
-      { utterance: 'Webサービスを作って', shape: 'project_bootstrap', outcomeKind: 'answer', authority: 'autonomous' },
-      { utterance: 'このPDFをパワポにして', shape: 'task_session', outcomeKind: 'artifact', authority: 'autonomous' },
-      { utterance: '今週の進捗レポートを作って', shape: 'task_session', outcomeKind: 'artifact', authority: 'autonomous' },
-      { utterance: 'プロジェクトのWBSをエクセルで作って', shape: 'task_session', outcomeKind: 'artifact', authority: 'autonomous' },
-      { utterance: 'voice-hub の状態を見て', shape: 'task_session', outcomeKind: 'status_report', authority: 'approval_required' },
-      { utterance: '日経新聞を開いて', shape: 'task_session', outcomeKind: 'status_report', authority: 'autonomous' },
-      { utterance: '左下の承認ボタンを押して', shape: 'task_session', outcomeKind: 'status_report', authority: 'autonomous' },
-      { utterance: 'mission authority を教えて', shape: 'direct_answer', outcomeKind: 'answer', authority: 'autonomous' },
-      { utterance: '今日の天気を教えて', shape: 'direct_answer', outcomeKind: 'answer', authority: 'autonomous' },
-      { utterance: 'このエージェントのハーネスを benchmark ベースで改善して', shape: 'task_session', outcomeKind: 'answer', authority: 'autonomous' },
+    const fixtures: Array<{
+      utterance: string;
+      shape: string;
+      outcomeKind: string;
+      authority: string;
+    }> = [
+      {
+        utterance: 'Webサービスを作って',
+        shape: 'project_bootstrap',
+        outcomeKind: 'answer',
+        authority: 'autonomous',
+      },
+      {
+        utterance: 'このPDFをパワポにして',
+        shape: 'task_session',
+        outcomeKind: 'artifact',
+        authority: 'autonomous',
+      },
+      {
+        utterance: '今週の進捗レポートを作って',
+        shape: 'task_session',
+        outcomeKind: 'artifact',
+        authority: 'autonomous',
+      },
+      {
+        utterance: 'プロジェクトのWBSをエクセルで作って',
+        shape: 'task_session',
+        outcomeKind: 'artifact',
+        authority: 'autonomous',
+      },
+      {
+        utterance: 'voice-hub の状態を見て',
+        shape: 'task_session',
+        outcomeKind: 'status_report',
+        authority: 'approval_required',
+      },
+      {
+        utterance: '日経新聞を開いて',
+        shape: 'task_session',
+        outcomeKind: 'status_report',
+        authority: 'autonomous',
+      },
+      {
+        utterance: '左下の承認ボタンを押して',
+        shape: 'task_session',
+        outcomeKind: 'status_report',
+        authority: 'autonomous',
+      },
+      {
+        utterance: '6/6-6/8で沖縄のホテルを探して',
+        shape: 'task_session',
+        outcomeKind: 'approval_ready_plan',
+        authority: 'approval_required',
+      },
+      {
+        utterance: '今夜のレストランを予約したい',
+        shape: 'task_session',
+        outcomeKind: 'approval_ready_plan',
+        authority: 'approval_required',
+      },
+      {
+        utterance: '歯医者の予約を取りたい',
+        shape: 'task_session',
+        outcomeKind: 'approval_ready_plan',
+        authority: 'approval_required',
+      },
+      {
+        utterance: 'mission authority を教えて',
+        shape: 'direct_answer',
+        outcomeKind: 'answer',
+        authority: 'autonomous',
+      },
+      {
+        utterance: '今日の天気を教えて',
+        shape: 'direct_answer',
+        outcomeKind: 'answer',
+        authority: 'autonomous',
+      },
+      {
+        utterance: 'このエージェントのハーネスを benchmark ベースで改善して',
+        shape: 'task_session',
+        outcomeKind: 'answer',
+        authority: 'autonomous',
+      },
     ];
 
     for (const fixture of fixtures) {

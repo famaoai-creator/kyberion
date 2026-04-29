@@ -106,9 +106,43 @@ Examples:
   - Kyberion resolves this to a service inspection path
 - `今週の進捗レポートを作って`
   - Kyberion resolves this to a task session or mission-backed document flow
+- `Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる`
+  - Kyberion resolves this to `meeting-operations`, then asks for the meeting URL, role boundary, and purpose if they are missing
+- `スケジュールを調整して`
+  - Kyberion resolves this to `schedule-coordination`, then asks for the schedule scope, date range, fixed constraints, and calendar-action boundary if they are missing
+  - If the adjustment is for a live meeting, Kyberion may hand off from `schedule-coordination` to `meeting-operations` once the meeting-specific authority boundary matters
 
 The user should ask for outcomes.
 Kyberion should choose the machinery.
+
+### How To Form A Good Request
+
+Use a short outcome-first request and add only the variables that affect the result.
+
+Recommended structure:
+
+```text
+Goal + Context + Constraints + Approval Boundary
+```
+
+Examples:
+
+- `6/6-6/8で沖縄に行くのでおすすめのホテルを探して。予算は1泊2万円前後、那覇か北谷を優先。`
+- `今夜のレストランを予約したい。2名で、静かな店を優先。予約前に候補を3件まで絞って。`
+- `この要件定義を説明する資料を作って。役員向け、10枚前後、厳しめのトーンで。`
+- `voice-hub の状態を見て。異常があれば要点だけ教えて。`
+- `Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる。会議URLはこれで、私の役割はファシリテータ。`
+- `スケジュールを調整して。誰の予定かは私のカレンダーで、変更は提案までにして。`
+- `会議の日程を調整して。参加者調整が必要なら meeting-operations に切り替えて。`
+  - Kyberion resolves this to `schedule-coordination` first, then asks one extra boundary question if the request is really about a live meeting: is this only a calendar edit, or should it be handed to `meeting-operations`?
+
+If the task is booking, presentation, narrated video, meeting operations, purchase, renewal, or another structured workflow, Kyberion should first produce an execution brief and ask only the questions that change the outcome.
+
+If you already know you want Kyberion to act with assumptions, say so explicitly:
+
+- `不足があれば先に聞いて`
+- `不明点は合理的に仮定して進めて`
+- `予約や決済の直前で止めて`
 
 ## 4. How To Explain The Backend Model
 
@@ -186,17 +220,17 @@ Those may be inspectable, but they should not be the default conversation burden
 
 The most useful directory model for operators is by purpose.
 
-| Path | Purpose |
-| --- | --- |
-| `knowledge/personal/` | private local identity, tokens, preferences |
-| `knowledge/confidential/` | sensitive org knowledge |
-| `knowledge/public/` | shared reusable knowledge and governance |
-| `active/missions/` | mission-specific durable state |
-| `active/shared/` | shared runtime state, logs, tmp artifacts, queues |
-| `libs/actuators/` | execution capabilities |
-| `scripts/` | control-plane and operational entry points |
-| `satellites/` | external bridges such as Slack |
-| `presence/displays/` | control and conversational displays |
+| Path                      | Purpose                                           |
+| ------------------------- | ------------------------------------------------- |
+| `knowledge/personal/`     | private local identity, tokens, preferences       |
+| `knowledge/confidential/` | sensitive org knowledge                           |
+| `knowledge/public/`       | shared reusable knowledge and governance          |
+| `active/missions/`        | mission-specific durable state                    |
+| `active/shared/`          | shared runtime state, logs, tmp artifacts, queues |
+| `libs/actuators/`         | execution capabilities                            |
+| `scripts/`                | control-plane and operational entry points        |
+| `satellites/`             | external bridges such as Slack                    |
+| `presence/displays/`      | control and conversational displays               |
 
 Practical rules:
 

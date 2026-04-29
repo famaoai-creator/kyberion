@@ -18,29 +18,17 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "product_development",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "project_created"
-      ],
-      "actuator_requirements": [
-        "orchestrator-actuator",
-        "artifact-actuator",
-        "wisdom-actuator"
-      ],
+      "outcome_ids": ["project_created"],
+      "actuator_requirements": ["orchestrator-actuator", "artifact-actuator", "wisdom-actuator"],
       "readiness_required": [
         "kyberion-runtime-baseline",
         "knowledge-tier-hygiene",
         "reasoning-backend"
       ],
-      "evidence_required": [
-        "project-record",
-        "mission-seed-record"
-      ],
+      "evidence_required": ["project-record", "mission-seed-record"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "structured_output",
-          "tool_use"
-        ],
+        "capability_tags": ["structured_output", "tool_use"],
         "fallback_allowed": false
       }
     },
@@ -57,19 +45,10 @@
       "workflow_template": "single-track-default",
       "team_template": "default",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "artifact:image"
-      ],
-      "actuator_requirements": [
-        "media-generation-actuator",
-        "artifact-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "artifact-record"
-      ]
+      "outcome_ids": ["artifact:image"],
+      "actuator_requirements": ["media-generation-actuator", "artifact-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["artifact-record"]
     },
     {
       "intent_id": "open-site",
@@ -84,18 +63,10 @@
       "workflow_template": "explore-then-govern",
       "team_template": "system_query",
       "risk_profile": "low",
-      "outcome_ids": [
-        "browser_navigation"
-      ],
-      "actuator_requirements": [
-        "browser-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "browser-session"
-      ]
+      "outcome_ids": ["browser_navigation"],
+      "actuator_requirements": ["browser-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["browser-session"]
     },
     {
       "intent_id": "browser-step",
@@ -110,18 +81,10 @@
       "workflow_template": "explore-then-govern",
       "team_template": "system_query",
       "risk_profile": "low",
-      "outcome_ids": [
-        "browser_step"
-      ],
-      "actuator_requirements": [
-        "browser-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "browser-session"
-      ]
+      "outcome_ids": ["browser_step"],
+      "actuator_requirements": ["browser-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["browser-session"]
     },
     {
       "intent_id": "generate-presentation",
@@ -136,28 +99,13 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "artifact:pptx"
-      ],
-      "actuator_requirements": [
-        "media-actuator",
-        "artifact-actuator",
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "reasoning-backend"
-      ],
-      "evidence_required": [
-        "artifact-record",
-        "execution-receipt"
-      ],
+      "outcome_ids": ["artifact:pptx"],
+      "actuator_requirements": ["media-actuator", "artifact-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "reasoning-backend"],
+      "evidence_required": ["artifact-record", "execution-receipt"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "structured_output",
-          "tool_use"
-        ],
+        "capability_tags": ["structured_output", "tool_use"],
         "fallback_allowed": false
       }
     },
@@ -174,28 +122,13 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "artifact:docx"
-      ],
-      "actuator_requirements": [
-        "media-actuator",
-        "artifact-actuator",
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "reasoning-backend"
-      ],
-      "evidence_required": [
-        "artifact-record",
-        "execution-receipt"
-      ],
+      "outcome_ids": ["artifact:docx"],
+      "actuator_requirements": ["media-actuator", "artifact-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "reasoning-backend"],
+      "evidence_required": ["artifact-record", "execution-receipt"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "structured_output",
-          "tool_use"
-        ],
+        "capability_tags": ["structured_output", "tool_use"],
         "fallback_allowed": false
       }
     },
@@ -212,28 +145,13 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "artifact:xlsx"
-      ],
-      "actuator_requirements": [
-        "media-actuator",
-        "artifact-actuator",
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "reasoning-backend"
-      ],
-      "evidence_required": [
-        "artifact-record",
-        "execution-receipt"
-      ],
+      "outcome_ids": ["artifact:xlsx"],
+      "actuator_requirements": ["media-actuator", "artifact-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "reasoning-backend"],
+      "evidence_required": ["artifact-record", "execution-receipt"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "structured_output",
-          "tool_use"
-        ],
+        "capability_tags": ["structured_output", "tool_use"],
         "fallback_allowed": false
       }
     },
@@ -250,22 +168,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "service_summary",
-        "approval_request"
-      ],
-      "actuator_requirements": [
-        "service-actuator",
-        "approval-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["service_summary", "approval_request"],
+      "actuator_requirements": ["service-actuator", "approval-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "knowledge-query",
@@ -280,25 +186,13 @@
       "workflow_template": "single-track-default",
       "team_template": "default",
       "risk_profile": "low",
-      "outcome_ids": [
-        "knowledge_answer"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene",
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ],
+      "outcome_ids": ["knowledge_answer"],
+      "actuator_requirements": ["wisdom-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene", "kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"],
       "reasoning_requirements": {
         "mode": "surface_reply",
-        "capability_tags": [
-          "multilingual",
-          "structured_output"
-        ],
+        "capability_tags": ["multilingual", "structured_output"],
         "fallback_allowed": true
       }
     },
@@ -315,28 +209,17 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "remediation_plan"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "modeling-actuator"
-      ],
+      "outcome_ids": ["remediation_plan"],
+      "actuator_requirements": ["wisdom-actuator", "modeling-actuator"],
       "readiness_required": [
         "knowledge-tier-hygiene",
         "reasoning-backend",
         "kyberion-runtime-baseline"
       ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ],
+      "evidence_required": ["execution-receipt", "delivery-pack"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "multi_step_reasoning",
-          "structured_output"
-        ],
+        "capability_tags": ["multi_step_reasoning", "structured_output"],
         "fallback_allowed": false
       }
     },
@@ -353,28 +236,17 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "review_findings"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "modeling-actuator"
-      ],
+      "outcome_ids": ["review_findings"],
+      "actuator_requirements": ["wisdom-actuator", "modeling-actuator"],
       "readiness_required": [
         "knowledge-tier-hygiene",
         "reasoning-backend",
         "kyberion-runtime-baseline"
       ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ],
+      "evidence_required": ["execution-receipt", "delivery-pack"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "multi_step_reasoning",
-          "structured_output"
-        ],
+        "capability_tags": ["multi_step_reasoning", "structured_output"],
         "fallback_allowed": false
       }
     },
@@ -391,30 +263,83 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "harness_experiment_report"
-      ],
-      "actuator_requirements": [
-        "code-actuator",
-        "modeling-actuator",
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "reasoning-backend",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ],
+      "outcome_ids": ["harness_experiment_report"],
+      "actuator_requirements": ["code-actuator", "modeling-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "reasoning-backend", "schema-integrity"],
+      "evidence_required": ["execution-receipt", "delivery-pack"],
       "reasoning_requirements": {
         "mode": "multi_step_reasoning",
-        "capability_tags": [
-          "tool_use",
-          "multi_step_reasoning"
-        ],
+        "capability_tags": ["tool_use", "multi_step_reasoning"],
         "fallback_allowed": false
+      }
+    },
+    {
+      "intent_id": "lifestyle-booking",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "prepare",
+      "object": "booking_plan",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "customer_engagement",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "surface_concierge",
+      "risk_profile": "approval_required",
+      "outcome_ids": ["approval_request"],
+      "actuator_requirements": ["browser-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": ["tool_use", "structured_output"],
+        "fallback_allowed": true
+      }
+    },
+    {
+      "intent_id": "meeting-operations",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "execute",
+      "object": "meeting_session",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "meeting_operations",
+      "risk_profile": "review_required",
+      "outcome_ids": ["meeting_operations_summary"],
+      "actuator_requirements": ["meeting-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "meeting-participation-runtime"],
+      "evidence_required": ["execution-receipt", "meeting-summary"],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": ["tool_use", "structured_output"],
+        "fallback_allowed": true
+      }
+    },
+    {
+      "intent_id": "schedule-coordination",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "target": "outcome",
+      "action": "change",
+      "object": "calendar_schedule",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "customer_engagement",
+      "workflow_template": "stage-gated-high-stakes",
+      "team_template": "surface_concierge",
+      "risk_profile": "approval_required",
+      "outcome_ids": ["schedule_coordination_summary"],
+      "actuator_requirements": ["browser-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "calendar-snapshot"],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": ["tool_use", "structured_output"],
+        "fallback_allowed": true
       }
     },
     {
@@ -430,24 +355,13 @@
       "workflow_template": "single-track-default",
       "team_template": "system_query",
       "risk_profile": "low",
-      "outcome_ids": [
-        "live_answer"
-      ],
-      "actuator_requirements": [
-        "network-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ],
+      "outcome_ids": ["live_answer"],
+      "actuator_requirements": ["network-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"],
       "reasoning_requirements": {
         "mode": "surface_reply",
-        "capability_tags": [
-          "tool_use"
-        ],
+        "capability_tags": ["tool_use"],
         "fallback_allowed": true
       }
     },
@@ -464,21 +378,14 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "service_summary"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "system-actuator"
-      ],
+      "outcome_ids": ["service_summary"],
+      "actuator_requirements": ["wisdom-actuator", "system-actuator"],
       "readiness_required": [
         "kyberion-runtime-baseline",
         "knowledge-tier-hygiene",
         "schema-integrity"
       ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "audit-security",
@@ -493,21 +400,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "incident",
       "risk_profile": "high_stakes",
-      "outcome_ids": [
-        "service_summary"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["service_summary"],
+      "actuator_requirements": ["wisdom-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "rebuild-env",
@@ -522,21 +418,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "high_stakes",
-      "outcome_ids": [
-        "service_summary"
-      ],
-      "actuator_requirements": [
-        "orchestrator-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["service_summary"],
+      "actuator_requirements": ["orchestrator-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "validate-all",
@@ -551,20 +436,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "service_summary"
-      ],
-      "actuator_requirements": [
-        "modeling-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["service_summary"],
+      "actuator_requirements": ["modeling-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "maintenance-routine",
@@ -579,20 +454,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "service_summary"
-      ],
-      "actuator_requirements": [
-        "code-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["service_summary"],
+      "actuator_requirements": ["code-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "bootstrap-kyberion-runtime",
@@ -607,21 +472,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "environment_bootstrapped"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "service-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["environment_bootstrapped"],
+      "actuator_requirements": ["system-actuator", "service-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "verify-environment-readiness",
@@ -636,21 +490,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "environment_readiness_report"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "readiness-report",
-        "execution-receipt"
-      ]
+      "outcome_ids": ["environment_readiness_report"],
+      "actuator_requirements": ["system-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["readiness-report", "execution-receipt"]
     },
     {
       "intent_id": "configure-reasoning-backend",
@@ -665,21 +508,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "reasoning_backend_configured"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "reasoning-backend"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["reasoning_backend_configured"],
+      "actuator_requirements": ["system-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "reasoning-backend"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "register-actuator-adapter",
@@ -694,21 +526,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "actuator_adapter_registered"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "schema-integrity",
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["actuator_adapter_registered"],
+      "actuator_requirements": ["process-actuator", "system-actuator"],
+      "readiness_required": ["schema-integrity", "kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "verify-actuator-capability",
@@ -723,20 +544,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "actuator_capability_report"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["actuator_capability_report"],
+      "actuator_requirements": ["process-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "rotate-integration-secret",
@@ -751,20 +562,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "secret_rotation_completed"
-      ],
-      "actuator_requirements": [
-        "secret-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "audit-chain-status"
-      ]
+      "outcome_ids": ["secret_rotation_completed"],
+      "actuator_requirements": ["secret-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "audit-chain-status"]
     },
     {
       "intent_id": "run-system-upgrade-check",
@@ -779,21 +580,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "system_upgrade_check_report"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["system_upgrade_check_report"],
+      "actuator_requirements": ["process-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "query-knowledge",
@@ -808,19 +598,10 @@
       "workflow_template": "single-track-default",
       "team_template": "default",
       "risk_profile": "low",
-      "outcome_ids": [
-        "knowledge_answer"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene",
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["knowledge_answer"],
+      "actuator_requirements": ["wisdom-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene", "kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "distill-mission-knowledge",
@@ -835,21 +616,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "knowledge_distill_report"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "modeling-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene",
-        "reasoning-backend"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["knowledge_distill_report"],
+      "actuator_requirements": ["wisdom-actuator", "modeling-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene", "reasoning-backend"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "organize-knowledge-assets",
@@ -864,19 +634,10 @@
       "workflow_template": "single-track-default",
       "team_template": "default",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "knowledge_organization_report"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "file-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["knowledge_organization_report"],
+      "actuator_requirements": ["wisdom-actuator", "file-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "promote-memory-candidate",
@@ -891,20 +652,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "memory_promotion_result"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["memory_promotion_result"],
+      "actuator_requirements": ["wisdom-actuator", "approval-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "sanitize-knowledge-for-public-tier",
@@ -919,20 +670,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "knowledge_sanitization_report"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "sanitize-evidence",
-        "execution-receipt"
-      ]
+      "outcome_ids": ["knowledge_sanitization_report"],
+      "actuator_requirements": ["wisdom-actuator", "approval-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["sanitize-evidence", "execution-receipt"]
     },
     {
       "intent_id": "retire-stale-knowledge",
@@ -947,19 +688,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "knowledge_retirement_report"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "file-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["knowledge_retirement_report"],
+      "actuator_requirements": ["wisdom-actuator", "file-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "reconcile-knowledge-index",
@@ -974,20 +706,10 @@
       "workflow_template": "single-track-default",
       "team_template": "default",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "knowledge_reconciliation_report"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "file-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["knowledge_reconciliation_report"],
+      "actuator_requirements": ["wisdom-actuator", "file-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene", "schema-integrity"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "check-kyberion-baseline",
@@ -1002,20 +724,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "kyberion_baseline_status"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["kyberion_baseline_status"],
+      "actuator_requirements": ["process-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "check-kyberion-vital",
@@ -1030,20 +742,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "kyberion_vital_status"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["kyberion_vital_status"],
+      "actuator_requirements": ["process-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "diagnose-kyberion-system",
@@ -1058,21 +760,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "kyberion_diagnostics_report"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "system-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "system-status-report"
-      ]
+      "outcome_ids": ["kyberion_diagnostics_report"],
+      "actuator_requirements": ["process-actuator", "system-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "system-status-report"]
     },
     {
       "intent_id": "inspect-mission-state",
@@ -1087,19 +778,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_state_summary"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_state_summary"],
+      "actuator_requirements": ["process-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "inspect-runtime-supervisor",
@@ -1114,19 +796,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "runtime_supervisor_summary"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["runtime_supervisor_summary"],
+      "actuator_requirements": ["system-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "verify-audit-chain",
@@ -1141,21 +814,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "audit_chain_verification_result"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "audit-chain-status"
-      ]
+      "outcome_ids": ["audit_chain_verification_result"],
+      "actuator_requirements": ["process-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt", "audit-chain-status"]
     },
     {
       "intent_id": "inspect-environment-readiness",
@@ -1170,19 +832,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "environment_readiness_report"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["environment_readiness_report"],
+      "actuator_requirements": ["system-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "create-mission",
@@ -1197,20 +850,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "product_development",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "mission_created"
-      ],
-      "actuator_requirements": [
-        "orchestrator-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "mission-record",
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_created"],
+      "actuator_requirements": ["orchestrator-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["mission-record", "execution-receipt"]
     },
     {
       "intent_id": "classify-mission",
@@ -1225,19 +868,10 @@
       "workflow_template": "decision-support-exploratory",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_classification_result"
-      ],
-      "actuator_requirements": [
-        "modeling-actuator",
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_classification_result"],
+      "actuator_requirements": ["modeling-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "select-mission-workflow",
@@ -1252,19 +886,10 @@
       "workflow_template": "decision-support-exploratory",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_workflow_selected"
-      ],
-      "actuator_requirements": [
-        "modeling-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_workflow_selected"],
+      "actuator_requirements": ["modeling-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "compose-mission-team",
@@ -1279,21 +904,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "product_development",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "mission_team_composed"
-      ],
-      "actuator_requirements": [
-        "agent-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "team-blueprint",
-        "staffing-assignments",
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_team_composed"],
+      "actuator_requirements": ["agent-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["team-blueprint", "staffing-assignments", "execution-receipt"]
     },
     {
       "intent_id": "prewarm-mission-team",
@@ -1308,20 +922,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_team_prewarmed"
-      ],
-      "actuator_requirements": [
-        "agent-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline",
-        "reasoning-backend"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_team_prewarmed"],
+      "actuator_requirements": ["agent-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "reasoning-backend"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "delegate-mission-task",
@@ -1336,20 +940,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "product_development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_task_delegated"
-      ],
-      "actuator_requirements": [
-        "agent-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-ledger",
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_task_delegated"],
+      "actuator_requirements": ["agent-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-ledger", "execution-receipt"]
     },
     {
       "intent_id": "review-worker-output",
@@ -1364,20 +958,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "worker_output_reviewed"
-      ],
-      "actuator_requirements": [
-        "approval-actuator",
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["worker_output_reviewed"],
+      "actuator_requirements": ["approval-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "handoff-mission",
@@ -1392,20 +976,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "mission_handoff_completed"
-      ],
-      "actuator_requirements": [
-        "agent-actuator",
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["mission_handoff_completed"],
+      "actuator_requirements": ["agent-actuator", "process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "distill-mission",
@@ -1420,20 +994,10 @@
       "workflow_template": "coordinated-multi-track",
       "team_template": "development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_distilled"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "modeling-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["mission_distilled"],
+      "actuator_requirements": ["wisdom-actuator", "modeling-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "close-mission",
@@ -1448,20 +1012,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "mission_closed"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "orchestrator-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt",
-        "delivery-pack"
-      ]
+      "outcome_ids": ["mission_closed"],
+      "actuator_requirements": ["process-actuator", "orchestrator-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     },
     {
       "intent_id": "deprecate-actuator-adapter",
@@ -1476,19 +1030,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "actuator_adapter_deprecated"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "schema-integrity"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["actuator_adapter_deprecated"],
+      "actuator_requirements": ["process-actuator", "approval-actuator"],
+      "readiness_required": ["schema-integrity"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "rollback-actuator-adapter",
@@ -1503,19 +1048,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "actuator_adapter_rolled_back"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["actuator_adapter_rolled_back"],
+      "actuator_requirements": ["process-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "recover-environment",
@@ -1530,19 +1066,10 @@
       "workflow_template": "platform-onboarding-stage-gated",
       "team_template": "operations",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "environment_recovered"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "service-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["environment_recovered"],
+      "actuator_requirements": ["system-actuator", "service-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "reset-environment-state",
@@ -1557,19 +1084,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "high_stakes",
-      "outcome_ids": [
-        "environment_state_reset"
-      ],
-      "actuator_requirements": [
-        "system-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["environment_state_reset"],
+      "actuator_requirements": ["system-actuator", "approval-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "audit-knowledge-tier-boundary",
@@ -1584,19 +1102,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "knowledge_tier_audit_report"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["knowledge_tier_audit_report"],
+      "actuator_requirements": ["wisdom-actuator", "approval-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "trace-memory-promotion-decision",
@@ -1611,18 +1120,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "memory_promotion_trace"
-      ],
-      "actuator_requirements": [
-        "wisdom-actuator"
-      ],
-      "readiness_required": [
-        "knowledge-tier-hygiene"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["memory_promotion_trace"],
+      "actuator_requirements": ["wisdom-actuator"],
+      "readiness_required": ["knowledge-tier-hygiene"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "reassign-mission-owner",
@@ -1637,19 +1138,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "product_development",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "mission_owner_reassigned"
-      ],
-      "actuator_requirements": [
-        "agent-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_owner_reassigned"],
+      "actuator_requirements": ["agent-actuator", "approval-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "cancel-mission",
@@ -1664,19 +1156,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "product_development",
       "risk_profile": "approval_required",
-      "outcome_ids": [
-        "mission_canceled"
-      ],
-      "actuator_requirements": [
-        "process-actuator",
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_canceled"],
+      "actuator_requirements": ["process-actuator", "approval-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "pause-mission",
@@ -1691,18 +1174,10 @@
       "workflow_template": "single-track-default",
       "team_template": "product_development",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "mission_paused"
-      ],
-      "actuator_requirements": [
-        "process-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["mission_paused"],
+      "actuator_requirements": ["process-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "request-approval",
@@ -1717,18 +1192,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "approval_request_created"
-      ],
-      "actuator_requirements": [
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["approval_request_created"],
+      "actuator_requirements": ["approval-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "resolve-approval",
@@ -1743,18 +1210,10 @@
       "workflow_template": "single-track-default",
       "team_template": "operations",
       "risk_profile": "review_required",
-      "outcome_ids": [
-        "approval_resolved"
-      ],
-      "actuator_requirements": [
-        "approval-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["approval_resolved"],
+      "actuator_requirements": ["approval-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     },
     {
       "intent_id": "escalate-governance-issue",
@@ -1769,19 +1228,10 @@
       "workflow_template": "stage-gated-high-stakes",
       "team_template": "operations",
       "risk_profile": "high_stakes",
-      "outcome_ids": [
-        "governance_issue_escalated"
-      ],
-      "actuator_requirements": [
-        "approval-actuator",
-        "system-actuator"
-      ],
-      "readiness_required": [
-        "kyberion-runtime-baseline"
-      ],
-      "evidence_required": [
-        "execution-receipt"
-      ]
+      "outcome_ids": ["governance_issue_escalated"],
+      "actuator_requirements": ["approval-actuator", "system-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"]
     }
   ]
 }

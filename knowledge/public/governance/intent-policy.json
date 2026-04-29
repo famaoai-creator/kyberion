@@ -38,6 +38,65 @@
         ]
       },
       {
+        "id": "lifestyle-booking-preflight",
+        "mode": "managed_program",
+        "shapes": ["task_session"],
+        "text_patterns": [
+          { "type": "contains", "value": "予約" },
+          { "type": "contains", "value": "手配" },
+          { "type": "contains", "value": "ホテル" },
+          { "type": "contains", "value": "レストラン" },
+          { "type": "contains", "value": "美容院" },
+          { "type": "contains", "value": "病院" },
+          { "type": "contains", "value": "サブスク" },
+          { "type": "contains", "value": "解約" },
+          { "type": "contains", "value": "配送" },
+          { "type": "contains", "value": "送迎" },
+          { "type": "contains", "value": "習い事" },
+          { "type": "contains", "value": "子ども" },
+          { "type": "contains", "value": "子供" },
+          { "type": "contains", "value": "家族" },
+          { "type": "contains", "value": "ギフト" },
+          { "type": "contains", "value": "購入" },
+          { "type": "contains", "value": "買って" },
+          { "type": "contains", "value": "探して" }
+        ]
+      },
+      {
+        "id": "meeting-operations-preflight",
+        "mode": "managed_program",
+        "shapes": ["task_session"],
+        "text_patterns": [
+          { "type": "contains", "value": "会議" },
+          { "type": "contains", "value": "ミーティング" },
+          { "type": "contains", "value": "打ち合わせ" },
+          { "type": "contains", "value": "Teams" },
+          { "type": "contains", "value": "Zoom" },
+          { "type": "contains", "value": "Meet" },
+          { "type": "contains", "value": "ファシリテート" },
+          { "type": "contains", "value": "進行して" },
+          { "type": "contains", "value": "議事録" },
+          { "type": "contains", "value": "アクションアイテム" },
+          { "type": "contains", "value": "代理参加" }
+        ]
+      },
+      {
+        "id": "schedule-coordination-preflight",
+        "mode": "managed_program",
+        "shapes": ["task_session"],
+        "text_patterns": [
+          { "type": "contains", "value": "スケジュール" },
+          { "type": "contains", "value": "予定" },
+          { "type": "contains", "value": "日程" },
+          { "type": "contains", "value": "調整" },
+          { "type": "contains", "value": "変更" },
+          { "type": "contains", "value": "リスケ" },
+          { "type": "contains", "value": "カレンダー" },
+          { "type": "contains", "value": "calendar" },
+          { "type": "contains", "value": "reschedule" }
+        ]
+      },
+      {
         "id": "default-one-shot",
         "mode": "one_shot"
       }

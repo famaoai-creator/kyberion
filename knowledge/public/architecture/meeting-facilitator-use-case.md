@@ -15,6 +15,8 @@ the rest until completion. This document describes the user-visible
 flow, the actuators / pipelines that compose it, and the operational
 guardrails.
 
+Surface requests for this workflow map to the `meeting-operations` intent.
+
 ## 1. Operator experience
 
 ```
@@ -39,6 +41,11 @@ The orchestrator drives three logical stages:
 3. **Track others** — for each `team_member` item, the agent generates
    a per-recipient reminder message, records it on the action item,
    and emits a `meeting.<verb>` audit event.
+
+Before stage 1 starts, Kyberion now compiles a meeting brief from the
+requested purpose and the stored `meeting-operations-profile`. That
+brief decides the initial role hint, the authority boundary, and the
+first clarification questions when the meeting request is underspecified.
 
 After every run, a summary is printed:
 
@@ -82,20 +89,20 @@ After every run, a summary is printed:
 
 ### New components introduced
 
-| Component | Purpose |
-|---|---|
-| `schemas/action-item.schema.json` | Canonical action-item shape (used by validators and AJV-based contract checks) |
-| `libs/core/action-item-store.ts` | Append-only JSONL store (`action-items.jsonl`) under the mission's evidence directory; provides `recordActionItem`, `updateActionItemStatus`, `appendReminder`, `listActionItems`, `listOperatorSelfPending`, `listOthersPending` |
-| `wisdom:extract_action_items` | LLM-driven transcript → structured items + persistence |
-| `wisdom:generate_facilitation_script` | Short utterances for opening / transition / wrap-up |
-| `wisdom:generate_reminder_message` | Per-item reminder draft (channel + text) |
-| `wisdom:execute_self_action_items` | Iterate `operator_self` pending items; dispatch via `delegateTask`; transition to completed / blocked |
-| `wisdom:track_pending_action_items` | Iterate `team_member` pending items; emit reminders; record into the store |
-| `meeting-actuator` (existing, hardened) | `join / leave / speak / listen / chat / status` with **voice consent gate** on `speak` and `meeting.<verb>` audit emission |
-| `pipelines/meeting-facilitation-workflow.json` | Stage 1 wiring |
-| `pipelines/action-item-execute-self.json` | Stage 2 wiring |
-| `pipelines/action-item-tracking.json` | Stage 3 wiring (cron-able) |
-| `scripts/meeting_orchestrator.ts` | Stage runner + summary |
+| Component                                      | Purpose                                                                                                                                                                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemas/action-item.schema.json`              | Canonical action-item shape (used by validators and AJV-based contract checks)                                                                                                                                                    |
+| `libs/core/action-item-store.ts`               | Append-only JSONL store (`action-items.jsonl`) under the mission's evidence directory; provides `recordActionItem`, `updateActionItemStatus`, `appendReminder`, `listActionItems`, `listOperatorSelfPending`, `listOthersPending` |
+| `wisdom:extract_action_items`                  | LLM-driven transcript → structured items + persistence                                                                                                                                                                            |
+| `wisdom:generate_facilitation_script`          | Short utterances for opening / transition / wrap-up                                                                                                                                                                               |
+| `wisdom:generate_reminder_message`             | Per-item reminder draft (channel + text)                                                                                                                                                                                          |
+| `wisdom:execute_self_action_items`             | Iterate `operator_self` pending items; dispatch via `delegateTask`; transition to completed / blocked                                                                                                                             |
+| `wisdom:track_pending_action_items`            | Iterate `team_member` pending items; emit reminders; record into the store                                                                                                                                                        |
+| `meeting-actuator` (existing, hardened)        | `join / leave / speak / listen / chat / status` with **voice consent gate** on `speak` and `meeting.<verb>` audit emission                                                                                                        |
+| `pipelines/meeting-facilitation-workflow.json` | Stage 1 wiring                                                                                                                                                                                                                    |
+| `pipelines/action-item-execute-self.json`      | Stage 2 wiring                                                                                                                                                                                                                    |
+| `pipelines/action-item-tracking.json`          | Stage 3 wiring (cron-able)                                                                                                                                                                                                        |
+| `scripts/meeting_orchestrator.ts`              | Stage runner + summary                                                                                                                                                                                                            |
 
 ## 3. Guardrails
 
@@ -124,13 +131,13 @@ The use case implies authority that the operator must explicitly delegate:
 
 ## 4. Failure modes
 
-| Failure | Detection | Response |
-|---|---|---|
-| Voice consent missing on `speak` | Returns `status: denied`; emits `meeting.speak_denied` | Operator records consent; rerun |
-| Bridge cannot join the meeting | Returns `status: error`; emits `meeting.join_failed` | Investigate bridge / platform; rerun with `--skip-facilitate` after manual join |
-| LLM extracts zero action items | `action_item_count = 0` in pipeline ctx; orchestrator summary shows total=0 | Re-run with longer `listen_duration_sec`; verify the transcript file is non-empty |
-| `delegateTask` fails on a self item | Item transitions to `blocked` with the error in `result_summary` | Operator unblocks manually or re-runs `pipelines/action-item-execute-self.json` |
-| Reminder dispatch sends duplicates | `appendReminder` is idempotent on `(sent_at, channel)` | No remediation needed |
+| Failure                             | Detection                                                                   | Response                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Voice consent missing on `speak`    | Returns `status: denied`; emits `meeting.speak_denied`                      | Operator records consent; rerun                                                   |
+| Bridge cannot join the meeting      | Returns `status: error`; emits `meeting.join_failed`                        | Investigate bridge / platform; rerun with `--skip-facilitate` after manual join   |
+| LLM extracts zero action items      | `action_item_count = 0` in pipeline ctx; orchestrator summary shows total=0 | Re-run with longer `listen_duration_sec`; verify the transcript file is non-empty |
+| `delegateTask` fails on a self item | Item transitions to `blocked` with the error in `result_summary`            | Operator unblocks manually or re-runs `pipelines/action-item-execute-self.json`   |
+| Reminder dispatch sends duplicates  | `appendReminder` is idempotent on `(sent_at, channel)`                      | No remediation needed                                                             |
 
 ## 5. Cron / scheduling
 
@@ -143,7 +150,7 @@ Stage 3 (tracking) is the obvious cron candidate:
     --context '{"mission_id":"MSN-MTG-2026-Q2-WEEKLY","tone":"friendly","language":"ja"}'
 ```
 
-Stage 1 is operator-triggered (a meeting is happening *now*). Stage 2
+Stage 1 is operator-triggered (a meeting is happening _now_). Stage 2
 runs immediately after Stage 1 inside `meeting_orchestrator.ts` so the
 operator's slice is dispatched while the context is fresh.
 

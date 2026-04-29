@@ -21,6 +21,7 @@ The corporate memory loop defines how completed work becomes reusable organizati
 ```text
 Execute
 -> Capture
+-> Assess
 -> Distill
 -> Promote
 -> Reuse
@@ -64,7 +65,21 @@ The system should extract reusable understanding such as:
 
 Distillation should prefer structured records over raw log accumulation.
 
-### 3.4 Promote
+### 3.4 Assess
+
+Not every completed execution should become a candidate.
+
+Before distillation, Kyberion should run a deterministic assessment that checks whether the output is actually reusable.
+
+Examples:
+
+- browser workflows need a trace, an interactive apply step, and a concrete target
+- task sessions need a governed artifact and a reusable structure
+- generic completions should remain as execution records only
+
+Assessment is a gate, not a memory object.
+
+### 3.5 Promote
 
 Useful learning should be promoted into governed memory forms such as:
 
@@ -77,7 +92,7 @@ Useful learning should be promoted into governed memory forms such as:
 
 High-impact changes may require explicit human ratification.
 
-### 3.5 Reuse
+### 3.6 Reuse
 
 Future resolution and planning should draw on:
 
@@ -139,7 +154,18 @@ They must be distilled into reusable forms.
 Reusable knowledge should be linked back to evidence.
 Memory without accountability becomes folklore.
 
-### 6.3 Reuse should improve resolution
+### 6.3 Candidate before promotion
+
+The system should distinguish:
+
+- execution record
+- distill candidate
+- promoted memory
+
+Those are separate stages.
+Promotion should not happen directly from a raw completion unless the governing policy explicitly allows it.
+
+### 6.4 Reuse should improve resolution
 
 The main value of memory is not archival.
 It is better future work:

@@ -25,9 +25,13 @@
 
 import * as path from 'node:path';
 import {
+  buildMeetingOperationsBrief,
+  getMeetingBriefQuestions,
   logger,
   pathResolver,
   safeReadFile,
+  safeWriteFile,
+  safeMkdir,
   safeExec,
   listOperatorSelfPending,
   listOthersPending,
@@ -41,6 +45,9 @@ interface OrchestratorOptions {
   platform: 'zoom' | 'teams' | 'meet' | 'auto';
   persona: string;
   profileId: string;
+  operationsProfilePath: string;
+  meetingTitle: string;
+  purpose: string;
   agentId: string;
   agenda: string[];
   attendees: Array<{ name: string; person_slug?: string; channel_handle?: string }>;
@@ -63,7 +70,7 @@ function runPipeline(name: string, context: Record<string, unknown>): void {
       '--context',
       ctx,
     ],
-    { cwd: pathResolver.rootDir() },
+    { cwd: pathResolver.rootDir() }
   );
   if (out.trim()) logger.info(out.trim());
 }
@@ -78,9 +85,30 @@ function summarize(missionId: string): void {
   logger.info(`   operator_self pending: ${selfPending.length}`);
   logger.info(`   team_member pending: ${othersPending.length}`);
   for (const item of all) {
-    const tag = item.assignee.kind === 'operator_self' ? '🟢' : item.assignee.kind === 'team_member' ? '🟡' : '⚪️';
-    logger.info(`   ${tag} [${item.status}] ${item.item_id}: ${item.title} (assignee=${item.assignee.label})`);
+    const tag =
+      item.assignee.kind === 'operator_self'
+        ? '🟢'
+        : item.assignee.kind === 'team_member'
+          ? '🟡'
+          : '⚪️';
+    logger.info(
+      `   ${tag} [${item.status}] ${item.item_id}: ${item.title} (assignee=${item.assignee.label})`
+    );
   }
+}
+
+function loadOperationsProfile(profilePath: string): any {
+  return JSON.parse(
+    safeReadFile(pathResolver.rootResolve(profilePath), { encoding: 'utf8' }) as string
+  );
+}
+
+function writeMeetingBrief(missionId: string, brief: unknown): string {
+  const dir = pathResolver.rootResolve('active/shared/runtime/meeting/briefs');
+  safeMkdir(dir, { recursive: true });
+  const outputPath = path.join(dir, `${missionId}.json`);
+  safeWriteFile(outputPath, JSON.stringify(brief, null, 2));
+  return outputPath;
 }
 
 async function main(): Promise<void> {
@@ -90,6 +118,15 @@ async function main(): Promise<void> {
     .option('platform', { type: 'string', default: 'auto' })
     .option('persona', { type: 'string', default: 'Operator' })
     .option('profile-id', { type: 'string', default: 'operator-default-v1' })
+    .option('operations-profile', {
+      type: 'string',
+      default: 'knowledge/public/schemas/meeting-operations-profile.example.json',
+    })
+    .option('meeting-title', { type: 'string', default: 'Live meeting' })
+    .option('purpose', {
+      type: 'string',
+      default: 'default',
+    })
     .option('agent-id', { type: 'string', default: 'meeting-proxy' })
     .option('agenda', { type: 'string', default: '' })
     .option('attendees', { type: 'string', default: '' })
@@ -108,11 +145,17 @@ async function main(): Promise<void> {
   if (argv.attendees) {
     try {
       const a = (argv.attendees as string).startsWith('@')
-        ? JSON.parse(safeReadFile((argv.attendees as string).slice(1), { encoding: 'utf8' }) as string)
+        ? JSON.parse(
+            safeReadFile(pathResolver.rootResolve((argv.attendees as string).slice(1)), {
+              encoding: 'utf8',
+            }) as string
+          )
         : JSON.parse(argv.attendees as string);
       attendees = Array.isArray(a) ? a : [];
     } catch (err: any) {
-      logger.warn(`[orchestrator] failed to parse --attendees: ${err?.message ?? err}; proceeding with []`);
+      logger.warn(
+        `[orchestrator] failed to parse --attendees: ${err?.message ?? err}; proceeding with []`
+      );
     }
   }
 
@@ -122,6 +165,9 @@ async function main(): Promise<void> {
     platform: ((argv.platform as any) ?? 'auto') as OrchestratorOptions['platform'],
     persona: String(argv.persona),
     profileId: String(argv['profile-id']),
+    operationsProfilePath: String(argv['operations-profile']),
+    meetingTitle: String(argv['meeting-title']),
+    purpose: String(argv.purpose),
     agentId: String(argv['agent-id']),
     agenda,
     attendees,
@@ -134,22 +180,74 @@ async function main(): Promise<void> {
 
   process.env.MISSION_ID = options.mission;
 
-  logger.info(`🎙️ meeting_orchestrator start (mission=${options.mission}, platform=${options.platform})`);
+  logger.info(
+    `🎙️ meeting_orchestrator start (mission=${options.mission}, platform=${options.platform})`
+  );
+
+  const operationsProfile = loadOperationsProfile(options.operationsProfilePath);
+  const meetingBrief = buildMeetingOperationsBrief(
+    {
+      meeting_title: options.meetingTitle,
+      meeting_url: options.meetingUrl || '',
+      platform: options.platform,
+      purpose: options.purpose,
+      agenda: options.agenda.length ? options.agenda : ['Status', 'Action items'],
+      participants: options.attendees,
+      desired_outcomes: [
+        'Clarify the meeting goal',
+        'Capture action items with owners and deadlines',
+      ],
+      own_tasks: ['Facilitate the meeting', 'Track follow-ups'],
+      tracking_expectations: ['Track team_member items until closed'],
+      notes: `persona=${options.persona}`,
+    },
+    operationsProfile
+  );
+  const briefQuestions = getMeetingBriefQuestions(operationsProfile, options.purpose);
+  const briefPath = writeMeetingBrief(options.mission, meetingBrief);
+
+  logger.info(`🧭 Meeting brief loaded from ${options.operationsProfilePath}`);
+  logger.info(`   purpose: ${meetingBrief.purpose}`);
+  logger.info(`   primary_role: ${meetingBrief.primary_role}`);
+  logger.info(`   follow_up_channel: ${meetingBrief.follow_up_channel}`);
+  logger.info(`   brief_path: ${briefPath}`);
+  if (briefQuestions.length > 0) {
+    logger.info(`   preflight questions:`);
+    for (const q of briefQuestions.slice(0, 3)) {
+      logger.info(`   - ${q}`);
+    }
+  }
 
   if (!options.skipFacilitate) {
-    runPipeline('meeting-facilitation-workflow', {
-      mission_id: options.mission,
-      persona_name: options.persona,
-      profile_id: options.profileId,
-      agent_id: options.agentId,
-      meeting_url: options.meetingUrl ?? '',
-      platform: options.platform,
-      agenda: options.agenda.length ? options.agenda : ['Status check', 'Action items'],
-      attendees: options.attendees,
-      listen_duration_sec: options.listenSec,
-      language: options.language,
-      operator_label: options.persona,
-    });
+    if (!options.meetingUrl) {
+      logger.warn(
+        '⏭ skipping facilitation stage because --meeting-url was not provided; provide a Teams/Zoom/Meet URL to join live.'
+      );
+    } else {
+      const meetingBriefSummary = [
+        `${meetingBrief.purpose} / ${meetingBrief.primary_role}`,
+        ...meetingBrief.desired_outcomes.slice(0, 3),
+      ].join(' | ');
+      runPipeline('meeting-facilitation-workflow', {
+        mission_id: options.mission,
+        persona_name: options.persona,
+        profile_id: options.profileId,
+        agent_id: options.agentId,
+        meeting_url: options.meetingUrl ?? '',
+        platform: options.platform,
+        agenda: options.agenda.length ? options.agenda : ['Status check', 'Action items'],
+        attendees: options.attendees,
+        listen_duration_sec: options.listenSec,
+        language: options.language,
+        operator_label: options.persona,
+        meeting_brief: meetingBrief,
+        meeting_brief_summary: meetingBriefSummary,
+        meeting_brief_purpose: meetingBrief.purpose,
+        meeting_brief_primary_role: meetingBrief.primary_role,
+        meeting_brief_follow_up_channel: meetingBrief.follow_up_channel,
+        meeting_brief_path: briefPath,
+      });
+    }
   } else {
     logger.info('⏭ skipping facilitation stage (--skip-facilitate).');
   }

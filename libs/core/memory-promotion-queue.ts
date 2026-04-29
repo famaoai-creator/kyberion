@@ -2,10 +2,22 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
+import { assessMissionMemoryCandidate } from './mission-assessment.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
-export type MemoryCandidateKind = 'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
+export type MemoryCandidateKind =
+  | 'sop'
+  | 'template'
+  | 'heuristic'
+  | 'risk_rule'
+  | 'clarification_prompt';
 export type MemoryCandidateTier = 'public' | 'confidential' | 'personal';
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
 
@@ -54,11 +66,11 @@ function parseJsonl(raw: string): MemoryCandidate[] {
 function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
   if (candidate.sensitivity_tier !== 'public') return;
   const hasRestrictedRef = candidate.evidence_refs.some((ref) =>
-    /(^|\/)(knowledge\/)?(confidential|personal)(\/|$)/iu.test(ref),
+    /(^|\/)(knowledge\/)?(confidential|personal)(\/|$)/iu.test(ref)
   );
   if (hasRestrictedRef) {
     throw new Error(
-      'Public-tier memory promotion cannot include confidential/personal evidence references.',
+      'Public-tier memory promotion cannot include confidential/personal evidence references.'
     );
   }
 }
@@ -66,14 +78,6 @@ function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
 function ensureQueueDir(): void {
   const dir = pathResolver.shared('runtime/memory');
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-}
-
-function inferMissionMemoryKind(missionType?: string): MemoryCandidateKind {
-  const normalized = String(missionType || '').toLowerCase();
-  if (normalized.includes('incident') || normalized.includes('risk')) return 'risk_rule';
-  if (normalized.includes('report') || normalized.includes('template')) return 'template';
-  if (normalized.includes('research') || normalized.includes('analysis')) return 'clarification_prompt';
-  return 'sop';
 }
 
 export function createMemoryPromotionCandidate(input: {
@@ -89,25 +93,33 @@ export function createMemoryPromotionCandidate(input: {
   queuedAt?: string;
 }): MemoryCandidate {
   return {
-    candidate_id: input.candidateId || `MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    candidate_id:
+      input.candidateId ||
+      `MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     source_type: input.sourceType,
     source_ref: String(input.sourceRef || '').trim(),
     proposed_memory_kind: input.proposedMemoryKind,
     summary: String(input.summary || '').trim(),
     evidence_refs: normalizeEvidenceRefs(input.evidenceRefs),
     sensitivity_tier: input.sensitivityTier,
-    ratification_required: typeof input.ratificationRequired === 'boolean'
-      ? input.ratificationRequired
-      : input.sensitivityTier !== 'personal',
+    ratification_required:
+      typeof input.ratificationRequired === 'boolean'
+        ? input.ratificationRequired
+        : input.sensitivityTier !== 'personal',
     status: input.status || 'queued',
     queued_at: input.queuedAt || new Date().toISOString(),
   };
 }
 
-export function validateMemoryPromotionCandidate(value: unknown): { valid: boolean; errors: string[] } {
+export function validateMemoryPromotionCandidate(value: unknown): {
+  valid: boolean;
+  errors: string[];
+} {
   const validate = ensureValidator();
   const valid = validate(value);
-  const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+  const errors = (validate.errors || []).map(
+    (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  );
   return { valid: Boolean(valid), errors };
 }
 
@@ -151,7 +163,9 @@ export function updateMemoryPromotionCandidateStatus(input: {
   const next: MemoryCandidate = {
     ...current,
     status: input.status,
-    ...(input.status === 'approved' || input.status === 'promoted' ? { ratified_at: new Date().toISOString() } : {}),
+    ...(input.status === 'approved' || input.status === 'promoted'
+      ? { ratified_at: new Date().toISOString() }
+      : {}),
     ...(input.ratificationNote ? { ratification_note: input.ratificationNote.trim() } : {}),
     ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
   };
@@ -172,10 +186,20 @@ export function queueMissionMemoryPromotionCandidate(input: {
   summary: string;
   evidenceRefs: string[];
 }): MemoryCandidate {
+  const assessment = assessMissionMemoryCandidate({
+    missionId: input.missionId,
+    missionType: input.missionType,
+    summary: input.summary,
+    evidenceCount: Array.isArray(input.evidenceRefs) ? input.evidenceRefs.length : 0,
+    tier: input.tier,
+  });
+  if (!assessment.eligible) {
+    throw new Error(`Mission memory candidate not eligible: ${assessment.reason}`);
+  }
   const candidate = createMemoryPromotionCandidate({
     sourceType: 'mission',
     sourceRef: `mission:${input.missionId}`,
-    proposedMemoryKind: inferMissionMemoryKind(input.missionType),
+    proposedMemoryKind: assessment.proposedKind,
     summary: input.summary,
     evidenceRefs: input.evidenceRefs,
     sensitivityTier: input.tier,

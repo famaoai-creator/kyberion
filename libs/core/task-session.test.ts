@@ -151,26 +151,128 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('ちょっと写真をとって')?.taskType).toBe('capture_photo');
     expect(classifyTaskSessionIntent('Webサービスを作って')?.intentId).toBe('bootstrap-project');
     expect(classifyTaskSessionIntent('Webサービスを作って')?.taskType).toBe('analysis');
-    expect(classifyTaskSessionIntent('プロジェクトのWBSをエクセルで作成して')?.taskType).toBe('workbook_wbs');
-    expect(classifyTaskSessionIntent('パワーポイントの資料を書いて')?.taskType).toBe('presentation_deck');
-    expect(classifyTaskSessionIntent('今週の進捗レポートを docx で作って')?.taskType).toBe('report_document');
+    expect(classifyTaskSessionIntent('プロジェクトのWBSをエクセルで作成して')?.taskType).toBe(
+      'workbook_wbs'
+    );
+    expect(classifyTaskSessionIntent('パワーポイントの資料を書いて')?.taskType).toBe(
+      'presentation_deck'
+    );
+    expect(classifyTaskSessionIntent('パワーポイントの資料を書いて')?.executionBrief?.kind).toBe(
+      'actuator-execution-brief'
+    );
+    expect(classifyTaskSessionIntent('今週の進捗レポートを docx で作って')?.taskType).toBe(
+      'report_document'
+    );
     expect(classifyTaskSessionIntent('voice-hub を再起動して')?.taskType).toBe('service_operation');
-    expect(classifyTaskSessionIntent('presence-studio の状態を見て')?.payload?.service_name).toBe('presence-studio');
-    expect(classifyTaskSessionIntent('voice-hub のログを見て')?.payload?.service_name).toBe('voice-hub');
-    expect(classifyTaskSessionIntent('voice-hub を再起動して')?.requirements?.missing).toContain('approval_confirmation');
-    expect(classifyTaskSessionIntent('voice-hub のログを見て')?.requirements?.missing || []).not.toContain('approval_confirmation');
-    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.intentId).toBe('cross-project-remediation');
-    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.taskType).toBe('analysis');
-    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.requirements?.missing || []).toEqual([]);
-    expect(classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')?.payload?.analysis_contract_id).toBe('analysis.cross-project-remediation.v1');
-    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.intentId).toBe('incident-informed-review');
-    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.taskType).toBe('analysis');
-    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.requirements?.missing || []).toEqual([]);
-    expect(classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.payload?.analysis_contract_id).toBe('analysis.incident-informed-review.v1');
-    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.intentId).toBe('evolve-agent-harness');
-    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.taskType).toBe('analysis');
-    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.requirements?.missing || []).toEqual([]);
-    expect(classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.payload?.analysis_contract_id).toBe('analysis.evolve-agent-harness.v1');
+    expect(classifyTaskSessionIntent('presence-studio の状態を見て')?.payload?.service_name).toBe(
+      'presence-studio'
+    );
+    expect(classifyTaskSessionIntent('voice-hub のログを見て')?.payload?.service_name).toBe(
+      'voice-hub'
+    );
+    expect(classifyTaskSessionIntent('voice-hub を再起動して')?.requirements?.missing).toContain(
+      'approval_confirmation'
+    );
+    expect(
+      classifyTaskSessionIntent('voice-hub のログを見て')?.requirements?.missing || []
+    ).not.toContain('approval_confirmation');
+    expect(
+      classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')
+        ?.intentId
+    ).toBe('cross-project-remediation');
+    expect(
+      classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')
+        ?.taskType
+    ).toBe('analysis');
+    expect(
+      classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')
+        ?.requirements?.missing || []
+    ).toEqual([]);
+    expect(
+      classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')
+        ?.payload?.analysis_contract_id
+    ).toBe('analysis.cross-project-remediation.v1');
+    expect(
+      classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.intentId
+    ).toBe('incident-informed-review');
+    expect(
+      classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.taskType
+    ).toBe('analysis');
+    expect(
+      classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.requirements
+        ?.missing || []
+    ).toEqual([]);
+    expect(
+      classifyTaskSessionIntent('過去のインシデント結果を踏まえてレビューを実施して')?.payload
+        ?.analysis_contract_id
+    ).toBe('analysis.incident-informed-review.v1');
+    expect(
+      classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.intentId
+    ).toBe('evolve-agent-harness');
+    expect(
+      classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.taskType
+    ).toBe('analysis');
+    expect(
+      classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')
+        ?.requirements?.missing || []
+    ).toEqual([]);
+    expect(
+      classifyTaskSessionIntent('このエージェントのハーネスを benchmark ベースで改善して')?.payload
+        ?.analysis_contract_id
+    ).toBe('analysis.evolve-agent-harness.v1');
+    expect(classifyTaskSessionIntent('6/6-6/8で沖縄のホテルを探して')?.intentId).toBe(
+      'lifestyle-booking'
+    );
+    expect(classifyTaskSessionIntent('6/6-6/8で沖縄のホテルを探して')?.taskType).toBe('analysis');
+    expect(
+      classifyTaskSessionIntent('6/6-6/8で沖縄のホテルを探して')?.payload?.booking_category
+    ).toBe('hotel');
+    expect(
+      classifyTaskSessionIntent('6/6-6/8で沖縄のホテルを探して')?.requirements?.missing || []
+    ).toContain('booking_path_preference');
+    expect(classifyTaskSessionIntent('6/6-6/8で沖縄のホテルを探して')?.executionBrief?.kind).toBe(
+      'actuator-execution-brief'
+    );
+    expect(
+      classifyTaskSessionIntent('今夜のレストランを予約したい')?.payload?.booking_category
+    ).toBe('restaurant');
+    expect(classifyTaskSessionIntent('日用品をまとめて買って')?.payload?.booking_category).toBe(
+      'shopping'
+    );
+    expect(classifyTaskSessionIntent('歯医者の予約を取りたい')?.payload?.booking_category).toBe(
+      'medical'
+    );
+    expect(classifyTaskSessionIntent('家事代行を手配して')?.payload?.booking_category).toBe(
+      'home_service'
+    );
+    expect(classifyTaskSessionIntent('子どもの習い事の送迎を調整したい')?.intentId).toBe(
+      'lifestyle-booking'
+    );
+    expect(
+      classifyTaskSessionIntent('子どもの習い事の送迎を調整したい')?.payload?.booking_category
+    ).toBe('family');
+    expect(classifyTaskSessionIntent('誕生日のギフトを手配して')?.payload?.booking_category).toBe(
+      'gifts'
+    );
+    expect(classifyTaskSessionIntent('今夜のレストランを予約したい')?.intentId).toBe(
+      'lifestyle-booking'
+    );
+    expect(classifyTaskSessionIntent('日用品をまとめて買って')?.intentId).toBe('lifestyle-booking');
+    expect(classifyTaskSessionIntent('歯医者の予約を取りたい')?.intentId).toBe('lifestyle-booking');
+    expect(classifyTaskSessionIntent('家事代行を手配して')?.intentId).toBe('lifestyle-booking');
+    expect(classifyTaskSessionIntent('スケジュールを調整して')?.intentId).toBe(
+      'schedule-coordination'
+    );
+    expect(classifyTaskSessionIntent('スケジュールを調整して')?.taskType).toBe('service_operation');
+    expect(
+      classifyTaskSessionIntent('スケジュールを調整して')?.requirements?.missing || []
+    ).toEqual(['schedule_scope', 'date_range', 'fixed_constraints', 'calendar_action_boundary']);
+    expect(classifyTaskSessionIntent('会議の日程を調整して')?.intentId).toBe(
+      'schedule-coordination'
+    );
+    expect(classifyTaskSessionIntent('会議の日程を調整して')?.payload?.handoff_intent_id).toBe(
+      'meeting-operations'
+    );
   });
 
   it('derives task-session payload and requirements from governed policy', () => {
@@ -179,7 +281,24 @@ describe('task-session', () => {
     expect(deck?.payload?.deck_purpose).toBe('proposal');
     expect(deck?.payload?.slide_count_hint).toBe(3);
 
-    const remediation = classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して');
+    const marketingDeck = classifyTaskSessionIntent('営業資料をパワポで作って');
+    expect(marketingDeck?.intentId).toBe('generate-presentation');
+    expect(marketingDeck?.payload?.deck_purpose).toBe('marketing');
+    expect(marketingDeck?.payload?.theme_hint).toBe('marketing_branded');
+
+    expect(classifyTaskSessionIntent('社内共有のスライドを作って')?.intentId).toBe(
+      'generate-presentation'
+    );
+    expect(classifyTaskSessionIntent('この要件定義を説明する資料を作って')?.intentId).toBe(
+      'generate-presentation'
+    );
+    expect(classifyTaskSessionIntent('新機能の告知用スライドを作って')?.intentId).toBe(
+      'generate-presentation'
+    );
+
+    const remediation = classifyTaskSessionIntent(
+      '過去の要件定義を横断的に見て横展開されていないバグを修正して'
+    );
     expect(remediation?.payload?.source_corpus).toBe('requirements');
     expect(remediation?.payload?.action_bias).toBe('remediation');
     expect(remediation?.requirements?.missing || []).toEqual([]);
@@ -187,7 +306,10 @@ describe('task-session', () => {
 
   it('emits task sessions that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/public/schemas/task-session.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const session = createTaskSession({
       sessionId: 'TSK-TEST-SCHEMA',
@@ -207,12 +329,21 @@ describe('task-session', () => {
 
   it('accepts the canonical task-session-capture-photo example', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session-capture-photo.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/public/schemas/task-session-capture-photo.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const example = JSON.parse(
-      safeReadFile(path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session-capture-photo.example.json'), {
-        encoding: 'utf8',
-      }) as string,
+      safeReadFile(
+        path.join(
+          pathResolver.rootDir(),
+          'knowledge/public/schemas/task-session-capture-photo.example.json'
+        ),
+        {
+          encoding: 'utf8',
+        }
+      ) as string
     );
 
     expect(validate(example.payload), JSON.stringify(validate.errors || [])).toBe(true);
@@ -220,12 +351,17 @@ describe('task-session', () => {
 
   it('rejects invalid task-session-capture-photo payloads', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/task-session-capture-photo.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/public/schemas/task-session-capture-photo.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
 
-    expect(validate({
-      device_preference: 'rear-camera',
-      save_path: 'active/shared/tmp/photo.jpg',
-    })).toBe(false);
+    expect(
+      validate({
+        device_preference: 'rear-camera',
+        save_path: 'active/shared/tmp/photo.jpg',
+      })
+    ).toBe(false);
   });
 });
