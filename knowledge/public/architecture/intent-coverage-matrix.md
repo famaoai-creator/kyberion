@@ -73,6 +73,7 @@ For the canonical completion pattern of each surface intent, see:
 - onboarding toolchain and presentation preference registration
 - approval handling across Presence, Chronos, and CLI
 - evidence and memory loop persistence
+- repeated coordination work now has a shared `guided-coordination` archetype instead of separate bespoke brief flows
 
 ## What Is Weak
 
@@ -106,7 +107,7 @@ But freeform image generation is still not a first-class governed capability.
 
 ### Service Binding Resolution
 
-Service bindings are persisted and visible, but natural-language execution is still only partially binding-aware.
+Service bindings are now carried through the shared coordination brief, execution brief, and task-session context. The remaining binding-awareness gap is now mostly in browser_session and direct_reply handler payloads, not the dispatch decision itself.
 
 ### Benchmark Loop Normalization
 
@@ -123,7 +124,7 @@ What is still missing:
 1. Make the standard intent catalog the single runtime source of truth.
 2. Normalize the outcome catalog so runtime never references undeclared outcomes.
 3. Replace hand-maintained super-nerve action classification with a shared op registry.
-4. Push service-binding-aware execution into resolver/runtime, not just storage and UI.
+4. Carry service-binding-aware execution fully into browser_session and direct_reply handler payloads.
 5. Split visual generation clearly into:
    - governed diagram/document visual
    - generative image visual

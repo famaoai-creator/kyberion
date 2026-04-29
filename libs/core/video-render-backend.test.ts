@@ -1,8 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { pathResolver, platform as corePlatform } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
   safeExistsSync: vi.fn(() => true),
+  safeMoveSync: vi.fn(),
+  safeRmSync: vi.fn(),
 }));
 
 vi.mock('./secure-io.js', async () => {
@@ -11,12 +14,15 @@ vi.mock('./secure-io.js', async () => {
     ...actual,
     safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
+    safeMoveSync: mocks.safeMoveSync,
+    safeRmSync: mocks.safeRmSync,
   };
 });
 
 describe('video render backend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(corePlatform, 'runMediaCommand').mockResolvedValue('');
   });
 
   it('returns non-executed when backend rendering is disabled', async () => {
@@ -66,6 +72,7 @@ describe('video render backend', () => {
         height: 1080,
         background_color: '#000000',
         output_format: 'mp4',
+        narration_ref: '/tmp/demo/narration.aiff',
         output_target_path: 'active/shared/tmp/video-composition/demo/output.mp4',
         bundle_dir: '/tmp/demo',
         index_html: '/tmp/demo/index.html',
@@ -87,5 +94,15 @@ describe('video render backend', () => {
       expect.arrayContaining(['hyperframes', 'render', '/tmp/demo', '--format', 'mp4']),
       expect.objectContaining({ timeoutMs: 300000 }),
     );
+    expect(corePlatform.runMediaCommand).toHaveBeenCalledWith(
+      'ffmpeg',
+      expect.arrayContaining([
+        '-i',
+        pathResolver.resolve('active/shared/tmp/video-composition/demo/output.mp4'),
+        '-i',
+        '/tmp/demo/narration.aiff',
+      ]),
+    );
+    expect(mocks.safeMoveSync).toHaveBeenCalled();
   });
 });

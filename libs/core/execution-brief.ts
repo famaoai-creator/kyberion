@@ -1,6 +1,8 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
+import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -78,6 +80,10 @@ function isProjectBootstrapRequest(text: string): boolean {
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 function sanitizeQuestion(value: unknown, fallbackId: string): ExecutionBriefQuestion {
@@ -237,6 +243,12 @@ function inferNormalizedScope(seed: ExecutionBriefSeed): string[] {
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
     .filter(Boolean);
   return scope.length > 0 ? scope : ['general'];
+}
+
+function inferServiceBindingRefs(seed: ExecutionBriefSeed): string[] {
+  return Array.isArray(seed.serviceBindings)
+    ? Array.from(new Set(seed.serviceBindings.map((value) => value.trim()).filter(Boolean)))
+    : [];
 }
 
 function inferAssumptions(seed: ExecutionBriefSeed, missingInputs: string[]): string[] {
@@ -432,20 +444,44 @@ export function validateExecutionBrief(value: unknown): {
   };
 }
 
-export function buildFallbackExecutionBrief(seed: ExecutionBriefSeed): ActuatorExecutionBrief {
-  const missingInputs = inferMissingInputs(seed);
+export function buildExecutionBriefFromGuidedCoordinationBrief(
+  guidedBrief: GuidedCoordinationBrief,
+  seed: ExecutionBriefSeed
+): ActuatorExecutionBrief {
+  const requiredInputs = toStringArray(seed.requiredInputs);
+  let missingInputs = requiredInputs.length > 0 ? requiredInputs : guidedBrief.missing_inputs;
+  let targetActuators = guidedBrief.suggested_target_actuators;
+  let deliverables = guidedBrief.suggested_deliverables;
+
+  if (isMeetingScheduleCoordination(seed)) {
+    missingInputs = [
+      'schedule_scope',
+      'date_range',
+      'fixed_constraints',
+      'calendar_action_boundary',
+      'meeting_handoff_boundary',
+    ];
+  }
+
+  if (isProjectBootstrapRequest(seed.requestText)) {
+    missingInputs = ['project_brief'];
+    targetActuators = ['orchestrator-actuator', 'artifact-actuator', 'wisdom-actuator'];
+    deliverables = ['project_created'];
+  }
+
   return {
     kind: 'actuator-execution-brief',
     request_text: seed.requestText,
     archetype_id: inferArchetypeId(seed),
     confidence: clampConfidence(seed.confidence, missingInputs.length > 0 ? 0.56 : 0.72),
-    summary: inferSummary(seed),
-    user_facing_summary: inferUserFacingSummary(inferSummary(seed)),
-    normalized_scope: inferNormalizedScope(seed),
-    target_actuators: inferTargetActuators(seed),
-    deliverables: inferDeliverables(seed),
+    summary: guidedBrief.objective,
+    user_facing_summary: inferUserFacingSummary(guidedBrief.objective),
+    normalized_scope: uniqueStrings([guidedBrief.coordination_kind, ...inferNormalizedScope(seed)]),
+    target_actuators: targetActuators,
+    deliverables,
     missing_inputs: missingInputs,
-    assumptions: inferAssumptions(seed, missingInputs),
+    service_binding_refs: inferServiceBindingRefs(seed),
+    assumptions: guidedBrief.assumptions,
     clarification_questions: inferClarificationQuestions(seed, missingInputs),
     readiness: inferReadiness(missingInputs),
     readiness_reason: inferReadinessReason(seed, missingInputs),
@@ -453,8 +489,22 @@ export function buildFallbackExecutionBrief(seed: ExecutionBriefSeed): ActuatorE
     recommended_next_step:
       missingInputs.length > 0
         ? 'Collect the missing inputs before compiling the intent contract.'
-        : 'Compile the intent contract and work loop.',
+        : guidedBrief.recommended_next_step || 'Compile the intent contract and work loop.',
   };
+}
+
+export function buildFallbackExecutionBrief(seed: ExecutionBriefSeed): ActuatorExecutionBrief {
+  const guidedBrief = buildGuidedCoordinationBrief({
+    requestText: seed.requestText,
+    intentId: seed.intentId,
+    goalSummary: seed.goalSummary,
+    serviceBindings: seed.serviceBindings,
+    tier: seed.tier,
+    locale: seed.locale,
+    summaryHint: seed.summaryHint,
+  });
+
+  return buildExecutionBriefFromGuidedCoordinationBrief(guidedBrief, seed);
 }
 
 export function normalizeExecutionBrief(

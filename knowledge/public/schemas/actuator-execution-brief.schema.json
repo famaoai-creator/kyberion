@@ -39,6 +39,10 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "service_binding_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "assumptions": {
       "type": "array",
       "items": { "type": "string" }

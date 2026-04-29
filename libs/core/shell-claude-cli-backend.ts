@@ -17,7 +17,7 @@
  * and parses the `structured_output` field from the CLI's JSON result.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import type {
@@ -51,6 +51,11 @@ export interface ShellClaudeCliBackendOptions {
   timeoutMs?: number;
   /** Additional CLI args to inject (e.g. --effort high). */
   extraArgs?: string[];
+}
+
+export interface ShellClaudeCliAvailability {
+  available: boolean;
+  reason?: string;
 }
 
 export class ShellClaudeCliBackend implements ReasoningBackend {
@@ -416,9 +421,51 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   }
 }
 
+export function probeShellClaudeCliAvailability(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { bin?: string; timeoutMs?: number } = {},
+): ShellClaudeCliAvailability {
+  const bin = options.bin?.trim() || env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude';
+  const timeoutMs = options.timeoutMs ?? 5_000;
+
+  try {
+    const result = spawnSync(bin, ['-p', 'Return the word ok.', '--output-format', 'json', '--model', 'opus'], {
+      encoding: 'utf8',
+      env: { ...process.env, ...env },
+      shell: false,
+      timeout: timeoutMs,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    if (result.error) {
+      return { available: false, reason: result.error.message };
+    }
+    if (result.status !== 0) {
+      const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : '';
+      const stdout = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+      return {
+        available: false,
+        reason: stderr || stdout || `exit code ${result.status}`,
+      };
+    }
+    return { available: true };
+  } catch (err: any) {
+    return { available: false, reason: err?.message ?? String(err) };
+  }
+}
+
 export function buildShellClaudeCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
+  probe: (env: NodeJS.ProcessEnv) => ShellClaudeCliAvailability = probeShellClaudeCliAvailability,
 ): ShellClaudeCliBackend | null {
+  const availability = probe(env);
+  if (!availability.available) {
+    logger.warn(
+      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}`,
+    );
+    return null;
+  }
+
   const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim();
   const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
   const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();

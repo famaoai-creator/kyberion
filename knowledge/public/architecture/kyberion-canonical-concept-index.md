@@ -59,6 +59,8 @@ Use each document for a distinct purpose:
 | `knowledge/public/architecture/enterprise-operating-kernel.md` | enterprise authority/accountability model |
 | `knowledge/public/architecture/kyberion-concept-map.md` | layer mapping and concept placement |
 | `docs/INTENT_LOOP_CONCEPT.md` | non-replaceable intent-loop closure model |
+| `knowledge/public/orchestration/guided-coordination-protocol.md` | shared repeated-work coordination flow |
+| `knowledge/public/schemas/guided-coordination-brief.schema.json` | shared intake brief for repeated coordination |
 
 ## 6. Reading Order
 

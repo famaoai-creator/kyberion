@@ -15,7 +15,7 @@ last_updated: 2026-03-06
 - **Status**: error
 
 ## Analysis
-- **Error**: Deep Data Contract Violation: contract ENOENT: no such file or directory, open '/Users/famaoai/gemini/skills/github/mock-skill/contract.json'
+- **Error**: Deep Data Contract Violation: contract ENOENT: no such file or directory, open '/Users/famao/gemini/skills/github/mock-skill/contract.json'
 - **Cause**: Required file or directory is missing from the filesystem.
 - **Impact**: Data processing halted due to missing inputs.
 

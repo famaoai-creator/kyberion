@@ -185,12 +185,24 @@ The first-run onboarding UX should make two reusable setup steps explicit:
 Both are stored as governed knowledge so later requests can reuse the same
 setup without hard-coded branches.
 
+Repeated coordination work should now be modeled through the shared
+`guided-coordination` archetype, with meeting, presentation, booking, video,
+schedule, and onboarding playbooks acting as domain overlays rather than
+independent one-off flows.
+
 When the deployment serves more than one organization, follow
 [`multi-tenant-operations.md`](./multi-tenant-operations.md) for directory
 layout, `tenant-scope-policy.json`, per-tenant adapter routing, and the
 single-tenant → multi-tenant migration recipe.
 
 ### 4.2 Reasoning backend selection
+
+Mission distillation and other structured reasoning workflows are policy-driven through:
+
+- [`wisdom-policy.json`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy.json)
+- [`Wisdom Policy Adapter Guide`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy-guide.md)
+
+Use this policy surface to select profiles and adapters without hardcoding provider branches in mission scripts.
 
 | Setting | Env var(s) |
 |---|---|
@@ -201,8 +213,7 @@ single-tenant → multi-tenant migration recipe.
 | Anthropic SDK direct | `ANTHROPIC_API_KEY` |
 | Gemini API direct | `GEMINI_API_KEY` |
 
-Auto-selection order: `anthropic` (if key) → `gemini-api` (if key) → `claude-cli`
-(default fallback).
+Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_REASONING_BACKEND` is set. Distillation policy selection is handled separately by `wisdom-policy.json`.
 
 ### 4.3 Voice / audio (record → STT/TTS → profile)
 

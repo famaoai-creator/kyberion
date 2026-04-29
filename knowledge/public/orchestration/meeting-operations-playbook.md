@@ -2,6 +2,7 @@
 
 Use this playbook when the user asks Kyberion to participate in, facilitate, or manage a live online meeting.
 It is the canonical surface playbook for the `meeting-operations` intent.
+It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for live meeting work.
 
 ## Kyberion Fit
 
@@ -17,7 +18,7 @@ Use Kyberion when the task has at least one of these properties:
 
 ## Brief And Role Separation
 
-Keep two layers distinct:
+Keep two layers distinct inside the shared coordination flow:
 
 1. Brief layer: what the meeting is about, who is present, what outcomes matter, and what authority Kyberion has.
 2. Role layer: whether Kyberion should act as planner, facilitator, scribe, executor, decision-maker, or tracker.

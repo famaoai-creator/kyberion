@@ -14,7 +14,7 @@
         },
         {
           "type": "cli",
-          "command": "/Users/famao/k/a/kyberion-runtimes/vision/venv/bin/comfy",
+          "command": "/Users/famao/kyberion-runtimes/vision/venv/bin/comfy",
           "args": ["run", "--workflow", "active/shared/tmp/temp_vision_workflow.json", "--wait"],
           "description": "Local ComfyUI via CLI"
         }

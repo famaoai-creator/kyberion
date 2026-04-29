@@ -55,9 +55,9 @@ project の存在理由と成功条件を定義する層です。
 
 代表文書:
 
-- [`project-charter.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/project-charter.md)
-- [`business-impact-analysis.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/business-impact-analysis.md)
-- [`stakeholder-communication-register.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/stakeholder-communication-register.md)
+- [`project-charter.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/project-charter.md)
+- [`business-impact-analysis.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/business-impact-analysis.md)
+- [`stakeholder-communication-register.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/stakeholder-communication-register.md)
 
 ### 2. What
 
@@ -65,10 +65,10 @@ track ごとに、何を作るか、何を満たすべきかを定義する層�
 
 代表文書:
 
-- [`requirements-definition.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/requirements-definition.md)
-- [`requirements-traceability-matrix.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/requirements-traceability-matrix.md)
-- [`slo-sli-definition.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/slo-sli-definition.md)
-- [`information-asset-registry.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/information-asset-registry.md)
+- [`requirements-definition.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/requirements-definition.md)
+- [`requirements-traceability-matrix.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/requirements-traceability-matrix.md)
+- [`slo-sli-definition.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/slo-sli-definition.md)
+- [`information-asset-registry.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/information-asset-registry.md)
 
 ### 3. How
 
@@ -76,14 +76,14 @@ track ごとに、どう作るか、どう動かすかを定義する層です�
 
 代表文書:
 
-- [`basic-design.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/basic-design.md)
-- [`architecture-design.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/architecture-design.md)
-- [`detailed-design.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/detailed-design.md)
-- [`operational-design.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/operational-design.md)
-- [`operation-runbook.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/operation-runbook.md)
-- [`data-flow-lifecycle-map.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/data-flow-lifecycle-map.md)
-- [`environment-setup-guide.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/environment-setup-guide.md)
-- [`compliance-control-matrix.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/compliance-control-matrix.md)
+- [`basic-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/basic-design.md)
+- [`architecture-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/architecture-design.md)
+- [`detailed-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/detailed-design.md)
+- [`operational-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/operational-design.md)
+- [`operation-runbook.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/operation-runbook.md)
+- [`data-flow-lifecycle-map.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/data-flow-lifecycle-map.md)
+- [`environment-setup-guide.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/environment-setup-guide.md)
+- [`compliance-control-matrix.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/compliance-control-matrix.md)
 
 ### 4. Control
 
@@ -92,12 +92,12 @@ track ごとに、どう作るか、どう動かすかを定義する層です�
 
 代表文書:
 
-- [`project-management-plan.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/project-management-plan.md)
-- [`mission-ledger.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/mission-ledger.md)
-- [`raid-log.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/raid-log.md)
-- [`issue-log.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/issue-log.md)
-- [`change-control-ledger.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/change-control-ledger.md)
-- [`gate-review-packet.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/gate-review-packet.md)
+- [`project-management-plan.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/project-management-plan.md)
+- [`mission-ledger.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/mission-ledger.md)
+- [`raid-log.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/raid-log.md)
+- [`issue-log.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/issue-log.md)
+- [`change-control-ledger.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/change-control-ledger.md)
+- [`gate-review-packet.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/gate-review-packet.md)
 
 ### 5. Evidence
 
@@ -105,15 +105,15 @@ track ごとに、本当にできたか、出荷してよいかを証明する�
 
 代表文書:
 
-- [`test-plan.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/test-plan.md)
-- [`test-case-specification.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/test-case-specification.md)
-- [`test-validation-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/test-validation-report.md)
-- [`security-audit-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/security-audit-report.md)
-- [`release-readiness-checklist.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/release-readiness-checklist.md)
-- [`rollback-plan.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/rollback-plan.md)
-- [`deployment-verification-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/deployment-verification-report.md)
-- [`incident-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/incident-report.md)
-- [`mission-closure-report.md`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/blueprints/mission-closure-report.md)
+- [`test-plan.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-plan.md)
+- [`test-case-specification.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-case-specification.md)
+- [`test-validation-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-validation-report.md)
+- [`security-audit-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/security-audit-report.md)
+- [`release-readiness-checklist.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/release-readiness-checklist.md)
+- [`rollback-plan.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/rollback-plan.md)
+- [`deployment-verification-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/deployment-verification-report.md)
+- [`incident-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/incident-report.md)
+- [`mission-closure-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/mission-closure-report.md)
 
 ## Lifecycle View
 

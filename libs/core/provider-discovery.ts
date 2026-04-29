@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { spawnSync } from 'node:child_process';
+import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
 
 /**
  * Provider Discovery v1.0
@@ -88,11 +89,23 @@ function checkClaude(): ProviderInfo {
   const which = run('which', ['claude']);
   if (!which.ok) return { provider: 'claude', installed: false, version: null, protocol: 'print-json', models: [], healthy: false };
 
+  const probe = probeShellClaudeCliAvailability();
+  if (!probe.available) {
+    return {
+      provider: 'claude',
+      installed: true,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+  }
+
   const ver = run('claude', ['--version']);
   return {
     provider: 'claude',
     installed: true,
-    version: ver.stdout || null,
+    version: ver.ok ? (ver.stdout || null) : null,
     protocol: 'print-json',
     models: [
       'sonnet', 'opus', 'haiku',
@@ -118,7 +131,7 @@ function checkClaude(): ProviderInfo {
       'claude-sonnet-4-20250514': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
       'claude-haiku-4-5-20251001': ['conversation', 'summarization', 'low_latency', 'structured_json'],
     },
-    healthy: true,
+    healthy: ver.ok,
   };
 }
 

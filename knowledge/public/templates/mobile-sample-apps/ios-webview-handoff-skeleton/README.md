@@ -4,12 +4,12 @@
 
 ## Files
 
-- [`ExampleIOSMobileApp.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/ExampleIOSMobileApp.swift)
-- [`RootView.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/RootView.swift)
-- [`WebViewScreen.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/WebViewScreen.swift)
-- [`SessionRepository.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/SessionRepository.swift)
-- [`IOSWebViewSessionReader.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/IOSWebViewSessionReader.swift)
-- [`DebugFeatureFlags.swift`](/Users/famaoai/k/a/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/DebugFeatureFlags.swift)
+- [`ExampleIOSMobileApp.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/ExampleIOSMobileApp.swift)
+- [`RootView.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/RootView.swift)
+- [`WebViewScreen.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/WebViewScreen.swift)
+- [`SessionRepository.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/SessionRepository.swift)
+- [`IOSWebViewSessionReader.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/IOSWebViewSessionReader.swift)
+- [`DebugFeatureFlags.swift`](/Users/famao/kyberion/knowledge/public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/DebugFeatureFlags.swift)
 
 ## Trigger
 
@@ -26,4 +26,4 @@ xcrun simctl launch booted com.example.iosmobile \
 - relative path:
   `Library/Application Support/kyberion/webview-session.json`
 
-これは [`example-ios-login-passkey.json`](/Users/famaoai/k/a/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json) と揃っています。
+これは [`example-ios-login-passkey.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json) と揃っています。

@@ -103,7 +103,8 @@ It is also:
 
 Detailed responsibility split and capability-boundary guidance are defined in:
 
-- [CLI Harness Coordination Model](/Users/famaoai/k/d/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
+- [CLI Harness Coordination Model](/Users/famao/kyberion/knowledge/public/architecture/cli-harness-coordination-model.md)
+- [Wisdom Policy Adapter Guide](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy-guide.md)
 
 ## Position In The Operating Model
 
@@ -150,6 +151,8 @@ Recommended severity classes:
 - `major`
   - new model family or major harness capability shift, requires full adaptation cycle
 
+When the change is reasoning-only, record the selected profile and adapter in [`wisdom-policy.json`](/Users/famao/kyberion/knowledge/public/governance/wisdom-policy.json) first, then add code only for genuinely new adapters.
+
 ## Goals
 
 The phase should answer six questions:
@@ -179,6 +182,8 @@ Each cycle should produce governed artifacts:
   - approved, deferred, or rolled back with rationale
 - `integration_decision`
   - whether a capability should stay local, move to host-native execution, or remain dual-path
+- `reasoning_policy_profile`
+  - the selected wisdom policy profile and adapter used for reasoning tasks
 
 ## Proposed Lifecycle
 

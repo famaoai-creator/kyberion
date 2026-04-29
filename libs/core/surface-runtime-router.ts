@@ -5,6 +5,7 @@ import {
   shouldForceSlackDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
 import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
+import type { SurfaceIntentResolution } from './router-contract.js';
 export type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 
 import type { SurfaceConversationInput, SlackExecutionMode, ParsedSlackSurfacePrompt, SlackSurfaceMetadata } from './channel-surface-types.js';
@@ -13,6 +14,7 @@ import type { UserIntentFlow } from './intent-contract.js';
 export interface SurfaceRuntimeRouteContext {
   input: SurfaceConversationInput;
   compiledFlow: UserIntentFlow | null;
+  resolvedIntent?: SurfaceIntentResolution;
   computedReceiver?: SurfaceDelegationReceiver;
   structuredQuery: string;
   parsedSlackPrompt: ParsedSlackSurfacePrompt | null;

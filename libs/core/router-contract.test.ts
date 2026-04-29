@@ -8,8 +8,10 @@ describe('router-contract', () => {
     const knowledge = resolveSurfaceIntent('ナレッジで planner を調べて');
     const live = resolveSurfaceIntent('今日の天気を教えて');
     expect(['knowledge-query', 'query-knowledge']).toContain(knowledge.intentId);
+    expect(knowledge.routeFamily).toBe('direct_reply');
     expect(knowledge.queryType).toBe('knowledge_search');
     expect(live.intentId).toBe('live-query');
+    expect(live.routeFamily).toBe('direct_reply');
     expect(live.queryType).toBe('weather');
     expect(classifySurfaceQueryIntent('今日の天気を教えて')).toBe('weather');
   });
@@ -18,8 +20,10 @@ describe('router-contract', () => {
     const openSite = resolveSurfaceIntent('日経新聞を開いて');
     const browserStep = resolveSurfaceIntent('左下の承認ボタンを押して');
     expect(openSite.intentId).toBe('open-site');
+    expect(openSite.routeFamily).toBe('browser_session');
     expect(openSite.browserCommandKind).toBe('open_site');
     expect(browserStep.intentId).toBe('browser-step');
+    expect(browserStep.routeFamily).toBe('browser_session');
     expect(browserStep.browserCommandKind).toBe('browser_step');
     expect(classifyBrowserConversationCommand('日経新聞を開いて')?.action).toBe('navigate');
     expect(classifyBrowserConversationCommand('左下の承認ボタンを押して')?.action).toBe('click');

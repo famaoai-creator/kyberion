@@ -18,6 +18,54 @@
       }
     },
     {
+      "id": "launch-first-run-onboarding",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Start the first-run onboarding wizard and prepare a Kyberion setup plan",
+        "success_condition": "The workspace, toolchain, and preference setup plan are prepared in a governed path."
+      },
+      "requirements": {
+        "default_missing": ["workspace", "organization_goals", "toolchain_requirements"]
+      },
+      "payload": {
+        "static": {
+          "onboarding_kind": "first_run_onboarding"
+        }
+      }
+    },
+    {
+      "id": "configure-organization-toolchain",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Configure organization-specific toolchain integrations",
+        "success_condition": "The approved toolchain integrations are registered and ready for governed use."
+      },
+      "requirements": {
+        "default_missing": ["workspace", "organization_tools", "integration_boundaries"]
+      },
+      "payload": {
+        "static": {
+          "toolchain_kind": "organization_toolchain"
+        }
+      }
+    },
+    {
+      "id": "register-presentation-preference-profile",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Register reusable presentation preference settings",
+        "success_condition": "The preference profile is stored and can guide future presentation work."
+      },
+      "requirements": {
+        "default_missing": ["profile_scope", "theme_preference"]
+      },
+      "payload": {
+        "static": {
+          "profile_kind": "presentation_preference"
+        }
+      }
+    },
+    {
       "id": "capture-photo",
       "task_type": "capture_photo",
       "goal": {
