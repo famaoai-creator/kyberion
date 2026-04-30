@@ -2,7 +2,7 @@
 
 Use this playbook when the user asks Kyberion to participate in, facilitate, or manage a live online meeting.
 It is the canonical surface playbook for the `meeting-operations` intent.
-It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for live meeting work.
+It specializes the shared [Guided Coordination Protocol](knowledge/public/orchestration/guided-coordination-protocol.md) for live meeting work.
 
 ## Kyberion Fit
 

@@ -167,7 +167,7 @@ Use when:
 
 If you need to understand or change which reasoning backend is used for distillation or other structured LLM work, start here:
 
-- [`knowledge/public/governance/wisdom-policy-guide.md`](../knowledge/public/governance/wisdom-policy-guide.md)
+- [`knowledge/public/governance/wisdom-policy-guide.md`](knowledge/public/governance/wisdom-policy-guide.md)
 
 The policy guide explains:
 
@@ -214,8 +214,8 @@ Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next R
 
 ## 8. Where To Read Next
 
-- [README.md](../README.md)
+- [README.md](README.md)
 - [docs/OPERATOR_UX_GUIDE.md](OPERATOR_UX_GUIDE.md)
 - [docs/GLOSSARY.md](GLOSSARY.md)
-- [CAPABILITIES_GUIDE.md](../CAPABILITIES_GUIDE.md)
-- [knowledge/public/governance/wisdom-policy-guide.md](../knowledge/public/governance/wisdom-policy-guide.md)
+- [CAPABILITIES_GUIDE.md](CAPABILITIES_GUIDE.md)
+- [knowledge/public/governance/wisdom-policy-guide.md](knowledge/public/governance/wisdom-policy-guide.md)

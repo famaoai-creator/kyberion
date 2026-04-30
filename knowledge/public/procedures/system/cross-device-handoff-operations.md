@@ -12,7 +12,7 @@ Operational runbook for moving an authenticated runtime session between
 Kyberion-managed surfaces (web browser, iOS WebView, Android WebView) without
 re-authenticating and without leaking session state.
 
-For envelope shape see [`schemas/cross-device-handoff.schema.json`](../../../../schemas/cross-device-handoff.schema.json).
+For envelope shape see [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json).
 
 ## 1. When to Hand Off
 
@@ -126,10 +126,10 @@ To wire a new surface for handoff:
 
 ## 8. Reference
 
-- [`schemas/cross-device-handoff.schema.json`](../../../../schemas/cross-device-handoff.schema.json)
-- [`pipelines/web-session-handoff-runner.json`](../../../../pipelines/web-session-handoff-runner.json)
-- [`pipelines/mobile-webview-handoff-runner-ios.json`](../../../../pipelines/mobile-webview-handoff-runner-ios.json)
-- [`pipelines/mobile-webview-handoff-runner-android.json`](../../../../pipelines/mobile-webview-handoff-runner-android.json)
-- [`libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json`](../../../../libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json)
-- Audit-chain integration: [`libs/core/audit-chain.ts`](../../../../libs/core/audit-chain.ts)
-- Secret resolution contract: [`libs/core/secret-resolver.ts`](../../../../libs/core/secret-resolver.ts)
+- [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json)
+- [`pipelines/web-session-handoff-runner.json`](pipelines/web-session-handoff-runner.json)
+- [`pipelines/mobile-webview-handoff-runner-ios.json`](pipelines/mobile-webview-handoff-runner-ios.json)
+- [`pipelines/mobile-webview-handoff-runner-android.json`](pipelines/mobile-webview-handoff-runner-android.json)
+- [`libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json`](libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json)
+- Audit-chain integration: [`libs/core/audit-chain.ts`](libs/core/audit-chain.ts)
+- Secret resolution contract: [`libs/core/secret-resolver.ts`](libs/core/secret-resolver.ts)
