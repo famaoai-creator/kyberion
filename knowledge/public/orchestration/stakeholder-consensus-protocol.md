@@ -113,9 +113,9 @@ Power/Interest Grid に基づく：
 
 ## 9. 関連
 
-- 依存: [relationship-graph-protocol.md](./relationship-graph-protocol.md)
-- 土台: [pmo/standard/stakeholder_management.md](../pmo/standard/stakeholder_management.md)
-- パイプライン: [pipelines/stakeholder-consensus-orchestrator.json](../../../pipelines/stakeholder-consensus-orchestrator.json)
+- 依存: [relationship-graph-protocol.md](knowledge/public/orchestration/relationship-graph-protocol.md)
+- 土台: [pmo/standard/stakeholder_management.md](knowledge/public/pmo/standard/stakeholder_management.md)
+- パイプライン: [pipelines/stakeholder-consensus-orchestrator.json](pipelines/stakeholder-consensus-orchestrator.json)
 
 ---
 _Created: 2026-04-17 as nemawashi-protocol.md | Generalized: 2026-04-20 per CONCEPT_INTEGRATION_BACKLOG P1-2b_

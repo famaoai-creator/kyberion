@@ -40,18 +40,18 @@ last_updated: 2026-03-06
 **定義**: 収束の前に意図的に発散を起こし、反対意見を資産として残すミッション。創造的判断、新規事業、組織設計、技術選定などで使用する。
 
 ### 3.1 実行原則
-- [hypothesis-tree-protocol.md](./hypothesis-tree-protocol.md) に従い、divergence → critique → convergence の 3 段階を必ず通す。
+- [hypothesis-tree-protocol.md](knowledge/public/orchestration/hypothesis-tree-protocol.md) に従い、divergence → critique → convergence の 3 段階を必ず通す。
 - 不採用仮説は `dissent-log.json` に保存する (judgment-rules.json の `require_dissent_quorum` に従う)。
-- 重大判断 (priority 8+) では [counterfactual-simulation-protocol.md](./counterfactual-simulation-protocol.md) の適用を推奨する。
+- 重大判断 (priority 8+) では [counterfactual-simulation-protocol.md](knowledge/public/orchestration/counterfactual-simulation-protocol.md) の適用を推奨する。
 
 ## 4. 交渉ミッション (Negotiation Mission)
 
 **定義**: 成果物がコードではなく **合意** であるミッション。投資家面談、顧客提案、ベンダー交渉、M&A、組織内合意など。
 
 ### 4.1 実行原則
-- [negotiation-protocol.md](./negotiation-protocol.md) に従い、`negotiation` ブロック (BATNA/ZOPA/concession_ladder/red_lines) を planning 段階で必ず埋める。
-- 本番セッションは **必ず人間が主導** し、エージェントは [real-time-coaching-protocol.md](./real-time-coaching-protocol.md) の補助に徹する。
-- 相手情報は [relationship-graph-protocol.md](./relationship-graph-protocol.md) から取得する。
+- [negotiation-protocol.md](knowledge/public/orchestration/negotiation-protocol.md) に従い、`negotiation` ブロック (BATNA/ZOPA/concession_ladder/red_lines) を planning 段階で必ず埋める。
+- 本番セッションは **必ず人間が主導** し、エージェントは [real-time-coaching-protocol.md](knowledge/public/orchestration/real-time-coaching-protocol.md) の補助に徹する。
+- 相手情報は [relationship-graph-protocol.md](knowledge/public/orchestration/relationship-graph-protocol.md) から取得する。
 
 ## 5. ミッション状態への反映
 

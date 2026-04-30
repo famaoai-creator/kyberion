@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Go Testing
 
-> This file extends [common/testing.md](../common/testing.md) with Go specific content.
+> This file extends [common/testing.md](knowledge/public/external-wisdom/everything-claude/rules/common/testing.md) with Go specific content.
 
 ## Framework
 

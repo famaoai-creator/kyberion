@@ -125,7 +125,7 @@ Preserve Kyberion's governance strictness while making execution easier to opera
 
 ### Decision-Support Integration
 
-Hardening the decision-support layer (judgment, consensus, rehearsal) so it participates in the same governance infrastructure as other mission classes. Detail tasks and status live in [`docs/CONCEPT_INTEGRATION_BACKLOG.md`](../../../docs/CONCEPT_INTEGRATION_BACKLOG.md).
+Hardening the decision-support layer (judgment, consensus, rehearsal) so it participates in the same governance infrastructure as other mission classes. Detail tasks and status live in [`docs/CONCEPT_INTEGRATION_BACKLOG.md`](docs/CONCEPT_INTEGRATION_BACKLOG.md).
 
 - Register `decision_support` mission class across classification, workflow catalog, review gates, team roles, scenario pack, and path scope (P1-1..P1-6)
 - Generalize `nemawashi-protocol` into `stakeholder-consensus-protocol` with culture variants (P1-2b)

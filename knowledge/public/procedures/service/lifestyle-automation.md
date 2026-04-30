@@ -3,7 +3,7 @@
 ## 1. Goal
 
 Interact with consumer services like Rakuten and IoT controllers like SwitchBot to manage travel bookings, shopping, and home automation.
-For scheduling, reservations, purchases, cancellations, and personal-life coordination, follow [lifestyle-booking-playbook.md](../../orchestration/lifestyle-booking-playbook.md).
+For scheduling, reservations, purchases, cancellations, and personal-life coordination, follow [lifestyle-booking-playbook.md](knowledge/public/orchestration/lifestyle-booking-playbook.md).
 
 ## 2. Dependencies
 
