@@ -21,7 +21,7 @@ Use it when you want to answer:
 Read this together with:
 
 - [`actuator-op-taxonomy.md`](actuator-op-taxonomy.md)
-- [`global_actuator_index.json`](../orchestration/global_actuator_index.json)
+- [`global_actuator_index.json`](knowledge/public/orchestration/global_actuator_index.json)
 
 ## Reading Rule
 

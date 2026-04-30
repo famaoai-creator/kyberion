@@ -181,12 +181,12 @@ KYBERION_REASONING_BACKEND=claude-cli \
 
 ## 7. Reference
 
-- [`schemas/action-item.schema.json`](../../../schemas/action-item.schema.json)
-- [`libs/core/action-item-store.ts`](../../../libs/core/action-item-store.ts)
-- [`libs/actuators/meeting-actuator/`](../../../libs/actuators/meeting-actuator/)
-- [`pipelines/meeting-facilitation-workflow.json`](../../../pipelines/meeting-facilitation-workflow.json)
-- [`pipelines/action-item-execute-self.json`](../../../pipelines/action-item-execute-self.json)
-- [`pipelines/action-item-tracking.json`](../../../pipelines/action-item-tracking.json)
-- [`scripts/meeting_orchestrator.ts`](../../../scripts/meeting_orchestrator.ts)
-- [`knowledge/agents/meeting-proxy.agent.md`](../agents/meeting-proxy.agent.md) — agent template
-- [`kyberion-intent-catalog.md`](./kyberion-intent-catalog.md) §3.6 — adjacent platform-extension intents
+- [`schemas/action-item.schema.json`](schemas/action-item.schema.json)
+- [`libs/core/action-item-store.ts`](libs/core/action-item-store.ts)
+- [`libs/actuators/meeting-actuator/`](libs/actuators/meeting-actuator)
+- [`pipelines/meeting-facilitation-workflow.json`](pipelines/meeting-facilitation-workflow.json)
+- [`pipelines/action-item-execute-self.json`](pipelines/action-item-execute-self.json)
+- [`pipelines/action-item-tracking.json`](pipelines/action-item-tracking.json)
+- [`scripts/meeting_orchestrator.ts`](scripts/meeting_orchestrator.ts)
+- [`knowledge/agents/meeting-proxy.agent.md`](knowledge/public/agents/meeting-proxy.agent.md) — agent template
+- [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md) §3.6 — adjacent platform-extension intents
