@@ -32,7 +32,7 @@ knowledge/confidential/relationships/
 - **outstanding_asks**: 本人から出ているが未解決の要望
 - **ng_topics**: 地雷リスト (e.g. 過去の失敗、個人情報)
 
-詳細: [schemas/relationship-node.schema.json](../../../schemas/relationship-node.schema.json)
+詳細: [schemas/relationship-node.schema.json](schemas/relationship-node.schema.json)
 
 ## 3. 更新プロトコル
 
@@ -53,9 +53,9 @@ knowledge/confidential/relationships/
 
 ## 4. 利用先
 
-- [negotiation-protocol.md](./negotiation-protocol.md) — BATNA 推定と stakeholder map 生成
-- [stakeholder-consensus-protocol.md](./stakeholder-consensus-protocol.md) — 根回し順序の最適化
-- [rehearsal-protocol.md](./rehearsal-protocol.md) — 相手役ペルソナ生成
+- [negotiation-protocol.md](knowledge/public/orchestration/negotiation-protocol.md) — BATNA 推定と stakeholder map 生成
+- [stakeholder-consensus-protocol.md](knowledge/public/orchestration/stakeholder-consensus-protocol.md) — 根回し順序の最適化
+- [rehearsal-protocol.md](knowledge/public/orchestration/rehearsal-protocol.md) — 相手役ペルソナ生成
 
 ## 5. セキュリティ
 

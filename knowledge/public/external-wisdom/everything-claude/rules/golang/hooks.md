@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Go Hooks
 
-> This file extends [common/hooks.md](../common/hooks.md) with Go specific content.
+> This file extends [common/hooks.md](knowledge/public/external-wisdom/everything-claude/rules/common/hooks.md) with Go specific content.
 
 ## PostToolUse Hooks
 

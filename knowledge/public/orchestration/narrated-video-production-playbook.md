@@ -1,7 +1,7 @@
 # Narrated Video Production Playbook
 
 Use this playbook when the user asks for a narrated product video, a tutorial clip, a promotional video, or a video that may later be uploaded to YouTube.
-It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for narrated media work.
+It specializes the shared [Guided Coordination Protocol](knowledge/public/orchestration/guided-coordination-protocol.md) for narrated media work.
 
 ## Kyberion Fit
 

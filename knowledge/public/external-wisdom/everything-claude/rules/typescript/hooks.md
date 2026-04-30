@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # TypeScript/JavaScript Hooks
 
-> This file extends [common/hooks.md](../common/hooks.md) with TypeScript/JavaScript specific content.
+> This file extends [common/hooks.md](knowledge/public/external-wisdom/everything-claude/rules/common/hooks.md) with TypeScript/JavaScript specific content.
 
 ## PostToolUse Hooks
 

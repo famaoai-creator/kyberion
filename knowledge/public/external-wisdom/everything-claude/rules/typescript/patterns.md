@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # TypeScript/JavaScript Patterns
 
-> This file extends [common/patterns.md](../common/patterns.md) with TypeScript/JavaScript specific content.
+> This file extends [common/patterns.md](knowledge/public/external-wisdom/everything-claude/rules/common/patterns.md) with TypeScript/JavaScript specific content.
 
 ## API Response Format
 

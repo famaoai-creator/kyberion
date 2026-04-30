@@ -1,7 +1,7 @@
 # Lifestyle Booking Playbook
 
 Use this playbook when the user asks Kyberion to schedule, reserve, purchase, renew, cancel, or coordinate personal-life services.
-It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for booking and personal coordination work.
+It specializes the shared [Guided Coordination Protocol](knowledge/public/orchestration/guided-coordination-protocol.md) for booking and personal coordination work.
 
 Examples:
 

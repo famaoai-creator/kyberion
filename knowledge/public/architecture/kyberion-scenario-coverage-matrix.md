@@ -10,7 +10,7 @@ last_updated: 2026-04-27
 
 This document audits which user-story scenarios Kyberion currently
 covers end-to-end, partially, or not at all. It complements
-[`kyberion-intent-catalog.md`](./kyberion-intent-catalog.md) (which
+[`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md) (which
 maps intents to surfaces) by approaching from the user-story angle and
 producing a matrix that maintainers can scan for gaps.
 
@@ -163,7 +163,7 @@ the canonical surface(s) involved.
 | L1 | New actuator | `libs/actuators/<name>/` + schema + examples + tests | ✅ |
 | L2 | New pipeline | `pipelines/<name>.json` + new `wisdom:` op when needed | ✅ |
 | L3 | Reasoning backend extension | `libs/core/<backend>-reasoning-backend.ts` + bootstrap | ✅ |
-| L4 | Developer onboarding workflow | [`developer-onboarding.md`](../procedures/system/developer-onboarding.md) | ✅ |
+| L4 | Developer onboarding workflow | [`developer-onboarding.md`](knowledge/public/procedures/system/developer-onboarding.md) | ✅ |
 | L5 | Tier-hygiene safety net | `pnpm run check:tier-hygiene` | ✅ |
 
 ## M. CISO / Security lead
@@ -203,9 +203,9 @@ contract tests for the meeting-actuator (6 cases pass).
 
 ## Cross-references
 
-- [`kyberion-intent-catalog.md`](./kyberion-intent-catalog.md) — what to ask for
-- [`kyberion-canonical-concept-index.md`](./kyberion-canonical-concept-index.md) — primitives and vocabulary
-- [`multi-tenant-operations.md`](./multi-tenant-operations.md) — multi-tenant operational baseline
-- [`operator-surface-strategy.md`](./operator-surface-strategy.md) — UI strategy
-- [`../procedures/system/developer-onboarding.md`](../procedures/system/developer-onboarding.md) — developer first month
-- [`../orchestration/cross-tenant-brokering-protocol.md`](../orchestration/cross-tenant-brokering-protocol.md) — brokering protocol
+- [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md) — what to ask for
+- [`kyberion-canonical-concept-index.md`](knowledge/public/architecture/kyberion-canonical-concept-index.md) — primitives and vocabulary
+- [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) — multi-tenant operational baseline
+- [`operator-surface-strategy.md`](knowledge/public/architecture/operator-surface-strategy.md) — UI strategy
+- [`../procedures/system/developer-onboarding.md`](knowledge/public/procedures/system/developer-onboarding.md) — developer first month
+- [`../orchestration/cross-tenant-brokering-protocol.md`](knowledge/public/orchestration/cross-tenant-brokering-protocol.md) — brokering protocol

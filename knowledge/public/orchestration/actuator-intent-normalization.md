@@ -3,7 +3,7 @@
 曖昧な依頼をそのまま actuator 実行へ落とさず、まず `guided-coordination-brief` に正規化するための考え方です。
 この shared brief は booking や presentation だけでなく、全ての repeated coordination intent の最初の共通層として扱います。
 
-The shared coordination flow is documented in [guided-coordination-protocol.md](./guided-coordination-protocol.md).
+The shared coordination flow is documented in [guided-coordination-protocol.md](knowledge/public/orchestration/guided-coordination-protocol.md).
 
 ## Core Rule
 

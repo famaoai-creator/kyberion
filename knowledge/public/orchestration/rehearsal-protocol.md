@@ -62,10 +62,10 @@ agent-actuator の `a2a` を利用し、以下の合成 context で worker agent
 
 ## 7. 関連
 
-- 依存: [relationship-graph-protocol.md](./relationship-graph-protocol.md)
-- 上位: [negotiation-protocol.md](./negotiation-protocol.md)
+- 依存: [relationship-graph-protocol.md](knowledge/public/orchestration/relationship-graph-protocol.md)
+- 上位: [negotiation-protocol.md](knowledge/public/orchestration/negotiation-protocol.md)
 - 実行: agent-actuator `a2a` + voice-actuator
-- パイプライン: [pipelines/negotiation-rehearsal.json](../../../pipelines/negotiation-rehearsal.json)
+- パイプライン: [pipelines/negotiation-rehearsal.json](pipelines/negotiation-rehearsal.json)
 
 ---
 _Created: 2026-04-17 | Ecosystem Architect_

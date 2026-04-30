@@ -3,7 +3,7 @@
 `travel-planning-brief.schema.json` is the high-level contract for travel planning before an agent compiles the work into executable ADF.
 
 Use it after the travel coordinator has captured the user's request and resolved the blocking hearing questions.
-The operating playbook is [travel-planning-playbook.md](../orchestration/travel-planning-playbook.md).
+The operating playbook is [travel-planning-playbook.md](knowledge/public/orchestration/travel-planning-playbook.md).
 
 Use the brief for intent capture and review:
 

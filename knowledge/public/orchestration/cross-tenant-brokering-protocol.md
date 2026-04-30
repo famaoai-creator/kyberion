@@ -17,7 +17,7 @@ isolation.
 
 The default for any tenant-bound persona is **denied** — `tier-guard`
 rejects writes / reads against another tenant's confidential prefix
-(see [`multi-tenant-operations.md`](../architecture/multi-tenant-operations.md) §4).
+(see [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) §4).
 
 A **brokered mission** is the only legal way for code to touch multiple
 tenants in a single execution. Every brokered access is recorded in
@@ -119,7 +119,7 @@ is tracked as a follow-up — for now, paste the JSON into the
 
 ## 8. Reference
 
-- [`multi-tenant-operations.md`](../architecture/multi-tenant-operations.md)
-- [`libs/core/tier-guard.ts`](../../../libs/core/tier-guard.ts) — `checkTenantScope`
-- [`libs/core/audit-forwarder.ts`](../../../libs/core/audit-forwarder.ts) — `TenantFilteringAuditForwarder`
-- [`scripts/refactor/mission-types.ts`](../../../scripts/refactor/mission-types.ts) — `MissionState.cross_tenant_brokerage`
+- [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md)
+- [`libs/core/tier-guard.ts`](libs/core/tier-guard.ts) — `checkTenantScope`
+- [`libs/core/audit-forwarder.ts`](libs/core/audit-forwarder.ts) — `TenantFilteringAuditForwarder`
+- [`scripts/refactor/mission-types.ts`](scripts/refactor/mission-types.ts) — `MissionState.cross_tenant_brokerage`

@@ -12,7 +12,7 @@ This document fixes Kyberion's stance on **how operators interact with the
 system**: which surfaces are first-class, which are observation-only, and
 what is intentionally not built.
 
-It complements [`USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+It complements [`USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
 (which defines the *language* of the human boundary) by defining the
 *surfaces* that boundary lives on.
 
@@ -102,7 +102,7 @@ Where the user might want to act, the page renders a **`suggested_command`**
 they can copy into their CLI — never a button that calls an API.
 
 This matches the `Next Action Contract` from
-[`USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md):
+[`USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md):
 the surface explains the purpose, then shows the runnable command.
 
 ## 6. Existing Surfaces — Where They Fit
@@ -211,8 +211,8 @@ Will the deployment serve >5 stakeholder personas (CEO, compliance, ops,
 
 ## 10. Reference
 
-- [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
-- [`kyberion-canonical-concept-index.md`](./kyberion-canonical-concept-index.md)
-- [`kyberion-intent-catalog.md`](./kyberion-intent-catalog.md)
-- [`multi-tenant-operations.md`](./multi-tenant-operations.md)
-- [`../../../presence/displays/chronos-mirror-v2/`](../../../presence/displays/chronos-mirror-v2/)
+- [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
+- [`kyberion-canonical-concept-index.md`](knowledge/public/architecture/kyberion-canonical-concept-index.md)
+- [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md)
+- [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md)
+- [`../../../presence/displays/chronos-mirror-v2/`](presence/displays/chronos-mirror-v2)

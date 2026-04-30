@@ -184,7 +184,7 @@ Examples:
 
 For distillation and other structured reasoning tasks, see:
 
-- [`knowledge/public/governance/wisdom-policy-guide.md`](../knowledge/public/governance/wisdom-policy-guide.md)
+- [`knowledge/public/governance/wisdom-policy-guide.md`](knowledge/public/governance/wisdom-policy-guide.md)
 
 Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
 

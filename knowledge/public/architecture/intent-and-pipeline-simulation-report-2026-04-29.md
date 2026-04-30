@@ -26,17 +26,17 @@ last_updated: 2026-04-29
 
 ## 2. 参照した主な資産
 
-- [`kyberion-intent-catalog.md`](./kyberion-intent-catalog.md)
-- [`kyberion-scenario-coverage-matrix.md`](./kyberion-scenario-coverage-matrix.md)
-- [`intent-domain-evaluation-2026-04-29.md`](./intent-domain-evaluation-2026-04-29.md)
-- [`mission-workflow-catalog.json`](../governance/mission-workflow-catalog.json)
-- [`mission-classification-policy.json`](../governance/mission-classification-policy.json)
-- [`standard-intents.json`](../governance/standard-intents.json)
-- [`intent-coverage-matrix.json`](../governance/intent-coverage-matrix.json)
-- [`pipelines/README.md`](../../../pipelines/README.md)
-- [`simulation-findings.md`](./simulation-findings.md)
-- [`agent-mission-control-model.md`](./agent-mission-control-model.md)
-- [`mission-team-composition-model.md`](./mission-team-composition-model.md)
+- [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md)
+- [`kyberion-scenario-coverage-matrix.md`](knowledge/public/architecture/kyberion-scenario-coverage-matrix.md)
+- [`intent-domain-evaluation-2026-04-29.md`](knowledge/public/architecture/intent-domain-evaluation-2026-04-29.md)
+- [`mission-workflow-catalog.json`](knowledge/public/governance/mission-workflow-catalog.json)
+- [`mission-classification-policy.json`](knowledge/public/governance/mission-classification-policy.json)
+- [`standard-intents.json`](knowledge/public/governance/standard-intents.json)
+- [`intent-coverage-matrix.json`](knowledge/public/governance/intent-coverage-matrix.json)
+- [`pipelines/README.md`](pipelines/README.md)
+- [`simulation-findings.md`](knowledge/public/architecture/simulation-findings.md)
+- [`agent-mission-control-model.md`](knowledge/public/architecture/agent-mission-control-model.md)
+- [`mission-team-composition-model.md`](knowledge/public/architecture/mission-team-composition-model.md)
 
 ## 3. シミュレーション方法
 

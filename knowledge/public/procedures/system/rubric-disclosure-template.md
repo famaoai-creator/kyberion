@@ -66,7 +66,7 @@ errors in any of them:
 3. Where the decision is **regulated** (e.g. covered by SR 11-7 or
    J-SOX), an independent validation per the Independent Validation
    Evidence Package is also required (see
-   [`../../governance/independent-validation-evidence-package.md`](../../governance/independent-validation-evidence-package.md)).
+   [`../../governance/independent-validation-evidence-package.md`](knowledge/public/governance/independent-validation-evidence-package.md)).
 
 ### Mandatory companion artefacts
 
@@ -87,7 +87,7 @@ When sharing simulation output:
 2. Confirm the companion artefacts are attached or referenced.
 3. If the rubric severity is `warn` or `poor`, additionally attach the
    relevant `rubric-warn-banner` / `rubric-poor-banner` text from
-   [`../../governance/counterfactual-degradation-policy.json`](../../governance/counterfactual-degradation-policy.json).
+   [`../../governance/counterfactual-degradation-policy.json`](knowledge/public/governance/counterfactual-degradation-policy.json).
 
 This disclosure is canonical and English-first. Localized labels for the
 column headers may use the governed vocabulary catalog. The body text

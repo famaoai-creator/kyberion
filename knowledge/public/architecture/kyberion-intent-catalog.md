@@ -16,8 +16,8 @@ and environment integration points so operators know **what to ask for** and
 implementers know **what is wired**.
 
 For naming and primitives, see
-[`kyberion-canonical-concept-index.md`](./kyberion-canonical-concept-index.md).
-For the human-boundary contract, see [`../../../docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md).
+[`kyberion-canonical-concept-index.md`](knowledge/public/architecture/kyberion-canonical-concept-index.md).
+For the human-boundary contract, see [`../../../docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md).
 
 ## 2. User-Facing Vocabulary
 
@@ -191,7 +191,7 @@ schedule, and onboarding playbooks acting as domain overlays rather than
 independent one-off flows.
 
 When the deployment serves more than one organization, follow
-[`multi-tenant-operations.md`](./multi-tenant-operations.md) for directory
+[`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) for directory
 layout, `tenant-scope-policy.json`, per-tenant adapter routing, and the
 single-tenant → multi-tenant migration recipe.
 
@@ -359,7 +359,7 @@ Review gates per class are in
 | Hand off web session state | `web-session-handoff-runner` |
 
 The handoff envelope is canonicalized in
-[`schemas/cross-device-handoff.schema.json`](../../../schemas/cross-device-handoff.schema.json)
+[`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json)
 (`envelope_version: "1.0.0"` — handoff_id, expires_at, source/target
 surface, surface_state.contract_ref, secret_refs, replay-bounded policy,
 audit-chain anchors).
@@ -367,7 +367,7 @@ audit-chain anchors).
 Operator obligations — checklist before export, checklist before import,
 failure modes (`reject_and_log` / `fall_back_to_clean_session` /
 `prompt_operator`), replay protection, and security considerations — live
-in [`../procedures/system/cross-device-handoff-operations.md`](../procedures/system/cross-device-handoff-operations.md).
+in [`../procedures/system/cross-device-handoff-operations.md`](knowledge/public/procedures/system/cross-device-handoff-operations.md).
 
 ## 8. Invocation Patterns
 
@@ -445,10 +445,10 @@ Otherwise a one-shot pipeline is fine.
 
 | Gap | Status | Reference |
 |---|---|---|
-| Cross-device UX (mobile / browser handoff) | **Documented** — handoff envelope schema + operations runbook published | [`schemas/cross-device-handoff.schema.json`](../../../schemas/cross-device-handoff.schema.json), [`../procedures/system/cross-device-handoff-operations.md`](../procedures/system/cross-device-handoff-operations.md) |
-| Multi-tenant operations | **Playbook published** — directory conventions, tenant scope policy, per-tenant adapter guidance, migration from single-tenant | [`multi-tenant-operations.md`](./multi-tenant-operations.md) |
-| Counterfactual simulation quality (LLM non-determinism) | **Hardened** — deterministic 6-check rubric (`evaluateSimulationQuality`) runs after every `simulate_all`; severity `ok / warn / poor` written next to summary; standalone `wisdom:evaluate_simulation_quality` op for retro-checks | [`libs/actuators/wisdom-actuator/src/decision-ops.ts`](../../../libs/actuators/wisdom-actuator/src/decision-ops.ts) |
-| GUI / Web UI for operators | **Strategy fixed** — CLI-first, read-only Web second, no mutating GUI; Minimum Operator Surface (MOS) MVP spec'd with acceptance criteria | [`operator-surface-strategy.md`](./operator-surface-strategy.md) |
+| Cross-device UX (mobile / browser handoff) | **Documented** — handoff envelope schema + operations runbook published | [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json), [`../procedures/system/cross-device-handoff-operations.md`](knowledge/public/procedures/system/cross-device-handoff-operations.md) |
+| Multi-tenant operations | **Playbook published** — directory conventions, tenant scope policy, per-tenant adapter guidance, migration from single-tenant | [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) |
+| Counterfactual simulation quality (LLM non-determinism) | **Hardened** — deterministic 6-check rubric (`evaluateSimulationQuality`) runs after every `simulate_all`; severity `ok / warn / poor` written next to summary; standalone `wisdom:evaluate_simulation_quality` op for retro-checks | [`libs/actuators/wisdom-actuator/src/decision-ops.ts`](libs/actuators/wisdom-actuator/src/decision-ops.ts) |
+| GUI / Web UI for operators | **Strategy fixed** — CLI-first, read-only Web second, no mutating GUI; Minimum Operator Surface (MOS) MVP spec'd with acceptance criteria | [`operator-surface-strategy.md`](knowledge/public/architecture/operator-surface-strategy.md) |
 
 Remaining genuine gaps:
 
@@ -458,8 +458,8 @@ Remaining genuine gaps:
   populated from `KYBERION_TENANT` / `mission-state.json`;
   `validateWritePermission` and `validateReadPermission` now reject
   cross-tenant `confidential/{other}/` access; SUDO bypass preserved
-  ([`tier-guard.ts`](../../../libs/core/tier-guard.ts), tests in
-  [`tier-guard-tenant.test.ts`](../../../libs/core/tier-guard-tenant.test.ts)).
+  ([`tier-guard.ts`](libs/core/tier-guard.ts), tests in
+  [`tier-guard-tenant.test.ts`](libs/core/tier-guard-tenant.test.ts)).
 - ✅ **`audit-chain` `tenantSlug`** — first-class additive field on
   `AuditEntry`; `record()` auto-fills from identity context;
   `TenantFilteringAuditForwarder` available for per-tenant SIEM routing.
@@ -468,7 +468,7 @@ Remaining genuine gaps:
   `evaluateEnsembleConvergence` produces a per-branch convergence score
   and raises `divergent_outcomes_warning` below threshold.
 - ✅ **Counterfactual degradation policy** —
-  [`counterfactual-degradation-policy.json`](../governance/counterfactual-degradation-policy.json)
+  [`counterfactual-degradation-policy.json`](knowledge/public/governance/counterfactual-degradation-policy.json)
   formalizes warn/poor handling, re-execution limits, and override
   rules.
 - ✅ **Tenant-drift watchdog** — `pnpm watch:tenant-drift` scans
@@ -478,14 +478,14 @@ Remaining genuine gaps:
   `mission_controller accept-with-override <id> --reason "..." [--severity warn|poor]`
   emits `rubric.override_accepted` per the degradation policy.
 - ✅ **Rubric scope disclosure template** —
-  [`rubric-disclosure-template.md`](../procedures/system/rubric-disclosure-template.md)
+  [`rubric-disclosure-template.md`](knowledge/public/procedures/system/rubric-disclosure-template.md)
   is now mandatory companion to any externally-shared simulation output.
 - ✅ **MOS security baseline** — `operator-surface-strategy.md` §9.1
   acceptance criteria now require SSRF tests, WAF placement, and
   independent auth review before any external exposure; §9.2 documents
   the alternative "structured CLI → existing dashboard" path.
 - ✅ **Independent validation evidence package** —
-  [`independent-validation-evidence-package.md`](../governance/independent-validation-evidence-package.md)
+  [`independent-validation-evidence-package.md`](knowledge/public/governance/independent-validation-evidence-package.md)
   defines the SR-11-7-class bundle hand-off contract for external
   model-risk validators.
 - ✅ **Multi-tenant onboarding runbook** — `multi-tenant-operations.md`
@@ -524,26 +524,26 @@ Remaining genuine gaps:
 
 ## 12. References
 
-- [`kyberion-canonical-concept-index.md`](./kyberion-canonical-concept-index.md)
+- [`kyberion-canonical-concept-index.md`](knowledge/public/architecture/kyberion-canonical-concept-index.md)
   — canonical primitives and vocabulary
-- [`kyberion-concept-evaluation-2026-04-26.md`](./kyberion-concept-evaluation-2026-04-26.md)
+- [`kyberion-concept-evaluation-2026-04-26.md`](knowledge/public/architecture/kyberion-concept-evaluation-2026-04-26.md)
   — concept evaluation and improvement plan (origin/main 2026-04-26)
-- [`../../../docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
+- [`../../../docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
   — human boundary contract
-- [`../../../docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md)
+- [`../../../docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
   — six-stage intent loop reference
-- [`../../../AGENTS.md`](../../../AGENTS.md) — operator rules (Rule 7 = mission threshold)
-- [`../governance/mission-classification-policy.json`](../governance/mission-classification-policy.json)
+- [`../../../AGENTS.md`](AGENTS.md) — operator rules (Rule 7 = mission threshold)
+- [`../governance/mission-classification-policy.json`](knowledge/public/governance/mission-classification-policy.json)
   — class assignment rules
-- [`../governance/mission-workflow-catalog.json`](../governance/mission-workflow-catalog.json)
+- [`../governance/mission-workflow-catalog.json`](knowledge/public/governance/mission-workflow-catalog.json)
   — per-class phase sequences
-- [`../governance/mission-review-gate-registry.json`](../governance/mission-review-gate-registry.json)
+- [`../governance/mission-review-gate-registry.json`](knowledge/public/governance/mission-review-gate-registry.json)
   — review gate registry
-- [`../orchestration/team-role-index.json`](../orchestration/team-role-index.json)
+- [`../orchestration/team-role-index.json`](knowledge/public/orchestration/team-role-index.json)
   — team role definitions
-- [`multi-tenant-operations.md`](./multi-tenant-operations.md)
+- [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md)
   — multi-tenant directory conventions, scope policy, migration
-- [`operator-surface-strategy.md`](./operator-surface-strategy.md)
+- [`operator-surface-strategy.md`](knowledge/public/architecture/operator-surface-strategy.md)
   — CLI-first / read-only-web stance + MOS MVP spec
-- [`../procedures/system/cross-device-handoff-operations.md`](../procedures/system/cross-device-handoff-operations.md)
+- [`../procedures/system/cross-device-handoff-operations.md`](knowledge/public/procedures/system/cross-device-handoff-operations.md)
   — handoff runbook (envelope expiry, replay protection, security)

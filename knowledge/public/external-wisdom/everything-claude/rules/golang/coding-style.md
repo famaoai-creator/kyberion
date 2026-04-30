@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Go Coding Style
 
-> This file extends [common/coding-style.md](../common/coding-style.md) with Go specific content.
+> This file extends [common/coding-style.md](knowledge/public/external-wisdom/everything-claude/rules/common/coding-style.md) with Go specific content.
 
 ## Formatting
 

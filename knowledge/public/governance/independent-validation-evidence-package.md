@@ -148,7 +148,7 @@ Until the dedicated command exists, assemble the bundle by hand following
 
 ## 6. Related
 
-- [`counterfactual-degradation-policy.json`](./counterfactual-degradation-policy.json)
-- [`../procedures/system/rubric-disclosure-template.md`](../procedures/system/rubric-disclosure-template.md)
-- [`../architecture/multi-tenant-operations.md`](../architecture/multi-tenant-operations.md)
-- [`../architecture/operator-surface-strategy.md`](../architecture/operator-surface-strategy.md)
+- [`counterfactual-degradation-policy.json`](knowledge/public/governance/counterfactual-degradation-policy.json)
+- [`../procedures/system/rubric-disclosure-template.md`](knowledge/public/procedures/system/rubric-disclosure-template.md)
+- [`../architecture/multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md)
+- [`../architecture/operator-surface-strategy.md`](knowledge/public/architecture/operator-surface-strategy.md)

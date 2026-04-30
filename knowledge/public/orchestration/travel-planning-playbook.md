@@ -1,7 +1,7 @@
 # Travel Planning Playbook
 
 Use this playbook when a user asks for a trip plan, tour comparison, reservation path, or anniversary itinerary.
-It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for travel and reservation work.
+It specializes the shared [Guided Coordination Protocol](knowledge/public/orchestration/guided-coordination-protocol.md) for travel and reservation work.
 
 ## Kyberion Fit
 

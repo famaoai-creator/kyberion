@@ -167,11 +167,11 @@ Internally, the system may still use:
 
 The recommended path for understanding the overall model is:
 
-1. [`docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md)
-2. [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../docs/USER_EXPERIENCE_CONTRACT.md)
-3. [`docs/COMPONENT_MAP.md`](../../../docs/COMPONENT_MAP.md)
+1. [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
+2. [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
+3. [`docs/COMPONENT_MAP.md`](docs/COMPONENT_MAP.md)
 4. [`llm-execution-boundary.md`](llm-execution-boundary.md)
-5. [`project-operating-system.md`](../orchestration/project-operating-system.md)
+5. [`project-operating-system.md`](knowledge/public/orchestration/project-operating-system.md)
 
 ## Cross-Cutting: The Intent Loop
 
@@ -182,7 +182,7 @@ The five layers above describe *where concepts live*. A second, orthogonal view
 receive → clarify → preserve → execute → verify → learn
 ```
 
-See [`docs/INTENT_LOOP_CONCEPT.md`](../../../docs/INTENT_LOOP_CONCEPT.md) for the
+See [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md) for the
 full definition. The loop is the one non-replaceable primitive: reasoning
 models, CLI hosts, actuator implementations, and schema names are all
 replaceable, but the loop closure is not.

@@ -13,7 +13,7 @@ For engineers joining a Kyberion deployment. The aim is to get from
 without bypassing the governance the rest of the system depends on.
 
 This is a procedure (not architecture). Architecture lives under
-[`knowledge/public/architecture/`](../../architecture/).
+[`knowledge/public/architecture/`](knowledge/public/architecture).
 
 ## Day 1 — local environment + first read
 
@@ -33,10 +33,10 @@ This is a procedure (not architecture). Architecture lives under
    pnpm build
    ```
 2. Read in this order, ≤ 5 minutes each:
-   - [`AGENTS.md`](../../../../AGENTS.md) — operator rules (especially Rule 7)
-   - [`docs/USER_EXPERIENCE_CONTRACT.md`](../../../../docs/USER_EXPERIENCE_CONTRACT.md)
-   - [`knowledge/public/architecture/kyberion-canonical-concept-index.md`](../../architecture/kyberion-canonical-concept-index.md)
-   - [`docs/INTENT_LOOP_CONCEPT.md`](../../../../docs/INTENT_LOOP_CONCEPT.md)
+   - [`AGENTS.md`](AGENTS.md) — operator rules (especially Rule 7)
+   - [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
+   - [`knowledge/public/architecture/kyberion-canonical-concept-index.md`](knowledge/public/architecture/kyberion-canonical-concept-index.md)
+   - [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
 3. Run baseline:
    ```bash
    pnpm pipeline --input pipelines/baseline-check.json
@@ -117,13 +117,13 @@ This is a procedure (not architecture). Architecture lives under
 Read each doc once, then come back to whichever maps closest to the
 work you actually do.
 
-1. [`kyberion-concept-evaluation-2026-04-26.md`](../../architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
-2. [`kyberion-intent-catalog.md`](../../architecture/kyberion-intent-catalog.md) — what users can ask for
-3. [`kyberion-scenario-coverage-matrix.md`](../../architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
-4. [`multi-tenant-operations.md`](../../architecture/multi-tenant-operations.md) — multi-tenant operations
-5. [`operator-surface-strategy.md`](../../architecture/operator-surface-strategy.md) — UI strategy
-6. [`mission-team-composition-model.md`](../../architecture/mission-team-composition-model.md) — how teams form
-7. [`agent-mission-control-model.md`](../../architecture/agent-mission-control-model.md) — agent control plane
+1. [`kyberion-concept-evaluation-2026-04-26.md`](knowledge/public/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
+2. [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md) — what users can ask for
+3. [`kyberion-scenario-coverage-matrix.md`](knowledge/public/architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
+4. [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) — multi-tenant operations
+5. [`operator-surface-strategy.md`](knowledge/public/architecture/operator-surface-strategy.md) — UI strategy
+6. [`mission-team-composition-model.md`](knowledge/public/architecture/mission-team-composition-model.md) — how teams form
+7. [`agent-mission-control-model.md`](knowledge/public/architecture/agent-mission-control-model.md) — agent control plane
 
 ### Anti-patterns to recognize and avoid
 
@@ -164,8 +164,8 @@ wasn't, the rule of thumb: **add the test before fixing the bug.**
 
 ## Reference
 
-- [`AGENTS.md`](../../../../AGENTS.md) — operator rules
-- [`docs/INITIALIZATION.md`](../../../../docs/INITIALIZATION.md) — first-time setup
-- [`docs/QUICKSTART.md`](../../../../docs/QUICKSTART.md) — quick start
-- [`docs/COMPONENT_MAP.md`](../../../../docs/COMPONENT_MAP.md) — directory structure
-- [`CAPABILITIES_GUIDE.md`](../../../../CAPABILITIES_GUIDE.md) — actuator catalog
+- [`AGENTS.md`](AGENTS.md) — operator rules
+- [`docs/INITIALIZATION.md`](docs/INITIALIZATION.md) — first-time setup
+- [`docs/QUICKSTART.md`](docs/QUICKSTART.md) — quick start
+- [`docs/COMPONENT_MAP.md`](docs/COMPONENT_MAP.md) — directory structure
+- [`CAPABILITIES_GUIDE.md`](CAPABILITIES_GUIDE.md) — actuator catalog
