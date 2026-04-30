@@ -9,7 +9,7 @@ last_updated: 2026-04-20
 
 # コンセプト統合バックログ
 
-[意図ループ概念](./INTENT_LOOP_CONCEPT.md) に沿って、ローカル main と `origin/main` の並行発展物を合流させるためのタスク集。
+[意図ループ概念](docs/INTENT_LOOP_CONCEPT.md) に沿って、ローカル main と `origin/main` の並行発展物を合流させるためのタスク集。
 
 ---
 
@@ -28,7 +28,7 @@ last_updated: 2026-04-20
 
 ## 2. 反映した論点判定
 
-[前段の論点詰め](./INTENT_LOOP_CONCEPT.md) の結論を本バックログに反映済み：
+[前段の論点詰め](docs/INTENT_LOOP_CONCEPT.md) の結論を本バックログに反映済み：
 
 - **論点 1**（層モデル）→ 意図ループに置換。層図は概念書へ移送。
 - **論点 2**（衝突）→ P0-4 で review-gate 側を正として統合。

@@ -334,10 +334,10 @@ When introducing the second tenant:
 
 ## 12. Reference
 
-- [`tier-hygiene-policy.json`](../governance/tier-hygiene-policy.json)
-- [`path-scope-policy.json`](../governance/path-scope-policy.json)
-- [`tiered-consensus-and-experimental-branches.md`](../governance/tiered-consensus-and-experimental-branches.md)
-- [`libs/core/secure-io.ts`](../../../libs/core/secure-io.ts)
-- [`libs/core/audit-chain.ts`](../../../libs/core/audit-chain.ts)
-- [`libs/core/audit-forwarder.ts`](../../../libs/core/audit-forwarder.ts)
-- [`libs/core/secret-resolver.ts`](../../../libs/core/secret-resolver.ts)
+- [`tier-hygiene-policy.json`](knowledge/public/governance/tier-hygiene-policy.json)
+- [`path-scope-policy.json`](knowledge/public/governance/path-scope-policy.json)
+- [`tiered-consensus-and-experimental-branches.md`](knowledge/public/governance/tiered-consensus-and-experimental-branches.md)
+- [`libs/core/secure-io.ts`](libs/core/secure-io.ts)
+- [`libs/core/audit-chain.ts`](libs/core/audit-chain.ts)
+- [`libs/core/audit-forwarder.ts`](libs/core/audit-forwarder.ts)
+- [`libs/core/secret-resolver.ts`](libs/core/secret-resolver.ts)

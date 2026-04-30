@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # TypeScript/JavaScript Testing
 
-> This file extends [common/testing.md](../common/testing.md) with TypeScript/JavaScript specific content.
+> This file extends [common/testing.md](knowledge/public/external-wisdom/everything-claude/rules/common/testing.md) with TypeScript/JavaScript specific content.
 
 ## E2E Testing
 

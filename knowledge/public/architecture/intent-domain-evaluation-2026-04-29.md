@@ -26,22 +26,22 @@ Kyberion 全体を「何に対して、何を実施するのか」というイ�
 
 ## 2. 参照した主な定義
 
-- [`kyberion-intent-catalog.md`](./kyberion-intent-catalog.md)
-- [`intent-classifier-routing.md`](./intent-classifier-routing.md)
-- [`intent-coverage-matrix.md`](./intent-coverage-matrix.md)
-- [`intent-observability-model.md`](./intent-observability-model.md)
-- [`agent-mission-control-model.md`](./agent-mission-control-model.md)
-- [`mission-runtime-primitives.md`](./mission-runtime-primitives.md)
-- [`mission-team-composition-model.md`](./mission-team-composition-model.md)
-- [`actuator-op-taxonomy.md`](./actuator-op-taxonomy.md)
-- [`standard-intents.json`](../governance/standard-intents.json)
-- [`intent-resolution-policy.json`](../governance/intent-resolution-policy.json)
-- [`mission-classification-policy.json`](../governance/mission-classification-policy.json)
-- [`mission-workflow-catalog.json`](../governance/mission-workflow-catalog.json)
-- [`model-registry.json`](../governance/model-registry.json)
-- [`runtime-design-profiles.json`](../governance/runtime-design-profiles.json)
-- [`environment-manifests/`](../governance/environment-manifests/)
-- [`CAPABILITIES_GUIDE.md`](../../../CAPABILITIES_GUIDE.md)
+- [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md)
+- [`intent-classifier-routing.md`](knowledge/public/architecture/intent-classifier-routing.md)
+- [`intent-coverage-matrix.md`](knowledge/public/architecture/intent-coverage-matrix.md)
+- [`intent-observability-model.md`](knowledge/public/architecture/intent-observability-model.md)
+- [`agent-mission-control-model.md`](knowledge/public/architecture/agent-mission-control-model.md)
+- [`mission-runtime-primitives.md`](knowledge/public/architecture/mission-runtime-primitives.md)
+- [`mission-team-composition-model.md`](knowledge/public/architecture/mission-team-composition-model.md)
+- [`actuator-op-taxonomy.md`](knowledge/public/architecture/actuator-op-taxonomy.md)
+- [`standard-intents.json`](knowledge/public/governance/standard-intents.json)
+- [`intent-resolution-policy.json`](knowledge/public/governance/intent-resolution-policy.json)
+- [`mission-classification-policy.json`](knowledge/public/governance/mission-classification-policy.json)
+- [`mission-workflow-catalog.json`](knowledge/public/governance/mission-workflow-catalog.json)
+- [`model-registry.json`](knowledge/public/governance/model-registry.json)
+- [`runtime-design-profiles.json`](knowledge/public/governance/runtime-design-profiles.json)
+- [`environment-manifests/`](knowledge/public/governance/environment-manifests)
+- [`CAPABILITIES_GUIDE.md`](CAPABILITIES_GUIDE.md)
 
 ## 3. 総合評価
 

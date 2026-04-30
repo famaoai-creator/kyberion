@@ -1,7 +1,7 @@
 # Presentation Authoring Playbook
 
 Use this playbook when the user asks for a PowerPoint deck, slides, a briefing pack, or a presentation artifact.
-It specializes the shared [Guided Coordination Protocol](./guided-coordination-protocol.md) for deck and briefing work.
+It specializes the shared [Guided Coordination Protocol](knowledge/public/orchestration/guided-coordination-protocol.md) for deck and briefing work.
 
 ## Kyberion Fit
 

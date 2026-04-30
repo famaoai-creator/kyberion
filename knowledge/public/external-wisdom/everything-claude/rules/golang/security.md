@@ -9,7 +9,7 @@ last_updated: 2026-03-06
 
 # Go Security
 
-> This file extends [common/security.md](../common/security.md) with Go specific content.
+> This file extends [common/security.md](knowledge/public/external-wisdom/everything-claude/rules/common/security.md) with Go specific content.
 
 ## Secret Management
 
