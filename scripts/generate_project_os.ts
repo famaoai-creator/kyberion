@@ -7,6 +7,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 type ArtifactMap = {
   lifecycle: Array<{
@@ -119,7 +120,7 @@ async function main() {
     : pathResolver.sharedTmp(path.join('project-os', slug));
 
   const artifactMapPath = pathResolver.knowledge('public/orchestration/project-operating-system-artifact-map.json');
-  const artifactMap = JSON.parse(safeReadFile(artifactMapPath, { encoding: 'utf8' }) as string) as ArtifactMap;
+  const artifactMap = readJsonFile<ArtifactMap>(artifactMapPath);
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
 
   safeMkdir(targetDir, { recursive: true });

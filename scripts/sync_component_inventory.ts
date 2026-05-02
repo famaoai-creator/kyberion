@@ -4,11 +4,11 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {
   actuator_id: string;
@@ -49,7 +49,7 @@ const LEGACY_RATIONALES: Record<string, string> = {
 };
 
 function loadManifest(manifestPath: string): CapabilityManifest {
-  return JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as CapabilityManifest;
+  return readJsonFile<CapabilityManifest>(manifestPath);
 }
 
 function collectComponentInventory() {

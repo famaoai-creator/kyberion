@@ -26,6 +26,7 @@ import {
   safeExistsSync,
   safeStat,
 } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,7 +109,7 @@ function loadTaxonomy(): TaxonomyManifest {
   }
 
   try {
-    cachedTaxonomy = JSON.parse(safeReadFile(taxonomyPath, { encoding: 'utf8' }) as string) as TaxonomyManifest;
+    cachedTaxonomy = readJsonFile<TaxonomyManifest>(taxonomyPath);
   } catch (_) {
     cachedTaxonomy = {};
   }
@@ -336,7 +337,7 @@ function loadWeights(): RankingWeights {
   const defaults: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25, phase: 18, scope: 12, kind: 10, authority: 8 };
   if (!safeExistsSync(configPath)) return defaults;
   try {
-    const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+    const config = readJsonFile<any>(configPath);
     return { ...defaults, ...config.algorithms?.ranking?.weights };
   } catch (_) {
     return defaults;

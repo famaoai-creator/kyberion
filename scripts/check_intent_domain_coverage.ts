@@ -1,4 +1,5 @@
-import { pathResolver, safeReadFile, safeReaddir } from '@agent/core';
+import { pathResolver, safeReaddir } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 type StandardIntent = {
   id?: string;
@@ -31,7 +32,7 @@ type IntentDomainEntry = {
 
 function readJson<T>(relativePath: string): T {
   const fullPath = pathResolver.rootResolve(relativePath);
-  return JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string) as T;
+  return readJsonFile(fullPath);
 }
 
 function pushIfMissing<T>(collection: Set<T>, value: T, message: string, violations: string[]): void {

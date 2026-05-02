@@ -14,6 +14,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { loadState, readJsonFileSafe } from './mission-state.js';
+import { readTextFile } from './cli-input.js';
 
 export function resolveProjectLedgerPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);
@@ -94,7 +95,7 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   const traceability = escapeTableCell((project.traceability_refs || []).join(', '));
   const row = `| ${upperId} | ${project.relationship_type} | ${state.status} | ${summary} | ${artifacts} | ${project.gate_impact || 'none'} | ${traceability} |`;
 
-  const current = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+  const current = readTextFile(ledgerPath);
   const updated = upsertMissionLedgerRow(current, row, upperId);
   safeWriteFile(ledgerPath, updated);
 

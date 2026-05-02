@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   derivePipelineStatus,
   pathResolver,
+  resolveVars,
   assertValidMobileAppProfile,
 } from '@agent/core';
 import type { MobileAppProfile } from '@agent/core';
@@ -14,8 +15,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const rootDir = process.cwd();
-const ANDROID_UI_DEFAULTS_PATH = path.join(rootDir, 'knowledge/public/orchestration/android-ui-defaults.json');
+const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge('public/orchestration/android-ui-defaults.json');
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -43,6 +43,7 @@ async function handleAction(input: AndroidAction) {
 }
 
 async function executePipeline(steps: PipelineStep[], options: AndroidAction['options'] = {}, initialCtx: Record<string, any> = {}) {
+  const rootDir = pathResolver.rootDir();
   const artifactsDir = path.resolve(
     rootDir,
     options?.artifacts_dir || pathResolver.sharedTmp(`actuators/android-actuator/session_${Date.now()}`),
@@ -56,17 +57,7 @@ async function executePipeline(steps: PipelineStep[], options: AndroidAction['op
     android_serial: options?.serial || initialCtx.android_serial || '',
   };
 
-  const resolve = (val: any): any => {
-    if (typeof val !== 'string') return val;
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      return resolveKey(singleVarMatch[1].trim(), ctx);
-    }
-    return val.replace(/{{(.*?)}}/g, (_, expr) => {
-      const resolved = resolveKey(expr.trim(), ctx);
-      return resolved === undefined || resolved === null ? '' : String(resolved);
-    });
-  };
+  const resolve = (val: any): any => resolveVars(val, ctx);
 
   const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
 
@@ -112,7 +103,7 @@ async function opCapture(
   resolve: (val: any) => any,
   options?: AndroidAction['options'],
 ) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_text_file': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
@@ -241,7 +232,7 @@ async function opApply(
   resolve: (val: any) => any,
   options?: AndroidAction['options'],
 ) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'launch_app': {
       ensureAdbAvailable(ctx, options);
@@ -907,7 +898,7 @@ function sleep(ms: number): void {
 
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = path.resolve(pathResolver.rootDir(), argv.input as string);
   const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(content));
   console.log(JSON.stringify(result, null, 2));

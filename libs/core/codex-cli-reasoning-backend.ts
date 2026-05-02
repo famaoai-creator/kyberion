@@ -281,6 +281,10 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     }) as z.infer<typeof schema>;
     return result.answer;
   }
+
+  async prompt(prompt: string): Promise<string> {
+    return this.delegateTask(prompt);
+  }
 }
 
 export function buildCodexCliBackendFromEnv(

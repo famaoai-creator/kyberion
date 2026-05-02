@@ -1,6 +1,7 @@
-import { pathResolver, logger, safeExistsSync, safeMkdir, safeReadFile, sharedExports } from '@agent/core';
+import { pathResolver, logger, safeExistsSync, safeMkdir, sharedExports } from '@agent/core';
 import * as path from 'node:path';
 import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
+import { readJsonFile } from './refactor/cli-input.js';
 
 /**
  * Design Pattern Generator
@@ -29,14 +30,14 @@ async function main() {
   // Resolve pattern path
   const patternPath = patternRelPath.startsWith('/')
     ? patternRelPath
-    : path.join(process.cwd(), patternRelPath);
+    : pathResolver.rootResolve(patternRelPath);
 
   if (!safeExistsSync(patternPath)) {
     logger.error(`Pattern file not found: ${patternPath}`);
     process.exit(1);
   }
 
-  const pattern = JSON.parse(safeReadFile(patternPath, { encoding: 'utf8' }) as string);
+  const pattern = readJsonFile<any>(patternPath);
   const engine = pattern.media_actuator_config?.engine || 'pptx';
 
   // Determine output path
@@ -44,7 +45,7 @@ async function main() {
   const defaultName = pattern.pattern_id?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'output';
   const outputPath = outputArg || sharedExports(`marketing/${defaultName}${ext}`);
 
-  const outputDir = path.dirname(path.resolve(process.cwd(), outputPath));
+  const outputDir = path.dirname(pathResolver.rootResolve(outputPath));
   if (!safeExistsSync(outputDir)) {
     safeMkdir(outputDir, { recursive: true });
   }

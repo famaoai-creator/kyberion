@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
+import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 interface RawActuatorEntry {
   n?: string;
@@ -169,7 +170,7 @@ function loadVocabularyCatalog(): VocabularyCatalog | null {
     return null;
   }
   try {
-    return JSON.parse(safeReadFile(vocabularyPath, { encoding: 'utf8' }) as string) as VocabularyCatalog;
+    return readJsonFile<VocabularyCatalog>(vocabularyPath);
   } catch {
     return null;
   }
@@ -206,9 +207,7 @@ export function normalizeActuators(index: RawActuatorIndex): ActuatorRecord[] {
 }
 
 export function loadActuators(): ActuatorRecord[] {
-  const indexContent = safeReadFile(resolveIndexPath(), { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(indexContent) as RawActuatorIndex;
-  return normalizeActuators(parsed);
+  return normalizeActuators(readJsonFile<RawActuatorIndex>(resolveIndexPath()));
 }
 
 export function searchActuators(actuators: ActuatorRecord[], query: string): ActuatorRecord[] {
@@ -249,8 +248,7 @@ function printMissionContextBanner(missionId?: string) {
   }
 
   try {
-    const stateContent = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-    const state = JSON.parse(stateContent) as { status?: string };
+    const state = readJsonFile<{ status?: string }>(statePath);
     process.stderr.write(chalk.cyan(`\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status || 'unknown'})\n`));
   } catch {
     // Keep the console usable even if mission metadata is malformed.
@@ -387,8 +385,7 @@ function loadActuatorExamples(actuator: ActuatorRecord): ActuatorExampleRecord[]
     return [];
   }
 
-  const content = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(content) as ActuatorExampleCatalog;
+  const parsed = readJsonFile<ActuatorExampleCatalog>(catalogPath);
   return Array.isArray(parsed.examples) ? parsed.examples : [];
 }
 
@@ -422,8 +419,7 @@ function loadMobileAppProfiles(): MobileAppProfileRecord[] {
   if (!safeExistsSync(indexPath)) {
     return [];
   }
-  const content = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(content) as MobileAppProfileIndex;
+  const parsed = readJsonFile<MobileAppProfileIndex>(indexPath);
   assertValidMobileAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
   return parsed.profiles;
 }
@@ -435,8 +431,7 @@ function resolveWebAppProfileIndexPath(): string {
 function loadWebAppProfiles(): WebAppProfileIndexRecord[] {
   const indexPath = resolveWebAppProfileIndexPath();
   if (!safeExistsSync(indexPath)) return [];
-  const content = safeReadFile(indexPath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(content) as { profiles: WebAppProfileIndexRecord[] };
+  const parsed = readJsonFile<{ profiles: WebAppProfileIndexRecord[] }>(indexPath);
   assertValidWebAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
   return parsed.profiles;
 }
@@ -491,7 +486,7 @@ function printArtifactInfo(targetPath: string) {
   console.log(`Size: ${stat.size} bytes`);
   console.log(`Modified: ${stat.mtime.toISOString()}`);
   if (['.json', '.md', '.txt', '.log', '.adf', '.xml', '.yaml', '.yml'].includes(ext)) {
-    const content = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
+    const content = readTextFile(resolvedPath);
     const preview = content.split('\n').slice(0, 40).join('\n');
     console.log('\nPreview:\n');
     console.log(preview);
@@ -595,7 +590,7 @@ function loadPacketFile(targetPath: string): { kind?: string } {
   if (!safeExistsSync(resolvedPath)) {
     throw new Error(`Packet file not found: ${targetPath}`);
   }
-  const content = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
+  const content = readTextFile(resolvedPath);
   return JSON.parse(content) as { kind?: string };
 }
 
@@ -1104,7 +1099,7 @@ export async function main(args = process.argv.slice(2)) {
     const { previewPipeline } = await import('@agent/core');
     const filePath = firstArg;
     if (!filePath) { console.error('Usage: pnpm cli preview <pipeline.json>'); process.exit(1); }
-    const content = safeReadFile(path.resolve(process.cwd(), filePath), { encoding: 'utf8' }) as string;
+    const content = readTextFile(pathResolver.rootResolve(filePath));
     const pipeline = JSON.parse(content);
     const preview = previewPipeline(pipeline);
 

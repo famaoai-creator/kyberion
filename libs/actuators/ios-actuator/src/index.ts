@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   derivePipelineStatus,
   pathResolver,
+  resolveVars,
   assertValidMobileAppProfile,
 } from '@agent/core';
 import type { MobileAppProfile } from '@agent/core';
@@ -47,7 +48,7 @@ async function handleAction(input: IOSAction) {
 }
 
 async function executePipeline(steps: PipelineStep[], options: IOSAction['options'] = {}, initialCtx: Record<string, any> = {}) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const artifactsDir = path.resolve(
     rootDir,
     options?.artifacts_dir || pathResolver.sharedTmp(`actuators/ios-actuator/session_${Date.now()}`),
@@ -61,17 +62,7 @@ async function executePipeline(steps: PipelineStep[], options: IOSAction['option
     ios_device_udid: options?.device_udid || initialCtx.ios_device_udid || '',
   };
 
-  const resolve = (val: any): any => {
-    if (typeof val !== 'string') return val;
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      return resolveKey(singleVarMatch[1].trim(), ctx);
-    }
-    return val.replace(/{{(.*?)}}/g, (_, expr) => {
-      const resolved = resolveKey(expr.trim(), ctx);
-      return resolved === undefined || resolved === null ? '' : String(resolved);
-    });
-  };
+  const resolve = (val: any): any => resolveVars(val, ctx);
 
   const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
 
@@ -117,7 +108,7 @@ async function opCapture(
   resolve: (val: any) => any,
   options?: IOSAction['options'],
 ) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
@@ -204,7 +195,7 @@ async function opApply(
   resolve: (val: any) => any,
   options?: IOSAction['options'],
 ) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'launch_app': {
       ensureSimctlAvailable(ctx, options);
@@ -467,7 +458,7 @@ function resolveKey(key: string, ctx: Record<string, any>): any {
 
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = path.resolve(pathResolver.rootDir(), argv.input as string);
   const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(content));
   console.log(JSON.stringify(result, null, 2));

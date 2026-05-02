@@ -1,5 +1,6 @@
 import { ptyEngine } from './pty-engine.js';
 import { logger } from './core.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Agent Mediator v1.0
@@ -29,7 +30,7 @@ export class AgentMediator {
     this.sessionId = ptyEngine.spawn(
       this.options.bootCommand,
       this.options.bootArgs,
-      process.cwd(),
+      pathResolver.rootDir(),
       {},
       this.options.threadId
     );

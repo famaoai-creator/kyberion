@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeMkdir, safeWriteFile, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger, safeExec } from '@agent/core';
+import { readTextFile } from './refactor/cli-input.js';
 
 const DEFAULT_INTENTS = [
   'verify-actuator-capability',
@@ -90,7 +91,7 @@ async function main(): Promise<void> {
   }, null, 2));
 
   const summaryText = safeExistsSync(summaryPath)
-    ? safeReadFile(summaryPath, { encoding: 'utf8' }) as string
+    ? readTextFile(summaryPath)
     : '';
   console.log(summaryText);
 

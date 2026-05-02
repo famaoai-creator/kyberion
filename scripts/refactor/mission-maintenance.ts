@@ -10,10 +10,8 @@ import {
   pathResolver,
   safeExec,
   safeExistsSync,
-  safeLstat,
   safeMkdir,
   safeReadFile,
-  safeReaddir,
   safeRmSync,
   safeStat,
   safeWriteFile,
@@ -21,8 +19,9 @@ import {
   appendMissionExecutionLedgerEntry,
   type MissionActorType,
 } from '@agent/core';
-import { getActiveMissionSearchDirs, loadState, saveState } from './mission-state.js';
+import { listActiveMissions, listMissionsInSearchDirs, loadState, saveState } from './mission-state.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
+import { readJsonFile } from './cli-input.js';
 
 export async function createCheckpoint(args: {
   taskId: string;
@@ -56,24 +55,7 @@ export async function createCheckpoint(args: {
     }
   }
 
-  const activeMissions: Array<{ missionId: string; missionPath: string }> = [];
-
-  for (const dir of getActiveMissionSearchDirs()) {
-    if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
-    const missions = safeReaddir(dir).filter((m) => {
-      try {
-        return safeLstat(path.join(dir, m)).isDirectory();
-      } catch (_) {
-        return false;
-      }
-    });
-    for (const missionId of missions) {
-      const state = loadState(missionId);
-      if (state?.status === 'active') {
-        activeMissions.push({ missionId, missionPath: path.join(dir, missionId) });
-      }
-    }
-  }
+  const activeMissions = listActiveMissions();
 
   if (activeMissions.length === 0) {
     logger.error('No active mission found. Checkpoint aborted.');
@@ -169,20 +151,9 @@ export async function resumeMission(
   let targetId = id?.toUpperCase();
 
   if (!targetId) {
-    for (const dir of getActiveMissionSearchDirs()) {
-      if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
-      const missions = safeReaddir(dir).filter((m) => {
-        try {
-          return safeLstat(path.join(dir, m)).isDirectory();
-        } catch (_) {
-          return false;
-        }
-      });
-      const active = missions.find((missionId) => loadState(missionId)?.status === 'active');
-      if (active) {
-        targetId = active;
-        break;
-      }
+    for (const { missionId: active } of listActiveMissions()) {
+      targetId = active;
+      break;
     }
 
     if (!targetId) {
@@ -205,8 +176,7 @@ export async function resumeMission(
 
   const flightRecorderPath = path.join(missionPath, 'LATEST_TASK.json');
   if (safeExistsSync(flightRecorderPath)) {
-    const content = safeReadFile(flightRecorderPath, { encoding: 'utf8' }) as string;
-    const task = JSON.parse(content);
+    const task = readJsonFile<{ description?: string }>(flightRecorderPath);
     logger.warn(`📍 FLIGHT RECORDER DETECTED: Last intended task was: ${task.description}`);
     logger.info('Please verify the physical state and continue from this point.');
   }
@@ -317,7 +287,14 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<vo
     return;
   }
 
-  const adf = JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string);
+  const adf = readJsonFile<{
+    policies: Array<{
+      name: string;
+      condition: { has_file?: string; max_age_days?: number };
+      target_dir: string;
+      naming_pattern: string;
+    }>;
+  }>(adfPath);
   const candidates: Array<{
     mission: string;
     missionDir: string;
@@ -325,44 +302,32 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<vo
     policyName: string;
   }> = [];
 
-  for (const dir of getActiveMissionSearchDirs()) {
-    if (!safeExistsSync(dir)) continue;
-    const missions = safeReaddir(dir).filter((m) => {
-      try {
-        return safeLstat(path.join(dir, m)).isDirectory();
-      } catch (_) {
-        return false;
+  for (const { missionId: mission, missionPath: missionDir } of listMissionsInSearchDirs()) {
+    for (const policy of adf.policies) {
+      let match = false;
+      const { condition } = policy;
+
+      if (condition.has_file) {
+        match = safeExistsSync(path.join(missionDir, condition.has_file));
+      } else if (condition.max_age_days) {
+        const stat = safeStat(missionDir);
+        const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+        match = ageDays > condition.max_age_days;
       }
-    });
 
-    for (const mission of missions) {
-      const missionDir = path.join(dir, mission);
-      for (const policy of adf.policies) {
-        let match = false;
-        const { condition } = policy;
+      if (!match) continue;
 
-        if (condition.has_file) {
-          match = safeExistsSync(path.join(missionDir, condition.has_file));
-        } else if (condition.max_age_days) {
-          const stat = safeStat(missionDir);
-          const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
-          match = ageDays > condition.max_age_days;
-        }
-
-        if (!match) continue;
-
-        let targetPath = policy.target_dir;
-        const now = new Date();
-        targetPath = targetPath.replace(
-          '{YYYY-MM}',
-          `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-        );
-        targetPath = pathResolver.rootResolve(
-          path.join(targetPath, policy.naming_pattern.replace('{mission_id}', mission))
-        );
-        candidates.push({ mission, missionDir, targetPath, policyName: policy.name });
-        break;
-      }
+      let targetPath = policy.target_dir;
+      const now = new Date();
+      targetPath = targetPath.replace(
+        '{YYYY-MM}',
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      );
+      targetPath = pathResolver.rootResolve(
+        path.join(targetPath, policy.naming_pattern.replace('{mission_id}', mission))
+      );
+      candidates.push({ mission, missionDir, targetPath, policyName: policy.name });
+      break;
     }
   }
 

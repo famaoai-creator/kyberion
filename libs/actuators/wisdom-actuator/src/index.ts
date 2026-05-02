@@ -2,6 +2,7 @@ import {
   logger, 
   safeReadFile, 
   safeWriteFile, 
+  safeAppendFileSync,
   safeMkdir, 
   safeExec, 
   safeExistsSync,
@@ -226,7 +227,17 @@ async function opApply(op: string, params: any, ctx: any) {
       const out = pathResolver.rootResolve(spec.path);
       const content = spec.content;
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
+      if (params.append) {
+        const payload =
+          typeof content === 'string'
+            ? content
+            : content === undefined
+              ? ''
+              : `${JSON.stringify(content, null, 2)}\n`;
+        safeAppendFileSync(out, payload, 'utf8');
+      } else {
+        safeWriteFile(out, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
+      }
       break;
     case 'knowledge_inject':
       const kPath = resolveVars(params.knowledge_path, ctx);

@@ -19,7 +19,6 @@ import * as path from 'node:path';
 import {
   auditChain,
   discoverProviders,
-  findMissionPath,
   getInstalledReasoningMode,
   listMemoryPromotionCandidates,
   loadProjectRecord,
@@ -30,18 +29,12 @@ import {
   resolveMissionClassification,
   resolveMissionWorkflowDesign,
   updateMemoryPromotionCandidateStatus,
-  safeReadFile,
   safeExec,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeUnlinkSync,
-  transitionStatus,
   validateWritePermission,
 } from '@agent/core';
 
 // --- Sub-module imports ---
-import { type MissionState, type MissionRelationships } from './refactor/mission-types.js';
+import { type MissionRelationships } from './refactor/mission-types.js';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -49,7 +42,6 @@ import {
   getOptionValue,
   parseCsvOption,
 } from './refactor/mission-cli-args.js';
-import { getGitHash, initMissionRepo, getCurrentBranch } from './refactor/mission-git.js';
 import {
   assertCanGrantMissionAuthority,
   normalizeRelationships,
@@ -59,44 +51,13 @@ import {
   saveState,
   checkDependencies,
 } from './refactor/mission-state.js';
-import {
-  createMission as _createMission,
-  startMission as _startMission,
-} from './refactor/mission-creation.js';
-import {
-  syncProjectLedger as _syncProjectLedger,
-  syncProjectLedgerIfLinked as _syncProjectLedgerIfLinked,
-  resolveProjectLedgerJsonPath,
-  resolveProjectLedgerPath,
-} from './refactor/mission-project-ledger.js';
-import {
-  delegateMission as _delegateMission,
-  finishMission as _finishMission,
-  grantMissionAccess as _grantMissionAccess,
-  grantMissionSudo as _grantMissionSudo,
-  importMission as _importMission,
-  verifyMission as _verifyMission,
-} from './refactor/mission-lifecycle.js';
-import {
-  createCheckpoint as _createCheckpoint,
-  purgeMissions as _purgeMissions,
-  recordTask as _recordTask,
-  recordEvidence as _recordEvidence,
-  resumeMission as _resumeMission,
-} from './refactor/mission-maintenance.js';
+import { resolveProjectLedgerJsonPath, resolveProjectLedgerPath } from './refactor/mission-project-ledger.js';
 import {
   dispatchNextQueuedMission,
   enqueueMission as _enqueueMission,
 } from './refactor/mission-queue.js';
 import { buildMissionStatusView, listMissionSummaries } from './refactor/mission-read-model.js';
-import {
-  prewarmMissionTeam as _prewarmMissionTeam,
-  showMissionTeam as _showMissionTeam,
-  staffMissionTeam as _staffMissionTeam,
-} from './refactor/mission-runtime.js';
-import { distillMission as _distillMission } from './refactor/mission-distill.js';
-import { sealMission as _sealMission } from './refactor/mission-seal.js';
-import { recordAgentRuntimeEvent } from './refactor/mission-governance.js';
+import { missionSystem } from './refactor/mission-system.js';
 
 // Re-export public API for backward compatibility (tests import these directly)
 export {
@@ -213,12 +174,8 @@ export function validateMissionStartCreateInput(
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const ROOT_DIR = pathResolver.rootDir();
-const ARCHIVE_DIR = pathResolver.active('archive/missions');
 const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
-const AGENT_RUNTIME_EVENT_PATH = pathResolver.shared(
-  'observability/mission-control/agent-runtime-events.jsonl'
-);
 
 // ─── Focus helpers (thin wrappers binding MISSION_FOCUS_PATH) ────────────────
 function readFocusedMissionId(): string | null {
@@ -231,20 +188,20 @@ function writeFocusedMissionId(missionId: string): void {
 
 // ─── Project ledger helpers (bind ROOT_DIR) ───────────────────────────────────
 async function syncProjectLedger(id: string): Promise<void> {
-  return _syncProjectLedger(id, ROOT_DIR);
+  return missionSystem.syncProjectLedger(id);
 }
 
 async function syncProjectLedgerIfLinked(id: string): Promise<void> {
-  return _syncProjectLedgerIfLinked(id, ROOT_DIR);
+  return missionSystem.syncProjectLedgerIfLinked(id);
 }
 
 // ─── Mission seal / distill wrappers ─────────────────────────────────────────
 async function sealMission(id: string): Promise<string | undefined> {
-  return _sealMission(id);
+  return missionSystem.sealMission(id);
 }
 
 async function distillMission(id: string): Promise<void> {
-  return _distillMission(id, ROOT_DIR);
+  return missionSystem.distillMission(id);
 }
 
 /**
@@ -452,17 +409,7 @@ async function createMission(
   relationships: any = {},
   tenantSlug?: string,
 ) {
-  return _createMission({
-    id,
-    tier,
-    tenantId,
-    ...(tenantSlug ? { tenantSlug } : {}),
-    missionType,
-    visionRef,
-    persona,
-    relationships,
-    rootDir: ROOT_DIR,
-  });
+  return missionSystem.create(id, tier, tenantId, missionType, visionRef, persona, relationships, tenantSlug);
 }
 
 /**
@@ -480,17 +427,7 @@ async function startMission(
   relationships: any = {},
   tenantSlug?: string,
 ) {
-  await _startMission({
-    id,
-    tier,
-    persona,
-    tenantId,
-    ...(tenantSlug ? { tenantSlug } : {}),
-    missionType,
-    visionRef,
-    relationships,
-    rootDir: ROOT_DIR,
-  });
+  await missionSystem.start(id, tier, persona, tenantId, missionType, visionRef, relationships, tenantSlug);
   const targetId = id.toUpperCase();
   const state = loadState(targetId);
   if (state?.status === 'active') {
@@ -502,15 +439,15 @@ async function startMission(
 // earlier in this file (lines 97-104), delegating to mission-project-ledger.ts
 
 async function delegateMission(id: string, agentId: string, a2aMessageId: string) {
-  return _delegateMission(id, agentId, a2aMessageId, syncProjectLedgerIfLinked);
+  return missionSystem.delegateMission(id, agentId, a2aMessageId);
 }
 
 async function importMission(id: string, remoteUrl: string) {
-  return _importMission(id, remoteUrl, transitionStatus as any, syncProjectLedgerIfLinked);
+  return missionSystem.importMission(id, remoteUrl);
 }
 
 async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
-  const output = await _verifyMission(id, result, note, transitionStatus as any, syncProjectLedgerIfLinked);
+  const output = await missionSystem.verifyMission(id, result, note);
   if (result === 'verified') {
     syncIntentContractMemorySnapshot(id, 'verify');
   }
@@ -524,14 +461,7 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 //   - scripts/refactor/mission-seal.ts (sealMission)
 
 async function finishMission(id: string, seal: boolean = false) {
-  const result = await _finishMission(id, seal, {
-    archiveDir: ARCHIVE_DIR,
-    agentRuntimeEventPath: AGENT_RUNTIME_EVENT_PATH,
-    getGitHash,
-    sealMission,
-    syncProjectLedgerIfLinked,
-    transitionStatus: transitionStatus as any,
-  });
+  const result = await missionSystem.finishMission(id, seal);
   syncIntentContractMemorySnapshot(id, 'finish');
   return result;
 }
@@ -564,28 +494,15 @@ function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'
 }
 
 async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
-  return _createCheckpoint({
-    taskId,
-    note,
-    explicitMissionId,
-    readFocusedMissionId,
-    writeFocusedMissionId,
-    getGitHash,
-    syncProjectLedgerIfLinked,
-  });
+  return missionSystem.createCheckpoint(taskId, note, explicitMissionId);
 }
 
 async function resumeMission(id?: string) {
-  return _resumeMission(id, {
-    readFocusedMissionId,
-    writeFocusedMissionId,
-    getCurrentBranch,
-    syncProjectLedgerIfLinked,
-  });
+  return missionSystem.resumeMission(id);
 }
 
 async function recordTask(missionId: string, description: string, details: any = {}) {
-  return _recordTask(missionId, description, details);
+  return missionSystem.recordTask(missionId, description, details);
 }
 
 async function recordEvidence(
@@ -597,21 +514,11 @@ async function recordEvidence(
   actorId?: string,
   actorType?: 'agent' | 'human' | 'service'
 ) {
-  return _recordEvidence({
-    missionId,
-    taskId,
-    note,
-    evidence,
-    teamRole,
-    actorId,
-    actorType,
-    getGitHash,
-    syncProjectLedgerIfLinked,
-  });
+  return missionSystem.recordEvidence(missionId, taskId, note, evidence, teamRole, actorId, actorType);
 }
 
 async function purgeMissions(dryRun: boolean = false) {
-  return _purgeMissions(ROOT_DIR, dryRun);
+  return missionSystem.purgeMissions(dryRun);
 }
 
 /**
@@ -837,15 +744,15 @@ Track Traceability Options:
 }
 
 function showMissionTeam(id: string, refresh = false) {
-  return _showMissionTeam(id, refresh);
+  return missionSystem.showMissionTeam(id, refresh);
 }
 
 async function staffMissionTeam(id: string) {
-  return _staffMissionTeam(id);
+  return missionSystem.staffMissionTeam(id);
 }
 
 async function prewarmMissionTeam(id: string, teamRolesArg?: string) {
-  return _prewarmMissionTeam(id, teamRolesArg);
+  return missionSystem.prewarmMissionTeam(id, teamRolesArg);
 }
 
 async function classifyMission(id: string, intentId?: string, taskType?: string): Promise<void> {
@@ -932,12 +839,12 @@ async function handoffMission(id: string, nextPersona: string, note?: string): P
 
 async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
   assertCanGrantMissionAuthority();
-  return _grantMissionAccess(missionId, serviceId, ttl);
+  return missionSystem.grantMissionAccess(missionId, serviceId, ttl);
 }
 
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
   assertCanGrantMissionAuthority();
-  return _grantMissionSudo(missionId, on, ttl);
+  return missionSystem.grantMissionSudo(missionId, on, ttl);
 }
 
 /**

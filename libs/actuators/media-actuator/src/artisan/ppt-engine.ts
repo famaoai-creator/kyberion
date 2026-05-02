@@ -5,7 +5,8 @@ import {
   safeUnlinkSync, 
   safeMkdir, 
   safeExistsSync, 
-  safeExec 
+  safeExec,
+  pathResolver,
 } from '@agent/core';
 
 export interface PPTConvertOptions {
@@ -27,7 +28,7 @@ export interface PPTResult {
 export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResult> {
   const { markdown, outputPath, theme } = options;
 
-  const tempDir = path.join(process.cwd(), 'temp_ppt');
+  const tempDir = pathResolver.sharedTmp('ppt');
   if (!safeExistsSync(tempDir)) {
     safeMkdir(tempDir, { recursive: true });
   }
@@ -42,7 +43,7 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
     safeWriteFile(themePath, theme.body);
   }
 
-  const localMarp = path.resolve(process.cwd(), 'node_modules/.bin/marp');
+  const localMarp = pathResolver.rootResolve('node_modules/.bin/marp');
   const marpCmd = safeExistsSync(localMarp) ? localMarp : 'npx';
   const args = safeExistsSync(localMarp) ? [] : ['-y', '@marp-team/marp-cli'];
   
