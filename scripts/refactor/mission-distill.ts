@@ -20,6 +20,7 @@ import { type MissionState } from './mission-types.js';
 import { findMissionPath } from '@agent/core';
 import { loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
+import { readJsonFile } from './cli-input.js';
 import {
   inspectLlmResolution,
   resolveLlmConfig,
@@ -235,7 +236,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   let wisdomPolicy: any = {};
   if (safeExistsSync(wisdomPolicyPath)) {
     try {
-      const parsed = JSON.parse(safeReadFile(wisdomPolicyPath, { encoding: 'utf8' }) as string);
+      const parsed = readJsonFile<any>(wisdomPolicyPath);
       const validated = WISDOM_POLICY_SCHEMA.safeParse(parsed);
       if (validated.success) {
         wisdomPolicy = validated.data;

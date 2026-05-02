@@ -1,7 +1,7 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
 import { pathResolver } from '../../path-resolver.js';
+import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import type { PdfDesignProtocol, PdfLayoutElement, PdfPage, PdfImageElement } from '../types/pdf-protocol.js';
 
 /**
@@ -20,7 +20,7 @@ export class NativePdfParser {
   private imagePathCache: Map<number, string | null> = new Map();
 
   constructor(filePath: string) {
-    this.buffer = fs.readFileSync(filePath);
+    this.buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
     this.str = this.buffer.toString('binary');
     this.discoverObjects();
   }
@@ -757,9 +757,9 @@ export class NativePdfParser {
     }
 
     const dir = pathResolver.sharedTmp('native-pdf/images');
-    fs.mkdirSync(dir, { recursive: true });
+    safeMkdir(dir, { recursive: true });
     const outPath = path.join(dir, `pdf-image-${objectId}${extension}`);
-    fs.writeFileSync(outPath, data);
+    safeWriteFile(outPath, data);
     this.imagePathCache.set(objectId, outPath);
     return outPath;
   }

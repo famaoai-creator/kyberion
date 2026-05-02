@@ -1,4 +1,4 @@
-import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile, emitComputerSurfacePatch } from '@agent/core';
+import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile, emitComputerSurfacePatch, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,7 +70,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
     return await handleComputerInteraction(input as unknown as ComputerInteractionAction);
   }
   const { action, params } = input;
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
 
   switch (action) {
     case 'spawn': {
@@ -267,7 +267,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
   
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = pathResolver.rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));

@@ -200,6 +200,7 @@ export {
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
+export { composeMissionTeamBrief } from './mission-team-brief-composer.js';
 
 // Domain Engines (Moved to @agent/shared-*)
 // export * as excelUtils from './excel-utils.js';

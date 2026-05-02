@@ -20,6 +20,7 @@ import type {
 } from '@agent/core/artifacts';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathResolver } from '@agent/core';
 
 interface ApprovalAction {
   action: 'create' | 'load' | 'decide' | 'list_pending';
@@ -116,7 +117,7 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = pathResolver.rootResolve(argv.input as string);
   const input = JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }) as string) as ApprovalAction;
   const result = await handleAction(input);
   console.log(JSON.stringify(result, null, 2));

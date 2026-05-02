@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../core.js';
+import { pathResolver } from '../path-resolver.js';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 
@@ -73,7 +74,7 @@ export async function checkActuatorCapabilities(
 export async function checkAllActuatorCapabilities(
   actuatorsDir?: string
 ): Promise<ActuatorStatus[]> {
-  const dir = actuatorsDir || path.join(process.cwd(), 'libs/actuators');
+  const dir = actuatorsDir ? pathResolver.rootResolve(actuatorsDir) : pathResolver.rootResolve('libs/actuators');
   const results: ActuatorStatus[] = [];
 
   if (!safeExistsSync(dir)) return results;
@@ -99,8 +100,8 @@ export async function checkAllActuatorCapabilities(
 // Browser actuator: check if Playwright is installed
 registerCapabilityProbe('browser-actuator', async () => {
   try {
-    const pwPath = path.join(process.cwd(), 'node_modules/playwright-core');
-    const pwTestPath = path.join(process.cwd(), 'node_modules/@playwright/test');
+    const pwPath = pathResolver.rootResolve('node_modules/playwright-core');
+    const pwTestPath = pathResolver.rootResolve('node_modules/@playwright/test');
     const available = safeExistsSync(pwPath) || safeExistsSync(pwTestPath);
     return [{
       op: 'pipeline',

@@ -12,6 +12,7 @@ import {
 } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathResolver } from '@agent/core';
 
 interface ArtifactAction {
   action: 'write_json' | 'append_event' | 'read_json' | 'list' | 'ensure_dir' | 'write_delivery_pack';
@@ -106,7 +107,7 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = pathResolver.rootResolve(argv.input as string);
   const input = JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }) as string) as ArtifactAction;
   const result = await handleAction(input);
   console.log(JSON.stringify(result, null, 2));

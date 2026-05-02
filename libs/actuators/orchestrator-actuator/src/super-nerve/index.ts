@@ -28,7 +28,7 @@ export interface A2AMessage {
 }
 
 export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessage, initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   
   let steps: SuperPipelineStep[];
@@ -102,7 +102,7 @@ async function handleCoreAction(action: string, params: any, ctx: any, options: 
       return currentCtx;
 
     case 'call':
-      const macroPath = path.resolve(process.cwd(), resolveVars(params.path, ctx));
+      const macroPath = pathResolver.rootResolve(resolveVars(params.path, ctx));
       const macroDef = JSON.parse(safeReadFile(macroPath, { encoding: 'utf8' }) as string);
       const res = await executeSuperPipeline(macroDef.steps || [], ctx, options, state);
       return res.context;
@@ -130,11 +130,12 @@ function evaluateCondition(cond: any, ctx: any): boolean {
 }
 
 async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {
+  const rootDir = pathResolver.rootDir();
   if (domain === 'system') {
     if (action === 'shell') {
       const cmd = resolveVars(params?.cmd, ctx);
       if (!cmd || typeof cmd !== 'string') return ctx;
-      const output = safeExec('zsh', ['-lc', cmd], { cwd: process.cwd(), timeoutMs: 120000 });
+      const output = safeExec('zsh', ['-lc', cmd], { cwd: rootDir, timeoutMs: 120000 });
       if (params?.export_as && typeof params.export_as === 'string') {
         return { ...ctx, [params.export_as]: output.trim() };
       }
@@ -145,7 +146,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
       return ctx;
     }
     if (action === 'pulse_status') {
-      const output = safeExec('node', ['dist/scripts/run_baseline_check.js'], { cwd: process.cwd(), timeoutMs: 120000 });
+      const output = safeExec('node', ['dist/scripts/run_baseline_check.js'], { cwd: rootDir, timeoutMs: 120000 });
       const trimmed = output.trim();
       if (params?.export_as && typeof params.export_as === 'string') {
         return { ...ctx, [params.export_as]: trimmed };
@@ -169,7 +170,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
 
   const actuatorPath = domainMap[domain];
   if (!actuatorPath) throw new Error(`Unknown actuator domain: ${domain}`);
-  const builtActuatorPath = path.resolve(process.cwd(), actuatorPath);
+  const builtActuatorPath = pathResolver.rootResolve(actuatorPath);
   if (!safeExistsSync(builtActuatorPath)) {
     throw new Error(`Built actuator not found for ${domain}. Expected ${actuatorPath}. Run pnpm build first.`);
   }
@@ -181,7 +182,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
 
   const adf = {
     action: 'pipeline',
-    context: { ...ctx, context_path: path.relative(process.cwd(), outCtxPath) }, 
+    context: { ...ctx, context_path: path.relative(rootDir, outCtxPath) }, 
     steps: [{ type: determineActuatorStepType(domain, action), op: action, params: params }]
   };
 

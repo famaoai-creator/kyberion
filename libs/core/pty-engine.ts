@@ -4,6 +4,7 @@ import { logger } from './core.js';
 import * as crypto from 'node:crypto';
 import * as os from 'node:os';
 import { runtimeSupervisor } from './runtime-supervisor.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Kyberion PTY Engine (Logical Kernel) v2.1
@@ -185,7 +186,7 @@ class PtyRegistry {
     const id = crypto.randomUUID();
     if (threadId) this.threadToSession.set(threadId, id);
     const targetShell = shell || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash'));
-    const targetCwd = cwd || process.cwd();
+    const targetCwd = cwd || pathResolver.rootDir();
     const targetEnv = { ...process.env, ...env, TERM: 'xterm-256color', PAGER: 'cat' };
 
     let adapter: TerminalAdapter;

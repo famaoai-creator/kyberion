@@ -20,6 +20,7 @@ import {
   transitionStatus,
   writeMissionTeamPlan,
 } from '@agent/core';
+import { readJsonFile } from './cli-input.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
 import { calculateRequiredTier, checkPrerequisites, loadState, normalizeRelationships, saveState } from './mission-state.js';
 import { syncRoleProcedure } from './mission-governance.js';
@@ -76,7 +77,13 @@ export async function createMission(
   const isEphemeral = process.argv.includes('--ephemeral');
   const normalizedRelationships = normalizeRelationships(relationships);
   const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
-  const templates = JSON.parse(safeReadFile(templatePath, { encoding: 'utf8' }) as string).templates;
+  const templates = readJsonFile<{
+    templates: Array<{
+      name?: string;
+      knowledge_injections?: string[];
+      files: Array<{ content_template: string; path: string }>;
+    }>;
+  }>(templatePath).templates;
   const template = templates.find((entry: any) => entry.name === missionType) || templates[0];
 
   const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);

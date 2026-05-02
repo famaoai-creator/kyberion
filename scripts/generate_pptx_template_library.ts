@@ -1,6 +1,7 @@
-import { logger, pathResolver, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { logger, pathResolver, safeExistsSync, safeMkdir } from '@agent/core';
 import * as path from 'node:path';
 import { handleAction } from '../libs/actuators/media-actuator/src/index.js';
+import { readJsonFile } from './refactor/cli-input.js';
 
 interface TemplateSpec {
   pattern_id: string;
@@ -56,9 +57,7 @@ async function generateTemplate(template: TemplateSpec) {
 
 async function main() {
   const manifestPath = pathResolver.rootResolve('knowledge/public/design-patterns/presentation/pptx-template-library.json');
-  const manifest = JSON.parse(
-    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
-  ) as TemplateLibrary;
+  const manifest = readJsonFile<TemplateLibrary>(manifestPath);
 
   logger.info(`Template library: ${manifest.library_id}`);
   for (const template of manifest.templates) {

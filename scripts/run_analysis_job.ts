@@ -3,19 +3,21 @@
  * ADF-driven runner for Strategic Analysis & Modeling.
  */
 
-import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, capabilityEntry } from '@agent/core';
+import { logger, safeExistsSync, pathResolver } from '@agent/core';
 import * as path from 'node:path';
+import { invokeActuatorWithTempInput } from './refactor/ephemeral-actuator-call.js';
+import { readJsonFile } from './refactor/cli-input.js';
 
 async function main() {
   const adfPath = process.argv[2] || 'work/analysis-job.json';
-  const fullAdfPath = path.isAbsolute(adfPath) ? adfPath : path.resolve(process.cwd(), adfPath);
+  const fullAdfPath = path.isAbsolute(adfPath) ? adfPath : path.resolve(pathResolver.rootDir(), adfPath);
 
   if (!safeExistsSync(fullAdfPath)) {
     logger.error(`ADF job file not found: ${fullAdfPath}`);
     process.exit(1);
   }
 
-  const adf = JSON.parse(safeReadFile(fullAdfPath, { encoding: 'utf8' }) as string);
+  const adf = readJsonFile(fullAdfPath);
   const actions = adf.actions || ['all'];
 
   logger.info(`🚀 Starting Analysis Job: ${adf.job_id} (Mission: ${adf.mission_id || 'N/A'})`);
@@ -37,16 +39,11 @@ async function main() {
 }
 
 async function runModelingActuator(input: any) {
-  const tempAdfPath = path.resolve(process.cwd(), `work/temp-mod-${Date.now()}.json`);
-  safeWriteFile(tempAdfPath, JSON.stringify(input, null, 2));
-
   try {
-    const output = safeExec('node', [capabilityEntry('modeling-actuator'), '--input', tempAdfPath]);
+    const output = invokeActuatorWithTempInput('modeling-actuator', input, 'temp-mod');
     console.log(output);
   } catch (err: any) {
     logger.error(`Action ${input.analysisType || input.action} failed: ${err.message}`);
-  } finally {
-    if (safeExistsSync(tempAdfPath)) safeUnlinkSync(tempAdfPath);
   }
 }
 

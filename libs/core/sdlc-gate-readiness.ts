@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { SPECIALIST_IDS } from './specialist-ids.js';
 import type { ArtifactRecord } from './artifact-record.js';
 import type { ProjectRecord } from './project-registry.js';
 import type { ProjectTrackRecord } from './project-track-registry.js';
@@ -96,7 +97,7 @@ function sanitizeSeedFragment(value: string): string {
 function inferSpecialistForArtifact(artifactId: string): string {
   if (artifactId.includes('test') || artifactId.includes('validation')) return 'quality-engineer';
   if (artifactId.includes('security') || artifactId.includes('compliance')) return 'risk-compliance';
-  if (artifactId.includes('runbook') || artifactId.includes('deployment') || artifactId.includes('rollback')) return 'service-operator';
+  if (artifactId.includes('runbook') || artifactId.includes('deployment') || artifactId.includes('rollback')) return SPECIALIST_IDS.serviceOperator;
   return 'ecosystem-architect';
 }
 

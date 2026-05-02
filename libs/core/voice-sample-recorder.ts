@@ -30,7 +30,7 @@ function getRecordingCommand(env: NodeJS.ProcessEnv = process.env): string {
 
 function resolveOutputPath(input: RecordVoiceSampleRequest): string {
   if (String(input.output_path || '').trim()) {
-    return path.resolve(process.cwd(), String(input.output_path).trim());
+    return pathResolver.rootResolve(String(input.output_path).trim());
   }
   return pathResolver.sharedTmp(`voice-sample-recording/${input.request_id}/${input.sample_id}.wav`);
 }

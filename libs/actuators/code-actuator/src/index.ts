@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -58,7 +58,7 @@ async function handleAction(input: CodeAction) {
  * Universal Pipeline Engine with Control Flow & Safety Guards
  */
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
@@ -137,7 +137,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
  * CAPTURE Operators
  */
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
@@ -190,7 +190,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
  * APPLY Operators
  */
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'write_file':
     case 'write_artifact':
@@ -208,7 +208,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
  * Strategic Reconciliation
  */
 async function performReconcile(input: CodeAction) {
-  const strategyPath = path.resolve(process.cwd(), input.strategy_path || 'knowledge/governance/code-strategy.json');
+  const strategyPath = path.resolve(pathResolver.rootDir(), input.strategy_path || 'knowledge/governance/code-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
@@ -222,7 +222,7 @@ async function performReconcile(input: CodeAction) {
  */
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(path.resolve(pathResolver.rootDir(), argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };
