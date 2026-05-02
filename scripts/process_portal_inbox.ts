@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 // chalk imported dynamically
-import { pathResolver, safeExistsSync, safeWriteFile, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
+import { readTextFile } from './refactor/cli-input.js';
 
 const inboxPath = pathResolver.shared('portal/inbox.json');
 const outboxPath = pathResolver.shared('portal/outbox.json');
@@ -14,7 +15,7 @@ interface PortalRequest {
 async function processInbox(): Promise<void> {
   if (!safeExistsSync(inboxPath)) return;
 
-  const raw = safeReadFile(inboxPath, { encoding: 'utf8' }) as string;
+  const raw = readTextFile(inboxPath);
   const request: PortalRequest = JSON.parse(raw);
   if (request.status !== 'pending') return;
 

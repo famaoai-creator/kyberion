@@ -3,8 +3,9 @@
  * CLI argument parsing utilities for the Mission Controller.
  */
 
-import { safeExistsSync, safeReadFile } from '@agent/core';
+import { safeExistsSync } from '@agent/core';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
+import { readJsonFile } from './cli-input.js';
 
 export interface MissionStartCreateOptions {
   tier?: 'personal' | 'confidential' | 'public';
@@ -138,7 +139,7 @@ export function extractFileRelationshipsOption(argv: string[] = process.argv): P
   if (!safeExistsSync(filePath)) {
     throw new Error(`Relationships file not found: ${filePath}`);
   }
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Partial<MissionRelationships>;
+  return readJsonFile<Partial<MissionRelationships>>(filePath);
 }
 
 export function extractMissionStartCreateOptionsFromArgv(argv: string[] = process.argv): MissionStartCreateOptions {

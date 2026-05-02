@@ -1,0 +1,61 @@
+{
+  "pipeline_id": "culture-governance-guardrail",
+  "version": "1.1.0",
+  "description": "Monitor agent traces for values alignment and ethical guardrails.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "sample-traces",
+      "type": "capture",
+      "op": "system:sample_traces",
+      "params": {
+        "count": 10,
+        "export_as": "sampled_data"
+      }
+    },
+    {
+      "id": "load-vision",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "knowledge/public/roles/ceo/PROCEDURE.md",
+        "export_as": "core_vision"
+      }
+    },
+    {
+      "id": "alignment-audit",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Audit the sampled traces against core vision and ethical guidelines. Identify any 'reasoning drift' or cultural misalignment. Tag violations as high/med/low risk.",
+        "context": [
+          "{{sampled_data}}",
+          "{{core_vision}}"
+        ],
+        "export_as": "audit_findings"
+      }
+    },
+    {
+      "id": "log-compliance",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Cultural Guardrail Audit complete. Findings: {{audit_findings}}"
+      }
+    },
+    {
+      "id": "emit-audit-log",
+      "type": "apply",
+      "op": "wisdom:write_file",
+      "params": {
+        "path": "knowledge/confidential/governance/culture-audit-log.jsonl",
+        "append": true,
+        "content": {
+          "ts": "{{timestamp}}",
+          "verdict": "{{audit_findings.summary}}",
+          "risks": "{{audit_findings.risks}}"
+        }
+      }
+    }
+  ]
+}

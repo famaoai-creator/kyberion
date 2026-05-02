@@ -1,6 +1,7 @@
 import { logger } from './core.js';
 import { safeReadFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Declarative Policy Engine v1.0
@@ -58,7 +59,7 @@ class PolicyEngineImpl {
   private rateLimitCounters: Map<string, { count: number; windowStart: number }> = new Map();
 
   loadFromFile(filePath?: string): void {
-    const root = findProjectRoot();
+    const root = pathResolver.rootDir();
     const policyPath = filePath || path.join(root, 'knowledge', 'governance', 'agent-policies.yaml');
 
     if (!safeExistsSync(policyPath)) {
@@ -271,17 +272,6 @@ function parseYamlValue(raw: string): any {
   if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
   if (raw.startsWith("'") && raw.endsWith("'")) return raw.slice(1, -1);
   return raw;
-}
-
-function findProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/policy-engine');

@@ -1,0 +1,65 @@
+{
+  "pipeline_id": "automate-browser-workflow",
+  "version": "1.0.0",
+  "description": "Execute a browser task while recording, then distill the recorded trace into a reusable automation pipeline (ADF).",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "init-session",
+      "type": "apply",
+      "op": "browser:open_tab",
+      "params": {
+        "url": "{{target_url}}",
+        "record_trace": true,
+        "keep_alive": true
+      }
+    },
+    {
+      "id": "execute-task",
+      "type": "apply",
+      "op": "browser:pipeline",
+      "params": {
+        "steps": "{{interaction_steps}}"
+      }
+    },
+    {
+      "id": "capture-final-state",
+      "type": "capture",
+      "op": "browser:snapshot",
+      "params": {
+        "export_as": "final_snapshot"
+      }
+    },
+    {
+      "id": "close-and-export",
+      "type": "apply",
+      "op": "browser:close_session",
+      "params": {
+        "export_trace_as": "interaction_trace"
+      }
+    },
+    {
+      "id": "distill-to-pipeline",
+      "type": "transform",
+      "op": "reasoning:synthesize",
+      "params": {
+        "instruction": "Convert the recorded browser interaction history (action_trail) and DOM snapshot into a reusable Kyberion Pipeline ADF (JSON). The output should be a single, complete JSON ADF including pipeline_id, description, and steps. Parameterize the inputs (like URLs, credentials, or search terms) using {{handlebars}} syntax to make the pipeline generic and reusable.",
+        "context": [
+          "{{action_trail}}",
+          "{{final_snapshot}}",
+          "{{interaction_steps}}"
+        ],
+        "export_as": "generated_adf"
+      }
+    },
+    {
+      "id": "save-artifact",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "pipelines/custom/{{pipeline_id_slug}}.json",
+        "content": "{{generated_adf}}"
+      }
+    }
+  ]
+}

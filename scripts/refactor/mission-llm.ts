@@ -9,10 +9,10 @@ import {
   pathResolver,
   safeExistsSync,
   safeExec,
-  safeReadFile,
   runCodexCliQuery,
   runGeminiCliQuery,
 } from '@agent/core';
+import { readJsonFile } from './cli-input.js';
 
 export interface LlmProfile {
   description?: string;
@@ -127,7 +127,7 @@ export function loadUserLlmTools(): UserLlmTools {
   const identityPath = pathResolver.knowledge('personal/my-identity.json');
   if (!safeExistsSync(identityPath)) return {};
   try {
-    const identity = JSON.parse(safeReadFile(identityPath, { encoding: 'utf8' }) as string);
+    const identity = readJsonFile<{ llm_tools?: UserLlmTools }>(identityPath);
     return identity.llm_tools || {};
   } catch (_) {
     return {};

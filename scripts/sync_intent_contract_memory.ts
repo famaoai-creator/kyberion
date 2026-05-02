@@ -1,5 +1,6 @@
 import * as AjvModule from 'ajv';
-import { compileSchemaFromPath, logger, pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { compileSchemaFromPath, logger, pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -29,7 +30,7 @@ type MemoryFile = {
 };
 
 function readJson<T>(absPath: string): T {
-  return JSON.parse(safeReadFile(absPath, { encoding: 'utf8' }) as string) as T;
+  return readJsonFile(absPath);
 }
 
 function validateMemory(value: unknown): asserts value is MemoryFile {

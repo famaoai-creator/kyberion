@@ -1,5 +1,6 @@
 import * as AjvModule from 'ajv';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -55,7 +56,7 @@ const CHECKS: CatalogCheck[] = [
 
 function readJson<T>(relativePath: string): T {
   const fullPath = pathResolver.rootResolve(relativePath);
-  return JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string) as T;
+  return readJsonFile(fullPath);
 }
 
 function validateCatalog(check: CatalogCheck, violations: string[]) {

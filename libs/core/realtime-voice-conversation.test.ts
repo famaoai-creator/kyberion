@@ -83,6 +83,9 @@ describe('realtime voice conversation', () => {
       async delegateTask() {
         return '今日はレビューと実装を進めます。';
       },
+      async prompt() {
+        return '今日はレビューと実装を進めます。';
+      },
     });
 
     const session = ensureRealtimeVoiceConversationSession({

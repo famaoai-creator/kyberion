@@ -1,5 +1,5 @@
-import * as path from 'node:path';
 import { compileFromFile } from 'json-schema-to-typescript';
+import { pathResolver } from '@agent/core';
 import { safeWriteFile } from '@agent/core/secure-io';
 
 interface GenerationTarget {
@@ -156,8 +156,8 @@ const targets: GenerationTarget[] = [
 
 async function main(): Promise<void> {
   for (const target of targets) {
-    const schemaPath = path.resolve(process.cwd(), target.schemaPath);
-    const outputPath = path.resolve(process.cwd(), target.outputPath);
+    const schemaPath = pathResolver.rootResolve(target.schemaPath);
+    const outputPath = pathResolver.rootResolve(target.outputPath);
     const compiled = await compileFromFile(schemaPath, {
       bannerComment:
         '/* tslint:disable */\n' +

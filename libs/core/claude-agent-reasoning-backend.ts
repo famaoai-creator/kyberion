@@ -574,4 +574,8 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
     });
     return result.parsed.answer;
   }
+
+  async prompt(prompt: string): Promise<string> {
+    return this.delegateTask(prompt);
+  }
 }

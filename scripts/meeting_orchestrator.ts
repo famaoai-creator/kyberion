@@ -29,7 +29,6 @@ import {
   getMeetingBriefQuestions,
   logger,
   pathResolver,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExec,
@@ -38,6 +37,7 @@ import {
   listActionItems,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { readTextFile } from './refactor/cli-input.js';
 
 interface OrchestratorOptions {
   mission: string;
@@ -98,9 +98,7 @@ function summarize(missionId: string): void {
 }
 
 function loadOperationsProfile(profilePath: string): any {
-  return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(profilePath), { encoding: 'utf8' }) as string
-  );
+  return JSON.parse(readTextFile(pathResolver.rootResolve(profilePath)));
 }
 
 function writeMeetingBrief(missionId: string, brief: unknown): string {
@@ -145,11 +143,7 @@ async function main(): Promise<void> {
   if (argv.attendees) {
     try {
       const a = (argv.attendees as string).startsWith('@')
-        ? JSON.parse(
-            safeReadFile(pathResolver.rootResolve((argv.attendees as string).slice(1)), {
-              encoding: 'utf8',
-            }) as string
-          )
+        ? JSON.parse(readTextFile(pathResolver.rootResolve((argv.attendees as string).slice(1))))
         : JSON.parse(argv.attendees as string);
       attendees = Array.isArray(a) ? a : [];
     } catch (err: any) {

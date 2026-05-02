@@ -4,12 +4,13 @@ import * as yaml from 'js-yaml';
 import { logger } from './core.js';
 import { metrics } from './metrics.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Actuator Pipeline Orchestrator - chains actuator steps together with data passing.
  */
 
-const rootDir = process.cwd();
+const rootDir = pathResolver.rootDir();
 const actuatorIndexCandidates = [
   path.join(rootDir, 'knowledge/public/orchestration/global_actuator_index.json'),
   path.join(rootDir, 'knowledge/orchestration/global_actuator_index.json'),

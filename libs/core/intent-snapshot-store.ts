@@ -11,7 +11,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { missionEvidenceDir } from './path-resolver.js';
-import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { safeAppendFileSync, safeReadFile, safeExistsSync } from './secure-io.js';
 import {
   classifyDrift,
   computeIntentDelta,
@@ -55,14 +55,7 @@ function readJsonl<T>(filePath: string): T[] {
 }
 
 function appendJsonl(filePath: string, record: unknown): void {
-  const existing = safeExistsSync(filePath)
-    ? (safeReadFile(filePath, { encoding: 'utf8' }) as string)
-    : '';
-  const line = JSON.stringify(record);
-  const next = existing.length > 0 && !existing.endsWith('\n')
-    ? `${existing}\n${line}\n`
-    : `${existing}${line}\n`;
-  safeWriteFile(filePath, next, { encoding: 'utf8', mkdir: true });
+  safeAppendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
 }
 
 export function listSnapshots(missionId: string): IntentSnapshot[] {

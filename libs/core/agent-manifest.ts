@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeExistsSync, safeReaddir } from './secure-io.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
@@ -289,12 +290,5 @@ export function isActuatorAllowed(manifest: AgentManifest, actuator: string): bo
 }
 
 function findProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
+  return pathResolver.rootDir();
 }

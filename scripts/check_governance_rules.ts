@@ -1,5 +1,6 @@
 import * as AjvModule from 'ajv';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -164,8 +165,7 @@ const CHECKS: GovernanceRuleCheck[] = [
 ];
 
 function readJson<T>(relativePath: string): T {
-  const fullPath = pathResolver.rootResolve(relativePath);
-  return JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string) as T;
+  return readJsonFile<T>(pathResolver.rootResolve(relativePath));
 }
 
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {

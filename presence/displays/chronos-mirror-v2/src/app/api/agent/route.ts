@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { safeExistsSync } from "@agent/core/secure-io";
+import { pathResolver as projectPathResolver } from "@agent/core/path-resolver";
 import { guardRequest } from "../../../lib/api-guard";
 import { normalizeChronosLocale, selectChronosLocaleText } from "../../../lib/ux-vocabulary";
 
@@ -64,19 +65,7 @@ async function loadChronosCore() {
   };
 }
 
-function findProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    try {
-      if (safeExistsSync(path.join(dir, "AGENTS.md"))) return dir;
-    } catch (_) {}
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
-}
-const PROJECT_ROOT = findProjectRoot();
+const PROJECT_ROOT = projectPathResolver.rootDir();
 
 const CHRONOS_AGENT_ID = "chronos-mirror";
 const CHRONOS_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000);

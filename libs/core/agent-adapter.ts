@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import type { ChildProcess } from 'node:child_process';
@@ -23,18 +24,7 @@ function safeEnv(): NodeJS.ProcessEnv {
   return env as unknown as NodeJS.ProcessEnv;
 }
 
-/** Walk up from cwd to find the project root (contains AGENTS.md) */
-function resolveProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
-}
-const PROJECT_ROOT = resolveProjectRoot();
+const PROJECT_ROOT = pathResolver.rootDir();
 
 async function getACPSdk() {
   return await import('@agentclientprotocol/sdk');
@@ -193,7 +183,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       args: this.bootArgs,
       shutdownPolicy: 'manual',
       spawnOptions: {
-        cwd: process.cwd(),
+        cwd: PROJECT_ROOT,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: safeEnv(),
       },
@@ -287,8 +277,8 @@ abstract class BaseACPAdapter implements AgentAdapter {
     try { await this.connection.extMethod(this.dialect.authenticate, { methodId: this.authMethod, type: this.authMethod }); } catch (e) {}
 
     const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, { 
-      cwd: process.cwd(), 
-      workingDirectory: process.cwd(),
+      cwd: PROJECT_ROOT, 
+      workingDirectory: PROJECT_ROOT,
       mcpServers: [] 
     });
 
@@ -371,8 +361,8 @@ abstract class BaseACPAdapter implements AgentAdapter {
   public async refreshContext(): Promise<{ mode: 'soft'; sessionId?: string | null }> {
     if (!this.connection) throw new Error('Agent not booted.');
     const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
-      cwd: process.cwd(),
-      workingDirectory: process.cwd(),
+      cwd: PROJECT_ROOT,
+      workingDirectory: PROJECT_ROOT,
       mcpServers: []
     });
     this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
@@ -722,7 +712,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public async boot(): Promise<void> {
-    const cwd = this.options.cwd || process.cwd();
+    const cwd = this.options.cwd || PROJECT_ROOT;
     logger.info(`[UAA] Codex App Server booting (cwd: ${cwd})`);
 
     this.runtimeResourceId = `codex-app-server:${cwd}`;
@@ -853,7 +843,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   public async refreshContext(): Promise<{ mode: 'soft'; threadId?: string | null }> {
     if (!this.child) throw new Error('Codex app-server not booted.');
-    const cwd = this.options.cwd || process.cwd();
+    const cwd = this.options.cwd || PROJECT_ROOT;
     const approvalMode = this.options.approvalMode || 'strict';
     const sandboxMode = this.getSandboxMode();
     const threadRes: any = await this.sendRequest('thread/start', {
@@ -1200,7 +1190,7 @@ export class ClaudeAdapter implements AgentAdapter {
       const res = spawnSync('claude', args, {
         encoding: 'utf8',
         env: safeEnv(),
-        cwd: this.options.cwd || process.cwd(),
+        cwd: this.options.cwd || PROJECT_ROOT,
         shell: false,
         timeout: 300000, // 5 min for complex tasks
       });

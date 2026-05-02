@@ -24,6 +24,12 @@ describe('reasoning-backend', () => {
       synthesizePersona: stubReasoningBackend.synthesizePersona,
       forkBranches: stubReasoningBackend.forkBranches,
       simulateBranches: stubReasoningBackend.simulateBranches,
+      extractRequirements: stubReasoningBackend.extractRequirements,
+      extractDesignSpec: stubReasoningBackend.extractDesignSpec,
+      extractTestPlan: stubReasoningBackend.extractTestPlan,
+      decomposeIntoTasks: stubReasoningBackend.decomposeIntoTasks,
+      delegateTask: stubReasoningBackend.delegateTask,
+      prompt: stubReasoningBackend.prompt,
     };
     registerReasoningBackend(fake);
     expect(getReasoningBackend().name).toBe('fake');

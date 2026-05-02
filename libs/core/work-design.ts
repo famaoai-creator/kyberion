@@ -2,6 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { DEFAULT_SPECIALIST_ID } from './specialist-ids.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
 import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
 import { resolveMissionClassification } from './mission-classification.js';
@@ -434,7 +435,7 @@ function specialistIdForIntent(input: {
   }
   const policy = loadSpecialistRoutingPolicy();
   const matched = (policy.rules || []).find((rule) => ruleMatches(input, rule.match));
-  return matched?.specialist_id || policy.fallback_specialist_id || 'surface-concierge';
+  return matched?.specialist_id || policy.fallback_specialist_id || DEFAULT_SPECIALIST_ID;
 }
 
 export function resolveWorkDesign(input: {

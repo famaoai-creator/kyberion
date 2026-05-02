@@ -646,4 +646,8 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const parts = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
     return parts.map((b) => b.text).join('\n');
   }
+
+  async prompt(prompt: string): Promise<string> {
+    return this.delegateTask(prompt);
+  }
 }

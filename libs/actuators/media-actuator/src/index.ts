@@ -16,6 +16,7 @@ import {
   loadProjectRecord,
   loadServiceBindingRecord,
   resolveRef,
+  resolveVars,
   handleStepError,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -228,25 +229,9 @@ async function handleAction(input: MediaAction) {
 }
 
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
-  
-  const resolve = (val: any) => {
-    if (typeof val !== 'string') return val;
-    const singleVarMatch = val.match(/^{{(.*?)}}$/);
-    if (singleVarMatch) {
-      const parts = singleVarMatch[1].trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? current : '';
-    }
-    return val.replace(/{{(.*?)}}/g, (_, p) => {
-      const parts = p.trim().split('.');
-      let current = ctx;
-      for (const part of parts) { current = current?.[part]; }
-      return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
-    });
-  };
+  const resolve = (val: any) => resolveVars(val, ctx);
 
   const results = [];
   for (const step of steps) {
@@ -305,7 +290,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'json_read': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
@@ -390,7 +375,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 }
 
 async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'pdf_to_pptx_design': {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
@@ -698,7 +683,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
-  const rootDir = process.cwd();
+  const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'mermaid_render': {
       const outPath = path.resolve(rootDir, resolve(params.path));
@@ -5310,7 +5295,7 @@ function buildDocumentPdfProtocol(rawBrief: any): any {
   ].filter(Boolean) : [];
 
   const noteLines = Array.isArray(brief.notes) ? brief.notes.filter(Boolean) : [];
-  const { templateId, template } = resolveDocumentLayoutTemplate(process.cwd(), brief);
+  const { templateId, template } = resolveDocumentLayoutTemplate(pathResolver.rootDir(), brief);
   const pageWidth = Number(template.page?.width || 595);
   const pageHeight = Number(template.page?.height || 842);
   const left = Number(template.page?.left || 48);
@@ -6062,7 +6047,7 @@ function resolveDrawioBoundaryIcon(node: any, iconRoot?: string): string | null 
   for (const candidate of candidates) {
     const absolutePath = iconRoot
       ? path.resolve(iconRoot, candidate)
-      : path.resolve(process.cwd(), candidate);
+      : path.resolve(pathResolver.rootDir(), candidate);
     if (!safeExistsSync(absolutePath)) continue;
     const buffer = safeReadFile(absolutePath, { encoding: null }) as Buffer;
     const extension = path.extname(absolutePath).toLowerCase();
@@ -6177,7 +6162,7 @@ function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string
   for (const candidate of candidates) {
     const absolutePath = iconRoot
       ? path.resolve(iconRoot, candidate)
-      : path.resolve(process.cwd(), candidate);
+      : path.resolve(pathResolver.rootDir(), candidate);
     if (!safeExistsSync(absolutePath)) {
       continue;
     }
@@ -6489,7 +6474,7 @@ function escapeXml(input: string): string {
 
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputContent = safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = safeReadFile(path.resolve(pathResolver.rootDir(), argv.input as string), { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

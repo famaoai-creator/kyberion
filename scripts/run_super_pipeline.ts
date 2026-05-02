@@ -1,18 +1,15 @@
 import { logger } from '@agent/core/core';
-import { rootResolve } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
-import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { SuperPipelineStep } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 
 async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputContent = safeReadFile(rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
-  const inputData = validatePipelineAdf(JSON.parse(inputContent)) as { steps: SuperPipelineStep[], context?: any, options?: any };
+  const inputData = readValidatedPipelineAdf(argv.input as string) as { steps: SuperPipelineStep[], context?: any, options?: any };
 
   logger.info(`🧠 [SUPER_NERVE] Initiating cross-actuator pipeline from: ${argv.input}`);
   
