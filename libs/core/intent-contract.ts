@@ -1,8 +1,8 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
-import { CodexAppServerAdapter, ClaudeAdapter, GeminiAdapter } from './agent-adapter.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import {
@@ -533,54 +533,8 @@ function buildWorkLoopPrompt(
   ].join('\n');
 }
 
-async function defaultAsk(prompt: string, target = resolveIntentCompilerTarget()): Promise<string> {
-  const provider = target.provider;
-  if (provider === 'claude') {
-    const adapter = new ClaudeAdapter({
-      cwd: pathResolver.rootDir(),
-      permissionMode: 'auto',
-      systemPrompt: 'Return only valid JSON. Do not include markdown fences.',
-      model: target.model,
-    });
-    await adapter.boot();
-    try {
-      const response = await adapter.ask(prompt);
-      return response.text;
-    } finally {
-      await adapter.shutdown();
-    }
-  }
-
-  if (provider === 'gemini') {
-    const adapter = new GeminiAdapter({
-      model: target.model,
-    });
-    await adapter.boot();
-    try {
-      const response = await adapter.ask(prompt);
-      return response.text;
-    } finally {
-      await adapter.shutdown();
-    }
-  }
-
-  const adapter = new CodexAppServerAdapter({
-    cwd: pathResolver.rootDir(),
-    systemPrompt: 'Return only valid JSON. Do not include markdown fences.',
-    model: target.model,
-    modelProvider: target.modelProvider,
-    approvalMode:
-      (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
-        ? 'relaxed'
-        : 'strict',
-  });
-  await adapter.boot();
-  try {
-    const response = await adapter.ask(prompt);
-    return response.text;
-  } finally {
-    await adapter.shutdown();
-  }
+async function defaultAsk(prompt: string): Promise<string> {
+  return getReasoningBackend().prompt(prompt);
 }
 
 export function resolveIntentCompilerTarget(
@@ -623,7 +577,7 @@ async function compileExecutionBriefWithLlm(
   options: LlmCompileOptions = {}
 ): Promise<ActuatorExecutionBrief | null> {
   const ask =
-    options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
+    options.askFn || ((prompt: string) => defaultAsk(prompt));
   const raw = await ask(buildExecutionBriefPrompt(input));
   const parsed = parseJsonObject<ActuatorExecutionBrief>(raw);
   return parsed ? normalizeExecutionBrief(parsed, toExecutionBriefSeed(input)) : null;
@@ -635,7 +589,7 @@ async function compileIntentContractWithLlm(
   options: LlmCompileOptions = {}
 ): Promise<IntentContract | null> {
   const ask =
-    options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
+    options.askFn || ((prompt: string) => defaultAsk(prompt));
   const raw = await ask(buildIntentContractPrompt(input, executionBrief));
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
@@ -650,7 +604,7 @@ async function compileWorkLoopWithLlm(
   options: LlmCompileOptions = {}
 ): Promise<OrganizationWorkLoopSummary | null> {
   const ask =
-    options.askFn || ((prompt: string) => defaultAsk(prompt, resolveIntentCompilerTarget(options)));
+    options.askFn || ((prompt: string) => defaultAsk(prompt));
   const raw = await ask(buildWorkLoopPrompt(input, executionBrief, contract));
   const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
   if (!parsed) return null;

@@ -4,9 +4,9 @@ import {
   buildMissionOrchestrationEvaluationReport,
   pathResolver,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -22,7 +22,7 @@ interface ScenarioRunRecord {
 }
 
 function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return readJsonFile(filePath);
 }
 
 function compileSchema(schemaPath: string) {

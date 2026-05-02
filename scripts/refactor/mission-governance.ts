@@ -18,6 +18,7 @@ import {
   trustEngine,
   validateOutcomeContractAtCompletion,
 } from '@agent/core';
+import { readJsonFile, readTextFile } from './cli-input.js';
 import { loadState } from './mission-state.js';
 
 export function syncRoleProcedure(missionId: string, persona: string): void {
@@ -33,7 +34,7 @@ export function syncRoleProcedure(missionId: string, persona: string): void {
   const targetPath = path.join(targetDir, 'ROLE_PROCEDURE.md');
 
   if (safeExistsSync(sourcePath)) {
-    const procedure = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+    const procedure = readTextFile(sourcePath);
     safeWriteFile(targetPath, procedure);
     logger.info(`📋 [Governance] Mirrored procedure for role "${persona}" to mission context.`);
   } else {
@@ -61,7 +62,7 @@ export function updateTrustScore(agentId: string, result: 'verified' | 'rejected
 export function readTrustLedger(): Record<string, any> {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (!safeExistsSync(ledgerPath)) return {};
-  const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+  const raw = readJsonFile<Record<string, unknown>>(ledgerPath);
   return raw?.agents ?? raw ?? {};
 }
 
@@ -69,7 +70,7 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
   const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
   if (!safeExistsSync(policyPath)) return { ok: true };
 
-  const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
+  const policy = readJsonFile<{ quality_requirements?: Record<string, unknown> }>(policyPath);
   const reqs = policy.quality_requirements;
   if (!reqs) return { ok: true };
 

@@ -49,7 +49,7 @@ export interface ExecuteTaskPlanParams {
   maxTasks?: number;
   /** Model alias passed to the sub-agent. Defaults to 'opus'. */
   model?: string;
-  /** Working directory for the sub-agent. Defaults to process.cwd(). */
+  /** Working directory for the sub-agent. Defaults to the project root in higher-level callers. */
   cwd?: string;
   /** Extra allowedTools to auto-approve beyond the claude_code preset. */
   allowedTools?: string[];

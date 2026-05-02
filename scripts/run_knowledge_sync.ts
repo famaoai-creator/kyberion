@@ -1,4 +1,6 @@
-import { logger, safeReadFile, safeExec, safeWriteFile, rootResolve, safeExistsSync, safeUnlinkSync, sharedTmp, capabilityEntry } from '@agent/core';
+import { logger, rootResolve, safeExistsSync } from '@agent/core';
+import { invokeActuatorWithTempInput } from './refactor/ephemeral-actuator-call.js';
+import { readJsonFile } from './refactor/cli-input.js';
 
 async function main() {
   const configPath = rootResolve('knowledge/governance/knowledge-sync-rules.json');
@@ -6,20 +8,15 @@ async function main() {
     logger.warn('Knowledge sync rules not found.');
     return;
   }
-  const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+  const config = readJsonFile(configPath);
   
   for (const job of config.jobs || []) {
     logger.info(`🔄 [KNOWLEDGE] Running sync action: ${job.action}`);
-    const tempAdfPath = sharedTmp(`scripts/knowledge-sync-${Date.now()}.json`);
-    safeWriteFile(tempAdfPath, JSON.stringify(job));
-    
     try {
-      const output = safeExec('node', [capabilityEntry('wisdom-actuator'), '--input', tempAdfPath]);
+      const output = invokeActuatorWithTempInput('wisdom-actuator', job, 'knowledge-sync');
       console.log(output);
     } catch (err: any) {
       logger.error(`Knowledge sync ${job.action} failed: ${err.message}`);
-    } finally {
-      if (safeExistsSync(tempAdfPath)) safeUnlinkSync(tempAdfPath);
     }
   }
 }

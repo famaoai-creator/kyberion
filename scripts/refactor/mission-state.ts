@@ -10,12 +10,14 @@ import {
   missionDir as resolveMissionDir,
   pathResolver,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
+  safeReaddir,
   safeWriteFile,
   withLock,
 } from '@agent/core';
 import { hasAuthority, detectTier } from '@agent/core/governance';
+import { readJsonFile } from './cli-input.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 
 export function assertCanGrantMissionAuthority(): void {
@@ -60,8 +62,7 @@ export function normalizeRelationships(
 export function readFocusedMissionId(missionFocusPath: string): string | null {
   if (!safeExistsSync(missionFocusPath)) return null;
   try {
-    const raw = safeReadFile(missionFocusPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw);
+    const parsed = readJsonFile<{ mission_id?: string }>(missionFocusPath);
     return typeof parsed?.mission_id === 'string' ? parsed.mission_id.toUpperCase() : null;
   } catch (_) {
     return null;
@@ -133,8 +134,7 @@ export function loadState(id: string): MissionState | null {
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
   try {
-    const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-    return JSON.parse(content);
+    return readJsonFile<MissionState>(statePath);
   } catch (_) { return null; }
 }
 
@@ -176,7 +176,7 @@ export function getActiveMissionSearchDirs(): string[] {
   const configPath = pathResolver.knowledge('public/governance/mission-management-config.json');
   if (safeExistsSync(configPath)) {
     try {
-      const config = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+      const config = readJsonFile<{ directories?: Record<string, string> }>(configPath);
       const dirs = config.directories || {};
       return ACTIVE_TIERS
         .map(tier => dirs[tier])
@@ -187,10 +187,33 @@ export function getActiveMissionSearchDirs(): string[] {
   return [pathResolver.active('missions')];
 }
 
+export function listMissionsInSearchDirs(): Array<{ missionId: string; missionPath: string }> {
+  const missions: Array<{ missionId: string; missionPath: string }> = [];
+  for (const dir of getActiveMissionSearchDirs()) {
+    if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
+    try {
+      for (const entry of safeReaddir(dir)) {
+        try {
+          if (!safeLstat(path.join(dir, entry)).isDirectory()) continue;
+          missions.push({
+            missionId: entry,
+            missionPath: path.join(dir, entry),
+          });
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+  return missions;
+}
+
+export function listActiveMissions(): Array<{ missionId: string; missionPath: string }> {
+  return listMissionsInSearchDirs().filter(({ missionId }) => loadState(missionId)?.status === 'active');
+}
+
 export function readJsonFileSafe(filePath: string): any | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    return readJsonFile(filePath);
   } catch (_) {
     return null;
   }

@@ -1,5 +1,5 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { logger, safeReadFile } from '@agent/core';
+import { logger, safeReadFile, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,7 +40,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = pathResolver.rootResolve(argv.input as string);
   const input = JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }) as string) as LegacyPhysicalBridgeInput;
   await handleAction(input);
 };

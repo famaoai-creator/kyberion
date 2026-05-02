@@ -1,8 +1,7 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeExistsSync, safeUnlinkSync } from '../secure-io.js';
+import { safeCreateExclusiveFileSync, safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync } from '../secure-io.js';
 
 /**
  * Lock Utilities for Autonomous Resource Arbitration.
@@ -25,14 +24,14 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
 
   while (Date.now() - startTime < timeoutMs) {
     try {
-      // Use 'wx' flag to fail if the file already exists (atomic check-and-create)
-      const fd = fs.openSync(lockFile, 'wx');
-      fs.writeSync(fd, JSON.stringify({
-        pid: process.pid,
-        ts: new Date().toISOString(),
-        id: resourceId
-      }));
-      fs.closeSync(fd);
+      safeCreateExclusiveFileSync(
+        lockFile,
+        JSON.stringify({
+          pid: process.pid,
+          ts: new Date().toISOString(),
+          id: resourceId,
+        }),
+      );
       return true;
     } catch (err: any) {
       if (err.code === 'EEXIST') {
@@ -60,7 +59,7 @@ export function releaseLock(resourceId: string): void {
   const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
   if (safeExistsSync(lockFile)) {
     try {
-      const content = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+      const content = JSON.parse(safeReadFile(lockFile, { encoding: 'utf8' }) as string);
       if (content.pid === process.pid) {
         safeUnlinkSync(lockFile);
       }
@@ -76,7 +75,7 @@ export function releaseLock(resourceId: string): void {
  */
 function _isLockStale(lockFile: string): boolean {
   try {
-    const content = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+    const content = JSON.parse(safeReadFile(lockFile, { encoding: 'utf8' }) as string);
     // Check if PID is still running (signal 0 doesn't kill but checks existence)
     process.kill(content.pid, 0);
     return false; // Still running

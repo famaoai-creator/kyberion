@@ -1,0 +1,83 @@
+{
+  "pipeline_id": "external-intelligence-radar",
+  "version": "1.1.0",
+  "description": "Compare external competitive intelligence with internal strategy docs.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-confidential-tier",
+      "type": "control",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+          {
+            "id": "load-targets",
+            "type": "capture",
+            "op": "system:read_json",
+            "params": {
+              "path": "knowledge/confidential/strategy/radar-targets.json",
+              "export_as": "radar_targets"
+            }
+          },
+          {
+            "id": "mock-findings",
+            "type": "transform",
+            "op": "reasoning:analyze",
+            "params": {
+              "instruction": "Simulate latest market findings for keywords: {{radar_targets.keywords}}. Focus on a new breakthrough from 'Agent-X' in autonomous SDR capability.",
+              "export_as": "web_findings"
+            }
+          },
+          {
+            "id": "load-internal-strategy",
+            "type": "capture",
+            "op": "wisdom:knowledge_search",
+            "params": {
+              "query": "current business strategy",
+              "tier": "confidential",
+              "limit": 5,
+              "export_as": "internal_strategy"
+            }
+          },
+          {
+            "id": "impact-analysis",
+            "type": "transform",
+            "op": "reasoning:analyze",
+            "params": {
+              "instruction": "Compare internal strategy with simulated findings. Identify critical gaps or threats.",
+              "context": [
+                "{{web_findings}}",
+                "{{internal_strategy}}"
+              ],
+              "export_as": "radar_analysis"
+            }
+          },
+          {
+            "id": "emit-report",
+            "type": "apply",
+            "op": "wisdom:write_file",
+            "params": {
+              "path": "{{mission_evidence_dir}}/radar-report.md",
+              "content": "{{radar_analysis}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "external-intelligence-radar requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

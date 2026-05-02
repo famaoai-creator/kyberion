@@ -1,8 +1,8 @@
 import { createRequire } from 'node:module';
-import * as path from 'node:path';
 import { validatePhysicalDependencies } from './PhysicalLayer.js';
 import { resolveServiceBinding } from '../../service-binding.js';
 import { safeReadFile, safeExistsSync, safeExec } from '../../secure-io.js';
+import { pathResolver } from '../../path-resolver.js';
 
 const require = createRequire(import.meta.url);
 
@@ -76,7 +76,7 @@ export async function validateService(req: ServiceRequirements): Promise<Service
 
 function checkModule(moduleName: string): boolean {
   try {
-    require.resolve(moduleName, { paths: [process.cwd()] });
+    require.resolve(moduleName, { paths: [pathResolver.rootDir()] });
     return true;
   } catch (e) {
     return false;
@@ -88,12 +88,13 @@ function checkModule(moduleName: string): boolean {
  * Checks both API tokens in Vault and CLI-based authentication health.
  */
 export async function validateServiceAuth(serviceId: string, presetPath?: string): Promise<{ valid: boolean; reason?: string }> {
-  if (!presetPath || !safeExistsSync(path.resolve(process.cwd(), presetPath))) {
+  const resolvedPresetPath = presetPath ? pathResolver.rootResolve(presetPath) : undefined;
+  if (!resolvedPresetPath || !safeExistsSync(resolvedPresetPath)) {
     return { valid: true };
   }
 
   try {
-    const presetRaw = safeReadFile(path.resolve(process.cwd(), presetPath), { encoding: 'utf8' }) as string;
+    const presetRaw = safeReadFile(resolvedPresetPath, { encoding: 'utf8' }) as string;
     const preset = JSON.parse(presetRaw);
     const strategy = (preset.auth_strategy || 'none').toLowerCase();
 

@@ -6,11 +6,13 @@ import {
   safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 const ROOT = pathResolver.rootDir();
 const ALLOWED_CJS_FILES = new Set([
   'presence/displays/chronos-mirror-v2/postcss.config.cjs',
   'presence/displays/chronos-mirror-v2/tailwind.config.cjs',
+  'scripts/hyperframes-localhost-preload.cjs',
   'scripts/refactor/standardize-yargs.js',
   'templates/skill-template-cjs/scripts/main.cjs',
 ]);
@@ -80,9 +82,9 @@ function checkPackageJson(filePath: string, violations: string[]) {
   const relativePath = toPosix(path.relative(ROOT, filePath));
   if (ALLOWED_NON_MODULE_PACKAGES.has(relativePath)) return;
 
-  const pkg = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const pkg = readJsonFile<{
     type?: string;
-  };
+  }>(filePath);
   if (pkg.type !== 'module') {
     violations.push(`${relativePath}: package.json must declare "type": "module"`);
   }
@@ -90,7 +92,7 @@ function checkPackageJson(filePath: string, violations: string[]) {
 
 function checkSourceFile(filePath: string, violations: string[]) {
   const relativePath = toPosix(path.relative(ROOT, filePath));
-  const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  const content = readTextFile(filePath);
 
   const isCjsFile = filePath.endsWith('.cjs');
   if (isCjsFile && !ALLOWED_CJS_FILES.has(relativePath)) {

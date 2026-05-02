@@ -1,0 +1,93 @@
+{
+  "pipeline_id": "strategic-impact-simulator",
+  "version": "1.1.0",
+  "description": "Simulate second-order effects of strategic decisions.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-inputs-and-tier",
+      "type": "control",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+          {
+            "id": "guard-decision-input",
+            "type": "control",
+            "op": "if",
+            "params": {
+              "condition": {
+                "from": "user_input_decision",
+                "operator": "exists"
+              },
+              "then": [
+                {
+                  "id": "load-roadmaps",
+                  "type": "capture",
+                  "op": "wisdom:knowledge_search",
+                  "params": {
+                    "query": "project roadmap",
+                    "tier": "confidential",
+                    "export_as": "current_roadmaps"
+                  }
+                },
+                {
+                  "id": "simulate-branches",
+                  "type": "transform",
+                  "op": "wisdom:simulate_all",
+                  "params": {
+                    "goal": "{{user_input_decision}}",
+                    "output_dir": "{{mission_evidence_dir}}/simulation",
+                    "export_as": "simulation_result"
+                  }
+                },
+                {
+                  "id": "impact-mapping",
+                  "type": "transform",
+                  "op": "reasoning:analyze",
+                  "params": {
+                    "instruction": "Analyze the simulated outcomes from {{simulation_result.written_to}}. Map to second-order impacts. Identify 'poison pills' and 'golden paths'.",
+                    "export_as": "impact_report"
+                  }
+                },
+                {
+                  "id": "emit-plan",
+                  "type": "apply",
+                  "op": "wisdom:write_file",
+                  "params": {
+                    "path": "{{mission_evidence_dir}}/strategic-impact-simulation.md",
+                    "content": "{{impact_report}}"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "id": "reject-missing-decision",
+                  "type": "apply",
+                  "op": "system:log",
+                  "params": {
+                    "message": "strategic-impact-simulator requires user_input_decision before execution."
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "strategic-impact-simulator requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

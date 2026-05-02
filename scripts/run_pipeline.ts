@@ -1,25 +1,83 @@
-import { logger, safeExec, resolveVars, evaluateCondition, capabilityEntry, findMissionPath, missionEvidenceDir } from '@agent/core';
-import { rootResolve } from '@agent/core/path-resolver';
+import { logger, safeExec, resolveVars, evaluateCondition, capabilityEntry, findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core';
 import * as nodePath from 'node:path';
-import { safeReadFile } from '@agent/core/secure-io';
-import { derivePipelineStatus, type PipelineAdfStep, validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 
-type WisdomDispatch = (op: string, params: any, ctx: Record<string, unknown>) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
+type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
-let wisdomDispatchCache: WisdomDispatch | null = null;
+const dispatchCache: Record<string, DispatchFunc> = {};
 
-async function loadWisdomDispatch(): Promise<WisdomDispatch> {
-  if (wisdomDispatchCache) return wisdomDispatchCache;
-  const entry = capabilityEntry('wisdom-actuator');
-  const mod = await import(pathToFileURL(entry).href);
-  if (typeof mod.dispatchDecisionOp !== 'function') {
-    throw new Error('wisdom-actuator does not export dispatchDecisionOp — rebuild required');
+async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
+  if (dispatchCache[domain]) return dispatchCache[domain];
+  
+  if (domain === 'reasoning') {
+    dispatchCache[domain] = async (op, params, ctx, type) => {
+      const { getReasoningBackend } = await import('@agent/core');
+      const backend = getReasoningBackend();
+      if (op === 'analyze' || op === 'transform' || op === 'synthesize') {
+        const resolvedInstruction =
+          typeof params.instruction === 'string'
+            ? resolveVars(params.instruction, ctx)
+            : params.instruction;
+        const resolvedContext = Array.isArray(params.context)
+          ? params.context.map((item) => (typeof item === 'string' ? resolveVars(item, ctx) : item))
+          : typeof params.context === 'string'
+            ? resolveVars(params.context, ctx)
+            : params.context || ctx;
+        const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}`;
+        const response = await backend.prompt(prompt);
+        return { handled: true, ctx: { ...ctx, [params.export_as || 'last_reasoning']: response } };
+      }
+      return { handled: false, ctx };
+    };
+    return dispatchCache[domain];
   }
-  wisdomDispatchCache = mod.dispatchDecisionOp;
-  return wisdomDispatchCache;
+
+  try {
+    const entry = capabilityEntry(`${domain}-actuator`);
+    const mod = await import(pathToFileURL(entry).href);
+    
+    dispatchCache[domain] = async (op, params, ctx, type) => {
+      let result = { handled: false, ctx };
+
+      // Priority 1: dispatchDecisionOp (Standard for Wisdom/Decision actuators)
+      if (typeof mod.dispatchDecisionOp === 'function') {
+        result = await mod.dispatchDecisionOp(op, params, ctx);
+      }
+      
+      // Priority 2: handleAction (Standard for Action-based actuators)
+      if (!result.handled && typeof mod.handleAction === 'function') {
+        try {
+          const actionResult = await mod.handleAction({ 
+            action: 'pipeline', 
+            steps: [{ type: type || 'apply', op, params }], 
+            context: ctx 
+          });
+          result = { handled: true, ctx: actionResult };
+        } catch (err: any) {
+          try {
+            const directResult = await mod.handleAction({ 
+              action: op, 
+              params: { ...params, context: ctx }
+            });
+            result = { handled: true, ctx: { ...ctx, [params.export_as || 'last_action_result']: directResult } };
+          } catch (err2) {
+            logger.info(`  [SYS_PIPELINE] Actuator fallback failed for domain: ${domain}, op: ${op}`);
+          }
+        }
+      }
+      
+      return result;
+    };
+  } catch (err) {
+    logger.info(`  [SYS_PIPELINE] Could not load actuator for domain: ${domain}`);
+    dispatchCache[domain] = async () => ({ handled: false, ctx: {} });
+  }
+  
+  return dispatchCache[domain];
 }
 
 export function normalizePipelineOp(op: string): string {
@@ -33,10 +91,26 @@ function resolveLogMessage(params: Record<string, unknown>, ctx: Record<string, 
   return String(resolveVars(template, ctx));
 }
 
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`);
+}
+
+function matchesArtifactPattern(filePath: string, pattern: string): boolean {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const basename = path.posix.basename(normalizedPath);
+  const matcher = globToRegExp(pattern.replace(/\\/g, '/'));
+  return matcher.test(normalizedPath) || matcher.test(basename);
+}
+
 export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {
   let ctx: Record<string, unknown> = { ...initialCtx };
   const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
   const shellBin = process.env.SHELL || 'bash';
+  const rootDir = pathResolver.rootDir();
 
   for (const step of steps) {
     try {
@@ -48,7 +122,7 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
         logger.info(resolveLogMessage(params, ctx));
       } else if (domain === 'system' && action === 'shell') {
         const cmd = String(resolveVars(params.cmd || '', ctx));
-        const output = safeExec(shellBin, ['-lc', cmd], { cwd: process.cwd() }).trim();
+        const output = safeExec(shellBin, ['-lc', cmd], { cwd: rootDir }).trim();
         if (params.export_as && typeof params.export_as === 'string') {
           ctx = { ...ctx, [params.export_as]: output };
         }
@@ -59,15 +133,19 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
           ctx = nested.context;
           results.push(...nested.results);
         }
-      } else if (domain === 'wisdom') {
-        const dispatch = await loadWisdomDispatch();
-        const decision = await dispatch(action, params, ctx);
-        if (!decision.handled) {
+      } else {
+        const dispatch = await loadActuatorDispatch(domain);
+        const result = await dispatch(action, params, ctx, step.type);
+        if (!result.handled) {
           throw new Error(`Unsupported pipeline op: ${step.op}`);
         }
-        ctx = decision.ctx;
-      } else {
-        throw new Error(`Unsupported pipeline op: ${step.op}`);
+        // If the actuator returned a standard result object with a nested context, extract it.
+        // Otherwise, use the returned object as the new context (backward compatibility).
+        if (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx) {
+          ctx = result.ctx.context as Record<string, unknown>;
+        } else {
+          ctx = result.ctx;
+        }
       }
 
       results.push({ op: normalizedOp, status: 'success' });
@@ -86,9 +164,7 @@ export async function main() {
     .option('context', { alias: 'c', type: 'string', describe: 'JSON string merged into pipeline.context (overrides)' })
     .parseSync();
 
-  const inputPath = rootResolve(argv.input as string);
-  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const pipeline = validatePipelineAdf(JSON.parse(inputContent));
+  const pipeline = readValidatedPipelineAdf(argv.input as string);
 
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;
   let overrideContext: Record<string, unknown> = {};
@@ -113,16 +189,18 @@ export async function main() {
     const missionPath = findMissionPath(missionId);
     const evidenceDir = missionEvidenceDir(missionId);
     if (missionPath) {
-      autoContext.mission_dir = nodePath.relative(process.cwd(), missionPath) || missionPath;
+      autoContext.mission_dir = nodePath.relative(pathResolver.rootDir(), missionPath) || missionPath;
       autoContext.mission_tier = nodePath.basename(nodePath.dirname(missionPath));
     }
     if (evidenceDir) {
-      autoContext.mission_evidence_dir = nodePath.relative(process.cwd(), evidenceDir) || evidenceDir;
+      autoContext.mission_evidence_dir = nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
     }
   }
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
 
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
+  logger.info(`   [PIPELINE] Mission ID: ${missionId || 'NONE'}`);
+  logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
 
   try {
     const result = await runSteps(

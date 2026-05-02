@@ -376,8 +376,8 @@ export const fileUtils = {
       const content = rawReadTextFile(resolved);
       const data = JSON.parse(content);
       if (stat.size < 5 * 1024 * 1024) {
-        const isIndex = resolved.includes('global_actuator_index.json');
-        _fileCache.set(resolved, { mtimeMs, data }, undefined, isIndex);
+        const persistCache = resolved.startsWith(pathResolver.knowledge('public/orchestration/'));
+        _fileCache.set(resolved, { mtimeMs, data }, undefined, persistCache);
       }
       return data;
     } catch (_) { return null; }

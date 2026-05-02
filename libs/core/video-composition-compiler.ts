@@ -13,7 +13,7 @@ import type {
 
 export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: { bundleDir?: string }): VideoCompositionRenderPlan {
   const policy = getVideoRenderRuntimePolicy();
-  const bundleDir = path.resolve(process.cwd(), options?.bundleDir || adf.output.bundle_dir || buildDefaultBundleDir(adf, policy.bundle.default_bundle_root));
+  const bundleDir = pathResolver.rootResolve(options?.bundleDir || adf.output.bundle_dir || buildDefaultBundleDir(adf, policy.bundle.default_bundle_root));
   const compositionId = slugify(adf.intent || adf.title || 'video-composition');
   const backgroundColor = adf.composition.background_color || '#0B1020';
 
@@ -39,7 +39,7 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
   ];
 
   if (adf.audio?.narration_ref) {
-    artifactRefs.push(path.resolve(process.cwd(), adf.audio.narration_ref));
+    artifactRefs.push(pathResolver.rootResolve(adf.audio.narration_ref));
   }
 
   return {
@@ -48,7 +48,7 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
     composition_id: compositionId,
     source_kind: 'video-composition-adf',
     title: adf.title || adf.intent || 'Kyberion Video Composition',
-    narration_ref: adf.audio?.narration_ref ? path.resolve(process.cwd(), adf.audio.narration_ref) : undefined,
+    narration_ref: adf.audio?.narration_ref ? pathResolver.rootResolve(adf.audio.narration_ref) : undefined,
     duration_sec: adf.composition.duration_sec,
     fps: adf.composition.fps,
     width: adf.composition.width,
@@ -499,7 +499,7 @@ function copySceneAssets(bundleDir: string, assetRefs: VideoCompositionAssetRef[
   const assetsDir = path.join(bundleDir, 'assets');
   safeMkdir(assetsDir, { recursive: true });
   for (const asset of assetRefs) {
-    const sourcePath = path.resolve(process.cwd(), asset.path);
+    const sourcePath = pathResolver.rootResolve(asset.path);
     if (!safeExistsSync(sourcePath)) continue;
     const fileName = path.basename(sourcePath);
     const targetPath = path.join(assetsDir, fileName);

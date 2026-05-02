@@ -1,0 +1,75 @@
+{
+  "pipeline_id": "mission-portfolio-auditor",
+  "version": "1.1.0",
+  "description": "Holistic view of all active missions and bottleneck detection.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-confidential-tier",
+      "type": "control",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+    {
+      "id": "list-active",
+      "type": "capture",
+      "op": "system:list_missions",
+      "params": {
+        "status": "active",
+        "export_as": "active_mission_list"
+      }
+    },
+    {
+      "id": "collect-boards",
+      "type": "capture",
+      "op": "system:collect_artifacts",
+      "params": {
+        "mission_ids": "{{active_mission_list}}",
+        "patterns": [
+          "TASK_BOARD.md",
+          "trace.json"
+        ],
+        "export_as": "portfolio_evidence"
+      }
+    },
+    {
+      "id": "portfolio-analysis",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Analyze all active missions. Identify stall points, resource overlaps, and strategic misalignments. Rank interventions needed by the CEO.",
+        "context": [
+          "{{portfolio_evidence}}"
+        ],
+        "export_as": "portfolio_summary"
+      }
+    },
+    {
+      "id": "update-dashboard",
+      "type": "apply",
+      "op": "wisdom:write_file",
+      "params": {
+        "path": "knowledge/confidential/governance/portfolio-status.md",
+        "content": "{{portfolio_summary}}"
+      }
+    }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "mission-portfolio-auditor requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

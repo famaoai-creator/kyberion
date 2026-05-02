@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
-import { buildSafeExecEnv, safeExec, safeExistsSync, safeMoveSync, safeRmSync, platform } from './index.js';
+import { buildSafeExecEnv, safeExec, safeExistsSync, safeMoveSync, safeRmSync, platform, pathResolver } from './index.js';
 import type { VideoCompositionRenderPlan, VideoRenderRuntimePolicy } from './video-composition-contract.js';
 
 export interface VideoRenderBackendResult {
@@ -41,6 +41,7 @@ export async function renderVideoCompositionBundle(
   plan: VideoCompositionRenderPlan,
   policy: VideoRenderRuntimePolicy,
 ): Promise<VideoRenderBackendResult> {
+  const rootDir = pathResolver.rootDir();
   if (!policy.render.enable_backend_rendering) {
     return {
       executed: false,
@@ -71,7 +72,7 @@ export async function renderVideoCompositionBundle(
 
     const outputPath = resolveOutputPath(plan);
     const execEnv = buildSafeExecEnv({
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${path.resolve(process.cwd(), 'scripts/hyperframes-localhost-preload.cjs')}`,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${pathResolver.rootResolve('scripts/hyperframes-localhost-preload.cjs')}`,
     });
     const command = [
       'hyperframes',
@@ -89,7 +90,7 @@ export async function renderVideoCompositionBundle(
 
     safeExec('npx', command, {
       timeoutMs: policy.render.command_timeout_ms,
-      cwd: process.cwd(),
+      cwd: rootDir,
       env: execEnv,
     });
 
@@ -120,6 +121,7 @@ export async function renderVideoCompositionBundleAsync(
   policy: VideoRenderRuntimePolicy,
   options: VideoRenderBackendExecutionOptions = {},
 ): Promise<VideoRenderBackendResult> {
+  const rootDir = pathResolver.rootDir();
   if (!policy.render.enable_backend_rendering) {
     return {
       executed: false,
@@ -150,7 +152,7 @@ export async function renderVideoCompositionBundleAsync(
 
     const outputPath = resolveOutputPath(plan);
     const execEnv = buildSafeExecEnv({
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${path.resolve(process.cwd(), 'scripts/hyperframes-localhost-preload.cjs')}`,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${pathResolver.rootResolve('scripts/hyperframes-localhost-preload.cjs')}`,
     });
     const command = [
       'hyperframes',
@@ -171,6 +173,7 @@ export async function renderVideoCompositionBundleAsync(
       is_cancelled: options.isCancelled,
       poll_interval_ms: options.poll_interval_ms || 100,
       env: execEnv,
+      cwd: rootDir,
     });
 
     if (!safeExistsSync(outputPath)) {
@@ -197,7 +200,7 @@ export async function renderVideoCompositionBundleAsync(
 
 function resolveOutputPath(plan: VideoCompositionRenderPlan): string {
   if (plan.output_target_path && plan.output_target_path.trim()) {
-    return path.resolve(process.cwd(), plan.output_target_path.trim());
+    return pathResolver.rootResolve(plan.output_target_path.trim());
   }
   const ext = plan.output_format;
   return path.join(plan.bundle_dir, `output.${ext}`);
@@ -278,6 +281,7 @@ async function runCancellableCommand(
     is_cancelled?: () => boolean;
     poll_interval_ms: number;
     env?: NodeJS.ProcessEnv;
+    cwd: string;
   },
 ): Promise<void> {
   if (options.is_cancelled?.()) {
@@ -291,7 +295,7 @@ async function runCancellableCommand(
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: process.cwd(),
+      cwd: options.cwd,
       env: options.env || buildSafeExecEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
