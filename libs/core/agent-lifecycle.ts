@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
 import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adapter.js';
 import { agentRegistry, AgentRecord, AgentProvider, AgentStatus } from './agent-registry.js';
@@ -10,18 +11,7 @@ import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 
-/** Walk up from cwd to find the project root (contains AGENTS.md) */
-function resolveProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
-}
-const PROJECT_ROOT = resolveProjectRoot();
+const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
 
 /**

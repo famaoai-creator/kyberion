@@ -1,0 +1,68 @@
+{
+  "pipeline_id": "executive-narrative-bridge",
+  "version": "1.1.0",
+  "description": "Transform technical mission artifacts into stakeholder-ready narratives.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-confidential-tier",
+      "type": "control",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+    {
+      "id": "collect-deliverables",
+      "type": "capture",
+      "op": "system:collect_artifacts",
+      "params": {
+        "mission_ids": [
+          "{{target_mission_id}}"
+        ],
+        "patterns": [
+          "*.md",
+          "*.json"
+        ],
+        "export_as": "technical_artifacts"
+      }
+    },
+    {
+      "id": "narrative-synthesis",
+      "type": "transform",
+      "op": "reasoning:transform",
+      "params": {
+        "instruction": "Translate technical achievement into executive value. Focus on ROI, strategic alignment, and future options created. Use high-signal, low-noise language.",
+        "context": [
+          "{{technical_artifacts}}"
+        ],
+        "export_as": "executive_narrative"
+      }
+    },
+    {
+      "id": "emit-brief",
+      "type": "apply",
+      "op": "wisdom:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/executive-briefing.md",
+        "content": "{{executive_narrative}}"
+      }
+    }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "executive-narrative-bridge requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

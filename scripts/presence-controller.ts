@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { logger, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync } from '@agent/core';
+import { logger, safeWriteFile, safeAppendFile, safeExistsSync } from '@agent/core';
 import { safeExec } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
+import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 /**
  * Presence Controller v2.0 (Type-Safe TS Edition)
@@ -35,13 +36,13 @@ export function perceive(): Stimulus[] {
   if (!safeExistsSync(STIMULI_PATH)) return [];
 
   try {
-    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+    const content = readTextFile(STIMULI_PATH);
     const stimuli: Stimulus[] = content.trim().split('\n')
       .filter(l => l.length > 0)
       .map(line => JSON.parse(line))
       .filter(s => s.status === 'PENDING' || s.status === 'INJECTED');
 
-    const registry: ChannelRegistry = JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string);
+    const registry: ChannelRegistry = readJsonFile(REGISTRY_PATH);
     const priorityMap = new Map(registry.channels.map(c => [c.id, c.priority]));
 
     return stimuli.sort((a, b) => {
@@ -61,7 +62,7 @@ export function getSensoryContext(): string | null {
   const pending = perceive();
   if (pending.length === 0) return null;
 
-  const registry: ChannelRegistry = JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string);
+  const registry: ChannelRegistry = readJsonFile(REGISTRY_PATH);
   
   const formatted = pending.map(s => {
     const channel = registry.channels.find(c => c.id === s.source_channel) || { name: 'Unknown', priority: 0 };
@@ -77,7 +78,7 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
   if (!safeExistsSync(STIMULI_PATH)) return;
 
   try {
-    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+    const content = readTextFile(STIMULI_PATH);
     let stimulusToReply: Stimulus | null = null;
 
     const lines = content.trim().split('\n').filter(l => l.length > 0).map(line => {
@@ -124,7 +125,7 @@ export async function pruneStimuli(): Promise<void> {
   if (!safeExistsSync(STIMULI_PATH)) return;
 
   try {
-    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+    const content = readTextFile(STIMULI_PATH);
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 

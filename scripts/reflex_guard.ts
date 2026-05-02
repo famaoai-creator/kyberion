@@ -2,10 +2,10 @@ import {
   pathResolver,
   safeAppendFileSync,
   safeExistsSync,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from '@agent/core';
+import { readTextFile } from './refactor/cli-input.js';
 /**
  * scripts/reflex_guard.ts
  * Kyberion Autonomous Nerve System (KANS) - Reflex Guard v1.0 [ZERO-DEP]
@@ -55,8 +55,7 @@ let lastSize = safeStat(STIMULI_PATH).size;
 setInterval(() => {
   const stats = safeStat(STIMULI_PATH);
   if (stats.size > lastSize) {
-    const fullContent = safeReadFile(STIMULI_PATH, { encoding: 'utf8' });
-    const data = String(fullContent).slice(lastSize);
+    const data = readTextFile(STIMULI_PATH).slice(lastSize);
     const lines = data.trim().split('\n');
     lines.forEach(line => {
       if (!line) return;

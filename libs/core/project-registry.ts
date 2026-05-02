@@ -1,6 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { SPECIALIST_IDS } from './specialist-ids.js';
 
 export interface ProjectRecord {
   project_id: string;
@@ -145,7 +146,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Frame the service',
         summary: `${input.projectName} の目的、利用者、主要ユースケースを固める。`,
         status: 'active',
-        specialist_id: 'project-lead',
+        specialist_id: SPECIALIST_IDS.projectLead,
         outcome_id: 'project_created',
       },
       {
@@ -154,7 +155,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Design architecture',
         summary: '情報設計、主要コンポーネント、運用境界を設計する。',
         status: 'planned',
-        specialist_id: 'document-specialist',
+        specialist_id: SPECIALIST_IDS.documentSpecialist,
       },
       {
         work_id: `WRK-${prefix}-BUILD`,
@@ -162,7 +163,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Build the first slice',
         summary: '最小の実装スライスと repository/worktree 戦略を切る。',
         status: 'planned',
-        specialist_id: 'surface-concierge',
+        specialist_id: SPECIALIST_IDS.surfaceConcierge,
       },
       {
         work_id: `WRK-${prefix}-VERIFY`,
@@ -170,7 +171,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Verify and launch',
         summary: '試験、運用導線、外部サービス連携を確認する。',
         status: 'planned',
-        specialist_id: 'service-operator',
+        specialist_id: SPECIALIST_IDS.serviceOperator,
       },
     ];
   }
@@ -183,7 +184,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Frame the document scope',
         summary: `${input.projectName} の目的、対象読者、必要成果物を整理する。`,
         status: 'active',
-        specialist_id: 'project-lead',
+        specialist_id: SPECIALIST_IDS.projectLead,
         outcome_id: 'project_created',
       },
       {
@@ -192,7 +193,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Collect source material',
         summary: '利用可能な資料、要件、参照元を集める。',
         status: 'planned',
-        specialist_id: 'knowledge-specialist',
+        specialist_id: SPECIALIST_IDS.knowledgeSpecialist,
       },
       {
         work_id: `WRK-${prefix}-DRAFT`,
@@ -200,7 +201,7 @@ export function buildProjectBootstrapWorkItems(input: {
         title: 'Generate the first draft',
         summary: '主要な成果物の初版を生成する。',
         status: 'planned',
-        specialist_id: 'document-specialist',
+        specialist_id: SPECIALIST_IDS.documentSpecialist,
       },
     ];
   }
@@ -212,7 +213,7 @@ export function buildProjectBootstrapWorkItems(input: {
       title: 'Frame the project',
       summary: `${input.projectName} の目的と成功条件を整理する。`,
       status: 'active',
-      specialist_id: 'project-lead',
+      specialist_id: SPECIALIST_IDS.projectLead,
       outcome_id: 'project_created',
     },
     {
@@ -221,7 +222,7 @@ export function buildProjectBootstrapWorkItems(input: {
       title: 'Prepare the first work plan',
       summary: '最初の durable work を切り出し、進め方を決める。',
       status: 'planned',
-      specialist_id: 'surface-concierge',
+      specialist_id: SPECIALIST_IDS.surfaceConcierge,
     },
   ];
 }

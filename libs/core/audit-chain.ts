@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { safeReadFile, safeWriteFile, safeAppendFileSync, safeExistsSync, safeMkdir } from './secure-io.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Hash-Chained Audit Trail v1.0
@@ -41,7 +42,7 @@ class AuditChainImpl {
   private auditDir: string;
 
   constructor() {
-    this.auditDir = path.join(findProjectRoot(), 'active', 'audit');
+    this.auditDir = path.join(pathResolver.rootDir(), 'active', 'audit');
   }
 
   /**
@@ -227,9 +228,9 @@ function resolveCurrentTenantSlug(): string | undefined {
   if (!missionId) return undefined;
   // Walk up looking for a mission-state.json with tenant_slug.
   const candidates = [
-    path.join(findProjectRoot(), 'active/missions/personal', missionId, 'mission-state.json'),
-    path.join(findProjectRoot(), 'active/missions/confidential', missionId, 'mission-state.json'),
-    path.join(findProjectRoot(), 'active/missions/public', missionId, 'mission-state.json'),
+    path.join(pathResolver.rootDir(), 'active/missions/personal', missionId, 'mission-state.json'),
+    path.join(pathResolver.rootDir(), 'active/missions/confidential', missionId, 'mission-state.json'),
+    path.join(pathResolver.rootDir(), 'active/missions/public', missionId, 'mission-state.json'),
   ];
   for (const candidate of candidates) {
     if (!safeExistsSync(candidate)) continue;
@@ -242,17 +243,6 @@ function resolveCurrentTenantSlug(): string | undefined {
     }
   }
   return undefined;
-}
-
-function findProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/audit-chain');

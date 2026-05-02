@@ -164,7 +164,7 @@ export function validateVoiceProfileRegistration(
       continue;
     }
 
-    const resolvedPath = path.resolve(process.cwd(), samplePath);
+    const resolvedPath = pathResolver.rootResolve(samplePath);
     if (policy.profile_rules.require_unique_sample_paths) {
       if (seenPaths.has(resolvedPath)) {
         violations.push(`duplicate sample path detected (${samplePath})`);

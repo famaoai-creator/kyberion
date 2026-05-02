@@ -9,12 +9,12 @@ import {
   loadIntentOutcomePatterns,
   logger,
   pathResolver,
-  safeReadFile,
   safeExec,
   summarizeMissionSeedAssessment,
   validateNextActionContract,
 } from '@agent/core';
 import * as path from 'node:path';
+import { readJsonFile } from './refactor/cli-input.js';
 
 export { summarizeMissionSeedAssessment };
 
@@ -43,19 +43,19 @@ const DESIGN_MD_SYSTEM_PATH = pathResolver.knowledge(
 );
 
 function loadArtifactLibraryIndex(): any {
-  return JSON.parse(safeReadFile(ARTIFACT_LIBRARY_INDEX_PATH, { encoding: 'utf8' }) as string);
+  return readJsonFile(ARTIFACT_LIBRARY_INDEX_PATH);
 }
 
 function loadDesignMdIndex(): any {
-  return JSON.parse(safeReadFile(DESIGN_MD_INDEX_PATH, { encoding: 'utf8' }) as string);
+  return readJsonFile(DESIGN_MD_INDEX_PATH);
 }
 
 function loadDesignMdThemes(): any {
-  return JSON.parse(safeReadFile(DESIGN_MD_THEME_PATH, { encoding: 'utf8' }) as string);
+  return readJsonFile(DESIGN_MD_THEME_PATH);
 }
 
 function loadDesignMdSystems(): any {
-  return JSON.parse(safeReadFile(DESIGN_MD_SYSTEM_PATH, { encoding: 'utf8' }) as string);
+  return readJsonFile(DESIGN_MD_SYSTEM_PATH);
 }
 
 function normalizeCatalogQuery(input: unknown): string {
@@ -89,7 +89,7 @@ function resolveArtifactLibraryProfile(profileId: string): any {
   for (const pack of asArray(index.packs)) {
     if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
     const fullPath = path.resolve(ARTIFACT_LIBRARY_DIR, String(pack.file));
-    const doc = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+    const doc = readJsonFile<any>(fullPath);
     return {
       profile_id: normalizedProfileId,
       domain: pack.domain,

@@ -13,6 +13,7 @@ import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir } from './path-resolver.js';
+import { pathResolver } from './path-resolver.js';
 import * as nodePath from 'node:path';
 import { safeExec, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
@@ -875,7 +876,7 @@ async function handleSurfaceControlRequested(event: MissionOrchestrationEvent<Su
     throw new Error(`Unsupported surface control operation: ${String(operation)}`);
   }
 
-  safeExec('node', args, { cwd: process.cwd(), env, timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS });
+  safeExec('node', args, { cwd: pathResolver.rootDir(), env, timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS });
   emitMissionOrchestrationObservation({
     decision: 'surface_control_action_applied',
     event_type: 'surface_control_action_applied',

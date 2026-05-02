@@ -10,6 +10,7 @@
 import { pathResolver, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readJsonFile } from './refactor/cli-input.js';
 
 interface DeniedPattern {
   name: string;
@@ -39,7 +40,7 @@ const POLICY_PATH = 'knowledge/public/governance/tier-hygiene-policy.json';
 
 async function loadPolicy(): Promise<Policy> {
   const absolute = pathResolver.rootResolve(POLICY_PATH);
-  return JSON.parse(safeReadFile(absolute, { encoding: 'utf8' }) as string) as Policy;
+  return readJsonFile<Policy>(absolute);
 }
 
 function buildAllowlist(policy: Policy): RegExp[] {

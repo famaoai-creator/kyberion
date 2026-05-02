@@ -7,9 +7,9 @@ import {
   pathResolver,
   safeExistsSync,
   safeReaddir,
-  safeReadFile,
 } from '@agent/core';
 import chalk from 'chalk';
+import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 /**
  * Kyberion Sovereign Dashboard v1.0
@@ -43,14 +43,14 @@ function drawMissions() {
     for (const item of items) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
-        const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+        const state = readJsonFile<any>(statePath);
         if (state.status === 'active') {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
           const missionPath = path.join(dir, item);
           const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
           const nextTasksPath = path.join(missionPath, 'NEXT_TASKS.json');
           const nextTaskCount = safeExistsSync(nextTasksPath)
-            ? ((JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as any[])?.length || 0)
+            ? (readJsonFile<any[]>(nextTasksPath)?.length || 0)
             : 0;
           const planning = planReady ? chalk.green('PLAN READY') : chalk.yellow('PLANNING');
           console.log(`  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`);
@@ -72,7 +72,7 @@ function drawMissionOrchestration() {
   const events: Array<{ ts: string; decision: string; mission?: string; why?: string }> = [];
   for (const file of [eventsPath, slackMissionsPath]) {
     if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
+    const raw = readTextFile(file);
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
       try {
@@ -116,7 +116,7 @@ function drawOwnerSummaries() {
     return;
   }
 
-  const summaries = (safeReadFile(slackMissionsPath, { encoding: 'utf8' }) as string)
+  const summaries = readTextFile(slackMissionsPath)
     .split('\n')
     .filter(Boolean)
     .map((line) => {
@@ -157,7 +157,7 @@ function drawRuntimeLeaseDoctor() {
     for (const item of safeReaddir(dir)) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (!safeExistsSync(statePath)) continue;
-      const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+      const state = readJsonFile<any>(statePath);
       if (state.status === 'active' && typeof state.mission_id === 'string') {
         missions.add(state.mission_id);
       }
@@ -249,11 +249,11 @@ function drawRuntimeSurfaces() {
     return;
   }
 
-  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as {
+  const manifest = readJsonFile<{
     surfaces: Array<{ id: string; kind: string; startupMode?: string }>;
-  };
+  }>(manifestPath);
   const state = safeExistsSync(statePath)
-    ? JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as { surfaces: Record<string, { pid: number }> }
+    ? readJsonFile<{ surfaces: Record<string, { pid: number }> }>(statePath)
     : { surfaces: {} };
 
   for (const surface of manifest.surfaces) {
@@ -269,7 +269,7 @@ function drawTrustBoard() {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
   if (safeExistsSync(ledgerPath)) {
-    const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const raw = readJsonFile<any>(ledgerPath);
     const ledger = raw?.agents ?? raw ?? {};
     Object.keys(ledger).forEach(a => {
       const score = ledger[a].current_score / 100;

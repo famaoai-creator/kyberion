@@ -343,6 +343,10 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     return this.spawnCli(args, '');
   }
 
+  async prompt(prompt: string): Promise<string> {
+    return this.delegateTask(prompt);
+  }
+
   private async runStructured<T>(params: {
     systemPrompt: string;
     userPrompt: string;

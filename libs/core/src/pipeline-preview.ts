@@ -1,4 +1,5 @@
 import { safeReadFile, safeExistsSync } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
 import * as path from 'node:path';
 
 // ---------------------------------------------------------------------------
@@ -113,7 +114,7 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
   // Check ref paths
   if (step.op === 'ref' && step.params?.path) {
     const refPathRaw = String(step.params.path).replace(/\{\{[^}]+\}\}/g, '_');
-    const refPath = path.resolve(process.cwd(), refPathRaw);
+    const refPath = pathResolver.rootResolve(refPathRaw);
     try {
       const content = safeReadFile(refPath, { encoding: 'utf8' }) as string;
       const subPipeline = JSON.parse(content);
@@ -131,7 +132,7 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
   // Check on_error
   if (step.on_error) {
     if (step.on_error.ref) {
-      const errRefPath = path.resolve(process.cwd(), step.on_error.ref);
+      const errRefPath = pathResolver.rootResolve(step.on_error.ref);
       if (!safeExistsSync(errRefPath)) {
         ps.warnings.push(`on_error ref path not found: ${step.on_error.ref}`);
       }

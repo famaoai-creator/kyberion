@@ -9,18 +9,14 @@ import {
   createOutcomeContract,
   createTaskSession,
   pathResolver,
-  safeReadFile,
 } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readGovernanceJson(relativePath: string): unknown {
-  return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(relativePath), {
-      encoding: 'utf8',
-    }) as string
-  ) as unknown;
+  return readJsonFile(pathResolver.rootResolve(relativePath));
 }
 
 type ContractCheck = {
@@ -31,24 +27,11 @@ type ContractCheck = {
 };
 
 function createChecks(): ContractCheck[] {
-  const workPolicy = JSON.parse(
-    safeReadFile(pathResolver.rootResolve('knowledge/public/governance/work-policy.json'), {
-      encoding: 'utf8',
-    }) as string
+  const workPolicy = readJsonFile(pathResolver.rootResolve('knowledge/public/governance/work-policy.json'));
+  const surfaceProviderManifests = readJsonFile(
+    pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifests.json')
   );
-  const surfaceProviderManifests = JSON.parse(
-    safeReadFile(
-      pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifests.json'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string
-  );
-  const surfacePolicy = JSON.parse(
-    safeReadFile(pathResolver.rootResolve('knowledge/public/governance/surface-policy.json'), {
-      encoding: 'utf8',
-    }) as string
-  );
+  const surfacePolicy = readJsonFile(pathResolver.rootResolve('knowledge/public/governance/surface-policy.json'));
 
   const promotedPattern = buildPromotedMemoryRecord(
     createDistillCandidateRecord({

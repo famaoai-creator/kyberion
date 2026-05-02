@@ -1,6 +1,7 @@
 import { logger } from './core.js';
 import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Trust Engine v1.0
@@ -258,14 +259,7 @@ class TrustEngineImpl {
 }
 
 function findProjectRoot(): string {
-  let dir = process.cwd();
-  for (let i = 0; i < 10; i++) {
-    if (safeExistsSync(path.join(dir, 'AGENTS.md'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
+  return pathResolver.rootDir();
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/trust-engine');

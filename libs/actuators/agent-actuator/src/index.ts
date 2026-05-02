@@ -23,6 +23,7 @@ import {
   shutdownAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
+  pathResolver,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
@@ -300,7 +301,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
+  const inputPath = pathResolver.rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));

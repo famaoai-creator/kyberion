@@ -1,4 +1,4 @@
-import { logger, safeReadFile, executeServicePreset } from '@agent/core';
+import { logger, safeReadFile, executeServicePreset, pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 
@@ -20,7 +20,7 @@ const LEGACY_MEDIA_GENERATION_ACTIONS = new Set([
 async function inspectImage(params: any) {
   const logicalPath = String(params.path || '');
   if (!logicalPath) throw new Error('inspect_image requires params.path');
-  const buffer = safeReadFile(path.resolve(process.cwd(), logicalPath), { encoding: null }) as Buffer;
+  const buffer = safeReadFile(pathResolver.rootResolve(logicalPath), { encoding: null }) as Buffer;
   const ext = path.extname(logicalPath).toLowerCase();
   return {
     status: 'succeeded',
@@ -39,7 +39,7 @@ async function ocrImage(params: any) {
   const logicalPath = String(params.path || '');
   if (!logicalPath) throw new Error('ocr_image requires params.path');
   const tesseract = await import('tesseract.js');
-  const result = await tesseract.recognize(path.resolve(process.cwd(), logicalPath), params.language || 'eng');
+  const result = await tesseract.recognize(pathResolver.rootResolve(logicalPath), params.language || 'eng');
   return {
     status: 'succeeded',
     path: logicalPath,
@@ -76,7 +76,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputData = JSON.parse(safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string);
+  const inputData = JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string);
   const result = await handleAction(inputData);
   console.log(JSON.stringify(result, null, 2));
 };

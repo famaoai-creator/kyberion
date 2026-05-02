@@ -3,10 +3,10 @@ import {
   pathResolver,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from "@agent/core";
+import { readTextFile } from './refactor/cli-input.js';
 import * as path from "node:path";
 
 type CollectionEntry = {
@@ -305,7 +305,7 @@ function buildDesignSystem(imported: ImportedDesign): any {
 function importDesignMd(dirPath: string, collectionMeta: Map<string, CollectionEntry>): ImportedDesign {
   const slug = path.basename(dirPath);
   const markdownPath = path.join(dirPath, "DESIGN.md");
-  const markdown = safeReadFile(markdownPath, { encoding: "utf8" }) as string;
+  const markdown = readTextFile(markdownPath);
   const titleMatch = markdown.match(/^# Design System:\s+(.+?)\s*$/m);
   const title = titleMatch?.[1]?.trim() || slug;
   const sections = parseSections(markdown);
@@ -369,7 +369,7 @@ async function main(): Promise<void> {
   const sourceDir = path.resolve(pathResolver.rootDir(), String(argv.source));
   const readmePath = path.resolve(pathResolver.rootDir(), String(argv.readme));
   const collectionMeta = safeLstatSafe(readmePath)?.isFile()
-    ? parseCollectionMetadata(safeReadFile(readmePath, { encoding: "utf8" }) as string)
+    ? parseCollectionMetadata(readTextFile(readmePath))
     : new Map<string, CollectionEntry>();
 
   const imported = walkDesignMdDirs(sourceDir).map((dirPath) => importDesignMd(dirPath, collectionMeta));

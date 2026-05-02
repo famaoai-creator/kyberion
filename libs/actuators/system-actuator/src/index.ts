@@ -1004,6 +1004,115 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'pulse_status':
       const { ledger } = await import('@agent/core');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
+    case 'list_missions': {
+      const missionRoot = path.resolve(rootDir, 'active/missions');
+      const tiers = ['personal', 'confidential', 'public'];
+      const requestedStatus = typeof params.status === 'string' && params.status.trim() ? params.status.trim() : undefined;
+      const allMissions: string[] = [];
+      for (const tier of tiers) {
+        const tierPath = path.join(missionRoot, tier);
+        if (safeExistsSync(tierPath)) {
+          const { safeReaddir } = await import('@agent/core/secure-io');
+          const missions = safeReaddir(tierPath);
+          for (const missionId of missions.filter((m) => !m.startsWith('.'))) {
+            const missionPath = path.join(tierPath, missionId);
+            if (!safeExistsSync(path.join(missionPath, 'mission-state.json'))) {
+              if (!requestedStatus) {
+                allMissions.push(`${tier}/${missionId}`);
+              }
+              continue;
+            }
+            if (!requestedStatus) {
+              allMissions.push(`${tier}/${missionId}`);
+              continue;
+            }
+            try {
+              const state = JSON.parse(safeReadFile(path.join(missionPath, 'mission-state.json'), { encoding: 'utf8' }) as string);
+              if (state?.status === requestedStatus) {
+                allMissions.push(`${tier}/${missionId}`);
+              }
+            } catch {
+              /* ignore unreadable missions */
+            }
+          }
+        }
+      }
+      return { ...ctx, [params.export_as || 'mission_list']: allMissions };
+    }
+    case 'collect_artifacts': {
+      const missionRoot = path.resolve(rootDir, 'active/missions');
+      const isPathWithin = (basePath: string, targetPath: string): boolean => {
+        const relative = path.relative(basePath, targetPath);
+        return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+      };
+      const resolveList = (value: unknown): string[] => {
+        const input = Array.isArray(value) ? value : [value];
+        return input.flatMap((item) => {
+          if (typeof item !== 'string') return [];
+          const resolved = resolve(item);
+          if (Array.isArray(resolved)) {
+            return resolved.filter((entry): entry is string => typeof entry === 'string');
+          }
+          if (typeof resolved === 'string') return [resolved];
+          return [];
+        });
+      };
+      const missionIds = resolveList(params.mission_ids);
+      const patterns = resolveList(params.patterns);
+      const results: Record<string, Record<string, string>> = {};
+      const globToRegExp = (pattern: string): RegExp => {
+        const escaped = pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.');
+        return new RegExp(`^${escaped}$`);
+      };
+      const matchesPattern = (filePath: string, pattern: string): boolean => {
+        const normalizedPath = filePath.replace(/\\/g, '/');
+        const basename = path.posix.basename(normalizedPath);
+        const matcher = globToRegExp(pattern.replace(/\\/g, '/'));
+        return matcher.test(normalizedPath) || matcher.test(basename);
+      };
+      for (const mId of missionIds) {
+        const mPath = path.resolve(missionRoot, mId);
+        if (isPathWithin(missionRoot, mPath) && safeExistsSync(mPath)) {
+          results[mId] = {};
+          for (const pattern of patterns) {
+            const files = getAllFiles(mPath).filter((f) => matchesPattern(path.relative(mPath, f), pattern));
+            for (const f of files) {
+              const rel = path.relative(mPath, f);
+              results[mId][rel] = safeReadFile(f, { encoding: 'utf8' }) as string;
+            }
+          }
+        }
+      }
+      return { ...ctx, [params.export_as || 'artifact_collection']: results };
+    }
+    case 'sample_traces': {
+      const missionRoot = path.resolve(rootDir, 'active/missions');
+      const count = Number(params.count || 5);
+      const allTraces: any[] = [];
+      const tiers = ['personal', 'confidential', 'public'];
+      const { safeReaddir } = await import('@agent/core/secure-io');
+      for (const tier of tiers) {
+        const tierPath = path.join(missionRoot, tier);
+        if (safeExistsSync(tierPath)) {
+          const missions = safeReaddir(tierPath);
+          for (const m of missions) {
+            const tracePath = path.join(tierPath, m, 'trace.json');
+            if (safeExistsSync(tracePath)) {
+              allTraces.push({ missionId: `${tier}/${m}`, path: tracePath });
+            }
+          }
+        }
+      }
+      const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
+      const results = sampled.map(s => ({
+        missionId: s.missionId,
+        trace: JSON.parse(safeReadFile(s.path, { encoding: 'utf8' }) as string)
+      }));
+      return { ...ctx, [params.export_as || 'sampled_traces']: results };
+    }
     default: 
       throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }

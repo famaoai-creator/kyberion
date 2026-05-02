@@ -1,9 +1,9 @@
 import {
   enqueueMissionOrchestrationEvent,
   logger,
-  safeReadFile,
   startMissionOrchestrationWorker,
 } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 interface LegacySlackKickoffInput {
   missionId: string;
@@ -19,7 +19,7 @@ async function main() {
     throw new Error('Missing orchestration job path argument');
   }
 
-  const input = JSON.parse(safeReadFile(jobPath, { encoding: 'utf8' }) as string) as LegacySlackKickoffInput;
+  const input = readJsonFile<LegacySlackKickoffInput>(jobPath);
   const event = enqueueMissionOrchestrationEvent({
     eventType: 'mission_team_prewarm_requested',
     missionId: input.missionId,

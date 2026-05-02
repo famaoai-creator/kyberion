@@ -1,0 +1,72 @@
+{
+  "pipeline_id": "extract-brand-theme",
+  "version": "1.0.0",
+  "description": "Extract brand design tokens from a PPTX file or Website URL.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "detect-source",
+      "type": "control",
+      "op": "core:if",
+      "params": {
+        "condition": {
+          "from": "source_url",
+          "operator": "exists"
+        },
+        "then": [
+          {
+            "id": "browse-site",
+            "type": "apply",
+            "op": "browser:open_tab",
+            "params": {
+              "url": "{{source_url}}",
+              "keep_alive": true
+            }
+          },
+          {
+            "id": "extract-css",
+            "type": "capture",
+            "op": "browser:snapshot",
+            "params": {
+              "export_as": "web_design_data"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "extract-pptx",
+            "type": "capture",
+            "op": "media:pptx_design_distill",
+            "params": {
+              "path": "{{source_file_path}}",
+              "export_as": "pptx_design_data"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthesize-theme",
+      "type": "transform",
+      "op": "reasoning:synthesize",
+      "params": {
+        "instruction": "Based on the extracted visual data (DOM/CSS or PPTX layout), identify the primary and secondary brand colors, heading and body fonts, and general aesthetic (e.g., 'minimalist', 'vibrant', 'corporate'). Output a structured Kyberion Design Spec (JSON).",
+        "context": [
+          "{{web_design_data}}",
+          "{{pptx_design_data}}"
+        ],
+        "export_as": "design_spec"
+      }
+    },
+    {
+      "id": "save-profile",
+      "type": "apply",
+      "op": "artifact:write_json",
+      "params": {
+        "role": "mission_controller",
+        "logicalPath": "active/shared/runtime/presentation-preferences/{{brand_name_slug}}.json",
+        "value": "{{design_spec}}"
+      }
+    }
+  ]
+}

@@ -564,7 +564,48 @@
       "object": "meeting_session",
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
-      "risk_profile": "review_required"
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "core:if",
+          "params": {
+            "condition": { "from": "mission_id", "operator": "exists" },
+            "then": [
+              {
+                "op": "core:if",
+                "params": {
+                  "condition": { "from": "meeting_url", "operator": "exists" },
+                  "then": [
+                    {
+                      "op": "system:shell",
+                      "params": {
+                        "cmd": "node dist/scripts/meeting_orchestrator.js --mission \"{{mission_id}}\" --meeting-url \"{{meeting_url}}\"",
+                        "export_as": "meeting_orchestrator_output"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "op": "system:log",
+                      "params": {
+                        "message": "meeting-operations needs meeting_url before live execution. Compile the meeting brief first."
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "else": [
+              {
+                "op": "system:log",
+                "params": {
+                  "message": "meeting-operations needs mission_id before live execution. Provide a governed mission context."
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "id": "schedule-coordination",
@@ -610,6 +651,198 @@
       "execution_shape": "task_session",
       "mission_class": "customer_engagement",
       "risk_profile": "approval_required"
+    },
+    {
+      "id": "automate-browser-workflow",
+      "category": "outcome_execution",
+      "description": "Execute a browser task while recording, then distill the recorded trace into a reusable automation pipeline (ADF).",
+      "surface_examples": [
+        "この操作を学習してpipeline化して",
+        "Record this browser flow and create a reusable pipeline",
+        "ブラウザ操作を自動化して"
+      ],
+      "plan_outline": [
+        "frame the target task and start recording browser trace",
+        "execute the browser operations and capture the interaction trace",
+        "distill the trace into a reusable ADF pipeline artifact",
+        "verify the generated pipeline and return the result"
+      ],
+      "outcome_ids": ["pipeline_created", "artifact:pipeline"],
+      "specialist_id": "browser-operator",
+      "trigger_keywords": ["学習", "自動化", "pipeline化", "learn", "automate", "record flow"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "workflow_distillation",
+        "result_shape": "pipeline"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "create",
+      "object": "browser_workflow_pipeline",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "automate-os-macro",
+      "category": "outcome_execution",
+      "description": "Record a series of desktop operations (mouse clicks, keyboard inputs, application switches) and distill them into a reusable OS-level macro pipeline.",
+      "surface_examples": [
+        "デスクトップでのこの一連の操作をマクロにして",
+        "Record these mouse and keyboard steps as a macro",
+        "PC操作を自動化して"
+      ],
+      "plan_outline": [
+        "start OS interaction recording with high-fidelity event capture",
+        "monitor and record mouse/keyboard events and window context",
+        "distill the event stream into a parameterized ADF macro pipeline",
+        "test the generated macro and save as a custom pipeline"
+      ],
+      "outcome_ids": ["pipeline_created", "artifact:macro"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": ["マクロ", "PC操作", "macro", "record desktop"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "macro_distillation",
+        "result_shape": "pipeline"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "create",
+      "object": "os_macro_pipeline",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "automate-code-transformation",
+      "category": "outcome_execution",
+      "description": "Analyze a manual code change or refactoring pattern and generate a reusable 'Code Mod' pipeline to apply that pattern across the workspace.",
+      "surface_examples": [
+        "このコード修正パターンを学習して横展開できるようにして",
+        "Learn this refactoring and create a code transformation pipeline",
+        "修正パターンを自動化して"
+      ],
+      "plan_outline": [
+        "analyze the 'before' and 'after' state of the sample code change",
+        "extract the underlying transformation logic and constraints",
+        "generate an ADF pipeline using code-actuator (regex/AST) to apply the change",
+        "verify the transformation on a test file and save the pipeline"
+      ],
+      "outcome_ids": ["pipeline_created", "artifact:codemod"],
+      "specialist_id": "harness-engineer",
+      "trigger_keywords": ["修正パターン", "横展開", "codemod", "learn code pattern"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "codemod_distillation",
+        "result_shape": "pipeline"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "code_transformation_pipeline",
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "extract-brand-theme",
+      "category": "outcome_execution",
+      "description": "Extract brand design tokens (colors, fonts, logo elements) from an existing PowerPoint file or website URL to create a reusable design theme.",
+      "surface_examples": [
+        "このパワポのデザインをテーマ化して",
+        "このWebサイトをベースにデザインテーマを作って",
+        "Extract brand styles from this URL"
+      ],
+      "plan_outline": [
+        "access the source asset (load file or navigate to URL)",
+        "extract visual design tokens using media or vision actuators",
+        "synthesize tokens into a reusable Kyberion Design Spec",
+        "save as a registered Presentation Preference Profile"
+      ],
+      "outcome_ids": ["design_theme_created", "artifact:design_spec"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["デザインテーマ", "ブランド", "テーマ化", "extract design", "brand styles"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "design_extraction",
+        "result_shape": "design_spec"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "brand_design_theme",
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "build-web-concept",
+      "category": "outcome_execution",
+      "description": "Generate and build a functional web site prototype based on a conceptual brief and optionally an extracted design theme.",
+      "surface_examples": [
+        "このコンセプトでWebサイトを構築して",
+        "Build a landing page for this product idea",
+        "AIエージェントの紹介サイトを作って"
+      ],
+      "plan_outline": [
+        "frame the site structure and content from the conceptual brief",
+        "apply the selected design theme or brand styles",
+        "generate web assets (HTML/CSS/JS) using code-actuator",
+        "deploy a local preview or verify the site layout in browser"
+      ],
+      "outcome_ids": ["website_built", "artifact:web_assets"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["Webサイト構築", "サイト作成", "LP作成", "build website", "landing page"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "web_development",
+        "result_shape": "web_assets"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "web_site_prototype",
+      "execution_shape": "task_session",
+      "mission_class": "product_delivery",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "list-capabilities",
+      "category": "system_observability",
+      "description": "Provide a comprehensive, user-friendly guide of all available Kyberion intents, capabilities, and automation workflows.",
+      "surface_examples": [
+        "何ができるの？",
+        "依頼できることの一覧を見せて",
+        "Kyberionで自動化できることを教えて",
+        "Show me your capabilities",
+        "What can you do?"
+      ],
+      "plan_outline": [
+        "scan the standard-intents catalog and specialized pipelines",
+        "categorize capabilities into user-centric outcomes",
+        "generate a formatted guide or interactive menu of outcomes"
+      ],
+      "outcome_ids": ["capability_guide"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": ["できること", "一覧", "使い方", "capabilities", "guide", "help"],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "capability_guide"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "inspect",
+      "object": "system_capabilities",
+      "execution_shape": "direct_reply",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "low"
     },
     {
       "id": "live-query",
@@ -1315,7 +1548,15 @@
       "object": "environment_manifest",
       "execution_shape": "task_session",
       "mission_class": "platform_onboarding",
-      "risk_profile": "review_required"
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json"
+          }
+        }
+      ]
     },
     {
       "id": "configure-reasoning-backend",
@@ -1486,7 +1727,15 @@
       "object": "actuator_contract",
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
-      "risk_profile": "review_required"
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "pnpm capabilities"
+          }
+        }
+      ]
     },
     {
       "id": "rotate-integration-secret",
@@ -1749,7 +1998,15 @@
       "object": "kyberion_baseline",
       "execution_shape": "pipeline",
       "mission_class": "platform_onboarding",
-      "risk_profile": "review_required"
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json"
+          }
+        }
+      ]
     },
     {
       "id": "check-kyberion-vital",
@@ -1801,7 +2058,15 @@
       "object": "kyberion_system",
       "execution_shape": "pipeline",
       "mission_class": "operations_and_release",
-      "risk_profile": "approval_required"
+      "risk_profile": "approval_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json"
+          }
+        }
+      ]
     },
     {
       "id": "inspect-mission-state",
@@ -1853,7 +2118,15 @@
       "object": "runtime_supervisor",
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
-      "risk_profile": "review_required"
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/agent_runtime_supervisor_status.js"
+          }
+        }
+      ]
     },
     {
       "id": "verify-audit-chain",
@@ -1879,7 +2152,15 @@
       "object": "audit_chain",
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
-      "risk_profile": "approval_required"
+      "risk_profile": "approval_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json"
+          }
+        }
+      ]
     },
     {
       "id": "inspect-environment-readiness",
@@ -1905,7 +2186,15 @@
       "object": "environment_readiness",
       "execution_shape": "task_session",
       "mission_class": "platform_onboarding",
-      "risk_profile": "review_required"
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/baseline-check.json"
+          }
+        }
+      ]
     },
     {
       "id": "create-mission",

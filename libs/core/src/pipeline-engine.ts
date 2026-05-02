@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { safeReadFile } from '../secure-io.js';
 import { logger } from '../core.js';
+import { pathResolver } from '../path-resolver.js';
 import type { PipelineAdfStep } from '../pipeline-contract.js';
 
 const MAX_REF_DEPTH = 10;
@@ -34,7 +35,7 @@ export async function resolveRef(
     throw new Error(`[PIPELINE] Circular ref or depth exceeded: depth=${currentDepth}, path=${refPath}`);
   }
 
-  const resolvedPath = path.resolve(process.cwd(), refPath);
+  const resolvedPath = pathResolver.rootResolve(refPath);
   logger.info(`[PIPELINE] resolveRef: loading sub-pipeline from ${resolvedPath} (depth=${currentDepth})`);
 
   const raw = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;

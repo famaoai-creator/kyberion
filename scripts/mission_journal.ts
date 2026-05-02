@@ -1,6 +1,7 @@
 import * as path from 'node:path';
-import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile } from '@agent/core';
+import { logger, pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
 import chalk from 'chalk';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
@@ -39,8 +40,7 @@ function scanMissions() {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
         try {
-          const content = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-          missions.push(JSON.parse(content));
+          missions.push(readJsonFile<Mission>(statePath));
         } catch (_) {}
       }
     }
@@ -103,7 +103,7 @@ function renderJournal() {
   // Trust Scores Summary
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (safeExistsSync(ledgerPath)) {
-    const raw = JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string);
+    const raw = readJsonFile<any>(ledgerPath);
     const ledger = raw?.agents ?? raw ?? {};
     console.log(chalk.bold('🤝 Agent Trust Scores:'));
     Object.keys(ledger).forEach(a => {

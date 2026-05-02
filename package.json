@@ -110,6 +110,11 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
+    "@agent/shared-business": "workspace:*",
+    "@agent/shared-media": "workspace:*",
+    "@agent/shared-nerve": "workspace:*",
+    "@agent/shared-network": "workspace:*",
+    "@agent/shared-vision": "workspace:*",
     "@agentclientprotocol/sdk": "^0.16.1",
     "@anthropic-ai/claude-agent-sdk": "^0.2.114",
     "@anthropic-ai/claude-code": "^2.1.76",
