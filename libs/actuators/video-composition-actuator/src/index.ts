@@ -477,7 +477,7 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputData = JSON.parse(safeReadFile(path.resolve(process.cwd(), argv.input as string), { encoding: 'utf8' }) as string);
+  const inputData = JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string);
   const result = await handleAction(inputData);
   console.log(JSON.stringify(result, null, 2));
 };

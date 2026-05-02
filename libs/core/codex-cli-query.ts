@@ -44,7 +44,7 @@ class CodexCliQuery {
     this.model = options.model ?? 'gpt-5.4';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
-    this.cwd = options.cwd ?? process.cwd();
+    this.cwd = options.cwd ?? pathResolver.rootDir();
   }
 
   async runStructured<T>(params: {

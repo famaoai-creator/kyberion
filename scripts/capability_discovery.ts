@@ -1,6 +1,7 @@
 import * as path from 'node:path';
-import { logger, pathResolver, safeExistsSync, safeReaddir, safeReadFile, safeExec } from '@agent/core';
+import { logger, pathResolver, safeExistsSync, safeReaddir, safeExec } from '@agent/core';
 import chalk from 'chalk';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
@@ -43,7 +44,7 @@ function discoverCapabilities() {
     if (!safeExistsSync(manifestPath)) continue;
 
     try {
-      const manifest: ActuatorManifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
+      const manifest: ActuatorManifest = readJsonFile<ActuatorManifest>(manifestPath);
       console.log(`${chalk.bold.white(manifest.actuator_id)} (${manifest.version})`);
       console.log(`${chalk.dim(manifest.description)}`);
 

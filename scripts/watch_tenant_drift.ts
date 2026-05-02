@@ -24,11 +24,11 @@ import * as path from 'node:path';
 import {
   logger,
   pathResolver,
-  safeReadFile,
   safeExistsSync,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core';
+import { readJsonFile } from './refactor/cli-input.js';
 
 const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -59,7 +59,7 @@ function readMissionState(missionDirRel: string): { tenant_slug?: string; missio
   const statePath = pathResolver.rootResolve(`${missionDirRel}/mission-state.json`);
   if (!safeExistsSync(statePath)) return null;
   try {
-    return JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+    return readJsonFile(statePath);
   } catch {
     return null;
   }

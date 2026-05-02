@@ -5,6 +5,7 @@ import { getAgentManifest, isActuatorAllowed } from './agent-manifest.js';
 import { touchManagedProcess, spawnManagedProcess, stopManagedProcess } from './managed-process.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
+import { pathResolver } from './path-resolver.js';
 
 /** Whitelist environment variables passed to child agent processes */
 const ENV_WHITELIST = [
@@ -115,7 +116,7 @@ export class ACPMediator {
   private async establishSession(): Promise<void> {
     logger.info('[ACP_MEDIATOR] Establishing Session...');
     const sessionRes = await this.connection.newSession({
-      cwd: this.options.cwd || process.cwd(),
+      cwd: this.options.cwd || pathResolver.rootDir(),
       mcpServers: []
     });
     this.acpSessionId = sessionRes.sessionId;
@@ -148,7 +149,7 @@ export class ACPMediator {
       args: this.options.bootArgs,
       shutdownPolicy: 'manual',
       spawnOptions: {
-        cwd: this.options.cwd || process.cwd(),
+        cwd: this.options.cwd || pathResolver.rootDir(),
         stdio: ['pipe', 'pipe', 'pipe'],
         env: sanitizeEnvForChild(process.env),
       },

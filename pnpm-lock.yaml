@@ -21,6 +21,21 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:libs/core
+      '@agent/shared-business':
+        specifier: workspace:*
+        version: link:libs/shared-business
+      '@agent/shared-media':
+        specifier: workspace:*
+        version: link:libs/shared-media
+      '@agent/shared-nerve':
+        specifier: workspace:*
+        version: link:libs/shared-nerve
+      '@agent/shared-network':
+        specifier: workspace:*
+        version: link:libs/shared-network
+      '@agent/shared-vision':
+        specifier: workspace:*
+        version: link:libs/shared-vision
       '@agentclientprotocol/sdk':
         specifier: ^0.16.1
         version: 0.16.1(zod@4.3.6)

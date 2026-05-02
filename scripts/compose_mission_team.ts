@@ -2,13 +2,13 @@ import * as path from 'node:path';
 import {
   createStandardYargs,
   composeMissionTeamPlan,
+  composeMissionTeamBrief,
   findMissionPath,
   initializeMissionTeamBindings,
   missionDir,
-  safeReadFile,
   writeMissionTeamPlan,
 } from '@agent/core';
-import { composeMissionTeamBrief } from '../libs/core/mission-team-brief-composer.js';
+import { readJsonFile } from './refactor/cli-input.js';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
   const previousRole = process.env.MISSION_ROLE;
@@ -61,9 +61,9 @@ async function main() {
   let assignedPersona = argv.persona ? String(argv.persona) : undefined;
 
   if (missionPath) {
-    const state = JSON.parse(
-      safeReadFile(path.join(missionPath, 'mission-state.json'), { encoding: 'utf8' }) as string,
-    ) as { tier?: typeof tier; assigned_persona?: string };
+    const state = readJsonFile<{ tier?: typeof tier; assigned_persona?: string }>(
+      path.join(missionPath, 'mission-state.json'),
+    );
     tier = state.tier || tier;
     assignedPersona = assignedPersona || state.assigned_persona;
   }

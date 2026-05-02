@@ -14,6 +14,7 @@ import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance'
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { handleAction as handleMediaGenerationAction } from '../libs/actuators/media-generation-actuator/src/index.js';
+import { resolveCliInputPath } from './refactor/cli-input.js';
 
 function normalizeScheduleId(value: string): string {
   return value.endsWith('.json') ? value.slice(0, -5) : value;
@@ -138,7 +139,7 @@ export async function runGenerationScheduleAction(argv: { action: string; input?
     switch (argv.action) {
       case 'register': {
         if (!argv.input) throw new Error('register requires --input');
-        const logicalPath = path.resolve(process.cwd(), String(argv.input));
+        const logicalPath = resolveCliInputPath(String(argv.input));
         if (!safeExistsSync(logicalPath)) throw new Error(`schedule file not found: ${logicalPath}`);
         return registerGenerationSchedule(logicalPath);
       }

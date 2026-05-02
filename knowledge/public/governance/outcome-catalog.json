@@ -15,6 +15,69 @@
       "downloadable": false,
       "previewable": true
     },
+    "pipeline_created": {
+      "label": "Pipeline created",
+      "description": "A reusable pipeline artifact was generated from an executed workflow trace.",
+      "deliverable_kind": "pipeline",
+      "downloadable": false,
+      "previewable": true
+    },
+    "artifact:pipeline": {
+      "label": "Pipeline artifact",
+      "description": "A pipeline artifact is generated and can be downloaded or reused.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:macro": {
+      "label": "Macro artifact",
+      "description": "A reusable automation macro is generated and can be downloaded or reused.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:codemod": {
+      "label": "Codemod artifact",
+      "description": "A reusable code transformation artifact is generated and can be downloaded or reused.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "capability_guide": {
+      "label": "Capability guide",
+      "description": "A governed guide summarizing available capabilities and how to use them.",
+      "deliverable_kind": "guide",
+      "downloadable": false,
+      "previewable": true
+    },
+    "design_theme_created": {
+      "label": "Design theme created",
+      "description": "A structured design theme or brand profile was extracted from a source and is ready for reuse.",
+      "deliverable_kind": "design_spec",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:design_spec": {
+      "label": "Design spec artifact",
+      "description": "A governed design specification artifact is produced and can be reused.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "website_built": {
+      "label": "Website built",
+      "description": "A website prototype or concept build was generated and written to disk.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:web_assets": {
+      "label": "Web assets artifact",
+      "description": "A governed web asset bundle is produced and can be downloaded or previewed.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
     "artifact:pptx": {
       "label": "Presentation artifact",
       "description": "A PowerPoint deck is generated and can be downloaded.",

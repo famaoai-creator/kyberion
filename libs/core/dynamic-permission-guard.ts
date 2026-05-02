@@ -47,7 +47,7 @@ class DynamicPermissionGuard {
   }
 
   public evaluate(role: string, filePath: string): { allowed: boolean; reason?: string } {
-    const relativePath = path.relative(process.cwd(), filePath);
+    const relativePath = path.relative(pathResolver.rootDir(), filePath);
 
     for (const policy of this.policies) {
       if (policy.grant.role !== role) continue;

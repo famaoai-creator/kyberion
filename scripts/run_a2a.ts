@@ -1,17 +1,15 @@
-import { logger, safeReadFile } from '@agent/core';
+import { logger } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as path from 'node:path';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
+import { readJsonCliInput } from './refactor/cli-input.js';
 
 async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true, description: 'Path to A2A Message JSON' })
     .parseSync();
 
-  const inputPath = path.resolve(process.cwd(), argv.input as string);
-  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const a2aMsg = JSON.parse(inputContent) as A2AMessage;
+  const a2aMsg = readJsonCliInput<A2AMessage>(argv.input as string);
 
   if (!a2aMsg.header || !a2aMsg.payload) {
     logger.error('Invalid A2A Message: Missing header or payload.');

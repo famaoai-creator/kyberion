@@ -5,6 +5,7 @@ import {
   safeReadFile,
 } from '@agent/core';
 import { generateNativeXlsx } from '@agent/core/media-contracts';
+import { readJsonFile } from './refactor/cli-input.js';
 import type {
   XlsxCell,
   XlsxCellStyle,
@@ -547,7 +548,7 @@ function buildProtocol(patternId: string): XlsxDesignProtocol {
 
 async function main() {
   const manifestPath = pathResolver.rootResolve('knowledge/public/design-patterns/spreadsheet/xlsx-template-library.json');
-  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as TemplateLibrary;
+  const manifest = readJsonFile<TemplateLibrary>(manifestPath);
   for (const template of manifest.templates) {
     const resolvedOutput = pathResolver.rootResolve(template.output);
     const outputDir = path.dirname(resolvedOutput);

@@ -5,11 +5,10 @@ import {
   formatClarificationPacket,
   logger,
   safeExistsSync,
-  safeReadFile,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import * as path from 'node:path';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
+import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';
 
 async function main() {
   const argv = await createStandardYargs()
@@ -68,10 +67,8 @@ async function main() {
   }
 
   let context = {};
-  if (argv.input && safeExistsSync(path.resolve(process.cwd(), argv.input))) {
-    context = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), argv.input), { encoding: 'utf8' }) as string
-    );
+  if (argv.input && safeExistsSync(resolveAdfInputPath(argv.input as string))) {
+    context = readJsonInput(argv.input as string);
   }
 
   logger.info(`🚀 [GATEWAY] Processing high-level intent: ${intent}`);

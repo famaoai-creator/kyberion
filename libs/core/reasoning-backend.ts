@@ -321,6 +321,8 @@ export interface ReasoningBackend {
   decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan>;
   /** Delegate a complex, multi-step task to an autonomous sub-agent. */
   delegateTask(instruction: string, context?: string): Promise<string>;
+  /** Run a plain prompt against the active reasoning backend. */
+  prompt(prompt: string): Promise<string>;
 }
 
 let registered: ReasoningBackend | null = null;
@@ -510,5 +512,10 @@ export const stubReasoningBackend: ReasoningBackend = {
   async delegateTask(instruction, context) {
     logger.warn(`[reasoning-backend:stub] delegateTask — no real backend registered; instruction="${instruction}"`);
     return `[STUB] Delegated task execution (stub). Context: ${context ?? 'none'}`;
+  },
+
+  async prompt(prompt) {
+    logger.warn(`[reasoning-backend:stub] prompt — no real backend registered; prompt="${prompt.slice(0, 80)}"`);
+    return `[STUB] ${prompt}`;
   },
 };
