@@ -1,0 +1,90 @@
+{
+  "pipeline_id": "incident-post-mortem",
+  "version": "1.0.0",
+  "description": "Analyze an execution failure, identify root causes, and propose a repair ADF or mitigation plan.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-confidential-tier",
+      "type": "control",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+          {
+            "id": "collect-orchestrator-log",
+            "type": "capture",
+            "op": "system:read_file",
+            "params": {
+              "path": "active/shared/runtime/orchestrator.log",
+              "export_as": "orchestrator_log"
+            }
+          },
+          {
+            "id": "collect-surface-log",
+            "type": "capture",
+            "op": "system:read_file",
+            "params": {
+              "path": "active/shared/runtime/surface.log",
+              "export_as": "surface_log"
+            }
+          },
+          {
+            "id": "collect-supervisor-log",
+            "type": "capture",
+            "op": "system:read_file",
+            "params": {
+              "path": "active/shared/runtime/supervisor.log",
+              "export_as": "supervisor_log"
+            }
+          },
+          {
+            "id": "collect-trace",
+            "type": "capture",
+            "op": "system:collect_artifacts",
+            "params": {
+              "mission_ids": ["{{target_mission_id}}"],
+              "patterns": ["trace.json", "TASK_BOARD.md"],
+              "export_as": "incident_trace"
+            }
+          },
+          {
+            "id": "analyze-failure",
+            "type": "transform",
+            "op": "reasoning:analyze",
+            "params": {
+              "instruction": "Perform a technical post-mortem. Categorize the failure (Environment, Logic, Governance). Identify the root cause from the logs and trace. Propose a Repair ADF step or a system configuration change to prevent this in the future.",
+              "context": ["{{orchestrator_log}}", "{{surface_log}}", "{{supervisor_log}}", "{{incident_trace}}"],
+              "export_as": "post_mortem_report"
+            }
+          },
+          {
+            "id": "emit-incident-record",
+            "type": "apply",
+            "op": "system:write_artifact",
+            "params": {
+              "kind": "incident_report",
+              "title": "Incident Post-Mortem: {{incident_id}}",
+              "content": "{{post_mortem_report}}",
+              "path": "knowledge/incidents/post_mortem_{{incident_id}}.md"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "incident-post-mortem requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
