@@ -88,7 +88,17 @@ Do not mix tiers casually.
 
 If a pipeline crosses tiers, the transfer must be governed and explicit.
 
-### 1.6 Treat evidence as part of the product
+### 1.6 Make privileged pipelines explicit
+
+Some pipelines are intentionally privileged.
+
+- If the output is confidential, require `mission_tier=confidential` at the first control step.
+- If the pipeline reads or writes confidential evidence, document the expected persona or role.
+- If a lower-privilege run fails with a permission error, treat that as a valid guard signal unless the pipeline is supposed to support broader access.
+
+This is especially important for audit, governance, and portfolio-style pipelines.
+
+### 1.7 Treat evidence as part of the product
 
 A pipeline is not complete until the outputs are reviewable.
 
@@ -167,6 +177,7 @@ At minimum:
 - governance checks
 - tier hygiene checks
 - intent/domain coverage when relevant
+- persona or role authorization when the pipeline targets confidential artifacts
 
 If the pipeline is generated or repaired, re-run preflight after the change.
 
@@ -265,6 +276,53 @@ Example symptoms:
 - a pipeline is judged successful only on synthetic input
 - real-site snapshots or real artifact writes were never verified
 - browser capture works in theory but not in practice
+
+### 3.7 Nested pipeline shell-outs
+
+Example symptoms:
+
+- one pipeline shells out to run another pipeline
+- the report is assembled from opaque sub-pipeline stdout
+- the composition is hidden from the ADF graph
+
+Why this is bad:
+
+- traceability is worse than direct ADF composition
+- failures become harder to localize
+- learning signals are split across multiple runtime layers
+
+Prefer direct capture, transform, and write steps when the underlying signal can be collected in the current pipeline.
+
+### 3.8 Misclassified actuator execution failures
+
+Example symptoms:
+
+- the runner reports an unsupported op even though the actuator loaded correctly
+- browser navigation or snapshot errors are collapsed into load failures
+- the error message does not distinguish load-time failure from runtime failure
+
+Why this is bad:
+
+- debugging points at the wrong layer
+- recovery logic may repair the wrong contract
+- retry policy becomes noisy and less trustworthy
+
+Prefer error messages that tell you whether the actuator failed to load, failed to dispatch, or failed while executing a supported step.
+
+### 3.9 Prefer direct reads over shell scraping
+
+If the signal already exists as a known file path, prefer a read op over a shell scrape.
+
+- Use `read_file` for plain-text logs and notes
+- Use `read_json` for structured runtime state
+- Use shell only when the data source is genuinely dynamic or cannot be addressed directly
+
+Why this is better:
+
+- less hidden formatting drift
+- better tier-aware path handling
+- clearer failure classification
+- easier preflight and replay
 
 ## 4. Review Checklist for New Pipelines
 
@@ -535,6 +593,7 @@ When it has:
 - unresolved placeholders
 - unsupported operator names
 - mock-only validation
+- ambiguous failure classification
 
 it should be treated as unstable until fixed.
 
@@ -550,6 +609,7 @@ Score each category from 0 to 2.
 | Artifact quality | incomplete | usable but rough | review-ready |
 | Governability | undocumented | partially documented | fully documented and tier-safe |
 | Reusability | one-off only | partially reusable | parameterized and portable |
+| Failure clarity | opaque or misleading | partially classifiable | load vs runtime vs operator failures are distinguishable |
 
 ### Interpretation
 

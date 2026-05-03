@@ -813,6 +813,40 @@
       "risk_profile": "approval_required"
     },
     {
+      "id": "setup-messaging-bridge",
+      "category": "environment_setup",
+      "description": "Onboard and activate a declared messaging communication channel implementation (currently Slack and macOS iMessage) by verifying credentials, reconciling the surface manifest, and starting the bridge service. Unsupported platforms require a scaffolded bridge first.",
+      "surface_examples": [
+        "Slackブリッジを起動して",
+        "iMessageの連携を設定して",
+        "Setup Slack bridge",
+        "Enable iMessage communication"
+      ],
+      "plan_outline": [
+        "identify the target messaging platform",
+        "verify or request the required API tokens or local permissions",
+        "confirm the requested platform has a declared bridge implementation",
+        "reconcile active-surfaces.json and start the bridge service"
+      ],
+      "intake_requirements": ["platform_id"],
+      "outcome_ids": ["messaging_bridge_active", "service_started"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["Telegram", "iMessage", "連携", "bridge", "messaging"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_onboarding",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "activate",
+      "object": "communication_bridge",
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "approval_required"
+    },
+    {
       "id": "list-capabilities",
       "category": "system_observability",
       "description": "Provide a comprehensive, user-friendly guide of all available Kyberion intents, capabilities, and automation workflows.",
