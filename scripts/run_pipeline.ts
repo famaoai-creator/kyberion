@@ -28,7 +28,9 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             ? resolveVars(params.context, ctx)
             : params.context || ctx;
         const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}`;
-        const response = await backend.prompt(prompt);
+        const response = shouldUseSubagentForReasoningStep(params)
+          ? await backend.delegateTask(String(resolvedInstruction || 'Analyze the context.'), JSON.stringify(resolvedContext))
+          : await backend.prompt(prompt);
         return { handled: true, ctx: { ...ctx, [params.export_as || 'last_reasoning']: response } };
       }
       return { handled: false, ctx };
@@ -138,6 +140,12 @@ function matchesArtifactPattern(filePath: string, pattern: string): boolean {
   const basename = path.posix.basename(normalizedPath);
   const matcher = globToRegExp(pattern.replace(/\\/g, '/'));
   return matcher.test(normalizedPath) || matcher.test(basename);
+}
+
+function shouldUseSubagentForReasoningStep(params: Record<string, unknown>): boolean {
+  if (params.use_subagent === true) return true;
+  const mode = String(params.execution_mode || params.mode || '');
+  return mode === 'subagent' || mode === 'delegate';
 }
 
 export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {

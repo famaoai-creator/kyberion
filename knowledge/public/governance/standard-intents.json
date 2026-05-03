@@ -847,6 +847,99 @@
       "risk_profile": "approval_required"
     },
     {
+      "id": "inspect-network-environment",
+      "category": "system_observability",
+      "description": "Scan and report on network connectivity, speed, and latency to ensure reliable agent-to-agent communication.",
+      "surface_examples": [
+        "ネットワークの状態を診断して",
+        "回線速度や安定性を見て",
+        "Check network health"
+      ],
+      "plan_outline": [
+        "check primary interface status and IP configuration",
+        "measure latency to core Kyberion service endpoints",
+        "detect potential firewall or proxy obstructions",
+        "synthesize a network readiness report"
+      ],
+      "outcome_ids": ["network_report"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["ネットワーク", "回線", "通信速度", "network", "latency", "wifi"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "inspect",
+      "object": "network_environment",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low"
+    },
+    {
+      "id": "inspect-workspace-surfaces",
+      "category": "system_observability",
+      "description": "Identify connected displays, resolutions, and active workspace surfaces available for visual interaction.",
+      "surface_examples": [
+        "モニターや画面の設定を確認して",
+        "ディスプレイの解像度を教えて",
+        "Inspect connected displays"
+      ],
+      "plan_outline": [
+        "scan connected monitors and GPUs",
+        "report active resolution and arrangement",
+        "identify available UI surfaces (presence-studio, computer-surface)",
+        "synthesize a workspace surface report"
+      ],
+      "outcome_ids": ["surface_report"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["ディスプレイ", "モニター", "画面", "解像度", "display", "resolution", "monitor"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "inspect",
+      "object": "display_hardware",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low"
+    },
+    {
+      "id": "monitor-service-health",
+      "category": "system_observability",
+      "description": "Verify the active response health of messaging bridges and internal services (not just if they are running).",
+      "surface_examples": [
+        "SlackやTelegramがちゃんと動いてるか確認して",
+        "サービスの応答速度を見て",
+        "Check messaging bridge reliability"
+      ],
+      "plan_outline": [
+        "ping active bridge processes for response heartbeat",
+        "verify API connectivity for configured gateways",
+        "check log for recent communication errors",
+        "synthesize a service reliability report"
+      ],
+      "outcome_ids": ["service_health_report"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["生存確認", "疎通", "レスポンス", "health check", "bridge health"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "inspect",
+      "object": "service_reliability",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low"
+    },
+    {
       "id": "list-capabilities",
       "category": "system_observability",
       "description": "Provide a comprehensive, user-friendly guide of all available Kyberion intents, capabilities, and automation workflows.",

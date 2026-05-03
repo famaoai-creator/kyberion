@@ -2926,6 +2926,46 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'agent-routing-decision',
+      schemaPath: 'knowledge/public/schemas/agent-routing-decision.schema.json',
+      validPayloads: [
+        {
+          kind: 'agent-routing-decision',
+          source_text: '今週の進捗レポートを作って',
+          intent_id: 'generate-report',
+          mode: 'subagent',
+          scope: 'single_artifact',
+          autonomy: 'medium',
+          boundary_crossing: false,
+          fanout: 'review',
+          owner: 'report-drafting-agent',
+          delegates: ['fact-check-agent', 'editor-agent'],
+          artifact_count: 1,
+          stop_condition: 'A governed report draft exists and the owner has accepted it.',
+          rationale:
+            'The request is review-heavy and benefits from a bounded drafting worker plus a lightweight review pass.',
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'agent-routing-decision',
+          source_text: '今週の進捗レポートを作って',
+          intent_id: 'generate-report',
+          mode: 'prompt',
+          scope: 'single_artifact',
+          autonomy: 'medium',
+          boundary_crossing: false,
+          fanout: 'review',
+          owner: 'report-drafting-agent',
+          delegates: ['fact-check-agent', 'editor-agent'],
+          artifact_count: 0,
+          stop_condition: 'A governed report draft exists and the owner has accepted it.',
+          rationale:
+            'The request is review-heavy and benefits from a bounded drafting worker plus a lightweight review pass.',
+        },
+      ],
+    },
+    {
       id: 'pipeline-adf',
       schemaPath: 'knowledge/public/schemas/pipeline-adf.schema.json',
       validPayloads: [

@@ -214,6 +214,15 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   return providers;
 }
 
+export function refreshProviderDiscoveryCache(): ProviderInfo[] {
+  return discoverProviders(true);
+}
+
+export function clearProviderDiscoveryCache(): void {
+  cachedProviders = null;
+  cacheTimestamp = 0;
+}
+
 /**
  * Get only installed providers.
  */
