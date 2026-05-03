@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -112,8 +113,8 @@ describe('run_generation_schedule', () => {
     const result = await runGenerationScheduleAction({ action: 'tick' });
 
     expect(mocks.safeCopyFileSync).toHaveBeenCalledWith(
-      'active/shared/exports/song.mp3',
-      'active/shared/exports/latest.mp3',
+      path.resolve('active/shared/exports/song.mp3'),
+      path.resolve('active/shared/exports/latest.mp3'),
     );
     expect(result).toEqual({
       status: 'completed',
@@ -124,7 +125,9 @@ describe('run_generation_schedule', () => {
           reason: 'schedule is not due',
           reconciliation: expect.objectContaining({
             alias_updated: true,
-            latest_alias_path: 'active/shared/exports/latest.mp3',
+            latest_alias_path: path.resolve('active/shared/exports/latest.mp3'),
+            artifact_dir: null,
+            workdir: path.resolve('active/shared/exports'),
           }),
         }),
       ],

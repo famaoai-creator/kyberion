@@ -150,6 +150,19 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'capability-bundle-registry',
+      schemaPath: 'knowledge/public/schemas/capability-bundle-registry.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/capability-bundle-registry.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          bundles: [],
+        },
+      ],
+    },
+    {
       id: 'execution-receipt-policy',
       schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
       validPayloads: [
@@ -2868,6 +2881,7 @@ function createChecks(): ContractCheck[] {
           kind: 'intent-contract',
           source_text: '提案資料を作って',
           intent_id: 'generate-presentation',
+          capability_bundle_id: 'browser-exploration-governed',
           goal: {
             summary: 'Create a presentation deck',
             success_condition: 'A governed PPTX draft is prepared.',

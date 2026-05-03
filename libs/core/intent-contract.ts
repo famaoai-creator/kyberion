@@ -9,6 +9,11 @@ import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
+import {
+  resolveCapabilityBundleForIntent,
+  summarizeRelevantCapabilityBundlesForIntentIds,
+  summarizeRelevantCapabilityBundlesForIntentIdsCompact,
+} from './capability-bundle-registry.js';
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
 import {
   buildFallbackExecutionBrief,
@@ -41,6 +46,7 @@ export interface IntentContract {
   kind: 'intent-contract';
   source_text: string;
   intent_id: string;
+  capability_bundle_id?: string;
   goal: {
     summary: string;
     success_condition: string;
@@ -171,6 +177,18 @@ function validateIntentContract(value: unknown): ValidationResult<IntentContract
   };
 }
 
+function attachCapabilityBundle(contract: IntentContract): IntentContract {
+  const bundle = resolveCapabilityBundleForIntent(contract.intent_id);
+  if (!bundle) {
+    const { capability_bundle_id: _ignored, ...rest } = contract;
+    return rest;
+  }
+  return {
+    ...contract,
+    capability_bundle_id: bundle.bundle_id,
+  };
+}
+
 function validateWorkLoop(value: unknown): ValidationResult<OrganizationWorkLoopSummary> {
   const validate = ensureWorkLoopValidator();
   const valid = validate(value);
@@ -218,6 +236,12 @@ function summarizeRelevantIntents(text: string): string {
     }));
 
   return JSON.stringify(scored, null, 2);
+}
+
+function summarizeRelevantCapabilityBundlesByIntentIds(intentIds: string[]): string {
+  return summarizeRelevantCapabilityBundlesForIntentIdsCompact(
+    intentIds
+  );
 }
 
 function normalizeShape(shape?: string): ExecutionShape {
@@ -297,7 +321,7 @@ function buildFallbackIntentContract(
       classified.payload?.bootstrap_kind === 'project_bootstrap'
         ? 'project_bootstrap'
         : 'task_session';
-    return {
+    return attachCapabilityBundle({
       kind: 'intent-contract',
       source_text: input.text,
       intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
@@ -331,10 +355,10 @@ function buildFallbackIntentContract(
       why: executionBrief
         ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
         : 'Fallback classifier mapped the request to the nearest governed task session contract.',
-    };
+    });
   }
 
-  return {
+  return attachCapabilityBundle({
     kind: 'intent-contract',
     source_text: input.text,
     intent_id: executionBrief?.archetype_id || 'general_request',
@@ -364,7 +388,7 @@ function buildFallbackIntentContract(
     why: executionBrief
       ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
       : 'Fallback could not derive a safe execution contract from the current request.',
-  };
+  });
 }
 
 function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
@@ -445,6 +469,8 @@ function buildIntentContractPrompt(
   executionBrief: ActuatorExecutionBrief
 ): string {
   const policy = loadIntentPolicy();
+  const packet = resolveIntentResolutionPacket(input.text);
+  const bundleIntentIds = packet.candidates.map((candidate) => candidate.intent_id);
   return [
     'You are the Kyberion Intent Contract Compiler.',
     'Convert the user request into a governed JSON contract.',
@@ -455,6 +481,7 @@ function buildIntentContractPrompt(
     'Rules:',
     ...policy.compiler.intent_contract_rules.map((rule) => `- ${rule}`),
     '- Preserve service binding references from the execution brief when present.',
+    '- Prefer attaching a capability_bundle_id when the intent maps to a reusable governed bundle.',
     '',
     'Execution brief:',
     JSON.stringify(executionBrief, null, 2),
@@ -465,6 +492,7 @@ function buildIntentContractPrompt(
         kind: 'intent-contract',
         source_text: 'string',
         intent_id: 'string',
+        capability_bundle_id: 'string?',
         goal: { summary: 'string', success_condition: 'string' },
         resolution: {
           execution_shape: 'direct_reply|task_session|mission|project_bootstrap',
@@ -484,6 +512,12 @@ function buildIntentContractPrompt(
     '',
     'Relevant governed intents:',
     summarizeRelevantIntents(input.text),
+    '',
+    'Relevant capability bundles:',
+    summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
+    '',
+    'Relevant capability bundles (detailed registry snapshot):',
+    summarizeRelevantCapabilityBundlesForIntentIds(bundleIntentIds),
     '',
     'Request context:',
     JSON.stringify(
@@ -510,6 +544,8 @@ function buildWorkLoopPrompt(
   contract: IntentContract
 ): string {
   const policy = loadIntentPolicy();
+  const packet = resolveIntentResolutionPacket(input.text);
+  const bundleIntentIds = packet.candidates.map((candidate) => candidate.intent_id);
   return [
     'You are the Kyberion Work Loop Compiler.',
     'Produce a governed Organization Work Loop Summary JSON.',
@@ -527,6 +563,12 @@ function buildWorkLoopPrompt(
     '',
     'Relevant governed intents:',
     summarizeRelevantIntents(input.text),
+    '',
+    'Relevant capability bundles:',
+    summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
+    '',
+    'Relevant capability bundles (detailed registry snapshot):',
+    summarizeRelevantCapabilityBundlesForIntentIds(bundleIntentIds),
     '',
     'Output must match this structure:',
     'organization-work-loop.schema.json',
@@ -594,7 +636,7 @@ async function compileIntentContractWithLlm(
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
   const result = validateIntentContract(parsed);
-  return result.valid ? result.value! : null;
+  return result.valid ? attachCapabilityBundle(result.value!) : null;
 }
 
 async function compileWorkLoopWithLlm(

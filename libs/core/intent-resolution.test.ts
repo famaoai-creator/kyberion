@@ -54,6 +54,7 @@ describe('intent-resolution', () => {
     const openSitePacket = resolveIntentResolutionPacket('Open OpenAI docs');
     expect(openSitePacket.selected_intent_id).toBe('open-site');
     expect(openSitePacket.selected_resolution?.shape).toBe('browser_session');
+    expect(openSitePacket.bundle_candidates?.[0]?.bundle_id).toBe('browser-exploration-governed');
 
     const browserStepPacket = resolveIntentResolutionPacket('左下の承認ボタンを押して');
     expect(browserStepPacket.selected_intent_id).toBe('browser-step');
