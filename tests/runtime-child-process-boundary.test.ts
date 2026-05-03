@@ -14,7 +14,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/codex-cli-query.ts',
   'libs/core/deployment-adapter.ts',
   'libs/core/doctor_core.ts',
-  'libs/core/environment-capability-probes.ts',
   'libs/core/environment-capability.ts',
   'libs/core/gemini-cli-backend.ts',
   'libs/core/managed-process.ts',
