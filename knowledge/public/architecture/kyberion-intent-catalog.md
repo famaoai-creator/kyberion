@@ -292,7 +292,7 @@ adapter wiring for the current environment.
 | `system-diagnostics` | Detailed diagnostics |
 | `dev-productivity-audit` | Engineering productivity signals |
 | `agent-provider-check` | Reasoning provider connectivity |
-| `ceo-strategic-report` | Executive dashboard aggregation |
+| `ceo-strategic-report` | Executive dashboard aggregation; prefer direct ADF capture/transform/write composition |
 | `daily-summary` | Today's activity rollup |
 
 ### 5.2 Mission and knowledge auditing

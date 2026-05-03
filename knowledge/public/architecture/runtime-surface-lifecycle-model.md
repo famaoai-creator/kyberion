@@ -26,7 +26,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
 
 1. `gateway`
    External ingress that receives events from a channel or protocol.
-   Examples: `slack-bridge`
+   Examples: `slack-bridge`, `imessage-bridge`
 
 2. `ui`
    Interactive control surface or workspace application.
@@ -52,7 +52,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
   - `cwd`
   - `shutdownPolicy`
   - `startupMode`
-- `slack-bridge` and `nexus-daemon` are `background` services.
+- `slack-bridge`, `imessage-bridge`, and `nexus-daemon` are `background` services.
 - `chronos-mirror-v2` is a `workspace-app` and may require a prior build.
 
 ## Shutdown Rules
@@ -67,6 +67,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
 node dist/scripts/surface_runtime.js --action reconcile
 node dist/scripts/surface_runtime.js --action status
 node dist/scripts/surface_runtime.js --action start --surface slack-bridge
+node dist/scripts/surface_runtime.js --action start --surface imessage-bridge
 node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
 ```
 
@@ -81,7 +82,7 @@ node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
 
 ## Boundaries
 
-- Slack ingress belongs to `slack-bridge`, not `service-actuator`.
+- Slack and iMessage ingress belong to their dedicated bridge satellites, not `service-actuator`.
 - Channel delivery belongs to `presence-actuator`.
 - Authenticated service access belongs to `service-binding` / `service-actuator`.
 - System-local ephemeral commands belong to `system-actuator`.

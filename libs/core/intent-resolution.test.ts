@@ -61,6 +61,16 @@ describe('intent-resolution', () => {
     expect(browserStepPacket.selected_resolution?.shape).toBe('browser_session');
   });
 
+  it('infers platform ids for messaging bridge setup intents', () => {
+    const imessagePacket = resolveIntentResolutionPacket('iMessageの連携を設定して');
+    expect(imessagePacket.selected_intent_id).toBe('setup-messaging-bridge');
+    expect(imessagePacket.selected_parameters?.platform_id).toBe('imessage');
+
+    const telegramPacket = resolveIntentResolutionPacket('Telegram連携を設定して');
+    expect(telegramPacket.selected_intent_id).toBe('setup-messaging-bridge');
+    expect(telegramPacket.selected_parameters?.platform_id).toBe('telegram');
+  });
+
   it('resolves Kyberion expansion and service lifecycle intents', () => {
     const cases = [
       ['Kyberionの実行環境を初期化して', 'bootstrap-kyberion-runtime', 'environment_bootstrapped'],

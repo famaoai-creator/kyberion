@@ -6,27 +6,32 @@ tags: [orchestration, adf, pipeline, quickstart]
 
 # ADF Pipeline Quickstart
 
-Use this quickstart when you want to build, validate, or revise an ADF pipeline with minimal drift.
+Use this page when you need to build, validate, or revise an ADF pipeline without drifting into ad hoc logic.
 
-This page is intentionally short. For the full learning model, see:
+For the full learning model, see:
 
 - [ADF Pipeline Learning Playbook](./adf-pipeline-learning-playbook.md)
 - [ADF Pipeline Template](./adf-pipeline-template.md)
 
-## 1. Start from the outcome
+## 1. Freeze the target
 
-Before writing ADF, freeze these four things:
+Before writing ADF, lock these four things:
 
 - What artifact must exist at the end
 - Which tier it belongs to
 - Which actuator(s) must run
 - How success will be judged
 
-If you cannot name the final artifact, do not start with a full pipeline.
+If the artifact is confidential, also lock:
 
-## 2. Pick the smallest runnable shape
+- the required `mission_tier`
+- the minimum persona or role that is allowed to write it
 
-Prefer the smallest shape that can prove the outcome:
+If you cannot name the final artifact, do not start.
+
+## 2. Start with the smallest runnable shape
+
+Prefer the smallest shape that proves the outcome:
 
 - `capture -> reasoning -> write -> validate`
 - `browser capture -> reasoning -> write`
@@ -34,9 +39,9 @@ Prefer the smallest shape that can prove the outcome:
 
 Do not add orchestration, fan-out, or recovery until the minimal shape works.
 
-## 3. Make context explicit
+## 3. Make runtime context explicit
 
-Always bind these values explicitly when the pipeline depends on runtime state:
+Bind these values explicitly when the pipeline depends on runtime state:
 
 - `mission_id`
 - `session_id`
@@ -44,7 +49,7 @@ Always bind these values explicitly when the pipeline depends on runtime state:
 - `source_url`
 - `target_artifact`
 
-Avoid hidden cwd, implicit browser state, or placeholder strings that are never resolved.
+Avoid hidden cwd, implicit browser state, and unresolved placeholders.
 
 ## 4. Use canonical ops only
 
@@ -54,7 +59,7 @@ Prefer governed operators that already exist in the repository.
 - Use the right write primitive for the target artifact type
 - Avoid unsupported `apply` / `control` / `write` combinations
 
-If the operator name looks plausible but has not been validated against the actuator, treat it as unsafe.
+If the operator name has not been validated against the actuator, treat it as unsafe.
 
 ## 5. Preflight before execution
 
@@ -64,9 +69,17 @@ Before running real data:
 - Check that all placeholders resolve
 - Confirm that every referenced path exists
 - Confirm tier-safe write targets
+- Confirm the run has the right persona or role for confidential outputs
 - Confirm the chosen actuator supports the step types
 
 If any of these fail, repair the pipeline first.
+
+When a failure occurs, classify it before retrying:
+
+- actuator load failure
+- actuator runtime failure
+- unsupported operator
+- environment / network failure
 
 ## 6. Smoke test with real input
 
@@ -131,3 +144,9 @@ If you are unsure where to begin, copy the standard shape from:
 - [ADF Pipeline Template](./adf-pipeline-template.md)
 
 Then trim it down until only the minimum verified steps remain.
+
+## 11. One-line operating rule
+
+If you need the shortest possible rule:
+
+**Outcome first, smallest shape second, explicit context third, real-input smoke test before standardization.**

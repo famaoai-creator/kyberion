@@ -57,6 +57,7 @@ export interface AssistantCompilerRequest {
     track_id?: string;
     track_name?: string;
     service_bindings: string[];
+    runtime_context?: Record<string, unknown>;
   };
   delegation: {
     mode: 'compile_intent';
@@ -96,6 +97,7 @@ export interface CreateAssistantCompilerRequestInput {
   trackId?: string;
   trackName?: string;
   serviceBindings?: string[];
+  runtimeContext?: Record<string, unknown>;
   preferredProvider?: IntentCompilerProvider;
   preferredModel?: string;
   preferredModelProvider?: string;
@@ -567,6 +569,7 @@ export function buildAssistantCompilerRequest(
       track_id: input.trackId,
       track_name: input.trackName,
       service_bindings: input.serviceBindings || [],
+      runtime_context: input.runtimeContext || {},
     },
     delegation: {
       mode: 'compile_intent',

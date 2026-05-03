@@ -218,6 +218,7 @@ export * from './voice-runtime-policy.js';
 export * from './voice-profile-registry.js';
 export * from './voice-profile-promotion.js';
 export * from './presentation-preference-registry.js';
+export * from './imessage-bridge.js';
 export * from './voice-engine-registry.js';
 export * from './voice-sample-ingestion-policy.js';
 export * from './voice-sample-collection.js';

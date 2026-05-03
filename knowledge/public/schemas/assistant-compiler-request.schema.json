@@ -57,6 +57,9 @@
         "service_bindings": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "runtime_context": {
+          "type": "object"
         }
       },
       "additionalProperties": false

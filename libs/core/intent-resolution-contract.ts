@@ -67,10 +67,14 @@ export function resolveIntentResolutionContract(utterance: string): IntentResolu
   const catalog = loadStandardIntentCatalog();
   const selectedIntent = catalog.find((intent) => intent.id === packet.selected_intent_id);
   const selectedShape = normalizeShape(packet.selected_resolution?.shape);
+  const inferredPlatformId = packet.selected_parameters?.platform_id;
   const missingInputs = packet.selected_intent_id
-    ? (packet.selected_confidence || 0) < 0.5
-      ? ['intent_confirmation']
-      : []
+    ? [
+        ...(packet.selected_intent_id === 'setup-messaging-bridge' && !inferredPlatformId
+          ? ['platform_id']
+          : []),
+        ...((packet.selected_confidence || 0) < 0.5 ? ['intent_confirmation'] : []),
+      ]
     : ['intent_or_goal'];
   const authorityLevel: IntentAuthorityLevel = missingInputs.length > 0
     ? 'human_clarification_required'

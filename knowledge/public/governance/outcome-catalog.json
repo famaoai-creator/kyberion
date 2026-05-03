@@ -120,6 +120,13 @@
       "downloadable": false,
       "previewable": true
     },
+    "messaging_bridge_active": {
+      "label": "Messaging bridge active",
+      "description": "A declared messaging bridge has been reconciled and is active under runtime supervision.",
+      "deliverable_kind": "service",
+      "downloadable": false,
+      "previewable": true
+    },
     "meeting_operations_summary": {
       "label": "Meeting operations summary",
       "description": "A concise meeting summary with decisions, action items, owners, deadlines, and follow-up channel is returned.",

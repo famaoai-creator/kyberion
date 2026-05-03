@@ -63,6 +63,25 @@
       "enabled": true
     },
     {
+      "id": "imessage-bridge",
+      "kind": "service",
+      "description": "Managed macOS Messages bridge for declared iMessage sending and governed runtime supervision",
+      "command": "node",
+      "args": ["dist/satellites/imessage-bridge/src/index.js"],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "imessage_bridge"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3034,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
       "id": "nexus-daemon",
       "kind": "service",
       "description": "Background system nerve daemon for stimuli routing and terminal dispatch",

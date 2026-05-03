@@ -64,6 +64,11 @@ export interface IntentResolutionBundleCandidate {
   references: string[];
 }
 
+export interface IntentResolutionSelectedParameters {
+  platform_id?: string;
+  target_platform?: string;
+}
+
 export interface IntentResolutionPacket {
   kind: 'intent_resolution_packet';
   utterance: string;
@@ -74,6 +79,7 @@ export interface IntentResolutionPacket {
     task_kind?: string;
     result_shape?: string;
   };
+  selected_parameters?: IntentResolutionSelectedParameters;
   candidates: IntentResolutionCandidate[];
   bundle_candidates?: IntentResolutionBundleCandidate[];
 }
@@ -249,6 +255,52 @@ function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
     }));
 }
 
+function inferMessagingBridgePlatformId(utterance: string): string | undefined {
+  const normalized = normalizeFreeText(utterance);
+  if (!normalized) return undefined;
+
+  if (
+    normalized.includes('slack') ||
+    utterance.includes('Slack') ||
+    utterance.includes('スラック')
+  ) {
+    return 'slack';
+  }
+
+  if (
+    normalized.includes('imessage') ||
+    normalized.includes('i message') ||
+    utterance.includes('iMessage') ||
+    utterance.includes('i message') ||
+    utterance.includes('アイメッセージ')
+  ) {
+    return 'imessage';
+  }
+
+  if (
+    normalized.includes('telegram') ||
+    utterance.includes('Telegram') ||
+    utterance.includes('テレグラム')
+  ) {
+    return 'telegram';
+  }
+
+  return undefined;
+}
+
+function inferSelectedParameters(
+  intentId: string | undefined,
+  utterance: string
+): IntentResolutionSelectedParameters | undefined {
+  if (intentId !== 'setup-messaging-bridge') return undefined;
+  const platformId = inferMessagingBridgePlatformId(utterance);
+  if (!platformId) return undefined;
+  return {
+    platform_id: platformId,
+    target_platform: platformId,
+  };
+}
+
 export function resolveIntentResolutionPacket(utterance: string): IntentResolutionPacket {
   const trimmed = utterance.trim();
   const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
@@ -277,6 +329,7 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
 
   const sorted = [...deduped.values()].sort((left, right) => right.confidence - left.confidence);
   const selected = sorted[0] && sorted[0].confidence >= scoringPolicy.selected_confidence_threshold ? sorted[0] : undefined;
+  const selectedParameters = inferSelectedParameters(selected?.intent_id, trimmed);
   const bundleById = new Map<string, IntentResolutionBundleCandidate>();
   for (const candidate of sorted) {
     const bundle = resolveCapabilityBundleForIntent(candidate.intent_id);
@@ -298,6 +351,7 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
     selected_intent_id: selected?.intent_id,
     selected_confidence: selected?.confidence,
     selected_resolution: selected?.resolution,
+    selected_parameters: selectedParameters,
     candidates: sorted,
     bundle_candidates: [...bundleById.values()],
   };

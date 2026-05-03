@@ -47,7 +47,7 @@ pnpm onboard
 
 ### Stage 3: Runtime Surface Reconciliation
 - **実行コマンド**: `pnpm surfaces:reconcile`
-- **目的**: `slack-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface を manifest から標準起動します。
+- **目的**: `slack-bridge`、`imessage-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface を manifest から標準起動します。
 - **物理的変化**:
     - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
     - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。

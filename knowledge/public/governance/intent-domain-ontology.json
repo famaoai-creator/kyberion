@@ -494,6 +494,30 @@
       }
     },
     {
+      "intent_id": "setup-messaging-bridge",
+      "category": "environment_setup",
+      "legacy_category": "surface",
+      "target": "external_service",
+      "action": "activate",
+      "object": "communication_bridge",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "single-track-default",
+      "team_template": "default",
+      "risk_profile": "approval_required",
+      "outcome_ids": ["messaging_bridge_active", "service_started"],
+      "intake_requirements": ["platform_id"],
+      "actuator_requirements": ["system-actuator", "service-actuator", "wisdom-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline"],
+      "evidence_required": ["execution-receipt"],
+      "reasoning_requirements": {
+        "mode": "surface_reply",
+        "capability_tags": ["tool_use"],
+        "fallback_allowed": true
+      }
+    },
+    {
       "intent_id": "list-capabilities",
       "category": "system_observability",
       "legacy_category": "surface",
