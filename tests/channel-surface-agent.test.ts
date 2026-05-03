@@ -382,11 +382,27 @@ describe.sequential('Channel surface agents', () => {
         tier: 'public',
       },
       sourceText: 'もっとチーム組んで連携して作って',
+      routingDecision: {
+        kind: 'agent-routing-decision',
+        source_text: 'もっとチーム組んで連携して作って',
+        intent_id: 'test-intent',
+        mode: 'subagent',
+        scope: 'multi_artifact',
+        autonomy: 'medium',
+        boundary_crossing: false,
+        fanout: 'review',
+        owner: 'document-specialist',
+        delegates: ['nerve-agent'],
+        artifact_count: 2,
+        stop_condition: 'proposal approved',
+        rationale: 'test routing decision',
+      },
     });
 
     const state = getSlackMissionProposalState('C123', '1710000000.000500');
     expect(state?.proposal.mission_type).toBe('product_development');
     expect(state?.sourceText).toBe('もっとチーム組んで連携して作って');
+    expect(state?.routingDecision?.mode).toBe('subagent');
 
     clearSlackMissionProposalState('C123', '1710000000.000500');
     expect(getSlackMissionProposalState('C123', '1710000000.000500')).toBeNull();
@@ -420,7 +436,7 @@ describe.sequential('Channel surface agents', () => {
 
     const result = await runSurfaceConversation({
       agentId: 'slack-surface-agent',
-      query: 'please help',
+      query: 'xyz123',
       senderAgentId: 'kyberion:slack-bridge',
       delegationSummaryInstruction: 'Summarize for Slack.',
     });

@@ -727,6 +727,25 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.3.2)(jsdom@24.1.3)(vite@8.0.0(@types/node@25.3.2)(esbuild@0.25.12)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.2))
 
+  satellites/imessage-bridge:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../libs/core
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: ^25.2.1
+        version: 25.3.2
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   satellites/slack-bridge:
     dependencies:
       '@agent/core':
@@ -8279,7 +8298,7 @@ packages:
     resolution: {integrity: sha512-/eCGLb5rxjx5e3mF1A7s+pLlR6CGyqWN91fv1JgER5mVWg1MZmlhBvy9kjcsOdRk8RrIujotWyJamfyrp+WIcA==}
 
   xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz:
-    resolution: {tarball: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz}
+    resolution: {integrity: sha512-+nKZ39+nvK7Qq6i0PvWWRA4j/EkfWOtkP/YhMtupm+lJIiHxUrgTr1CcKv1nBk1rHtkRRQ3O2+Ih/q/sA+FXZA==, tarball: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz}
     version: 0.20.2
     engines: {node: '>=0.8'}
     hasBin: true

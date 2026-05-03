@@ -37,11 +37,23 @@ describe('intent-compiler', () => {
     {
       id: 'meeting-operations',
       triggers: ['meeting', 'Teams', 'Zoom', 'ミーティング'],
-      resolution: {
-        shape: 'task_session',
-        task_kind: 'meeting_operations',
-        result_shape: 'summary',
-      },
+      pipeline: [
+        {
+          id: 'meeting-guard',
+          op: 'core:if',
+          params: {
+            condition: { from: 'meeting_url', operator: 'exists' },
+            then: [
+              {
+                op: 'system:log',
+                params: {
+                  message: 'meeting-operations ready',
+                },
+              },
+            ],
+          },
+        },
+      ],
     },
   ];
 

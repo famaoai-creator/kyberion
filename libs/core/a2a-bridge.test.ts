@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
   const shutdownAgentRuntimeViaDaemon = vi.fn();
   const toSupervisorEnsurePayload = vi.fn();
   const getAgentManifest = vi.fn();
+  const resolveAgentSelectionHints = vi.fn();
   return {
     warn,
     info,
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => {
     shutdownAgentRuntimeViaDaemon,
     toSupervisorEnsurePayload,
     getAgentManifest,
+    resolveAgentSelectionHints,
   };
 });
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -69,6 +71,7 @@ vi.mock('./agent-runtime-supervisor-client.js', () => ({
 
 vi.mock('./agent-manifest', () => ({
   getAgentManifest: mocks.getAgentManifest,
+  resolveAgentSelectionHints: mocks.resolveAgentSelectionHints,
   loadAgentManifests: vi.fn(),
 }));
 
@@ -84,6 +87,10 @@ describe('a2a-bridge', () => {
     vi.clearAllMocks();
     mocks.getAgentRuntimeHandle.mockReturnValue(null);
     mocks.toSupervisorEnsurePayload.mockImplementation((payload: any) => payload);
+    mocks.resolveAgentSelectionHints.mockImplementation((manifest: any) => ({
+      provider: manifest.selection_hints?.preferred_provider || manifest.provider || 'gemini',
+      modelId: manifest.selection_hints?.preferred_modelId || manifest.modelId || 'gemini-2.5-flash',
+    }));
   });
 
   it('signs and verifies messages', async () => {

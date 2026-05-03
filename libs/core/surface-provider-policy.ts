@@ -152,6 +152,7 @@ export function resolveSurfaceConversationReceiverForProvider(
   compiledFlow?: UserIntentFlow | null,
 ): SurfaceDelegationReceiver | undefined {
   if (!compiledFlow) return undefined;
+  if (compiledFlow.routingDecision?.mode === 'prompt') return undefined;
   const routing = getSurfaceProviderManifestRecord(surface).routing;
   return (routing.compiled_flow_rules || []).find((rule) => {
     const executionShape = compiledFlow.intentContract.resolution.execution_shape;

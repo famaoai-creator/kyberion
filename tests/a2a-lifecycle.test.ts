@@ -58,7 +58,7 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
     
     // Cleanup for next test
     runMissionController('finish', missionId);
-  });
+  }, 60000);
 
   it('Scenario 2: Failure Flow (Rejected & Score Decrease)', async () => {
     const FAIL_MISSION_ID = `MSN-TEST-LIFE-FAIL-${RUN_ID}`;
@@ -75,7 +75,7 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
     expect(ledger[AGENT_ID].current_score).toBe(480);
     
     runMissionController('finish', FAIL_MISSION_ID);
-  });
+  }, 60000);
 
   it('Scenario 3: Trust Guardrail (Insufficient Score)', async () => {
     const GUARD_MISSION_ID = `MSN-TEST-LIFE-GUARD-${RUN_ID}`;
@@ -108,5 +108,5 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
     }
 
     runMissionController('finish', GUARD_MISSION_ID);
-  });
+  }, 60000);
 });

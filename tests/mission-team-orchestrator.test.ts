@@ -16,22 +16,22 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@agent/core/mission-team-composer', () => ({
+vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
   loadMissionTeamPlan: mocks.loadMissionTeamPlan,
   loadAgentProfileIndex: mocks.loadAgentProfileIndex,
 }));
 
-vi.mock('@agent/core/agent-registry', () => ({
+vi.mock('../libs/core/agent-registry.js', () => ({
   agentRegistry: {
     get: mocks.get,
   },
 }));
 
-vi.mock('@agent/core/agent-runtime-supervisor', () => ({
+vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
   ensureAgentRuntime: mocks.ensureAgentRuntime,
 }));
 
-vi.mock('@agent/core/agent-runtime-supervisor-client', () => ({
+vi.mock('../libs/core/agent-runtime-supervisor-client.js', () => ({
   ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
 }));
 
@@ -51,6 +51,9 @@ describe('mission-team-orchestrator', () => {
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['reasoning'],
         },
         {
           team_role: 'reviewer',
@@ -114,18 +117,27 @@ describe('mission-team-orchestrator', () => {
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['reasoning'],
         },
         {
           team_role: 'planner',
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['reasoning'],
         },
         {
           team_role: 'tester',
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['reasoning'],
         },
       ],
     });
@@ -156,18 +168,27 @@ describe('mission-team-orchestrator', () => {
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['reasoning'],
         },
         {
           team_role: 'planner',
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['reasoning'],
         },
         {
           team_role: 'implementer',
           required: true,
           status: 'assigned',
           agent_id: 'implementation-architect',
+          provider: 'gemini',
+          modelId: 'gemini-2.5-pro',
+          required_capabilities: ['implementation'],
         },
       ],
     });

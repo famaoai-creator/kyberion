@@ -98,6 +98,7 @@ async function main() {
           ? (context as any).service_bindings
           : [],
         runtimeContext,
+        resolutionPacket: packet,
       },
       compilerOptions
     );
@@ -165,6 +166,11 @@ async function main() {
     if (compiled.clarificationPacket) {
       console.log(formatClarificationPacket(compiled.clarificationPacket));
     }
+    if (compiled.routingDecision) {
+      logger.info(
+        `[GATEWAY] Routing decision: ${compiled.routingDecision.mode} (${compiled.routingDecision.rationale})`
+      );
+    }
     console.log(
       JSON.stringify(
         {
@@ -172,6 +178,7 @@ async function main() {
           write_back_path: delegation.request.expected_output.write_back_path,
           compiled,
           execution_brief: compiled.executionBrief,
+          routing_decision: compiled.routingDecision,
           delegation_request: delegation.request,
         },
         null,
@@ -192,6 +199,11 @@ async function main() {
       console.log(formatClarificationPacket(compiled.clarificationPacket));
       console.log(JSON.stringify(compiled, null, 2));
       return;
+    }
+    if (compiled.routingDecision) {
+      logger.info(
+        `[GATEWAY] Routing decision: ${compiled.routingDecision.mode} (${compiled.routingDecision.rationale})`
+      );
     }
     console.log(JSON.stringify(compiled, null, 2));
   }

@@ -96,6 +96,13 @@ function buildDelegatedSurfaceConversationResult(
   };
 }
 
+function attachRoutingDecision(
+  result: SurfaceConversationResult,
+  routingDecision?: UserIntentFlow['routingDecision'],
+): SurfaceConversationResult {
+  return routingDecision ? { ...result, routingDecision } : result;
+}
+
 function formatExecutionReceipt(params: {
   intentId?: string;
   shape?: string;
@@ -543,6 +550,9 @@ async function handleGovernedExecutionHint(
   const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
   const intentId = resolved.intentId;
   const candidates = intentId ? selectContractCandidates(intentId, 3) : [];
+  const routingDecisionArgs = context.compiledFlow?.routingDecision
+    ? ['--routing-decision', JSON.stringify(context.compiledFlow.routingDecision)]
+    : [];
   const direct = directIntentCommand(resolved.intentId);
   if (direct) {
     const command = `${direct.command} ${direct.args.join(' ')}`;
@@ -657,7 +667,7 @@ async function handleGovernedExecutionHint(
     try {
       output = safeExec(
         'node',
-        ['dist/scripts/mission_controller.js', 'create', missionId, 'public'],
+        ['dist/scripts/mission_controller.js', 'create', missionId, 'public', ...routingDecisionArgs],
         {
           cwd: pathResolver.rootDir(),
         }
@@ -737,7 +747,7 @@ async function handleGovernedExecutionHint(
   const command = `node dist/scripts/mission_controller.js ${mapped.join(' ')}`;
   let output = '';
   try {
-    output = safeExec('node', ['dist/scripts/mission_controller.js', ...mapped], {
+    output = safeExec('node', ['dist/scripts/mission_controller.js', ...mapped, ...routingDecisionArgs], {
       cwd: pathResolver.rootDir(),
     });
     if (intentId) {
@@ -1109,7 +1119,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   {
     matches: (context) => {
       const resolved = resolvedSurfaceIntent(context);
-      return resolved.routeFamily === 'direct_reply';
+      return resolved.routeFamily === 'direct_reply' && !context.computedReceiver;
     },
     handle: async (context) => {
       const resolved = resolvedSurfaceIntent(context);
@@ -1195,7 +1205,7 @@ export async function runSurfaceConversation(
     : null;
 
   if (compiledFlow?.clarificationPacket) {
-    return {
+    return attachRoutingDecision({
       text: formatClarificationPacket(compiledFlow.clarificationPacket),
       a2uiMessages: [],
       a2aMessages: [],
@@ -1204,7 +1214,7 @@ export async function runSurfaceConversation(
       routingProposals: [],
       missionProposals: [],
       planningPackets: [],
-    };
+    }, compiledFlow.routingDecision);
   }
 
   const computedReceiver: SurfaceDelegationReceiver | undefined =
@@ -1247,7 +1257,8 @@ export async function runSurfaceConversation(
     handler.matches(routeContext)
   );
   if (matchedRouteHandler) {
-    return matchedRouteHandler.handle(routeContext);
+    const routedResult = await matchedRouteHandler.handle(routeContext);
+    return attachRoutingDecision(routedResult, compiledFlow?.routingDecision);
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
@@ -1279,7 +1290,7 @@ export async function runSurfaceConversation(
   }
 
   if (delegationResults.length === 0) {
-    return firstBlocks;
+    return attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision);
   }
 
   const successful = delegationResults.filter((result) => !result.error);
@@ -1294,14 +1305,14 @@ export async function runSurfaceConversation(
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
-    return {
+    return attachRoutingDecision({
       ...firstBlocks,
       delegationResults: finalDelegationResults,
       approvalRequests: firstBlocks.approvalRequests,
       routingProposals,
       missionProposals: firstBlocks.missionProposals,
       planningPackets: firstBlocks.planningPackets,
-    };
+    }, compiledFlow?.routingDecision);
   }
 
   const summaryContext = finalDelegationResults
@@ -1318,7 +1329,7 @@ export async function runSurfaceConversation(
   const followUpResponse = await handle.ask(summaryPrompt);
   const followUpBlocks = extractSurfaceBlocks(followUpResponse);
 
-  return {
+  return attachRoutingDecision({
     text: followUpBlocks.text,
     a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
     a2aMessages: firstBlocks.a2aMessages,
@@ -1333,7 +1344,7 @@ export async function runSurfaceConversation(
       ...(firstBlocks.planningPackets || []),
       ...(followUpBlocks.planningPackets || []),
     ],
-  };
+  }, compiledFlow?.routingDecision);
 }
 
 export async function runSurfaceMessageConversation(

@@ -120,6 +120,27 @@
       "downloadable": false,
       "previewable": true
     },
+    "network_report": {
+      "label": "Network report",
+      "description": "A network connectivity, latency, and readiness report is returned.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "surface_report": {
+      "label": "Surface report",
+      "description": "A workspace surface and display readiness report is returned.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "service_health_report": {
+      "label": "Service health report",
+      "description": "A service or bridge health report is returned with reliability signals and recent errors.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
     "messaging_bridge_active": {
       "label": "Messaging bridge active",
       "description": "A declared messaging bridge has been reconciled and is active under runtime supervision.",

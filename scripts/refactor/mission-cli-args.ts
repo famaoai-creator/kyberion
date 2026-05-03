@@ -20,6 +20,7 @@ export interface MissionStartCreateOptions {
   visionRef?: string;
   persona?: string;
   relationships?: Partial<MissionRelationships>;
+  routingDecision?: string;
 }
 
 export function extractMissionControllerPositionalArgs(argv: string[]): string[] {
@@ -151,6 +152,7 @@ export function extractMissionStartCreateOptionsFromArgv(argv: string[] = proces
     missionType: getOptionValue('--mission-type', argv),
     visionRef: getOptionValue('--vision-ref', argv) || getOptionValue('--vision', argv),
     persona: getOptionValue('--persona', argv),
+    routingDecision: getOptionValue('--routing-decision', argv),
     relationships: {
       ...extractJsonRelationshipsOption(argv),
       ...extractFileRelationshipsOption(argv),

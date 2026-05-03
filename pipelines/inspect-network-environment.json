@@ -1,0 +1,57 @@
+{
+  "pipeline_id": "inspect-network-environment",
+  "version": "1.0.0",
+  "description": "Scan and report on network connectivity and speed.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "get-interface",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "networksetup -listallhardwareports | grep -A 1 'Wi-Fi' | grep 'Device' | awk '{print $2}'",
+        "export_as": "wifi_interface"
+      }
+    },
+    {
+      "id": "check-signal",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "wdutil info | grep -E 'RSSI|Noise|Tx Rate' || echo 'Signal info unavailable'",
+        "export_as": "network_signal"
+      }
+    },
+    {
+      "id": "ping-test",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "ping -c 3 8.8.8.8 | tail -n 1",
+        "export_as": "ping_results"
+      }
+    },
+    {
+      "id": "synthesize-network-report",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Analyze the network interface, signal quality, and latency. Determine if the environment is stable for high-bandwidth agent tasks (like video generation or large model downloads).",
+        "context": [
+          "{{wifi_interface}}",
+          "{{network_signal}}",
+          "{{ping_results}}"
+        ],
+        "export_as": "network_report"
+      }
+    },
+    {
+      "id": "log-network-report",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "🌐 [NETWORK AUDIT]\n{{network_report}}"
+      }
+    }
+  ]
+}

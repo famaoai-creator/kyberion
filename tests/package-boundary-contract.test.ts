@@ -20,7 +20,17 @@ const IGNORED_DIRS = new Set([
 ]);
 const RUNTIME_ROOTS = ["scripts", "libs/actuators", "presence/displays", "satellites"];
 const TEST_ROOTS = ["tests"];
-const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>();
+const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
+  [
+    'tests/mission-team-orchestrator.test.ts',
+    [
+      '../libs/core/mission-team-plan-composer.js',
+      '../libs/core/agent-registry.js',
+      '../libs/core/agent-runtime-supervisor.js',
+      '../libs/core/agent-runtime-supervisor-client.js',
+    ],
+  ],
+]);
 const ALLOWED_SCRIPT_CANONICAL_ROOT_CWD = new Set<string>([]);
 const ALLOWED_PLUGIN_SATELLITE_CANONICAL_ROOT_CWD = new Set<string>([]);
 
