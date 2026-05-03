@@ -61,6 +61,12 @@ Prefer governed operators that already exist in the repository.
 
 If the operator name has not been validated against the actuator, treat it as unsafe.
 
+For reasoning steps, prefer the lightest path that still matches the task:
+
+- use plain `reasoning` prompt mode for short synthesis and straightforward analysis
+- use `use_subagent: true` only for deeper exploration, comparison, multi-file synthesis, or review work that benefits from autonomous decomposition
+- keep structured JSON-producing steps on prompt mode unless you truly need subagent autonomy
+
 ## 5. Preflight before execution
 
 Before running real data:

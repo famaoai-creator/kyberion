@@ -108,6 +108,59 @@
       "runtime_design_profile_id": "single_actor_delivery"
     }
   },
+  "agent_routing": {
+    "mode_rules": [
+      {
+        "id": "lightweight-browser-interactions",
+        "match": {
+          "intent_ids": ["open-site", "browser-step"],
+          "shapes": ["browser_session"]
+        },
+        "mode": "prompt",
+        "scope": "single_artifact",
+        "autonomy": "low",
+        "boundary_crossing": false,
+        "fanout": "none",
+        "owner": "browser-operator",
+        "artifact_count": 1,
+        "stop_condition": "The browser response is ready as a single governed reply or artifact.",
+        "rationale": "Browser navigation and single-step confirmations should stay on the direct reply path."
+      },
+      {
+        "id": "document-generation-review-heavy",
+        "match": {
+          "intent_ids": ["generate-presentation", "generate-report", "generate-workbook"],
+          "task_types": ["presentation_deck", "report_document", "workbook_wbs"]
+        },
+        "mode": "subagent",
+        "scope": "single_artifact",
+        "autonomy": "medium",
+        "boundary_crossing": false,
+        "fanout": "review",
+        "owner": "document-specialist",
+        "delegates": ["nerve-agent"],
+        "artifact_count": 1,
+        "stop_condition": "The document worker has produced a bounded draft and the owner has accepted it.",
+        "rationale": "Document generation benefits from a bounded worker plus review."
+      },
+      {
+        "id": "mission-and-bootstrap-coordination",
+        "match": {
+          "shapes": ["mission", "project_bootstrap"]
+        },
+        "mode": "coordination",
+        "scope": "boundary_crossing",
+        "autonomy": "high",
+        "boundary_crossing": true,
+        "fanout": "parallel",
+        "owner": "mission-controller",
+        "delegates": ["mission-orchestration-worker"],
+        "artifact_count": 1,
+        "stop_condition": "The coordinated mission or bootstrap flow has a durable owner and completion checkpoint.",
+        "rationale": "Durable mission and project bootstrap flows must be managed as coordination."
+      }
+    ]
+  },
   "design_rules": {
     "process_checklist_rules": [
       {

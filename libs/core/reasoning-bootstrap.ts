@@ -68,6 +68,8 @@ export interface InstallReasoningOptions {
   anthropicClient?: Anthropic;
   /** Force install even if stub would be chosen otherwise (for tests). */
   force?: boolean;
+  /** Re-scan provider availability instead of using the cached discovery snapshot. */
+  refreshProviders?: boolean;
 }
 
 /** @deprecated Use InstallReasoningOptions */
@@ -92,7 +94,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
   if (process.env.GEMINI_API_KEY) return 'gemini-api';
 
-  const providers = discoverProviders(true);
+  const providers = discoverProviders(shouldRefreshProviders(options));
   if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
     return 'codex-cli';
   }
@@ -171,7 +173,7 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   }
 
   if (mode === 'codex-cli') {
-    const providers = discoverProviders(true);
+    const providers = discoverProviders(shouldRefreshProviders(options));
     const codexHealthy = providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy);
     if (!codexHealthy && !options.force) {
       logger.warn('[reasoning-bootstrap] mode=codex-cli selected but Codex CLI is not usable — keeping stubs.');
@@ -208,7 +210,7 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   }
 
   if (mode === 'gemini-cli') {
-    const providers = discoverProviders(true);
+    const providers = discoverProviders(shouldRefreshProviders(options));
     const geminiHealthy = providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy);
     if (!geminiHealthy && !options.force) {
       logger.warn('[reasoning-bootstrap] mode=gemini-cli selected but Gemini CLI is not usable — keeping stubs.');
@@ -235,6 +237,10 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   installed = true;
   installedMode = 'stub';
   return false;
+}
+
+function shouldRefreshProviders(options: InstallReasoningOptions): boolean {
+  return options.refreshProviders === true || process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1';
 }
 
 /** @deprecated Use installReasoningBackends */

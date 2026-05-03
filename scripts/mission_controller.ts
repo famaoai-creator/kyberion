@@ -84,6 +84,7 @@ export interface ResolvedMissionCliInput {
     markdown: string;
     json: string;
   };
+  routingDecision?: string;
 }
 
 export function resolveMissionStartCreateInputFromArgv(
@@ -127,10 +128,11 @@ export function resolveMissionStartCreateInputFromArgv(
     missionType: namedStartCreateOptions.missionType || arg4,
     visionRef: namedStartCreateOptions.visionRef || arg5,
     persona: namedStartCreateOptions.persona || arg6,
+    routingDecision: namedStartCreateOptions.routingDecision,
     relationships,
     ledgerTargets: projectPath
       ? {
-          markdown: resolveProjectLedgerPath(projectPath),
+        markdown: resolveProjectLedgerPath(projectPath),
           json: resolveProjectLedgerJsonPath(projectPath),
         }
       : undefined,
@@ -412,6 +414,53 @@ async function createMission(
   return missionSystem.create(id, tier, tenantId, missionType, visionRef, persona, relationships, tenantSlug);
 }
 
+function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+  } catch {
+    return { raw };
+  }
+}
+
+function formatRoutingDecisionSummary(routingDecision: Record<string, unknown> | null): string | undefined {
+  if (!routingDecision) return undefined;
+  const mode = typeof routingDecision.mode === 'string' ? routingDecision.mode : 'unknown';
+  const owner = typeof routingDecision.owner === 'string' && routingDecision.owner.trim()
+    ? routingDecision.owner.trim()
+    : undefined;
+  const fanout = typeof routingDecision.fanout === 'string' && routingDecision.fanout !== 'none'
+    ? routingDecision.fanout
+    : undefined;
+  const parts = [mode];
+  if (owner) parts.push(`owner=${owner}`);
+  if (fanout) parts.push(`fanout=${fanout}`);
+  return parts.join(', ');
+}
+
+async function recordRoutingDecisionInMissionState(
+  missionId: string,
+  routingDecision: Record<string, unknown> | null,
+  event: 'CREATE' | 'START',
+): Promise<void> {
+  if (!routingDecision) return;
+  const targetId = missionId.toUpperCase();
+  const state = loadState(targetId);
+  if (!state) return;
+  const summary = formatRoutingDecisionSummary(routingDecision);
+  state.context = {
+    ...(state.context || {}),
+    routing_decision_summary: summary,
+  };
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'ROUTE',
+    note: `${event} routing decision: ${summary || 'unknown'}`,
+  });
+  await saveState(targetId, state);
+}
+
 /**
  * 4.5. Mission Directory Search Helper
  * Returns only the active tier directories (personal, confidential, public)
@@ -605,6 +654,9 @@ function showMissionStatus(id: string) {
     }
     console.log(`  Track Rel:   ${state.relationships.track.relationship_type}`);
   }
+  if (state.context?.routing_decision_summary) {
+    console.log(`  Routing:     ${state.context.routing_decision_summary}`);
+  }
 
   console.log(`  Next:        ${nextAction}`);
 
@@ -619,7 +671,10 @@ function showMissionStatus(id: string) {
 
 function showReasoningBackendStatus() {
   const selectedMode = getInstalledReasoningMode();
-  const providers = discoverProviders(true).filter((provider) =>
+  const forceRefresh =
+    process.argv.includes('--refresh-providers') ||
+    process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1';
+  const providers = discoverProviders(forceRefresh).filter((provider) =>
     ['claude', 'gemini', 'codex'].includes(provider.provider)
   );
 
@@ -675,7 +730,8 @@ Queue Commands:
 
 Visibility Commands:
   list     [status]              List all missions (optionally filter by status)
-  status   <ID>                  Show detailed status of a specific mission and backend availability
+  status   <ID> [--refresh-providers]
+                                 Show detailed status of a specific mission and backend availability
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
@@ -873,6 +929,7 @@ async function main() {
   switch (action) {
     case 'create': {
       const input = validateMissionStartCreateInput('create', arg1);
+      const routingDecision = parseRoutingDecision(input.routingDecision);
       if (hasDryRun) {
         console.log(
           JSON.stringify(
@@ -880,6 +937,7 @@ async function main() {
               action: 'create',
               mission_id: arg1,
               input,
+              routingDecision,
             },
             null,
             2
@@ -897,10 +955,24 @@ async function main() {
         input.relationships,
         input.tenantSlug,
       );
+      await recordRoutingDecisionInMissionState(arg1, routingDecision, 'CREATE');
+      if (routingDecision) {
+        auditChain.record({
+          agentId: process.env.KYBERION_PERSONA || 'mission_controller',
+          action: 'mission.routing_decision_recorded',
+          operation: `create:${arg1}`,
+          result: 'completed',
+          metadata: {
+            mission_id: arg1.toUpperCase(),
+            routing_decision: routingDecision,
+          },
+        });
+      }
       break;
     }
     case 'start': {
       const input = validateMissionStartCreateInput('start', arg1);
+      const routingDecision = parseRoutingDecision(input.routingDecision);
       if (hasDryRun) {
         console.log(
           JSON.stringify(
@@ -908,6 +980,7 @@ async function main() {
               action: 'start',
               mission_id: arg1,
               input,
+              routingDecision,
             },
             null,
             2
@@ -925,6 +998,19 @@ async function main() {
         input.relationships,
         input.tenantSlug,
       );
+      await recordRoutingDecisionInMissionState(arg1, routingDecision, 'START');
+      if (routingDecision) {
+        auditChain.record({
+          agentId: process.env.KYBERION_PERSONA || 'mission_controller',
+          action: 'mission.routing_decision_recorded',
+          operation: `start:${arg1}`,
+          result: 'completed',
+          metadata: {
+            mission_id: arg1.toUpperCase(),
+            routing_decision: routingDecision,
+          },
+        });
+      }
       break;
     }
     case 'grant':

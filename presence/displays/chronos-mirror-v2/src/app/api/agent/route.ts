@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { safeExistsSync } from "@agent/core/secure-io";
 import { pathResolver as projectPathResolver } from "@agent/core/path-resolver";
+import type { AgentRoutingDecision } from "@agent/core/intent-contract";
 import { guardRequest } from "../../../lib/api-guard";
 import { normalizeChronosLocale, selectChronosLocaleText } from "../../../lib/ux-vocabulary";
 
@@ -175,6 +176,7 @@ type ChronosMissionProposalState = {
   threadTs: string;
   proposal: MissionProposal;
   sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
   createdAt: string;
 };
 
@@ -224,7 +226,7 @@ function getChronosMissionProposalState(
 }
 
 function saveChronosMissionProposalState(
-  params: { sessionId: string; proposal: MissionProposal; sourceText?: string },
+  params: { sessionId: string; proposal: MissionProposal; sourceText?: string; routingDecision?: AgentRoutingDecision },
   core: Awaited<ReturnType<typeof loadChronosCore>>,
 ): string {
   const statePath = chronosMissionProposalStatePath(params.sessionId, core.pathResolver);
@@ -239,6 +241,7 @@ function saveChronosMissionProposalState(
           threadTs: params.sessionId,
           proposal: params.proposal,
           sourceText: params.sourceText,
+          routingDecision: params.routingDecision,
           createdAt: new Date().toISOString(),
         } satisfies ChronosMissionProposalState,
         null,
@@ -261,7 +264,7 @@ function clearChronosMissionProposalState(
 }
 
 async function issueChronosMissionFromProposal(
-  params: { sessionId: string; proposal: MissionProposal; sourceText?: string },
+  params: { sessionId: string; proposal: MissionProposal; sourceText?: string; routingDecision?: AgentRoutingDecision },
   core: Awaited<ReturnType<typeof loadChronosCore>>,
 ) {
   const missionId = buildSurfaceMissionId("CHRONOS", params.sessionId, params.proposal, params.sourceText);
@@ -272,7 +275,16 @@ async function issueChronosMissionFromProposal(
 
   const startOutput = core.safeExec(
     "node",
-    ["dist/scripts/mission_controller.js", "start", missionId, tier, persona, "default", missionType],
+    [
+      "dist/scripts/mission_controller.js",
+      "start",
+      missionId,
+      tier,
+      persona,
+      "default",
+      missionType,
+      ...(params.routingDecision ? ["--routing-decision", JSON.stringify(params.routingDecision)] : []),
+    ],
     { env, cwd: PROJECT_ROOT },
   );
 
@@ -697,7 +709,11 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
       };
     }
     case "audit-log": {
+      const auditChainPath = core.pathResolver.rootResolve(
+        `active/audit/audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+      );
       const eventFiles = [
+        auditChainPath,
         core.pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
         core.pathResolver.shared("observability/channels/slack/missions.jsonl"),
       ];
@@ -707,11 +723,23 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         const lines = (core.safeReadFile(file, { encoding: "utf8" }) as string).trim().split("\n").filter(Boolean);
         for (const line of lines.slice(-12)) {
           const event = JSON.parse(line);
+          const routingDecision = event.metadata?.routing_decision as { mode?: string; owner?: string; fanout?: string } | undefined;
+          const routingSummary = routingDecision
+            ? [routingDecision.mode, routingDecision.owner ? `owner=${routingDecision.owner}` : undefined, routingDecision.fanout && routingDecision.fanout !== "none" ? `fanout=${routingDecision.fanout}` : undefined]
+                .filter(Boolean)
+                .join(", ")
+            : undefined;
           events.push({
             time: String(event.ts || new Date().toISOString()).slice(11, 19),
-            label: String(event.decision || event.event_type || "event"),
-            detail: String(event.mission_id || event.resource_id || "system"),
-            status: event.decision?.includes("failed") ? "error" : event.decision?.includes("completed") ? "ok" : "warning",
+            label: String(event.decision || event.action || event.event_type || "event"),
+            detail: routingSummary
+              ? `${String(event.mission_id || event.resource_id || event.agentId || "system")} · ${routingSummary}`
+              : String(event.mission_id || event.resource_id || event.agentId || "system"),
+            status: String(event.result || event.decision || "").includes("failed")
+              ? "error"
+              : String(event.result || event.decision || "").includes("completed")
+                ? "ok"
+                : "warning",
           });
         }
       }
@@ -839,6 +867,7 @@ export async function POST(req: NextRequest) {
         sessionId,
         proposal: pendingMissionProposal.proposal,
         sourceText: pendingMissionProposal.sourceText,
+        routingDecision: pendingMissionProposal.routingDecision,
       }, core);
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
@@ -848,17 +877,22 @@ export async function POST(req: NextRequest) {
           `Type: ${issued.missionType}`,
           `Tier: ${issued.tier}`,
           `Persona: ${issued.persona}`,
+          issued.routingDecision
+            ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ""}`
+            : undefined,
           issued.orchestrationStatus === "queued"
             ? "Background orchestration has been queued."
             : "Background orchestration could not be queued.",
-        ].join("\n"),
+        ].filter(Boolean).join("\n"),
         a2ui: [
           {
             type: "display:hero",
             props: {
               eyebrow: "Mission Started",
               title: issued.missionId,
-              description: `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}.`,
+              description: issued.routingDecision
+                ? `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}. Routing ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ""}.`
+                : `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}.`,
               status: issued.orchestrationStatus,
             },
           },
@@ -948,6 +982,7 @@ export async function POST(req: NextRequest) {
         sessionId,
         proposal,
         sourceText: query,
+        routingDecision: conversation.routingDecision,
       }, core);
       const confirmationText = [
         conversation.text || "I can turn this into a mission.",
