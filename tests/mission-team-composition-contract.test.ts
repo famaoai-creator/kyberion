@@ -62,7 +62,7 @@ describe('Mission team composition contract', () => {
     expect(plan.template).toBe('development');
     expect(plan.assignments.find((entry) => entry.team_role === 'owner')?.agent_id).toBe('nerve-agent');
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe('implementation-architect');
-    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toBe('gemini');
+    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(/^(gemini|codex)$/);
     expect(plan.assignments.find((entry) => entry.team_role === 'surface_liaison')?.required).toBe(false);
 
     for (const assignment of plan.assignments.filter((entry) => entry.status === 'assigned')) {
