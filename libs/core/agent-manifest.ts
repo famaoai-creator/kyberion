@@ -116,7 +116,14 @@ export function resolveAgentSelectionHints(
   manifest: AgentManifest,
   fallbackProvider?: AgentProvider,
 ): { provider: AgentProvider; modelId: string } {
-  return resolveSelectionHints(manifest.selection_hints, fallbackProvider, manifest.agentId);
+  const legacyProvider = (manifest as AgentManifest & { provider?: AgentProvider }).provider;
+  const legacyModelId = (manifest as AgentManifest & { modelId?: string }).modelId;
+  return resolveSelectionHints(
+    manifest.selection_hints,
+    fallbackProvider || legacyProvider,
+    legacyModelId,
+    manifest.agentId
+  );
 }
 
 export function resolveSelectionHints(

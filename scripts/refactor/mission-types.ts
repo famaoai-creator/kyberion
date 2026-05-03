@@ -102,6 +102,7 @@ export interface MissionState {
     next_step?: string;
     blockers?: string[];
     associated_projects?: string[];
+    routing_decision_summary?: string;
     intent_delta_summary?: {
       checked_at: string;
       passed: boolean;
@@ -157,6 +158,7 @@ export const VALUE_FLAGS = new Set([
   '--evidence',
   '--note',
   '--execution-role',
+  '--routing-decision',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

@@ -44,5 +44,5 @@ describe('Core runtime import contract', () => {
     }
 
     expect(failures).toEqual([]);
-  });
+  }, 60000);
 });

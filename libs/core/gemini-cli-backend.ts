@@ -203,7 +203,7 @@ export class GeminiCliBackend implements ReasoningBackend {
   }
 
   async prompt(prompt: string): Promise<string> {
-    return this.delegateTask(prompt);
+    return this.runPrompt(prompt);
   }
 
   private async runStructured<T>(params: {
@@ -216,7 +216,6 @@ export class GeminiCliBackend implements ReasoningBackend {
       `${params.systemPrompt}\n\n${params.userPrompt}`,
       '-o',
       'json',
-      '-y',
       ...(this.model ? ['--model', this.model] : []),
       ...this.extraArgs,
     ];
@@ -256,6 +255,31 @@ export class GeminiCliBackend implements ReasoningBackend {
       return parsed.data;
     } catch (err: any) {
       throw new Error(`[gemini-cli] failed to parse inner JSON: ${err.message}. Raw response: ${responseStr.slice(0, 500)}`);
+    }
+  }
+
+  private async runPrompt(prompt: string): Promise<string> {
+    const args = [
+      '-p',
+      prompt,
+      '-o',
+      'json',
+      ...(this.model ? ['--model', this.model] : []),
+      ...this.extraArgs,
+    ];
+
+    const stdout = await this.spawnCli(args);
+    const lines = stdout.split('\n');
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
+    if (jsonStartIdx === -1) {
+      return stdout.trim();
+    }
+    const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+    try {
+      const cliResult = JSON.parse(cleanStdout);
+      return String(cliResult.response || stdout).trim();
+    } catch {
+      return stdout.trim();
     }
   }
 

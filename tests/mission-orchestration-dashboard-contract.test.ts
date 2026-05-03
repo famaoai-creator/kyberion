@@ -59,9 +59,9 @@ describe('mission orchestration dashboard contract', () => {
     expect(component).toContain('a2a handoff');
     expect(component).toContain('pin mission thread');
     expect(component).toContain('mission pinned');
-    expect(component).toContain('url.searchParams.set("mission", selectedMissionId)');
-    expect(component).toContain('const mission = params.get("mission")');
-    expect(component).toContain('EventSource("/api/intelligence/stream")');
+    expect(component).toContain("url.searchParams.set('mission', selectedMissionId)");
+    expect(component).toContain("const mission = params.get('mission')");
+    expect(component).toContain("new EventSource('/api/intelligence/stream')");
     expect(component).toContain('No mission-scoped agent messages observed yet.');
     expect(component).toContain('Owner Summaries');
     expect(component).toContain('Delivery Exceptions');
@@ -150,7 +150,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(agentRoute).toContain('RUN_PIPELINE_PATTERN');
     expect(agentRoute).toContain('dist/scripts/run_pipeline.js');
     expect(agentRoute).toContain('import("@agent/core/core")');
-    expect(route).toContain('from "@agent/core"');
+    expect(route).toContain("from '@agent/core'");
     expect(route).toContain('emitMissionOrchestrationObservation');
   });
 

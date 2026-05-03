@@ -7,6 +7,10 @@ const ptyState = {
 vi.mock('@agent/core', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   createStandardYargs: vi.fn(),
+  pathResolver: {
+    rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
+    rootResolve: vi.fn((value: string) => value),
+  },
   safeReadFile: vi.fn(),
   encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
   emitComputerSurfacePatch: vi.fn(),

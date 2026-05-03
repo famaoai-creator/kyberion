@@ -1,0 +1,47 @@
+{
+  "pipeline_id": "inspect-workspace-surfaces",
+  "version": "1.0.0",
+  "description": "Identify connected displays and active UI surfaces.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "scan-displays",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "system_profiler SPDisplaysDataType | grep -E 'Resolution|Main Display|Mirror' -B 2",
+        "export_as": "display_info"
+      }
+    },
+    {
+      "id": "check-surfaces",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/surface_runtime.js --action status",
+        "export_as": "surface_status"
+      }
+    },
+    {
+      "id": "synthesize-surface-report",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Summarize the connected monitors and the health of active Kyberion UI surfaces. Identify the 'Main' surface for human interaction.",
+        "context": [
+          "{{display_info}}",
+          "{{surface_status}}"
+        ],
+        "export_as": "surface_report"
+      }
+    },
+    {
+      "id": "log-surface-report",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "🖥️ [WORKSPACE AUDIT]\n{{surface_report}}"
+      }
+    }
+  ]
+}
