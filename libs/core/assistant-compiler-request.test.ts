@@ -12,6 +12,7 @@ describe('assistant compiler request', () => {
       sourceText: '勘定系システムの非機能要件定義書をパワーポイントで出力して',
       preferredProvider: 'gemini',
       preferredModel: 'gemini-2.5-pro',
+      runtimeContext: { platform_id: 'imessage' },
     });
 
     const validation = validateAssistantCompilerRequest(request);
@@ -19,6 +20,7 @@ describe('assistant compiler request', () => {
     expect(request.delegation.mode).toBe('compile_intent');
     expect(request.delegation.preferred_provider).toBe('gemini');
     expect(request.expected_output.contract).toBe('intent-bundle');
+    expect(request.context.runtime_context?.platform_id).toBe('imessage');
     expect(requestPath).toContain('/active/shared/tmp/assistant-compiler-requests/');
     expect(request.expected_output.write_back_path).toContain(
       '/active/shared/tmp/assistant-compiler-results/'

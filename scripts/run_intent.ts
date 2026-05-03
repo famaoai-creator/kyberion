@@ -5,6 +5,7 @@ import {
   formatClarificationPacket,
   logger,
   safeExistsSync,
+  resolveIntentResolutionPacket,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
@@ -70,6 +71,11 @@ async function main() {
   if (argv.input && safeExistsSync(resolveAdfInputPath(argv.input as string))) {
     context = readJsonInput(argv.input as string);
   }
+  const packet = resolveIntentResolutionPacket(intent);
+  const runtimeContext = {
+    ...(packet.selected_parameters || {}),
+    ...(context as Record<string, unknown>),
+  };
 
   logger.info(`🚀 [GATEWAY] Processing high-level intent: ${intent}`);
   const compilerOptions = {
@@ -91,6 +97,7 @@ async function main() {
         serviceBindings: Array.isArray((context as any)?.service_bindings)
           ? (context as any).service_bindings
           : [],
+        runtimeContext,
       },
       compilerOptions
     );
@@ -108,6 +115,7 @@ async function main() {
       serviceBindings: Array.isArray((context as any)?.service_bindings)
         ? (context as any).service_bindings
         : [],
+      runtimeContext,
       preferredProvider:
         (argv.delegateProvider as 'codex' | 'gemini' | 'claude' | undefined) ||
         compilerOptions.provider,
@@ -174,7 +182,7 @@ async function main() {
   }
 
   try {
-    const result = await resolveAndExecuteIntent(intent, context);
+    const result = await resolveAndExecuteIntent(intent, runtimeContext);
     console.log(JSON.stringify(result, null, 2));
     logger.success(`✅ [GATEWAY] Goal achieved for intent: ${intent}`);
   } catch (err: any) {

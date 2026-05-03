@@ -38,9 +38,16 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
 
   if (domain === 'browser') {
     dispatchCache[domain] = async (op, params, ctx, type) => {
+      let mod: any;
       try {
         const entry = capabilityEntry('browser-actuator');
-        const mod = await import(pathToFileURL(entry).href);
+        mod = await import(pathToFileURL(entry).href);
+      } catch (err) {
+        logger.info(`  [SYS_PIPELINE] Could not load browser actuator: ${String(err)}`);
+        return { handled: false, ctx };
+      }
+
+      try {
         const browserSessionId = String(
           ctx.browser_session_id ||
             ctx.session_id ||
@@ -55,9 +62,9 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
           context: ctx,
         });
         return { handled: true, ctx: (result as any)?.context || ctx };
-      } catch (err) {
-        logger.info(`  [SYS_PIPELINE] Could not load browser actuator: ${String(err)}`);
-        return { handled: false, ctx };
+      } catch (err: any) {
+        const message = err?.message || String(err);
+        throw new Error(`Browser actuator execution failed for ${op}: ${message}`);
       }
     };
     return dispatchCache[domain];

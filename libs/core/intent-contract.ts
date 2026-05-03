@@ -93,6 +93,7 @@ export interface CompileUserIntentFlowInput {
   trackName?: string;
   tier?: 'personal' | 'confidential' | 'public';
   serviceBindings?: string[];
+  runtimeContext?: Record<string, unknown>;
 }
 
 interface ValidationResult<T> {
@@ -315,12 +316,26 @@ function buildFallbackIntentContract(
   input: CompileUserIntentFlowInput,
   executionBrief?: ActuatorExecutionBrief
 ): IntentContract {
+  const packet = resolveIntentResolutionPacket(input.text);
+  const selectedPlatformId =
+    typeof input.runtimeContext?.platform_id === 'string'
+      ? input.runtimeContext.platform_id
+      : packet.selected_parameters?.platform_id;
   const classified = classifyTaskSessionIntent(input.text);
   if (classified) {
     const shape =
       classified.payload?.bootstrap_kind === 'project_bootstrap'
         ? 'project_bootstrap'
         : 'task_session';
+    const requiredInputs = [...(executionBrief?.missing_inputs || classified.requirements?.missing || [])];
+    if (packet.selected_intent_id === 'setup-messaging-bridge') {
+      if (selectedPlatformId) {
+        const platformIndex = requiredInputs.indexOf('platform_id');
+        if (platformIndex >= 0) requiredInputs.splice(platformIndex, 1);
+      } else if (!requiredInputs.includes('platform_id')) {
+        requiredInputs.push('platform_id');
+      }
+    }
     return attachCapabilityBundle({
       kind: 'intent-contract',
       source_text: input.text,
@@ -335,7 +350,7 @@ function buildFallbackIntentContract(
           ? 'presentation_deck'
           : classified.taskType,
       },
-      required_inputs: executionBrief?.missing_inputs || classified.requirements?.missing || [],
+      required_inputs: requiredInputs,
       outcome_ids: executionBrief?.deliverables || [],
       approval: {
         requires_approval: Boolean(classified.payload?.approval_required),
@@ -346,17 +361,28 @@ function buildFallbackIntentContract(
           : inferGovernedDeliveryMode(
               input.text,
               normalizeShape(shape),
-              executionBrief?.missing_inputs || classified.requirements?.missing || []
+              requiredInputs
             ),
-      clarification_needed: Boolean(
-        (executionBrief?.missing_inputs || classified.requirements?.missing || []).length
-      ),
+      clarification_needed: requiredInputs.length > 0,
       confidence: 0.55,
       why: executionBrief
         ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
         : 'Fallback classifier mapped the request to the nearest governed task session contract.',
     });
   }
+
+  const requiredInputs = (() => {
+    const required = [...(executionBrief?.missing_inputs || ['goal_or_target'])];
+    if (packet.selected_intent_id === 'setup-messaging-bridge') {
+      if (selectedPlatformId) {
+        return required.filter((item) => item !== 'platform_id');
+      }
+      if (!required.includes('platform_id')) {
+        required.push('platform_id');
+      }
+    }
+    return required;
+  })();
 
   return attachCapabilityBundle({
     kind: 'intent-contract',
@@ -367,13 +393,13 @@ function buildFallbackIntentContract(
       success_condition:
         'The request is either clarified or answered without violating governance constraints.',
     },
+    required_inputs: requiredInputs,
     resolution: {
       execution_shape: executionBrief ? 'task_session' : 'direct_reply',
       task_type: executionBrief?.target_actuators?.includes('pptx-generator')
         ? 'presentation_deck'
         : undefined,
     },
-    required_inputs: executionBrief?.missing_inputs || ['goal_or_target'],
     outcome_ids: executionBrief?.deliverables || [],
     approval: {
       requires_approval: false,
@@ -381,9 +407,9 @@ function buildFallbackIntentContract(
     delivery_mode: inferGovernedDeliveryMode(
       input.text,
       executionBrief ? 'task_session' : 'direct_reply',
-      executionBrief?.missing_inputs || ['goal_or_target']
+      requiredInputs
     ),
-    clarification_needed: Boolean((executionBrief?.missing_inputs || ['goal_or_target']).length),
+    clarification_needed: requiredInputs.length > 0,
     confidence: 0.25,
     why: executionBrief
       ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
@@ -419,6 +445,7 @@ function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
         track_name: input.trackName,
         tier: input.tier || 'confidential',
         service_bindings: input.serviceBindings || [],
+        runtime_context: input.runtimeContext || {},
       },
       null,
       2
@@ -485,6 +512,9 @@ function buildIntentContractPrompt(
     '',
     'Execution brief:',
     JSON.stringify(executionBrief, null, 2),
+    '',
+    'Runtime context hints:',
+    JSON.stringify(input.runtimeContext || {}, null, 2),
     '',
     'Output schema:',
     JSON.stringify(
@@ -560,6 +590,9 @@ function buildWorkLoopPrompt(
     '',
     'Intent contract:',
     JSON.stringify(contract, null, 2),
+    '',
+    'Runtime context hints:',
+    JSON.stringify(input.runtimeContext || {}, null, 2),
     '',
     'Relevant governed intents:',
     summarizeRelevantIntents(input.text),

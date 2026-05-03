@@ -158,6 +158,7 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check:esm`.
 ### 4. Channel ingress and interactive control
 
 - `satellites/slack-bridge/`
+- `satellites/imessage-bridge/`
 - `presence/bridge/nexus-daemon.ts`
 - `presence/displays/chronos-mirror-v2/`
 - `knowledge/public/architecture/slack-chronos-control-model.md`
@@ -248,7 +249,7 @@ Kyberion uses four separate concepts here:
 
 - `gateway`
   - receives external events
-  - examples: `satellites/slack-bridge`, `chronos-mirror-v2` API routes
+  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `chronos-mirror-v2` API routes
 - `service binding`
   - resolves authenticated service access from governed secrets
   - examples: `libs/core/service-binding.ts`, `service-actuator`

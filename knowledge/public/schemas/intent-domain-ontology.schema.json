@@ -151,6 +151,10 @@
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         },
+        "intake_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "actuator_requirements": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
