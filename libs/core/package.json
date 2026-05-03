@@ -163,6 +163,10 @@
       "types": "./dist/shared-business-types.d.ts",
       "default": "./dist/shared-business-types.js"
     },
+    "./intent-contract": {
+      "types": "./dist/intent-contract.d.ts",
+      "default": "./dist/intent-contract.js"
+    },
     "./surface-runtime": {
       "types": "./dist/surface-runtime.d.ts",
       "default": "./dist/surface-runtime.js"
