@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeMkdir, safeWriteFile } from '../secure-io.js';
 
 vi.mock('../core.js', () => ({
   logger: {
@@ -12,15 +13,20 @@ vi.mock('../core.js', () => ({
 
 import {
   checkActuatorCapabilities,
+  checkAllActuatorCapabilities,
   registerCapabilityProbe,
 } from './actuator-capability.js';
 
 const TMP_MANIFEST = path.resolve(process.cwd(), 'active/shared/tmp/test-actuator-manifest.json');
+const TMP_CATALOG_DIR = path.resolve(process.cwd(), 'active/shared/tmp/test-actuator-capability-catalog');
 
 describe('actuator-capability', () => {
   afterEach(() => {
     if (fs.existsSync(TMP_MANIFEST)) {
       fs.unlinkSync(TMP_MANIFEST);
+    }
+    if (fs.existsSync(TMP_CATALOG_DIR)) {
+      fs.rmSync(TMP_CATALOG_DIR, { recursive: true, force: true });
     }
   });
 
@@ -101,6 +107,30 @@ describe('actuator-capability', () => {
 
       expect(status.capabilities.length).toBeGreaterThan(0);
       expect(status.capabilities[0].available).toBe(true);
+    });
+  });
+
+  describe('catalog order', () => {
+    it('sorts discovery results by the global actuator index order', async () => {
+      safeMkdir(TMP_CATALOG_DIR, { recursive: true });
+      safeMkdir(path.join(TMP_CATALOG_DIR, 'voice-actuator'), { recursive: true });
+      safeMkdir(path.join(TMP_CATALOG_DIR, 'browser-actuator'), { recursive: true });
+
+      safeWriteFile(
+        path.join(TMP_CATALOG_DIR, 'voice-actuator', 'manifest.json'),
+        JSON.stringify({ actuator_id: 'voice-actuator', version: '1.0.0', capabilities: [] }),
+      );
+      safeWriteFile(
+        path.join(TMP_CATALOG_DIR, 'browser-actuator', 'manifest.json'),
+        JSON.stringify({ actuator_id: 'browser-actuator', version: '1.0.0', capabilities: [] }),
+      );
+
+      const statuses = await checkAllActuatorCapabilities(TMP_CATALOG_DIR);
+
+      expect(statuses.map((status) => status.actuatorId)).toEqual([
+        'browser-actuator',
+        'voice-actuator',
+      ]);
     });
   });
 });

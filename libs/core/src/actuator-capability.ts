@@ -28,12 +28,45 @@ export interface ActuatorStatus {
 
 // Registry of capability probe functions
 const capabilityProbes = new Map<string, () => Promise<ActuatorCapability[]>>();
+const actuatorCatalogOrderPath = pathResolver.knowledge('public/orchestration/global_actuator_index.json');
+let actuatorCatalogOrderCache: Map<string, number> | null = null;
 
 export function registerCapabilityProbe(
   actuatorId: string,
   probe: () => Promise<ActuatorCapability[]>
 ) {
   capabilityProbes.set(actuatorId, probe);
+}
+
+function loadActuatorCatalogOrder(): Map<string, number> {
+  if (actuatorCatalogOrderCache) return actuatorCatalogOrderCache;
+  const order = new Map<string, number>();
+  if (!safeExistsSync(actuatorCatalogOrderPath)) {
+    actuatorCatalogOrderCache = order;
+    return order;
+  }
+
+  try {
+    const parsed = JSON.parse(safeReadFile(actuatorCatalogOrderPath, { encoding: 'utf8' }) as string) as {
+      actuators?: Array<{ n?: string }>;
+    };
+    for (const [index, entry] of (parsed.actuators || []).entries()) {
+      if (entry?.n) order.set(entry.n, index);
+    }
+  } catch {
+    // Fall back to filesystem order when the index cannot be parsed.
+  }
+
+  actuatorCatalogOrderCache = order;
+  return order;
+}
+
+function compareActuatorCatalogOrder(left: string, right: string): number {
+  const order = loadActuatorCatalogOrder();
+  const leftOrder = order.has(left) ? order.get(left)! : Number.POSITIVE_INFINITY;
+  const rightOrder = order.has(right) ? order.get(right)! : Number.POSITIVE_INFINITY;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return left.localeCompare(right);
 }
 
 /**
@@ -92,7 +125,7 @@ export async function checkAllActuatorCapabilities(
     }
   }
 
-  return results;
+  return results.sort((left, right) => compareActuatorCatalogOrder(left.actuatorId, right.actuatorId));
 }
 
 // ─── Built-in Probes ───────────────────────────────────────────────────────────

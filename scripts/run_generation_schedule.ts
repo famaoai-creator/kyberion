@@ -9,6 +9,8 @@ import {
   markGenerationScheduleSubmitted,
   markGenerationScheduleReconciled,
   isGenerationScheduleDue,
+  resolveGenerationScheduleDeliveryPaths,
+  resolveGenerationScheduleWorkdir,
 } from '@agent/core';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -41,7 +43,8 @@ async function reconcileSchedule(schedule: any): Promise<{ schedule: any; outcom
   });
 
   let aliasUpdated = false;
-  const latestAliasPath = schedule.delivery_policy?.latest_alias_path;
+  const { artifactDir, latestAliasPath } = resolveGenerationScheduleDeliveryPaths(schedule);
+  const workdir = resolveGenerationScheduleWorkdir(schedule);
   const copiedSource = job?.result?.copied_to || job?.request?.target_path;
   if (job?.status === 'succeeded' && latestAliasPath && copiedSource && safeExistsSync(copiedSource)) {
     safeMkdir(path.dirname(latestAliasPath), { recursive: true });
@@ -62,6 +65,8 @@ async function reconcileSchedule(schedule: any): Promise<{ schedule: any; outcom
       reconciled_status: job?.status || null,
       alias_updated: aliasUpdated,
       latest_alias_path: aliasUpdated ? latestAliasPath : null,
+      artifact_dir: artifactDir,
+      workdir,
     },
   };
 }

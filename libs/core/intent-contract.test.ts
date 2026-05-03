@@ -153,6 +153,141 @@ describe('intent-contract compiler', () => {
     expect(flow.clarificationPacket).toBeUndefined();
   });
 
+  it('attaches capability bundle ids when the resolved intent maps to a governed bundle', async () => {
+    const responses = [
+      JSON.stringify({
+        kind: 'actuator-execution-brief',
+        request_text: 'Open OpenAI docs',
+        archetype_id: 'open-site',
+        confidence: 0.81,
+        summary: 'Open a site in the governed browser surface',
+        user_facing_summary: 'Open the requested site',
+        normalized_scope: ['browser_session'],
+        target_actuators: ['browser-actuator'],
+        deliverables: ['browser_navigation'],
+        missing_inputs: [],
+        assumptions: ['Use the requested browser destination.'],
+        clarification_questions: [],
+        readiness: 'fully_automatable',
+        readiness_reason: 'The browser destination is known.',
+        llm_touchpoints: [
+          {
+            stage: 'execution_brief',
+            purpose: 'Extract the request into a governed execution brief',
+            output_contract: 'actuator-execution-brief',
+          },
+        ],
+        recommended_next_step: 'Compile the intent contract and work loop.',
+      }),
+      JSON.stringify({
+        kind: 'intent-contract',
+        source_text: 'Open OpenAI docs',
+        intent_id: 'open-site',
+        goal: {
+          summary: 'Open the requested website',
+          success_condition: 'The requested site is opened in the governed browser surface.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'browser_navigation',
+        },
+        required_inputs: [],
+        outcome_ids: ['browser_navigation'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.88,
+        why: 'The request is a governed browser navigation task.',
+      }),
+      JSON.stringify({
+        intent: { label: 'open-site' },
+        context: {
+          tier: 'confidential',
+          service_bindings: [],
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'browser_navigation',
+        },
+        workflow_design: {
+          workflow_id: 'single-track-default',
+          pattern: 'single_track_execution',
+          stage: 'planning',
+          phases: ['intake', 'planning', 'execution', 'verification', 'delivery'],
+          rationale: 'Default workflow for straightforward bounded work.',
+        },
+        review_design: {
+          review_mode: 'standard',
+          required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          all_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          rationale: 'Standard mode requires contract and QA gates.',
+        },
+        outcome_design: {
+          outcome_ids: ['browser_navigation'],
+          labels: ['Browser navigation'],
+        },
+        process_design: {
+          plan_outline: ['resolve destination', 'open browser', 'confirm page'],
+          intake_requirements: [],
+          operator_checklist: ['confirm the governed browser path'],
+        },
+        runtime_design: {
+          owner_model: 'single_actor',
+          assignment_policy: 'direct_specialist',
+          coordination: {
+            bus: 'none',
+            channels: [],
+          },
+          memory: {
+            store: 'none',
+            scope: 'none',
+            purpose: [],
+          },
+        },
+        execution_boundary: {
+          llm_zone: {
+            allowed: ['draft_content_within_governed_slots'],
+            forbidden: ['override_governed_structure'],
+          },
+          knowledge_zone: {
+            owns: ['intent definitions'],
+          },
+          compiler_zone: {
+            responsibilities: ['map_intent_to_governed_execution_shape'],
+          },
+          executor_zone: {
+            responsibilities: ['perform_governed_execution'],
+          },
+          rule: 'LLM drafts within governed slots; compiler and executor remain deterministic',
+        },
+        teaming: {
+          specialist_id: 'browser-operator',
+          specialist_label: 'Browser Operator',
+          conversation_agent: 'nerve-agent',
+          team_roles: ['planner'],
+        },
+        authority: {
+          requires_approval: false,
+        },
+        learning: {
+          reusable_refs: [],
+        },
+      }),
+    ];
+
+    const flow = await compileUserIntentFlow(
+      { text: 'Open OpenAI docs' },
+      {
+        askFn: async () => responses.shift() || '',
+      }
+    );
+
+    expect(flow.intentContract.intent_id).toBe('open-site');
+    expect(flow.intentContract.capability_bundle_id).toBe('browser-exploration-governed');
+  });
+
   it('falls back to deterministic classification and formats clarification packets', async () => {
     const flow = await compileUserIntentFlow(
       { text: 'Webサービスを作って' },

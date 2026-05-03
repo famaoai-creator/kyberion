@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
+import { resolveCapabilityBundleForIntent } from './capability-bundle-registry.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -53,6 +54,16 @@ export interface IntentResolutionCandidate {
   };
 }
 
+export interface IntentResolutionBundleCandidate {
+  bundle_id: string;
+  status: 'active' | 'experimental' | 'conceptual' | 'deprecated';
+  kind: 'actuator-pipeline-bundle' | 'capability-bundle';
+  summary: string;
+  required_actuators: string[];
+  intents: string[];
+  references: string[];
+}
+
 export interface IntentResolutionPacket {
   kind: 'intent_resolution_packet';
   utterance: string;
@@ -64,6 +75,7 @@ export interface IntentResolutionPacket {
     result_shape?: string;
   };
   candidates: IntentResolutionCandidate[];
+  bundle_candidates?: IntentResolutionBundleCandidate[];
 }
 
 type CatalogScoringPolicy = {
@@ -265,6 +277,20 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
 
   const sorted = [...deduped.values()].sort((left, right) => right.confidence - left.confidence);
   const selected = sorted[0] && sorted[0].confidence >= scoringPolicy.selected_confidence_threshold ? sorted[0] : undefined;
+  const bundleById = new Map<string, IntentResolutionBundleCandidate>();
+  for (const candidate of sorted) {
+    const bundle = resolveCapabilityBundleForIntent(candidate.intent_id);
+    if (!bundle) continue;
+    bundleById.set(bundle.bundle_id, {
+      bundle_id: bundle.bundle_id,
+      status: bundle.status,
+      kind: bundle.kind,
+      summary: bundle.summary,
+      required_actuators: bundle.required_actuators || [],
+      intents: bundle.intents || [],
+      references: bundle.references || [],
+    });
+  }
 
   return {
     kind: 'intent_resolution_packet',
@@ -273,5 +299,6 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
     selected_confidence: selected?.confidence,
     selected_resolution: selected?.resolution,
     candidates: sorted,
+    bundle_candidates: [...bundleById.values()],
   };
 }

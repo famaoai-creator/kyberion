@@ -343,6 +343,10 @@
         "en": "Execution bundle",
         "ja": "実行セット"
       },
+      "capability_bundle": {
+        "en": "Capability bundle",
+        "ja": "能力バンドル"
+      },
       "execution_plan_set": {
         "en": "Generated execution files",
         "ja": "実行ファイル群"

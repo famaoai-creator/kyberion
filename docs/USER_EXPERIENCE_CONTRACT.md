@@ -28,6 +28,7 @@ At the interaction boundary, Kyberion should consistently answer four questions:
 | execution brief | Request understanding | A normalized summary of the request and missing inputs |
 | resolution plan | Execution plan | A structured view of how the system intends to proceed |
 | pipeline bundle | Execution bundle | A bundle of execution templates |
+| capability bundle | Capability bundle | A reusable package of actuators, pipelines, governance, and docs |
 | execution plan set | Generated execution files | The concrete pipelines that will actually run |
 | delivery pack | Deliverable pack | Main outputs, evidence, and summary |
 | operator-interaction-packet | Interaction card | A human-facing clarification, status, or delivery contract |
@@ -143,6 +144,7 @@ Internally, the system may still use:
 - mission
 - project
 - actuator
+- capability bundle
 - ADF
 - packet
 - ledger

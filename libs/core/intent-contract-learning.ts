@@ -76,6 +76,7 @@ export interface ContractCandidate {
 
 let memoryValidateFn: ValidateFunction | null = null;
 let policyValidateFn: ValidateFunction | null = null;
+let memorySnapshotCache: IntentContractMemoryFile | null = null;
 
 function ensureMemoryValidator(): ValidateFunction {
   if (memoryValidateFn) return memoryValidateFn;
@@ -91,6 +92,11 @@ function ensurePolicyValidator(): ValidateFunction {
 
 function parseJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+}
+
+function loadMemoryFile(filePath: string): IntentContractMemoryFile | null {
+  if (!safeExistsSync(filePath)) return null;
+  return validateIntentContractMemory(parseJson<IntentContractMemoryFile>(filePath));
 }
 
 function memoryEntryKey(entry: Pick<IntentContractMemoryEntry, 'intent_id' | 'contract_ref'>): string {
@@ -117,11 +123,13 @@ function loadOntologyByIntentId(): Map<string, IntentDomainOntologyEntry> {
 }
 
 export function loadIntentContractMemory(): IntentContractMemoryFile {
+  return loadIntentContractMemorySnapshot();
+}
+
+export function loadIntentContractMemoryStore(): IntentContractMemoryFile {
   const fallback: IntentContractMemoryFile = { version: '1.0.0', entries: [] };
-  const seed = safeExistsSync(MEMORY_SEED_PATH) ? validateIntentContractMemory(parseJson<IntentContractMemoryFile>(MEMORY_SEED_PATH)) : fallback;
-  const runtime = safeExistsSync(MEMORY_RUNTIME_PATH)
-    ? validateIntentContractMemory(parseJson<IntentContractMemoryFile>(MEMORY_RUNTIME_PATH))
-    : fallback;
+  const seed = loadMemoryFile(MEMORY_SEED_PATH) || fallback;
+  const runtime = loadMemoryFile(MEMORY_RUNTIME_PATH) || fallback;
 
   const mergedByKey = new Map<string, IntentContractMemoryEntry>();
   for (const entry of seed.entries) {
@@ -132,6 +140,18 @@ export function loadIntentContractMemory(): IntentContractMemoryFile {
     mergedByKey.set(memoryEntryKey(entry), entry);
   }
   return { version: runtime.version || seed.version || '1.0.0', entries: Array.from(mergedByKey.values()) };
+}
+
+export function loadIntentContractMemorySnapshot(): IntentContractMemoryFile {
+  if (!memorySnapshotCache) {
+    memorySnapshotCache = loadIntentContractMemoryStore();
+  }
+  return memorySnapshotCache;
+}
+
+export function refreshIntentContractMemorySnapshot(): IntentContractMemoryFile {
+  memorySnapshotCache = loadIntentContractMemoryStore();
+  return memorySnapshotCache;
 }
 
 export function saveIntentContractMemory(memory: IntentContractMemoryFile): void {
@@ -195,7 +215,7 @@ function defaultContractForIntent(intentId: string): ContractCandidate | null {
 
 export function selectContractCandidates(intentId: string, maxCandidates = 3): ContractCandidate[] {
   const policy = loadIntentContractSelectionPolicy();
-  const memory = loadIntentContractMemory();
+  const memory = loadIntentContractMemorySnapshot();
   const remembered: ContractCandidate[] = memory.entries
     .filter((entry) => entry.intent_id === intentId)
     .map((entry) => ({
@@ -226,7 +246,7 @@ export function recordIntentContractOutcome(input: {
   error?: string;
   context_fingerprint?: IntentContractMemoryEntry['context_fingerprint'];
 }): IntentContractMemoryEntry {
-  const memory = loadIntentContractMemory();
+  const memory = loadIntentContractMemoryStore();
   const idx = memory.entries.findIndex((entry) =>
     entry.intent_id === input.intent_id &&
     entry.contract_ref.kind === input.contract_ref.kind &&

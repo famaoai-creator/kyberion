@@ -19,10 +19,18 @@ Kyberionエージェントが「最小のコスト」で「最高の精度」を
 2. **Capability Overlay**: mission / role / phase に必要な 3～5 個の actuator, procedure, policy overlay だけを優先ロードする。
 3. **Knowledge Pruning**: `asset-token-economist` を使い、関連ナレッジの「核心」のみを抽出し、冗長な背景情報をカットする。
 
+Read order should follow the context precedence protocol:
+
+1. `AGENTS.md`
+2. mission / project governance
+3. capability bundle / playbook summaries
+4. active run context
+5. transient prompt text
+
 ## 2. 階層的コンテキスト管理
 
 - **L1 (Global)**: `AGENTS.md` と `global_actuator_index.json` のみ。常時ロード。
-- **L2 (Mission)**: アクティブな actuator, procedure, playbook, role guidance。タスク開始時にロード。
+- **L2 (Mission)**: アクティブな actuator, procedure, playbook, role guidance, capability bundle summaries。タスク開始時にロード。
 - **L3 (Active)**: 実行中のログと成果物。処理完了後に `asset-token-economist` で要約して L2 へ戻す。
 
 ## 3. 効率的な実行サイクル

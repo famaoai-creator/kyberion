@@ -53,6 +53,12 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'capability-bundle-registry',
+    schemaPath: 'knowledge/public/schemas/capability-bundle-registry.schema.json',
+    dataPath: 'knowledge/public/governance/capability-bundle-registry.json',
+    invalidPayload: { version: '1.0.0' },
+  },
+  {
     name: 'execution-receipt-policy',
     schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
     dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
