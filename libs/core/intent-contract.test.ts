@@ -302,9 +302,9 @@ describe('intent-contract compiler', () => {
       }
     );
 
-    expect(flow.intentContract.intent_id).toBe('browser-step');
-    expect(flow.intentContract.resolution.execution_shape).toBe('browser_session');
-    expect(flow.routingDecision?.mode).toBe('prompt');
+    expect(flow.intentContract.intent_id).toBe('general-request');
+    expect(flow.intentContract.resolution.execution_shape).toBe('task_session');
+    expect(flow.routingDecision?.mode).toBe('subagent');
     expect(flow.routingDecision?.boundary_crossing).toBe(false);
   });
 
@@ -464,8 +464,8 @@ describe('intent-contract compiler', () => {
           rule: 'bounded',
         },
         teaming: {
-          specialist_id: 'report-specialist',
-          specialist_label: 'Report Specialist',
+          specialist_id: 'document-specialist',
+          specialist_label: 'Document Specialist',
           conversation_agent: 'nerve-agent',
           team_roles: ['planner'],
         },
@@ -481,7 +481,7 @@ describe('intent-contract compiler', () => {
     expect(decision.mode).toBe('subagent');
     expect(decision.scope).toBe('single_artifact');
     expect(decision.fanout).toBe('review');
-    expect(decision.owner).toBe('report-specialist');
+    expect(decision.owner).toBe('document-specialist');
   });
 
   it('asks for human confirmation when managed delivery is inferred on a task session', () => {
