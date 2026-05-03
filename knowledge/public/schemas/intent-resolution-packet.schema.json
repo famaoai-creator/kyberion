@@ -66,6 +66,38 @@
         },
         "additionalProperties": false
       }
+    },
+    "bundle_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["bundle_id", "status", "kind", "summary", "required_actuators", "intents", "references"],
+        "properties": {
+          "bundle_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "experimental", "conceptual", "deprecated"]
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["actuator-pipeline-bundle", "capability-bundle"]
+          },
+          "summary": { "type": "string" },
+          "required_actuators": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "intents": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "references": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

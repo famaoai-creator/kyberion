@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "generative-video-from-adf",
+      "status": "active",
+      "kind": "actuator-pipeline-bundle",
+      "summary": "Generate a governed country-drive video clip from a video-generation-adf contract through media-generation-actuator.",
+      "source_bundle_path": "libs/actuators/orchestrator-actuator/examples/video-generation-pipeline-bundle.json",
+      "intents": ["country_drive_campaign_clip"],
+      "required_actuators": ["media-generation-actuator"],
+      "references": ["knowledge/public/procedures/media/generate-video-from-adf.md"]
+    },
+    {
+      "bundle_id": "browser-exploration-governed",
+      "status": "conceptual",
+      "kind": "capability-bundle",
+      "summary": "Explore a website through the host browser surface and distill the findings into a governed Kyberion artifact.",
+      "harness_capability_refs": ["cli.native.browser_interactive"],
+      "required_actuators": ["browser-actuator"],
+      "intents": ["browser-step", "open-site"],
+      "references": [
+        "knowledge/public/architecture/cli-harness-coordination-model.md",
+        "knowledge/public/architecture/capability-bundle-model.md"
+      ]
+    }
+  ]
+}

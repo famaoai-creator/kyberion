@@ -16,11 +16,13 @@
         "then": [
           {
             "id": "browse-site",
-            "type": "apply",
+            "type": "control",
             "op": "browser:open_tab",
             "params": {
               "url": "{{source_url}}",
-              "keep_alive": true
+              "keep_alive": true,
+              "select": true,
+              "waitUntil": "domcontentloaded"
             }
           },
           {
@@ -61,11 +63,10 @@
     {
       "id": "save-profile",
       "type": "apply",
-      "op": "artifact:write_json",
+      "op": "code:write_artifact",
       "params": {
-        "role": "mission_controller",
-        "logicalPath": "active/shared/runtime/presentation-preferences/{{brand_name_slug}}.json",
-        "value": "{{design_spec}}"
+        "path": "active/shared/runtime/presentation-preferences/{{brand_name_slug}}.json",
+        "content": "{{design_spec}}"
       }
     }
   ]

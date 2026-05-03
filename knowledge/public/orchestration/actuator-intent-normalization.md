@@ -62,12 +62,14 @@ This packet is the human-facing surface of the shared coordination protocol.
 - `resolution plan` だけで終わらせない
 - 不足入力が残る場合は `status: clarification_required`
 - 入力が揃ったら `status: ready` の `actuator-pipeline-bundle` を生成する
-- bundle には少なくとも次を含める
+- bundle は、ユーザー向けには `capability bundle` として説明してよい
+- capability bundle には少なくとも次を含める
   - `actuator`
   - `template_path`
   - `recommended_procedure`
   - `parameter_overrides`
   - `outputs`
+- capability bundle は runtime primitive ではなく、actuator と pipeline を束ねる catalog 概念として扱う
 
 ## LLM Touchpoint Rule
 

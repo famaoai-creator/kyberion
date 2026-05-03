@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import type { GenerationSchedule } from './src/types/generation-schedule.js';
 import { matchesCron, getZonedDateParts } from './src/cron-utils.js';
+import { pathResolver } from './path-resolver.js';
 
 export const GENERATION_SCHEDULE_DIR = 'active/shared/runtime/media-generation/schedules';
 
@@ -17,6 +18,33 @@ function ensureScheduleDir(): void {
 
 export function generationSchedulePath(scheduleId: string): string {
   return path.join(GENERATION_SCHEDULE_DIR, `${scheduleId}.json`);
+}
+
+function resolveRootRelativePath(logicalPath?: string): string | null {
+  if (!logicalPath) return null;
+  return pathResolver.rootResolve(logicalPath);
+}
+
+export function resolveGenerationScheduleDeliveryPaths(schedule: GenerationSchedule): {
+  artifactDir: string | null;
+  latestAliasPath: string | null;
+  schedulePath: string;
+} {
+  return {
+    artifactDir: resolveRootRelativePath(schedule.delivery_policy?.artifact_dir || null),
+    latestAliasPath: resolveRootRelativePath(schedule.delivery_policy?.latest_alias_path || null),
+    schedulePath: generationSchedulePath(schedule.schedule_id),
+  };
+}
+
+export function resolveGenerationScheduleWorkdir(schedule: GenerationSchedule): string {
+  const artifactDir = resolveRootRelativePath(schedule.delivery_policy?.artifact_dir || '');
+  if (artifactDir) return artifactDir;
+
+  const latestAliasPath = resolveRootRelativePath(schedule.delivery_policy?.latest_alias_path || '');
+  if (latestAliasPath) return path.dirname(latestAliasPath);
+
+  return pathResolver.rootResolve(path.dirname(generationSchedulePath(schedule.schedule_id)));
 }
 
 export function readGenerationSchedule(logicalPath: string): GenerationSchedule {

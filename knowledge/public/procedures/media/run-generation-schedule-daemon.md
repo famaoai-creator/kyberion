@@ -34,6 +34,12 @@ pnpm surfaces:reconcile
 - submits due schedules as new `generation-job`
 - updates `delivery_policy.latest_alias_path` when the previous job succeeded
 
+Path handling follows [`schedule-delivery-protocol.md`](../../orchestration/schedule-delivery-protocol.md):
+
+- `delivery_policy.artifact_dir` is the preferred schedule workdir
+- if `artifact_dir` is absent, the alias directory becomes the working boundary
+- the alias path itself is always resolved from the repository root
+
 ## 6. Expected Output
 - runtime ownership under `active/shared/runtime/surfaces/state.json`
 - logs under `active/shared/logs/generation-schedule.log`
