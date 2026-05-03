@@ -436,7 +436,7 @@ describe.sequential('Channel surface agents', () => {
 
     const result = await runSurfaceConversation({
       agentId: 'slack-surface-agent',
-      query: 'please help',
+      query: 'xyz123',
       senderAgentId: 'kyberion:slack-bridge',
       delegationSummaryInstruction: 'Summarize for Slack.',
     });

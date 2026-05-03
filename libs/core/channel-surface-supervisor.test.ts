@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
   const createSupervisorBackedAgentHandle = vi.fn();
   const toSupervisorEnsurePayload = vi.fn();
   const getAgentManifest = vi.fn();
+  const resolveAgentSelectionHints = vi.fn();
 
   return {
     getAgentRuntimeHandle,
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => {
     createSupervisorBackedAgentHandle,
     toSupervisorEnsurePayload,
     getAgentManifest,
+    resolveAgentSelectionHints,
   };
 });
 
@@ -31,6 +33,7 @@ vi.mock('./agent-runtime-supervisor-client.js', () => ({
 
 vi.mock('./agent-manifest.js', () => ({
   getAgentManifest: mocks.getAgentManifest,
+  resolveAgentSelectionHints: mocks.resolveAgentSelectionHints,
 }));
 
 describe('channel-surface supervisor routing', () => {
@@ -40,10 +43,19 @@ describe('channel-surface supervisor routing', () => {
 
     mocks.getAgentRuntimeHandle.mockReturnValue(undefined);
     mocks.getAgentManifest.mockReturnValue({
+      agentId: 'presence-surface-agent',
+      selection_hints: {
+        preferred_provider: 'gemini',
+        preferred_modelId: 'gemini-2.5-flash',
+      },
       provider: 'gemini',
       modelId: 'gemini-2.5-flash',
       systemPrompt: 'test system prompt',
       capabilities: ['presence'],
+    });
+    mocks.resolveAgentSelectionHints.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-flash',
     });
     mocks.toSupervisorEnsurePayload.mockImplementation((payload) => ({
       routed: 'daemon',
@@ -105,7 +117,7 @@ describe('channel-surface supervisor routing', () => {
     const { runSurfaceConversation } = await import('./channel-surface.js');
     const result = await runSurfaceConversation({
       agentId: 'slack-surface-agent',
-      query: 'hello from slack',
+      query: 'hello',
       senderAgentId: 'kyberion:slack-bridge',
     });
 

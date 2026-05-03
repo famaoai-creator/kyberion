@@ -1119,7 +1119,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   {
     matches: (context) => {
       const resolved = resolvedSurfaceIntent(context);
-      return resolved.routeFamily === 'direct_reply';
+      return resolved.routeFamily === 'direct_reply' && !context.computedReceiver;
     },
     handle: async (context) => {
       const resolved = resolvedSurfaceIntent(context);
