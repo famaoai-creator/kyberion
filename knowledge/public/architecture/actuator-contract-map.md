@@ -32,6 +32,12 @@ The current discovery model is:
 3. follow `contract_schema`
 4. read the detailed step or action vocabulary there
 
+Discovery order should follow [`actuator-discovery-registry.md`](../orchestration/actuator-discovery-registry.md):
+
+1. `global_actuator_index.json` order
+2. manifest-backed package order
+3. lexical fallback only when no catalog signal exists
+
 This means `manifest.json` is the index.
 The schema is the real detailed contract.
 

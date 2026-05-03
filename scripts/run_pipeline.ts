@@ -36,6 +36,33 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
     return dispatchCache[domain];
   }
 
+  if (domain === 'browser') {
+    dispatchCache[domain] = async (op, params, ctx, type) => {
+      try {
+        const entry = capabilityEntry('browser-actuator');
+        const mod = await import(pathToFileURL(entry).href);
+        const browserSessionId = String(
+          ctx.browser_session_id ||
+            ctx.session_id ||
+            ctx.mission_id ||
+            'default',
+        );
+        const result = await mod.handleAction({
+          action: 'pipeline',
+          session_id: browserSessionId,
+          options: { keep_alive: true },
+          steps: [{ type: type || 'apply', op, params }],
+          context: ctx,
+        });
+        return { handled: true, ctx: (result as any)?.context || ctx };
+      } catch (err) {
+        logger.info(`  [SYS_PIPELINE] Could not load browser actuator: ${String(err)}`);
+        return { handled: false, ctx };
+      }
+    };
+    return dispatchCache[domain];
+  }
+
   try {
     const entry = capabilityEntry(`${domain}-actuator`);
     const mod = await import(pathToFileURL(entry).href);
@@ -196,6 +223,7 @@ export async function main() {
       autoContext.mission_evidence_dir = nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
     }
   }
+  autoContext.browser_session_id = `${pipeline.pipeline_id || path.basename(String(argv.input), path.extname(String(argv.input)))}`;
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
 
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);

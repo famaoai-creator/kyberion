@@ -39,6 +39,10 @@ Internally, Kyberion may use:
 
 Those are execution details behind the contract above.
 
+When Kyberion explains a complex capability, it should surface the
+governed capability bundle summary before expanding into the underlying
+actuator or pipeline details.
+
 ## 2. Choosing A Surface
 
 ### Terminal

@@ -6,6 +6,10 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
 import { logger } from './core.js';
 import { validate } from './validate.js';
+import {
+  completeDelegatedTaskTrace,
+  startDelegatedTaskTrace,
+} from './delegated-task-observability.js';
 
 export interface AdfRepairResult {
   repaired: boolean;
@@ -48,6 +52,13 @@ async function attemptSubagentRepair(
   errorDetail: string
 ): Promise<AdfRepairResult> {
   const backend = getReasoningBackend();
+  const trace = startDelegatedTaskTrace({
+    owner: 'adf-repair-agent',
+    instruction: `Repair invalid ADF at ${adfPath} against ${schemaName}.schema.json`,
+    context: errorDetail,
+    contextRef: adfPath,
+    backendName: backend.name,
+  });
   const instruction = `
 The ADF file at '${adfPath}' is invalid.
 Error details: ${errorDetail}
@@ -68,9 +79,13 @@ Do not change the intent of the file, only its structural/format errors.
     const finalValidation = validate(updatedParsed, schemaName);
 
     if (finalValidation.valid) {
+      completeDelegatedTaskTrace(trace, { resultSummary: report });
       return { repaired: true, report };
     } else {
       const finalErrors = finalValidation.errors.map(e => `${e.field}: ${e.message}`);
+      completeDelegatedTaskTrace(trace, {
+        resultSummary: `repair completed but validation still failed: ${finalErrors.join('; ')}`,
+      });
       return { 
         repaired: false, 
         errors: finalErrors,
@@ -78,6 +93,7 @@ Do not change the intent of the file, only its structural/format errors.
       };
     }
   } catch (err: any) {
+    completeDelegatedTaskTrace(trace, { error: err.message });
     return { 
       repaired: false, 
       errors: [err.message], 

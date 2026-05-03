@@ -124,6 +124,14 @@ Mission orchestration should now be read together with the higher-order context 
 - artifact records the outcome
 - service binding governs external system interaction
 
+For prompt assembly and operator-facing summaries, use the context
+precedence protocol:
+
+- `AGENTS.md` first
+- mission / project governance second
+- capability bundle and playbook summaries third
+- live run context last
+
 Local boot sequence:
 
 ```bash

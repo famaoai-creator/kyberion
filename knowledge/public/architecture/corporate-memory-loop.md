@@ -142,19 +142,30 @@ Suitable for:
 
 Vault remains the trust boundary for sensitive learning.
 
-## 6. Design Rules
+## 6. Snapshot vs Durable Store
 
-### 6.1 Logs are not memory
+Kyberion also distinguishes between:
+
+- the **current memory snapshot** used by a running session
+- the **durable memory store** that receives updates for later reuse
+
+Snapshot reads should remain stable during a run. Durable writes should be preserved immediately, but they should not force the current session to re-interpret itself mid-turn.
+
+This separation is documented in [`memory-snapshot-protocol.md`](../orchestration/memory-snapshot-protocol.md) and is used by memory-backed resolution flows such as intent-contract learning.
+
+## 7. Design Rules
+
+### 7.1 Logs are not memory
 
 Raw logs alone do not produce organizational learning.
 They must be distilled into reusable forms.
 
-### 6.2 Evidence before promotion
+### 7.2 Evidence before promotion
 
 Reusable knowledge should be linked back to evidence.
 Memory without accountability becomes folklore.
 
-### 6.3 Candidate before promotion
+### 7.3 Candidate before promotion
 
 The system should distinguish:
 
@@ -165,7 +176,7 @@ The system should distinguish:
 Those are separate stages.
 Promotion should not happen directly from a raw completion unless the governing policy explicitly allows it.
 
-### 6.4 Reuse should improve resolution
+### 7.4 Reuse should improve resolution
 
 The main value of memory is not archival.
 It is better future work:
@@ -175,11 +186,11 @@ It is better future work:
 - better approvals
 - fewer repeated mistakes
 
-### 6.4 Human ratification for structural change
+### 7.5 Human ratification for structural change
 
 Changes to high-impact procedures or organizational rules should be reviewable and, where appropriate, approved before promotion.
 
-## 7. Success Criteria
+## 8. Success Criteria
 
 The corporate memory loop succeeds when:
 
