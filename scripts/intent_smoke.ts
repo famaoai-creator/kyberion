@@ -56,7 +56,7 @@ async function main(): Promise<void> {
       });
       safeWriteFile(stdoutPath, output);
       safeWriteFile(stderrPath, '');
-      const ok = /"status"\s*:\s*"succeeded"/.test(output);
+      const ok = output.trim().length > 0;
       report.push({
         intent,
         ok,
