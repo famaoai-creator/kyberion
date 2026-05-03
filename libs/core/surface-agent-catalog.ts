@@ -128,7 +128,15 @@ export function listSurfaceAgentCatalog(): SurfaceAgentCatalogEntry[] {
     .map((manifest) => {
       const profile = profileIndex[manifest.agentId] || {};
       const body = loadAgentBody(manifest.agentId);
-      const { provider: selectionProvider, modelId: selectionModel } = resolveAgentSelectionHints(manifest);
+      let selectionProvider: string;
+      let selectionModel: string;
+      try {
+        const resolved = resolveAgentSelectionHints(manifest);
+        selectionProvider = resolved.provider;
+        selectionModel = resolved.modelId;
+      } catch {
+        return null;
+      }
       return {
         agentId: manifest.agentId,
         displayName: body.match(/^#\s+(.+)$/m)?.[1]?.trim() || titleCaseAgentId(manifest.agentId),
@@ -145,6 +153,7 @@ export function listSurfaceAgentCatalog(): SurfaceAgentCatalogEntry[] {
         delegationTargets: extractDelegationTargets(body),
       };
     })
+    .filter((entry): entry is SurfaceAgentCatalogEntry => Boolean(entry))
     .sort((left, right) => left.agentId.localeCompare(right.agentId));
 }
 

@@ -78,6 +78,12 @@ Common examples:
 
 If an operator is not canonical, it should be treated as a design smell until proven otherwise.
 
+Reasoning routing should also stay explicit:
+
+- default to `prompt`-style reasoning for short synthesis and deterministic conversion
+- set `use_subagent: true` only when the step needs autonomous decomposition, broader exploration, or multi-file review
+- do not use subagent mode for small single-shot transformations where the prompt path is faster and easier to debug
+
 ### 1.5 Preserve tier boundaries
 
 Do not mix tiers casually.
@@ -138,6 +144,8 @@ Prefer:
 - one browser session
 - one reasoning pass
 - one artifact write
+
+If the reasoning pass is exploratory or review-heavy, a subagent can replace the direct prompt path, but only when the pipeline explicitly opts in.
 
 Only add branches or fan-out when the use case truly needs them.
 

@@ -98,6 +98,79 @@ describe('surface-provider-policy', () => {
     expect(getSurfaceProviderManifestRecord('slack').displayName).toBe('Slack');
   });
 
+  it('keeps prompt-mode compiled flows on the direct reply path', () => {
+    const receiver = resolveSurfaceConversationReceiverForProvider('slack', {
+      intentContract: {
+        kind: 'intent-contract',
+        source_text: '左下の承認ボタンを押して',
+        intent_id: 'browser-step',
+        goal: {
+          summary: 'Click the requested button',
+          success_condition: 'The requested browser step is completed.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'browser_step',
+        },
+        required_inputs: [],
+        outcome_ids: ['browser_step'],
+        approval: { requires_approval: false },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.9,
+        why: 'Lightweight browser step',
+      },
+      workLoop: {
+        intent: { label: 'browser-step' },
+        context: { tier: 'confidential', service_bindings: [] },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'browser_step',
+        },
+        outcome_design: { outcome_ids: ['browser_step'], labels: [] },
+        process_design: { plan_outline: [], intake_requirements: [], operator_checklist: [] },
+        runtime_design: {
+          owner_model: 'single_actor',
+          assignment_policy: 'direct_specialist',
+          coordination: { bus: 'none', channels: [] },
+          memory: { store: 'none', scope: 'none', purpose: [] },
+        },
+        execution_boundary: {
+          llm_zone: { allowed: [], forbidden: [] },
+          knowledge_zone: { owns: [] },
+          compiler_zone: { responsibilities: [] },
+          executor_zone: { responsibilities: [] },
+          rule: 'test',
+        },
+        teaming: {
+          specialist_id: 'browser-operator',
+          specialist_label: 'Browser Operator',
+          conversation_agent: 'nerve-agent',
+          team_roles: [],
+        },
+        authority: { requires_approval: false },
+        learning: { reusable_refs: [] },
+      },
+      routingDecision: {
+        kind: 'agent-routing-decision',
+        source_text: '左下の承認ボタンを押して',
+        intent_id: 'browser-step',
+        mode: 'prompt',
+        scope: 'single_artifact',
+        autonomy: 'low',
+        boundary_crossing: false,
+        fanout: 'none',
+        owner: 'browser-operator',
+        artifact_count: 1,
+        stop_condition: 'The response is ready as a single governed reply or artifact.',
+        rationale: 'Lightweight browser step',
+      },
+      source: 'llm',
+    } as any);
+
+    expect(receiver).toBeUndefined();
+  });
+
   it('keeps the governed provider manifests schema-valid', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });

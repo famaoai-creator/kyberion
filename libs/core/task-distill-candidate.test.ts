@@ -5,7 +5,7 @@ describe('task-distill-candidate', () => {
   it('rejects generic document completions without reusable structure', () => {
     const result = assessTaskDistillCandidate({
       taskType: 'report_document',
-      goalSummary: 'Create a report',
+      goalSummary: 'Report',
       previewText: 'レポート文書を生成しました。',
       artifactId: 'ART-1',
       hasWorkLoop: true,

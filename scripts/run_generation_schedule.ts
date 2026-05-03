@@ -48,7 +48,7 @@ async function reconcileSchedule(schedule: any): Promise<{ schedule: any; outcom
   const copiedSource = job?.result?.copied_to || job?.request?.target_path;
   if (job?.status === 'succeeded' && latestAliasPath && copiedSource && safeExistsSync(copiedSource)) {
     safeMkdir(path.dirname(latestAliasPath), { recursive: true });
-    safeCopyFileSync(copiedSource, latestAliasPath);
+    safeCopyFileSync(path.resolve(copiedSource), latestAliasPath);
     aliasUpdated = true;
   }
 

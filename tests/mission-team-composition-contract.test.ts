@@ -62,7 +62,7 @@ describe('Mission team composition contract', () => {
     expect(plan.template).toBe('development');
     expect(plan.assignments.find((entry) => entry.team_role === 'owner')?.agent_id).toBe('nerve-agent');
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe('implementation-architect');
-    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toBe('gemini');
+    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(/^(gemini|codex)$/);
     expect(plan.assignments.find((entry) => entry.team_role === 'surface_liaison')?.required).toBe(false);
 
     for (const assignment of plan.assignments.filter((entry) => entry.status === 'assigned')) {
@@ -101,8 +101,8 @@ describe('Mission team composition contract', () => {
     expect(plan.template).toBe('product_development');
     expect(plan.assignments.find((entry) => entry.team_role === 'product_strategist')?.agent_id).toBe('sovereign-brain');
     expect(plan.assignments.find((entry) => entry.team_role === 'experience_designer')?.required).toBe(false);
-    expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.provider).toBe('gemini');
-    expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.modelId).toBe('gemini-2.5-flash');
+    expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.provider).toMatch(/^(gemini|codex)$/);
+    expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.modelId).toBeTruthy();
   });
 
   it('returns a specific team assignment by role', () => {

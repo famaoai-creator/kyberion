@@ -223,6 +223,7 @@ async function start() {
           threadTs,
           proposal: pendingMissionProposal.proposal,
           sourceText: pendingMissionProposal.sourceText,
+          routingDecision: pendingMissionProposal.routingDecision,
         });
         clearSlackMissionProposalState(message.channel, threadTs);
         const response = await client.chat.postMessage({
@@ -233,10 +234,13 @@ async function start() {
             `Type: ${issued.missionType}`,
             `Tier: ${issued.tier}`,
             `Persona: ${issued.persona}`,
+            issued.routingDecision
+              ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
+              : undefined,
             issued.orchestrationStatus === 'queued'
               ? 'Background orchestration has been queued.'
               : 'Background orchestration could not be queued.',
-          ].join('\n'),
+          ].filter(Boolean).join('\n'),
         });
         recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, 'system');
         return;
@@ -323,6 +327,7 @@ async function start() {
           threadTs,
           proposal,
           sourceText: message.text,
+          routingDecision: conversation.routingDecision,
         });
         const response = await client.chat.postMessage({
           channel: message.channel,

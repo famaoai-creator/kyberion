@@ -1,0 +1,47 @@
+{
+  "pipeline_id": "monitor-service-health",
+  "version": "1.0.0",
+  "description": "Verify the response health of messaging bridges.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "check-process-uptime",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "ps -eo pid,etime,comm | grep -E 'slack-bridge|voice-hub|nexus-daemon' || echo 'No active services'",
+        "export_as": "process_uptime"
+      }
+    },
+    {
+      "id": "check-recent-errors",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "grep -r 'ERROR' active/shared/logs | tail -n 10 || echo 'No recent errors'",
+        "export_as": "recent_service_errors"
+      }
+    },
+    {
+      "id": "analyze-reliability",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Based on process uptime and recent log errors, evaluate the reliability of communication bridges. Propose restarts for any 'zombie' or flapping services.",
+        "context": [
+          "{{process_uptime}}",
+          "{{recent_service_errors}}"
+        ],
+        "export_as": "reliability_report"
+      }
+    },
+    {
+      "id": "log-reliability-report",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "📡 [SERVICE HEALTH AUDIT]\n{{reliability_report}}"
+      }
+    }
+  ]
+}

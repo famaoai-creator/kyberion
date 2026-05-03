@@ -10,6 +10,7 @@ For a layer-oriented view of the concepts themselves, read:
 - `knowledge/public/architecture/kyberion-concept-map.md`
 - `knowledge/public/architecture/llm-execution-boundary.md`
 - `knowledge/public/architecture/actuator-contract-map.md`
+- `knowledge/public/architecture/agent-communication-layer-model.md`
 - `knowledge/public/architecture/enterprise-operating-kernel.md`
 - `knowledge/public/architecture/ceo-ux.md`
 - `knowledge/public/architecture/management-control-plane.md`

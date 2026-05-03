@@ -7,7 +7,8 @@
     "version": { "type": "string" },
     "specialist_routing": { "$ref": "#/$defs/specialistRouting" },
     "profile_routing": { "$ref": "#/$defs/profileRouting" },
-    "design_rules": { "$ref": "#/$defs/designRules" }
+    "design_rules": { "$ref": "#/$defs/designRules" },
+    "agent_routing": { "$ref": "#/$defs/agentRouting" }
   },
   "required": ["version", "specialist_routing", "profile_routing", "design_rules"],
   "$defs": {
@@ -136,6 +137,54 @@
         }
       },
       "required": ["process_checklist_rules", "execution_shape_rules", "intent_label_rules"]
+    },
+    "agentRoutingRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "match": { "$ref": "#/$defs/routingMatch" },
+        "mode": {
+          "type": "string",
+          "enum": ["prompt", "subagent", "coordination"]
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["single_artifact", "multi_artifact", "stateful_flow", "boundary_crossing"]
+        },
+        "autonomy": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "boundary_crossing": { "type": "boolean" },
+        "fanout": {
+          "type": "string",
+          "enum": ["none", "parallel", "review", "cross_critique"]
+        },
+        "owner": { "type": "string" },
+        "delegates": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "artifact_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stop_condition": { "type": "string" },
+        "rationale": { "type": "string" }
+      },
+      "required": ["match", "mode", "owner"]
+    },
+    "agentRouting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/agentRoutingRule" }
+        }
+      },
+      "required": ["mode_rules"]
     }
   }
 }

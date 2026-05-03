@@ -211,6 +211,21 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['start', 'MSN-5']);
   });
 
+  it('treats --routing-decision as a named option instead of a positional argument', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'start',
+      'MSN-5B',
+      '--routing-decision',
+      '{"kind":"agent-routing-decision","intent_id":"generate-report"}',
+      '--persona',
+      'Ecosystem Architect',
+    ]);
+
+    expect(positionalArgs).toEqual(['start', 'MSN-5B']);
+  });
+
   it('extracts named mission start/create options safely', () => {
     const options = extractMissionStartCreateOptionsFromArgv([
       'node',
@@ -225,11 +240,14 @@ describe('mission_controller argument parsing', () => {
       'development',
       '--relationships',
       '{"project":{"project_id":"PRJ-1","project_path":"projects/sample","relationship_type":"belongs_to"}}',
+      '--routing-decision',
+      '{"kind":"agent-routing-decision","intent_id":"generate-report","mode":"subagent","owner":"document-specialist"}',
     ]);
 
     expect(options.tier).toBe('public');
     expect(options.persona).toBe('Ecosystem Architect');
     expect(options.missionType).toBe('development');
+    expect(options.routingDecision).toContain('"mode":"subagent"');
     expect(options.relationships).toEqual({
       project: {
         project_id: 'PRJ-1',

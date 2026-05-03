@@ -65,7 +65,7 @@ describe('control_plane_cli next actions', () => {
     expect(summary.flagged).toBe(1);
     expect(summary.eligible).toBe(1);
     expect(summary.unassessed).toBe(1);
-    expect(summary.promotable).toBe(0);
+    expect(summary.promotable).toBe(1);
     expect(summary.flagged_seed_ids).toEqual(['MSD-1']);
     expect(summary.eligible_seed_ids).toEqual(['MSD-2']);
     expect(summary.promoted_seed_ids).toEqual(['MSD-2']);

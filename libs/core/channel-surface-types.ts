@@ -8,6 +8,7 @@ import type { ApprovalRequestDraft, ApprovalRequestRecord } from './approval-sto
 import type { GovernedArtifactRole } from './artifact-store.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import type { A2UIMessage } from './a2ui.js';
+import type { AgentRoutingDecision } from './intent-contract.js';
 
 export type SurfaceRole = GovernedArtifactRole;
 
@@ -84,6 +85,7 @@ export interface SlackMissionIssuanceResult {
   orchestrationStatus: 'queued' | 'failed';
   orchestrationJobPath?: string;
   orchestrationError?: string;
+  routingDecision?: AgentRoutingDecision;
 }
 
 export interface SlackApprovalActionPayload {
@@ -254,6 +256,7 @@ export interface SurfaceConversationResult {
   routingProposals?: NerveRoutingProposal[];
   missionProposals?: MissionProposal[];
   planningPackets?: PlanningPacket[];
+  routingDecision?: AgentRoutingDecision;
 }
 
 export interface SurfaceDelegationResult {
@@ -337,6 +340,7 @@ export interface SlackMissionProposalState {
   threadTs: string;
   proposal: MissionProposal;
   sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
   createdAt: string;
 }
 
@@ -346,5 +350,6 @@ export interface ChronosMissionProposalState {
   threadTs: string;
   proposal: MissionProposal;
   sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
   createdAt: string;
 }
