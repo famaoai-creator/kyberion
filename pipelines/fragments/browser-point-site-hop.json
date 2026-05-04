@@ -1,0 +1,43 @@
+{
+  "name": "browser-point-site-hop",
+  "description": "Fragment for navigating through a loyalty/point site to a target merchant. Handles finding the merchant link and clicking through to ensure point tracking.",
+  "steps": [
+    {
+      "id": "visit_point_site",
+      "op": "browser:goto",
+      "params": {
+        "url": "{{point_site_url}}"
+      }
+    },
+    {
+      "id": "search_merchant",
+      "op": "browser:fill_ref",
+      "params": {
+        "selector": "{{point_site_search_input}}",
+        "value": "{{merchant_name}}"
+      }
+    },
+    {
+      "id": "execute_search",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "{{point_site_search_button}}"
+      }
+    },
+    {
+      "id": "click_merchant_link",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "{{point_site_merchant_link_selector}}",
+        "wait_for_navigation": true
+      }
+    },
+    {
+      "id": "verify_merchant_landing",
+      "op": "browser:snapshot",
+      "params": {
+        "export_as": "merchant_landing_page"
+      }
+    }
+  ]
+}

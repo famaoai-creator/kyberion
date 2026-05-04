@@ -1,0 +1,47 @@
+{
+  "name": "browser-travel-search-select",
+  "description": "Fragment for searching flights or hotels and selecting the best option based on provided criteria.",
+  "steps": [
+    {
+      "id": "input_search_criteria",
+      "op": "browser:fill_bulk",
+      "params": {
+        "inputs": [
+          { "selector": "{{origin_selector}}", "value": "{{origin}}" },
+          { "selector": "{{destination_selector}}", "value": "{{destination}}" },
+          { "selector": "{{date_selector}}", "value": "{{date}}" }
+        ]
+      }
+    },
+    {
+      "id": "trigger_search",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "{{search_button_selector}}"
+      }
+    },
+    {
+      "id": "extract_options",
+      "op": "browser:snapshot",
+      "params": {
+        "export_as": "travel_options"
+      }
+    },
+    {
+      "id": "select_best_option",
+      "op": "wisdom:recommend",
+      "params": {
+        "options": "{{travel_options}}",
+        "criteria": "{{selection_criteria}}",
+        "export_as": "selected_option"
+      }
+    },
+    {
+      "id": "click_selection",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "{{selected_option.selector}}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "pipeline_id": "browser-profile-list",
+  "version": "1.0.0",
+  "description": "Fragment demonstrating how to list available Kyberion managed profiles and Chrome native profiles.",
+  "action": "pipeline",
+  "options": {
+    "headless": true
+  },
+  "steps": [
+    {
+      "type": "apply",
+      "op": "list_profiles",
+      "params": {
+        "export_as": "available_profiles"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "log",
+      "params": {
+        "message": "Profiles retrieved. They are available in ctx.available_profiles."
+      }
+    }
+  ]
+}

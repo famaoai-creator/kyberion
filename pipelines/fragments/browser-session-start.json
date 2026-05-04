@@ -1,0 +1,29 @@
+{
+  "pipeline_id": "browser-session-start",
+  "version": "1.0.0",
+  "description": "Fragment demonstrating how to start a browser session with a specific managed profile and optional native chrome profile directory.",
+  "action": "pipeline",
+  "options": {
+    "headless": false,
+    "user_data_dir": "active/shared/runtime/browser/profiles/my-evaluation-profile",
+    "profile_directory": "Default",
+    "browser_channel": "chrome",
+    "timeout_ms": 60000
+  },
+  "steps": [
+    {
+      "type": "apply",
+      "op": "log",
+      "params": {
+        "message": "Browser started with dedicated profile."
+      }
+    },
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": {
+        "url": "about:blank"
+      }
+    }
+  ]
+}

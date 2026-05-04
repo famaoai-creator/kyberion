@@ -102,11 +102,24 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   if (process.env.KYBERION_LOCAL_LLM_URL) return 'local';
 
   const providers = discoverProviders(shouldRefreshProviders(options));
-  if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
-    return 'codex-cli';
+
+  // Determine preferred provider based on CLI context
+  let preferredProvider: string | null = null;
+  if (process.env.GEMINI_CLI) preferredProvider = 'gemini';
+  else if (process.env.CODEX_CLI || process.env.CODEX_VERSION || process.env.TERM_PROGRAM === 'codex') preferredProvider = 'codex';
+  else if (process.env.CLAUDE_CLI) preferredProvider = 'claude';
+
+  // If a preferred provider is detected and healthy, use it
+  if (preferredProvider && providers.some((p) => p.provider === preferredProvider && p.installed && p.healthy)) {
+    return `${preferredProvider}-cli` as ReasoningBackendMode;
   }
+
+  // Fallback to the first healthy provider found in discovery
   if (providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy)) {
     return 'gemini-cli';
+  }
+  if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
+    return 'codex-cli';
   }
   if (providers.some((provider) => provider.provider === 'claude' && provider.installed && provider.healthy)) {
     return 'claude-cli';

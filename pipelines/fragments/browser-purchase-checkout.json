@@ -1,0 +1,59 @@
+{
+  "name": "browser-purchase-checkout",
+  "description": "Deterministic sequence for cart checkout and payment. Includes a high-risk approval gate before final confirmation.",
+  "steps": [
+    {
+      "id": "navigate_to_cart",
+      "op": "browser:goto",
+      "params": {
+        "url": "{{cart_url}}"
+      }
+    },
+    {
+      "id": "proceed_to_checkout",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "{{checkout_button_selector}}"
+      }
+    },
+    {
+      "id": "capture_summary",
+      "op": "browser:snapshot",
+      "params": {
+        "export_as": "order_summary"
+      }
+    },
+    {
+      "id": "approval_gate_payment",
+      "op": "approval:request",
+      "params": {
+        "title": "Purchase Confirmation Required",
+        "description": "Reviewing order for {{merchant_name}}. Total: {{order_summary.total_price}}. Evidence: {{order_summary.screenshot_url}}",
+        "risk_level": "high_stakes"
+      }
+    },
+    {
+      "id": "finalize_payment",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "{{confirm_payment_button_selector}}"
+      }
+    },
+    {
+      "id": "capture_receipt",
+      "op": "browser:snapshot",
+      "params": {
+        "export_as": "purchase_receipt"
+      }
+    },
+    {
+      "id": "audit_record_purchase",
+      "op": "blockchain:record_event",
+      "params": {
+        "event": "PURCHASE_COMPLETED",
+        "merchant": "{{merchant_name}}",
+        "receipt_hash": "sha256:{{purchase_receipt.hash}}"
+      }
+    }
+  ]
+}
