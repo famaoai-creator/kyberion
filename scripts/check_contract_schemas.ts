@@ -150,6 +150,31 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'harness-adapter-registry',
+      schemaPath: 'knowledge/public/schemas/harness-adapter-registry.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/harness-adapter-registry.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+        },
+      ],
+    },
+    {
+      id: 'provider-capability-scan-policy',
+      schemaPath: 'knowledge/public/schemas/provider-capability-scan-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/provider-capability-scan-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          providers: [],
+        },
+      ],
+    },
+    {
       id: 'capability-bundle-registry',
       schemaPath: 'knowledge/public/schemas/capability-bundle-registry.schema.json',
       validPayloads: [

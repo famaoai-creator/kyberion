@@ -26,7 +26,61 @@
         "target": "browser-actuator"
       },
       "status": "active",
-      "notes": "Preferred for exploratory browsing and observation-heavy loops."
+      "notes": "Preferred for exploratory browsing and observation-heavy loops. Execution receipts should preserve the capability_id, adapter_id, and trace_id."
+    },
+    {
+      "capability_id": "cli.native.codex_exec",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "exec",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["reason-over-code", "generate-patch"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Non-interactive Codex execution should be traced and registered as a provider-native reasoning surface."
+    },
+    {
+      "capability_id": "cli.native.codex_review",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "review",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["code-review", "review-pr"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Codex review should be used for structured code review prompts, not as an uncontrolled editor."
     },
     {
       "capability_id": "cli.native.computer_use",
@@ -53,7 +107,142 @@
         "target": "pipelines/browser-session-simulation.json"
       },
       "status": "experimental",
-      "notes": "Use with approval-aware boundaries for high-risk UI actions."
+      "notes": "Use with approval-aware boundaries for high-risk UI actions. Action trails and receipt traces must remain visible."
+    },
+    {
+      "capability_id": "provider.runtime.codex_app_server",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "codex-cli",
+        "name": "app-server",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["reasoning-session", "long-lived-analysis"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Codex app is a provider runtime surface; keep thread ids and soft refresh traces visible."
+    },
+    {
+      "capability_id": "cli.native.codex_cloud_tasks",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "cloud",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["cloud-task", "apply-cloud-changes"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "experimental",
+      "notes": "Codex Cloud task browsing should remain optional and be mirrored into Kyberion traces when used."
+    },
+    {
+      "capability_id": "cli.native.codex_plugin_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "plugin",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["plugin-management", "install-plugin"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Codex plugin management is useful for controlled extension installation and inspection."
+    },
+    {
+      "capability_id": "cli.native.codex_mcp_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "mcp",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["mcp-server-management", "connect-mcp"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "External MCP server management should be registered explicitly because it changes tool surface exposure."
+    },
+    {
+      "capability_id": "cli.native.codex_feature_flags",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "features",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session"],
+        "intents": ["inspect-features", "discover-capabilities"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Feature flag inspection is a discovery-only surface that should be safe to call frequently."
     },
     {
       "capability_id": "cli.native.delegated_agent_worker",
@@ -80,7 +269,331 @@
         "target": "pipelines/a2a-task-contract.json"
       },
       "status": "active",
-      "notes": "Prefer for bounded sidecar execution with explicit task contracts."
+      "notes": "Prefer for bounded sidecar execution with explicit task contracts. Delegation traces should remain auditable."
+    },
+    {
+      "capability_id": "cli.native.gemini_headless_prompt",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "prompt",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session", "mission"],
+        "intents": ["reason-over-code", "structured-query", "headless-prompt"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Gemini headless prompt mode is the primary non-interactive reasoning surface."
+    },
+    {
+      "capability_id": "cli.native.gemini_extension_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "extensions",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["extension-management", "discover-extensions"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Gemini extension management should stay discovery-oriented and auditable."
+    },
+    {
+      "capability_id": "cli.native.gemini_skill_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "skills",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["skill-management", "discover-skills"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Gemini skills are treated as deterministic utility surfaces."
+    },
+    {
+      "capability_id": "cli.native.gemini_hook_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "hooks",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["hook-management", "discover-hooks"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Gemini hooks alter runtime behavior and should be registered explicitly."
+    },
+    {
+      "capability_id": "cli.native.gemini_mcp_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "mcp",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["mcp-server-management", "connect-mcp"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "Gemini MCP server management changes the tool surface and should remain governed."
+    },
+    {
+      "capability_id": "cli.native.github_pr_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "pr",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["review-pr", "manage-pr"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Use for PR inspection and management through GitHub CLI, with audit trails preserved."
+    },
+    {
+      "capability_id": "cli.native.github_issue_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "issue",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["manage-issue", "triage-issue"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Issue management is operationally useful but should stay approval-aware."
+    },
+    {
+      "capability_id": "cli.native.github_repo_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "repo",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["manage-repo", "inspect-repo"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Repository operations can be powerful; keep them routed through governed surfaces."
+    },
+    {
+      "capability_id": "cli.native.github_api_access",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "api",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session"],
+        "intents": ["github-api-query", "github-api-mutation"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "GitHub API requests are deterministic enough for discovery and read-only flows, but mutations still need policy review."
+    },
+    {
+      "capability_id": "cli.native.github_actions_inspection",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "run / workflow",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["inspect-actions", "inspect-workflow"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Actions inspection is low-risk and useful for auditing CI behavior."
+    },
+    {
+      "capability_id": "cli.native.github_skill_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "skill",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["skill-management", "install-skill"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "experimental",
+      "notes": "GitHub CLI skills are preview features; keep them clearly marked in the registry."
+    },
+    {
+      "capability_id": "cli.native.github_agent_task",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "agent-task",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["agent-task-management"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "experimental",
+      "notes": "GitHub agent-task is preview-only and should remain an explicit opt-in surface."
     },
     {
       "capability_id": "cli.plugin.skill_executor",

@@ -143,6 +143,10 @@
       "types": "./dist/provider-discovery.d.ts",
       "default": "./dist/provider-discovery.js"
     },
+    "./provider-capability-scanner": {
+      "types": "./dist/provider-capability-scanner.d.ts",
+      "default": "./dist/provider-capability-scanner.js"
+    },
     "./reflex-terminal": {
       "types": "./dist/reflex-terminal.d.ts",
       "default": "./dist/reflex-terminal.js"

@@ -88,6 +88,16 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/harness-capability-registry.json',
   },
   {
+    id: 'harness-adapter-registry',
+    schemaPath: 'knowledge/public/schemas/harness-adapter-registry.schema.json',
+    dataPath: 'knowledge/public/governance/harness-adapter-registry.json',
+  },
+  {
+    id: 'provider-capability-scan-policy',
+    schemaPath: 'knowledge/public/schemas/provider-capability-scan-policy.schema.json',
+    dataPath: 'knowledge/public/governance/provider-capability-scan-policy.json',
+  },
+  {
     id: 'execution-receipt-policy',
     schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
     dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
@@ -576,6 +586,87 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.capabilities || []).some((capability) => capability.status === 'active')) {
       violations.push('harness-capability-registry: at least one active capability is required');
+    }
+  }
+
+  if (check.id === 'harness-adapter-registry') {
+    const typed = data as {
+      profiles?: Array<{
+        adapter_id?: string;
+        enabled?: boolean;
+        fallback_contract?: string;
+        capability_id?: string;
+      }>;
+    };
+    if (!(typed.profiles || []).length) {
+      violations.push('harness-adapter-registry: profiles must not be empty');
+      return;
+    }
+    const adapterIds = new Set<string>();
+    for (const profile of typed.profiles || []) {
+      const adapterId = String(profile.adapter_id || '');
+      if (!adapterId) {
+        violations.push('harness-adapter-registry: every profile must define adapter_id');
+        continue;
+      }
+      if (adapterIds.has(adapterId)) {
+        violations.push(`harness-adapter-registry: duplicate adapter_id detected (${adapterId})`);
+      }
+      adapterIds.add(adapterId);
+
+      if (profile.enabled && !String(profile.fallback_contract || '')) {
+        violations.push(`harness-adapter-registry: enabled adapter ${adapterId} must define fallback_contract`);
+      }
+      if (!String(profile.capability_id || '')) {
+        violations.push(`harness-adapter-registry: adapter ${adapterId} must define capability_id`);
+      }
+    }
+    if (!(typed.profiles || []).some((profile) => profile.enabled)) {
+      violations.push('harness-adapter-registry: at least one enabled profile is required');
+    }
+  }
+
+  if (check.id === 'provider-capability-scan-policy') {
+    const typed = data as {
+      providers?: Array<{
+        provider?: string;
+        primary_probe?: {
+          command?: string;
+        };
+        evidence_probes?: Array<{
+          capability_ids?: string[];
+          probe?: {
+            command?: string;
+          };
+        }>;
+      }>;
+    };
+    if (!(typed.providers || []).length) {
+      violations.push('provider-capability-scan-policy: providers must not be empty');
+      return;
+    }
+    const providerNames = new Set<string>();
+    for (const provider of typed.providers || []) {
+      const providerName = String(provider.provider || '');
+      if (!providerName) {
+        violations.push('provider-capability-scan-policy: every provider must define provider');
+        continue;
+      }
+      if (providerNames.has(providerName)) {
+        violations.push(`provider-capability-scan-policy: duplicate provider detected (${providerName})`);
+      }
+      providerNames.add(providerName);
+      if (!String(provider.primary_probe?.command || '')) {
+        violations.push(`provider-capability-scan-policy: provider ${providerName} must define primary_probe.command`);
+      }
+      for (const evidenceProbe of provider.evidence_probes || []) {
+        if (!String(evidenceProbe.probe?.command || '')) {
+          violations.push(`provider-capability-scan-policy: provider ${providerName} evidence probe must define probe.command`);
+        }
+        if (!(evidenceProbe.capability_ids || []).length) {
+          violations.push(`provider-capability-scan-policy: provider ${providerName} evidence probe must define capability_ids`);
+        }
+      }
     }
   }
 
