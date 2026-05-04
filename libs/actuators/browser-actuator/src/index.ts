@@ -1036,6 +1036,40 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
     case 'log':
       logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`);
       return recordBrowserAction(ctx, { kind: 'apply', op: 'log', tab_id: runtime.activeTabId });
+    case 'list_profiles': {
+      let managedProfiles: string[] = [];
+      let nativeProfiles: string[] = [];
+      let lease: any = undefined;
+      for (const [id, l] of browserRuntimeLeases.entries()) {
+        if (l.runtime === runtime) {
+          lease = l;
+          break;
+        }
+      }
+      try {
+        const managedDir = pathResolver.rootResolve('active/shared/runtime/browser/profiles');
+        if (safeExistsSync(managedDir)) {
+          managedProfiles = (await safeReaddir(managedDir))
+            .filter(name => !name.startsWith('.') && (safeExistsSync(path.join(managedDir, name, 'Preferences')) || safeExistsSync(path.join(managedDir, name, 'Default', 'Preferences'))));
+        }
+      } catch (e) { /* ignore */ }
+      try {
+        if (lease && safeExistsSync(lease.userDataDir)) {
+          nativeProfiles = (await safeReaddir(lease.userDataDir))
+            .filter(name => name === 'Default' || name.startsWith('Profile '));
+        }
+      } catch (e) { /* ignore */ }
+      
+      const profilesList = {
+        managed: managedProfiles,
+        native: nativeProfiles
+      };
+      
+      if (params.export_as) {
+        ctx[params.export_as] = profilesList;
+      }
+      return recordBrowserAction(ctx, { kind: 'apply', op: 'list_profiles', tab_id: runtime.activeTabId });
+    }
     case 'set_passkey_user_verified': {
       const authenticatorId = getPasskeyAuthenticatorId(runtime);
       const cdp = await getOrCreatePageCdpSession(runtime, page);
