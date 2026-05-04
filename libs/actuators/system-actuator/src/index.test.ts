@@ -5,7 +5,9 @@ const safeReadFile = vi.fn(() => '{}');
 const safeWriteFile = vi.fn();
 const safeMkdir = vi.fn();
 const safeExistsSync = vi.fn(() => false);
-const derivePipelineStatus = vi.fn((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed');
+const derivePipelineStatus = vi.fn((results: Array<{ status: string }>) =>
+  results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'
+);
 const resolveVars = vi.fn((value: any, ctx: Record<string, any>) => {
   if (typeof value !== 'string') {
     return value;
@@ -16,15 +18,20 @@ const resolveVars = vi.fn((value: any, ctx: Record<string, any>) => {
   });
 });
 const evaluateCondition = vi.fn(() => false);
-const getPathValue = vi.fn((data: any, path: string) => path.split('.').reduce((acc, key) => acc?.[key], data));
+const getPathValue = vi.fn((data: any, path: string) =>
+  path.split('.').reduce((acc, key) => acc?.[key], data)
+);
 const resolveWriteArtifactSpec = vi.fn((params: any, ctx: any, resolve: (value: any) => any) => ({
   path: String(resolve(params.path || params.output_path || 'active/shared/tmp/output.txt')),
   content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
 }));
-const activateApplication = vi.fn((application: string) => safeExec('osascript', ['-e', `tell application "${application}" to activate`]));
+const activateApplication = vi.fn((application: string) =>
+  safeExec('osascript', ['-e', `tell application "${application}" to activate`])
+);
 const detectFocusedInput = vi.fn(() => {
   const output = String(safeExec('osascript', ['-e', '__detect_focused_input__'])).trimEnd();
-  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] = output.split('\n');
+  const [application = '', windowTitle = '', role = '', description = '', editableFlag = 'false'] =
+    output.split('\n');
   return {
     application,
     windowTitle,
@@ -33,14 +40,24 @@ const detectFocusedInput = vi.fn(() => {
     editable: editableFlag.trim().toLowerCase() === 'true',
   };
 });
-const keystrokeText = vi.fn((text: string) => safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${text}"`]));
-const pasteText = vi.fn((text: string) => safeExec('osascript', ['-e', `set the clipboard to "${text}"\ntell application "System Events" to keystroke "v" using command down`]));
+const keystrokeText = vi.fn((text: string) =>
+  safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${text}"`])
+);
+const pasteText = vi.fn((text: string) =>
+  safeExec('osascript', [
+    '-e',
+    `set the clipboard to "${text}"\ntell application "System Events" to keystroke "v" using command down`,
+  ])
+);
 const pressKey = vi.fn((key: string) => {
   const normalizedKey = key.trim().toLowerCase();
   if (normalizedKey === 'enter' || normalizedKey === 'return') {
     return safeExec('osascript', ['-e', 'tell application "System Events" to key code 36']);
   }
-  return safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${normalizedKey}"`]);
+  return safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to keystroke "${normalizedKey}"`,
+  ]);
 });
 const clickAt = vi.fn((x: number, y: number, clickCount = 1) => {
   for (let index = 0; index < clickCount; index += 1) {
@@ -49,17 +66,47 @@ const clickAt = vi.fn((x: number, y: number, clickCount = 1) => {
 });
 const rightClickAt = vi.fn((x: number, y: number, clickCount = 1) => {
   for (let index = 0; index < clickCount; index += 1) {
-    safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`]);
+    safeExec('osascript', [
+      '-e',
+      `tell application "System Events" to do shell script "/usr/bin/env cliclick rc:${x},${y}"`,
+    ]);
   }
 });
-const moveMouse = vi.fn((x: number, y: number) => safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`]));
+const moveMouse = vi.fn((x: number, y: number) =>
+  safeExec('osascript', [
+    '-e',
+    `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`,
+  ])
+);
 const listKnownAppCapabilities = vi.fn(() => [
-  { application: 'Google Chrome', adapter: 'browser_tabs', capabilities: ['list_tabs', 'activate_tab_by_title'] },
+  {
+    application: 'Google Chrome',
+    adapter: 'browser_tabs',
+    capabilities: ['list_tabs', 'activate_tab_by_title'],
+  },
   { application: 'Finder', adapter: 'file_manager', capabilities: ['empty_trash'] },
 ]);
 const listTerminalTargets = vi.fn(() => [
-  { application: 'Terminal', supported: true, preferred: false, adapter: 'terminal', canInject: true, sessionCount: 0, sessions: [], idleSession: null },
-  { application: 'iTerm2', supported: true, preferred: true, adapter: 'iterm2', canInject: true, sessionCount: 1, sessions: [{ winId: '1', sessionId: 'abc', type: 'iTerm2' }], idleSession: { winId: '1', sessionId: 'abc', type: 'iTerm2' } },
+  {
+    application: 'Terminal',
+    supported: true,
+    preferred: false,
+    adapter: 'terminal',
+    canInject: true,
+    sessionCount: 0,
+    sessions: [],
+    idleSession: null,
+  },
+  {
+    application: 'iTerm2',
+    supported: true,
+    preferred: true,
+    adapter: 'iterm2',
+    canInject: true,
+    sessionCount: 1,
+    sessions: [{ winId: '1', sessionId: 'abc', type: 'iTerm2' }],
+    idleSession: { winId: '1', sessionId: 'abc', type: 'iTerm2' },
+  },
 ]);
 const listChromeTabs = vi.fn(() => [
   { index: 1, title: 'Inbox', url: 'https://mail.example' },
@@ -177,7 +224,9 @@ beforeEach(() => {
   safeWriteFile.mockImplementation(() => {});
   safeMkdir.mockImplementation(() => {});
   safeExistsSync.mockImplementation(() => false);
-  derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) => results.every((r) => r.status === 'success') ? 'succeeded' : 'failed');
+  derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) =>
+    results.every((r) => r.status === 'success') ? 'succeeded' : 'failed'
+  );
   resolveVars.mockImplementation((value: any, ctx: Record<string, any>) => {
     if (typeof value !== 'string') {
       return value;
@@ -188,11 +237,15 @@ beforeEach(() => {
     });
   });
   evaluateCondition.mockImplementation(() => false);
-  getPathValue.mockImplementation((data: any, path: string) => path.split('.').reduce((acc, key) => acc?.[key], data));
-  resolveWriteArtifactSpec.mockImplementation((params: any, ctx: any, resolve: (value: any) => any) => ({
-    path: String(resolve(params.path || params.output_path || 'active/shared/tmp/output.txt')),
-    content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
-  }));
+  getPathValue.mockImplementation((data: any, path: string) =>
+    path.split('.').reduce((acc, key) => acc?.[key], data)
+  );
+  resolveWriteArtifactSpec.mockImplementation(
+    (params: any, ctx: any, resolve: (value: any) => any) => ({
+      path: String(resolve(params.path || params.output_path || 'active/shared/tmp/output.txt')),
+      content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
+    })
+  );
   restorePlatform();
 });
 
@@ -200,7 +253,9 @@ describe('system-actuator computer_interaction adapter', () => {
   it('detects the currently focused input element', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
+    vi.mocked(core.safeExec).mockReturnValueOnce(
+      'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
+    );
 
     const result = await handleAction({
       version: '0.1',
@@ -222,7 +277,9 @@ describe('system-actuator computer_interaction adapter', () => {
   it('remembers the currently focused target', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
+    vi.mocked(core.safeExec).mockReturnValueOnce(
+      'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
+    );
 
     const result = await handleAction({
       version: '0.1',
@@ -236,14 +293,16 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.context.focus_target_id).toBe('chat-main');
     expect(core.safeWriteFile).toHaveBeenCalledWith(
       '/tmp/kyberion/active/shared/runtime/computer/focused-targets.json',
-      expect.stringContaining('"chat-main"'),
+      expect.stringContaining('"chat-main"')
     );
   });
 
   it('fails typing when focused element is not editable', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\nfalse');
+    vi.mocked(core.safeExec).mockReturnValueOnce(
+      'Codex\nCurrent Chat\nAXTextArea\nChat Input\nfalse'
+    );
 
     await expect(
       handleAction({
@@ -253,7 +312,7 @@ describe('system-actuator computer_interaction adapter', () => {
           type: 'type_into_focused_input',
           text: 'hello',
         },
-      } as any),
+      } as any)
     ).rejects.toThrow('Focused element is not editable');
   });
 
@@ -283,7 +342,7 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.context.parsed.a).toBe(1);
     expect(core.safeWriteFile).toHaveBeenCalledWith(
       '/tmp/kyberion/active/shared/tmp/system-context.json',
-      expect.stringContaining('"parsed"'),
+      expect.stringContaining('"parsed"')
     );
   });
 
@@ -305,7 +364,10 @@ describe('system-actuator computer_interaction adapter', () => {
       },
     } as any);
 
-    expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "Safari" to activate']);
+    expect(core.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "Safari" to activate',
+    ]);
 
     restorePlatform();
   });
@@ -324,7 +386,10 @@ describe('system-actuator computer_interaction adapter', () => {
       },
     } as any);
 
-    expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "Finder" to activate']);
+    expect(core.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "Finder" to activate',
+    ]);
 
     restorePlatform();
   });
@@ -332,7 +397,9 @@ describe('system-actuator computer_interaction adapter', () => {
   it('submits the focused input with enter', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
+    vi.mocked(core.safeExec).mockReturnValueOnce(
+      'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
+    );
 
     const result = await handleAction({
       version: '0.1',
@@ -343,13 +410,18 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 36']);
+    expect(core.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "System Events" to key code 36',
+    ]);
   });
 
   it('uses paste strategy for focused input typing by default', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
+    vi.mocked(core.safeExec).mockReturnValueOnce(
+      'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
+    );
 
     const result = await handleAction({
       version: '0.1',
@@ -363,7 +435,7 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.status).toBe('succeeded');
     expect(core.safeExec).toHaveBeenCalledWith(
       'osascript',
-      expect.arrayContaining(['-e', expect.stringContaining('keystroke "v" using command down')]),
+      expect.arrayContaining(['-e', expect.stringContaining('keystroke "v" using command down')])
     );
   });
 
@@ -379,9 +451,11 @@ describe('system-actuator computer_interaction adapter', () => {
           windowTitle: 'Original Chat',
           role: 'AXTextArea',
         },
-      }),
+      })
     );
-    vi.mocked(core.safeExec).mockReturnValueOnce('Codex\nDifferent Chat\nAXTextArea\nChat Input\ntrue');
+    vi.mocked(core.safeExec).mockReturnValueOnce(
+      'Codex\nDifferent Chat\nAXTextArea\nChat Input\ntrue'
+    );
 
     await expect(
       handleAction({
@@ -395,7 +469,7 @@ describe('system-actuator computer_interaction adapter', () => {
           type: 'type_into_focused_input',
           text: 'hello',
         },
-      } as any),
+      } as any)
     ).rejects.toThrow('Focused target guard failed for chat-main');
   });
 
@@ -411,7 +485,7 @@ describe('system-actuator computer_interaction adapter', () => {
           windowTitle: 'Original Chat',
           role: 'AXTextArea',
         },
-      }),
+      })
     );
     vi.mocked(core.safeExec)
       .mockReturnValueOnce('')
@@ -447,7 +521,7 @@ describe('system-actuator computer_interaction adapter', () => {
           windowTitle: 'Original Chat',
           role: 'AXTextArea',
         },
-      }),
+      })
     );
     vi.mocked(core.safeExec)
       .mockReturnValueOnce('')
@@ -470,7 +544,10 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "Codex" to activate']);
+    expect(core.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "Codex" to activate',
+    ]);
   });
 
   it('maps keyboard typing into the system pipeline', async () => {
@@ -747,5 +824,101 @@ describe('system-actuator computer_interaction adapter', () => {
 
     expect(result.status).toBe('succeeded');
     expect(core.openFinderPath).toHaveBeenCalledWith('/tmp/demo-folder');
+  });
+
+  it('handles pipeline action with empty steps', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toHaveLength(0);
+  });
+
+  it('handles max_steps limit in pipeline', async () => {
+    const { handleAction } = await import('./index');
+    const steps = Array.from({ length: 3 }, (_, i) => ({
+      type: 'apply' as const,
+      op: 'log',
+      params: { message: `step ${i}` },
+    }));
+
+    await expect(
+      handleAction({ action: 'pipeline', steps, options: { max_steps: 2 } } as any)
+    ).rejects.toThrow('[SAFETY_LIMIT]');
+  });
+
+  it('handles right_click action', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'right_click',
+        coordinate: { x: 100, y: 200 },
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+  });
+
+  it('handles move_mouse action', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'move_mouse',
+        coordinate: { x: 300, y: 400 },
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+  });
+
+  it('handles key_press action', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'key_press',
+        key: 'Enter',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+  });
+
+  it('handles double_click action', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'double_click',
+        coordinate: { x: 100, y: 200 },
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+  });
+
+  it('handles screenshot action', async () => {
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+    vi.mocked(core.safeExec).mockReturnValueOnce('');
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'screenshot',
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
   });
 });

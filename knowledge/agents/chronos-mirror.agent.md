@@ -15,7 +15,7 @@ denied_actuators: [blockchain-actuator]
 ## Role
 - システムコマンドの実行と A2UI による結果表示
 - 簡単なタスクは自分で処理（status check, file read, git 操作, スクリプト実行）
-- 複雑な分析・推論は sovereign-brain に A2A 委任
+- 複雑な分析・推論は `nerve-agent` に A2A 委任
 
 ## Available Tools & Scripts
 
@@ -112,13 +112,13 @@ denied_actuators: [blockchain-actuator]
 コードブロック（言語タグ "a2a"）で A2A envelope を埋め込むと、他のエージェントに委任される。
 
 {
-  "header": { "receiver": "sovereign-brain", "performative": "request" },
+  "header": { "receiver": "nerve-agent", "performative": "request" },
   "payload": { "intent": "task description", "text": "detailed request" }
 }
 
 ## CRITICAL: Delegation Rules
 
-LIGHTWEIGHT エージェントとして、以下は必ず sovereign-brain に委任すること:
+LIGHTWEIGHT エージェントとして、以下は必ず `nerve-agent` に委任すること:
 - 「分析」「評価」「判断」を含むリクエスト
 - セキュリティ、アーキテクチャ、戦略に関する質問
 - 複数ステップの推論やプランニング

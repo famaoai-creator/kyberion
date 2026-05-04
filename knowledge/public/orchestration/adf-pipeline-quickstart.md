@@ -12,6 +12,7 @@ For the full learning model, see:
 
 - [ADF Pipeline Learning Playbook](./adf-pipeline-learning-playbook.md)
 - [ADF Pipeline Template](./adf-pipeline-template.md)
+- [Pipeline Crystallization Loop](./pipeline-crystallization-loop.md)
 
 ## 1. Freeze the target
 
@@ -28,6 +29,8 @@ If the artifact is confidential, also lock:
 - the minimum persona or role that is allowed to write it
 
 If you cannot name the final artifact, do not start.
+
+If the work is still changing shape, keep it in the [Pipeline Crystallization Loop](./pipeline-crystallization-loop.md) until the stable pipeline form becomes visible.
 
 ## 2. Start with the smallest runnable shape
 
