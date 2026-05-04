@@ -14,6 +14,8 @@ describe('risky-op-registry', () => {
       expect(RISKY_OPS.AUTH_GRANT_AUTHORITY).toBe('auth:grant_authority');
       expect(RISKY_OPS.CONFIG_UPDATE).toBe('config:update');
       expect(RISKY_OPS.VAULT_WRITE).toBe('vault:write');
+      expect(RISKY_OPS.CLAUDE_BROWSER_INTERACTIVE).toBe('claude:browser_interactive');
+      expect(RISKY_OPS.CLAUDE_DOCUMENT_GENERATION).toBe('claude:document_generation');
     });
   });
 

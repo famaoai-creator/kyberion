@@ -185,3 +185,20 @@ registerCapabilityProbe('system-actuator', async () => [
   { op: 'exec', available: true, cost: 'free' },
   { op: 'pipeline', available: true, cost: 'free' },
 ]);
+
+// Gemini CLI: check sub-commands and extensions
+registerCapabilityProbe('gemini-cli', async () => {
+  const { safeExec } = await import('../secure-io.js');
+  try {
+    const help = safeExec('gemini', ['--help']);
+    return [
+      { op: 'prompt', available: help.includes('--prompt'), cost: 'compute_intensive' },
+      { op: 'extensions', available: help.includes('extensions'), cost: 'free' },
+      { op: 'skills', available: help.includes('skills'), cost: 'free' },
+      { op: 'hooks', available: help.includes('hooks'), cost: 'free' },
+      { op: 'mcp', available: help.includes('mcp'), cost: 'free' },
+    ];
+  } catch {
+    return [{ op: 'prompt', available: false, reason: 'gemini binary not in PATH' }];
+  }
+});

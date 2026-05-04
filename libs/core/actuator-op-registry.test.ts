@@ -15,6 +15,12 @@ describe('actuator-op-registry', () => {
     expect(determineActuatorStepType('system', 'log')).toBe('apply');
   });
 
+  it('prefers apply semantics when provider ops overlap', () => {
+    expect(determineActuatorStepType('gemini', 'prompt')).toBe('apply');
+    expect(determineActuatorStepType('gh', 'pr')).toBe('apply');
+    expect(determineActuatorStepType('codex', 'exec')).toBe('apply');
+  });
+
   it('exposes registered ops for a domain', () => {
     const mediaOps = listRegisteredDomainOps('media');
     expect(mediaOps.transform).toContain('apply_pattern');

@@ -120,13 +120,25 @@ const DOMAIN_REGISTRY: Record<string, DomainOpRegistry> = {
     capture: ['discover_capabilities', 'discover_skills'],
     apply: ['deploy', 'log'],
   },
+  gemini: {
+    capture: ['extensions', 'skills', 'hooks', 'mcp'],
+    apply: ['prompt', 'log'],
+  },
+  gh: {
+    capture: [],
+    apply: ['pr', 'issue', 'repo', 'api', 'run-workflow', 'skill', 'agent-task'],
+  },
+  codex: {
+    capture: ['review', 'app-server', 'cloud', 'mcp', 'features'],
+    apply: ['exec', 'plugin'],
+  },
 };
 
 export function determineActuatorStepType(domain: string, action: string): PipelineStepType {
   const registry = DOMAIN_REGISTRY[domain];
+  if (registry?.apply?.includes(action)) return 'apply';
   if (registry?.capture?.includes(action)) return 'capture';
   if (registry?.transform?.includes(action)) return 'transform';
-  if (registry?.apply?.includes(action)) return 'apply';
 
   if (SHARED_CAPTURE_OPS.includes(action)) return 'capture';
   if (SHARED_TRANSFORM_OPS.includes(action)) return 'transform';
