@@ -1,0 +1,43 @@
+{
+  "action": "pipeline",
+  "name": "meeting-facilitation-postprocess",
+  "description": "Post-meeting follow-up flow: extract action items from the meeting transcript and run speaker fairness audit. Intended to run after the live meeting session finishes.",
+  "context": {
+    "mission_id": "",
+    "attendees": [],
+    "operator_label": "Operator",
+    "language": "ja"
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "op": "system:log",
+      "params": {
+        "message": "🧾 Meeting postprocess start for mission {{mission_id}}."
+      }
+    },
+    {
+      "id": "write_action_items_stub",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/action-items-extracted-{{mission_id}}.json",
+        "content": "{\"mission_id\":\"{{mission_id}}\",\"transcript_path\":\"active/shared/tmp/meeting-transcript-{{mission_id}}.txt\",\"status\":\"stub\",\"action_items\":[]}"
+      }
+    },
+    {
+      "id": "write_fairness_stub",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/speaker-fairness-{{mission_id}}.json",
+        "content": "{\"mission_id\":\"{{mission_id}}\",\"status\":\"stub\",\"fairness_notes\":[\"No live speaker attribution available in deterministic meeting transcript.\"]}"
+      }
+    },
+    {
+      "id": "log_summary",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Meeting postprocess complete: action items at active/shared/tmp/action-items-extracted-{{mission_id}}.json, fairness at active/shared/tmp/speaker-fairness-{{mission_id}}.json"
+      }
+    }
+  ]
+}

@@ -15,6 +15,12 @@
     },
     "exploratory_to_deterministic_conversion": {
       "description": "Start with exploration, then compile stable governed contracts for deterministic execution."
+    },
+    "pipeline_crystallization_loop": {
+      "description": "Explore the work, crystallize the stable shape into a pipeline, then freeze it for reproducible execution."
+    },
+    "capability_lifecycle_procedure": {
+      "description": "Discover, normalize, register, reconcile, activate, observe, refresh, and retire governed capabilities under a shared lifecycle skeleton."
     }
   },
   "templates": [
@@ -31,11 +37,32 @@
     {
       "id": "explore-then-govern",
       "pattern": "exploratory_to_deterministic_conversion",
-      "description": "Use exploration before deterministic governed execution.",
+      "description": "Use exploration before deterministic governed execution; this is the pre-pipeline crystallization path.",
       "match": {
         "delivery_shapes": ["interactive_exploration"]
       },
       "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery"]
+    },
+    {
+      "id": "crystallize-then-freeze",
+      "pattern": "pipeline_crystallization_loop",
+      "description": "Convert an exploratory mission into a stable pipeline artifact, then freeze the stable execution shape.",
+      "match": {
+        "mission_classes": ["decision_support", "research_and_absorption", "operations_and_release"],
+        "delivery_shapes": ["interactive_exploration", "multi_artifact_pipeline"]
+      },
+      "phases": ["intake", "classification", "planning", "normalization", "contract_authoring", "verification", "freeze", "delivery"]
+    },
+    {
+      "id": "capability-reconcile-and-refresh",
+      "pattern": "capability_lifecycle_procedure",
+      "description": "Use the shared capability lifecycle skeleton to scan, normalize, register, reconcile, and refresh provider/gateway/platform capabilities.",
+      "match": {
+        "mission_classes": ["operations_and_release", "platform_onboarding"],
+        "delivery_shapes": ["multi_artifact_pipeline", "task_session"],
+        "risk_profiles": ["review_required", "approval_required", "high_stakes"]
+      },
+      "phases": ["intake", "classification", "planning", "discovery", "normalization", "registration", "reconciliation", "activation", "observation", "refresh", "retirement", "delivery"]
     },
     {
       "id": "coordinated-multi-track",

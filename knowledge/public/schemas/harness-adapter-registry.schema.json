@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "harness-adapter-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "required": ["version", "profiles"],
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter_id": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "surface_kind": {
+          "type": "string",
+          "enum": ["host_native", "provider_runtime"]
+        },
+        "capability_id": { "type": "string", "minLength": 1 },
+        "contract_kind": { "type": "string", "minLength": 1 },
+        "observation_kind": { "type": "string", "minLength": 1 },
+        "result_kind": { "type": "string", "minLength": 1 },
+        "approval_behavior": {
+          "type": "string",
+          "enum": ["none", "pre_action", "pre_and_post"]
+        },
+        "replayability": {
+          "type": "string",
+          "enum": ["deterministic", "partial", "opaque"]
+        },
+        "fallback_contract": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" },
+        "owner": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" }
+      },
+      "required": [
+        "adapter_id",
+        "surface_kind",
+        "capability_id",
+        "contract_kind",
+        "observation_kind",
+        "result_kind",
+        "approval_behavior",
+        "replayability",
+        "fallback_contract",
+        "enabled",
+        "owner"
+      ]
+    }
+  }
+}

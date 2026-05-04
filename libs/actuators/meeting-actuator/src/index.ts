@@ -41,6 +41,7 @@ export interface MeetingAction {
     passcode?: string;
     text?: string;
     duration_sec?: number;
+    transcript_path?: string;
   };
 }
 
@@ -181,8 +182,7 @@ export async function handleAction(input: MeetingAction): Promise<MeetingActionR
   }
 
   const bridgePath = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '../meeting-bridge.py',
+    pathResolver.rootResolve('libs/actuators/meeting-actuator/meeting-bridge.py'),
   );
   logger.info(`[MEETING] Executing action: ${input.action} on ${input.params.platform}`);
 
@@ -203,6 +203,7 @@ export async function handleAction(input: MeetingAction): Promise<MeetingActionR
       message: err?.message ?? String(err),
     };
   }
+
   parsed.audit_event_id = recordMeetingEvent(input, parsed);
   return parsed;
 }

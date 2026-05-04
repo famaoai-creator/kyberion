@@ -4,7 +4,8 @@
   "notes": [
     "This catalog is user-facing first. It describes what people ask Kyberion to do.",
     "Mission, task session, actuator, and ADF details remain backend execution concerns unless inspection is needed.",
-    "Legacy operator and maintenance intents remain available for internal and operator use."
+    "Legacy operator and maintenance intents remain available for internal and operator use.",
+    "When an intent is meant to produce a reusable pipeline, it should pass through the pipeline crystallization loop: explore, normalize, crystallize, verify, then freeze."
   ],
   "intents": [
     {
@@ -655,7 +656,7 @@
     {
       "id": "automate-browser-workflow",
       "category": "outcome_execution",
-      "description": "Execute a browser task while recording, then distill the recorded trace into a reusable automation pipeline (ADF).",
+      "description": "Execute a browser task while recording, then distill the recorded trace through the pipeline crystallization loop into a reusable automation pipeline (ADF).",
       "surface_examples": [
         "この操作を学習してpipeline化して",
         "Record this browser flow and create a reusable pipeline",
@@ -687,7 +688,7 @@
     {
       "id": "automate-os-macro",
       "category": "outcome_execution",
-      "description": "Record a series of desktop operations (mouse clicks, keyboard inputs, application switches) and distill them into a reusable OS-level macro pipeline.",
+      "description": "Record a series of desktop operations (mouse clicks, keyboard inputs, application switches) and distill them through the pipeline crystallization loop into a reusable OS-level macro pipeline.",
       "surface_examples": [
         "デスクトップでのこの一連の操作をマクロにして",
         "Record these mouse and keyboard steps as a macro",
@@ -719,7 +720,7 @@
     {
       "id": "automate-code-transformation",
       "category": "outcome_execution",
-      "description": "Analyze a manual code change or refactoring pattern and generate a reusable 'Code Mod' pipeline to apply that pattern across the workspace.",
+      "description": "Analyze a manual code change or refactoring pattern and generate a reusable 'Code Mod' pipeline to apply that pattern across the workspace after crystallizing the stable transformation shape.",
       "surface_examples": [
         "このコード修正パターンを学習して横展開できるようにして",
         "Learn this refactoring and create a code transformation pipeline",
@@ -2220,6 +2221,45 @@
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
       "risk_profile": "review_required"
+    },
+    {
+      "id": "reconcile-capability-lifecycle",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "inspect",
+      "object": "capability_lifecycle",
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "review_required",
+      "description": "Scan, register, reconcile, and refresh governed capabilities across providers, gateways, and platform surfaces.",
+      "surface_examples": ["capabilityを最新化して", "機能一覧をスキャンして", "provider capability を再同期して"],
+      "plan_outline": [
+        "discover available capability surfaces",
+        "normalize and register the current state",
+        "reconcile registry, adapter, and observability records"
+      ],
+      "intake_requirements": ["provider availability", "registry access", "execution receipt policy"],
+      "outcome_ids": ["capability_lifecycle_report"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["capability", "scan", "refresh", "reconcile", "最新化", "再同期", "機能一覧"],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "capability_lifecycle_report"
+      },
+      "pipeline": [
+        {
+          "op": "provider-capabilities:scan",
+          "params": {}
+        },
+        {
+          "op": "system:log",
+          "params": {
+            "message": "Capability lifecycle reconciliation completed."
+          }
+        }
+      ]
     },
     {
       "id": "inspect-runtime-supervisor",
