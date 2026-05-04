@@ -198,6 +198,16 @@ Purpose:
 - describe their risk and replay profile
 - define preferred and fallback routing
 
+Suggested artifact:
+
+- `knowledge/public/governance/harness-adapter-registry.json`
+
+Purpose:
+
+- map host-native or provider-runtime surfaces to Kyberion contracts
+- capture adapter identity, surface kind, and fallback contract
+- keep provider-specific runtime details outside ADF
+
 ## 2. Harness Adapter Profile
 
 Suggested artifact:
@@ -211,6 +221,8 @@ Purpose:
 Suggested fields:
 
 - `adapter_id`
+- `provider`
+- `surface_kind`
 - `capability_id`
 - `contract_kind`
 - `observation_kind`
@@ -218,6 +230,10 @@ Suggested fields:
 - `approval_behavior`
 - `replayability`
 - `fallback_contract`
+
+The adapter registry should stay small and governed. It is not a second ADF.
+It is the lookup table that tells Kyberion which native surface can safely
+serve a given work shape.
 
 ## 3. Integration Decision
 

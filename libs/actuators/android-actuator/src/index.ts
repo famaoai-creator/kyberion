@@ -15,7 +15,9 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge('public/orchestration/android-ui-defaults.json');
+const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
+  'public/orchestration/android-ui-defaults.json'
+);
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -42,11 +44,16 @@ async function handleAction(input: AndroidAction) {
   return executePipeline(input.steps || [], input.options || {}, input.context || {});
 }
 
-async function executePipeline(steps: PipelineStep[], options: AndroidAction['options'] = {}, initialCtx: Record<string, any> = {}) {
+async function executePipeline(
+  steps: PipelineStep[],
+  options: AndroidAction['options'] = {},
+  initialCtx: Record<string, any> = {}
+) {
   const rootDir = pathResolver.rootDir();
   const artifactsDir = path.resolve(
     rootDir,
-    options?.artifacts_dir || pathResolver.sharedTmp(`actuators/android-actuator/session_${Date.now()}`),
+    options?.artifacts_dir ||
+      pathResolver.sharedTmp(`actuators/android-actuator/session_${Date.now()}`)
   );
   if (!safeExistsSync(artifactsDir)) safeMkdir(artifactsDir, { recursive: true });
 
@@ -60,6 +67,11 @@ async function executePipeline(steps: PipelineStep[], options: AndroidAction['op
   const resolve = (val: any): any => resolveVars(val, ctx);
 
   const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
+
+  const maxSteps = options?.max_steps ?? 50;
+  if (steps.length > maxSteps) {
+    throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
+  }
 
   for (const step of steps) {
     try {
@@ -101,7 +113,7 @@ async function opCapture(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  options?: AndroidAction['options'],
+  options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
@@ -121,7 +133,12 @@ async function opCapture(
     }
     case 'adb_health_check': {
       const health = collectAdbHealth(ctx, options);
-      return { ...ctx, [params.export_as || 'adb_health']: health, adb_available: health.available, android_serial: health.selected_serial || ctx.android_serial };
+      return {
+        ...ctx,
+        [params.export_as || 'adb_health']: health,
+        adb_available: health.available,
+        android_serial: health.selected_serial || ctx.android_serial,
+      };
     }
     case 'capture_foreground_activity': {
       ensureAdbAvailable(ctx, options);
@@ -143,14 +160,19 @@ async function opCapture(
       const serial = resolveSerial(ctx, options, params);
       const profile = resolveAppProfile(params, ctx);
       const devicePath = String(
-        resolve(params.device_path || profile?.webview?.runtime_export?.android_device_path || ''),
+        resolve(params.device_path || profile?.webview?.runtime_export?.android_device_path || '')
       ).trim();
       if (!devicePath) {
-        throw new Error('capture_runtime_session_handoff requires params.device_path or app_profile.webview.runtime_export.android_device_path');
+        throw new Error(
+          'capture_runtime_session_handoff requires params.device_path or app_profile.webview.runtime_export.android_device_path'
+        );
       }
       const outPath = path.resolve(
         rootDir,
-        resolve(params.path || path.join(ctx.artifacts_dir, `android-runtime-session-handoff-${Date.now()}.json`)),
+        resolve(
+          params.path ||
+            path.join(ctx.artifacts_dir, `android-runtime-session-handoff-${Date.now()}.json`)
+        )
       );
       ensureParentDir(outPath);
       runAdb(['pull', devicePath, outPath], serial, options);
@@ -164,7 +186,10 @@ async function opCapture(
     }
     case 'extract_ui_tree': {
       ensureAdbAvailable(ctx, options);
-      const outPath = path.resolve(rootDir, resolve(params.path || path.join(ctx.artifacts_dir, `ui-tree-${Date.now()}.xml`)));
+      const outPath = path.resolve(
+        rootDir,
+        resolve(params.path || path.join(ctx.artifacts_dir, `ui-tree-${Date.now()}.xml`))
+      );
       ensureParentDir(outPath);
       const remotePath = `/sdcard/kyberion-ui-${Date.now()}.xml`;
       const serial = resolveSerial(ctx, options, params);
@@ -188,7 +213,7 @@ async function opTransform(
   op: string,
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ) {
   switch (op) {
     case 'set': {
@@ -202,7 +227,9 @@ async function opTransform(
       const summary = {
         node_count: nodes.length,
         clickable_count: nodes.filter((node) => node.clickable).length,
-        editable_count: nodes.filter((node) => node.className.includes('EditText') || node.resourceId.includes('input')).length,
+        editable_count: nodes.filter(
+          (node) => node.className.includes('EditText') || node.resourceId.includes('input')
+        ).length,
         texts: nodes
           .map((node) => node.text)
           .filter(Boolean)
@@ -230,7 +257,7 @@ async function opApply(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  options?: AndroidAction['options'],
+  options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
@@ -238,7 +265,8 @@ async function opApply(
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
       const component = resolve(params.component);
-      if (!component) throw new Error('launch_app requires params.component, e.g. com.example/.MainActivity');
+      if (!component)
+        throw new Error('launch_app requires params.component, e.g. com.example/.MainActivity');
       const output = runAdb(['shell', 'am', 'start', '-n', component], serial, options);
       return { ...ctx, last_launch_output: output, android_serial: serial || ctx.android_serial };
     }
@@ -255,7 +283,11 @@ async function opApply(
     case 'tap': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      runAdb(['shell', 'input', 'tap', String(resolve(params.x)), String(resolve(params.y))], serial, options);
+      runAdb(
+        ['shell', 'input', 'tap', String(resolve(params.x)), String(resolve(params.y))],
+        serial,
+        options
+      );
       return ctx;
     }
     case 'tap_ui_node': {
@@ -276,7 +308,11 @@ async function opApply(
 
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      runAdb(['shell', 'input', 'tap', String(target.center.x), String(target.center.y)], serial, options);
+      runAdb(
+        ['shell', 'input', 'tap', String(target.center.x), String(target.center.y)],
+        serial,
+        options
+      );
       return { ...ctx, [params.export_as || 'last_tap_target']: tapResult };
     }
     case 'input_text_into_ui_node': {
@@ -301,7 +337,11 @@ async function opApply(
 
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      runAdb(['shell', 'input', 'tap', String(target.center.x), String(target.center.y)], serial, options);
+      runAdb(
+        ['shell', 'input', 'tap', String(target.center.x), String(target.center.y)],
+        serial,
+        options
+      );
       const preDelayMs = Number(resolve(params.pre_input_delay_ms || 250));
       if (preDelayMs > 0) sleep(preDelayMs);
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(text)], serial, options);
@@ -316,14 +356,38 @@ async function opApply(
 
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      runAdb(['shell', 'input', 'tap', String(formPlan.email_field.x), String(formPlan.email_field.y)], serial, options);
+      runAdb(
+        ['shell', 'input', 'tap', String(formPlan.email_field.x), String(formPlan.email_field.y)],
+        serial,
+        options
+      );
       sleep(Number(resolve(params.pre_input_delay_ms || 200)));
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(formPlan.email)], serial, options);
-      runAdb(['shell', 'input', 'tap', String(formPlan.password_field.x), String(formPlan.password_field.y)], serial, options);
+      runAdb(
+        [
+          'shell',
+          'input',
+          'tap',
+          String(formPlan.password_field.x),
+          String(formPlan.password_field.y),
+        ],
+        serial,
+        options
+      );
       sleep(Number(resolve(params.pre_input_delay_ms || 200)));
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(formPlan.password)], serial, options);
       if (params.submit !== false) {
-        runAdb(['shell', 'input', 'tap', String(formPlan.submit_button.x), String(formPlan.submit_button.y)], serial, options);
+        runAdb(
+          [
+            'shell',
+            'input',
+            'tap',
+            String(formPlan.submit_button.x),
+            String(formPlan.submit_button.y),
+          ],
+          serial,
+          options
+        );
       }
       return { ...ctx, [params.export_as || 'last_login_form_plan']: formPlan };
     }
@@ -342,7 +406,7 @@ async function opApply(
           String(resolve(params.duration_ms || 250)),
         ],
         serial,
-        options,
+        options
       );
       return ctx;
     }
@@ -356,7 +420,10 @@ async function opApply(
     case 'capture_screen': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      const outPath = path.resolve(rootDir, resolve(params.path || path.join(ctx.artifacts_dir, `screen-${Date.now()}.png`)));
+      const outPath = path.resolve(
+        rootDir,
+        resolve(params.path || path.join(ctx.artifacts_dir, `screen-${Date.now()}.png`))
+      );
       ensureParentDir(outPath);
       const remotePath = `/sdcard/kyberion-screen-${Date.now()}.png`;
       runAdb(['shell', 'screencap', '-p', remotePath], serial, options);
@@ -367,7 +434,9 @@ async function opApply(
     case 'wait_for_ui_text': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      const target = String(resolve(params.text || '')).trim().toLowerCase();
+      const target = String(resolve(params.text || ''))
+        .trim()
+        .toLowerCase();
       if (!target) throw new Error('wait_for_ui_text requires params.text');
 
       const timeoutMs = Number(resolve(params.timeout_ms || options?.timeout_ms || 15000));
@@ -377,11 +446,18 @@ async function opApply(
       while (Date.now() - startedAt <= timeoutMs) {
         const xml = dumpUiTree(serial, options);
         const nodes = parseUiTreeNodes(xml);
-        const found = nodes.some((node) =>
-          node.text.toLowerCase().includes(target) || node.contentDesc.toLowerCase().includes(target),
+        const found = nodes.some(
+          (node) =>
+            node.text.toLowerCase().includes(target) ||
+            node.contentDesc.toLowerCase().includes(target)
         );
         if (found) {
-          return { ...ctx, last_ui_tree: xml, wait_for_ui_text_found: true, wait_for_ui_text_value: resolve(params.text) };
+          return {
+            ...ctx,
+            last_ui_tree: xml,
+            wait_for_ui_text_found: true,
+            wait_for_ui_text_value: resolve(params.text),
+          };
         }
         sleep(intervalMs);
       }
@@ -402,7 +478,8 @@ async function opApply(
           return {
             ...ctx,
             last_ui_tree: xml,
-            [params.export_as || 'wait_for_ui_node_match']: matches[Number(resolve(params.match_index || 0))] || matches[0],
+            [params.export_as || 'wait_for_ui_node_match']:
+              matches[Number(resolve(params.match_index || 0))] || matches[0],
             wait_for_ui_node_found: true,
           };
         }
@@ -416,9 +493,20 @@ async function opApply(
       const defaults = loadAndroidUiDefaults();
       const selector = {
         ...params,
-        text: params.selector_text || params.text || profile?.selectors?.passkey?.trigger?.text || defaults.passkey?.trigger?.text,
-        resource_id: params.selector_resource_id || params.resource_id || profile?.selectors?.passkey?.trigger?.resource_id,
-        class_name: params.selector_class_name || params.class_name || profile?.selectors?.passkey?.trigger?.class_name || defaults.passkey?.trigger?.class_name,
+        text:
+          params.selector_text ||
+          params.text ||
+          profile?.selectors?.passkey?.trigger?.text ||
+          defaults.passkey?.trigger?.text,
+        resource_id:
+          params.selector_resource_id ||
+          params.resource_id ||
+          profile?.selectors?.passkey?.trigger?.resource_id,
+        class_name:
+          params.selector_class_name ||
+          params.class_name ||
+          profile?.selectors?.passkey?.trigger?.class_name ||
+          defaults.passkey?.trigger?.class_name,
         package_name: params.selector_package_name || params.package_name || profile?.package_name,
       };
       const target = resolveTapTarget(selector, ctx, resolve);
@@ -440,12 +528,21 @@ async function opApply(
 
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      runAdb(['shell', 'input', 'tap', String(target.center.x), String(target.center.y)], serial, options);
+      runAdb(
+        ['shell', 'input', 'tap', String(target.center.x), String(target.center.y)],
+        serial,
+        options
+      );
       return { ...ctx, [params.export_as || 'last_passkey_plan']: passkeyPlan };
     }
     case 'emit_session_handoff': {
       const handoff = buildSessionHandoffArtifact(params, ctx, resolve, 'android');
-      const outPath = path.resolve(rootDir, resolve(params.path || path.join(ctx.artifacts_dir, `android-session-handoff-${Date.now()}.json`)));
+      const outPath = path.resolve(
+        rootDir,
+        resolve(
+          params.path || path.join(ctx.artifacts_dir, `android-session-handoff-${Date.now()}.json`)
+        )
+      );
       ensureParentDir(outPath);
       safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
       return {
@@ -465,11 +562,16 @@ async function opApply(
 
 function collectAdbHealth(ctx: Record<string, any>, options?: AndroidAction['options']) {
   try {
-    const version = safeExec('adb', ['version'], { timeoutMs: options?.timeout_ms || 15000 }).trim();
-    const devicesOutput = safeExec('adb', ['devices'], { timeoutMs: options?.timeout_ms || 15000 }).trim();
+    const version = safeExec('adb', ['version'], {
+      timeoutMs: options?.timeout_ms || 15000,
+    }).trim();
+    const devicesOutput = safeExec('adb', ['devices'], {
+      timeoutMs: options?.timeout_ms || 15000,
+    }).trim();
     const devices = parseAdbDevices(devicesOutput);
     const preferredSerial = options?.serial || ctx.android_serial || '';
-    const selectedSerial = preferredSerial || devices.find((device) => device.state === 'device')?.serial || '';
+    const selectedSerial =
+      preferredSerial || devices.find((device) => device.state === 'device')?.serial || '';
     return {
       available: true,
       version,
@@ -493,8 +595,14 @@ function ensureAdbAvailable(ctx: Record<string, any>, options?: AndroidAction['o
   }
 }
 
-function resolveSerial(ctx: Record<string, any>, options: AndroidAction['options'] | undefined, params: any): string {
-  return String(resolvePrimitive(params?.serial) || options?.serial || ctx.android_serial || '').trim();
+function resolveSerial(
+  ctx: Record<string, any>,
+  options: AndroidAction['options'] | undefined,
+  params: any
+): string {
+  return String(
+    resolvePrimitive(params?.serial) || options?.serial || ctx.android_serial || ''
+  ).trim();
 }
 
 function resolvePrimitive(val: any): any {
@@ -559,7 +667,11 @@ function resolveKey(key: string, ctx: Record<string, any>): any {
   return current;
 }
 
-function resolveUiTreeSource(params: any, ctx: Record<string, any>, resolve: (val: any) => any): string {
+function resolveUiTreeSource(
+  params: any,
+  ctx: Record<string, any>,
+  resolve: (val: any) => any
+): string {
   if (params.from) {
     const value = ctx[String(params.from)];
     if (typeof value === 'string' && value.trim()) return value;
@@ -574,7 +686,9 @@ function resolveUiTreeSource(params: any, ctx: Record<string, any>, resolve: (va
     return ctx.last_ui_tree;
   }
 
-  throw new Error('summarize_ui_tree/find_ui_nodes requires params.from, params.source, or ctx.last_ui_tree');
+  throw new Error(
+    'summarize_ui_tree/find_ui_nodes requires params.from, params.source, or ctx.last_ui_tree'
+  );
 }
 
 interface AndroidUiNode {
@@ -617,7 +731,7 @@ function parseUiTreeNodes(xml: string): AndroidUiNode[] {
 function resolveTapTarget(
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): AndroidTapTarget {
   let candidates: AndroidUiNode[] = [];
 
@@ -657,8 +771,14 @@ function selectorParamsFromInput(params: any): any {
   return {
     ...params,
     text: params.selector_text,
-    resource_id: params.selector_resource_id || params.resource_id || appProfile?.selectors?.login?.email?.resource_id,
-    class_name: params.selector_class_name || params.class_name || appProfile?.selectors?.login?.email?.class_name,
+    resource_id:
+      params.selector_resource_id ||
+      params.resource_id ||
+      appProfile?.selectors?.login?.email?.resource_id,
+    class_name:
+      params.selector_class_name ||
+      params.class_name ||
+      appProfile?.selectors?.login?.email?.class_name,
     package_name: params.selector_package_name || params.package_name || appProfile?.package_name,
   };
 }
@@ -666,7 +786,7 @@ function selectorParamsFromInput(params: any): any {
 function buildLoginFormPlan(
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): {
   email: string;
   password: string;
@@ -684,35 +804,62 @@ function buildLoginFormPlan(
   const emailTarget = resolveTapTarget(
     {
       ...params,
-      text: params.email_selector_text || profile?.selectors?.login?.email?.text || defaults.login?.email?.text,
-      resource_id: params.email_selector_resource_id || profile?.selectors?.login?.email?.resource_id || defaults.login?.email?.resource_id,
-      class_name: params.email_selector_class_name || profile?.selectors?.login?.email?.class_name || defaults.login?.email?.class_name,
+      text:
+        params.email_selector_text ||
+        profile?.selectors?.login?.email?.text ||
+        defaults.login?.email?.text,
+      resource_id:
+        params.email_selector_resource_id ||
+        profile?.selectors?.login?.email?.resource_id ||
+        defaults.login?.email?.resource_id,
+      class_name:
+        params.email_selector_class_name ||
+        profile?.selectors?.login?.email?.class_name ||
+        defaults.login?.email?.class_name,
       package_name: params.email_selector_package_name || profile?.package_name,
     },
     ctx,
-    resolve,
+    resolve
   );
   const passwordTarget = resolveTapTarget(
     {
       ...params,
-      text: params.password_selector_text || profile?.selectors?.login?.password?.text || defaults.login?.password?.text,
-      resource_id: params.password_selector_resource_id || profile?.selectors?.login?.password?.resource_id || defaults.login?.password?.resource_id,
-      class_name: params.password_selector_class_name || profile?.selectors?.login?.password?.class_name || defaults.login?.password?.class_name,
+      text:
+        params.password_selector_text ||
+        profile?.selectors?.login?.password?.text ||
+        defaults.login?.password?.text,
+      resource_id:
+        params.password_selector_resource_id ||
+        profile?.selectors?.login?.password?.resource_id ||
+        defaults.login?.password?.resource_id,
+      class_name:
+        params.password_selector_class_name ||
+        profile?.selectors?.login?.password?.class_name ||
+        defaults.login?.password?.class_name,
       package_name: params.password_selector_package_name || profile?.package_name,
     },
     ctx,
-    resolve,
+    resolve
   );
   const submitTarget = resolveTapTarget(
     {
       ...params,
-      text: params.submit_selector_text || profile?.selectors?.login?.submit?.text || defaults.login?.submit?.text,
-      resource_id: params.submit_selector_resource_id || profile?.selectors?.login?.submit?.resource_id || defaults.login?.submit?.resource_id,
-      class_name: params.submit_selector_class_name || profile?.selectors?.login?.submit?.class_name || defaults.login?.submit?.class_name,
+      text:
+        params.submit_selector_text ||
+        profile?.selectors?.login?.submit?.text ||
+        defaults.login?.submit?.text,
+      resource_id:
+        params.submit_selector_resource_id ||
+        profile?.selectors?.login?.submit?.resource_id ||
+        defaults.login?.submit?.resource_id,
+      class_name:
+        params.submit_selector_class_name ||
+        profile?.selectors?.login?.submit?.class_name ||
+        defaults.login?.submit?.class_name,
       package_name: params.submit_selector_package_name || profile?.package_name,
     },
     ctx,
-    resolve,
+    resolve
   );
 
   return {
@@ -758,16 +905,26 @@ function buildSessionHandoffArtifact(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  platform: 'android' | 'ios',
+  platform: 'android' | 'ios'
 ) {
   const profile = resolveAppProfile(params, ctx);
   const targetUrl = String(
-    resolve(params.target_url || profile?.webview?.session_handoff?.target_url || profile?.webview?.entry_url || ''),
+    resolve(
+      params.target_url ||
+        profile?.webview?.session_handoff?.target_url ||
+        profile?.webview?.entry_url ||
+        ''
+    )
   ).trim();
-  if (!targetUrl) throw new Error('emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url');
+  if (!targetUrl)
+    throw new Error(
+      'emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url'
+    );
 
-  const localStorage = resolveObjectRef(params.local_storage_from, ctx) || resolve(params.local_storage) || {};
-  const sessionStorage = resolveObjectRef(params.session_storage_from, ctx) || resolve(params.session_storage) || {};
+  const localStorage =
+    resolveObjectRef(params.local_storage_from, ctx) || resolve(params.local_storage) || {};
+  const sessionStorage =
+    resolveObjectRef(params.session_storage_from, ctx) || resolve(params.session_storage) || {};
   const headers = resolveObjectRef(params.headers_from, ctx) || resolve(params.headers) || {};
   const cookies = resolveObjectRef(params.cookies_from, ctx) || resolve(params.cookies) || [];
 
@@ -775,9 +932,17 @@ function buildSessionHandoffArtifact(
     kind: 'webview-session-handoff',
     target_url: targetUrl,
     origin: safeOrigin(targetUrl),
-    browser_session_id: String(resolve(params.browser_session_id || profile?.webview?.session_handoff?.browser_session_id || `${platform}-webview`)),
+    browser_session_id: String(
+      resolve(
+        params.browser_session_id ||
+          profile?.webview?.session_handoff?.browser_session_id ||
+          `${platform}-webview`
+      )
+    ),
     prefer_persistent_context:
-      params.prefer_persistent_context ?? profile?.webview?.session_handoff?.prefer_persistent_context ?? true,
+      params.prefer_persistent_context ??
+      profile?.webview?.session_handoff?.prefer_persistent_context ??
+      true,
     cookies,
     local_storage: localStorage,
     session_storage: sessionStorage,
@@ -829,17 +994,30 @@ function resolveAppProfile(params: any, ctx: Record<string, any>): MobileAppProf
 function matchUiNodes(
   nodes: AndroidUiNode[],
   params: any,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): AndroidUiNode[] {
-  const text = String(resolve(params.text || '')).trim().toLowerCase();
-  const resourceId = String(resolve(params.resource_id || '')).trim().toLowerCase();
-  const className = String(resolve(params.class_name || '')).trim().toLowerCase();
-  const packageName = String(resolve(params.package_name || '')).trim().toLowerCase();
+  const text = String(resolve(params.text || ''))
+    .trim()
+    .toLowerCase();
+  const resourceId = String(resolve(params.resource_id || ''))
+    .trim()
+    .toLowerCase();
+  const className = String(resolve(params.class_name || ''))
+    .trim()
+    .toLowerCase();
+  const packageName = String(resolve(params.package_name || ''))
+    .trim()
+    .toLowerCase();
   const clickableOnly = params.clickable === true;
   const enabledOnly = params.enabled !== false;
 
   return nodes.filter((node) => {
-    if (text && !node.text.toLowerCase().includes(text) && !node.contentDesc.toLowerCase().includes(text)) return false;
+    if (
+      text &&
+      !node.text.toLowerCase().includes(text) &&
+      !node.contentDesc.toLowerCase().includes(text)
+    )
+      return false;
     if (resourceId && !node.resourceId.toLowerCase().includes(resourceId)) return false;
     if (className && !node.className.toLowerCase().includes(className)) return false;
     if (packageName && !node.packageName.toLowerCase().includes(packageName)) return false;
@@ -879,7 +1057,7 @@ function readXmlAttr(attrs: string, name: string): string | undefined {
 function decodeXml(input: string): string {
   return input
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, '\'')
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&');
@@ -897,7 +1075,9 @@ function sleep(ms: number): void {
 }
 
 const main = async () => {
-  const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
+  const argv = await createStandardYargs()
+    .option('input', { alias: 'i', type: 'string', required: true })
+    .parseSync();
   const inputPath = path.resolve(pathResolver.rootDir(), argv.input as string);
   const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(content));

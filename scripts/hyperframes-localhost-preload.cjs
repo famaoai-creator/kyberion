@@ -3,7 +3,13 @@ const net = require('node:net');
 const originalListen = net.Server.prototype.listen;
 
 function normalizeListenArgs(args) {
-  if (args.length === 0) return args;
+  if (args.length === 0) {
+    return [0, '127.0.0.1'];
+  }
+
+  if (typeof args[0] === 'function') {
+    return [0, '127.0.0.1', ...args];
+  }
 
   if (typeof args[0] === 'object' && args[0] !== null) {
     const options = { ...args[0] };
@@ -19,6 +25,7 @@ function normalizeListenArgs(args) {
   if (typeof args[0] === 'number') {
     if (args.length === 1) return [args[0], '127.0.0.1'];
     if (typeof args[1] === 'function') return [args[0], '127.0.0.1', ...args.slice(1)];
+    if (args[1] == null) return [args[0], '127.0.0.1', ...args.slice(2)];
     if (typeof args[1] === 'string' && args[1] === '0.0.0.0') {
       return [args[0], '127.0.0.1', ...args.slice(2)];
     }
