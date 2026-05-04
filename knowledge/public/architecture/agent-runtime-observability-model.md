@@ -24,6 +24,11 @@ Examples:
 - Codex app-server thread ids
 - Claude session ids when configured
 
+Provider runtime state is not a host-native capability.
+It is the session layer underneath the capability bridge, and it should
+always be visible in the trace and execution receipt when a native runtime
+is used.
+
 4. `surface / control API`
 Exposes snapshots and recovery controls to Chronos Mirror v2 and other operator surfaces.
 
@@ -58,6 +63,22 @@ The lifecycle layer tracks:
 
 Provider token usage is best-effort.
 If a provider does not emit structured usage, the snapshot still exposes the rest of the runtime state.
+
+## Trace Requirements For Native Surfaces
+
+When Kyberion routes through a host-native capability or provider runtime,
+the observability layer should preserve:
+
+- `capability_id`
+- `adapter_id`
+- `provider`
+- `surface_kind`
+- session or thread identifier
+- approval scope
+- fallback path
+
+This is the audit boundary that keeps native leverage compatible with
+Kyberion governance.
 
 ## Refresh Semantics
 

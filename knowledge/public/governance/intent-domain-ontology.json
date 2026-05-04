@@ -1841,6 +1841,33 @@
       "evidence_required": ["execution-receipt"]
     },
     {
+      "intent_id": "reconcile-capability-lifecycle",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "target": "system_state",
+      "action": "inspect",
+      "object": "capability_lifecycle",
+      "exposed_to_surface": true,
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "capability-reconcile-and-refresh",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": ["capability_lifecycle_report"],
+      "actuator_requirements": ["code-actuator", "wisdom-actuator", "orchestrator-actuator"],
+      "readiness_required": [
+        "kyberion-runtime-baseline",
+        "schema-integrity",
+        "knowledge-tier-hygiene"
+      ],
+      "evidence_required": ["execution-receipt", "capability-drift-report"],
+      "reasoning_requirements": {
+        "mode": "tool_first_execution",
+        "capability_tags": ["structured_output", "tool_use"],
+        "fallback_allowed": true
+      }
+    },
+    {
       "intent_id": "resolve-approval",
       "category": "governance_control",
       "legacy_category": "surface",

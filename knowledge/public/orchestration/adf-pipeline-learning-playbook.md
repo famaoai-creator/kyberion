@@ -4,7 +4,7 @@ category: Orchestration
 tags: [adf, pipeline, learning, preflight, stability, governance]
 importance: 9
 author: Kyberion
-last_updated: 2026-05-03
+last_updated: 2026-05-04
 ---
 
 # ADF Pipeline Learning Playbook
@@ -13,6 +13,8 @@ This playbook explains how to learn, design, and stabilize ADF pipelines so they
 
 For a copy-ready version, see [ADF Pipeline Template](./adf-pipeline-template.md).
 For a short operational entry point, see [ADF Pipeline Quickstart](./adf-pipeline-quickstart.md).
+For the pre-deterministic stabilization phase, see [Pipeline Crystallization Loop](./pipeline-crystallization-loop.md).
+For the Japanese design memo, see [パイプライン結晶化ループ設計メモ](./pipeline-crystallization-memo.md).
 
 The goal is not only to make a pipeline "work once", but to make it:
 
@@ -48,6 +50,8 @@ Every pipeline should make these boundaries visible:
 - verification
 
 Do not hide major work in implicit defaults or side effects.
+
+The stabilization phase before execution is described in [Pipeline Crystallization Loop](./pipeline-crystallization-loop.md).
 
 ### 1.3 Bind the runtime explicitly
 

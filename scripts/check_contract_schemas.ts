@@ -175,6 +175,19 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'capability-lifecycle-procedure',
+      schemaPath: 'knowledge/public/schemas/capability-lifecycle-procedure.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/capability-lifecycle-procedure.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          procedure_id: 'other',
+        },
+      ],
+    },
+    {
       id: 'capability-bundle-registry',
       schemaPath: 'knowledge/public/schemas/capability-bundle-registry.schema.json',
       validPayloads: [

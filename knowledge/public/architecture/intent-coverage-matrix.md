@@ -36,6 +36,7 @@ For the canonical completion pattern of each surface intent, see:
 | `generate-report` | `implemented` | `voice-hub` + `task-session` | `task_session` | `artifact:docx` / `artifact:pdf` | Report brief and document artifact generation are connected |
 | `generate-workbook` | `implemented` | `voice-hub` + `task-session` | `task_session` | `artifact:xlsx` | Workbook/WBS flow is connected to governed artifact output |
 | `inspect-service` | `implemented` | `voice-hub` + `task-session` | `task_session` | `service_summary` / `approval_request` | Service inspection and approval-aware operation path exist |
+| `reconcile-capability-lifecycle` | `implemented` | `voice-hub` + `task-session` + `provider-capabilities:scan` | `pipeline` | `capability_lifecycle_report` | Capability discovery, registry reconciliation, and governed reporting are connected |
 | `schedule-coordination` | `implemented` | `voice-hub` + `task-session` | `task_session` | `schedule_coordination_summary` | Calendar reshuffling is modeled as a governed task-session with a clear meeting handoff boundary |
 | `launch-first-run-onboarding` | `implemented` | `voice-hub` + `task-session` | `task_session` | `onboarding_plan` | First-run onboarding is now a reusable intent that can lead into toolchain and theme registration |
 | `configure-organization-toolchain` | `implemented` | `voice-hub` + `task-session` | `task_session` | `organization_toolchain_configured` | Onboarding for CI/CD and organization-specific integration settings is now catalog-driven |

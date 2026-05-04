@@ -5,6 +5,11 @@
   "additionalProperties": false,
   "properties": {
     "adapter_id": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "surface_kind": {
+      "type": "string",
+      "enum": ["host_native", "provider_runtime"]
+    },
     "capability_id": { "type": "string", "minLength": 1 },
     "contract_kind": { "type": "string", "minLength": 1 },
     "observation_kind": { "type": "string", "minLength": 1 },
@@ -24,6 +29,7 @@
   },
   "required": [
     "adapter_id",
+    "surface_kind",
     "capability_id",
     "contract_kind",
     "observation_kind",

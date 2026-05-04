@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/capability-lifecycle-procedure.schema.json",
+  "title": "Capability Lifecycle Procedure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "procedure_id",
+    "scope",
+    "phases",
+    "required_receipt_fields",
+    "policy_refs"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "procedure_id": {
+      "type": "string",
+      "const": "capability_lifecycle"
+    },
+    "scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["provider", "gateway", "platform"]
+      }
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "discover",
+          "normalize",
+          "register",
+          "reconcile",
+          "activate",
+          "observe",
+          "refresh",
+          "retire"
+        ]
+      }
+    },
+    "required_receipt_fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "subject_id",
+          "subject_type",
+          "source",
+          "version",
+          "status",
+          "trace_id",
+          "fallback_path"
+        ]
+      }
+    },
+    "policy_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "procedure_id": "capability_lifecycle",
+  "scope": ["provider", "gateway", "platform"],
+  "phases": [
+    "discover",
+    "normalize",
+    "register",
+    "reconcile",
+    "activate",
+    "observe",
+    "refresh",
+    "retire"
+  ],
+  "required_receipt_fields": [
+    "subject_id",
+    "subject_type",
+    "source",
+    "version",
+    "status",
+    "trace_id",
+    "fallback_path"
+  ],
+  "policy_refs": [
+    "knowledge/public/architecture/capability-lifecycle-eligibility-checklist.md",
+    "knowledge/public/governance/provider-capability-scan-policy.json",
+    "knowledge/public/governance/surface-provider-manifests.json",
+    "knowledge/public/governance/execution-receipt-policy.json"
+  ]
+}

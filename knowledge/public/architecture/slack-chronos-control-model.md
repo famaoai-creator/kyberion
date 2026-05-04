@@ -128,7 +128,7 @@ Slack should be modeled as:
 - sensor on ingress
 - channel endpoint on egress
 - never the durable execution authority
-- serviced by a Slack Surface Agent for channel-local conversational quality
+- serviced by `slack-surface-agent` for channel-local conversational quality
 
 ### 3.1 Slack ingress
 
@@ -214,6 +214,7 @@ Recommended roles:
 - `chronos_gateway`
 - `infrastructure_sentinel`
 - `mission_controller`
+- `nerve-agent` for deeper reasoning and mission-routing support
 
 ### 5.2 Write scopes
 
@@ -250,6 +251,8 @@ The intended mapping is:
   - Slack ingress gateway
 - `chronos-mirror-v2`
   - Chronos control gateway
+- `slack-surface-agent`
+  - Slack conversation handler
 - `presence-actuator`
   - channel delivery actuator
 - `service-actuator`

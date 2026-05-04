@@ -283,6 +283,35 @@
       ]
     },
     {
+      "intent_id": "reconcile-capability-lifecycle",
+      "canonical_flow": [
+        "intent normalization",
+        "provider and registry discovery",
+        "capability scan and reconciliation",
+        "governed report synthesis"
+      ],
+      "contract_layers": [
+        "environment manifest",
+        "capability registry",
+        "adapter registry",
+        "governance report"
+      ],
+      "primary_outcome_ids": ["capability_lifecycle_report"],
+      "evidence": [
+        "scan output",
+        "registry reconciliation summary",
+        "governed report"
+      ],
+      "completion_criteria": [
+        "available capabilities are discovered",
+        "registry and adapter state are reconciled",
+        "the report is returned through the governed outcome"
+      ],
+      "follow_up": [
+        "report can seed a repair or refresh mission"
+      ]
+    },
+    {
       "intent_id": "open-site",
       "canonical_flow": [
         "intent normalization",

@@ -72,6 +72,16 @@
       "notes": "Devils_advocate delegation. Hypothesis-tree pipeline."
     },
     {
+      "scenario_id": "golden-pipeline-crystallization",
+      "scenario_class": "golden",
+      "mission_class": "research_and_absorption",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "pipeline_crystallization_loop",
+      "prompt": "この調査結果をもとに、探索から実行へ移すための pipeline を固めてください。曖昧な部分を整理し、再実行できる形にしてください",
+      "expected_signals": ["classification", "planning", "normalization", "verification", "freeze"],
+      "notes": "Pipeline crystallization should convert exploratory work into a reproducible governed pipeline artifact."
+    },
+    {
       "scenario_id": "failure-decision-skip-stakeholder-alignment",
       "scenario_class": "controlled-failure",
       "mission_class": "decision_support",

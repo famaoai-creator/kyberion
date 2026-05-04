@@ -120,6 +120,13 @@
       "downloadable": false,
       "previewable": true
     },
+    "capability_lifecycle_report": {
+      "label": "Capability lifecycle report",
+      "description": "A governed report summarizing discovered capabilities, registry state, adapter coverage, and reconciliation status.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
     "network_report": {
       "label": "Network report",
       "description": "A network connectivity, latency, and readiness report is returned.",
@@ -291,6 +298,13 @@
     "actuator_capability_report": {
       "label": "actuator capability report",
       "description": "Governed outcome for intent verify-actuator-capability.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "provider_cli_capability_report": {
+      "label": "provider cli capability report",
+      "description": "Governed outcome for intent register-provider-cli-capability-report.",
       "deliverable_kind": "report",
       "downloadable": false,
       "previewable": true

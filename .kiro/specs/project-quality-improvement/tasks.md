@@ -1,314 +1,246 @@
-# 実装計画: プロジェクト品質向上
+# 実装計画: プロジェクト品質向上（テストカバレッジ拡充）
 
 ## 概要
 
-本実装計画は、Kyberionプロジェクトの品質を段階的に向上させるための具体的なタスクを定義します。6つのフェーズに分けて、テストカバレッジの拡充、型安全性の強化、コード品質の改善、モノレポ構造の整理を実施します。
+本実装計画は、Kyberionプロジェクトのテストカバレッジを段階的に拡充するための具体的なタスクを定義します。
+**既存のプロダクションコードは一切変更しません。** テストファイルの追加のみを行います。
+
+5つのフェーズに分けて、fast-checkの導入、テストなしアクチュエータへのテスト追加、共有パッケージへのテスト追加、既存アクチュエータのテスト品質向上、カバレッジ確認を実施します。
 
 ## タスク
 
-### フェーズ1: 基盤整備（1-2週間）
+### フェーズ1: 準備
 
-- [~] 1. テストインフラストラクチャの強化
-  - [x] 1.1 Vitest設定ファイルの更新
-    - vitest.config.tsを更新し、並列実行、キャッシング、カバレッジ設定を追加
-    - テスト対象パスとexcludeパスを明確に定義
-    - エイリアス設定を追加して共有パッケージのインポートを簡素化
-    - _要件: 9.1, 9.2_
-  - [x] 1.2 テストユーティリティの作成
-    - tests/utils/mock-factory.tsを作成し、モックヘルパーを実装
-    - tests/utils/fixture-generator.tsを作成し、テストデータ生成機能を実装
-    - tests/utils/assertion-extensions.tsを作成し、カスタムアサーションを実装
-    - _要件: 9.5_
+- [x] 1. fast-checkのインストール
+  - ルートの `package.json` の `devDependencies` に `fast-check` を追加する
+  - `pnpm install` を実行してインストールを確認する
+  - _要件: 4.1_
 
-- [~] 2. CI/CDパイプラインの構築
-  - [x] 2.1 GitHub Actionsワークフローの作成
-    - .github/workflows/pr-validation.ymlを作成
-    - テスト実行、型チェック、Lintチェック、カバレッジレポート、セキュリティスキャンのステップを定義
-    - _要件: 7.1, 7.3, 7.4, 7.6_
-  - [x] 2.2 カバレッジレポート機能の実装
-    - カバレッジ閾値チェックのステップを追加
-    - PRへのカバレッジレポート投稿機能を実装
-    - _要件: 7.2, 7.5_
-  - [-] 2.3 ビルドサイズ測定機能の追加
-    - ビルド成果物のサイズを測定し報告するステップを追加
-    - _要件: 7.7_
+### フェーズ2: テストなしアクチュエータへのテスト追加
 
-- [~] 3. チェックポイント - 基盤整備の確認
+- [x] 2. android-actuatorのテスト作成
+  - [x] 2.1 `libs/actuators/android-actuator/src/index.test.ts` を新規作成する
+    - `@agent/core` の `safeExec`・`safeExistsSync`・`safeMkdir`・`safeReadFile`・`safeWriteFile`・`logger`・`pathResolver` をモックする
+    - 正常系: `adb_health_check` でadb利用可能な場合に `adb_available: true` を返すことを検証する
+    - エラーケース: `adb_health_check` でadb利用不可な場合に `adb_available: false` を返すことを検証する
+    - エラーケース: `launch_app` でadb未利用可能時にエラーをスローすることを検証する
+    - エラーケース: `tap` で座標を指定して `safeExec` が正しい引数で呼ばれることを検証する
+    - エラーケース: `capture_screen` でスクリーンショット取得後に `last_screenshot_path` が設定されることを検証する
+    - _要件: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+  - [x] 2.2 android-actuatorのProperty 1プロパティテストを作成する
+    - **Property 1: パイプライン結果の構造不変条件**
+    - **検証: 要件 1.3, 1.7, 4.5**
+    - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件`
+
+  - [x] 2.3 android-actuatorのProperty 2プロパティテストを作成する
+    - **Property 2: SAFETY_LIMITエラーの一貫性**
+    - **検証: 要件 1.6**
+    - `fc.integer({ min: 1, max: 10 })` で任意の `max_steps` を生成し、`max_steps + 1` 以上のステップを持つパイプラインが常に `[SAFETY_LIMIT]` プレフィックスのエラーをスローすることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 2: SAFETY_LIMITエラーの一貫性`
+
+- [x] 3. code-actuatorのテスト作成
+  - [x] 3.1 `libs/actuators/code-actuator/src/index.test.ts` を新規作成する
+    - `@agent/core` および `@agent/core/fs-utils` をモックする
+    - 正常系: `pipeline` actionで空のstepsを処理できることを検証する
+    - エラーケース: `reconcile` actionで `strategy_path` が存在しない場合にエラーをスローすることを検証する
+    - エラーケース: サポートされていない `action` でエラーをスローすることを検証する
+    - エラーケース: `KYBERION_ALLOW_UNSAFE_SHELL=false` の場合、`shell` オペレーターが `[SECURITY]` プレフィックスのエラーを返すことを検証する
+    - _要件: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+  - [x] 3.2 code-actuatorのProperty 1プロパティテストを作成する
+    - **Property 1: パイプライン結果の構造不変条件**
+    - **検証: 要件 1.3, 1.7, 4.5**
+    - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件`
+
+  - [x] 3.3 code-actuatorのProperty 2プロパティテストを作成する
+    - **Property 2: SAFETY_LIMITエラーの一貫性**
+    - **検証: 要件 1.6**
+    - `fc.integer({ min: 1, max: 10 })` で任意の `max_steps` を生成し、`max_steps + 1` 以上のステップを持つパイプラインが常に `[SAFETY_LIMIT]` プレフィックスのエラーをスローすることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 2: SAFETY_LIMITエラーの一貫性`
+
+- [x] 4. file-actuatorのテスト作成
+  - [x] 4.1 `libs/actuators/file-actuator/src/index.test.ts` を新規作成する
+    - `@agent/core` をモックする（`safeReadFile`・`safeWriteFile`・`safeMkdir`・`safeExistsSync`・`safeReaddir`・`safeStat`・`safeExec`・`safeAppendFileSync`・`safeCopyFileSync`・`safeMoveSync`・`safeRmSync`・`logger`・`pathResolver`）
+    - 正常系: 空のstepsで `status: 'success'` を返すことを検証する
+    - エラーケース: サポートされていない `action` でエラーをスローすることを検証する
+    - エラーケース: ステップが失敗した場合に残りのステップを実行せず `status: 'failed'` を返すことを検証する
+    - エラーケース: `max_steps` 超過時に `[SAFETY_LIMIT]` エラーをスローすることを検証する
+    - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
+
+  - [x] 4.2 file-actuatorのProperty 1プロパティテストを作成する
+    - **Property 1: パイプライン結果の構造不変条件**
+    - **検証: 要件 1.3, 1.7, 4.5**
+    - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件`
+
+  - [x] 4.3 file-actuatorのProperty 2プロパティテストを作成する
+    - **Property 2: SAFETY_LIMITエラーの一貫性**
+    - **検証: 要件 1.6**
+    - `fc.integer({ min: 1, max: 10 })` で任意の `max_steps` を生成し、`max_steps + 1` 以上のステップを持つパイプラインが常に `[SAFETY_LIMIT]` プレフィックスのエラーをスローすることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 2: SAFETY_LIMITエラーの一貫性`
+
+- [x] 5. ios-actuatorのテスト作成
+  - [x] 5.1 `libs/actuators/ios-actuator/src/index.test.ts` を新規作成する
+    - `@agent/core` の `safeExec`・`safeExistsSync`・`safeMkdir`・`safeReadFile`・`safeWriteFile`・`logger`・`pathResolver` をモックする
+    - 正常系: `simctl_health_check` でsimctl利用可能な場合に `ios_available: true` を返すことを検証する
+    - エラーケース: `simctl_health_check` でsimctl利用不可な場合に `ios_available: false` を返すことを検証する
+    - エラーケース: `launch_app` で `bundle_id` 未指定時にエラーをスローすることを検証する
+    - 正常系: `boot_simulator` で既にBooted状態の場合にエラーなしで完了することを検証する
+    - 正常系: `capture_screen` でスクリーンショット取得後に `last_screenshot_path` が設定されることを検証する
+    - _要件: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+  - [ ]\* 5.2 ios-actuatorのProperty 1プロパティテストを作成する
+    - **Property 1: パイプライン結果の構造不変条件**
+    - **検証: 要件 1.3, 1.7, 4.5**
+    - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件`
+
+  - [ ]\* 5.3 ios-actuatorのProperty 2プロパティテストを作成する
+    - **Property 2: SAFETY_LIMITエラーの一貫性**
+    - **検証: 要件 1.6**
+    - `fc.integer({ min: 1, max: 10 })` で任意の `max_steps` を生成し、`max_steps + 1` 以上のステップを持つパイプラインが常に `[SAFETY_LIMIT]` プレフィックスのエラーをスローすることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 2: SAFETY_LIMITエラーの一貫性`
+
+- [x] 6. network-actuatorのテスト作成
+  - [x] 6.1 `libs/actuators/network-actuator/src/index.test.ts` を新規作成する
+    - `@agent/core` をモックする（`safeReadFile`・`safeWriteFile`・`safeMkdir`・`safeExistsSync`・`safeExec`・`logger`・`pathResolver`）
+    - 正常系: 空のstepsで `status: 'success'` を返すことを検証する
+    - エラーケース: サポートされていない `action` でエラーをスローすることを検証する
+    - エラーケース: ステップが失敗した場合に残りのステップを実行せず `status: 'failed'` を返すことを検証する
+    - エラーケース: `max_steps` 超過時に `[SAFETY_LIMIT]` エラーをスローすることを検証する
+    - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
+
+  - [ ]\* 6.2 network-actuatorのProperty 1プロパティテストを作成する
+    - **Property 1: パイプライン結果の構造不変条件**
+    - **検証: 要件 1.3, 1.7, 4.5**
+    - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件`
+
+  - [ ]\* 6.3 network-actuatorのProperty 2プロパティテストを作成する
+    - **Property 2: SAFETY_LIMITエラーの一貫性**
+    - **検証: 要件 1.6**
+    - `fc.integer({ min: 1, max: 10 })` で任意の `max_steps` を生成し、`max_steps + 1` 以上のステップを持つパイプラインが常に `[SAFETY_LIMIT]` プレフィックスのエラーをスローすることを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 2: SAFETY_LIMITエラーの一貫性`
+
+- [x] 7. チェックポイント - テストなしアクチュエータの確認
   - すべてのテストが正常に実行されることを確認し、質問があればユーザーに確認してください。
 
-### フェーズ2: テスト拡充（4-6週間）
+### フェーズ3: 共有パッケージへのテスト追加
 
-- [~] 4. アクチュエータのテスト作成
-  - [~] 4.1 blockchain-actuatorのテスト作成
-    - libs/actuators/blockchain-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.2 browser-actuatorのテスト作成
-    - libs/actuators/browser-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.3 code-actuatorのテスト作成
-    - libs/actuators/code-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.4 daemon-actuatorのテスト作成
-    - libs/actuators/daemon-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.5 file-actuatorのテスト作成
-    - libs/actuators/file-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.6 media-actuatorのテスト作成
-    - libs/actuators/media-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.7 modeling-actuatorのテスト作成
-    - libs/actuators/modeling-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.8 network-actuatorのテスト作成
-    - libs/actuators/network-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.9 orchestrator-actuatorのテスト作成
-    - libs/actuators/orchestrator-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.10 physical-bridgeのテスト作成
-    - libs/actuators/physical-bridge/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.11 secret-actuatorのテスト作成
-    - libs/actuators/secret-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.12 service-actuatorのテスト作成
-    - libs/actuators/service-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.13 system-actuatorのテスト作成
-    - libs/actuators/system-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.14 wisdom-actuatorのテスト作成
-    - libs/actuators/wisdom-actuator/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（60%カバレッジ目標）
-    - _要件: 1.1, 1.2, 1.3, 1.4_
-  - [~] 4.15 アクチュエータのプロパティテスト作成
-    - **Property 1: 公開APIカバレッジの完全性**
-    - **検証: 要件 1.4, 2.3**
-    - tests/properties/actuator-coverage.test.tsを作成
-    - fast-checkを使用してすべてのアクチュエータの公開APIカバレッジを検証
+- [x] 8. shared-businessのテスト作成
+  - [x] 8.1 `libs/shared-business/src/finance.test.ts` を新規作成する
+    - 正常系: `calculateReinvestment(100)` が `reinvestableHours: 70`・`costAvoidanceUSD: 10000`・`potentialFeatures: '1.8'` を返すことを検証する
+    - 正常系: `calculateReinvestment(0)` が `reinvestableHours: 0`・`costAvoidanceUSD: 0` を返すことを検証する
+    - 正常系: `potentialFeatures >= 1.0` の場合に推奨メッセージが `'autonomous skills'` を含むことを検証する
+    - 正常系: `potentialFeatures < 1.0` の場合に推奨メッセージが `'cumulative savings'` を含むことを検証する
+    - _要件: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [~] 5. 共有パッケージのテスト作成
-  - [~] 5.1 shared-mediaのテスト作成
-    - libs/shared-media/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（70%カバレッジ目標）
-    - _要件: 2.1, 2.2, 2.3_
-  - [~] 5.2 shared-visionのテスト作成
-    - libs/shared-vision/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（70%カバレッジ目標）
-    - _要件: 2.1, 2.2, 2.3_
-  - [~] 5.3 shared-networkのテスト作成
-    - libs/shared-network/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（70%カバレッジ目標）
-    - _要件: 2.1, 2.2, 2.3_
-  - [~] 5.4 shared-businessのテスト作成
-    - libs/shared-business/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（70%カバレッジ目標）
-    - _要件: 2.1, 2.2, 2.3_
-  - [~] 5.5 shared-nerveのテスト作成
-    - libs/shared-nerve/src配下にテストファイルを作成
-    - 公開APIのユニットテストを実装（70%カバレッジ目標）
-    - _要件: 2.1, 2.2, 2.3_
-  - [~] 5.6 共有パッケージの依存関係テスト作成
-    - **Property 3: 依存関係変更時のテスト実行**
-    - **検証: 要件 2.4**
-    - tests/properties/package-dependency.test.tsを作成
-    - 共有パッケージ変更時に依存アクチュエータのテストが実行されることを検証
+  - [ ]\* 8.2 shared-businessのProperty 3プロパティテストを作成する
+    - **Property 3: reinvestableHoursの上限不変条件**
+    - **検証: 要件 3.6, 4.4**
+    - `fc.integer({ min: 0, max: 100000 })` で任意の非負整数を生成し、`calculateReinvestment(n).reinvestableHours <= n` が常に成立することを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 3: reinvestableHoursの上限不変条件`
 
-- [~] 6. スクリプトのテスト作成
-  - [~] 6.1 mission_controller.tsのテスト作成
-    - scripts/mission_controller.test.tsを作成
-    - 主要な実行パスとエラーケースのユニットテストを実装（50%カバレッジ目標）
-    - _要件: 3.1, 3.2, 3.3, 3.4_
-  - [~] 6.2 run_pipeline.tsのテスト作成
-    - scripts/run_pipeline.test.tsを作成
-    - 主要な実行パスとエラーケースのユニットテストを実装（50%カバレッジ目標）
-    - _要件: 3.1, 3.2, 3.3, 3.4_
-  - [~] 6.3 system_whisperer.tsのテスト作成
-    - scripts/system_whisperer.test.tsを作成
-    - 主要な実行パスとエラーケースのユニットテストを実装（50%カバレッジ目標）
-    - _要件: 3.1, 3.2, 3.3, 3.4_
-  - [~] 6.4 run_orchestration_job.tsのテスト作成
-    - scripts/run_orchestration_job.test.tsを作成
-    - 主要な実行パスとエラーケースのユニットテストを実装（50%カバレッジ目標）
-    - _要件: 3.1, 3.2, 3.3, 3.4_
-  - [~] 6.5 スクリプトのプロパティテスト作成
-    - **Property 2: 実行パスカバレッジの網羅性**
-    - **検証: 要件 3.3, 3.4**
-    - tests/properties/script-coverage.test.tsを作成
-    - すべてのスクリプトの主要実行パス（正常系・エラー系）がカバーされることを検証
+  - [ ]\* 8.3 shared-businessのProperty 4プロパティテストを作成する
+    - **Property 4: costAvoidanceUSDの線形性**
+    - **検証: 要件 3.5, 4.4**
+    - `fc.integer({ min: 0, max: 100000 })` で任意の非負整数を生成し、`calculateReinvestment(n).costAvoidanceUSD === n * 100` が常に成立することを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 4: costAvoidanceUSDの線形性`
 
-- [~] 7. チェックポイント - テスト拡充の確認
-  - すべてのテストが正常に実行され、カバレッジ目標を達成していることを確認し、質問があればユーザーに確認してください。
+- [x] 9. shared-mediaのテスト作成
+  - [x] 9.1 `libs/shared-media/src/excel-utils.test.ts` を新規作成する
+    - `exceljs` および `adm-zip` をモックする（design.mdのモック実装例を参照）
+    - 正常系: `distillExcelDesign()` が `version`・`generatedAt`・`sheets` フィールドを含む `ExcelDesignProtocol` を返すことを検証する
+    - 正常系: `generateExcelWithDesign()` が `protocol.sheets` のシート名で `addWorksheet` を呼び出すことを検証する
+    - _要件: 3.1, 3.2, 3.3, 3.7, 3.8, 3.10_
 
-### フェーズ3: 型安全性向上（3-4週間）
+  - [ ]\* 9.2 shared-mediaのProperty 6プロパティテストを作成する
+    - **Property 6: ExcelDesignProtocolのラウンドトリップ特性**
+    - **検証: 要件 3.9, 4.6**
+    - `fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 5 })` で任意のシート名配列を生成し、`generateExcelWithDesign` 呼び出し後も `protocol.sheets.length` が変化しないことを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 6: ExcelDesignProtocolのラウンドトリップ特性`
 
-- [~] 8. TypeScript厳格設定の準備
-  - [~] 8.1 tsconfig.strict.jsonの作成
-    - tsconfig.strict.jsonを作成し、strict: true等の厳格設定を定義
-    - _要件: 4.3_
-  - [~] 8.2 移行トラッカーの実装
-    - scripts/migration-tracker.tsを作成
-    - .kiro/migration/typescript-strict.jsonで移行状態を管理
-    - _要件: 4.4, 12.1, 12.2_
-  - [~] 8.3 移行トラッカーのプロパティテスト作成
-    - **Property 4: 移行ファイルの自動追跡**
-    - **検証: 要件 4.4, 12.2**
-    - tests/properties/migration-tracker.test.tsを作成
-    - ファイルの移行状態が正確に追跡・更新されることを検証
+- [x] 10. shared-nerveのテスト作成
+  - [x] 10.1 `libs/shared-nerve/src/reflex-engine.test.ts` を新規作成する
+    - `@agent/core` をモックする（`safeExistsSync: false`・`safeReaddir: []`・`safeReadFile`・`logger`・`pathResolver`）
+    - 正常系: `intent` が一致する `NerveMessage` でディスパッチャーが呼び出されることを検証する
+    - 正常系: `intent` が一致しない `NerveMessage` でディスパッチャーが呼び出されないことを検証する
+    - 正常系: `keyword` フィルターが設定されていてペイロードにキーワードが含まれない場合にディスパッチャーが呼び出されないことを検証する
+    - 正常系: ディスパッチャー未設定で `evaluate()` を呼び出してもエラーをスローしないことを検証する
+    - _要件: 3.1, 3.2, 3.3, 3.11, 3.12, 3.13, 3.14_
 
-- [~] 9. 新規ファイルへのstrict適用
-  - [~] 9.1 新規ファイル作成時のstrict適用ルールの設定
-    - tsconfig.jsonを更新し、新規ファイルにstrict設定を適用
-    - _要件: 4.1_
-  - [~] 9.2 既存ファイルの移行計画の作成
-    - 移行対象ファイルのリストを.kiro/migration/配下に作成
-    - _要件: 4.4, 12.1_
+  - [x] 10.2 shared-nerveのProperty 5プロパティテストを作成する
+    - **Property 5: ReflexEngineのマッチング一貫性**
+    - **検証: 要件 3.12**
+    - `fc.string({ minLength: 1, maxLength: 20 })` で2つの異なる `intent` 文字列を生成し（`fc.pre` で不一致を保証）、intent不一致時にディスパッチャーが呼び出されないことを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 5: ReflexEngineのマッチング一貫性`
 
-- [~] 10. 既存ファイルの段階的移行
-  - [~] 10.1 優先度の高いファイルの移行
-    - libs/core/配下の主要ファイルにnoImplicitAny: trueを適用
-    - 型エラーを修正
-    - _要件: 4.2_
-  - [~] 10.2 移行完了ファイルのマーク
-    - 移行トラッカーを使用して完了ファイルを記録
-    - _要件: 12.2_
-  - [~] 10.3 移行進捗レポートの生成
-    - 移行トラッカーを使用して進捗レポートを生成
-    - _要件: 12.3_
+- [x] 11. shared-networkのテスト作成
+  - [x] 11.1 `libs/shared-network/src/mcp-client-engine.test.ts` を新規作成する
+    - `@modelcontextprotocol/sdk/client/index.js` および `@modelcontextprotocol/sdk/client/stdio.js` をモックする（design.mdのモック実装例を参照）
+    - 正常系: `action: 'list_tools'` で `client.listTools()` が呼び出されることを検証する
+    - エラーケース: `action: 'call_tool'` で `name` 未指定の場合に `"Tool name is required"` を含むエラーをスローすることを検証する
+    - 正常系: `action: 'call_tool'` で `name` 指定の場合に `client.callTool()` が正しい引数で呼び出されることを検証する
+    - エラーケース: サポートされていない `action` でエラーをスローすることを検証する
+    - 正常系: 実行後に `transport.close()` が呼び出されることを検証する
+    - _要件: 3.1, 3.2, 3.3, 3.15, 3.16_
 
-- [~] 11. チェックポイント - 型安全性向上の確認
-  - TypeScript型チェックが正常に実行され、移行が計画通り進んでいることを確認し、質問があればユーザーに確認してください。
+- [x] 12. shared-visionのテスト作成
+  - [x] 12.1 `libs/shared-vision/src/vision-judge.test.ts` を新規作成する
+    - `node:readline`・`@agent/core`・`chalk` をモックする（design.mdのモック実装例を参照）
+    - 正常系: 数値インデックスで選択した場合に対応するオプションを返すことを検証する
+    - 正常系: IDで選択した場合に対応するオプションを返すことを検証する
+    - 正常系: 無効な選択の後に有効な選択をした場合に正しいオプションを返すことを検証する
+    - _要件: 3.1, 3.2, 3.3, 3.17, 3.18_
 
-### フェーズ4: コード品質向上（3-4週間）
+  - [x] 12.2 shared-visionのProperty 7プロパティテストを作成する
+    - **Property 7: consultVisionの選択一貫性**
+    - **検証: 要件 3.17**
+    - `fc.array(fc.record({ id: fc.string(), description: fc.string(), logic_score: fc.float({ min: 0, max: 1 }) }), { minLength: 1, maxLength: 5 })` と `fc.nat()` で任意のオプション配列と有効なインデックスを生成し、`consultVision()` が対応するオプションを返すことを検証する（`numRuns: 100`）
+    - タグ: `Feature: project-quality-improvement, Property 7: consultVisionの選択一貫性`
 
-- [~] 12. ESLintルールの段階的有効化
-  - [~] 12.1 ESLint設定の更新（警告レベル）
-    - eslint.config.jsを更新し、@typescript-eslint/no-explicit-anyと@typescript-eslint/no-unused-varsを'warn'レベルで有効化
-    - _要件: 5.1, 5.2_
-  - [~] 12.2 新規ファイルへのerrorレベル適用
-    - 新規ファイルに対してすべてのルールを'error'レベルで適用する設定を追加
-    - _要件: 5.3_
-  - [~] 12.3 既存ファイルの段階的修正
-    - 自動修正可能な違反をeslint --fixで修正
-    - 残りの違反を優先順位付けして手動修正
-    - _要件: 5.4_
-  - [~] 12.4 ルールレベルのerrorへの昇格
-    - すべての警告が解消されたら、ルールレベルを'error'に昇格
-    - _要件: 5.5_
+- [x] 13. チェックポイント - 共有パッケージの確認
+  - すべてのテストが正常に実行されることを確認し、質問があればユーザーに確認してください。
 
-- [~] 13. Kyberion準拠の検証強化
-  - [~] 13.1 Kyberion準拠カスタムルールの作成
-    - eslint-plugin-kyberion/配下にカスタムルールを作成
-    - mission_controller.ts使用チェック、ADF形式チェックを実装
-    - _要件: 11.3, 11.4_
-  - [~] 13.2 既存のKyberion準拠ルールの確認
-    - no-restricted-importsルールが正しく機能していることを確認
-    - _要件: 11.1, 11.2_
-  - [~] 13.3 Kyberion違反の修正提案機能の実装
-    - カスタムルールに修正提案機能を追加
-    - _要件: 11.5_
+### フェーズ4: 既存アクチュエータのテスト品質向上
 
-- [~] 14. チェックポイント - コード品質向上の確認
-  - ESLintチェックが正常に実行され、Kyberion準拠が強化されていることを確認し、質問があればユーザーに確認してください。
+- [ ] 14. カバレッジ60%未達アクチュエータのテスト補強
+  - [x] 14.1 `pnpm test:coverage` を実行して各アクチュエータの現在のカバレッジを確認する
+    - カバレッジレポート（`./coverage/`）を参照して60%未達のアクチュエータを特定する
+    - _要件: 2.1_
 
-### フェーズ5: 構造改善（2-3週間）
+  - [ ] 14.2 カバレッジ60%未達アクチュエータの既存テストファイルにエラーケースを追加する
+    - 対象: agent-actuator, approval-actuator, artifact-actuator, blockchain-actuator, browser-actuator, daemon-actuator, media-actuator, media-generation-actuator, meeting-actuator, meeting-browser-driver, modeling-actuator, orchestrator-actuator, physical-bridge, presence-actuator, process-actuator, secret-actuator, service-actuator, system-actuator, terminal-actuator, video-composition-actuator, vision-actuator, voice-actuator, wisdom-actuator のうちカバレッジ60%未達のもの
+    - 各アクチュエータの正常系に加えてエラーケース・境界値（空の入力・最大値・不正な型）を追加する
+    - 外部依存（ファイルシステム・ネットワーク・外部プロセス）は `vi.mock()` でモックする
+    - _要件: 2.1, 2.2, 2.3, 2.4_
 
-- [~] 15. モノレポ構造の整理
-  - [~] 15.1 libs/core/のファイル整理
-    - libs/core/配下の150以上のファイルをsrc/ディレクトリに整理
-    - _要件: 6.1_
-  - [~] 15.2 package.jsonの更新
-    - 各パッケージのpackage.jsonにmain, types, exportsフィールドを追加
-    - _要件: 6.2_
-  - [~] 15.3 依存関係の明示化
-    - 各shared-\*パッケージの依存関係をpackage.jsonに明示的に宣言
-    - _要件: 6.3_
-  - [~] 15.4 パッケージメタデータのプロパティテスト作成
-    - **Property 5: パッケージメタデータの完全性**
-    - **検証: 要件 6.2, 6.3**
-    - tests/properties/package-metadata.test.tsを作成
-    - すべてのパッケージが必須フィールドと依存関係を持つことを検証
-  - [~] 15.5 インポートパスの自動更新
-    - ファイル移動時にインポートパスを自動更新するスクリプトを作成
-    - _要件: 6.4_
-  - [~] 15.6 インポートパス更新のプロパティテスト作成
-    - **Property 6: インポートパスの自動更新**
-    - **検証: 要件 6.4**
-    - tests/properties/import-path-update.test.tsを作成
-    - ファイル移動時にすべてのインポートパスが正しく更新されることを検証
-  - [~] 15.7 循環依存の検出と解消
-    - 循環依存を検出するスクリプトを作成し、検出された循環依存を解消
-    - _要件: 6.5_
+- [~] 15. チェックポイント - 既存アクチュエータの確認
+  - すべてのテストが正常に実行されることを確認し、質問があればユーザーに確認してください。
 
-- [~] 16. ドキュメントの一貫性向上
-  - [~] 16.1 各パッケージのREADME.md作成
-    - 各パッケージに日本語のREADME.mdを作成
-    - _要件: 8.1_
-  - [~] 16.2 コメントの言語統一
-    - コード内のコメントを日本語または英語で統一
-    - _要件: 8.2_
-  - [~] 16.3 README言語のプロパティテスト作成
-    - **Property 7: README言語の一貫性**
-    - **検証: 要件 8.1**
-    - tests/properties/readme-language.test.tsを作成
-    - すべてのパッケージのREADME.mdが日本語で記述されていることを検証
-  - [~] 16.4 APIドキュメントの自動生成設定
-    - TypeDocまたは類似ツールを設定し、APIドキュメントを自動生成
-    - _要件: 8.4_
+### フェーズ5: カバレッジ確認
 
-- [~] 17. チェックポイント - 構造改善の確認
-  - モノレポ構造が整理され、ドキュメントが統一されていることを確認し、質問があればユーザーに確認してください。
+- [ ] 16. カバレッジ目標の達成確認
+  - [~] 16.1 `pnpm test:coverage` を実行してカバレッジレポートを生成する
+    - アクチュエータ全体でlines・functions・branches・statementsが60%以上であることを確認する
+    - 共有パッケージ全体でlines・functions・branches・statementsが70%以上であることを確認する
+    - _要件: 5.1, 5.2, 5.3_
 
-### フェーズ6: 可視化（1-2週間）
+  - [~] 16.2 カバレッジが目標未達のパッケージがある場合、追加テストを作成して目標を達成する
+    - `./coverage/coverage-summary.json` を参照して未達パッケージを特定する
+    - 未達パッケージの既存テストファイルにテストケースを追加する
+    - _要件: 5.1, 5.2, 5.3_
 
-- [~] 18. メトリクス収集の実装
-  - [~] 18.1 メトリクス収集スクリプトの作成
-    - scripts/collect-metrics.tsを作成
-    - カバレッジ、型エラー数、Lint警告数、複雑度を収集
-    - _要件: 10.1, 10.2, 10.3, 10.4_
-  - [~] 18.2 メトリクス履歴の保存
-    - .kiro/metrics/history.jsonにメトリクスを保存
-    - _要件: 10.1, 10.2, 10.3_
-  - [~] 18.3 CI/CDへのメトリクス収集の統合
-    - GitHub Actionsワークフローにメトリクス収集ステップを追加
-    - _要件: 10.1, 10.2, 10.3_
-
-- [~] 19. ダッシュボードの作成
-  - [~] 19.1 メトリクス可視化スクリプトの作成
-    - scripts/generate-dashboard.tsを作成
-    - メトリクスの推移グラフを生成
-    - _要件: 10.1, 10.2, 10.3_
-  - [~] 19.2 アラート機能の実装
-    - メトリクスが悪化した場合に通知を送信する機能を実装
-    - _要件: 10.5_
-
-- [~] 20. 最終チェックポイント - すべての改善の確認
-  - すべてのフェーズが完了し、品質メトリクスが可視化されていることを確認し、質問があればユーザーに確認してください。
+- [~] 17. 最終チェックポイント - カバレッジ目標達成の確認
+  - `pnpm test:coverage` が非ゼロの終了コードなしで完了し、すべてのカバレッジ目標が達成されていることを確認し、質問があればユーザーに確認してください。
 
 ## 注意事項
 
-- `*`マークが付いたタスクはオプションであり、より迅速なMVPのためにスキップ可能です
-- 各タスクは具体的な要件を参照しており、トレーサビリティを確保しています
+- `*` マークが付いたサブタスクはオプションであり、より迅速なMVPのためにスキップ可能です
+- 各タスクは具体的な要件番号を参照しており、トレーサビリティを確保しています
 - チェックポイントタスクで段階的な検証を行い、問題を早期に発見します
 - プロパティテストは普遍的な正確性プロパティを検証し、ユニットテストは具体的な例とエッジケースを検証します
-
-## 実装の進め方
-
-1. tasks.mdファイルを開く
-2. 各タスク項目の横にある「Start task」をクリック
-3. タスクの指示に従って実装を進める
-4. チェックポイントで進捗を確認し、必要に応じて調整する
+- **既存のプロダクションコードは一切変更しません**

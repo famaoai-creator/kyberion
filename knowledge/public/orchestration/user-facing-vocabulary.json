@@ -55,6 +55,18 @@
         "en": "Command the mirror...",
         "ja": "mirror に指示してください..."
       },
+      "pipeline_crystallization_loop": {
+        "en": "Pipeline Crystallization Loop",
+        "ja": "パイプライン結晶化ループ"
+      },
+      "pipeline_crystallization_loop_description": {
+        "en": "The phase that turns exploratory work into a stable, reproducible pipeline before execution.",
+        "ja": "探索段階の work を、実行前に stable かつ再現可能な pipeline へ固める段階。"
+      },
+      "pipeline_crystallization_loop_rule": {
+        "en": "Explore first, normalize the shape, crystallize it into a pipeline, verify, then freeze.",
+        "ja": "まず探索し、形を整え、pipeline に結晶化し、検証してから freeze します。"
+      },
       "chronos_mission_loading": {
         "en": "Loading mission intelligence...",
         "ja": "mission intelligence を読み込み中..."

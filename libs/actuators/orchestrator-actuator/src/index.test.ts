@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
@@ -52,7 +52,8 @@ describe('orchestrator-actuator', () => {
           id: 'generate-anniversary-song',
           title: 'Generate Anniversary Song From Music ADF',
           actuator: 'media-generation-actuator',
-          template_path: 'libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json',
+          template_path:
+            'libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json',
           recommended_procedure: 'knowledge/public/procedures/media/generate-music-from-adf.md',
           parameter_overrides: {
             'params.music_adf.intent': 'updated_anniversary_song',
@@ -78,7 +79,8 @@ describe('orchestrator-actuator', () => {
 
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('music-generation-pipeline-bundle.json')) return JSON.stringify(bundle);
-      if (filePath.includes('music-adf-anniversary-country-ja.json')) return JSON.stringify(template);
+      if (filePath.includes('music-adf-anniversary-country-ja.json'))
+        return JSON.stringify(template);
       throw new Error(`unexpected read: ${filePath}`);
     });
 
@@ -114,26 +116,31 @@ describe('orchestrator-actuator', () => {
     } as any);
 
     const planSet = result.context.execution_plan_set;
-    expect(planSet).toEqual(expect.objectContaining({
-      kind: 'actuator-execution-plan-set',
-      archetype_id: 'generative-music-from-adf',
-      status: 'ready',
-    }));
-    expect(planSet.jobs[0]).toEqual(expect.objectContaining({
-      actuator: 'media-generation-actuator',
-      output_path: 'active/shared/runtime/generated-pipelines/music-generation-demo/generate-anniversary-song.json',
-      rendered_pipeline: expect.objectContaining({
-        action: 'generate_music',
-        params: {
-          music_adf: expect.objectContaining({
-            intent: 'updated_anniversary_song',
-          }),
-        },
-      }),
-    }));
+    expect(planSet).toEqual(
+      expect.objectContaining({
+        kind: 'actuator-execution-plan-set',
+        archetype_id: 'generative-music-from-adf',
+        status: 'ready',
+      })
+    );
+    expect(planSet.jobs[0]).toEqual(
+      expect.objectContaining({
+        actuator: 'media-generation-actuator',
+        output_path:
+          'active/shared/runtime/generated-pipelines/music-generation-demo/generate-anniversary-song.json',
+        rendered_pipeline: expect.objectContaining({
+          action: 'generate_music',
+          params: {
+            music_adf: expect.objectContaining({
+              intent: 'updated_anniversary_song',
+            }),
+          },
+        }),
+      })
+    );
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       'active/shared/runtime/generated-pipelines/music-generation-demo/generate-anniversary-song.json',
-      expect.stringContaining('"intent": "updated_anniversary_song"'),
+      expect.stringContaining('"intent": "updated_anniversary_song"')
     );
   });
 
@@ -174,7 +181,7 @@ describe('orchestrator-actuator', () => {
     expect(result.context.payload).toEqual({ answer: 42 });
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       resolvedContextPath,
-      expect.stringContaining('"payload"'),
+      expect.stringContaining('"payload"')
     );
   });
 
@@ -188,7 +195,8 @@ describe('orchestrator-actuator', () => {
           id: 'generate-country-cover',
           title: 'Generate Country Cover Image From Image ADF',
           actuator: 'media-generation-actuator',
-          template_path: 'libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json',
+          template_path:
+            'libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json',
           recommended_procedure: 'knowledge/public/procedures/media/generate-image-from-adf.md',
           parameter_overrides: {
             'params.image_adf.intent': 'updated_country_cover',
@@ -250,23 +258,28 @@ describe('orchestrator-actuator', () => {
     } as any);
 
     const planSet = result.context.execution_plan_set;
-    expect(planSet).toEqual(expect.objectContaining({
-      kind: 'actuator-execution-plan-set',
-      archetype_id: 'generative-image-from-adf',
-      status: 'ready',
-    }));
-    expect(planSet.jobs[0]).toEqual(expect.objectContaining({
-      actuator: 'media-generation-actuator',
-      output_path: 'active/shared/runtime/generated-pipelines/image-generation-demo/generate-country-cover.json',
-      rendered_pipeline: expect.objectContaining({
-        action: 'generate_image',
-        params: {
-          image_adf: expect.objectContaining({
-            intent: 'updated_country_cover',
-          }),
-        },
-      }),
-    }));
+    expect(planSet).toEqual(
+      expect.objectContaining({
+        kind: 'actuator-execution-plan-set',
+        archetype_id: 'generative-image-from-adf',
+        status: 'ready',
+      })
+    );
+    expect(planSet.jobs[0]).toEqual(
+      expect.objectContaining({
+        actuator: 'media-generation-actuator',
+        output_path:
+          'active/shared/runtime/generated-pipelines/image-generation-demo/generate-country-cover.json',
+        rendered_pipeline: expect.objectContaining({
+          action: 'generate_image',
+          params: {
+            image_adf: expect.objectContaining({
+              intent: 'updated_country_cover',
+            }),
+          },
+        }),
+      })
+    );
   });
 
   it('renders a video pipeline bundle into an execution plan set', async () => {
@@ -279,7 +292,8 @@ describe('orchestrator-actuator', () => {
           id: 'generate-drive-clip',
           title: 'Generate Drive Clip From Video ADF',
           actuator: 'media-generation-actuator',
-          template_path: 'libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json',
+          template_path:
+            'libs/actuators/media-generation-actuator/examples/video-adf-drive-clip.json',
           recommended_procedure: 'knowledge/public/procedures/media/generate-video-from-adf.md',
           parameter_overrides: {
             'params.video_adf.intent': 'updated_drive_clip',
@@ -342,29 +356,37 @@ describe('orchestrator-actuator', () => {
     } as any);
 
     const planSet = result.context.execution_plan_set;
-    expect(planSet).toEqual(expect.objectContaining({
-      kind: 'actuator-execution-plan-set',
-      archetype_id: 'generative-video-from-adf',
-      status: 'ready',
-    }));
-    expect(planSet.jobs[0]).toEqual(expect.objectContaining({
-      actuator: 'media-generation-actuator',
-      output_path: 'active/shared/runtime/generated-pipelines/video-generation-demo/generate-drive-clip.json',
-      rendered_pipeline: expect.objectContaining({
-        action: 'generate_video',
-        params: {
-          video_adf: expect.objectContaining({
-            intent: 'updated_drive_clip',
-          }),
-        },
-      }),
-    }));
+    expect(planSet).toEqual(
+      expect.objectContaining({
+        kind: 'actuator-execution-plan-set',
+        archetype_id: 'generative-video-from-adf',
+        status: 'ready',
+      })
+    );
+    expect(planSet.jobs[0]).toEqual(
+      expect.objectContaining({
+        actuator: 'media-generation-actuator',
+        output_path:
+          'active/shared/runtime/generated-pipelines/video-generation-demo/generate-drive-clip.json',
+        rendered_pipeline: expect.objectContaining({
+          action: 'generate_video',
+          params: {
+            video_adf: expect.objectContaining({
+              intent: 'updated_drive_clip',
+            }),
+          },
+        }),
+      })
+    );
   });
 
   it('marks actuator jobs as failed when the actuator reports failed status in JSON', async () => {
     mocks.safeExec.mockImplementation((command: string, args?: string[]) => {
       if (command === 'node' && Array.isArray(args) && args[0]?.includes('media-actuator')) {
-        return JSON.stringify({ status: 'failed', results: [{ status: 'failed', error: 'SAFE_IO_VIOLATION' }] });
+        return JSON.stringify({
+          status: 'failed',
+          results: [{ status: 'failed', error: 'SAFE_IO_VIOLATION' }],
+        });
       }
       return '';
     });
@@ -399,15 +421,17 @@ describe('orchestrator-actuator', () => {
       },
     } as any);
 
-    expect(result.context.run_report).toEqual(expect.objectContaining({
-      status: 'partial',
-      results: [
-        expect.objectContaining({
-          status: 'failed',
-          error: 'Actuator reported status=failed',
-        }),
-      ],
-    }));
+    expect(result.context.run_report).toEqual(
+      expect.objectContaining({
+        status: 'partial',
+        results: [
+          expect.objectContaining({
+            status: 'failed',
+            error: 'Actuator reported status=failed',
+          }),
+        ],
+      })
+    );
   });
 
   it('infers required inputs from context aliases when building an execution brief', async () => {
@@ -423,7 +447,12 @@ describe('orchestrator-actuator', () => {
               normalized_scope: ['project-os'],
               target_actuators: ['orchestrator-actuator'],
               deliverables: ['project documents'],
-              required_inputs: ['project name', 'delivery scope', 'phase or gate', 'related missions'],
+              required_inputs: [
+                'project name',
+                'delivery scope',
+                'phase or gate',
+                'related missions',
+              ],
             },
           ],
         });
@@ -541,13 +570,13 @@ describe('orchestrator-actuator', () => {
     expect(result.context.preflight.status).toBe('needs_clarification');
     expect(result.context.preflight.repair_count).toBeGreaterThan(0);
     expect(result.context.validated_execution_plan_set.jobs[0].output_path).toBe(
-      'active/shared/runtime/generated-pipelines/preflight-demo/repairable-job.json',
+      'active/shared/runtime/generated-pipelines/preflight-demo/repairable-job.json'
     );
     expect(result.context.validated_execution_plan_set.jobs[0].rendered_pipeline).toEqual(
       expect.objectContaining({
         action: 'pipeline',
         context: {},
-      }),
+      })
     );
   });
 
@@ -599,8 +628,178 @@ describe('orchestrator-actuator', () => {
         expect.objectContaining({
           code: 'unresolved_template_variable',
         }),
-      ]),
+      ])
     );
     expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
+
+  it('throws for unsupported action', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({ action: 'unsupported_action' as any, steps: [] } as any)
+    ).rejects.toThrow();
+  });
+
+  it('handles empty pipeline with no steps', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({ action: 'pipeline', steps: [] } as any);
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toHaveLength(0);
+  });
+
+  it('throws when reconcile strategy is not found', async () => {
+    mocks.safeExistsSync.mockReturnValue(false);
+
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({ action: 'reconcile', strategy_path: 'nonexistent.json' } as any)
+    ).rejects.toThrow('Strategy not found');
+  });
+
+  it('handles max_steps limit', async () => {
+    const { handleAction } = await import('./index.js');
+    const steps = Array.from({ length: 3 }, (_, i) => ({
+      type: 'apply' as const,
+      op: 'log',
+      params: { message: `step ${i}` },
+    }));
+
+    await expect(
+      handleAction({ action: 'pipeline', steps, options: { max_steps: 2 } } as any)
+    ).rejects.toThrow('[SAFETY_LIMIT]');
+  });
+
+  it('handles request_to_status_brief transform', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: { request_text: 'What is the current system status?' },
+      steps: [
+        {
+          type: 'transform',
+          op: 'request_to_status_brief',
+          params: { export_as: 'status_brief' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.status_brief.kind).toBe('system-status-brief');
+    expect(result.context.status_brief.scope).toBeDefined();
+  });
+
+  it('handles execution_brief_to_operator_packet transform', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        execution_brief: {
+          kind: 'actuator-execution-brief',
+          archetype_id: 'project-document-pack',
+          summary: 'Test brief',
+          user_facing_summary: 'Test summary',
+          missing_inputs: [],
+          clarification_questions: [],
+          readiness: 'fully_automatable',
+          confidence: 5,
+          llm_touchpoints: [],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'execution_brief_to_operator_packet',
+          params: { from: 'execution_brief', export_as: 'operator_packet' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.operator_packet.kind).toBe('operator-interaction-packet');
+    expect(result.context.operator_packet.interaction_type).toBe('execution-preview');
+  });
+
+  it('handles execution_brief_to_resolution_plan transform', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        execution_brief: {
+          kind: 'actuator-execution-brief',
+          archetype_id: 'project-document-pack',
+          summary: 'Test brief',
+          target_actuators: ['orchestrator-actuator'],
+          deliverables: ['project documents'],
+          missing_inputs: [],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'execution_brief_to_resolution_plan',
+          params: { from: 'execution_brief', export_as: 'resolution_plan' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.resolution_plan.kind).toBe('actuator-resolution-plan');
+    expect(result.context.resolution_plan.phases).toHaveLength(3);
+  });
+
+  it('handles operator_packet_to_response_preview transform', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        operator_packet: {
+          kind: 'operator-interaction-packet',
+          headline: 'Test headline',
+          summary: 'Test summary',
+          readiness: 'fully_automatable',
+          confidence: 5,
+          questions: [],
+          next_actions: [{ id: 'action-1', action: 'Do something', reason: 'Because' }],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'operator_packet_to_response_preview',
+          params: { from: 'operator_packet', export_as: 'response_preview' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.response_preview.kind).toBe('operator-response-preview');
+    expect(result.context.response_preview.text).toContain('Test headline');
+  });
+
+  it('handles status_report_to_operator_packet transform', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        system_status_report: {
+          kind: 'system-status-report',
+          headline: 'System is healthy',
+          summary: 'All systems operational',
+          findings: [],
+          next_actions: [],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'status_report_to_operator_packet',
+          params: { from: 'system_status_report', export_as: 'operator_packet' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.operator_packet.kind).toBe('operator-interaction-packet');
+    expect(result.context.operator_packet.interaction_type).toBe('status-summary');
   });
 });

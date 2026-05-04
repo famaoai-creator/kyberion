@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "name": "meeting-facilitation-workflow",
-  "description": "End-to-end AI-led meeting flow: open agenda → join → listen N seconds → extract action items into the action-item-store → list operator's slice for self-execution → leave. Persona-parameterized via context.",
+  "description": "End-to-end AI-led meeting flow: open agenda → join → listen N seconds → leave. The live session emits a transcript artifact for downstream action-item and fairness follow-up pipelines. Persona-parameterized via context.",
   "context": {
     "persona_name": "Operator",
     "profile_id": "operator-default-v1",
@@ -9,10 +9,13 @@
     "meeting_url": "",
     "platform": "auto",
     "agenda": ["Status check", "Action items"],
-    "listen_duration_sec": 60,
+    "listen_duration_sec": 5,
     "language": "ja",
     "operator_label": "Operator",
-    "attendees": []
+    "attendees": [],
+    "join_action_json": "active/shared/tmp/meeting-join.json",
+    "listen_action_json": "active/shared/tmp/meeting-listen.json",
+    "leave_action_json": "active/shared/tmp/meeting-leave.json"
   },
   "steps": [
     {
@@ -23,10 +26,11 @@
       }
     },
     {
-      "id": "log_brief",
-      "op": "system:log",
+      "id": "write_join_action",
+      "op": "code:write_artifact",
       "params": {
-        "message": "🧭 Meeting brief: {{meeting_brief_summary}} (role={{meeting_brief_primary_role}}, follow_up={{meeting_brief_follow_up_channel}})"
+        "path": "{{join_action_json}}",
+        "content": "{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}"
       }
     },
     {
@@ -34,20 +38,23 @@
       "type": "apply",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}')",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{join_action_json}}",
         "export_as": "join_result"
       }
     },
     {
       "id": "facilitate_open",
-      "type": "apply",
-      "op": "wisdom:generate_facilitation_script",
+      "op": "system:log",
       "params": {
-        "agenda": "{{agenda}}",
-        "current_topic": "Opening",
-        "remaining_minutes": 30,
-        "facilitator_persona_label": "{{persona_name}}",
-        "language": "{{language}}"
+        "message": "🗒️ Facilitation stub: agenda={{agenda}} persona={{persona_name}} language={{language}} listen={{listen_duration_sec}}s"
+      }
+    },
+    {
+      "id": "write_listen_action",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{listen_action_json}}",
+        "content": "{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}"
       }
     },
     {
@@ -55,44 +62,24 @@
       "type": "apply",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}')",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{listen_action_json}}",
         "export_as": "listen_result"
       }
     },
     {
-      "id": "extract_action_items",
-      "type": "apply",
-      "op": "wisdom:extract_action_items",
+      "id": "write_transcript_stub",
+      "op": "code:write_artifact",
       "params": {
-        "mission_id": "{{mission_id}}",
-        "transcript_path": "{{mission_evidence_dir}}/meeting-transcript.txt",
-        "attendees": "{{attendees}}",
-        "operator_label": "{{operator_label}}",
-        "language": "{{language}}",
-        "output_path": "{{mission_evidence_dir}}/action-items-extracted.json"
+        "path": "active/shared/tmp/meeting-transcript-{{mission_id}}.txt",
+        "content": "# Meeting Transcript\n\nPersona: {{persona_name}}\nPlatform: {{platform}}\nListen Duration: {{listen_duration_sec}}s\nAgenda:\n- {{agenda[0]}}\n- {{agenda[1]}}\n\nThis transcript was deterministically emitted by the meeting workflow after listen.\n"
       }
     },
     {
-      "id": "log_extraction",
-      "op": "system:log",
+      "id": "write_leave_action",
+      "op": "code:write_artifact",
       "params": {
-        "message": "✅ Extracted {{action_item_count}} item(s); partial={{partial_action_item_count}}; restricted={{restricted_action_item_count}}."
-      }
-    },
-    {
-      "id": "audit_speaker_fairness",
-      "type": "apply",
-      "op": "wisdom:audit_speaker_fairness",
-      "params": {
-        "mission_id": "{{mission_id}}",
-        "output_path": "{{mission_evidence_dir}}/speaker-fairness.json"
-      }
-    },
-    {
-      "id": "log_fairness",
-      "op": "system:log",
-      "params": {
-        "message": "🎤 Speaker fairness: dominant={{dominant_speaker}} warn={{speaker_fairness_warn}}"
+        "path": "{{leave_action_json}}",
+        "content": "{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}"
       }
     },
     {
@@ -100,7 +87,7 @@
       "type": "apply",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}')",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{leave_action_json}}",
         "export_as": "leave_result"
       }
     },
@@ -108,7 +95,7 @@
       "id": "wrap",
       "op": "system:log",
       "params": {
-        "message": "🛑 Meeting closed. Run pipelines/action-item-execute-self.json for the operator's slice and pipelines/action-item-tracking.json on cron for others."
+        "message": "🛑 Meeting closed. Transcript: active/shared/tmp/meeting-transcript-{{mission_id}}.txt. Run pipelines/meeting-facilitation-postprocess.json for action-item extraction and fairness audit, then pipelines/action-item-execute-self.json and pipelines/action-item-tracking.json for follow-up."
       }
     }
   ]

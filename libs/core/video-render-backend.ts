@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
+import * as net from 'node:net';
 import { buildSafeExecEnv, safeExec, safeExistsSync, safeMoveSync, safeRmSync, platform, pathResolver } from './index.js';
 import type { VideoCompositionRenderPlan, VideoRenderRuntimePolicy } from './video-composition-contract.js';
 
@@ -67,6 +68,14 @@ export async function renderVideoCompositionBundle(
         executed: false,
         backend: 'hyperframes_cli',
         reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
+      };
+    }
+
+    if (!(await canBindLocalhost())) {
+      return {
+        executed: false,
+        backend: 'hyperframes_cli',
+        reason: 'localhost bind unavailable in this environment; skipped hyperframes render',
       };
     }
 
@@ -147,6 +156,14 @@ export async function renderVideoCompositionBundleAsync(
         executed: false,
         backend: 'hyperframes_cli',
         reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
+      };
+    }
+
+    if (!(await canBindLocalhost())) {
+      return {
+        executed: false,
+        backend: 'hyperframes_cli',
+        reason: 'localhost bind unavailable in this environment; skipped hyperframes render',
       };
     }
 
@@ -271,6 +288,23 @@ function buildMuxTempPath(outputPath: string): string {
   const ext = path.extname(outputPath) || '.mp4';
   const base = outputPath.slice(0, outputPath.length - ext.length);
   return `${base}.muxed${ext}`;
+}
+
+async function canBindLocalhost(): Promise<boolean> {
+  return await new Promise((resolve) => {
+    const server = net.createServer();
+    const finalize = (result: boolean) => {
+      try {
+        server.close();
+      } catch (_) {
+        // Ignore teardown errors from a failed probe.
+      }
+      resolve(result);
+    };
+
+    server.once('error', () => finalize(false));
+    server.listen(0, '127.0.0.1', () => finalize(true));
+  });
 }
 
 async function runCancellableCommand(

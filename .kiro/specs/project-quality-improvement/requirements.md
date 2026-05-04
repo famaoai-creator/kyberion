@@ -2,173 +2,116 @@
 
 ## はじめに
 
-本ドキュメントは、Kyberionプロジェクト全体の品質向上を目的とした改善計画の要件を定義します。現在、テストカバレッジの不足、TypeScript設定の緩さ、ESLintルールの無効化、モノレポ構造の未整理など、複数の技術的負債が存在しています。これらを段階的に改善し、プロジェクトの保守性、信頼性、開発効率を向上させることを目指します。
+本ドキュメントは、Kyberionプロジェクトのテストカバレッジ拡充を目的とした要件を定義します。
+
+現在のスコープは以下の2領域に絞られています：
+
+1. **テストなしアクチュエータへのテスト追加**（android-actuator, code-actuator, file-actuator, ios-actuator, network-actuator）
+2. **共有パッケージ5つへのテスト追加**（shared-business, shared-media, shared-nerve, shared-network, shared-vision）
+
+既に実装済みの項目（Vitest設定・CI/CD・カバレッジ閾値チェック・ビルドサイズ測定・ESLint準拠チェック）は本ドキュメントのスコープ外です。
 
 ## 用語集
 
-- **Test_Coverage_System**: テストカバレッジを測定・報告するシステム（c8、vitest coverage）
-- **Type_Safety_Enforcer**: TypeScriptコンパイラの型安全性チェック機能
-- **Lint_Rule_Engine**: ESLintによるコード品質チェックエンジン
-- **Actuator**: Kyberionエコシステムにおける物理的実装を担うモジュール（14種類存在）
-- **Shared_Package**: 複数のアクチュエータで共有されるライブラリパッケージ（shared-media, shared-vision等）
-- **CI_Pipeline**: 継続的インテグレーションパイプライン（GitHub Actions）
-- **Monorepo_Structure**: pnpm workspacesによるモノレポ構成
-- **Kyberion_Framework**: Kyberionの統治フレームワーク（AGENTS.md）
+- **Actuator**: Kyberionエコシステムにおける機能実装モジュール。`libs/actuators/` 配下に配置される。各アクチュエータは `handleAction()` を公開エントリポイントとして持つ。
+- **Pipeline_Engine**: アクチュエータ内部のパイプライン実行エンジン。`steps` 配列を受け取り `{ status, results, context }` を返す。
+- **Shared_Package**: 複数のアクチュエータで共有されるライブラリパッケージ。`libs/shared-*/` 配下に配置される。
+- **Test_Coverage_System**: Vitestとv8 providerによるテストカバレッジ測定・報告システム。
+- **Property_Test_Runner**: fast-checkライブラリを使用したプロパティベーステスト実行環境。
+- **ExcelDesignProtocol**: `shared-media` が定義するExcelデザイン情報の中間表現フォーマット。
+- **ReflexEngine**: `shared-nerve` が提供する自律反射エンジン。刺激（NerveMessage）とReflexADFを照合して反応を実行する。
+- **McpActionRequest**: `shared-network` が定義するMCPクライアント操作リクエスト型。
 
 ## 要件
 
-### 要件1: アクチュエータのテストカバレッジ拡充
+### 要件1: テストなしアクチュエータへのテスト追加
 
-**ユーザーストーリー:** 開発者として、すべてのアクチュエータが適切にテストされていることを確認したい。これにより、リファクタリングや機能追加時の回帰バグを防止できる。
-
-#### 受入基準
-
-1. THE Test_Coverage_System SHALL 各アクチュエータのテストカバレッジを測定する
-2. WHEN 新しいアクチュエータテストが作成される場合、THE Test_Coverage_System SHALL 最低60%のカバレッジを達成する
-3. THE Test_Coverage_System SHALL blockchain-actuator, browser-actuator, code-actuator, daemon-actuator, file-actuator, media-actuator, modeling-actuator, network-actuator, orchestrator-actuator, physical-bridge, secret-actuator, service-actuator, system-actuator, wisdom-actuatorの14個すべてに対してテストを実行する
-4. WHEN アクチュエータテストが実行される場合、THE Test_Coverage_System SHALL 各アクチュエータの主要な公開APIをカバーする
-5. THE Test_Coverage_System SHALL テストカバレッジレポートをHTML形式で出力する
-
-### 要件2: 共有パッケージのテストカバレッジ拡充
-
-**ユーザーストーリー:** 開発者として、共有パッケージが適切にテストされていることを確認したい。これにより、複数のアクチュエータに影響する変更を安全に行える。
+**ユーザーストーリー:** 開発者として、テストが存在しない5つのアクチュエータ（android-actuator, code-actuator, file-actuator, ios-actuator, network-actuator）に対してテストを追加したい。これにより、リファクタリングや機能追加時の回帰バグを防止できる。
 
 #### 受入基準
 
-1. THE Test_Coverage_System SHALL shared-media, shared-vision, shared-network, shared-business, shared-nerveの5つすべてに対してテストを実行する
-2. WHEN 共有パッケージテストが作成される場合、THE Test_Coverage_System SHALL 最低70%のカバレッジを達成する
-3. THE Test_Coverage_System SHALL 各共有パッケージの公開APIをカバーする
-4. WHEN 共有パッケージが変更される場合、THE Test_Coverage_System SHALL 依存するアクチュエータのテストも実行する
+1. THE Test_Coverage_System SHALL android-actuator, code-actuator, file-actuator, ios-actuator, network-actuatorの各アクチュエータに対してテストファイルを実行する
+2. WHEN 各アクチュエータのテストが実行される場合、THE Test_Coverage_System SHALL lines・functions・branches・statementsの各カバレッジ指標で60%以上を達成する
+3. WHEN `handleAction()` に有効なパイプライン入力が渡される場合、THE Pipeline_Engine SHALL `{ status: 'success' | 'failed', results: Array, context: Record<string, any> }` の形式でレスポンスを返す
+4. WHEN `handleAction()` にサポートされていない `action` 値が渡される場合、THE Pipeline_Engine SHALL エラーをスローする
+5. WHEN パイプラインのステップが失敗する場合、THE Pipeline_Engine SHALL 残りのステップを実行せずに `status: 'failed'` を返す
+6. WHEN `max_steps` を超えるステップ数が指定される場合、THE Pipeline_Engine SHALL `[SAFETY_LIMIT]` プレフィックスを含むエラーをスローする
+7. THE Property_Test_Runner SHALL パイプライン結果の構造不変条件（`status` フィールドが常に `'success'` または `'failed'` であること）をプロパティテストで検証する
 
-### 要件3: スクリプトの重要機能のテストカバレッジ拡充
+### 要件2: 既存アクチュエータテストの品質向上
 
-**ユーザーストーリー:** 開発者として、重要なスクリプトが適切にテストされていることを確認したい。これにより、システムの中核機能の信頼性を保証できる。
-
-#### 受入基準
-
-1. THE Test_Coverage_System SHALL mission_controller.ts, run_pipeline.ts, system_whisperer.ts, run_orchestration_job.tsの重要スクリプトに対してテストを実行する
-2. WHEN スクリプトテストが作成される場合、THE Test_Coverage_System SHALL 最低50%のカバレッジを達成する
-3. THE Test_Coverage_System SHALL 各スクリプトの主要な実行パスをカバーする
-4. WHEN スクリプトがエラーハンドリングを含む場合、THE Test_Coverage_System SHALL エラーケースもカバーする
-
-### 要件4: TypeScript厳格モードへの段階的移行
-
-**ユーザーストーリー:** 開発者として、TypeScriptの型安全性を段階的に向上させたい。これにより、実行時エラーを減らし、コードの保守性を向上させる。
+**ユーザーストーリー:** 開発者として、既存テストが存在する23個のアクチュエータのテスト品質を向上させたい。これにより、テストが実際のバグを検出できる信頼性を確保できる。
 
 #### 受入基準
 
-1. THE Type_Safety_Enforcer SHALL 新規作成されるファイルに対してstrict: trueを適用する
-2. WHEN 既存ファイルが大幅に変更される場合、THE Type_Safety_Enforcer SHALL そのファイルに対してnoImplicitAny: trueを適用する
-3. THE Type_Safety_Enforcer SHALL 段階的移行のための中間設定ファイル（tsconfig.strict.json）を提供する
-4. THE Type_Safety_Enforcer SHALL 移行対象ファイルのリストを管理する
-5. WHEN すべての対象ファイルが移行完了した場合、THE Type_Safety_Enforcer SHALL tsconfig.jsonのstrict設定をtrueに更新する
+1. WHEN 既存アクチュエータのテストが実行される場合、THE Test_Coverage_System SHALL lines・functions・branches・statementsの各カバレッジ指標で60%以上を達成する
+2. THE Test_Coverage_System SHALL 各アクチュエータの正常系（happy path）に加えてエラーケースをカバーする
+3. WHEN 外部依存（ファイルシステム・ネットワーク・外部プロセス）が必要な場合、THE Test_Coverage_System SHALL モックまたはスタブを使用してテストを分離する
+4. THE Test_Coverage_System SHALL 境界値（空の入力・最大値・不正な型）に対するテストケースを含む
 
-### 要件5: ESLintルールの段階的有効化
+### 要件3: 共有パッケージへのテスト追加
 
-**ユーザーストーリー:** 開発者として、コード品質を段階的に向上させたい。これにより、バグの早期発見と一貫したコーディングスタイルを実現できる。
-
-#### 受入基準
-
-1. THE Lint_Rule_Engine SHALL @typescript-eslint/no-explicit-anyルールを'warn'レベルで有効化する
-2. THE Lint_Rule_Engine SHALL @typescript-eslint/no-unused-varsルールを'warn'レベルで有効化する
-3. WHEN 新規作成されるファイルの場合、THE Lint_Rule_Engine SHALL すべてのルールを'error'レベルで適用する
-4. THE Lint_Rule_Engine SHALL 既存ファイルに対する段階的移行計画を提供する
-5. WHEN すべての警告が解消された場合、THE Lint_Rule_Engine SHALL ルールレベルを'error'に昇格させる
-
-### 要件6: モノレポ構造の整理
-
-**ユーザーストーリー:** 開発者として、モノレポ構造を整理したい。これにより、コードの発見性と保守性を向上させる。
+**ユーザーストーリー:** 開発者として、テストが存在しない5つの共有パッケージ（shared-business, shared-media, shared-nerve, shared-network, shared-vision）に対してテストを追加したい。これにより、複数のアクチュエータに影響する変更を安全に行える。
 
 #### 受入基準
 
-1. THE Monorepo_Structure SHALL libs/core/配下の150以上のファイルをsrc/ディレクトリに整理する
-2. THE Monorepo_Structure SHALL 各パッケージのpackage.jsonにmain, types, exportsフィールドを定義する
-3. THE Monorepo_Structure SHALL 各shared-\*パッケージの依存関係を明示的に宣言する
-4. WHEN ファイルが移動される場合、THE Monorepo_Structure SHALL すべてのインポートパスを自動的に更新する
-5. THE Monorepo_Structure SHALL 循環依存を検出し報告する
+1. THE Test_Coverage_System SHALL shared-business, shared-media, shared-nerve, shared-network, shared-visionの各パッケージに対してテストファイルを実行する
+2. WHEN 各共有パッケージのテストが実行される場合、THE Test_Coverage_System SHALL lines・functions・branches・statementsの各カバレッジ指標で70%以上を達成する
+3. THE Test_Coverage_System SHALL 各共有パッケージの公開API（`index.ts` からエクスポートされる関数・クラス・型）をすべてカバーする
 
-### 要件7: CI/CDパイプラインの強化
+#### shared-business の受入基準
 
-**ユーザーストーリー:** 開発者として、CI/CDパイプラインを強化したい。これにより、品質問題を早期に発見し、デプロイの信頼性を向上させる。
+4. WHEN `calculateReinvestment(savedHours)` が呼び出される場合、THE Shared_Package SHALL `reinvestableHours` が `savedHours * 0.7` を四捨五入した値と等しいレスポンスを返す
+5. WHEN `calculateReinvestment(savedHours)` が呼び出される場合、THE Shared_Package SHALL `costAvoidanceUSD` が `savedHours * 100` と等しいレスポンスを返す
+6. THE Property_Test_Runner SHALL 任意の非負整数 `savedHours` に対して `reinvestableHours <= savedHours` が常に成立することをプロパティテストで検証する
 
-#### 受入基準
+#### shared-media の受入基準
 
-1. THE CI_Pipeline SHALL すべてのプルリクエストに対してテストを自動実行する
-2. THE CI_Pipeline SHALL テストカバレッジレポートを生成しコメントとして投稿する
-3. THE CI_Pipeline SHALL TypeScript型チェックを実行する
-4. THE CI_Pipeline SHALL ESLintチェックを実行し、警告数を報告する
-5. WHEN カバレッジが閾値を下回る場合、THE CI_Pipeline SHALL プルリクエストをブロックする
-6. THE CI_Pipeline SHALL 依存関係の脆弱性スキャンを実行する
-7. THE CI_Pipeline SHALL ビルド成果物のサイズを測定し報告する
+7. WHEN `distillExcelDesign(filePath)` が有効なExcelファイルに対して呼び出される場合、THE Shared_Package SHALL `version`, `generatedAt`, `sheets` フィールドを含む `ExcelDesignProtocol` オブジェクトを返す
+8. WHEN `generateExcelWithDesign(data, protocol, sheetName)` が呼び出される場合、THE Shared_Package SHALL `protocol.sheets` に含まれるシート名を持つワークブックを返す
+9. THE Property_Test_Runner SHALL `distillExcelDesign` で取得した `ExcelDesignProtocol` を `generateExcelWithDesign` に渡した場合、シート数が保持されることをラウンドトリップ特性としてプロパティテストで検証する
+10. WHEN `extractThemePalette(filePath)` が有効なExcelファイルに対して呼び出される場合、THE Shared_Package SHALL テーマインデックスをキーとするARGB文字列のマッピングを返す
 
-### 要件8: ドキュメントの一貫性向上
+#### shared-nerve の受入基準
 
-**ユーザーストーリー:** 開発者として、ドキュメントの言語を統一したい。これにより、プロジェクトの理解を容易にする。
+11. WHEN `ReflexEngine` が `intent` が一致する `NerveMessage` を受け取る場合、THE Shared_Package SHALL ディスパッチャーを呼び出す
+12. WHEN `ReflexEngine` が `intent` が一致しない `NerveMessage` を受け取る場合、THE Shared_Package SHALL ディスパッチャーを呼び出さない
+13. WHEN `ReflexEngine` に `keyword` フィルターが設定されたReflexADFが存在し、ペイロードにキーワードが含まれない `NerveMessage` が渡される場合、THE Shared_Package SHALL ディスパッチャーを呼び出さない
+14. WHEN `ReflexEngine` にディスパッチャーが設定されていない状態で `evaluate()` が呼び出される場合、THE Shared_Package SHALL エラーをスローせずに処理を完了する
 
-#### 受入基準
+#### shared-network の受入基準
 
-1. THE Monorepo_Structure SHALL 各パッケージのREADME.mdを日本語で提供する
-2. THE Monorepo_Structure SHALL コード内のコメントを日本語または英語で統一する
-3. WHEN 新しいドキュメントが作成される場合、THE Monorepo_Structure SHALL 言語ガイドラインに従う
-4. THE Monorepo_Structure SHALL APIドキュメントを自動生成する
+15. WHEN `executeMcp` が `action: 'call_tool'` で `name` フィールドなしに呼び出される場合、THE Shared_Package SHALL `"Tool name is required"` を含むエラーをスローする
+16. WHEN `executeMcp` が `action: 'list_tools'` で呼び出される場合、THE Shared_Package SHALL MCPクライアントの `listTools()` を呼び出す
 
-### 要件9: テストインフラストラクチャの改善
+#### shared-vision の受入基準
 
-**ユーザーストーリー:** 開発者として、テストの実行速度と信頼性を向上させたい。これにより、開発サイクルを高速化できる。
+17. WHEN `consultVision` が有効な `TieBreakOption` 配列と選択インデックスで呼び出される場合、THE Shared_Package SHALL 選択されたオプションを返す
+18. WHEN `consultVision` に空の `options` 配列が渡される場合、THE Shared_Package SHALL エラーを適切に処理する
 
-#### 受入基準
+### 要件4: プロパティベーステストの導入
 
-1. THE Test_Coverage_System SHALL テストを並列実行する
-2. THE Test_Coverage_System SHALL テスト結果をキャッシュし、変更されたファイルのみ再実行する
-3. WHEN テストが失敗する場合、THE Test_Coverage_System SHALL 詳細なエラーメッセージとスタックトレースを提供する
-4. THE Test_Coverage_System SHALL テスト実行時間を測定し、遅いテストを報告する
-5. THE Test_Coverage_System SHALL モックとスタブのユーティリティを提供する
-
-### 要件10: 品質メトリクスの可視化
-
-**ユーザーストーリー:** 開発者として、プロジェクトの品質メトリクスを可視化したい。これにより、改善の進捗を追跡できる。
+**ユーザーストーリー:** 開発者として、fast-checkを使用したプロパティベーステストを導入したい。これにより、手動では発見しにくいエッジケースを自動的に検出できる。
 
 #### 受入基準
 
-1. THE CI_Pipeline SHALL テストカバレッジの推移をグラフで表示する
-2. THE CI_Pipeline SHALL TypeScriptエラー数の推移を追跡する
-3. THE CI_Pipeline SHALL ESLint警告数の推移を追跡する
-4. THE CI_Pipeline SHALL コード複雑度メトリクスを計算する
-5. WHEN メトリクスが悪化する場合、THE CI_Pipeline SHALL 通知を送信する
+1. THE Property_Test_Runner SHALL fast-checkライブラリを使用してプロパティテストを実行する
+2. THE Property_Test_Runner SHALL 各プロパティテストで最低100ケースの入力を生成して検証する
+3. WHEN プロパティテストが失敗する場合、THE Property_Test_Runner SHALL 失敗を引き起こした最小の反例（counterexample）を出力する
+4. THE Property_Test_Runner SHALL `shared-business` の `calculateReinvestment` に対して以下の不変条件をプロパティテストで検証する：
+   - 任意の非負数 `n` に対して `reinvestableHours(n) <= n` が成立する
+   - 任意の非負数 `n` に対して `costAvoidanceUSD(n) = n * 100` が成立する
+5. THE Property_Test_Runner SHALL パイプライン実行結果の構造不変条件（`status` が `'success'` または `'failed'` のいずれかであること）をプロパティテストで検証する
+6. THE Property_Test_Runner SHALL `ExcelDesignProtocol` のラウンドトリップ特性（distill → generate → シート数保持）をプロパティテストで検証する
 
-### 要件11: Kyberion準拠の検証強化
+### 要件5: カバレッジ目標の達成と継続的な維持
 
-**ユーザーストーリー:** 開発者として、AGENTS.mdで定義された原則への準拠を自動的に検証したい。これにより、アーキテクチャの一貫性を保証できる。
-
-#### 受入基準
-
-1. THE Lint_Rule_Engine SHALL node:fsとchild_processの直接使用を検出しエラーを報告する（既存機能の確認）
-2. THE Lint_Rule_Engine SHALL @agent/core/secure-ioの使用を推奨する
-3. THE Lint_Rule_Engine SHALL mission_controller.tsを使用しないミッション管理を検出する
-4. THE Lint_Rule_Engine SHALL ADF形式以外のアクチュエータ呼び出しを検出する
-5. WHEN Kyberion原則違反が検出される場合、THE Lint_Rule_Engine SHALL 修正方法を提案する
-
-### 要件12: 段階的移行計画の管理
-
-**ユーザーストーリー:** 開発者として、品質改善の進捗を追跡したい。これにより、計画的に技術的負債を解消できる。
+**ユーザーストーリー:** 開発者として、テストカバレッジの目標値を明確にし、継続的に維持したい。これにより、テスト品質の退行を防止できる。
 
 #### 受入基準
 
-1. THE Monorepo_Structure SHALL 移行対象ファイルのリストを.kiro/migration/配下に保存する
-2. THE Monorepo_Structure SHALL 移行完了ファイルを自動的にマークする
-3. THE Monorepo_Structure SHALL 移行進捗レポートを生成する
-4. WHEN 移行が完了する場合、THE Monorepo_Structure SHALL 設定ファイルを自動的に更新する
-5. THE Monorepo_Structure SHALL 移行履歴をGitコミットメッセージに記録する
-
-## 実装の優先順位
-
-本要件の実装は以下の優先順位で段階的に進めることを推奨します：
-
-1. **フェーズ1（基盤整備）**: 要件9（テストインフラ）、要件7（CI/CD）
-2. **フェーズ2（テスト拡充）**: 要件1（アクチュエータテスト）、要件2（共有パッケージテスト）、要件3（スクリプトテスト）
-3. **フェーズ3（型安全性）**: 要件4（TypeScript厳格化）、要件12（移行管理）
-4. **フェーズ4（コード品質）**: 要件5（ESLint有効化）、要件11（Kyberion準拠）
-5. **フェーズ5（構造改善）**: 要件6（モノレポ整理）、要件8（ドキュメント統一）
-6. **フェーズ6（可視化）**: 要件10（メトリクス可視化）
-
-各フェーズは独立して実装可能ですが、前のフェーズの完了が推奨されます。
+1. WHEN `pnpm test:coverage` が実行される場合、THE Test_Coverage_System SHALL アクチュエータ全体でlines・functions・branches・statementsの各指標が60%以上であることを検証する
+2. WHEN `pnpm test:coverage` が実行される場合、THE Test_Coverage_System SHALL 共有パッケージ全体でlines・functions・branches・statementsの各指標が70%以上であることを検証する
+3. WHEN カバレッジが設定済み閾値（`vitest.config.mts` の `coverage.lines/functions/branches/statements: 60`）を下回る場合、THE Test_Coverage_System SHALL テスト実行を非ゼロの終了コードで終了する
+4. THE Test_Coverage_System SHALL カバレッジレポートをHTML形式（`./coverage/` ディレクトリ）で出力する
+5. THE Test_Coverage_System SHALL カバレッジレポートをJSON形式（`./coverage/coverage-summary.json`）で出力する（CIでのPRコメント投稿に使用）

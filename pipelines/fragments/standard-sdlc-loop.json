@@ -1,0 +1,71 @@
+{
+  "action": "pipeline",
+  "name": "standard-sdlc-loop",
+  "description": "Reusable SDLC skeleton: requirements extraction → design synthesis → test planning → task decomposition → summary.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "source_path": "",
+    "source_type": "meeting_notes",
+    "language": "ja",
+    "customer_name": "",
+    "customer_org": "",
+    "additional_context": "",
+    "validation_profile": "default"
+  },
+  "steps": [
+    {
+      "id": "extract_requirements",
+      "type": "apply",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{source_path}}",
+        "source_type": "{{source_type}}",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_org": "{{customer_org}}",
+        "export_as": "requirements"
+      }
+    },
+    {
+      "id": "synthesize_design",
+      "type": "apply",
+      "op": "wisdom:extract_design_spec",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "additional_context": "{{additional_context}}",
+        "export_as": "design"
+      }
+    },
+    {
+      "id": "derive_test_plan",
+      "type": "apply",
+      "op": "wisdom:extract_test_plan",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "export_as": "test_plan"
+      }
+    },
+    {
+      "id": "decompose_tasks",
+      "type": "apply",
+      "op": "wisdom:decompose_into_tasks",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "export_as": "task_plan"
+      }
+    },
+    {
+      "id": "emit_summary",
+      "op": "system:log",
+      "params": {
+        "message": "SDLC fragment complete for {{project_name}}: requirements v{{requirements.version}} / design v{{design.version}} / test plan v{{test_plan.version}} / task plan v{{task_plan.version}}."
+      }
+    }
+  ]
+}
