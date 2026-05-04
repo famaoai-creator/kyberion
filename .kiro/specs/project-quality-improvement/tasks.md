@@ -92,13 +92,13 @@
     - 正常系: `capture_screen` でスクリーンショット取得後に `last_screenshot_path` が設定されることを検証する
     - _要件: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-  - [ ]\* 5.2 ios-actuatorのProperty 1プロパティテストを作成する
+  - [x] 5.2 ios-actuatorのProperty 1プロパティテストを作成する
     - **Property 1: パイプライン結果の構造不変条件**
     - **検証: 要件 1.3, 1.7, 4.5**
     - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
     - タグ: `Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件`
 
-  - [ ]\* 5.3 ios-actuatorのProperty 2プロパティテストを作成する
+  - [ ] 5.3 ios-actuatorのProperty 2プロパティテストを作成する
     - **Property 2: SAFETY_LIMITエラーの一貫性**
     - **検証: 要件 1.6**
     - `fc.integer({ min: 1, max: 10 })` で任意の `max_steps` を生成し、`max_steps + 1` 以上のステップを持つパイプラインが常に `[SAFETY_LIMIT]` プレフィックスのエラーをスローすることを検証する（`numRuns: 100`）
@@ -113,7 +113,7 @@
     - エラーケース: `max_steps` 超過時に `[SAFETY_LIMIT]` エラーをスローすることを検証する
     - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
-  - [ ]\* 6.2 network-actuatorのProperty 1プロパティテストを作成する
+  - [x] 6.2 network-actuatorのProperty 1プロパティテストを作成する
     - **Property 1: パイプライン結果の構造不変条件**
     - **検証: 要件 1.3, 1.7, 4.5**
     - `fc.array` で任意のステップ配列を生成し、`handleAction()` の返り値の `status` が常に `'success'` または `'failed'` であることを検証する（`numRuns: 100`）
