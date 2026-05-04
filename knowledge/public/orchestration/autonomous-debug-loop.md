@@ -4,12 +4,15 @@ category: Orchestration
 tags: [orchestration, autonomous, debug, loop]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-05-04
 ---
 
 # 自律型デバッグ・ループ (Autonomous Debug Loop)
 
 capability execution 中に予期せぬエラーが発生した際の、自動復旧と再試行の標準プロトコル。
+
+このループは、すでに pipeline として凍結された実行が失敗した後の復旧を扱う。
+探索中の曖昧さ整理や pipeline 化そのものは [パイプライン結晶化ループ設計メモ](./pipeline-crystallization-memo.md) を参照する。
 
 ## 1. エラー検知 (Detection)
 

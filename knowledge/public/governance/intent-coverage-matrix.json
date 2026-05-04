@@ -83,6 +83,20 @@
       "gaps": []
     },
     {
+      "intent_id": "reconcile-capability-lifecycle",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session + provider-capabilities:scan",
+      "work_shape": "pipeline",
+      "outcome_ids": ["capability_lifecycle_report"],
+      "execution_path": [
+        "task-session classifier",
+        "provider capability scanner",
+        "registry reconciliation",
+        "governed report"
+      ],
+      "gaps": []
+    },
+    {
       "intent_id": "launch-first-run-onboarding",
       "status": "implemented",
       "entry_path": "voice-hub + task-session",

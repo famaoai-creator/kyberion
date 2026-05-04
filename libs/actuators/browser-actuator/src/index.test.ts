@@ -4,14 +4,20 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } fr
 
 const mocks = vi.hoisted(() => {
   const pageHandlers = new Map<string, Record<string, Function>>();
-  function createPage(label: string, initialUrl = 'https://example.com', initialTitle = 'Test Page') {
+  function createPage(
+    label: string,
+    initialUrl = 'https://example.com',
+    initialTitle = 'Test Page'
+  ) {
     const handlers: Record<string, Function> = {};
     pageHandlers.set(label, handlers);
     let currentUrl = initialUrl;
     let currentTitle = initialTitle;
     const videoPath = `${process.cwd()}/evidence/browser/videos/${label}.webm`;
     return {
-      goto: vi.fn(async (url: string) => { currentUrl = url; }),
+      goto: vi.fn(async (url: string) => {
+        currentUrl = url;
+      }),
       click: vi.fn(async () => undefined),
       fill: vi.fn(async () => undefined),
       press: vi.fn(async () => undefined),
@@ -49,7 +55,9 @@ const mocks = vi.hoisted(() => {
       on: vi.fn((event: string, handler: Function) => {
         handlers[event] = handler;
       }),
-      __setTitle: (next: string) => { currentTitle = next; },
+      __setTitle: (next: string) => {
+        currentTitle = next;
+      },
       __handlers: handlers,
     };
   }
@@ -126,10 +134,10 @@ vi.mock('@playwright/test', async () => {
   const actual = await vi.importActual<typeof import('@playwright/test')>('@playwright/test');
   return {
     ...actual,
-  chromium: {
-    launchPersistentContext: mocks.launchPersistentContext,
-    connectOverCDP: mocks.connectOverCDP,
-  },
+    chromium: {
+      launchPersistentContext: mocks.launchPersistentContext,
+      connectOverCDP: mocks.connectOverCDP,
+    },
   };
 });
 
@@ -156,7 +164,9 @@ describe('browser-actuator v3 contract', () => {
 
     expect(mocks.launchPersistentContext).toHaveBeenCalled();
     expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
-    expect(mocks.page.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'hello', { timeout: 5000 });
+    expect(mocks.page.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'hello', {
+      timeout: 5000,
+    });
     expect(result.context.snapshot).toMatchObject({
       session_id: 'browser-test',
       title: 'Test Page',
@@ -237,14 +247,22 @@ describe('browser-actuator v3 contract', () => {
     mocks.page2.goto.mockImplementationOnce(async (url: string) => {
       const handlers = mocks.pageHandlers.get('tab-2') || {};
       handlers.console?.({ type: () => 'log', text: () => 'hello from tab 2' });
-      handlers.request?.({ method: () => 'GET', url: () => `${url}/api`, resourceType: () => 'fetch' });
+      handlers.request?.({
+        method: () => 'GET',
+        url: () => `${url}/api`,
+        resourceType: () => 'fetch',
+      });
     });
 
     const result = await handleAction({
       action: 'pipeline',
       session_id: 'browser-test',
       steps: [
-        { type: 'control', op: 'open_tab', params: { url: 'https://example.org', tab_id: 'research' } },
+        {
+          type: 'control',
+          op: 'open_tab',
+          params: { url: 'https://example.org', tab_id: 'research' },
+        },
         { type: 'control', op: 'select_tab', params: { tab_id: 'research' } },
         { type: 'capture', op: 'tabs', params: { export_as: 'tabs' } },
         { type: 'capture', op: 'console', params: { export_as: 'console' } },
@@ -281,8 +299,16 @@ describe('browser-actuator v3 contract', () => {
         { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
         { type: 'apply', op: 'click_ref', params: { ref: '@e1' } },
         { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
-        { type: 'capture', op: 'content', params: { selector: 'button:nth-of-type(1)', export_as: 'content' } },
-        { type: 'transform', op: 'export_playwright', params: { path: specPath, export_as: 'spec_path', assertions: 'strict' } },
+        {
+          type: 'capture',
+          op: 'content',
+          params: { selector: 'button:nth-of-type(1)', export_as: 'content' },
+        },
+        {
+          type: 'transform',
+          op: 'export_playwright',
+          params: { path: specPath, export_as: 'spec_path', assertions: 'strict' },
+        },
         { type: 'transform', op: 'export_adf', params: { path: adfPath, export_as: 'adf_path' } },
       ],
       options: { headless: true },
@@ -292,7 +318,11 @@ describe('browser-actuator v3 contract', () => {
       expect.objectContaining({ op: 'snapshot', kind: 'capture' }),
       expect.objectContaining({ op: 'click_ref', kind: 'apply', ref: '@e1' }),
       expect.objectContaining({ op: 'fill_ref', kind: 'apply', ref: '@e1', text: 'hello' }),
-      expect.objectContaining({ op: 'content', kind: 'capture', selector: 'button:nth-of-type(1)' }),
+      expect.objectContaining({
+        op: 'content',
+        kind: 'capture',
+        selector: 'button:nth-of-type(1)',
+      }),
     ]);
     expect(result.context.spec_path).toBe(specPath);
     expect(result.context.adf_path).toBe(adfPath);
@@ -302,8 +332,12 @@ describe('browser-actuator v3 contract', () => {
     expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toBeVisible();');
     expect(spec).toContain('await page.click("button:nth-of-type(1)");');
     expect(spec).toContain('await page.fill("button:nth-of-type(1)", "hello");');
-    expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toHaveValue("hello");');
-    expect(spec).toContain('await expect(page.locator("button:nth-of-type(1)")).toContainText("content");');
+    expect(spec).toContain(
+      'await expect(page.locator("button:nth-of-type(1)")).toHaveValue("hello");'
+    );
+    expect(spec).toContain(
+      'await expect(page.locator("button:nth-of-type(1)")).toContainText("content");'
+    );
     expect(JSON.parse(safeReadFile(adfPath, { encoding: 'utf8' }) as string)).toMatchObject({
       action: 'pipeline',
       session_id: 'browser-test',
@@ -363,10 +397,10 @@ describe('browser-actuator v3 contract', () => {
         recordVideo: {
           dir: path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video'),
         },
-      }),
+      })
     );
     expect(result.context.video_output_dir).toBe(
-      path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video'),
+      path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video')
     );
     expect(result.context.video_recording_pending).toBe(false);
     expect(result.context.recorded_videos).toEqual([
@@ -392,9 +426,7 @@ describe('browser-actuator v3 contract', () => {
 
     expect(result.context.video_recording_pending).toBe(true);
     expect(result.context.recorded_videos).toEqual([]);
-    expect(result.context.video_output_dir).toBe(
-      path.resolve(process.cwd(), videoOutputDir),
-    );
+    expect(result.context.video_output_dir).toBe(path.resolve(process.cwd(), videoOutputDir));
   });
 
   it('configures a virtual passkey authenticator and inspects stored credentials', async () => {
@@ -404,7 +436,11 @@ describe('browser-actuator v3 contract', () => {
       action: 'pipeline',
       session_id: 'browser-passkey',
       steps: [
-        { type: 'control', op: 'setup_passkey_authenticator', params: { export_as: 'authenticator' } },
+        {
+          type: 'control',
+          op: 'setup_passkey_authenticator',
+          params: { export_as: 'authenticator' },
+        },
         { type: 'capture', op: 'passkey_credentials', params: { export_as: 'credentials' } },
         { type: 'apply', op: 'set_passkey_user_verified', params: { is_user_verified: false } },
         { type: 'apply', op: 'set_passkey_presence', params: { enabled: false } },
@@ -425,7 +461,7 @@ describe('browser-actuator v3 contract', () => {
           hasResidentKey: true,
           hasUserVerification: true,
         }),
-      }),
+      })
     );
     expect(result.context.authenticator).toMatchObject({
       authenticator_id: 'auth-1',
@@ -459,16 +495,36 @@ describe('browser-actuator v3 contract', () => {
       session_id: 'browser-passkey-flow',
       context: { username: 'kyberion_passkey_demo' },
       steps: [
-        { type: 'apply', op: 'register_passkey', params: { provider: 'webauthn.io', username: '{{username}}', export_as: 'registration' } },
-        { type: 'apply', op: 'authenticate_passkey', params: { provider: 'webauthn.io', username: '{{username}}', export_as: 'authentication' } },
-        { type: 'apply', op: 'delete_passkey', params: { username: '{{username}}', export_as: 'deletion' } },
+        {
+          type: 'apply',
+          op: 'register_passkey',
+          params: { provider: 'webauthn.io', username: '{{username}}', export_as: 'registration' },
+        },
+        {
+          type: 'apply',
+          op: 'authenticate_passkey',
+          params: {
+            provider: 'webauthn.io',
+            username: '{{username}}',
+            export_as: 'authentication',
+          },
+        },
+        {
+          type: 'apply',
+          op: 'delete_passkey',
+          params: { username: '{{username}}', export_as: 'deletion' },
+        },
       ],
       options: { headless: true },
     });
 
-    expect(mocks.page.goto).toHaveBeenCalledWith('https://webauthn.io/', { waitUntil: 'networkidle' });
+    expect(mocks.page.goto).toHaveBeenCalledWith('https://webauthn.io/', {
+      waitUntil: 'networkidle',
+    });
     expect(mocks.context.clearCookies).toHaveBeenCalled();
-    expect(mocks.page.fill).toHaveBeenCalledWith('#input-email', 'kyberion_passkey_demo', { timeout: 5000 });
+    expect(mocks.page.fill).toHaveBeenCalledWith('#input-email', 'kyberion_passkey_demo', {
+      timeout: 5000,
+    });
     expect(mocks.page.click).toHaveBeenCalledWith('#register-button', { timeout: 5000 });
     expect(mocks.page.click).toHaveBeenCalledWith('#login-button', { timeout: 5000 });
     const cdp = await mocks.context.newCDPSession.mock.results[0].value;
@@ -494,25 +550,72 @@ describe('browser-actuator v3 contract', () => {
   it('exports assertion hints in comment-only mode when requested', async () => {
     const { renderPlaywrightSkeleton } = await import('./index');
 
-    const spec = renderPlaywrightSkeleton([
-      { kind: 'capture', op: 'snapshot', url: 'https://example.com', title: 'Test Page', ts: new Date().toISOString() },
-      { kind: 'apply', op: 'click_ref', selector: 'button:nth-of-type(1)', ref: '@e1', element_name: 'Submit', element_role: 'button', ts: new Date().toISOString() },
-    ], { assertions: 'hint' });
+    const spec = renderPlaywrightSkeleton(
+      [
+        {
+          kind: 'capture',
+          op: 'snapshot',
+          url: 'https://example.com',
+          title: 'Test Page',
+          ts: new Date().toISOString(),
+        },
+        {
+          kind: 'apply',
+          op: 'click_ref',
+          selector: 'button:nth-of-type(1)',
+          ref: '@e1',
+          element_name: 'Submit',
+          element_role: 'button',
+          ts: new Date().toISOString(),
+        },
+      ],
+      { assertions: 'hint' }
+    );
 
-    expect(spec).toContain('// assertion hint: await expect(page).toHaveURL("https://example.com");');
+    expect(spec).toContain(
+      '// assertion hint: await expect(page).toHaveURL("https://example.com");'
+    );
     expect(spec).toContain('// assertion hint: await expect(page).toHaveTitle("Test Page");');
-    expect(spec).toContain('// assertion hint: await expect(page.locator("button:nth-of-type(1)")).toBeVisible();');
+    expect(spec).toContain(
+      '// assertion hint: await expect(page.locator("button:nth-of-type(1)")).toBeVisible();'
+    );
     expect(spec).toContain('await page.click("button:nth-of-type(1)");');
   });
 
   it('groups exported playwright skeleton into recorded actions and assertions with step labels', async () => {
     const { renderPlaywrightSkeleton } = await import('./index');
 
-    const spec = renderPlaywrightSkeleton([
-      { kind: 'capture', op: 'snapshot', url: 'https://example.com', title: 'Test Page', ts: new Date().toISOString() },
-      { kind: 'apply', op: 'click_ref', selector: 'button:nth-of-type(1)', ref: '@e1', element_name: 'Submit', element_role: 'button', ts: new Date().toISOString() },
-      { kind: 'apply', op: 'fill_ref', selector: 'input:nth-of-type(1)', ref: '@e2', text: 'hello', element_name: 'Name', element_role: 'textbox', ts: new Date().toISOString() },
-    ], { assertions: 'strict' });
+    const spec = renderPlaywrightSkeleton(
+      [
+        {
+          kind: 'capture',
+          op: 'snapshot',
+          url: 'https://example.com',
+          title: 'Test Page',
+          ts: new Date().toISOString(),
+        },
+        {
+          kind: 'apply',
+          op: 'click_ref',
+          selector: 'button:nth-of-type(1)',
+          ref: '@e1',
+          element_name: 'Submit',
+          element_role: 'button',
+          ts: new Date().toISOString(),
+        },
+        {
+          kind: 'apply',
+          op: 'fill_ref',
+          selector: 'input:nth-of-type(1)',
+          ref: '@e2',
+          text: 'hello',
+          element_name: 'Name',
+          element_role: 'textbox',
+          ts: new Date().toISOString(),
+        },
+      ],
+      { assertions: 'strict' }
+    );
 
     expect(spec).toContain('// recorded actions');
     expect(spec).toContain('// assertions');
@@ -563,7 +666,13 @@ describe('browser-actuator v3 contract', () => {
     await handleAction({
       action: 'pipeline',
       session_id: 'browser-pause',
-      steps: [{ type: 'control', op: 'pause_for_operator', params: { continue_file: continueFile, poll_ms: 10, timeout_ms: 500 } }],
+      steps: [
+        {
+          type: 'control',
+          op: 'pause_for_operator',
+          params: { continue_file: continueFile, poll_ms: 10, timeout_ms: 500 },
+        },
+      ],
       options: { headless: true },
     });
 
@@ -578,8 +687,20 @@ describe('browser-actuator v3 contract', () => {
       action: 'pipeline',
       session_id: 'browser-select-tab-matching',
       steps: [
-        { type: 'control', op: 'open_tab', params: { tab_id: 'rakuten-tab', url: 'https://travel.rakuten.co.jp/', waitUntil: 'domcontentloaded' } },
-        { type: 'control', op: 'select_tab_matching', params: { url_includes: 'travel.rakuten.co.jp' } },
+        {
+          type: 'control',
+          op: 'open_tab',
+          params: {
+            tab_id: 'rakuten-tab',
+            url: 'https://travel.rakuten.co.jp/',
+            waitUntil: 'domcontentloaded',
+          },
+        },
+        {
+          type: 'control',
+          op: 'select_tab_matching',
+          params: { url_includes: 'travel.rakuten.co.jp' },
+        },
         { type: 'capture', op: 'tabs', params: { export_as: 'tabs' } },
       ],
       options: { headless: true },
@@ -609,8 +730,12 @@ describe('browser-actuator v3 contract', () => {
       path.resolve(process.cwd(), 'active/shared/tmp/browser/chrome-profile'),
       expect.objectContaining({
         channel: 'chrome',
-        args: ['--disable-features=Translate', '--profile-directory=Profile 1', '--remote-debugging-port=0'],
-      }),
+        args: [
+          '--disable-features=Translate',
+          '--profile-directory=Profile 1',
+          '--remote-debugging-port=0',
+        ],
+      })
     );
   });
 
@@ -639,22 +764,33 @@ describe('browser-actuator v3 contract', () => {
     const { handleAction, resetBrowserRuntimeLeasesForTest } = await import('./index');
     const sessionId = 'browser-cdp-reconnect';
     await resetBrowserRuntimeLeasesForTest();
-    const metadataPath = path.resolve(process.cwd(), 'active/shared/runtime/browser/sessions', `${sessionId}.json`);
+    const metadataPath = path.resolve(
+      process.cwd(),
+      'active/shared/runtime/browser/sessions',
+      `${sessionId}.json`
+    );
     safeMkdir(path.dirname(metadataPath), { recursive: true });
-    safeWriteFile(metadataPath, JSON.stringify({
-      session_id: sessionId,
-      user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
-      active_tab_id: 'tab-1',
-      tab_count: 1,
-      tabs: [{ tab_id: 'tab-1', url: 'https://example.com', title: 'Test Page', active: true }],
-      updated_at: new Date().toISOString(),
-      lease_status: 'active',
-      retained: true,
-      cdp_url: 'http://127.0.0.1:9334',
-      cdp_port: 9334,
-      action_trail_count: 1,
-      recent_actions: [],
-    }, null, 2));
+    safeWriteFile(
+      metadataPath,
+      JSON.stringify(
+        {
+          session_id: sessionId,
+          user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
+          active_tab_id: 'tab-1',
+          tab_count: 1,
+          tabs: [{ tab_id: 'tab-1', url: 'https://example.com', title: 'Test Page', active: true }],
+          updated_at: new Date().toISOString(),
+          lease_status: 'active',
+          retained: true,
+          cdp_url: 'http://127.0.0.1:9334',
+          cdp_port: 9334,
+          action_trail_count: 1,
+          recent_actions: [],
+        },
+        null,
+        2
+      )
+    );
 
     const result = await handleAction({
       action: 'pipeline',
@@ -669,5 +805,83 @@ describe('browser-actuator v3 contract', () => {
     expect(result.status).toBe('succeeded');
     expect(mocks.connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9334');
     expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+  });
+
+  it('handles pipeline with unsupported action gracefully', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [{ type: 'apply', op: 'unknown_op', params: {} }],
+      options: { headless: true },
+    });
+
+    // Unknown ops should fail gracefully
+    expect(result.status).toBe('failed');
+  });
+
+  it('handles goto navigation', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-nav',
+      steps: [{ type: 'apply', op: 'goto', params: { url: 'https://example.com' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.goto).toHaveBeenCalledWith('https://example.com', expect.any(Object));
+  });
+
+  it('handles screenshot capture', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-screenshot',
+      steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'screenshot' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.screenshot).toHaveBeenCalled();
+  });
+
+  it('handles page content capture', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-content',
+      steps: [{ type: 'capture', op: 'content', params: { export_as: 'page_content' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.page_content).toBe('<html></html>');
+  });
+
+  it('handles page title capture', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-title',
+      steps: [{ type: 'capture', op: 'title', params: { export_as: 'page_title' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.page_title).toBe('Test Page');
+  });
+
+  it('handles url capture', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-url',
+      steps: [{ type: 'capture', op: 'url', params: { export_as: 'current_url' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.current_url).toBe('https://example.com');
   });
 });

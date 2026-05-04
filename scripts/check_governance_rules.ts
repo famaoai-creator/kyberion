@@ -98,6 +98,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/provider-capability-scan-policy.json',
   },
   {
+    id: 'capability-lifecycle-procedure',
+    schemaPath: 'knowledge/public/schemas/capability-lifecycle-procedure.schema.json',
+    dataPath: 'knowledge/public/governance/capability-lifecycle-procedure.json',
+  },
+  {
     id: 'execution-receipt-policy',
     schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
     dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
