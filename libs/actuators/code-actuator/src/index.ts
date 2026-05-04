@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver, loadCapabilityRegistry, scanProviderCapabilities } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -160,9 +160,25 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           });
         }
       }
+      capabilities.push(...discoverProviderCliCapabilities());
       return { ...ctx, [params.export_as || 'capabilities_list']: capabilities };
     default: return ctx;
   }
+}
+
+function discoverProviderCliCapabilities(): any[] {
+  const registry = loadCapabilityRegistry();
+  return scanProviderCapabilities(registry, undefined, { includeUnavailable: false }).map((capability) => ({
+    name: capability.source.name,
+    path: `${capability.source.provider} ${capability.source.name}`.trim(),
+    category: capability.source.type,
+    provider: capability.source.provider,
+    capability_id: capability.capability_id,
+    status: capability.discovery_status === 'available' ? capability.status : 'blocked',
+    description: capability.notes || capability.capability_id,
+    evidence: capability.evidence || capability.provider_probe.evidence,
+    discovery_status: capability.discovery_status,
+  }));
 }
 
 /**
