@@ -19,6 +19,8 @@ export const RISKY_OPS = {
   AUTH_GRANT_AUTHORITY: 'auth:grant_authority',
   CONFIG_UPDATE: 'config:update',
   VAULT_WRITE: 'vault:write',
+  CLAUDE_BROWSER_INTERACTIVE: 'claude:browser_interactive',
+  CLAUDE_DOCUMENT_GENERATION: 'claude:document_generation',
 } as const;
 
 export type RiskyOpId = typeof RISKY_OPS[keyof typeof RISKY_OPS];

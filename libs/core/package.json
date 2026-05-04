@@ -147,6 +147,26 @@
       "types": "./dist/provider-capability-scanner.d.ts",
       "default": "./dist/provider-capability-scanner.js"
     },
+    "./provider-bridge": {
+      "types": "./dist/provider-bridge.d.ts",
+      "default": "./dist/provider-bridge.js"
+    },
+    "./openai-compatible-backend": {
+      "types": "./dist/openai-compatible-backend.d.ts",
+      "default": "./dist/openai-compatible-backend.js"
+    },
+    "./reasoning-bootstrap": {
+      "types": "./dist/reasoning-bootstrap.d.ts",
+      "default": "./dist/reasoning-bootstrap.js"
+    },
+    "./claude-task-runner": {
+      "types": "./dist/claude-task-runner.d.ts",
+      "default": "./dist/claude-task-runner.js"
+    },
+    "./claude-task-session-executor": {
+      "types": "./dist/claude-task-session-executor.d.ts",
+      "default": "./dist/claude-task-session-executor.js"
+    },
     "./reflex-terminal": {
       "types": "./dist/reflex-terminal.d.ts",
       "default": "./dist/reflex-terminal.js"
@@ -197,10 +217,11 @@
     }
   },
   "dependencies": {
-    "chalk": "^4.1.2",
-    "yargs": "^18.0.0",
     "axios": "^1.13.4",
+    "chalk": "^4.1.2",
     "js-yaml": "^4.1.1",
-    "marked": "^12.0.0"
+    "marked": "^12.0.0",
+    "openai": "^6.35.0",
+    "yargs": "^18.0.0"
   }
 }

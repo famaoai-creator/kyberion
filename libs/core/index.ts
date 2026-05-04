@@ -239,6 +239,10 @@ export { ReflexTerminal } from './reflex-terminal.js';
 export type { ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './sensor-engine.js';
 export * from './sensory-memory.js';
+export * from './provider-capability-scanner.js';
+export * from './provider-bridge.js';
+export * from './claude-task-runner.js';
+export * from './claude-task-session-executor.js';
 export * from './actuator-op-registry.js';
 export * from './stimuli-journal.js';
 
@@ -555,6 +559,15 @@ export type { CodexCliIntentExtractorOptions } from './codex-cli-intent-extracto
 export { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
 export type { CodexCliVoiceBridgeOptions } from './codex-cli-voice-bridge.js';
 export { runCodexCliQuery, buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
+export {
+  OpenAiCompatibleBackend,
+  buildOpenAiCompatibleBackendFromEnv,
+  probeOpenAiCompatibleBackendAvailability,
+} from './openai-compatible-backend.js';
+export type {
+  OpenAiCompatibleBackendOptions,
+  OpenAiCompatibleBackendAvailability,
+} from './openai-compatible-backend.js';
 export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
 export type { CodexCliQueryOptions, RunCodexCliQueryParams } from './codex-cli-query.js';
 export { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
