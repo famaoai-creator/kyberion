@@ -28,6 +28,7 @@ import {
 } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
 import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
+import { probeOpenAiCompatibleBackendAvailability } from './openai-compatible-backend.js';
 
 export function installCoreEnvironmentProbes(): void {
   registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
@@ -40,31 +41,26 @@ export function installCoreEnvironmentProbes(): void {
  * ------------------------------------------------------------------ */
 
 async function probeReasoningBackend(): Promise<{ available: boolean; reason?: string }> {
-  const candidates: Array<{ name: string; check: () => boolean }> = [
-    {
-      name: 'claude-cli',
-      check: () =>
-        process.env.CLAUDE_API_KEY !== undefined ||
-        probeShellClaudeCliAvailability().available,
-    },
-    {
-      name: 'anthropic',
-      check: () => Boolean(process.env.ANTHROPIC_API_KEY),
-    },
-    {
-      name: 'gemini-cli',
-      check: () => binaryAvailable('gemini', ['--version']),
-    },
-    {
-      name: 'codex-cli',
-      check: () => binaryAvailable('codex', ['--version']),
-    },
-  ];
-  if (candidates.find((c) => c.check())) return { available: true };
+  if (process.env.CLAUDE_API_KEY !== undefined || probeShellClaudeCliAvailability().available) {
+    return { available: true };
+  }
+  if (Boolean(process.env.ANTHROPIC_API_KEY)) {
+    return { available: true };
+  }
+  if (Boolean(process.env.KYBERION_LOCAL_LLM_URL)) {
+    const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
+    if (localProbe.available) return { available: true };
+  }
+  if (binaryAvailable('gemini', ['--version'])) {
+    return { available: true };
+  }
+  if (binaryAvailable('codex', ['--version'])) {
+    return { available: true };
+  }
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: claude CLI, anthropic API key (ANTHROPIC_API_KEY), gemini CLI, codex CLI. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: claude CLI, anthropic API key (ANTHROPIC_API_KEY), local LLM URL (KYBERION_LOCAL_LLM_URL), gemini CLI, codex CLI. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

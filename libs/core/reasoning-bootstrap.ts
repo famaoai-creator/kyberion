@@ -38,6 +38,10 @@ import { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
 import { buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
 import { buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
 import { buildShellClaudeCliBackendFromEnv } from './shell-claude-cli-backend.js';
+import {
+  OpenAiCompatibleBackend,
+  buildOpenAiCompatibleBackendFromEnv,
+} from './openai-compatible-backend.js';
 import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
 import { registerVoiceBridge } from './voice-bridge.js';
@@ -54,6 +58,7 @@ export type ReasoningBackendMode =
   | 'anthropic'
   | 'gemini-cli'
   | 'gemini-api'
+  | 'local'
   | 'stub';
 
 let installed = false;
@@ -85,6 +90,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
     'anthropic',
     'gemini-cli',
     'gemini-api',
+    'local',
     'stub',
   ];
   if (envMode && validModes.includes(envMode)) {
@@ -93,6 +99,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   // Auto-selection logic
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
   if (process.env.GEMINI_API_KEY) return 'gemini-api';
+  if (process.env.KYBERION_LOCAL_LLM_URL) return 'local';
 
   const providers = discoverProviders(shouldRefreshProviders(options));
   if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
@@ -229,6 +236,26 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
     installedMode = 'gemini-cli';
     logger.success(
       `[reasoning-bootstrap] mode=gemini-cli — shell gemini CLI (model=${options.model ?? 'gemini-2.0-flash-exp'})`,
+    );
+    return true;
+  }
+
+  if (mode === 'local') {
+    const localBackend = buildOpenAiCompatibleBackendFromEnv(process.env);
+    if (!localBackend && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=local selected but KYBERION_LOCAL_LLM_URL is unset — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
+    const baseURL = process.env.KYBERION_LOCAL_LLM_URL || 'http://localhost:11434/v1';
+    const apiKey = process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
+    const model = options.model || process.env.KYBERION_LOCAL_LLM_MODEL || 'llama3';
+    registerReasoningBackend(new OpenAiCompatibleBackend({ baseURL, apiKey, model }));
+    installed = true;
+    installedMode = 'local';
+    logger.success(
+      `[reasoning-bootstrap] mode=local — OpenAI-compatible local server (${baseURL}, model=${model})`,
     );
     return true;
   }

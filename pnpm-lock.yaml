@@ -573,6 +573,9 @@ importers:
       marked:
         specifier: ^12.0.0
         version: 12.0.2
+      openai:
+        specifier: ^6.35.0
+        version: 6.35.0(ws@8.19.0)(zod@4.3.6)
       yargs:
         specifier: ^18.0.0
         version: 18.0.0
@@ -6585,6 +6588,18 @@ packages:
     peerDependencies:
       ws: ^8.18.0
       zod: ^3.23.8
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
+  openai@6.35.0:
+    resolution: {integrity: sha512-L/skwIGnt5xQZHb0UfTu9uAUKbis3ehKypOuJKi20QvG7UStV6C8IC3myGYHcdiF4kms/bAvOJ9UqqNWqi8x/Q==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       ws:
         optional: true
@@ -15407,6 +15422,11 @@ snapshots:
       zod: 4.3.6
     transitivePeerDependencies:
       - encoding
+
+  openai@6.35.0(ws@8.19.0)(zod@4.3.6):
+    optionalDependencies:
+      ws: 8.19.0
+      zod: 4.3.6
 
   opencollective-postinstall@2.0.3: {}
 

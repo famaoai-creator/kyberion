@@ -22,6 +22,7 @@ import {
 } from './mission-team-plan-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
 import { classifyTaskSessionIntent, createTaskSession, saveTaskSession } from './task-session.js';
+import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
@@ -433,6 +434,83 @@ async function handleTaskSessionRoute(
     payload: intent.payload,
   });
   saveTaskSession(session);
+
+  const shouldExecuteClaudeTask =
+    session.requirements?.missing?.length === 0 &&
+    (session.task_type === 'browser' ||
+      session.task_type === 'report_document' ||
+      session.task_type === 'document_generation');
+
+  if (shouldExecuteClaudeTask) {
+    try {
+      const result = await executeApprovedClaudeTaskSession({
+        session,
+        queryText,
+        agentId: context.input.agentId,
+        channel: context.input.surface,
+        missionId: context.input.missionId,
+      });
+      if (intent.intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intent.intentId,
+          execution_shape: result.session.work_loop?.resolution.execution_shape || 'task_session',
+          contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
+          success: true,
+          context_fingerprint: {
+            execution_shape: result.session.work_loop?.resolution.execution_shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      return emptySurfaceResult(
+        [
+          `Created task session: ${result.session.session_id}`,
+          `Intent: ${intent.intentId}`,
+          `Task type: ${result.session.task_type}`,
+          `Goal: ${result.session.goal.summary}`,
+          `Claude runner kind: ${result.kind}`,
+          `Artifact: ${result.outputPath}`,
+          '',
+          formatExecutionReceipt({
+            intentId: intent.intentId,
+            shape: result.session.work_loop?.resolution.execution_shape || 'task_session',
+            command: `claude-task-session ${result.kind} ${result.session.session_id}`,
+            status: 'ok',
+          }),
+          '',
+          result.output.trim() || '(no output)',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      );
+    } catch (error: any) {
+      logger.warn(
+        `[SURFACE] Claude task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`,
+      );
+      if (intent.intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intent.intentId,
+          execution_shape: session.work_loop?.resolution.execution_shape || 'task_session',
+          contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: session.work_loop?.resolution.execution_shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      return emptySurfaceResult(
+        [
+          `Created task session: ${session.session_id}`,
+          `Intent: ${intent.intentId}`,
+          `Task type: ${session.task_type}`,
+          `Goal: ${session.goal.summary}`,
+          `Claude runner execution failed: ${error?.message || String(error)}`,
+        ].join('\n'),
+      );
+    }
+  }
 
   if (intent.intentId) {
     recordLearningOutcomeSafely({

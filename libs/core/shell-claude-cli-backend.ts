@@ -58,6 +58,24 @@ export interface ShellClaudeCliAvailability {
   reason?: string;
 }
 
+export interface BrowserAgentTaskInput {
+  /** Natural language instruction for the browser / computer-use task. */
+  instruction: string;
+  /** Optional context to prepend to the prompt. */
+  context?: string;
+  /** Maximum number of agentic turns. Defaults to 10. */
+  maxTurns?: number;
+}
+
+export interface DocumentAgentTaskInput {
+  /** Natural language instruction for the document or media generation task. */
+  instruction: string;
+  /** Optional context to prepend to the prompt. */
+  context?: string;
+  /** Maximum number of agentic turns. Defaults to 15. */
+  maxTurns?: number;
+}
+
 export class ShellClaudeCliBackend implements ReasoningBackend {
   readonly name = 'shell-claude-cli';
   private readonly bin: string;
@@ -347,7 +365,54 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     return this.delegateTask(prompt);
   }
 
-  private async runStructured<T>(params: {
+  /**
+   * Run a document or media generation task in a separate Claude CLI agent
+   * session. This is intended for higher-level orchestration paths that need
+   * artifact generation without using the reasoning-only structured backend.
+   */
+  async runDocumentAgentTask(input: DocumentAgentTaskInput): Promise<string> {
+    const prompt = [
+      input.instruction.trim(),
+      input.context ? `Context: ${input.context}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const args = [
+      '--dangerously-skip-permissions',
+      '-p',
+      prompt,
+      ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
+      ...this.extraArgs,
+    ];
+
+    return this.spawnCli(args, '');
+  }
+
+  /**
+   * Run a browser-interactive or computer-use task in a separate Claude CLI
+   * agent session.
+   */
+  async runBrowserAgentTask(input: BrowserAgentTaskInput): Promise<string> {
+    const prompt = [
+      input.instruction.trim(),
+      input.context ? `Context: ${input.context}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const args = [
+      '--dangerously-skip-permissions',
+      '-p',
+      prompt,
+      ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
+      ...this.extraArgs,
+    ];
+
+    return this.spawnCli(args, '');
+  }
+
+  async runStructured<T>(params: {
     systemPrompt: string;
     userPrompt: string;
     schema: ZodType<T>;
@@ -456,6 +521,40 @@ export function probeShellClaudeCliAvailability(
   } catch (err: any) {
     return { available: false, reason: err?.message ?? String(err) };
   }
+}
+
+export interface RunClaudeCliQueryParams<T> {
+  systemPrompt: string;
+  userPrompt: string;
+  schema: ZodType<T>;
+  options?: ShellClaudeCliBackendOptions;
+}
+
+export async function runClaudeCliQuery<T>({
+  systemPrompt,
+  userPrompt,
+  schema,
+  options = {},
+}: RunClaudeCliQueryParams<T>): Promise<T> {
+  const backend = new ShellClaudeCliBackend(options);
+  return backend.runStructured({ systemPrompt, userPrompt, schema });
+}
+
+export function buildClaudeCliOptionsFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): ShellClaudeCliBackendOptions {
+  const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim();
+  const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
+  const timeoutRaw = env.KYBERION_CLAUDE_CLI_TIMEOUT_MS?.trim();
+  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
+  const extraRaw = env.KYBERION_CLAUDE_CLI_EXTRA_ARGS?.trim();
+  const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
+  return {
+    ...(bin ? { bin } : {}),
+    ...(model ? { model } : {}),
+    ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
+    ...(extraArgs ? { extraArgs } : {}),
+  };
 }
 
 export function buildShellClaudeCliBackendFromEnv(

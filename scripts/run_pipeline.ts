@@ -38,53 +38,37 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
     return dispatchCache[domain];
   }
 
-  if (domain === 'browser') {
-    dispatchCache[domain] = async (op, params, ctx, type) => {
-      let mod: any;
-      try {
-        const entry = capabilityEntry('browser-actuator');
-        mod = await import(pathToFileURL(entry).href);
-      } catch (err) {
-        logger.info(`  [SYS_PIPELINE] Could not load browser actuator: ${String(err)}`);
-        return { handled: false, ctx };
-      }
+  // Check for Provider Bridge (Gemini, GH, Codex native tools)
+  const { resolveProviderCapabilityId, invokeProviderCapability } = await import('@agent/core/provider-bridge');
 
-      try {
-        const browserSessionId = String(
-          ctx.browser_session_id ||
-            ctx.session_id ||
-            ctx.mission_id ||
-            'default',
-        );
-        const result = await mod.handleAction({
-          action: 'pipeline',
-          session_id: browserSessionId,
-          options: { keep_alive: true },
-          steps: [{ type: type || 'apply', op, params }],
-          context: ctx,
-        });
-        return { handled: true, ctx: (result as any)?.context || ctx };
-      } catch (err: any) {
-        const message = err?.message || String(err);
-        throw new Error(`Browser actuator execution failed for ${op}: ${message}`);
-      }
-    };
-    return dispatchCache[domain];
-  }
+  dispatchCache[domain] = async (op, params, ctx, type) => {
+    // Try to resolve a registered capability for this domain:op
+    const resolvedId = resolveProviderCapabilityId(domain, op);
+    if (resolvedId) {
+      const result = await invokeProviderCapability({
+        capabilityId: resolvedId,
+        args: params.args,
+        payload: params.payload || params.instruction || params.prompt,
+        context: ctx,
+      });
+      let parsed = result;
+      try { parsed = JSON.parse(result); } catch {}
+      return { handled: true, ctx: { ...ctx, [params.export_as || 'last_provider_result']: parsed } };
+    }
 
-  try {
-    const entry = capabilityEntry(`${domain}-actuator`);
-    const mod = await import(pathToFileURL(entry).href);
-    
-    dispatchCache[domain] = async (op, params, ctx, type) => {
-      let result = { handled: false, ctx };
+    let result = { handled: false, ctx };
 
-      // Priority 1: dispatchDecisionOp (Standard for Wisdom/Decision actuators)
+    // Standard actuator lookup fallback...
+    try {
+      const entry = capabilityEntry(`${domain}-actuator`);
+      const mod = await import(pathToFileURL(entry).href);
+      
+      // Priority 1: dispatchDecisionOp
       if (typeof mod.dispatchDecisionOp === 'function') {
         result = await mod.dispatchDecisionOp(op, params, ctx);
       }
       
-      // Priority 2: handleAction (Standard for Action-based actuators)
+      // Priority 2: handleAction
       if (!result.handled && typeof mod.handleAction === 'function') {
         try {
           const actionResult = await mod.handleAction({ 
@@ -105,13 +89,10 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
           }
         }
       }
-      
-      return result;
-    };
-  } catch (err) {
-    logger.info(`  [SYS_PIPELINE] Could not load actuator for domain: ${domain}`);
-    dispatchCache[domain] = async () => ({ handled: false, ctx: {} });
-  }
+    } catch (err) {}
+
+    return result;
+  };
   
   return dispatchCache[domain];
 }
