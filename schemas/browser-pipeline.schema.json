@@ -21,7 +21,14 @@
         "record_trace": { "type": "boolean" },
         "record_video": { "type": "boolean" },
         "max_steps": { "type": "integer" },
-        "timeout_ms": { "type": "integer" }
+        "timeout_ms": { "type": "integer" },
+        "user_data_dir": { "type": "string" },
+        "profile_directory": { "type": "string" },
+        "browser_channel": { "enum": ["chromium", "chrome"] },
+        "launch_args": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       }
     },
     "steps": {
@@ -37,7 +44,18 @@
               "goto", "screenshot", "content", "evaluate",
               "regex_extract", "json_query",
               "click", "fill", "press", "wait", "log",
-              "if", "while"
+              "if", "while",
+              "setup_passkey_authenticator",
+              "remove_passkey_authenticator",
+              "register_passkey",
+              "authenticate_passkey",
+              "delete_passkey",
+              "passkey_credentials",
+              "passkey_events",
+              "set_passkey_user_verified",
+              "set_passkey_presence",
+              "clear_passkey_credentials",
+              "list_profiles"
             ]
           },
           "params": { "type": "object" }

@@ -1,0 +1,225 @@
+{
+  "pipeline_id": "learnpasskeys-demo-flow",
+  "version": "1.0.0",
+  "description": "Full passkey lifecycle demo on learnpasskeys.io using my-evaluation-profile in headed mode.",
+  "action": "pipeline",
+  "options": {
+    "headless": false,
+    "user_data_dir": "active/shared/runtime/browser/profiles/my-evaluation-profile",
+    "browser_channel": "chrome",
+    "timeout_ms": 120000,
+    "viewport": { "width": 1280, "height": 800 }
+  },
+  "steps": [
+    {
+      "type": "control",
+      "op": "setup_passkey_authenticator",
+      "params": {
+        "export_as": "passkey_auth",
+        "protocol": "ctap2",
+        "transport": "internal",
+        "has_resident_key": true,
+        "has_user_verification": true
+      }
+    },
+    {
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "ナビゲーション：パスキーの作成ページ" }
+    },
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": { "url": "https://learnpasskeys.io/ja/demo/create" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 2000 }
+    },
+    {
+      "type": "capture",
+      "op": "evaluate",
+      "params": {
+        "script": "document.querySelectorAll('button').forEach(b => { if(b.innerText.includes('Accept All')) b.click(); });"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('登録方法を見る')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('データを選択')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('登録オプションを生成')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1500 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('登録オプションを使用')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1500 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('認証情報の作成を開始')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 3000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('アテステーション レスポンスを送信')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 2000 }
+    },
+    {
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "パスキーの作成完了。続いて読み取り（認証）ページへ遷移します。" }
+    },
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": { "url": "https://learnpasskeys.io/ja/demo/read" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 2000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('認証方法を見る')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('認証オプションを生成')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1500 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('認証オプションを使用')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1500 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('パスキーでサインイン')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 3000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('認証レスポンスを検証')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 2000 }
+    },
+    {
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "パスキー認証完了。続いてデータ削除ページへ遷移します。" }
+    },
+    {
+      "type": "capture",
+      "op": "goto",
+      "params": { "url": "https://learnpasskeys.io/ja/demo/delete" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 2000 }
+    },
+    {
+      "type": "capture",
+      "op": "evaluate",
+      "params": {
+        "script": "document.querySelectorAll('button').forEach(b => { if(b.innerText.includes('削除方法を見る')) b.click(); });"
+      }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 1000 }
+    },
+    {
+      "type": "apply",
+      "op": "click",
+      "params": { "selector": "button:has-text('デモで作成されたデータを今すぐ削除')" }
+    },
+    {
+      "type": "apply",
+      "op": "wait",
+      "params": { "duration": 2000 }
+    },
+    {
+      "type": "apply",
+      "op": "log",
+      "params": { "message": "全プロセスのテストが完了しました。" }
+    },
+    {
+      "type": "control",
+      "op": "remove_passkey_authenticator",
+      "params": {}
+    }
+  ]
+}
