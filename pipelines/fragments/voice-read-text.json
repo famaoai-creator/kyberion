@@ -1,0 +1,17 @@
+{
+  "pipeline_id": "voice-read-text",
+  "version": "1.0.0",
+  "description": "Fragment demonstrating how to synthesize and play text-to-speech audio using the local voice actuator.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "action": "speak_local",
+      "params": {
+        "text": "テキストの音声読み上げテストを完了しました。パスキーパイプラインとともに堅牢化されています。",
+        "style": "neutral",
+        "speed": 1.0,
+        "language": "ja"
+      }
+    }
+  ]
+}
