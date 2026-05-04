@@ -267,6 +267,7 @@ export * from './runtime-supervisor.js';
 export * from './surface-runtime.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
+export * from './provider-capability-scanner.js';
 export { enforceApprovalGate } from './approval-gate.js';
 export type { ApprovalGateParams, ApprovalGateResult } from './approval-gate.js';
 export { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './risky-op-registry.js';
