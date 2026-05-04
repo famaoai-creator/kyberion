@@ -1,0 +1,99 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "provider": "codex-cli",
+      "primary_probe": {
+        "command": "codex",
+        "args": ["--help"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "codex --help"
+      },
+      "evidence_probes": [
+        {
+          "capability_ids": ["provider.runtime.codex_app_server"],
+          "probe": {
+            "command": "codex",
+            "args": ["app-server", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "codex app-server --help"
+          }
+        }
+      ]
+    },
+    {
+      "provider": "gemini-cli",
+      "primary_probe": {
+        "command": "gemini",
+        "args": ["--help"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "gemini --help"
+      },
+      "evidence_probes": [
+        {
+          "capability_ids": ["cli.native.gemini_headless_prompt"],
+          "probe": {
+            "command": "gemini",
+            "args": ["--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "gemini -p / --prompt"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.gemini_extension_management"],
+          "probe": {
+            "command": "gemini",
+            "args": ["extensions", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "gemini extensions --help"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.gemini_skill_management"],
+          "probe": {
+            "command": "gemini",
+            "args": ["skills", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "gemini skills --help"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.gemini_hook_management"],
+          "probe": {
+            "command": "gemini",
+            "args": ["hooks", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "gemini hooks --help"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.gemini_mcp_management"],
+          "probe": {
+            "command": "gemini",
+            "args": ["mcp", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "gemini mcp --help"
+          }
+        }
+      ]
+    },
+    {
+      "provider": "gh",
+      "primary_probe": {
+        "command": "gh",
+        "args": ["--help"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "gh --help"
+      }
+    }
+  ]
+}
