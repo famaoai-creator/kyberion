@@ -38,6 +38,18 @@
       "intent_ids": ["vault:write"],
       "requires_approval": true,
       "missing_requirements": ["dual_key_confirmation"]
+    },
+    {
+      "id": "claude-browser-interactive",
+      "intent_ids": ["claude:browser_interactive"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "claude-document-generation",
+      "intent_ids": ["claude:document_generation"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
     }
   ],
   "defaults": {

@@ -14,6 +14,9 @@ describe('reasoning-bootstrap', () => {
     resetReasoningBackend();
     resetIntentExtractor();
     resetVoiceBridge();
+    delete process.env.KYBERION_LOCAL_LLM_URL;
+    delete process.env.KYBERION_LOCAL_LLM_MODEL;
+    delete process.env.KYBERION_LOCAL_LLM_KEY;
   });
 
   it('installs codex-cli adapters when requested explicitly', () => {
@@ -24,5 +27,16 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('codex-cli');
     expect(getIntentExtractor().name).toBe('codex-cli');
     expect(getVoiceBridge().name).toBe('codex-cli-text');
+  });
+
+  it('installs the local OpenAI-compatible backend when configured', () => {
+    process.env.KYBERION_LOCAL_LLM_URL = 'http://127.0.0.1:11434/v1';
+    process.env.KYBERION_LOCAL_LLM_MODEL = 'llama3.2';
+
+    const installed = installReasoningBackends({ mode: 'local' });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('local');
+    expect(getReasoningBackend().name).toBe('openai-compatible');
   });
 });
