@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fc from 'fast-check';
 import { handleAction } from './index.js';
 
 const MOCK_DEVICES_JSON = JSON.stringify({
@@ -480,5 +481,30 @@ describe('ios-actuator', () => {
         expect(result.results[0].status).toBe('failed');
       });
     });
+  });
+});
+
+// Feature: project-quality-improvement, Property 1: パイプライン結果の構造不変条件
+describe('Property 1: パイプライン結果の構造不変条件', () => {
+  it('任意のstepsに対してstatusは常にsucceeded|failedのいずれか', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(
+          fc.record({
+            type: fc.constantFrom('capture', 'apply', 'transform') as fc.Arbitrary<
+              'capture' | 'apply' | 'transform'
+            >,
+            op: fc.string({ minLength: 1, maxLength: 20 }),
+            params: fc.record({ path: fc.string() }),
+          }),
+          { maxLength: 5 }
+        ),
+        async (steps) => {
+          const result = await handleAction({ action: 'pipeline', steps });
+          expect(['succeeded', 'failed']).toContain(result.status);
+        }
+      ),
+      { numRuns: 100 }
+    );
   });
 });
