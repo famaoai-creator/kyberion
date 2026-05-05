@@ -372,6 +372,52 @@ export function safeExistsSync(filePath: string): boolean {
 }
 
 /**
+ * Execute a command safely and return the full result (stdout, stderr, exit code).
+ * Unlike safeExec, this does NOT throw on non-zero exit codes.
+ */
+export function safeExecResult(command: string, args: string[] = [], options: any = {}): {
+  stdout: string;
+  stderr: string;
+  status: number | null;
+  error?: Error;
+} {
+  const {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    cwd = process.cwd(),
+    encoding = 'utf8',
+    maxOutputMB = 10,
+    env = {},
+    input,
+  } = options;
+
+  try {
+    const result = spawnSync(command, args, {
+      encoding,
+      cwd,
+      env: buildSafeExecEnv(env),
+      timeout: timeoutMs,
+      maxBuffer: maxOutputMB * 1024 * 1024,
+      input,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    return {
+      stdout: (result.stdout as string) || '',
+      stderr: (result.stderr as string) || '',
+      status: result.status,
+      error: result.error,
+    };
+  } catch (err: any) {
+    return {
+      stdout: '',
+      stderr: err.message || '',
+      status: err.status || 1,
+      error: err,
+    };
+  }
+}
+
+/**
  * Execute a command safely.
  */
 export function safeExec(command: string, args: string[] = [], options: any = {}): string {
