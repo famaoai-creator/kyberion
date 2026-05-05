@@ -1193,6 +1193,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
+    case 'shell':
+    case 'exec':
+    case 'cli_health_check':
+      return opCapture(op, params, ctx, resolve);
     case 'keyboard':
       keystrokeText(String(resolve(params.text || '{{last_capture}}')));
       break;
