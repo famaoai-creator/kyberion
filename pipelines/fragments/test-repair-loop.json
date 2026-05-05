@@ -1,0 +1,50 @@
+{
+  "action": "pipeline",
+  "name": "test-repair-loop-fragment",
+  "description": "Runs the test suite and automatically attempts to repair any identified failures using LLM reasoning.",
+  "steps": [
+    {
+      "id": "run_tests",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "pnpm",
+        "args": ["test"],
+        "allow_error": true,
+        "export_as": "test_results"
+      }
+    },
+    {
+      "id": "conditional_repair",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "test_results.status", "operator": "not_equals", "value": 0 },
+        "then": [
+          {
+            "op": "system:log",
+            "params": { "message": "Tests failed. Initiating self-healing loop..." }
+          },
+          {
+            "op": "reasoning:synthesize",
+            "params": {
+              "instruction": "Analyze these test failures and propose a fix. Output a Git patch or direct code instructions.",
+              "context": "{{test_results.stderr}}",
+              "export_as": "proposed_fix"
+            }
+          },
+          {
+            "op": "system:log",
+            "params": { "message": "Proposed Fix: {{proposed_fix}}" }
+          }
+        ],
+        "else": [
+          {
+            "op": "system:log",
+            "params": { "message": "All tests passed. System is stable." }
+          }
+        ]
+      }
+    }
+  ]
+}

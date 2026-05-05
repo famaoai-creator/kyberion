@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "name": "artifact-packaging-fragment",
+  "description": "Bundles project artifacts into a compressed archive for delivery.",
+  "context": {
+    "source_dir": "dist",
+    "package_name": "kyberion-delivery.zip"
+  },
+  "steps": [
+    {
+      "id": "zip_artifacts",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "zip -r active/shared/tmp/{{package_name}} {{source_dir}}"
+      }
+    },
+    {
+      "id": "log_package",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Artifacts packaged into active/shared/tmp/{{package_name}}."
+      }
+    }
+  ]
+}

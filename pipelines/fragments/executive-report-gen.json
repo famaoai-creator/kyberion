@@ -1,0 +1,31 @@
+{
+  "action": "pipeline",
+  "name": "executive-report-gen-fragment",
+  "description": "Generates a high-level executive report based on mission progress and state.",
+  "context": {
+    "output_file": "active/shared/tmp/mission-report.md"
+  },
+  "steps": [
+    {
+      "id": "gen_report",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "node",
+        "args": [
+          "dist/scripts/report_generator.js",
+          "--output", "{{output_file}}"
+        ],
+        "export_as": "report_result"
+      }
+    },
+    {
+      "id": "log_report",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Executive report generated at {{output_file}}."
+      }
+    }
+  ]
+}
