@@ -27,6 +27,7 @@ export {
   safeMkdir,
   safeExistsSync,
   safeExec,
+  safeExecResult,
   buildSafeExecEnv,
   safeReaddir,
   safeStat,

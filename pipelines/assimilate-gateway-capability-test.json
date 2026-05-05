@@ -1,0 +1,46 @@
+{
+  "action": "pipeline",
+  "name": "assimilate-gateway-capability-test",
+  "context": {
+    "service_name": "mock-api"
+  },
+  "steps": [
+    {
+      "id": "fetch_api_spec",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "echo",
+        "args": ["{\"openapi\": \"3.0.0\", \"info\": {\"title\": \"Mock API\"}, \"components\": {\"securitySchemes\": {\"oauth2\": {\"type\": \"oauth2\", \"flows\": {\"authorizationCode\": {\"authorizationUrl\": \"https://mock.com/auth\", \"tokenUrl\": \"https://mock.com/token\", \"scopes\": {\"read\": \"read data\", \"write\": \"write data\"}}}}}}}, \"paths\": {\"/users\": {\"get\": {\"summary\": \"Get users\"}}, \"/users/{id}\": {\"post\": {\"summary\": \"Update user\"}}}}"],
+        "export_as": "api_spec"
+      }
+    },
+    {
+      "id": "synthesize_adapter",
+      "type": "transform",
+      "op": "reasoning:synthesize",
+      "params": {
+        "instruction": "Analyze the provided API specification. Generate a strict JSON object representing a Gateway Adapter Profile conforming to `gateway-adapter-profile.schema.json`. The output MUST be raw JSON. Structure: { adapter_id: '{{service_name}}-adapter', provider: '{{service_name}}', capability_id: 'api.{{service_name}}', auth_profile: { type: 'oauth2' (or bearer/api_key), authorize_url: '...', token_url: '...', scopes: [...] }, operations: { action_name: { risk_class: 'low/medium/high', alternatives: [ { type: 'cli', command: '...', args: [...] }, { type: 'api', method: '...', path: '...', payload_template: {...} } ] } }, status: 'experimental' }. Generate at least two major operations from the spec. If a CLI tool is common for this service, include a 'cli' alternative as the first option, followed by the 'api' alternative. If only API is known, just provide the 'api' alternative. Return ONLY raw JSON without markdown blocks.",
+        "context": "Service: {{service_name}}\nAPI Spec:\n{{api_spec.stdout}}",
+        "export_as": "generated_adapter_profile"
+      }
+    },
+    {
+      "id": "write_adapter",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/{{service_name}}-gateway-adapter.json",
+        "content": "{{generated_adapter_profile}}"
+      }
+    },
+    {
+      "id": "log_completion",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Successfully assimilated Gateway API {{service_name}}. Generated adapter profile at active/shared/tmp/{{service_name}}-gateway-adapter.json."
+      }
+    }
+  ]
+}

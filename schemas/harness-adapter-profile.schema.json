@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Harness Adapter Profile Schema",
+  "description": "Schema for defining adapter profiles that wrap host-native CLI capabilities into Kyberion contracts.",
+  "type": "object",
+  "required": ["adapter_id", "provider", "surface_kind", "capability_id", "contract_kind"],
+  "properties": {
+    "adapter_id": {
+      "type": "string",
+      "description": "Unique identifier for this adapter (e.g., gh-issue-list-adapter)"
+    },
+    "provider": {
+      "type": "string",
+      "description": "The external provider or tool (e.g., github-cli, jq, claude-cli)"
+    },
+    "surface_kind": {
+      "type": "string",
+      "enum": ["deterministic_utility", "interactive_tooling", "reasoning", "delegated_execution"],
+      "description": "The capability class as defined in the Harness Coordination Model"
+    },
+    "capability_id": {
+      "type": "string",
+      "description": "The specific capability being wrapped (e.g., issue_list, code_search)"
+    },
+    "contract_kind": {
+      "type": "string",
+      "description": "The Kyberion ADF contract type this adapter exposes (e.g., pipeline, capability-input)"
+    },
+    "observation_kind": {
+      "type": "string",
+      "description": "Format of the output observation (e.g., json, plain_text, markdown)"
+    },
+    "result_kind": {
+      "type": "string",
+      "description": "Expected shape of the final result context"
+    },
+    "approval_behavior": {
+      "type": "string",
+      "enum": ["auto", "require_approval", "dry_run_only"],
+      "default": "auto",
+      "description": "Whether this capability requires explicit human approval before execution"
+    },
+    "replayability": {
+      "type": "string",
+      "enum": ["deterministic", "idempotent", "side_effects", "interactive"],
+      "description": "Classification of how safe this adapter is to replay automatically"
+    },
+    "fallback_contract": {
+      "type": "string",
+      "description": "Optional: Path to a fallback ADF contract if this native capability fails"
+    }
+  }
+}

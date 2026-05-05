@@ -2934,6 +2934,58 @@
         "shape": "task_session",
         "result_shape": "summary"
       }
+    },
+    {
+      "id": "assimilate-gateway-capability",
+      "category": "environment_setup",
+      "description": "Assimilate a new Gateway API or SaaS service by generating a governed adapter profile from its OpenAPI specification.",
+      "surface_examples": [
+        "新しいAPIを同化して",
+        "このSaaSのOpenAPIを読み込んでAdapterを作って",
+        "Slack APIを統合できるように設定して",
+        "Assimilate this Gateway API",
+        "APIの仕様を取り込んで"
+      ],
+      "plan_outline": [
+        "fetch the target API documentation or OpenAPI specification",
+        "extract authentication and endpoint details",
+        "synthesize a Gateway Adapter Profile (CLI/API 3-Tier mapping)",
+        "register the adapter profile in the workspace"
+      ],
+      "intake_requirements": ["service_name", "openapi_url_or_docs"],
+      "outcome_ids": ["gateway_adapter_created"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "API",
+        "SaaS",
+        "同化",
+        "取り込んで",
+        "assimilate",
+        "openapi",
+        "gateway"
+      ],
+      "resolution": {
+        "shape": "pipeline",
+        "task_kind": "service_onboarding",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "create",
+      "object": "gateway_capability_adapter",
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/assimilate-gateway-capability.json --context '{\"service_name\": \"{{service_name}}\", \"openapi_url\": \"{{openapi_url_or_docs}}\"}'",
+            "export_as": "assimilation_result"
+          }
+        }
+      ]
     }
   ]
 }

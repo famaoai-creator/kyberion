@@ -1,0 +1,67 @@
+{
+  "action": "pipeline",
+  "name": "assimilate-harness-capability",
+  "context": {
+    "tool_name": "",
+    "capability_class": "deterministic_utility",
+    "tier": "public"
+  },
+  "steps": [
+    {
+      "id": "health_check",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": {
+        "command": "{{tool_name}}",
+        "export_as": "tool_health"
+      }
+    },
+    {
+      "id": "inspect_docs",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "{{tool_name}}",
+        "args": ["--help"],
+        "allow_error": true,
+        "export_as": "help_docs"
+      }
+    },
+    {
+      "id": "synthesize_adapter",
+      "type": "transform",
+      "op": "reasoning:synthesize",
+      "params": {
+        "instruction": "Analyze the CLI tool's help output. Generate a strict JSON object representing a Harness Capability Registry entry for this tool. The output MUST be raw JSON without markdown code blocks. Structure: { capability_id (e.g. cli.native.{{tool_name}}), source: { type: 'cli_native', provider: 'host-env', name: '{{tool_name}}', version: 'v1' }, kind (e.g. deterministic_utility), interaction_mode (e.g. deterministic_task), risk_class (low/medium/high), replayability (deterministic/partial), approval_hooks: { requires_pre_approval: boolean, approval_scope: string }, preferred_usage: { workflow_shapes: string[], intents: string[] }, fallback_path: { mode: 'kyberion_local_actuator', target: 'system-actuator' }, status: 'experimental', notes: string }. Do NOT wrap in ```json ... ```.",
+        "context": "Tool Name: {{tool_name}}\nHelp Output:\n{{help_docs.stdout}}\n\nSchema Requirement: Return ONLY the raw JSON object.",
+        "export_as": "generated_adapter_profile"
+      }
+    },
+    {
+      "id": "write_temp_adapter",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/{{tool_name}}-adapter.json",
+        "content": "{{generated_adapter_profile}}"
+      }
+    },
+    {
+      "id": "register_capability",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "KYBERION_PERSONA=sovereign node dist/scripts/registry_manager.js --adapter active/shared/tmp/{{tool_name}}-adapter.json --tier {{tier}} --type harness",
+        "export_as": "registry_result"
+      }
+    },
+    {
+      "id": "log_completion",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Successfully assimilated {{tool_name}} into {{tier}} tier. Output: {{registry_result}}"
+      }
+    }
+  ]
+}
