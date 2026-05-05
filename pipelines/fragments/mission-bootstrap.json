@@ -1,0 +1,50 @@
+{
+  "action": "pipeline",
+  "name": "mission-bootstrap-fragment",
+  "description": "Standardizes the creation of a new Kyberion mission, initializing the evidence directory and Git repository.",
+  "context": {
+    "tier": "confidential",
+    "tenant_id": "default",
+    "mission_type": "development",
+    "vision_ref": "vision_001",
+    "persona": "ecosystem_architect"
+  },
+  "steps": [
+    {
+      "id": "create_mission",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "node",
+        "args": [
+          "dist/scripts/mission_controller.js",
+          "create",
+          "{{tier}}",
+          "{{tenant_id}}",
+          "{{mission_type}}",
+          "{{vision_ref}}",
+          "{{persona}}"
+        ],
+        "export_as": "bootstrap_raw"
+      }
+    },
+    {
+      "id": "extract_mission_id",
+      "type": "transform",
+      "op": "system:regex_extract",
+      "params": {
+        "from": "bootstrap_raw.stdout",
+        "pattern": "Created evidence directory for mission ([^\\s\\.]*)",
+        "export_as": "mission_id"
+      }
+    },
+    {
+      "id": "log_mission_id",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Mission bootstrapped successfully. ID: {{mission_id}}"
+      }
+    }
+  ]
+}

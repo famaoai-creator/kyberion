@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "name": "emergency-rollback-fragment",
+  "description": "Rolls back the current workspace to the last committed state and cleans up temporary files.",
+  "steps": [
+    {
+      "id": "git_reset",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git reset --hard HEAD"
+      }
+    },
+    {
+      "id": "git_clean",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git clean -fd"
+      }
+    },
+    {
+      "id": "cleanup_tmp",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "rm -rf active/shared/tmp/*"
+      }
+    },
+    {
+      "id": "log_rollback",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Emergency Rollback executed successfully. Workspace restored to HEAD."
+      }
+    }
+  ]
+}

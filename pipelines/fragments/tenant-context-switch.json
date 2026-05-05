@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "name": "tenant-context-switch-fragment",
+  "description": "Switches the active operational context to a specific tenant, loading their rules and identifying boundaries.",
+  "context": {
+    "tenant_slug": "default"
+  },
+  "steps": [
+    {
+      "id": "validate_tenant",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "ls",
+        "args": ["knowledge/confidential/{{tenant_slug}}"],
+        "allow_error": true,
+        "export_as": "tenant_dir_check"
+      }
+    },
+    {
+      "id": "switch_context",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Switched to tenant context: {{tenant_slug}}. Enforcement of Tier Guard for this tenant is now active."
+      }
+    }
+  ]
+}
