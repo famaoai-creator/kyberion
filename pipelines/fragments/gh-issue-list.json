@@ -1,0 +1,43 @@
+{
+  "action": "pipeline",
+  "name": "gh-issue-list-fragment",
+  "context": {
+    "repo": "cli/cli",
+    "limit": 5
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "cli_health_check",
+      "params": {
+        "command": "gh",
+        "export_as": "gh_health"
+      }
+    },
+    {
+      "type": "capture",
+      "op": "exec",
+      "params": {
+        "command": "gh",
+        "args": [
+          "issue",
+          "list",
+          "--repo",
+          "{{repo}}",
+          "--limit",
+          "{{limit}}",
+          "--json",
+          "number,title,state,updatedAt"
+        ],
+        "export_as": "issues_raw"
+      }
+    },
+    {
+      "type": "transform",
+      "op": "log",
+      "params": {
+        "message": "Found {{issues_raw.stdout.length}} characters of issue data."
+      }
+    }
+  ]
+}

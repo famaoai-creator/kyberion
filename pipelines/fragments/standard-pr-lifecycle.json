@@ -1,0 +1,112 @@
+{
+  "action": "pipeline",
+  "name": "standard-pr-lifecycle-fragment",
+  "description": "A reusable pipeline fragment that automates the standard Git workflow: create a branch, commit changes, push, create a pull request, and optionally merge it.",
+  "context": {
+    "branch_name": "feature/default-branch",
+    "commit_message": "feat: default commit message",
+    "pr_title": "Default PR Title",
+    "pr_body": "Default PR body.",
+    "auto_merge": false
+  },
+  "steps": [
+    {
+      "id": "create_branch",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git checkout -b {{branch_name}}"
+      }
+    },
+    {
+      "id": "stage_changes",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git add ."
+      }
+    },
+    {
+      "id": "commit_changes",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git commit -m \"{{commit_message}}\"",
+        "allow_error": true
+      }
+    },
+    {
+      "id": "push_branch",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "git push -u origin {{branch_name}}"
+      }
+    },
+    {
+      "id": "create_pr",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "gh",
+        "args": [
+          "pr", "create",
+          "--title", "{{pr_title}}",
+          "--body", "{{pr_body}}"
+        ],
+        "export_as": "pr_creation_result"
+      }
+    },
+    {
+      "id": "log_pr_url",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Pull Request created successfully! URL: {{pr_creation_result.stdout}}"
+      }
+    },
+    {
+      "id": "conditional_merge",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "auto_merge", "operator": "equals", "value": true },
+        "then": [
+          {
+            "op": "system:exec",
+            "params": {
+              "command": "gh",
+              "args": [
+                "pr", "merge",
+                "{{pr_creation_result.stdout}}",
+                "--merge",
+                "--delete-branch"
+              ],
+              "allow_error": true 
+            }
+          },
+          {
+            "op": "system:shell",
+            "params": {
+              "cmd": "git checkout main && git pull origin main"
+            }
+          },
+          {
+            "op": "system:log",
+            "params": {
+              "message": "Pull Request automatically merged and branch deleted."
+            }
+          }
+        ],
+        "else": [
+          {
+            "op": "system:log",
+            "params": {
+              "message": "Auto-merge is disabled. The PR is ready for human review."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

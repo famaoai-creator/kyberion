@@ -16,10 +16,10 @@
           "type": { "enum": ["capture", "transform", "apply"] },
           "op": {
             "enum": [
-              "shell", "read_file", "read_json", "glob_files", "vision_consult", "pulse_status",
+              "shell", "exec", "cli_health_check", "read_file", "read_json", "glob_files", "vision_consult", "pulse_status",
               "regex_extract", "json_query", "sre_analyze",
               "keyboard", "mouse_click", "voice", "notify", "write_file", "mkdir", "log", "if",
-              "system:shell", "system:read_file", "system:read_json", "system:glob_files", "system:vision_consult", "system:pulse_status",
+              "system:shell", "system:exec", "system:cli_health_check", "system:read_file", "system:read_json", "system:glob_files", "system:vision_consult", "system:pulse_status",
               "system:regex_extract", "system:json_query", "system:sre_analyze",
               "system:keyboard", "system:mouse_click", "system:voice", "system:notify", "system:write_file", "system:mkdir", "system:log",
               "core:if"
@@ -32,6 +32,13 @@
               "x": { "type": "number", "description": "X coordinate for mouse" },
               "y": { "type": "number", "description": "Y coordinate for mouse" },
               "cmd": { "type": "string", "description": "Shell command to execute" },
+              "command": { "type": "string", "description": "CLI command to execute (for exec/cli_health_check)" },
+              "args": { "type": "array", "items": { "type": "string" }, "description": "Arguments for the command" },
+              "cwd": { "type": "string", "description": "Current working directory" },
+              "env": { "type": "object", "description": "Environment variables" },
+              "timeout_ms": { "type": "number", "description": "Timeout in milliseconds" },
+              "allow_error": { "type": "boolean", "description": "Whether to continue on non-zero exit code" },
+              "input": { "type": "string", "description": "Stdin input for the command" },
               "path": { "type": "string", "description": "File or directory path" },
               "pattern": { "type": "string", "description": "Regex pattern" },
               "template": { "type": "string", "description": "Replacement template with {{var}} support" },
