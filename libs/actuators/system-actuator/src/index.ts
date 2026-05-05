@@ -4,6 +4,7 @@ import {
   safeWriteFile,
   safeMkdir,
   safeExec,
+  safeExecResult,
   safeExistsSync,
   derivePipelineStatus,
   emitComputerSurfacePatch,
@@ -993,6 +994,43 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           { cwd: rootDir },
         ).trim(),
       };
+    case 'cli_health_check': {
+      const command = resolve(params.command);
+      const args = params.args ? params.args.map((a: any) => resolve(a)) : ['--version'];
+      const result = safeExecResult(command, args, { timeoutMs: params.timeout_ms || 5000 });
+      return {
+        ...ctx,
+        [params.export_as || 'cli_health']: {
+          available: result.status === 0,
+          stdout: result.stdout.trim(),
+          stderr: result.stderr.trim(),
+          status: result.status,
+        },
+      };
+    }
+    case 'exec': {
+      assertUnsafeShellAllowed();
+      const command = resolve(params.command);
+      const args = params.args ? params.args.map((a: any) => resolve(a)) : [];
+      const env = params.env ? params.env : {};
+      const result = safeExecResult(command, args, {
+        cwd: params.cwd ? path.resolve(rootDir, resolve(params.cwd)) : rootDir,
+        env,
+        timeoutMs: params.timeout_ms || 30000,
+        input: params.input ? resolve(params.input) : undefined,
+      });
+      if (result.status !== 0 && !params.allow_error) {
+        throw new Error(`CLI execution failed with status ${result.status}: ${result.stderr}`);
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_exec']: {
+          stdout: result.stdout.trim(),
+          stderr: result.stderr.trim(),
+          status: result.status,
+        },
+      };
+    }
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
     case 'read_json':

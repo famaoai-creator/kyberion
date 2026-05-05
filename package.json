@@ -27,7 +27,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "pnpm run build:packages && pnpm run build:actuators && pnpm run build:repo",
-    "build:packages": "pnpm --filter @agent/core build",
+    "build:packages": "pnpm --filter '@agent/core' --filter '@agent/shared-*' build",
     "build:actuators": "tsc -p tsconfig.actuators.json",
     "build:repo": "tsc",
     "check:esm": "node dist/scripts/check_esm_integrity.js",
