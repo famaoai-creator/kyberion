@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "name": "presentation-scaffolding-fragment",
+  "description": "Creates a structured PPTX configuration for the media-actuator based on mission outcomes.",
+  "context": {
+    "title": "Kyberion System Update",
+    "subtitle": "Capability Lifecycle & Automation"
+  },
+  "steps": [
+    {
+      "id": "write_pptx_config",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/presentation-config.json",
+        "content": {
+          "title": "{{title}}",
+          "subtitle": "{{subtitle}}",
+          "slides": [
+            { "title": "Overview", "content": ["Dynamic Assimilation", "3-Tier Abstraction"] },
+            { "title": "Results", "content": ["100% Simulation Success", "Governance Enforced"] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "log_pptx",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Presentation scaffolding created at active/shared/tmp/presentation-config.json. Use media-actuator to render."
+      }
+    }
+  ]
+}

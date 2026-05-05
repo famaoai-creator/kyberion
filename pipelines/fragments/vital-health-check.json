@@ -1,0 +1,61 @@
+{
+  "action": "pipeline",
+  "name": "vital-health-check-fragment",
+  "description": "Scans the environment for necessary tools, network connectivity, and resource availability.",
+  "steps": [
+    {
+      "id": "check_node",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": { "command": "node", "export_as": "node_health" }
+    },
+    {
+      "id": "check_git",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": { "command": "git", "export_as": "git_health" }
+    },
+    {
+      "id": "check_gh",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": { "command": "gh", "export_as": "gh_health" }
+    },
+    {
+      "id": "check_pnpm",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": { "command": "pnpm", "export_as": "pnpm_health" }
+    },
+    {
+      "id": "check_network",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "curl",
+        "args": ["-I", "https://github.com"],
+        "timeout_ms": 5000,
+        "allow_error": true,
+        "export_as": "network_health"
+      }
+    },
+    {
+      "id": "check_disk",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "df",
+        "args": ["-h", "."],
+        "export_as": "disk_health"
+      }
+    },
+    {
+      "id": "summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Health Check Complete. Node: {{node_health.available}}, Git: {{git_health.available}}, GH: {{gh_health.available}}, PNPM: {{pnpm_health.available}}, Network: {{network_health.status}}"
+      }
+    }
+  ]
+}

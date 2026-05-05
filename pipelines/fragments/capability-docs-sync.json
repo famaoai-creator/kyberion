@@ -1,0 +1,23 @@
+{
+  "action": "pipeline",
+  "name": "capability-docs-sync-fragment",
+  "description": "Synchronizes the global CAPABILITIES_GUIDE.md with all registered CLI and Gateway capabilities across knowledge tiers.",
+  "steps": [
+    {
+      "id": "sync_docs",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "KYBERION_PERSONA=sovereign node dist/scripts/docs_sync.js"
+      }
+    },
+    {
+      "id": "log_sync",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "CAPABILITIES_GUIDE.md has been synchronized with the latest registry state."
+      }
+    }
+  ]
+}
