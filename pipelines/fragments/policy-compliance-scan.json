@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "name": "policy-compliance-scan-fragment",
+  "description": "Scans a directory for security policy violations and sensitive content markers.",
+  "context": {
+    "target_dir": "active/shared/tmp",
+    "target_tier": "public"
+  },
+  "steps": [
+    {
+      "id": "run_scan",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "sh",
+        "args": [
+          "-c",
+          "KYBERION_PERSONA=sovereign node dist/scripts/compliance_checker.js --dir {{target_dir}} --tier {{target_tier}}"
+        ],
+        "allow_error": true,
+        "export_as": "scan_result"
+      }
+    },
+    {
+      "id": "check_violations",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "scan_result.status", "operator": "equals", "value": "passed" },
+        "then": [
+          { "op": "system:log", "params": { "message": "Compliance scan passed for {{target_dir}}." } }
+        ],
+        "else": [
+          { "op": "system:log", "params": { "message": "Compliance scan FAILED for {{target_dir}}. Violations: {{scan_result.violations}}" } }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "action": "pipeline",
+  "name": "memory-distillation-fragment",
+  "description": "Analyzes recent mission traces to extract hints and lessons learned, updating the system's operational memory.",
+  "steps": [
+    {
+      "id": "distill_wisdom",
+      "type": "capture",
+      "op": "wisdom:distill",
+      "params": {
+        "scope": "recent_missions",
+        "export_as": "lessons_learned"
+      }
+    },
+    {
+      "id": "persist_hints",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "knowledge/public/governance/HINTS.md",
+        "content": "# Operational Hints\n\n{{lessons_learned}}"
+      }
+    }
+  ]
+}
