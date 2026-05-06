@@ -4,7 +4,9 @@
  */
 
 import * as path from 'node:path';
+import AjvModule from 'ajv';
 import {
+  compileSchemaFromPath,
   findMissionPath,
   logger,
   missionDir as resolveMissionDir,
@@ -19,6 +21,20 @@ import {
 import { hasAuthority, detectTier } from '@agent/core/governance';
 import { readJsonFile } from './cli-input.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
+const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
+const missionStateAjv = new AjvCtor({ allErrors: true });
+const missionStateValidate = compileSchemaFromPath(
+  missionStateAjv,
+  pathResolver.rootResolve('schemas/mission-state.schema.json'),
+);
+
+function assertMissionStateSchema(state: MissionState): void {
+  if (missionStateValidate(state)) return;
+  const errors = Array.isArray(missionStateValidate.errors)
+    ? missionStateValidate.errors.map((entry: any) => `${entry.instancePath || '/'} ${entry.message || 'invalid'}`).join('; ')
+    : 'unknown schema error';
+  throw new Error(`[MISSION_STATE_SCHEMA] Invalid mission state: ${errors}`);
+}
 
 export function assertCanGrantMissionAuthority(): void {
   if (!hasAuthority('SUDO')) {
@@ -143,6 +159,7 @@ export async function saveState(
   state: MissionState,
   { alreadyLocked = false } = {}
 ): Promise<void> {
+  assertMissionStateSchema(state);
   const dir = findMissionPath(id) || resolveMissionDir(id, state.tier);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 

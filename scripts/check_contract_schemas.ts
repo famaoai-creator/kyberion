@@ -359,6 +359,34 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'service-connection-readiness',
+      schemaPath: 'knowledge/public/schemas/service-connection-readiness.schema.json',
+      validPayloads: [
+        {
+          version: '1.0.0',
+          tenant_guard: {
+            require_zero_drift: true,
+          },
+          required_services: {
+            comfyui: {
+              required_keys_any: ['base_url', 'output_dir'],
+            },
+            voice: {
+              required_keys_any: ['voice_python_bin', 'voice_name'],
+            },
+          },
+        },
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          required_services: {
+            comfyui: {},
+          },
+        },
+      ],
+    },
+    {
       id: 'mission-orchestration-scenario-pack',
       schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
       validPayloads: [
@@ -1338,6 +1366,71 @@ function createChecks(): ContractCheck[] {
           mission_id: 'Invalid Space',
           tier: 'confidential',
           skill: 'design',
+        },
+      ],
+    },
+    {
+      id: 'mission-state',
+      schemaPath: 'schemas/mission-state.schema.json',
+      validPayloads: [
+        {
+          mission_id: 'MSN-STATE-001',
+          mission_type: 'development',
+          tenant_slug: 'acme-corp',
+          tier: 'confidential',
+          status: 'planned',
+          execution_mode: 'local',
+          priority: 3,
+          assigned_persona: 'Ecosystem Architect',
+          confidence_score: 1,
+          git: {
+            branch: 'main',
+            start_commit: 'abc123',
+            latest_commit: 'abc123',
+            checkpoints: [],
+          },
+          cross_tenant_brokerage: {
+            source_tenants: ['acme-corp', 'beta-co'],
+            purpose: 'Portfolio-level consolidated analysis',
+            approved_by: 'governance-board',
+            approved_at: '2026-05-01T00:00:00.000Z',
+            expires_at: '2099-01-01T00:00:00.000Z',
+          },
+          history: [
+            {
+              ts: '2026-05-01T00:00:00.000Z',
+              event: 'CREATE',
+              note: 'Mission created.',
+            },
+          ],
+        },
+      ],
+      invalidPayloads: [
+        {
+          mission_id: 'MSN-STATE-INVALID',
+          tier: 'confidential',
+          status: 'planned',
+          execution_mode: 'local',
+          priority: 3,
+          assigned_persona: 'Ecosystem Architect',
+          confidence_score: 1,
+          git: {
+            branch: 'main',
+            start_commit: 'abc123',
+            latest_commit: 'abc123',
+            checkpoints: [],
+          },
+          cross_tenant_brokerage: {
+            source_tenants: ['acme-corp'],
+            purpose: 'Missing approval and expiry fields',
+          },
+          history: [
+            {
+              ts: '2026-05-01T00:00:00.000Z',
+              event: 'CREATE',
+              note: 'Mission created.',
+            },
+          ],
         },
       ],
     },

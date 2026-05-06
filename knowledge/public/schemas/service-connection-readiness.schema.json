@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/service-connection-readiness.schema.json",
+  "title": "Service Connection Readiness Policy",
+  "type": "object",
+  "required": ["version", "required_services"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "tenant_guard": {
+      "type": "object",
+      "properties": {
+        "require_zero_drift": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "required_services": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "required_keys_any": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "required": ["required_keys_any"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

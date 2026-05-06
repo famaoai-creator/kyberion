@@ -1,0 +1,48 @@
+{
+  "service_id": "comfyui",
+  "name": "ComfyUI Management Presets",
+  "operations": {
+    "get_stats": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "system_stats",
+      "method": "GET",
+      "description": "Get ComfyUI server system statistics"
+    },
+    "get_queue": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "queue",
+      "method": "GET",
+      "description": "Get ComfyUI active and pending queue"
+    },
+    "get_history": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "history",
+      "method": "GET",
+      "description": "Get ComfyUI job execution history"
+    },
+    "list_outputs": {
+      "type": "cli",
+      "allow_unsafe_cli": true,
+      "command": "ls",
+      "args": ["-lt", "{{output_dir}}"],
+      "description": "List generated artifacts in the ComfyUI output directory"
+    },
+    "inspect_config": {
+      "type": "cli",
+      "allow_unsafe_cli": true,
+      "command": "cat",
+      "args": ["{{start_script}}"],
+      "description": "Inspect ComfyUI startup configuration"
+    },
+    "list_custom_nodes": {
+      "type": "cli",
+      "allow_unsafe_cli": true,
+      "command": "ls",
+      "args": ["-F", "{{custom_nodes_dir}}"],
+      "description": "List installed ComfyUI custom nodes"
+    }
+  }
+}

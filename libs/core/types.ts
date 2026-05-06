@@ -255,6 +255,12 @@ export interface IdentityContext {
    * Brokered access emits a `tenant.broker_access` audit event.
    */
   brokeredTenants?: string[];
+  brokerApproval?: {
+    purpose?: string;
+    approvedBy?: string;
+    approvedAt?: string;
+    expiresAt?: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
