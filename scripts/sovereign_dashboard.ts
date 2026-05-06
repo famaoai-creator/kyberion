@@ -28,6 +28,99 @@ function drawHeader() {
   console.log(` Status: ${chalk.green('OPERATIONAL')} | User: ${chalk.bold('famao')} | Time: ${new Date().toLocaleTimeString()}\n`);
 }
 
+function readJsonIfExists<T>(logicalPath: string): T | null {
+  if (!safeExistsSync(logicalPath)) return null;
+  try {
+    return readJsonFile<T>(logicalPath);
+  } catch {
+    return null;
+  }
+}
+
+function listJsonFiles(dir: string): string[] {
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .map((entry) => path.join(dir, entry));
+}
+
+function drawOnboardingHome() {
+  console.log(chalk.bold.green(' 🏠 ONBOARDING HOME'));
+
+  const onboardingStatePath = pathResolver.knowledge('personal/onboarding/onboarding-state.json');
+  const onboardingState = readJsonIfExists<{
+    status?: string;
+    current_phase?: string;
+    completed_phases?: string[];
+    identity?: { name?: string; agent_id?: string; language?: string; interaction_style?: string; primary_domain?: string };
+    services?: { candidates?: Array<{ service_id: string; status?: string; connection_kind?: string }> };
+    tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }> };
+    tutorial?: { mode?: string; summary?: string };
+  }>(onboardingStatePath);
+
+  const connectionDir = pathResolver.knowledge('personal/connections');
+  const tenantDir = pathResolver.knowledge('personal/tenants');
+  const connectionFiles = listJsonFiles(connectionDir);
+  const tenantFiles = listJsonFiles(tenantDir);
+  const readiness = readJsonIfExists<{
+    required_services?: Record<string, { required_keys_any?: string[] }>;
+  }>(pathResolver.knowledge('public/governance/service-connection-readiness.json'));
+
+  const serviceMap = new Map<string, Record<string, unknown>>();
+  for (const file of connectionFiles) {
+    const serviceId = path.basename(file, '.json');
+    const payload = readJsonIfExists<Record<string, unknown>>(file);
+    if (payload) serviceMap.set(serviceId, payload);
+  }
+
+  const requiredServices = Object.entries(readiness?.required_services || {});
+  const readyServices: string[] = [];
+  const blockedServices: string[] = [];
+  for (const [serviceId, policy] of requiredServices) {
+    const record = serviceMap.get(serviceId);
+    const requiredKeys = policy.required_keys_any || [];
+    const hasRequiredKey = requiredKeys.length === 0
+      ? Boolean(record)
+      : requiredKeys.some((key) => Boolean(record && Object.prototype.hasOwnProperty.call(record, key)));
+    if (hasRequiredKey) readyServices.push(serviceId);
+    else blockedServices.push(serviceId);
+  }
+
+  const onboardingComplete = onboardingState?.status === 'complete';
+  const phaseLabel = onboardingState?.current_phase || 'identity';
+  const identity = onboardingState?.identity;
+  const tenantEntries = onboardingState?.tenants?.entries || [];
+  const tutorial = onboardingState?.tutorial;
+
+  console.log(`  ${chalk.gray('•')} State: ${onboardingComplete ? chalk.green('complete') : chalk.yellow('draft')} ${chalk.dim(`phase=${phaseLabel}`)}`);
+  console.log(`  ${chalk.gray('•')} Identity: ${chalk.cyan(identity?.name || 'Sovereign')} ${chalk.dim(`/${identity?.agent_id || 'KYBERION-PRIME'}`)}`);
+  console.log(`  ${chalk.gray('•')} Services: ${readyServices.length > 0 ? chalk.green(`${readyServices.length} ready`) : chalk.dim('0 ready')} / ${blockedServices.length > 0 ? chalk.yellow(`${blockedServices.length} blocked`) : chalk.dim('0 blocked')}`);
+  console.log(`  ${chalk.gray('•')} Tenants: ${tenantFiles.length > 0 ? chalk.green(tenantFiles.length) : chalk.dim(0)} registered`);
+  console.log(`  ${chalk.gray('•')} Tutorial: ${tutorial?.mode ? chalk.cyan(tutorial.mode) : chalk.dim('not started')}`);
+
+  const recommendedNextAction = !onboardingComplete
+    ? 'Run `pnpm onboard` and resume the current phase.'
+    : blockedServices.length > 0
+      ? `Review ${blockedServices.join(', ')} connection drafts.`
+      : tenantEntries.length === 0
+        ? 'Register the first tenant and then choose a starter mission.'
+        : 'Pick a starter mission from the current tenant context.';
+
+  console.log(`  ${chalk.gray('•')} Next: ${chalk.white(recommendedNextAction)}`);
+
+  if (connectionFiles.length > 0) {
+    console.log(chalk.dim('  Connections:'));
+    for (const file of connectionFiles.slice(0, 4)) {
+      const serviceId = path.basename(file, '.json');
+      const status = serviceMap.has(serviceId) ? chalk.green('captured') : chalk.yellow('pending');
+      console.log(`    ${chalk.gray('•')} ${serviceId.padEnd(16)} ${status}`);
+    }
+  } else {
+    console.log(chalk.dim('  Connections: none captured yet'));
+  }
+  console.log('');
+}
+
 function drawMissions() {
   const missionDirs = [
     pathResolver.active('missions/public'),
@@ -285,6 +378,7 @@ function drawTrustBoard() {
 function render() {
   clearScreen();
   drawHeader();
+  drawOnboardingHome();
   drawMissions();
   drawMissionOrchestration();
   drawOwnerSummaries();
