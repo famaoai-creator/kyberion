@@ -12,6 +12,9 @@ function read(relPath: string): string {
 describe('mission orchestration dashboard contract', () => {
   it('shows mission orchestration state in the sovereign dashboard', () => {
     const dashboard = read('scripts/sovereign_dashboard.ts');
+    expect(dashboard).toContain('ONBOARDING HOME');
+    expect(dashboard).toContain('TENANT CONTEXT');
+    expect(dashboard).toContain('CONNECTION REVIEW');
     expect(dashboard).toContain('MISSION ORCHESTRATION');
     expect(dashboard).toContain('OWNER SUMMARIES');
     expect(dashboard).toContain('RUNTIME LEASE DOCTOR');
