@@ -142,6 +142,59 @@ function drawConnectionReview() {
   console.log('');
 }
 
+function drawStarterMissionSuggestion() {
+  console.log(chalk.bold.yellow(' 🎯 STARTER MISSION'));
+
+  const onboardingState = readJsonIfExists<{
+    status?: string;
+    tutorial?: { mode?: string };
+    tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string }> };
+  }>(pathResolver.knowledge('personal/onboarding/onboarding-state.json'));
+
+  const connectionReview = readConnectionReview();
+  const readyServices = connectionReview.services.filter((entry) => entry.status === 'ready').map((entry) => entry.serviceId);
+  const blockedServices = connectionReview.services.filter((entry) => entry.status === 'blocked' || entry.status === 'missing').map((entry) => entry.serviceId);
+  const tenantEntries = onboardingState?.tenants?.entries || [];
+  const tutorialMode = onboardingState?.tutorial?.mode || 'skipped';
+
+  const suggestion = !onboardingState || onboardingState.status !== 'complete'
+    ? {
+        intentId: 'launch-first-run-onboarding',
+        title: 'Run onboarding to finish setup',
+        why: 'Onboarding is not complete yet.',
+      }
+    : blockedServices.length > 0
+      ? {
+          intentId: 'verify-environment-readiness',
+          title: 'Verify blocked service readiness',
+          why: `Blocked services remain: ${blockedServices.join(', ')}.`,
+        }
+      : tenantEntries.length === 0
+        ? {
+            intentId: 'configure-organization-toolchain',
+            title: 'Register the first tenant toolchain',
+            why: 'No tenant is registered yet, so the next useful step is organization setup.',
+          }
+        : tutorialMode === 'skipped'
+          ? {
+              intentId: 'register-presentation-preference-profile',
+              title: 'Capture a reusable preference profile',
+              why: 'Tenant and service setup are available; a lightweight preference capture gives the first durable win.',
+            }
+          : {
+              intentId: 'register-presentation-preference-profile',
+              title: 'Refine presentation defaults',
+              why: 'The environment is ready for reusable preference capture.',
+            };
+
+  console.log(`  ${chalk.gray('•')} Intent: ${chalk.cyan(suggestion.intentId)}`);
+  console.log(`  ${chalk.gray('•')} Suggestion: ${chalk.white(suggestion.title)}`);
+  console.log(`  ${chalk.gray('•')} Why: ${chalk.dim(suggestion.why)}`);
+  console.log(`  ${chalk.gray('•')} Ready services: ${readyServices.length > 0 ? chalk.green(readyServices.join(', ')) : chalk.dim('none')}`);
+  console.log(`  ${chalk.gray('•')} Next action: ${chalk.white(`create a mission from ${suggestion.intentId} in the current tenant context`)}`);
+  console.log('');
+}
+
 function drawOnboardingHome() {
   console.log(chalk.bold.green(' 🏠 ONBOARDING HOME'));
 
@@ -479,6 +532,7 @@ function render() {
   drawOnboardingHome();
   drawTenantContext();
   drawConnectionReview();
+  drawStarterMissionSuggestion();
   drawMissions();
   drawMissionOrchestration();
   drawOwnerSummaries();
