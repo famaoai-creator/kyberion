@@ -1,6 +1,6 @@
 import vocabularyCatalog from "../../../../../knowledge/public/orchestration/user-facing-vocabulary.json";
 
-type SupportedLocale = "en" | "ja";
+export type SupportedLocale = "en" | "ja";
 
 type VocabularyCatalog = {
   default_locale: SupportedLocale;

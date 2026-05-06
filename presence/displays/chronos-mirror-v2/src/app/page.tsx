@@ -1,6 +1,6 @@
 "use client";
 
-import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft } from "lucide-react";
+import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft, ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { FocusedOperatorView } from "../components/FocusedOperatorView";
@@ -8,7 +8,8 @@ import { SovereignChat } from "../components/SovereignChat";
 import { AgentPanel } from "../components/AgentPanel";
 import { MissionIntelligence } from "../components/MissionIntelligence";
 import { MISSION_CYCLE, OPERATOR_VIEW_LINKS, SURFACE_ROLES } from "../lib/operator-console";
-import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
+import { uxText } from "../lib/ux-vocabulary";
+import { useChronosLocale } from "../lib/hooks";
 
 type QuickAction = {
   label: string;
@@ -106,11 +107,20 @@ const STATUS_CARDS: StatusCard[] = [
 ];
 
 export default function ChronosMirrorV2() {
-  const locale = resolveChronosLocale();
+  const locale = useChronosLocale();
   const [surface, setSurface] = useState<any>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [focusedOperatorView, setFocusedOperatorView] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    taxonomy: false,
+    cycle: false,
+    views: true
+  });
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
+
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const handleReady = useCallback((fn: (q: string) => void) => {
     sendQueryRef.current = fn;
@@ -163,45 +173,40 @@ export default function ChronosMirrorV2() {
   );
 
   return (
-    <main className="min-h-screen w-screen overflow-hidden bg-[#0e1419] text-kyberion-gold">
+    <main className="min-h-screen w-screen overflow-hidden bg-[#020617] text-white">
       <div className="absolute inset-0 pointer-events-none opacity-60">
-        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-amber-200/10 blur-[160px]" />
-        <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-sky-200/7 blur-[150px]" />
-        <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full bg-stone-200/5 blur-[160px]" />
+        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-cyan-500/10 blur-[160px]" />
+        <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-cyan-400/5 blur-[150px]" />
+        <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full bg-slate-500/5 blur-[160px]" />
       </div>
       <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.06]" />
       <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(255,248,225,0.05)_0%,transparent_18%,transparent_82%,rgba(148,163,184,0.04)_100%)]" />
 
       <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6 xl:h-screen xl:overflow-hidden">
-        <header className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(247,240,223,0.08),rgba(255,255,255,0.02))] px-5 py-4 md:px-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-200/30 bg-black/25 shadow-[0_0_40px_rgba(251,191,36,0.12)]">
-                <Shield className="h-5 w-5 text-amber-200" />
+        <header className="px-1 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10">
+                <Shield className="h-5 w-5 text-cyan-400" />
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.35em] text-stone-200/60">Chronos Mirror</div>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-                  {uxText("chronos_header_title", "Operator console for mission risk, runtime governance, and delivery recovery.", locale)}
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200/70">
-                  {uxText("chronos_header_description", "Chronos is not a general workspace. Read exceptions first, open an A2UI surface when you need drill-down, and intervene only where the control plane needs help.", locale)}
-                </p>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold">Chronos Mirror</div>
+                <h1 className="text-lg font-bold tracking-tight text-white/90">Control Plane</h1>
               </div>
             </div>
 
             <button
               onClick={() => setAgentPanelOpen(true)}
-              className="flex items-center gap-2 self-start rounded-xl border border-stone-200/12 bg-stone-100/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-50 transition hover:border-stone-200/28 hover:bg-stone-100/10"
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400"
             >
-              <Cpu size={14} />
+              <Cpu size={12} />
               <span>{uxText("chronos_agent_runtimes", "Agent Runtimes", locale)}</span>
             </button>
           </div>
         </header>
 
-        <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[360px,minmax(0,1fr)]">
-          <aside className="min-h-0 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
+        <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
+          <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
             <div className="flex flex-col gap-6">
               <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between">
@@ -279,77 +284,107 @@ export default function ChronosMirrorV2() {
               </section>
 
               <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
-                <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Operator Views</div>
-                <div className="mt-2 text-sm text-slate-200/68">
-                  Use this menu to switch the main console into a single focused operator view, including the runtime map.
-                </div>
-                <div className="mt-4 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFocusedOperatorView(null)}
-                    className={`rounded-2xl border px-3 py-3 text-left transition ${
-                      focusedOperatorView === null
-                        ? "border-amber-200/20 bg-amber-200/8"
-                        : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
-                    }`}
-                  >
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">Full Console</div>
-                    <div className="mt-2 text-[11px] leading-5 text-slate-200/56">Show the complete control surface with all operator sections.</div>
-                  </button>
-                  {OPERATOR_VIEW_LINKS.map((view) => (
-                    <button
-                      key={view.targetId}
-                      type="button"
-                      onClick={() => handleOperatorViewOpen(view.targetId)}
-                      className={`rounded-2xl border px-3 py-3 text-left transition ${
-                        focusedOperatorView === view.targetId
-                          ? "border-cyan-200/22 bg-cyan-300/10"
-                          : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
-                      }`}
-                    >
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">{view.label}</div>
-                      <div className="mt-2 text-[11px] leading-5 text-slate-200/56">{view.detail}</div>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
-                <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Surface Taxonomy</div>
-                <div className="mt-2 text-sm text-slate-200/68">
-                  Every surface connects people and agent execution in a different mode. Chronos is the control surface, while A2UI provides drill-down work surfaces.
-                </div>
-                <div className="mt-4 space-y-3">
-                  {SURFACE_ROLES.map((role) => (
-                    <div key={role.label} className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/44">{role.label}</div>
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/72">{role.value}</div>
-                      </div>
-                      <div className="mt-2 text-[11px] leading-5 text-slate-200/58">{role.detail}</div>
+                <button 
+                  onClick={() => toggleSection('views')}
+                  className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                >
+                  <span>Operator Views</span>
+                  {expandedSections.views ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+                {expandedSections.views && (
+                  <>
+                    <div className="mt-2 text-sm text-slate-200/68">
+                      Use this menu to switch the main console into a single focused operator view, including the runtime map.
                     </div>
-                  ))}
-                </div>
+                    <div className="mt-4 grid gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFocusedOperatorView(null)}
+                        className={`rounded-2xl border px-3 py-3 text-left transition ${
+                          focusedOperatorView === null
+                            ? "border-cyan-400/30 bg-cyan-400/10"
+                            : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">Full Console</div>
+                        <div className="mt-2 text-[11px] leading-5 text-slate-200/56">Show the complete control surface with all operator sections.</div>
+                      </button>
+                      {OPERATOR_VIEW_LINKS.map((view) => (
+                        <button
+                          key={view.targetId}
+                          type="button"
+                          onClick={() => handleOperatorViewOpen(view.targetId)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            focusedOperatorView === view.targetId
+                              ? "border-cyan-400/30 bg-cyan-400/10"
+                              : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
+                          }`}
+                        >
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">{view.label}</div>
+                          <div className="mt-2 text-[11px] leading-5 text-slate-200/56">{view.detail}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </section>
 
-              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
-                <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Mission Cycle</div>
-                <div className="mt-2 text-sm text-slate-200/68">
-                  Kyberion should always make this loop legible: a request becomes a mission, execution stays explainable, and the result remains inspectable and reusable.
-                </div>
-                <div className="mt-4 grid gap-2">
-                  {MISSION_CYCLE.map((step, index) => (
-                    <div key={step.label} className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-amber-200/18 bg-amber-300/8 text-[10px] font-semibold text-amber-100/84">
-                          {index + 1}
+              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                <button 
+                  onClick={() => toggleSection('taxonomy')}
+                  className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                >
+                  <span>Surface Taxonomy</span>
+                  {expandedSections.taxonomy ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+                {expandedSections.taxonomy && (
+                  <>
+                    <div className="mt-2 text-sm text-slate-200/68">
+                      Every surface connects people and agent execution in a different mode. Chronos is the control surface, while A2UI provides drill-down work surfaces.
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {SURFACE_ROLES.map((role) => (
+                        <div key={role.label} className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/44">{role.label}</div>
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/72">{role.value}</div>
+                          </div>
+                          <div className="mt-2 text-[11px] leading-5 text-slate-200/58">{role.detail}</div>
                         </div>
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">{step.label}</div>
-                      </div>
-                      <div className="mt-2 text-[11px] leading-5 text-slate-200/58">{step.detail}</div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
+              </section>
+
+              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                <button 
+                  onClick={() => toggleSection('cycle')}
+                  className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                >
+                  <span>Mission Cycle</span>
+                  {expandedSections.cycle ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </button>
+                {expandedSections.cycle && (
+                  <>
+                    <div className="mt-2 text-sm text-slate-200/68">
+                      Kyberion should always make this loop legible: a request becomes a mission, execution stays explainable, and the result remains inspectable and reusable.
+                    </div>
+                    <div className="mt-4 grid gap-2">
+                      {MISSION_CYCLE.map((step, index) => (
+                        <div key={step.label} className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-[10px] font-semibold text-cyan-400">
+                              {index + 1}
+                            </div>
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">{step.label}</div>
+                          </div>
+                          <div className="mt-2 text-[11px] leading-5 text-slate-200/58">{step.detail}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </section>
             </div>
           </aside>

@@ -3,37 +3,57 @@
 @tailwind utilities;
 
 :root {
-  --background: #0f151a;
-  --foreground: #efe3bc;
+  --background: #020617;
+  --foreground: #F8FAFC;
+  
+  /* Kyberion Design System (KDS): Sovereign Command */
+  --kb-bg-main: #020617;
+  --kb-panel-bg: rgba(10, 25, 47, 0.8);
+  --kb-accent: #00F2FF;
+  --kb-warning: #FFAB00;
+  --kb-text-primary: #F8FAFC;
+  --kb-text-secondary: #94A3B8;
+  --kb-font-sans: 'Inter', sans-serif;
+  --kb-font-mono: 'JetBrains Mono', monospace;
+  --kb-blur: blur(12px);
+  --kb-border: 1px solid rgba(148, 163, 184, 0.1);
+  --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);
 }
 
 body {
-  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at 14% 8%, rgba(216, 180, 88, 0.11), transparent 22%),
-    radial-gradient(circle at 84% 18%, rgba(194, 214, 227, 0.08), transparent 24%),
-    radial-gradient(circle at 58% 82%, rgba(188, 161, 112, 0.06), transparent 20%),
-    linear-gradient(180deg, #0f151a 0%, #131b20 46%, #0a1014 100%);
-  color: var(--foreground);
-  letter-spacing: 0.002em;
+  font-family: var(--kb-font-sans);
+  background: 
+    radial-gradient(circle at 50% 0%, rgba(0, 242, 255, 0.05) 0%, transparent 50%),
+    var(--kb-bg-main);
+  color: var(--kb-text-primary);
+  letter-spacing: -0.01em;
+  overflow-x: hidden;
 }
 
 .kyberion-glass {
-  background: rgba(15, 21, 26, 0.72);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(245, 240, 230, 0.08);
-  box-shadow:
-    0 24px 90px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 248, 225, 0.04);
+  background: var(--kb-panel-bg);
+  backdrop-filter: var(--kb-blur);
+  border: var(--kb-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
 }
 
-.gold-glow {
-  text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+.cyan-glow {
+  text-shadow: var(--kb-glow-cyan);
+}
+
+.pulse-animation {
+  animation: pulse-cyan 2s infinite;
+}
+
+@keyframes pulse-cyan {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; text-shadow: var(--kb-glow-cyan); }
+  100% { opacity: 0.6; }
 }
 
 .chronos-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.38) transparent;
+  scrollbar-color: rgba(0, 242, 255, 0.2) transparent;
 }
 
 .chronos-scroll::-webkit-scrollbar {
