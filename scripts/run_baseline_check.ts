@@ -3,8 +3,85 @@ import {
   SovereignSentinel, 
   validateService, 
   pathResolver, 
-  safeExistsSync 
+  safeExistsSync,
+  safeReadFile,
+  withExecutionContext,
 } from '@agent/core';
+import { scanTenantDrift } from './watch_tenant_drift.js';
+
+function hasAnyKey(obj: Record<string, unknown>, keys: string[]): boolean {
+  return keys.some((key) => {
+    const value = obj[key];
+    return typeof value === 'string' ? value.trim().length > 0 : value !== undefined && value !== null;
+  });
+}
+
+type ReadinessRule = {
+  required_keys_any?: string[];
+};
+
+function loadConnectionReadinessConfig(): {
+  requiredServices: Record<string, ReadinessRule>;
+  tenantGuard: { requireZeroDrift: boolean };
+} {
+  const configPath = pathResolver.rootResolve('knowledge/public/governance/service-connection-readiness.json');
+  if (!safeExistsSync(configPath)) {
+    return {
+      requiredServices: {},
+      tenantGuard: { requireZeroDrift: true },
+    };
+  }
+  try {
+    const parsed = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+    return {
+      requiredServices:
+        parsed?.required_services && typeof parsed.required_services === 'object'
+          ? parsed.required_services
+          : {},
+      tenantGuard: {
+        requireZeroDrift: parsed?.tenant_guard?.require_zero_drift !== false,
+      },
+    };
+  } catch (_) {
+    return {
+      requiredServices: {},
+      tenantGuard: { requireZeroDrift: true },
+    };
+  }
+}
+
+function checkServiceConnectionReadiness(): boolean {
+  return withExecutionContext('mission_controller', () => {
+    const endpointsPath = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints.json');
+    if (!safeExistsSync(endpointsPath)) return false;
+    const endpoints = JSON.parse(safeReadFile(endpointsPath, { encoding: 'utf8' }) as string);
+    const services = endpoints?.services || {};
+
+    const readinessConfig = loadConnectionReadinessConfig();
+    const readinessRules = readinessConfig.requiredServices;
+    if (Object.keys(readinessRules).length === 0) return false;
+
+    for (const [serviceId, rule] of Object.entries(readinessRules)) {
+      const service = services[serviceId];
+      if (!service?.preset_path) return false;
+      const presetPath = pathResolver.rootResolve(String(service.preset_path));
+      if (!safeExistsSync(presetPath)) return false;
+
+      const connectionPath = pathResolver.rootResolve(`knowledge/personal/connections/${serviceId}.json`);
+      if (!safeExistsSync(connectionPath)) return false;
+      const connection = JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+      const requiredAny = Array.isArray(rule?.required_keys_any) ? rule.required_keys_any : [];
+      if (requiredAny.length > 0 && !hasAnyKey(connection, requiredAny)) return false;
+    }
+
+    if (readinessConfig.tenantGuard.requireZeroDrift) {
+      const drift = scanTenantDrift();
+      if (drift.findings.length > 0) return false;
+    }
+
+    return true;
+  });
+}
 
 async function main() {
   const statePath = pathResolver.rootResolve('active/shared/runtime/state/pfc-state.json');
@@ -41,15 +118,14 @@ async function main() {
   });
 
   // L4: Surface Layer (Background Daemons)
-  // For baseline, we just check if active surfaces manifest exists, or assume true for now
   sentinel.registerLayer('L4', async () => {
-    return true; 
+    const surfacesPath = pathResolver.rootResolve('knowledge/public/governance/active-surfaces.json');
+    return safeExistsSync(surfacesPath);
   });
 
   // L5: Trust/API Layer (Vault/Credentials)
   sentinel.registerLayer('L5', async () => {
-    // Basic vault check
-    return true; 
+    return checkServiceConnectionReadiness();
   });
 
   const result = await sentinel.run();

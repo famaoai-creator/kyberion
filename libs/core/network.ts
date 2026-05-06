@@ -65,9 +65,10 @@ function enforcePayloadSize(options: AxiosRequestConfig) {
   }
 }
 
-export async function secureFetch<T = any>(options: AxiosRequestConfig): Promise<T> {
+export async function secureFetch<T = any>(options: SecureFetchOptions): Promise<T> {
+  const { kyberion_allow_local_network, ...axiosOptions } = options;
   const url = options.url || '';
-  validateUrl(url);
+  validateUrl(url, { allowLocalNetwork: kyberion_allow_local_network === true });
   const hostname = new URL(url).hostname;
 
   // 1. Verify Endpoint Integrity
@@ -93,11 +94,14 @@ export async function secureFetch<T = any>(options: AxiosRequestConfig): Promise
       headers: {
         'User-Agent': 'Kyberion-Sovereign-Agent/2.1.0 (Physical-Integrity-Enforced)',
       },
-      ...options,
+      ...axiosOptions,
     });
     return response.data;
   } catch (err: any) {
     const status = err.response ? ` (${err.response.status})` : '';
     throw new Error(`Network Error: ${err.message}${status}`);
   }
+}
+export interface SecureFetchOptions extends AxiosRequestConfig {
+  kyberion_allow_local_network?: boolean;
 }

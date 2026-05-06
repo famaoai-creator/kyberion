@@ -104,6 +104,53 @@ function hasAuthorityAccess(
   return authorities.some((authority) => matchesAny(relativePath, authorityPermissions[authority]?.[accessType], missionId));
 }
 
+function tenantScopeConfig(policy: any): {
+  protectedPrefixes: string[];
+  sharedPrefixes: string[];
+  slugPattern: RegExp;
+  brokerRequirements: {
+    requireApprovedBy: boolean;
+    requireApprovedAt: boolean;
+    requireExpiresAt: boolean;
+  };
+} {
+  const cfg = policy?.tenant_scope || {};
+  const slugPatternRaw = typeof cfg.slug_pattern === 'string' ? cfg.slug_pattern : '^[a-z][a-z0-9-]{1,30}$';
+  let slugPattern = /^[a-z][a-z0-9-]{1,30}$/;
+  try {
+    slugPattern = new RegExp(slugPatternRaw);
+  } catch (_) {
+    /* fallback */
+  }
+  return {
+    protectedPrefixes: Array.isArray(cfg.protected_prefixes)
+      ? cfg.protected_prefixes
+      : ['knowledge/confidential/'],
+    sharedPrefixes: Array.isArray(cfg.shared_prefixes)
+      ? cfg.shared_prefixes
+      : ['knowledge/confidential/heuristics/', 'knowledge/confidential/relationships/'],
+    slugPattern,
+    brokerRequirements: {
+      requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,
+      requireApprovedAt: cfg?.broker_requirements?.require_approved_at !== false,
+      requireExpiresAt: cfg?.broker_requirements?.require_expires_at !== false,
+    },
+  };
+}
+
+function extractTenantFromProtectedPrefix(
+  relativePath: string,
+  protectedPrefixes: string[],
+): { tenant: string; prefix: string } | null {
+  for (const prefix of protectedPrefixes) {
+    if (!pathStartsWith(relativePath, prefix)) continue;
+    const rest = relativePath.slice(prefix.length);
+    const tenant = rest.split(/[\\/]/)[0] || '';
+    return { tenant, prefix };
+  }
+  return null;
+}
+
 /**
  * Validates write permission based on security-policy.json ADF and Persona.
  */
@@ -120,23 +167,34 @@ function hasAuthorityAccess(
  * always reviewable.
  */
 function checkTenantScope(
+  policy: any,
   relativePath: string,
   tenantSlug: string | undefined,
   brokeredTenants: string[] | undefined,
+  brokerApproval:
+    | {
+        purpose?: string;
+        approvedBy?: string;
+        approvedAt?: string;
+        expiresAt?: string;
+      }
+    | undefined,
   authorities: Authority[],
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
+  const cfg = tenantScopeConfig(policy);
+  if (cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix))) return null;
+
+  const scoped = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
+  if (!scoped) return null;
   if (!tenantSlug && !brokeredTenants) return null;
-
-  const segments = relativePath.split(/[\\/]/);
-  const idx = segments.findIndex((s) => s === 'confidential');
-  if (idx === -1) return null;
-
-  const targetTenant = segments[idx + 1];
-  if (!targetTenant) return null;
-  // Legacy single-tenant layouts under confidential/{mission_id}/ are
-  // not slug-shaped → not tenant-scoped.
-  if (!/^[a-z][a-z0-9-]{1,30}$/.test(targetTenant)) return null;
+  const targetTenant = scoped.tenant;
+  if (!targetTenant || !cfg.slugPattern.test(targetTenant)) {
+    return {
+      allowed: false,
+      reason: `[POLICY_VIOLATION] tenant.scope_invalid_prefix — '${relativePath}' is under protected prefix '${scoped.prefix}' but tenant segment '${targetTenant || '(missing)'}' is invalid.`,
+    };
+  }
 
   // Same tenant → allow.
   if (tenantSlug === targetTenant) return null;
@@ -145,6 +203,43 @@ function checkTenantScope(
   // Side-effect: emit a broker-access audit event so the cross-tenant
   // touch is recorded even though it is permitted.
   if (brokeredTenants && brokeredTenants.includes(targetTenant)) {
+    const purpose = String(brokerApproval?.purpose || '').trim();
+    const approvedBy = String(brokerApproval?.approvedBy || '').trim();
+    const approvedAt = String(brokerApproval?.approvedAt || '').trim();
+    const expiresAt = String(brokerApproval?.expiresAt || '').trim();
+    if (!purpose) {
+      return {
+        allowed: false,
+        reason: `[POLICY_VIOLATION] tenant.broker_missing_purpose — brokered access requires cross_tenant_brokerage.purpose.`,
+      };
+    }
+    if (cfg.brokerRequirements.requireApprovedBy && !approvedBy) {
+      return {
+        allowed: false,
+        reason: `[POLICY_VIOLATION] tenant.broker_unapproved — brokered access requires cross_tenant_brokerage.approved_by.`,
+      };
+    }
+    if (cfg.brokerRequirements.requireApprovedAt && !approvedAt) {
+      return {
+        allowed: false,
+        reason: `[POLICY_VIOLATION] tenant.broker_unapproved — brokered access requires cross_tenant_brokerage.approved_at.`,
+      };
+    }
+    if (cfg.brokerRequirements.requireExpiresAt && !expiresAt) {
+      return {
+        allowed: false,
+        reason: `[POLICY_VIOLATION] tenant.broker_expiry_required — brokered access requires cross_tenant_brokerage.expires_at.`,
+      };
+    }
+    if (expiresAt) {
+      const expiryMs = Date.parse(expiresAt);
+      if (Number.isNaN(expiryMs) || expiryMs <= Date.now()) {
+        return {
+          allowed: false,
+          reason: `[POLICY_VIOLATION] tenant.broker_expired — brokered access expired at '${expiresAt}'.`,
+        };
+      }
+    }
     void recordBrokerAccess({ relativePath, brokerTenants: brokeredTenants, targetTenant });
     return null;
   }
@@ -195,14 +290,14 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   }
 
   // 1. Identify Identity Context (Persona & Authority)
-  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants } = resolveIdentityContext();
-
-  // 1.5 Tenant scope — deny cross-tenant writes when the persona is tenant-bound.
-  const tenantDenial = checkTenantScope(relativePath, tenantSlug, brokeredTenants, authorities);
-  if (tenantDenial) return tenantDenial;
+  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants, brokerApproval } = resolveIdentityContext();
 
   const policy = loadPolicy();
   if (!policy) return { allowed: true };
+
+  // 1.5 Tenant scope — deny cross-tenant writes when the persona is tenant-bound.
+  const tenantDenial = checkTenantScope(policy, relativePath, tenantSlug, brokeredTenants, brokerApproval, authorities);
+  if (tenantDenial) return tenantDenial;
 
   const defaultAllow = (policy.default_allow || []).map((p: string) => expandMissionPath(p, currentMission));
   if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
@@ -268,10 +363,10 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const policy = loadPolicy();
   if (!policy) return { allowed: true };
 
-  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants } = resolveIdentityContext();
+  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants, brokerApproval } = resolveIdentityContext();
 
   // Tenant scope — deny cross-tenant reads from confidential.
-  const tenantDenial = checkTenantScope(relativePath, tenantSlug, brokeredTenants, authorities);
+  const tenantDenial = checkTenantScope(policy, relativePath, tenantSlug, brokeredTenants, brokerApproval, authorities);
   if (tenantDenial) return tenantDenial;
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };

@@ -8,6 +8,21 @@
     "work/metrics/",
     "active/shared/runtime/"
   ],
+  "tenant_scope": {
+    "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
+    "protected_prefixes": [
+      "knowledge/confidential/"
+    ],
+    "shared_prefixes": [
+      "knowledge/confidential/heuristics/",
+      "knowledge/confidential/relationships/"
+    ],
+    "broker_requirements": {
+      "require_approved_by": true,
+      "require_approved_at": true,
+      "require_expires_at": true
+    }
+  },
   "tier_restrictions": {
     "personal": {
       "allow_read": ["personal", "sovereign", "ecosystem_architect"],
@@ -271,6 +286,14 @@
         "presence/bridge/runtime/",
         "active/audit/"
       ]
+    },
+    "service_actuator": {
+      "allow_read": [
+        "knowledge/personal/connections/",
+        "knowledge/public/orchestration/",
+        "active/shared/auth-grants.json"
+      ],
+      "allow_write": []
     },
     "nexus_daemon": {
       "allow_read": [

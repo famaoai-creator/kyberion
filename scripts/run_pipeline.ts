@@ -145,7 +145,8 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
         logger.info(resolveLogMessage(params, ctx));
       } else if (domain === 'system' && action === 'shell') {
         const cmd = String(resolveVars(params.cmd || '', ctx));
-        const output = safeExec(shellBin, ['-lc', cmd], { cwd: rootDir }).trim();
+        const env = (params.env || {}) as Record<string, string>;
+        const output = safeExec(shellBin, ['-lc', cmd], { cwd: rootDir, env }).trim();
         if (params.export_as && typeof params.export_as === 'string') {
           ctx = { ...ctx, [params.export_as]: output };
         }

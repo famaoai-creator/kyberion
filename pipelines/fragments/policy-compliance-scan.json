@@ -12,11 +12,13 @@
       "type": "capture",
       "op": "system:exec",
       "params": {
-        "command": "sh",
+        "command": "node",
         "args": [
-          "-c",
-          "KYBERION_PERSONA=sovereign node dist/scripts/compliance_checker.js --dir {{target_dir}} --tier {{target_tier}}"
+          "dist/scripts/compliance_checker.js",
+          "--dir", "{{target_dir}}",
+          "--tier", "{{target_tier}}"
         ],
+        "env": { "KYBERION_PERSONA": "sovereign" },
         "allow_error": true,
         "export_as": "scan_result"
       }

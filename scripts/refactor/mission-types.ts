@@ -27,6 +27,7 @@ export interface MissionState {
     purpose: string;
     approved_by?: string;
     approved_at?: string;
+    expires_at?: string;
   };
   vision_ref?: string;
   tier: 'personal' | 'confidential' | 'public';

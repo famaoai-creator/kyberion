@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "name": "comfyui-artifact-ingestion",
+  "description": "Scans ComfyUI output directory and syncs missing artifacts to Kyberion using dynamic paths.",
+  "steps": [
+    {
+      "id": "scan_comfy_output",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "find",
+        "args": ["{{output_dir}}", "-maxdepth", "1", "-mmin", "-60", "-type", "f"],
+        "export_as": "recent_files"
+      }
+    },
+    {
+      "id": "ingest_missing",
+      "type": "apply",
+      "op": "system:exec",
+      "params": {
+        "command": "node",
+        "args": [
+          "dist/scripts/ingest_external_artifacts.js",
+          "--source", "{{output_dir}}",
+          "--target", "active/shared/exports/media/ingested",
+          "--pattern", ".*\\.(mp3|wav|png|jpg)$"
+        ],
+        "condition": "{{recent_files.output}} !== ''"
+      }
+    }
+  ]
+}

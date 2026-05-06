@@ -1,6 +1,7 @@
-import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding } from './index.js';
+import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding, secretGuard } from './index.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 
 /**
  * Shared Service Execution Engine v1.0
@@ -9,7 +10,34 @@ import { pathResolver } from './path-resolver.js';
 
 const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
 
-function resolveVars(input: string, vars: Record<string, any>): string {
+function loadConnectionWithFallback(serviceId: string): Record<string, any> {
+  const primary = withExecutionContext('service_actuator', () => secretGuard.loadConnectionDocument(serviceId));
+  if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
+  try {
+    return withExecutionContext('service_actuator', () => {
+      const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
+      return JSON.parse(safeReadFile(fallbackPath, { encoding: 'utf8' }) as string);
+    });
+  } catch (_) {
+    return {};
+  }
+}
+
+function isUnresolvedTemplateString(value: unknown): value is string {
+  return typeof value === 'string' && /^\{\{\s*[^}]+\s*\}\}$/.test(value.trim());
+}
+
+function mergeParamsWithConnection(connection: Record<string, any>, params: Record<string, any>): Record<string, any> {
+  const merged: Record<string, any> = { ...connection };
+  for (const [key, value] of Object.entries(params || {})) {
+    if (isUnresolvedTemplateString(value) && merged[key] !== undefined) continue;
+    merged[key] = value;
+  }
+  return merged;
+}
+
+function resolveVars(input: string | undefined, vars: Record<string, any>): string {
+  if (!input) return '';
   return input.replace(/{{(.*?)}}/g, (_, key) => {
     const value = vars[key.trim()];
     return value !== undefined ? String(value) : `{{${key}}}`;
@@ -114,6 +142,19 @@ function isUnsafeCliAllowed(): boolean {
   return process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true';
 }
 
+function isCliAllowedForOperation(
+  serviceConfig: Record<string, any>,
+  preset: Record<string, any>,
+  operation: Record<string, any>,
+): boolean {
+  if (isUnsafeCliAllowed()) return true;
+  return (
+    Boolean(operation.allow_unsafe_cli) ||
+    Boolean(preset.allow_unsafe_cli) ||
+    Boolean(serviceConfig.allow_unsafe_cli)
+  );
+}
+
 export async function executeServicePreset(serviceId: string, action: string, params: any, auth: 'none' | 'secret-guard' = 'none') {
   const endpoints = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
   const serviceConfig = endpoints.services[serviceId];
@@ -126,18 +167,29 @@ export async function executeServicePreset(serviceId: string, action: string, pa
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
 
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
+  const connection = loadConnectionWithFallback(serviceId);
+  const mergedParams = {
+    ...mergeParamsWithConnection(
+      {
+        ...(serviceConfig && typeof serviceConfig === 'object' ? serviceConfig : {}),
+        ...(connection && typeof connection === 'object' ? connection : {}),
+      },
+      params && typeof params === 'object' ? params : {},
+    ),
+    [`${serviceId}_connection`]: connection,
+  };
   
   // Auth resolution
   const binding = resolveServiceBinding(serviceId, auth);
   for (const alt of alternatives) {
     try {
       if (alt.type === 'cli') {
-        const bin = resolveVars(alt.command, params);
+        const bin = resolveVars(alt.command, mergedParams);
         if (!(await platform.checkBinary(bin))) continue;
-        if (!isUnsafeCliAllowed()) throw new Error('CLI execution disabled.');
+        if (!isCliAllowedForOperation(serviceConfig, preset, alt)) throw new Error('CLI execution disabled.');
         
         const args = (alt.args || []).map((a: any) => {
-          const resolved = resolveTemplateValue(a, params);
+          const resolved = resolveTemplateValue(a, mergedParams);
           return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
         });
         logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
@@ -148,10 +200,16 @@ export async function executeServicePreset(serviceId: string, action: string, pa
       }
 
       if (alt.type === 'api') {
-        const baseUrl = resolveVars(alt.base_url || preset.base_url || serviceConfig.base_url, params);
-        const apiPath = resolveVars(alt.path, params);
+        const baseUrl = resolveVars(
+          alt.base_url || preset.base_url || serviceConfig.base_url || connection.base_url,
+          mergedParams,
+        );
+        if (!baseUrl) {
+          throw new Error(`No base_url resolved for service "${serviceId}"`);
+        }
+        const apiPath = resolveVars(alt.path, mergedParams);
         const method = alt.method || 'GET';
-        const rawPayload = alt.payload_template ? resolveTemplateValue(alt.payload_template, params) : params;
+        const rawPayload = alt.payload_template ? resolveTemplateValue(alt.payload_template, mergedParams) : params;
         const headers = {
           ...preset.headers,
           ...alt.headers,
@@ -165,7 +223,11 @@ export async function executeServicePreset(serviceId: string, action: string, pa
           url: `${baseUrl}/${apiPath}`,
           headers,
           data: method !== 'GET' ? payload : undefined,
-          params: method === 'GET' ? payload : undefined
+          params: method === 'GET' ? payload : undefined,
+          kyberion_allow_local_network:
+            Boolean(alt.allow_local_network) ||
+            Boolean(preset.allow_local_network) ||
+            Boolean(serviceConfig.allow_local_network),
         });
         return normalizePresetResult(result, alt.output_mapping);
       }

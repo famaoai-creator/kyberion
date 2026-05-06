@@ -187,6 +187,7 @@ export function compileMusicGenerationADF(adf: KyberionMusicGenerationADF): Comp
       inputs: {
         audio: ['18', 0],
         filename_prefix,
+        quality: 'V0',
       },
       class_type: 'SaveAudioMP3',
     },
