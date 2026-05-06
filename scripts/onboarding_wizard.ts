@@ -1,131 +1,554 @@
 import * as path from 'node:path';
 import * as readline from 'node:readline';
+import AjvModule from 'ajv';
 import chalk from 'chalk';
-import { 
-  logger, 
-  pathResolver, 
-  safeWriteFile, 
-  safeMkdir,
+import {
+  compileSchemaFromPath,
+  pathResolver,
   safeExistsSync,
-  withLock
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+  withExecutionContext,
+  withLock,
 } from '@agent/core';
+
+const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
+const onboardingStateAjv = new AjvCtor({ allErrors: true });
+const onboardingStateValidate = compileSchemaFromPath(
+  onboardingStateAjv,
+  pathResolver.rootResolve('knowledge/public/schemas/onboarding-state.schema.json'),
+);
 
 const rl = readline.createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
-const ask = (question: string): Promise<string> => {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => resolve(answer.trim()));
+type OnboardingPhase = 'identity' | 'services' | 'tenants' | 'tutorial' | 'summary';
+type OnboardingStatus = 'draft' | 'complete';
+type ServiceStatus = 'pending' | 'saved' | 'skipped';
+
+interface IdentityDraft {
+  name: string;
+  language: string;
+  interaction_style: 'Senior Partner' | 'Concierge' | 'Minimalist';
+  primary_domain: string;
+  vision: string;
+  agent_id: string;
+}
+
+interface ServiceCandidateDraft {
+  service_id: string;
+  status: ServiceStatus;
+  connection_kind?: 'base_url' | 'output_dir' | 'cli_path' | 'custom' | 'none';
+  base_url?: string;
+  output_dir?: string;
+  cli_path?: string;
+  notes?: string;
+  captured_at: string;
+}
+
+interface TenantDraft {
+  tenant_slug: string;
+  tenant_id?: string;
+  display_name: string;
+  status: 'active' | 'suspended' | 'archived';
+  assigned_role: string;
+  purpose?: string;
+  created_at: string;
+}
+
+interface TutorialDraft {
+  mode: 'simulate' | 'apply' | 'skipped';
+  summary?: string;
+  plan_path?: string;
+}
+
+interface OnboardingState {
+  version: '1.0.0';
+  status: OnboardingStatus;
+  current_phase: OnboardingPhase;
+  completed_phases: OnboardingPhase[];
+  created_at: string;
+  updated_at: string;
+  identity?: IdentityDraft;
+  services?: { candidates: ServiceCandidateDraft[] };
+  tenants?: { entries: TenantDraft[] };
+  tutorial?: TutorialDraft;
+}
+
+const DEFAULT_SERVICES = ['comfyui', 'whisper', 'tts', 'meeting'] as const;
+const PHASES: OnboardingPhase[] = ['identity', 'services', 'tenants', 'tutorial', 'summary'];
+const ONBOARDING_ROOT = pathResolver.knowledge('personal/onboarding');
+const STATE_PATH = path.join(ONBOARDING_ROOT, 'onboarding-state.json');
+const SUMMARY_PATH = path.join(ONBOARDING_ROOT, 'onboarding-summary.md');
+
+const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+
+const ask = async (question: string, defaultValue = ''): Promise<string> => {
+  if (!interactive) {
+    return defaultValue;
+  }
+
+  return await new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      const trimmed = answer.trim();
+      resolve(trimmed || defaultValue);
+    });
   });
 };
 
-async function runOnboarding() {
-  const ROOT_DIR = pathResolver.rootDir();
-  const personalDir = path.join(ROOT_DIR, 'knowledge/personal');
-  const identityPath = path.join(personalDir, 'my-identity.json');
+const normalizeInteractionStyle = (input: string): IdentityDraft['interaction_style'] => {
+  const normalized = input.trim().toLowerCase();
+  if (normalized.startsWith('s')) return 'Senior Partner';
+  if (normalized.startsWith('m')) return 'Minimalist';
+  return 'Concierge';
+};
 
-  console.log('\n🌟 Welcome to Kyberion Ecosystem Onboarding 🌟\n');
-  console.log('I will help you establish your Sovereign Identity to unlock full capabilities.\n');
+const normalizeTenantSlug = (value: string): string => {
+  const trimmed = value.trim();
+  if (/^[a-z][a-z0-9-]{1,30}$/.test(trimmed)) return trimmed;
+  throw new Error(`Invalid tenant slug: ${value}`);
+};
 
-  if (safeExistsSync(identityPath)) {
-    const overwrite = await ask('An identity already exists. Overwrite? (y/N): ');
-    if (overwrite.toLowerCase() !== 'y') {
-      console.log('Onboarding cancelled. Existing identity preserved.');
-      process.exit(0);
-    }
+const isAffirmative = (value: string): boolean => /^(y|yes|true|1|ok|sure|please)$/i.test(value.trim());
+
+const ensureArtifactDir = (filePath: string): void => {
+  const dir = path.dirname(filePath);
+  if (!safeExistsSync(dir)) {
+    safeMkdir(dir, { recursive: true });
   }
+};
 
-  const name = await ask('1. What is your name or how should I call you? (e.g., Sovereign, Master, Commander): ') || 'Sovereign';
-  const language = await ask('2. Preferred language? (e.g., Japanese, English) [Japanese]: ') || 'Japanese';
-  
-  console.log('\n3. Choose your preferred interaction style:');
-  console.log('   - [S]enior Partner: Professional & strategic dialogue.');
-  console.log('   - [C]oncierge: Polite, proactive, and guiding (default).');
-  console.log('   - [M]inimalist: Concise and efficiency-focused.');
-  const styleCode = (await ask('Choice (S/C/M) [C]: ')).toUpperCase() || 'C';
-  
-  const styleMap: Record<string, string> = {
-    'S': 'Senior Partner',
-    'C': 'Concierge',
-    'M': 'Minimalist'
-  };
-  const style = styleMap[styleCode] || 'Concierge';
+function assertOnboardingStateSchema(state: OnboardingState): void {
+  if (onboardingStateValidate(state)) return;
+  const errors = Array.isArray(onboardingStateValidate.errors)
+    ? onboardingStateValidate.errors.map((entry: any) => `${entry.instancePath || '/'} ${entry.message || 'invalid'}`).join('; ')
+    : 'unknown schema error';
+  throw new Error(`[ONBOARDING_STATE_SCHEMA] Invalid onboarding state: ${errors}`);
+}
 
-  const domain = await ask('4. Primary domain? (e.g., Software Engineering, Data Analysis, Writing) [General]: ') || 'General';
-
-  const identity = {
-    name,
-    language,
-    interaction_style: style,
-    primary_domain: domain,
-    created_at: new Date().toISOString(),
-    status: 'active',
-    version: '1.0.0'
-  };
-
-  // Ensure directories exist
-  const tiers = ['knowledge/personal', 'knowledge/confidential', 'knowledge/public'];
-  for (const tier of tiers) {
-    const tierPath = path.join(ROOT_DIR, tier);
-    if (!safeExistsSync(tierPath)) {
-      console.log(`Creating directory: ${tier}`);
-      safeMkdir(tierPath, { recursive: true });
-    }
-  }
-
-  // Write identity file
-  await withLock('sovereign-identity', async () => {
-    safeWriteFile(identityPath, JSON.stringify(identity, null, 2));
+async function writeJsonArtifact(filePath: string, payload: unknown, lockName: string): Promise<void> {
+  await withLock(lockName, async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      ensureArtifactDir(filePath);
+      safeWriteFile(filePath, JSON.stringify(payload, null, 2));
+    });
   });
+}
 
-  console.log('\n✅ Sovereign Identity established successfully!');
-  console.log(`Saved to: ${identityPath}\n`);
+async function writeTextArtifact(filePath: string, content: string, lockName: string): Promise<void> {
+  await withLock(lockName, async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      ensureArtifactDir(filePath);
+      safeWriteFile(filePath, content);
+    });
+  });
+}
 
-  // --- NEW: Agent Greeting & Naming ---
-  console.log('--------------------------------------------------');
-  console.log('🤖 Agent Greeting & Naming Ceremony');
-  console.log('--------------------------------------------------');
-  console.log('\nNice to meet you, ' + name + '. I am your autonomous partner.');
-  console.log('To collaborate with other agents (A2A) and record immutable evidence,');
-  console.log('I also require a formal Agent ID.\n');
+function loadState(): OnboardingState | null {
+  if (!safeExistsSync(STATE_PATH)) return null;
+  try {
+    return JSON.parse(safeReadFile(STATE_PATH, { encoding: 'utf8' }) as string) as OnboardingState;
+  } catch {
+    return null;
+  }
+}
 
-  const proposedAgentId = 'KYBERION-PRIME';
-  console.log(`I propose the Agent ID: [${chalk.bold.cyan(proposedAgentId)}]`);
-  const agentNameChoice = await ask(`Accept this name or provide a new one? (Enter to accept / [Name]): `);
-  const finalAgentId = (agentNameChoice || proposedAgentId).toUpperCase();
+async function saveState(state: OnboardingState): Promise<void> {
+  assertOnboardingStateSchema(state);
+  await writeJsonArtifact(STATE_PATH, state, 'onboarding-state');
+}
 
-  const agentIdentity = {
-    agent_id: finalAgentId,
+function createInitialState(): OnboardingState {
+  const now = new Date().toISOString();
+  return {
+    version: '1.0.0',
+    status: 'draft',
+    current_phase: 'identity',
+    completed_phases: [],
+    created_at: now,
+    updated_at: now,
+    services: { candidates: [] },
+    tenants: { entries: [] },
+    tutorial: { mode: 'skipped' },
+  };
+}
+
+function buildIdentityFromState(state: OnboardingState): IdentityDraft {
+  const existing = state.identity;
+  return {
+    name: existing?.name || 'Sovereign',
+    language: existing?.language || 'Japanese',
+    interaction_style: existing?.interaction_style || 'Concierge',
+    primary_domain: existing?.primary_domain || 'General',
+    vision: existing?.vision || 'Build a high-fidelity Kyberion environment.',
+    agent_id: existing?.agent_id || 'KYBERION-PRIME',
+  };
+}
+
+function buildSummaryMarkdown(state: OnboardingState): string {
+  const identity = state.identity;
+  const services = state.services?.candidates || [];
+  const tenants = state.tenants?.entries || [];
+  const tutorial = state.tutorial;
+
+  return [
+    '# Kyberion Onboarding Summary',
+    '',
+    '## Identity',
+    `- Name: ${identity?.name || 'n/a'}`,
+    `- Language: ${identity?.language || 'n/a'}`,
+    `- Style: ${identity?.interaction_style || 'n/a'}`,
+    `- Domain: ${identity?.primary_domain || 'n/a'}`,
+    `- Vision: ${identity?.vision || 'n/a'}`,
+    `- Agent ID: ${identity?.agent_id || 'n/a'}`,
+    '',
+    '## Services',
+    ...(services.length > 0
+      ? services.map((entry) => `- ${entry.service_id}: ${entry.status}${entry.connection_kind ? ` (${entry.connection_kind})` : ''}`)
+      : ['- None captured yet']),
+    '',
+    '## Tenants',
+    ...(tenants.length > 0
+      ? tenants.map((tenant) => `- ${tenant.tenant_slug}: ${tenant.display_name} [${tenant.assigned_role}]`)
+      : ['- None registered yet']),
+    '',
+    '## Tutorial',
+    `- Mode: ${tutorial?.mode || 'skipped'}`,
+    `- Summary: ${tutorial?.summary || 'n/a'}`,
+    '',
+    '## Next Steps',
+    '- Review candidate service connections before using them in missions.',
+    '- Register additional tenants one at a time.',
+    '- Convert the tutorial into an explicit mission only after confirming the setup.',
+    '',
+  ].join('\n');
+}
+
+async function runIdentityPhase(state: OnboardingState): Promise<void> {
+  console.log('\n🧬 Phase 1 — Identity & Purpose\n');
+  const identity = buildIdentityFromState(state);
+
+  identity.name = await ask(`How should I call you? [${identity.name}]: `, identity.name);
+  identity.language = await ask(`Preferred language? [${identity.language}]: `, identity.language);
+  const styleInput = await ask(`Interaction style (Senior Partner / Concierge / Minimalist) [${identity.interaction_style}]: `, identity.interaction_style);
+  identity.interaction_style = normalizeInteractionStyle(styleInput || identity.interaction_style);
+  identity.primary_domain = await ask(`Primary domain? [${identity.primary_domain}]: `, identity.primary_domain);
+  identity.vision = await ask(`Core vision for this environment? [${identity.vision}]: `, identity.vision);
+  identity.agent_id = (await ask(`Agent ID? [${identity.agent_id}]: `, identity.agent_id)).trim().toUpperCase() || 'KYBERION-PRIME';
+
+  state.identity = identity;
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'identity']));
+  state.current_phase = 'services';
+  state.updated_at = new Date().toISOString();
+  await saveState(state);
+
+  const personalDir = pathResolver.knowledge('personal');
+  await writeJsonArtifact(path.join(personalDir, 'my-identity.json'), {
+    name: identity.name,
+    language: identity.language,
+    interaction_style: identity.interaction_style,
+    primary_domain: identity.primary_domain,
+    created_at: state.created_at,
+    status: 'active',
+    version: '1.0.0',
+  }, 'onboarding-my-identity');
+
+  await writeTextArtifact(path.join(personalDir, 'my-vision.md'), `# Sovereign Vision\n\n${identity.vision}\n`, 'onboarding-my-vision');
+
+  await writeJsonArtifact(path.join(personalDir, 'agent-identity.json'), {
+    agent_id: identity.agent_id,
     version: '1.0.0',
     role: 'Ecosystem Architect / Senior Partner',
-    owner: name,
+    owner: identity.name,
     trust_tier: 'sovereign',
-    created_at: new Date().toISOString(),
-    description: `The primary autonomous entity of the Kyberion Ecosystem for ${name}.`
+    created_at: state.created_at,
+    description: `The primary autonomous entity of the Kyberion Ecosystem for ${identity.name}.`,
+  }, 'onboarding-agent-identity');
+}
+
+async function promptComfyuiConnection(): Promise<Record<string, unknown> | null> {
+  const baseUrl = await ask('ComfyUI base URL [http://127.0.0.1:8188]: ', 'http://127.0.0.1:8188');
+  const outputDir = await ask('ComfyUI output dir [optional]: ');
+  const notes = await ask('ComfyUI notes [optional]: ');
+  if (!baseUrl && !outputDir && !notes) return null;
+  return {
+    base_url: baseUrl || undefined,
+    output_dir: outputDir || undefined,
+    notes: notes || undefined,
+    source: 'onboarding',
   };
+}
 
-  const agentIdentityPath = path.join(personalDir, 'agent-identity.json');
-  await withLock('agent-identity', async () => {
-    safeWriteFile(agentIdentityPath, JSON.stringify(agentIdentity, null, 2));
-  });
+async function promptWhisperConnection(): Promise<Record<string, unknown> | null> {
+  const whisperkitBaseUrl = await ask('WhisperKit base URL [optional]: ');
+  const whisperCliPath = await ask('Whisper CLI path [optional]: ');
+  const notes = await ask('Whisper notes [optional]: ');
+  if (!whisperkitBaseUrl && !whisperCliPath && !notes) return null;
+  return {
+    whisperkit_base_url: whisperkitBaseUrl || undefined,
+    whisper_cli_path: whisperCliPath || undefined,
+    notes: notes || undefined,
+    source: 'onboarding',
+  };
+}
 
-  console.log(`\n✨ Agent Identity established: ${chalk.bold.green(finalAgentId)}`);
-  console.log(`Saved to: ${agentIdentityPath}\n`);
-  // ------------------------------------
+async function promptGenericConnection(serviceId: string): Promise<Record<string, unknown> | null> {
+  const baseUrl = await ask(`${serviceId} base URL [optional]: `);
+  const outputDir = await ask(`${serviceId} output dir [optional]: `);
+  const cliPath = await ask(`${serviceId} CLI path [optional]: `);
+  const notes = await ask(`${serviceId} notes [optional]: `);
+  if (!baseUrl && !outputDir && !cliPath && !notes) return null;
+  return {
+    base_url: baseUrl || undefined,
+    output_dir: outputDir || undefined,
+    cli_path: cliPath || undefined,
+    notes: notes || undefined,
+    source: 'onboarding',
+  };
+}
 
-  console.log('Next steps:');
-  console.log('1. Build the workspace with: pnpm build');
-  console.log('2. Start background surfaces with: pnpm surfaces:reconcile');
-  console.log('3. Run missions with: pnpm mission:create');
-  console.log('4. Check health with: pnpm vital');
-  console.log('\nWelcome aboard, ' + name + '.\n');
+async function runServicesPhase(state: OnboardingState): Promise<void> {
+  console.log('\n🔌 Phase 2 — Infrastructure & Services\n');
+  const wantsServiceSetup = isAffirmative(await ask('Capture service connection candidates now? (y/N): ', 'n'));
+  const candidates: ServiceCandidateDraft[] = [];
+  const connectionDir = pathResolver.knowledge('personal/connections');
+  if (!safeExistsSync(connectionDir)) safeMkdir(connectionDir, { recursive: true });
 
+  if (wantsServiceSetup) {
+    for (const serviceId of DEFAULT_SERVICES) {
+      const wantsThisService = isAffirmative(await ask(`Add ${serviceId} connection now? (y/N): `, 'n'));
+      if (!wantsThisService) {
+        candidates.push({
+          service_id: serviceId,
+          status: 'skipped',
+          connection_kind: 'none',
+          captured_at: new Date().toISOString(),
+        });
+        continue;
+      }
+
+      let payload: Record<string, unknown> | null = null;
+      if (serviceId === 'comfyui') {
+        payload = await promptComfyuiConnection();
+      } else if (serviceId === 'whisper') {
+        payload = await promptWhisperConnection();
+      } else {
+        payload = await promptGenericConnection(serviceId);
+      }
+
+      const capturedAt = new Date().toISOString();
+      const candidate: ServiceCandidateDraft = {
+        service_id: serviceId,
+        status: payload ? 'saved' : 'pending',
+        connection_kind: payload?.base_url ? 'base_url' : payload?.output_dir ? 'output_dir' : payload?.cli_path ? 'cli_path' : payload ? 'custom' : 'none',
+        captured_at: capturedAt,
+        ...(payload?.base_url ? { base_url: String(payload.base_url) } : {}),
+        ...(payload?.output_dir ? { output_dir: String(payload.output_dir) } : {}),
+        ...(payload?.cli_path ? { cli_path: String(payload.cli_path) } : {}),
+        ...(payload?.notes ? { notes: String(payload.notes) } : {}),
+      };
+
+      candidates.push(candidate);
+
+      if (payload) {
+        await writeJsonArtifact(
+          path.join(connectionDir, `${serviceId}.json`),
+          {
+            service_id: serviceId,
+            status: 'draft',
+            captured_at: capturedAt,
+            ...payload,
+          },
+          `onboarding-connection-${serviceId}`,
+        );
+      }
+    }
+  }
+
+  state.services = { candidates };
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'services']));
+  state.current_phase = 'tenants';
+  state.updated_at = new Date().toISOString();
+  await saveState(state);
+}
+
+async function runTenantsPhase(state: OnboardingState): Promise<void> {
+  console.log('\n🏢 Phase 3 — Multi-Tenant Registration\n');
+  const entries: TenantDraft[] = [];
+  const wantsTenantSetup = isAffirmative(await ask('Register a tenant now? (y/N): ', 'n'));
+  const tenantDir = pathResolver.knowledge('personal/tenants');
+  if (!safeExistsSync(tenantDir)) safeMkdir(tenantDir, { recursive: true });
+
+  if (wantsTenantSetup) {
+    let tenantSlug = '';
+    while (!tenantSlug) {
+      const slugInput = await ask('Tenant slug [e.g. acme-co]: ', '');
+      try {
+        tenantSlug = normalizeTenantSlug(slugInput);
+      } catch (error) {
+        console.log(chalk.red(String(error)));
+      }
+    }
+    const displayName = await ask('Tenant display name [required]: ', tenantSlug);
+    const assignedRole = await ask('Your role in this tenant [strategist]: ', 'strategist');
+    const purpose = await ask('Purpose / scope for this tenant [optional]: ');
+    const createdAt = new Date().toISOString();
+
+    const tenantProfile: TenantDraft = {
+      tenant_slug: tenantSlug,
+      tenant_id: tenantSlug,
+      display_name: displayName || tenantSlug,
+      status: 'active',
+      assigned_role: assignedRole || 'strategist',
+      ...(purpose ? { purpose } : {}),
+      created_at: createdAt,
+    };
+    entries.push(tenantProfile);
+
+    await writeJsonArtifact(
+      path.join(tenantDir, `${tenantSlug}.json`),
+      {
+        tenant_slug: tenantSlug,
+        tenant_id: tenantSlug,
+        display_name: tenantProfile.display_name,
+        status: tenantProfile.status,
+        assigned_role: tenantProfile.assigned_role,
+        purpose: purpose || undefined,
+        created_at: createdAt,
+        isolation_policy: {
+          strict_isolation: true,
+          allow_cross_distillation: true,
+        },
+        metadata: {
+          onboarding_source: 'pnpm onboard',
+        },
+      },
+      `onboarding-tenant-${tenantSlug}`,
+    );
+  }
+
+  state.tenants = { entries };
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'tenants']));
+  state.current_phase = 'tutorial';
+  state.updated_at = new Date().toISOString();
+  await saveState(state);
+}
+
+async function runTutorialPhase(state: OnboardingState): Promise<void> {
+  console.log('\n🎓 Phase 4 — Hands-on Tutorial\n');
+  const modeInput = (await ask('Tutorial mode: simulate / apply / skipped [simulate]: ', 'simulate')).trim().toLowerCase();
+  const mode: TutorialDraft['mode'] = modeInput === 'apply' ? 'apply' : modeInput === 'skipped' ? 'skipped' : 'simulate';
+  const summary = mode === 'skipped'
+    ? 'Tutorial skipped during onboarding.'
+    : await ask('Describe the first tutorial mission in one sentence: ', 'Demonstrate the initial Kyberion setup with a safe dry-run.');
+
+  const planPath = path.join(ONBOARDING_ROOT, 'tutorial-plan.md');
+  const planMarkdown = [
+    '# Onboarding Tutorial Plan',
+    '',
+    `- Mode: ${mode}`,
+    `- Summary: ${summary}`,
+    '',
+    '## Suggested next step',
+    mode === 'apply'
+      ? '- Review the plan and create a mission manually if the setup is ready.'
+      : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
+    '',
+  ].join('\n');
+
+  await writeTextArtifact(planPath, planMarkdown, 'onboarding-tutorial-plan');
+
+  state.tutorial = { mode, summary, plan_path: planPath };
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'tutorial']));
+  state.current_phase = 'summary';
+  state.updated_at = new Date().toISOString();
+  await saveState(state);
+}
+
+async function runSummaryPhase(state: OnboardingState): Promise<void> {
+  console.log('\n📊 Phase 5 — Summary\n');
+  const summary = buildSummaryMarkdown(state);
+  await writeTextArtifact(SUMMARY_PATH, summary, 'onboarding-summary');
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'summary']));
+  state.status = 'complete';
+  state.current_phase = 'summary';
+  state.updated_at = new Date().toISOString();
+  await saveState(state);
+
+  const identity = state.identity;
+  console.log(chalk.green('✅ Onboarding complete.'));
+  console.log(`Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`);
+  console.log(`Summary written to: ${SUMMARY_PATH}`);
+  console.log(`State written to: ${STATE_PATH}`);
+  console.log('\nNext steps:');
+  console.log('1. Review the service connection drafts in `knowledge/personal/connections/`.');
+  console.log('2. Review the tenant draft in `knowledge/personal/tenants/`.');
+  console.log('3. If the tutorial should become real work, create a mission explicitly after review.');
+  console.log('4. Re-run `pnpm surfaces:reconcile` after the workspace is ready.');
+}
+
+async function runOnboarding() {
+  const rootDir = pathResolver.rootDir();
+  const personalDir = pathResolver.knowledge('personal');
+
+  console.log('\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n');
+  console.log('This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n');
+
+  if (!safeExistsSync(personalDir)) {
+    safeMkdir(personalDir, { recursive: true });
+  }
+  if (!safeExistsSync(ONBOARDING_ROOT)) {
+    safeMkdir(ONBOARDING_ROOT, { recursive: true });
+  }
+
+  let state = loadState();
+  if (!state) {
+    state = createInitialState();
+    await saveState(state);
+  } else if (state.status === 'complete') {
+    const overwrite = await ask('An onboarding state already exists and is complete. Restart from scratch? (y/N): ', 'n');
+    if (!isAffirmative(overwrite)) {
+      console.log('Onboarding cancelled. Existing state preserved.');
+      rl.close();
+      process.exit(0);
+    }
+    state = createInitialState();
+    await saveState(state);
+  } else {
+    const resume = await ask(`Resume onboarding from phase "${state.current_phase}"? (Y/n): `, 'y');
+    if (!isAffirmative(resume)) {
+      state = createInitialState();
+      await saveState(state);
+    }
+  }
+
+  for (const phase of PHASES) {
+    if (state.completed_phases.includes(phase) && phase !== 'summary') {
+      continue;
+    }
+    if (phase === 'identity') {
+      await runIdentityPhase(state);
+    } else if (phase === 'services') {
+      await runServicesPhase(state);
+    } else if (phase === 'tenants') {
+      await runTenantsPhase(state);
+    } else if (phase === 'tutorial') {
+      await runTutorialPhase(state);
+    } else if (phase === 'summary') {
+      await runSummaryPhase(state);
+    }
+  }
+
+  console.log('\nWelcome aboard.');
+  console.log(`Workspace root: ${rootDir}`);
   rl.close();
 }
 
-runOnboarding().catch(err => {
+runOnboarding().catch((err) => {
   console.error('Onboarding failed:', err);
+  rl.close();
   process.exit(1);
 });
