@@ -15,6 +15,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('TENANT CONTEXT');
     expect(dashboard).toContain('CONNECTION REVIEW');
+    expect(dashboard).toContain('STARTER MISSION');
+    expect(dashboard).toContain('register-presentation-preference-profile');
     expect(dashboard).toContain('MISSION ORCHESTRATION');
     expect(dashboard).toContain('OWNER SUMMARIES');
     expect(dashboard).toContain('RUNTIME LEASE DOCTOR');
