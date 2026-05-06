@@ -4,7 +4,7 @@
 
 ## 📋 クイック・スタート (Quick Commands)
 
-システムをゼロから立ち上げるための標準的なコマンド列です：
+システムをゼロから立ち上げるための標準的なコマンド列です。
 
 前提:
 - Node.js `22+`
@@ -20,7 +20,7 @@ pnpm build
 # 3. バックグラウンド surface の整列
 pnpm surfaces:reconcile
 
-# 4. 魂の注入 (アイデンティティ設定 - 対話形式)
+# 4. 魂の注入 (オンボーディング)
 pnpm onboard
 ```
 
@@ -32,46 +32,52 @@ pnpm onboard
 - **実行コマンド**: `pnpm install`
 - **目的**: 必要なライブラリを全てロードし、内部モジュール間の接続を確立します。
 - **物理的変化**:
-    - `node_modules/` が生成されます。
-    - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
-- **前提ランタイム**:
-    - Node.js `22+` を使用してください。
-    - `.nvmrc` を使う場合は `nvm use` で repo 推奨バージョンに合わせてください。
+  - `node_modules/` が生成されます。
+  - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
 
 ### Stage 2: システムの具現化 (System Manifestation)
 - **実行コマンド**: `pnpm build`
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
 - **物理的変化**:
-    - `dist/` ディレクトリが生成され、全ソースコードがビルドされます。
-    - workspace 間の runtime contract が再構築されます。
+  - `dist/` ディレクトリが生成され、全ソースコードがビルドされます。
+  - workspace 間の runtime contract が再構築されます。
 
 ### Stage 3: Runtime Surface Reconciliation
 - **実行コマンド**: `pnpm surfaces:reconcile`
 - **目的**: `slack-bridge`、`imessage-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface を manifest から標準起動します。
 - **物理的変化**:
-    - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
-    - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。
-    - `runtime-supervisor` に surface runtime が登録されます。
+  - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
+  - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。
+  - `runtime-supervisor` に surface runtime が登録されます。
 
 ### Stage 4: 魂の注入 (Soul Infusion)
 - **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)
-- **目的**: 主権者の名前、言語、対話スタイル、専門分野をシステムに記憶させます。
+- **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **物理的変化**:
-    - `knowledge/personal/my-identity.json` が生成されます。
-    - `knowledge/personal/my-vision.md` が生成（または更新）されます。
+  - `knowledge/personal/my-identity.json` が生成されます。
+  - `knowledge/personal/my-vision.md` が生成（または更新）されます。
+  - `knowledge/personal/onboarding/onboarding-state.json` が生成されます。
+  - `knowledge/personal/onboarding/onboarding-summary.md` が生成されます。
 
 ### Stage 5: 邂逅と命名の儀式 (Greeting & Naming)
 - **内容**: アイデンティティ設定の最後に、エージェントが自ら自己紹介を行い、主権者との間で「Agent ID」を合意します。
 - **目的**: A2A 通信やブロックチェーン記録に使用する、エージェントの公的な名前（Agent ID）を決定します。
-- **物理적変化**:
-    - `knowledge/personal/agent-identity.json` が生成されます。
+- **物理的変化**:
+  - `knowledge/personal/agent-identity.json` が生成されます。
 
+### Stage 6: 接続・領域・チュートリアルの下準備
+- **内容**: サービス接続の候補、テナント 1 件分の登録、最初の tutorial plan を個別に整えます。
+- **目的**: 初回実行で副作用を強制せず、提案・承認・適用を分離します。
+- **物理的変化**:
+  - `knowledge/personal/connections/*.json` が候補として生成されます。
+  - `knowledge/personal/tenants/*.json` が 1 件ずつ生成されます。
+  - `knowledge/personal/onboarding/tutorial-plan.md` が生成されます。
 
 ---
 
 ## 🩺 健全性確認 (Vital Check)
 
-オンボーディングが正しく完了したかを確認するには、以下のコマンドを実行してください：
+オンボーディングが正しく完了したかを確認するには、以下のコマンドを実行してください。
 
 ```bash
 pnpm vital
@@ -82,7 +88,8 @@ pnpm vital
 - ✅ [OK] System Build (dist)
 - ✅ [OK] Sovereign Identity
 - ✅ [OK] Sovereign Vision
+- ✅ [OK] Onboarding Summary
 
 ---
 *Status: Mandated by AGENTS.md*
-*Last Updated: 2026-03-11 by Ecosystem Architect*
+*Last Updated: 2026-05-06 by Ecosystem Architect*
