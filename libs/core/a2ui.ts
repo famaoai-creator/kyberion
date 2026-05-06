@@ -5,12 +5,25 @@ import { logger } from './core.js';
  * Inspired by OpenClaw A2UI.
  */
 
+export type A2UIComponentType = 
+  | 'text' 
+  | 'button' 
+  | 'card' 
+  | 'container'
+  // Chronos Specific Components
+  | 'kb-layout-grid'
+  | 'kb-status-orbit'
+  | 'kb-mission-card'
+  | 'kb-artifact-tile'
+  | 'kb-intervention-panel';
+
 export interface A2UIComponent {
   id: string;
-  type: string;
-  props?: Record<string, any>;
+  type: A2UIComponentType;
+  props: Record<string, any>;
   children?: string[];
 }
+
 
 export interface A2UIMessage {
   createSurface?: {

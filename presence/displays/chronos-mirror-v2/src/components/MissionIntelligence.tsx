@@ -1840,6 +1840,70 @@ export function MissionIntelligence({
 
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
+      {/* Command Center: High-Visibility Action Dashboard */}
+      {!selectedProject && !selectedMissionId && (
+        <section className="flex flex-col gap-8 py-4">
+          <div className="flex flex-col gap-2">
+            <div className="text-[12px] uppercase tracking-[0.4em] text-cyan-400 font-bold">Sovereign Command</div>
+            <h2 className="text-3xl font-bold tracking-tight text-white/90">Welcome to the Mirror.</h2>
+            <p className="text-sm text-white/50 max-w-2xl leading-relaxed">
+              Chronos is your operational管制塔. 
+              Use the tiles below to start monitoring or intervene in active agent workflows.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <button 
+              onClick={() => document.getElementById('mission-control-plane')?.scrollIntoView({ behavior: 'smooth' })}
+              className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-cyan-400/50 transition-all hover:translate-y-[-4px]"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-cyan-400/10 flex items-center justify-center text-cyan-400 mb-6 group-hover:scale-110 transition-transform">
+                <Radar size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Monitor Missions</h3>
+              <p className="text-xs text-white/40 leading-relaxed">Observe real-time intent execution and artifact delivery across all active agents.</p>
+              <div className="mt-6 text-[10px] uppercase tracking-widest text-cyan-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Open Dashboard →</div>
+            </button>
+
+            <button 
+              onClick={() => document.getElementById('runtime-lease-doctor')?.scrollIntoView({ behavior: 'smooth' })}
+              className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-amber-400/50 transition-all hover:translate-y-[-4px]"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-amber-400/10 flex items-center justify-center text-amber-400 mb-6 group-hover:scale-110 transition-transform">
+                <Activity size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">System Health</h3>
+              <p className="text-xs text-white/40 leading-relaxed">Inspect runtime leases, remediation findings, and supervisor-level governance.</p>
+              <div className="mt-6 text-[10px] uppercase tracking-widest text-amber-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Check Vitals →</div>
+            </button>
+
+            <button 
+              onClick={() => document.getElementById('recent-surface-outbox')?.scrollIntoView({ behavior: 'smooth' })}
+              className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-rose-400/50 transition-all hover:translate-y-[-4px]"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-rose-400/10 flex items-center justify-center text-rose-400 mb-6 group-hover:scale-110 transition-transform">
+                <ShieldAlert size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Intervention</h3>
+              <p className="text-xs text-white/40 leading-relaxed">Resolve blocked deliveries, approve sensitive requests, and manage exceptions.</p>
+              <div className="mt-6 text-[10px] uppercase tracking-widest text-rose-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">View Outbox →</div>
+            </button>
+          </div>
+
+          <div className="kyberion-glass p-6 rounded-[24px] border-white/5 flex items-center justify-between bg-white/[0.02]">
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 pulse-animation" />
+              <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">
+                System Status: <span className="text-cyan-400 font-bold">Nominal</span>
+              </div>
+            </div>
+            <div className="text-[10px] text-white/30 font-mono">
+              Ready for operator commands via Sovereign Link or Quick Actions.
+            </div>
+          </div>
+        </section>
+      )}
+
       {focusedView && (
         <section className="rounded-[24px] border border-cyan-300/12 bg-cyan-400/[0.06] px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
