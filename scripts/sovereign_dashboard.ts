@@ -44,6 +44,104 @@ function listJsonFiles(dir: string): string[] {
     .map((entry) => path.join(dir, entry));
 }
 
+function readConnectionReview() {
+  const connectionDir = pathResolver.knowledge('personal/connections');
+  const readinessPath = pathResolver.knowledge('public/governance/service-connection-readiness.json');
+  const readiness = readJsonIfExists<{
+    required_services?: Record<string, { required_keys_any?: string[] }>;
+  }>(readinessPath);
+  const files = listJsonFiles(connectionDir);
+
+  const services = files.map((file) => {
+    const serviceId = path.basename(file, '.json');
+    const record = readJsonIfExists<Record<string, unknown>>(file);
+    const requirements = readiness?.required_services?.[serviceId]?.required_keys_any || [];
+    const hasRequiredKey = requirements.length === 0
+      ? Boolean(record)
+      : requirements.some((key) => Boolean(record && Object.prototype.hasOwnProperty.call(record, key)));
+    const status = !record ? 'pending' : hasRequiredKey ? 'ready' : 'blocked';
+    return {
+      serviceId,
+      status,
+      record,
+      requirements,
+    };
+  });
+
+  const blocked = Object.entries(readiness?.required_services || {})
+    .filter(([serviceId]) => !services.some((entry) => entry.serviceId === serviceId))
+    .map(([serviceId]) => ({
+      serviceId,
+      status: 'missing',
+      record: null,
+      requirements: readiness?.required_services?.[serviceId]?.required_keys_any || [],
+    }));
+
+  return {
+    services: [...services, ...blocked],
+    readiness,
+  };
+}
+
+function drawTenantContext() {
+  console.log(chalk.bold.cyan(' 🧩 TENANT CONTEXT'));
+
+  const onboardingState = readJsonIfExists<{
+    identity?: { name?: string };
+    tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }> };
+  }>(pathResolver.knowledge('personal/onboarding/onboarding-state.json'));
+  const tenants = onboardingState?.tenants?.entries || [];
+
+  if (tenants.length === 0) {
+    console.log(chalk.dim('  (No tenant registered yet)'));
+    console.log('');
+    return;
+  }
+
+  const activeTenant = tenants[0];
+  console.log(`  ${chalk.gray('•')} Active: ${chalk.cyan(activeTenant.tenant_slug)} ${chalk.dim(activeTenant.display_name || '')}`);
+  console.log(`  ${chalk.gray('•')} Role: ${chalk.white(activeTenant.assigned_role || 'unknown')}`);
+  console.log(`  ${chalk.gray('•')} Owner: ${chalk.white(onboardingState?.identity?.name || 'Sovereign')}`);
+  if (tenants.length > 1) {
+    console.log(`  ${chalk.gray('•')} Other tenants: ${chalk.dim(tenants.slice(1).map((tenant) => tenant.tenant_slug).join(', '))}`);
+  }
+  console.log('');
+}
+
+function drawConnectionReview() {
+  console.log(chalk.bold.magenta(' 🔍 CONNECTION REVIEW'));
+
+  const review = readConnectionReview();
+  const services = review.services;
+  const ready = services.filter((entry) => entry.status === 'ready');
+  const blocked = services.filter((entry) => entry.status === 'blocked' || entry.status === 'missing');
+  const pending = services.filter((entry) => entry.status === 'pending');
+
+  console.log(`  ${chalk.gray('•')} Ready: ${ready.length > 0 ? chalk.green(ready.length) : chalk.dim(0)}`);
+  console.log(`  ${chalk.gray('•')} Blocked: ${blocked.length > 0 ? chalk.yellow(blocked.length) : chalk.dim(0)}`);
+  console.log(`  ${chalk.gray('•')} Pending: ${pending.length > 0 ? chalk.yellow(pending.length) : chalk.dim(0)}`);
+
+  const recommended = blocked.length > 0
+    ? `review ${blocked[0].serviceId}`
+    : pending.length > 0
+      ? `capture ${pending[0].serviceId}`
+      : 'all required connection drafts are available';
+  console.log(`  ${chalk.gray('•')} Review cue: ${chalk.white(recommended)}`);
+
+  for (const entry of services.slice(0, 5)) {
+    const label = entry.status === 'ready'
+      ? chalk.green('READY')
+      : entry.status === 'blocked'
+        ? chalk.yellow('BLOCKED')
+        : entry.status === 'missing'
+          ? chalk.red('MISSING')
+          : chalk.dim('PENDING');
+    const requirements = entry.requirements.length > 0 ? chalk.dim(` needs=${entry.requirements.join('|')}`) : '';
+    console.log(`  ${chalk.gray('•')} ${entry.serviceId.padEnd(16)} [${label}]${requirements}`);
+  }
+  console.log('');
+}
+
 function drawOnboardingHome() {
   console.log(chalk.bold.green(' 🏠 ONBOARDING HOME'));
 
@@ -379,6 +477,8 @@ function render() {
   clearScreen();
   drawHeader();
   drawOnboardingHome();
+  drawTenantContext();
+  drawConnectionReview();
   drawMissions();
   drawMissionOrchestration();
   drawOwnerSummaries();
