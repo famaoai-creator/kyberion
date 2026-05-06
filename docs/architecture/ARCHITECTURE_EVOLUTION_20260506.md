@@ -1,35 +1,38 @@
-# Kyberion Architectural Evolution Report (2026-05-06)
+# Kyberion Architecture Evolution Log — 2026-05-06
 
-## 1. Executive Summary
-This session focused on evolving Kyberion from a machine-dependent, single-tenant environment into a **Portable, Multi-Tenant Sovereign Ecosystem**. The current state is a partial transition: core artifacts and contracts have been added, while runtime enforcement and operational validation are still in progress.
+この記録は、2026-05-06 に実施した tenant/confidential 境界と契約検証の整理を残すためのものです。
 
-## 2. Implemented Frameworks
+## 概要
 
-### A. Service-Centric Infrastructure (Dynamic Binding)
-The system reduces hardcoded local paths by introducing a service/connection contract. Full runtime resolution coverage is not yet complete.
-*   **Connection Layer (`knowledge/personal/connections/`)**: Stores environment-specific metadata (binary paths, base URLs, Python venvs) for ComfyUI, Whisper, TTS, and Meeting tools.
-*   **Service Presets (`knowledge/public/orchestration/service-presets/`)**: Standardized operation definitions (API/CLI) that resolve metadata at runtime.
-*   **Portability (Target State)**: Moving to a new machine should require only updating `connections/*.json`, but some execution paths still require additional resolver hardening.
+Kyberion の `knowledge/confidential/` 境界と契約検証を、`tenant_slug` と governed schema を基準に整理しました。  
+加えて、サービス接続の readiness、mission-state の broker 期限、baseline の drift 検査を実装し、public tier に環境依存値を残さない方向へ寄せています。
 
-### B. Dynamic Multi-Tenant Governance
-Multi-tenant governance scaffolding is in place, but full tenant lifecycle operation is not yet demonstrated.
-*   **Tenant Profiles**: Dynamic registration of organizations via `knowledge/personal/tenants/{tenant_id}.json`.
-*   **Variable Scope Isolation**: Updated `path-scope-policy.json` to use `${TENANT_ID}` variables, ensuring strict data boundaries between `knowledge/confidential/{tenant_id}/` directories.
-*   **Per-Tenant Identity (Schema Level)**: Tenant profile schema supports role assignment, pending broader runtime adoption and validation.
+## 実施した変更
 
-### C. Autonomous Scheduling & Recovery
-Long-running task lifecycle contracts were extended, with validation still ongoing.
-*   **Stimulus-Driven Scheduling**: Cron-like and interval registration surfaces exist for autonomous media generation and system tasks.
-*   **ComfyUI Resilience**: Added specific monitoring fragments (`comfyui-status-check`, `comfyui-artifact-ingestion`) to ensure Kyberion can recover artifacts generated while the main process was offline.
+- `knowledge/confidential/` の tenant 境界を `tenant_slug` 基準に統一
+- `security-policy.json` に `tenant_scope` を追加し、broker 許可条件を明示化
+- `mission-state` に `cross_tenant_brokerage.expires_at` を追加し、保存時に schema 検証を導入
+- `service-connection-readiness` を governance schema として外出しし、baseline check に組み込み
+- `tier-guard` / `authority` / `service-engine` / `secure-io` の接続経路を policy 駆動で整備
+- ComfyUI / Whisper / Meeting の preset を整理し、環境依存値を public tier に残さない形へ寄せた
 
-## 3. Directory & File Inventory
-New architectural assets created in this session:
-- `docs/architecture/service-integration-plan.md`
-- `knowledge/personal/connections/` (comfyui, whisper, voice, meeting)
-- `knowledge/public/orchestration/service-presets/` (comfyui, whisper, voice, meeting)
-- `knowledge/public/schemas/tenant-profile.schema.json`
-- `knowledge/personal/tenants/` (_index.json, PROCEDURE.md)
-- `pipelines/fragments/` (comfyui-status-check, comfyui-config-inspect, comfyui-artifact-ingestion)
+## 追加の整理
 
-## 4. Operational Readiness
-The system has passed `baseline-check` in this session. ComfyUI/voice synchronization and generation-daemon active monitoring require separate runtime verification and are not asserted here.
+- `path-scope-policy.json` は `${TENANT_SLUG}` に寄せ、tenant 境界の判定キーを統一
+- `tenant-profile.schema.json` で `tenant_slug` を必須化
+- `service-connection-readiness.schema.json` を追加し、運用設定の型安全性を上げた
+- `check_contract_schemas.ts` に `mission-state` と `service-connection-readiness` を追加した
+- `comfyui-status-check` などの fragment を、未解決テンプレート前提から外した
+
+## 検証
+
+- `pnpm build`
+- `pnpm pipeline --input pipelines/baseline-check.json`
+- `pnpm vitest run libs/core/tier-guard-tenant.test.ts`
+- `pnpm tsx scripts/check_contract_schemas.ts`
+
+## 運用メモ
+
+- 変更は PR `#269` として統合済み
+- ワークツリーの生成物は整理済みで、現在はクリーン状態
+- 以後は `tenant_slug` と `brokerApproval` を tenant 境界の基準として扱う
