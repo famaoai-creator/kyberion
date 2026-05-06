@@ -26,6 +26,8 @@ describe('Runtime surface operations contract', () => {
   it('mentions runtime surfaces in the operator dashboard and onboarding next steps', () => {
     const dashboard = read('scripts/sovereign_dashboard.ts');
     const onboarding = read('scripts/onboarding_wizard.ts');
+    expect(dashboard).toContain('ONBOARDING HOME');
+    expect(dashboard).toContain('Next:');
     expect(dashboard).toContain('RUNTIME SURFACES');
     expect(onboarding).toContain('pnpm surfaces:reconcile');
   });
