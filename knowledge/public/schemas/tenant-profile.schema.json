@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/tenant-profile.schema.json",
+  "title": "Tenant Profile",
+  "description": "Definition of a tenant and the user's role within it.",
+  "type": "object",
+  "required": ["tenant_slug", "display_name", "status", "assigned_role"],
+  "properties": {
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "display_name": { "type": "string" },
+    "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
+    "assigned_role": { "type": "string", "description": "The user's primary role in this tenant (e.g., strategist, pm, lead)." },
+    "isolation_policy": {
+      "type": "object",
+      "properties": {
+        "strict_isolation": { "type": "boolean", "default": true },
+        "allow_cross_distillation": { "type": "boolean", "default": true, "description": "Allow abstract wisdom extraction to public tier." }
+      }
+    },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

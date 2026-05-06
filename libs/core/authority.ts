@@ -19,6 +19,7 @@ const ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_gateway: 'worker',
   chronos_operator: 'worker',
   chronos_localadmin: 'worker',
+  service_actuator: 'worker',
   surface_runtime: 'worker',
   infrastructure_sentinel: 'worker',
   ruthless_auditor: 'analyst',
@@ -123,6 +124,14 @@ export function resolveIdentityContext(): IdentityContext {
   const authorities: Authority[] = [];
   let tenantSlug: string | undefined = normalizeTenantSlug(process.env.KYBERION_TENANT);
   let brokeredTenants: string[] | undefined;
+  let brokerApproval:
+    | {
+        purpose?: string;
+        approvedBy?: string;
+        approvedAt?: string;
+        expiresAt?: string;
+      }
+    | undefined;
 
   // 1. Resolve Persona (and tenantSlug / brokeredTenants) from Mission State.
   // Try the legacy no-tier path first, then fall back to tier-aware lookup
@@ -145,6 +154,15 @@ export function resolveIdentityContext(): IdentityContext {
               .map((t: unknown) => normalizeTenantSlug(typeof t === 'string' ? t : undefined))
               .filter((t): t is string => !!t);
             if (slugs.length > 0) brokeredTenants = slugs;
+          }
+          if (state.cross_tenant_brokerage && typeof state.cross_tenant_brokerage === 'object') {
+            const cfg = state.cross_tenant_brokerage;
+            brokerApproval = {
+              purpose: typeof cfg.purpose === 'string' ? cfg.purpose : undefined,
+              approvedBy: typeof cfg.approved_by === 'string' ? cfg.approved_by : undefined,
+              approvedAt: typeof cfg.approved_at === 'string' ? cfg.approved_at : undefined,
+              expiresAt: typeof cfg.expires_at === 'string' ? cfg.expires_at : undefined,
+            };
           }
           break;
         }
@@ -199,6 +217,7 @@ export function resolveIdentityContext(): IdentityContext {
     sudoScope: resolveSudoScope(),
     tenantSlug,
     ...(brokeredTenants ? { brokeredTenants } : {}),
+    ...(brokerApproval ? { brokerApproval } : {}),
   };
 }
 

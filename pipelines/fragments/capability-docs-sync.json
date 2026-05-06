@@ -8,7 +8,8 @@
       "type": "apply",
       "op": "system:shell",
       "params": {
-        "cmd": "KYBERION_PERSONA=sovereign node dist/scripts/docs_sync.js"
+        "cmd": "node dist/scripts/docs_sync.js",
+        "env": { "KYBERION_PERSONA": "sovereign" }
       }
     },
     {

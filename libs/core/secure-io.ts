@@ -444,7 +444,7 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
 /**
  * Validate a URL against SSRF and protocol restrictions.
  */
-export function validateUrl(url: string): string {
+export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean }): string {
   if (!url) {
     throw new Error('Missing or invalid URL');
   }
@@ -462,12 +462,16 @@ export function validateUrl(url: string): string {
     const normalizedHostname = hostname.replace(/^\[(.*)\]$/, '$1');
     const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::', '::1'];
     
+    const allowLocal = options?.allowLocalNetwork === true || process.env.KYBERION_ALLOW_LOCAL_NETWORK === 'true';
+
     if (blockedHostnames.includes(normalizedHostname)) {
+      if (allowLocal) return url;
       throw new Error(`Blocked URL: ${hostname}`);
     }
 
     // Basic private IP range detection (IPv4)
     if (/^(10\.|127\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(normalizedHostname)) {
+      if (allowLocal) return url;
       throw new Error(`Blocked URL: Private IP range (${hostname})`);
     }
 
@@ -479,6 +483,7 @@ export function validateUrl(url: string): string {
       normalizedHostname.startsWith('::ffff:7f00:') ||
       normalizedHostname.startsWith('::ffff:127.')
     ) {
+      if (allowLocal) return url;
       throw new Error(`Blocked URL: Private IP range (${hostname})`);
     }
 

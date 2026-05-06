@@ -1,248 +1,88 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Mission State Protocol (MSP) v2.1",
+  "$id": "https://kyberion.local/schemas/mission-state.schema.json",
+  "title": "Mission State",
   "type": "object",
   "required": [
     "mission_id",
-    "version",
+    "tier",
     "status",
-    "priority"
+    "execution_mode",
+    "priority",
+    "assigned_persona",
+    "confidence_score",
+    "git",
+    "history"
   ],
   "properties": {
-    "mission_id": {
-      "type": "string",
-      "description": "Unique mission identifier"
+    "mission_id": { "type": "string", "minLength": 1 },
+    "mission_type": { "type": "string" },
+    "tenant_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "cross_tenant_brokerage": {
+      "type": "object",
+      "required": ["source_tenants", "purpose", "approved_by", "approved_at", "expires_at"],
+      "properties": {
+        "source_tenants": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" }
+        },
+        "purpose": { "type": "string", "minLength": 1 },
+        "approved_by": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "minLength": 1 },
+        "expires_at": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
     },
-    "version": {
-      "type": "string",
-      "default": "2.1"
-    },
+    "vision_ref": { "type": "string" },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
     "status": {
       "type": "string",
-      "enum": [
-        "draft",
-        "planned",
-        "active",
-        "paused",
-        "validating",
-        "distilling",
-        "completed",
-        "failed",
-        "archived"
-      ]
+      "enum": ["planned", "active", "validating", "distilling", "completed", "paused", "failed", "archived"]
     },
-    "execution_mode": {
-      "type": "string",
-      "enum": [
-        "local",
-        "delegated"
-      ],
-      "default": "local"
-    },
-    "relationships": {
-      "type": "object",
-      "description": "Causal and dependency relationships with other missions.",
-      "properties": {
-        "prerequisites": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Missions that must be COMPLETED before this one starts."
-        },
-        "successors": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Missions triggered or proposed after this one is COMPLETED."
-        },
-        "blockers": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Missions that cannot run simultaneously with this one."
-        }
-      }
-    },
-    "delegation": {
-      "type": "object",
-      "properties": {
-        "agent_id": {
-          "type": "string"
-        },
-        "a2a_message_id": {
-          "type": "string"
-        },
-        "remote_repo_url": {
-          "type": "string"
-        },
-        "last_sync_ts": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "verification_status": {
-          "type": "string",
-          "enum": [
-            "pending",
-            "verified",
-            "rejected"
-          ]
-        },
-        "evidence_hashes": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "priority": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 10,
-      "default": 5
-    },
-    "owner": {
-      "type": "string",
-      "default": "famao"
-    },
-    "assigned_persona": {
-      "type": "string"
-    },
+    "execution_mode": { "type": "string", "enum": ["local", "delegated"] },
+    "priority": { "type": "number" },
+    "assigned_persona": { "type": "string", "minLength": 1 },
+    "confidence_score": { "type": "number" },
     "git": {
       "type": "object",
+      "required": ["branch", "start_commit", "latest_commit", "checkpoints"],
       "properties": {
-        "branch": {
-          "type": "string"
-        },
-        "start_commit": {
-          "type": "string"
-        },
-        "latest_commit": {
-          "type": "string"
-        },
+        "branch": { "type": "string" },
+        "start_commit": { "type": "string" },
+        "latest_commit": { "type": "string" },
         "checkpoints": {
           "type": "array",
           "items": {
             "type": "object",
+            "required": ["task_id", "commit_hash", "ts"],
             "properties": {
-              "task_id": {
-                "type": "string"
-              },
-              "commit_hash": {
-                "type": "string"
-              },
-              "ts": {
-                "type": "string",
-                "format": "date-time"
-              }
-            }
+              "task_id": { "type": "string" },
+              "commit_hash": { "type": "string" },
+              "ts": { "type": "string" }
+            },
+            "additionalProperties": true
           }
         }
-      }
-    },
-    "milestones": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "id",
-          "title",
-          "status"
-        ],
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "in-progress",
-              "completed"
-            ]
-          },
-          "completed_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
-        }
-      }
-    },
-    "context": {
-      "type": "object",
-      "properties": {
-        "last_action": {
-          "type": "string"
-        },
-        "next_step": {
-          "type": "string"
-        },
-        "blockers": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "associated_projects": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
+      },
+      "additionalProperties": true
     },
     "history": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "ts",
-          "event"
-        ],
+        "required": ["ts", "event", "note"],
         "properties": {
-          "ts": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "event": {
-            "type": "string"
-          },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          },
-          "note": {
-            "type": "string"
-          }
-        }
+          "ts": { "type": "string" },
+          "event": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": true
       }
-    },
-    "tenant_id": {
-      "type": "string",
-      "description": "Tenant to which this mission belongs, linking it to a specific Vision."
-    },
-    "vision_ref": {
-      "type": "string",
-      "description": "Reference to the specific Vision document or concept guiding this mission."
-    },
-    "type": {
-      "type": "string",
-      "enum": [
-        "evaluation",
-        "development",
-        "research"
-      ],
-      "default": "development",
-      "description": "Type of mission defining its permissions and focus."
-    },
-    "external_ref": {
-      "type": "string",
-      "description": "Reference to an external issue, ticket, or trigger URL."
     }
-  }
+  },
+  "additionalProperties": true
 }

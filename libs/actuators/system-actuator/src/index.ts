@@ -991,7 +991,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         [params.export_as || 'last_capture']: safeExec(
           process.env.SHELL || '/bin/zsh',
           ['-lc', resolve(params.cmd)],
-          { cwd: rootDir },
+          { cwd: rootDir, env: params.env || {} },
         ).trim(),
       };
     case 'cli_health_check': {

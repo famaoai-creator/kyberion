@@ -939,6 +939,7 @@ function runActuator(actuators: ActuatorRecord[], actuatorName: string | undefin
   try {
     const output = safeExec('node', [script, ...forwardedArgs], {
       env: { ...process.env, MISSION_ID: missionId || '' },
+      timeoutMs: 1800000, // 30 minutes for long-running actuators (media generation, etc.)
     });
 
     if (output) {
