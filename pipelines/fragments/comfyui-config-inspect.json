@@ -1,0 +1,33 @@
+{
+  "action": "pipeline",
+  "name": "comfyui-config-inspect",
+  "description": "Inspects ComfyUI configuration using Service Presets.",
+  "steps": [
+    {
+      "id": "inspect_config",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "comfyui",
+        "action": "inspect_config",
+        "params": {
+          "start_script": "{{start_script}}"
+        },
+        "export_as": "start_script_content"
+      }
+    },
+    {
+      "id": "list_custom_nodes",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "comfyui",
+        "action": "list_custom_nodes",
+        "params": {
+          "custom_nodes_dir": "{{custom_nodes_dir}}"
+        },
+        "export_as": "installed_nodes"
+      }
+    }
+  ]
+}

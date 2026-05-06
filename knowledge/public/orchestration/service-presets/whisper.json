@@ -1,0 +1,30 @@
+{
+  "service_id": "whisper",
+  "name": "Whisper STT Management Presets",
+  "operations": {
+    "transcribe": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "api",
+          "base_url": "{{whisperkit_base_url}}",
+          "path": "transcribe",
+          "method": "POST",
+          "description": "WhisperKit Local Server Transcription"
+        },
+        {
+          "type": "cli",
+          "command": "{{whisper_cli_path}}",
+          "args": ["--model", "{{whisper_model_path}}", "--file", "{{audio_path}}", "--language", "{{language}}", "--output-json"],
+          "description": "Local whisper.cpp CLI transcription"
+        }
+      ]
+    },
+    "stream": {
+      "type": "cli",
+      "command": "{{whisper_stream_path}}",
+      "args": ["--model", "{{whisper_model_path}}", "--language", "{{language}}"],
+      "description": "Real-time Whisper streaming"
+    }
+  }
+}

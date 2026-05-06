@@ -43,6 +43,15 @@
     },
     "youtube": {
       "preset_path": "knowledge/public/orchestration/service-presets/youtube.json"
+    },
+    "comfyui": {
+      "preset_path": "knowledge/public/orchestration/service-presets/comfyui.json"
+    },
+    "whisper": {
+      "preset_path": "knowledge/public/orchestration/service-presets/whisper.json"
+    },
+    "meeting": {
+      "preset_path": "knowledge/public/orchestration/service-presets/meeting.json"
     }
   }
 }

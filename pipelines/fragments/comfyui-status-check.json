@@ -1,0 +1,50 @@
+{
+  "action": "pipeline",
+  "name": "comfyui-status-check",
+  "description": "Checks the status of the ComfyUI server, active queue, and output history using Service Presets.",
+  "steps": [
+    {
+      "id": "get_stats",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "comfyui",
+        "action": "get_stats",
+        "export_as": "server_stats"
+      }
+    },
+    {
+      "id": "get_queue",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "comfyui",
+        "action": "get_queue",
+        "export_as": "queue_status"
+      }
+    },
+    {
+      "id": "get_history",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "comfyui",
+        "action": "get_history",
+        "export_as": "job_history"
+      }
+    },
+    {
+      "id": "list_outputs",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "comfyui",
+        "action": "list_outputs",
+        "params": {
+          "output_dir": "{{output_dir}}"
+        },
+        "export_as": "recent_outputs"
+      }
+    }
+  ]
+}

@@ -2982,6 +2982,7 @@
           "op": "system:shell",
           "params": {
             "cmd": "node dist/scripts/run_pipeline.js --input pipelines/assimilate-gateway-capability.json --context '{\"service_name\": \"{{service_name}}\", \"openapi_url\": \"{{openapi_url_or_docs}}\"}'",
+            "env": { "KYBERION_PERSONA": "sovereign" },
             "export_as": "assimilation_result"
           }
         }

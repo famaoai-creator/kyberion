@@ -37,6 +37,13 @@
         "active/shared/exports/"
       ]
     },
+    "tenant_confidential": {
+      "description": "Tenant-specific confidential knowledge and assets.",
+      "allow_prefixes": [
+        "knowledge/confidential/${TENANT_SLUG}/",
+        "knowledge/personal/tenants/${TENANT_SLUG}/"
+      ]
+    },
     "communication_surface": {
       "description": "Surface/gateway communication channels and runtime state.",
       "allow_prefixes": [
