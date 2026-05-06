@@ -14,6 +14,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts['surfaces:reconcile']).toBe('node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['surfaces:status']).toBe('node dist/scripts/surface_runtime.js --action status');
     expect(pkg.scripts.bootstrap).toBe('pnpm build && node dist/scripts/surface_runtime.js --action reconcile');
+    expect(pkg.scripts['dashboard:onboarding']).toBe('node dist/scripts/sovereign_dashboard.js --once --focus onboarding');
   });
 
   it('includes surface checks in the vital pipeline', () => {
@@ -28,6 +29,7 @@ describe('Runtime surface operations contract', () => {
     const onboarding = read('scripts/onboarding_wizard.ts');
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('Next:');
+    expect(dashboard).toContain('Focused view: onboarding setup, connection review, tenant context, starter mission.');
     expect(dashboard).toContain('RUNTIME SURFACES');
     expect(onboarding).toContain('pnpm surfaces:reconcile');
   });

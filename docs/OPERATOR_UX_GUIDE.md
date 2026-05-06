@@ -259,6 +259,7 @@ pnpm build
 pnpm onboard
 pnpm doctor
 pnpm capabilities
+pnpm dashboard:onboarding
 ```
 
 ### Surface lifecycle
