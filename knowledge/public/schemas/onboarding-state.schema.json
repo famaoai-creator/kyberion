@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/onboarding-state.schema.json",
+  "title": "Onboarding State",
+  "description": "Persistent state for the phased Kyberion onboarding wizard.",
+  "type": "object",
+  "required": ["version", "status", "current_phase", "completed_phases", "created_at", "updated_at"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "complete"]
+    },
+    "current_phase": {
+      "type": "string",
+      "enum": ["identity", "services", "tenants", "tutorial", "summary"]
+    },
+    "completed_phases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["identity", "services", "tenants", "tutorial", "summary"]
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identity": {
+      "type": "object",
+      "required": ["name", "language", "interaction_style", "primary_domain", "vision", "agent_id"],
+      "properties": {
+        "name": { "type": "string" },
+        "language": { "type": "string" },
+        "interaction_style": {
+          "type": "string",
+          "enum": ["Senior Partner", "Concierge", "Minimalist"]
+        },
+        "primary_domain": { "type": "string" },
+        "vision": { "type": "string" },
+        "agent_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "services": {
+      "type": "object",
+      "required": ["candidates"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["service_id", "status", "captured_at"],
+            "properties": {
+              "service_id": { "type": "string" },
+              "status": { "type": "string", "enum": ["pending", "saved", "skipped"] },
+              "connection_kind": {
+                "type": "string",
+                "enum": ["base_url", "output_dir", "cli_path", "custom", "none"]
+              },
+              "base_url": { "type": "string" },
+              "output_dir": { "type": "string" },
+              "cli_path": { "type": "string" },
+              "notes": { "type": "string" },
+              "captured_at": { "type": "string", "format": "date-time" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tenants": {
+      "type": "object",
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tenant_slug", "display_name", "assigned_role", "status"],
+            "properties": {
+              "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+              "tenant_id": { "type": "string" },
+              "display_name": { "type": "string" },
+              "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
+              "assigned_role": { "type": "string" },
+              "purpose": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tutorial": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["simulate", "apply", "skipped"] },
+        "summary": { "type": "string" },
+        "plan_path": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

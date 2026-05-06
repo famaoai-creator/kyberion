@@ -387,6 +387,67 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'onboarding-state',
+      schemaPath: 'knowledge/public/schemas/onboarding-state.schema.json',
+      validPayloads: [
+        {
+          version: '1.0.0',
+          status: 'complete',
+          current_phase: 'summary',
+          completed_phases: ['identity', 'services', 'tenants', 'tutorial', 'summary'],
+          created_at: '2026-05-06T00:00:00.000Z',
+          updated_at: '2026-05-06T00:10:00.000Z',
+          identity: {
+            name: 'Sovereign',
+            language: 'Japanese',
+            interaction_style: 'Concierge',
+            primary_domain: 'Software Engineering',
+            vision: 'Build a high-fidelity Kyberion environment.',
+            agent_id: 'KYBERION-PRIME',
+          },
+          services: {
+            candidates: [
+              {
+                service_id: 'comfyui',
+                status: 'saved',
+                connection_kind: 'base_url',
+                base_url: 'http://127.0.0.1:8188',
+                captured_at: '2026-05-06T00:05:00.000Z',
+              },
+            ],
+          },
+          tenants: {
+            entries: [
+              {
+                tenant_slug: 'acme-co',
+                tenant_id: 'acme-co',
+                display_name: 'Acme Co',
+                status: 'active',
+                assigned_role: 'strategist',
+                purpose: 'First onboarding tenant',
+                created_at: '2026-05-06T00:07:00.000Z',
+              },
+            ],
+          },
+          tutorial: {
+            mode: 'simulate',
+            summary: 'Demonstrate the initial Kyberion setup with a safe dry-run.',
+            plan_path: 'knowledge/personal/onboarding/tutorial-plan.md',
+          },
+        },
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          status: 'draft',
+          current_phase: 'invalid-phase',
+          completed_phases: [],
+          created_at: '2026-05-06T00:00:00.000Z',
+          updated_at: '2026-05-06T00:00:00.000Z',
+        },
+      ],
+    },
+    {
       id: 'mission-orchestration-scenario-pack',
       schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
       validPayloads: [
