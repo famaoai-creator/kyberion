@@ -1,13 +1,14 @@
 import React from 'react';
 import { Info, AlertTriangle, CheckCircle, Activity, Clock, ArrowUp, ArrowDown, Minus } from 'lucide-react';
-import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
+import { uxText } from "../lib/ux-vocabulary";
+import { useChronosLocale } from "../lib/hooks";
 
 /**
  * A2UI Component Library for Chronos Mirror v2
  */
 
 function useA2UIText() {
-  const locale = resolveChronosLocale();
+  const locale = useChronosLocale();
   return (key: string | undefined, fallbackEn: string) => key ? uxText(key, fallbackEn, locale) : fallbackEn;
 }
 
@@ -361,6 +362,153 @@ export const KyberionGrid = ({ cols, children: items }: {
   </div>
 );
 
+// --- kb:layout-grid ---
+export const KbLayoutGrid = ({ columns = 2, gap = "1rem", children: items, variant = "dashboard" }: {
+  columns?: number; gap?: string; children: { type: string; props: Record<string, any> }[]; variant?: string;
+}) => (
+  <div 
+    className={`grid ${variant === 'mission-focus' ? 'p-6 bg-slate-900/20' : ''}`} 
+    style={{ gridTemplateColumns: `repeat(${columns}, 1fr)`, gap }}
+  >
+    {(items || []).map((item, i) => (
+      <A2UIRenderer key={i} type={item.type} props={item.props} />
+    ))}
+  </div>
+);
+
+// --- kb:status-orbit ---
+export const KbStatusOrbit = ({ currentPhase, status, label }: {
+  currentPhase: 'intent' | 'plan' | 'state' | 'result'; status: string; label: string;
+}) => {
+  const phases = ['intent', 'plan', 'state', 'result'];
+  const currentIndex = phases.indexOf(currentPhase);
+  
+  return (
+    <div className="flex flex-col items-center gap-6 py-8">
+      <div className="relative w-48 h-48 flex items-center justify-center">
+        {/* Static Background Ring */}
+        <div className="absolute inset-0 rounded-full border-2 border-white/5" />
+        
+        {/* Dynamic Pulse Ring */}
+        <div className={`absolute inset-0 rounded-full border-2 border-cyan-400/30 ${status === 'running' ? 'animate-ping' : ''}`} />
+        
+        {/* Phase Indicators */}
+        {phases.map((phase, i) => {
+          const angle = (i * 90) - 90;
+          const isActive = i <= currentIndex;
+          const isCurrent = i === currentIndex;
+          
+          return (
+            <div 
+              key={phase}
+              className="absolute transition-all duration-500"
+              style={{ 
+                transform: `rotate(${angle}deg) translate(96px) rotate(-${angle}deg)`
+              }}
+            >
+              <div className={`w-3 h-3 rounded-full border-2 ${
+                isCurrent ? 'bg-cyan-400 border-cyan-400 shadow-[0_0_10px_#00f2ff]' : 
+                isActive ? 'bg-cyan-900 border-cyan-400' : 'bg-slate-800 border-white/20'
+              }`} />
+              <div className={`absolute top-5 left-1/2 -translate-x-1/2 text-[8px] uppercase tracking-tighter ${isActive ? 'text-cyan-400' : 'text-slate-500'}`}>
+                {phase}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Center Text */}
+        <div className="text-center px-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] opacity-40 mb-1">Status</div>
+          <div className={`text-sm font-bold uppercase tracking-widest ${status === 'running' ? 'pulse-animation text-cyan-400' : 'text-white'}`}>
+            {label}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- kb:mission-card ---
+export const KbMissionCard = ({ missionId, title, owner, progress, priority }: {
+  missionId: string; title: string; owner: string; progress: number; priority: string;
+}) => {
+  const priorityColors = {
+    low: 'text-slate-400',
+    medium: 'text-cyan-400',
+    high: 'text-amber-400',
+    critical: 'text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'
+  };
+
+  return (
+    <div className="kyberion-glass p-4 rounded-xl flex flex-col gap-3 group hover:border-cyan-400/30 transition-all">
+      <div className="flex justify-between items-start">
+        <div className="text-[10px] font-mono text-cyan-400/60 uppercase">{missionId}</div>
+        <div className={`text-[9px] uppercase font-bold tracking-widest ${(priorityColors as any)[priority] || priorityColors.medium}`}>
+          {priority}
+        </div>
+      </div>
+      <div className="text-sm font-bold text-white/90 group-hover:text-cyan-400 transition-colors">{title}</div>
+      <div className="flex items-center gap-2 opacity-40 text-[10px]">
+        <Activity size={10} /> {owner}
+      </div>
+      <div className="mt-2">
+        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-cyan-400 transition-all duration-1000" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="flex justify-between mt-1 text-[8px] uppercase tracking-widest opacity-30">
+          <span>Progress</span>
+          <span>{progress}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- kb:artifact-tile ---
+export const KbArtifactTile = ({ type, path, previewContent }: {
+  type: string; path: string; previewContent: string;
+}) => (
+  <div className="bg-slate-950/40 border border-white/5 rounded-lg p-3 hover:bg-slate-900/60 transition cursor-pointer">
+    <div className="flex items-center gap-2 mb-2">
+      <div className="w-6 h-6 rounded bg-cyan-400/10 flex items-center justify-center text-cyan-400">
+        <Clock size={12} /> {/* Placeholder for type icon */}
+      </div>
+      <div className="text-[10px] font-mono text-slate-400 truncate flex-1">{path}</div>
+    </div>
+    <div className="bg-black/40 p-2 rounded text-[9px] font-mono text-slate-500 line-clamp-3">
+      {previewContent}
+    </div>
+  </div>
+);
+
+// --- kb:intervention-panel ---
+export const KbInterventionPanel = ({ reason, options, isBlocking }: {
+  reason: string; options: any[]; isBlocking: boolean;
+}) => (
+  <div className={`p-6 rounded-2xl border-2 ${isBlocking ? 'border-amber-500/50 bg-amber-950/20' : 'border-cyan-500/50 bg-cyan-950/20'} shadow-2xl`}>
+    <div className="flex items-center gap-3 mb-4">
+      <AlertTriangle className={isBlocking ? 'text-amber-500' : 'text-cyan-400'} />
+      <div className="text-xs font-bold uppercase tracking-[0.2em]">Intervention Required</div>
+    </div>
+    <p className="text-sm text-white/80 mb-6 leading-relaxed">{reason}</p>
+    <div className="flex gap-3">
+      {(options || []).map((opt, i) => (
+        <button 
+          key={i}
+          className={`px-4 py-2 rounded text-[10px] uppercase font-bold tracking-widest transition-all ${
+            opt.variant === 'primary' ? 'bg-cyan-500 text-black hover:bg-cyan-400' :
+            opt.variant === 'danger' ? 'bg-red-500 text-white hover:bg-red-400' :
+            'bg-white/10 text-white hover:bg-white/20'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 /**
  * Registry mapping A2UI component types to React components.
  */
@@ -382,6 +530,12 @@ export const A2UI_COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
   'display:list':        KyberionList,
   'display:card':        KyberionCard,
   'display:grid':        KyberionGrid,
+  // Chronos Specific (kb-*)
+  'kb-layout-grid':      KbLayoutGrid,
+  'kb-status-orbit':     KbStatusOrbit,
+  'kb-mission-card':     KbMissionCard,
+  'kb-artifact-tile':    KbArtifactTile,
+  'kb-intervention-panel': KbInterventionPanel,
 };
 
 /** Sanitize string props to prevent XSS via script injection */

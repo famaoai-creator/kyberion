@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback, PointerEvent as ReactPointerEvent } from "react";
 import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from "lucide-react";
-import { chronosSpeechLocale, resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
+import { chronosSpeechLocale, uxText } from "../lib/ux-vocabulary";
+import { useChronosLocale } from "../lib/hooks";
 
 const AGENT_URL = "/api/agent";
 
@@ -21,16 +22,21 @@ export function SovereignChat({
   onA2UIMessage?: (message: any) => void;
   onReady?: (sendFn: (query: string) => void) => void;
 }) {
-  const locale = resolveChronosLocale();
+  const locale = useChronosLocale();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 }); // offset from default bottom-right
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // --- Drag to move ---
   const onDragStart = useCallback((e: ReactPointerEvent) => {
@@ -195,8 +201,31 @@ export function SovereignChat({
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
-          <div className="text-center text-[11px] opacity-30 italic pt-8">
-            {uxText("chronos_chat_welcome", "Welcome, Sovereign. The mirror is ready for your command.", locale)}
+          <div className="flex flex-col gap-6 pt-4">
+            <div className="text-center text-[11px] opacity-40 italic">
+              {uxText("chronos_chat_welcome", "Welcome, Sovereign. The mirror is ready for your command.", locale)}
+            </div>
+            
+            <div className="space-y-3">
+              <div className="text-[9px] uppercase tracking-widest opacity-30 px-2">Suggested Commands</div>
+              <div className="grid gap-2">
+                {[
+                  { label: "Check system health", cmd: "How is the system doing?" },
+                  { label: "List active missions", cmd: "Show me all active missions." },
+                  { label: "Start a new mission", cmd: "I want to start a new mission for..." },
+                  { label: "What are my next actions?", cmd: "What should I do next?" }
+                ].map((hint, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInput(hint.cmd)}
+                    className="text-left p-2 rounded-lg bg-white/5 border border-white/5 hover:border-cyan-400/30 transition group"
+                  >
+                    <div className="text-[10px] text-white/60 group-hover:text-cyan-400">{hint.label}</div>
+                    <div className="text-[9px] text-white/30 truncate">"{hint.cmd}"</div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {messages.map((msg) => (
@@ -215,7 +244,7 @@ export function SovereignChat({
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
               <div className="text-[8px] opacity-30 mt-1 text-right">
-                {new Date(msg.timestamp).toLocaleTimeString()}
+                {isMounted ? new Date(msg.timestamp).toLocaleTimeString() : ""}
               </div>
             </div>
           </div>

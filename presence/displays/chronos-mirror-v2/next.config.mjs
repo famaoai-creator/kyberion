@@ -10,9 +10,6 @@ const nextConfig = {
     // @agent/core uses its own tsconfig (non-strict). Skip re-checking here.
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   transpilePackages: ["@agent/core"],
   serverExternalPackages: ["node-pty", "@agentclientprotocol/sdk"],
   webpack: (config) => {
