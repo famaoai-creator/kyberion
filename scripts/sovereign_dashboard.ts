@@ -18,6 +18,14 @@ import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
+type DashboardFocus = 'all' | 'onboarding';
+
+function getDashboardFocus(): DashboardFocus {
+  const focusIndex = process.argv.indexOf('--focus');
+  const focusValue = focusIndex >= 0 ? String(process.argv[focusIndex + 1] || '').trim().toLowerCase() : '';
+  return focusValue === 'onboarding' ? 'onboarding' : 'all';
+}
+
 function clearScreen() {
   process.stdout.write('\x1Bc');
 }
@@ -527,12 +535,18 @@ function drawTrustBoard() {
 }
 
 function render() {
+  const focus = getDashboardFocus();
   clearScreen();
   drawHeader();
   drawOnboardingHome();
   drawTenantContext();
   drawConnectionReview();
   drawStarterMissionSuggestion();
+  if (focus === 'onboarding') {
+    console.log(chalk.dim(' Focused view: onboarding setup, connection review, tenant context, starter mission.'));
+    console.log(chalk.dim(' Press Ctrl+C to exit.'));
+    return;
+  }
   drawMissions();
   drawMissionOrchestration();
   drawOwnerSummaries();
