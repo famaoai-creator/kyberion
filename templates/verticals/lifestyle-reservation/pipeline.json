@@ -1,0 +1,90 @@
+{
+  "pipeline_id": "vertical-lifestyle-reservation",
+  "version": "1.0.0",
+  "description": "Search → propose → reserve. Customer fills in domains, preferences, and confirmation channel.",
+  "action": "pipeline",
+  "inputs": {
+    "INTENT": { "required": true, "description": "Natural-language reservation request" },
+    "RESERVATION_DOMAINS": { "required": true, "type": "array" },
+    "PREFERENCES_PATH": { "required": true },
+    "AUTO_CONFIRM_BELOW": { "required": false, "default": 5000 },
+    "NOTIFICATION_CHANNEL": { "required": true }
+  },
+  "steps": [
+    {
+      "id": "load-preferences",
+      "type": "transform",
+      "op": "load_json",
+      "params": {
+        "path": "{{PREFERENCES_PATH}}",
+        "export_as": "preferences"
+      }
+    },
+    {
+      "id": "search-candidates",
+      "type": "apply",
+      "op": "browser:search_multi",
+      "params": {
+        "domains": "{{RESERVATION_DOMAINS}}",
+        "intent": "{{INTENT}}",
+        "preferences": "{{preferences}}",
+        "max_per_domain": 5,
+        "export_as": "raw_candidates"
+      },
+      "on_error": {
+        "strategy": "abort",
+        "remediation": "Search failed. Check connection to RESERVATION_DOMAINS."
+      }
+    },
+    {
+      "id": "rank-and-shortlist",
+      "type": "transform",
+      "op": "wisdom:rank_candidates",
+      "params": {
+        "candidates": "{{raw_candidates}}",
+        "preferences": "{{preferences}}",
+        "top_n": 3,
+        "export_as": "shortlist"
+      }
+    },
+    {
+      "id": "confirm-with-user",
+      "type": "control",
+      "op": "approval:request",
+      "params": {
+        "channel": "{{NOTIFICATION_CHANNEL}}",
+        "subject": "Reservation candidates for: {{INTENT}}",
+        "options": "{{shortlist}}",
+        "auto_confirm_below": "{{AUTO_CONFIRM_BELOW}}",
+        "export_as": "user_choice"
+      }
+    },
+    {
+      "id": "make-reservation",
+      "type": "apply",
+      "op": "browser:reserve",
+      "params": {
+        "candidate": "{{user_choice}}",
+        "export_as": "reservation"
+      }
+    },
+    {
+      "id": "add-to-calendar",
+      "type": "apply",
+      "op": "service:calendar_create",
+      "params": {
+        "connection": "google-workspace",
+        "event": "{{reservation}}"
+      }
+    },
+    {
+      "id": "notify",
+      "type": "apply",
+      "op": "presence:notify",
+      "params": {
+        "channel": "{{NOTIFICATION_CHANNEL}}",
+        "message": "Reserved: {{reservation.title}} at {{reservation.time}}"
+      }
+    }
+  ]
+}

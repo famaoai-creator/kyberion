@@ -3,6 +3,9 @@ import {
   getMeetingJoinDriver,
   listMeetingJoinDriversFor,
   resetMeetingJoinDriverRegistry,
+  redactMeetingUrl,
+  resolveMeetingPlatform,
+  validateMeetingTarget,
 } from '@agent/core';
 import {
   installBrowserMeetingJoinDriver,
@@ -123,6 +126,53 @@ describe('BrowserMeetingJoinDriver selectors', () => {
   it('ZOOM_SELECTORS has required fields', () => {
     expect(ZOOM_SELECTORS).toBeDefined();
     expect(Array.isArray(ZOOM_SELECTORS.join_button)).toBe(true);
+  });
+});
+
+describe('resolveMeetingPlatform', () => {
+  it('infers meet/zoom/teams from known hosts', () => {
+    expect(
+      resolveMeetingPlatform({
+        url: 'https://meet.google.com/abc-defg-hij',
+        platform: 'auto',
+      }),
+    ).toBe('meet');
+    expect(
+      resolveMeetingPlatform({
+        url: 'https://company.zoom.us/j/123',
+        platform: 'auto',
+      }),
+    ).toBe('zoom');
+    expect(
+      resolveMeetingPlatform({
+        url: 'https://teams.microsoft.com/l/meetup-join/abc',
+        platform: 'auto',
+      }),
+    ).toBe('teams');
+  });
+
+  it('throws on unknown hosts when platform is auto', () => {
+    expect(() =>
+      resolveMeetingPlatform({
+        url: 'https://example.com/meeting',
+        platform: 'auto',
+      }),
+    ).toThrow(/unsupported meeting URL/i);
+  });
+
+  it('rejects disallowed hosts before join', () => {
+    expect(() =>
+      validateMeetingTarget({
+        url: 'https://example.com/meeting',
+        platform: 'meet',
+      }),
+    ).toThrow(/not allow-listed/i);
+  });
+
+  it('redacts meeting urls down to host-only values', () => {
+    expect(redactMeetingUrl('https://meet.google.com/abc-defg-hij?foo=bar')).toBe(
+      'meet.google.com',
+    );
   });
 });
 

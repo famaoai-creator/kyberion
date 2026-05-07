@@ -585,6 +585,10 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      fast-check:
+        specifier: 4.6.0
+        version: 4.6.0
 
   libs/shared-media:
     dependencies:

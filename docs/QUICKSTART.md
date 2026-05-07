@@ -30,7 +30,31 @@ pnpm onboard
 pnpm surfaces:reconcile
 ```
 
-## 2. Bring Up The Local Surfaces
+## 2. First Win Smoke
+
+If you only want the shortest path to a visible result, start here.
+
+The first-win path is intentionally staged:
+
+- 30 seconds: `pnpm doctor`
+- 5 minutes: `pnpm pipeline --input pipelines/voice-hello.json`
+- 15 minutes: `pnpm pipeline --input pipelines/enterprise-login.json` then `pnpm pipeline --input pipelines/verify-session.json`
+
+```bash
+pnpm doctor
+pnpm pipeline --input pipelines/voice-hello.json
+```
+
+If you want a screenshot artifact from a persisted browser session:
+
+```bash
+pnpm pipeline --input pipelines/enterprise-login.json
+pnpm pipeline --input pipelines/verify-session.json
+```
+
+The browser session smoke writes `active/shared/tmp/enterprise-login-success.png`.
+
+## 3. Bring Up The Local Surfaces
 
 ```bash
 pnpm agent-runtime:supervisor
@@ -44,7 +68,7 @@ Useful local surfaces:
 - `Chronos`: `http://127.0.0.1:3000`
 - `Presence Studio`: usually `http://127.0.0.1:3031`
 
-## 3. Use Kyberion By Asking For Outcomes
+## 4. Use Kyberion By Asking For Outcomes
 
 The intended interface is natural language.
 
@@ -87,7 +111,7 @@ Kyberion should respond with one of these:
 - an approval request
 - a result or artifact
 
-## 4. What Happens Internally
+## 5. What Happens Internally
 
 You do not need to drive this manually most of the time, but this is the internal model:
 
@@ -107,7 +131,7 @@ Rule of thumb:
 - `quick conversational work` -> answer or task session
 - `larger durable work` -> mission
 
-## 5. The Smallest Mental Model
+## 6. The Smallest Mental Model
 
 If you only remember a few things, remember these:
 
@@ -129,7 +153,7 @@ Practical rule:
 
 Kyberion will decide whether to answer directly, ask for a brief clarification, or start a task session or mission.
 
-## 6. When To Use Each Surface
+## 7. When To Use Each Surface
 
 ### Terminal
 
@@ -163,7 +187,7 @@ Use when:
 - you want conversational browser or task assistance
 - you want to inspect live task details and artifacts
 
-## 7. Reasoning Backends
+## 8. Reasoning Backends
 
 If you need to understand or change which reasoning backend is used for distillation or other structured LLM work, start here:
 
@@ -175,7 +199,7 @@ The policy guide explains:
 - how `adapter` maps to a runtime runner
 - how to add a new local LLM without hardcoding a provider branch
 
-## 8. Direct Operator Commands
+## 9. Direct Operator Commands
 
 When you need to operate internals directly:
 
@@ -212,7 +236,7 @@ pnpm control chronos ref knowledge/public/templates/blueprints/requirements-trac
 
 Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next Required Artifact` without opening a surface.
 
-## 8. Where To Read Next
+## 10. Where To Read Next
 
 - [README.md](README.md)
 - [docs/OPERATOR_UX_GUIDE.md](OPERATOR_UX_GUIDE.md)

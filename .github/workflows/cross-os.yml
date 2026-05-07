@@ -1,0 +1,78 @@
+name: Cross-OS Smoke
+
+# Phase B-2: ensure Kyberion's core build + representative contract scenarios pass on macOS and Ubuntu.
+# This closes the gap where one platform can drift while the other keeps passing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly to catch ecosystem drift (Node minor releases, OS package changes).
+    - cron: '0 4 * * 1'
+
+jobs:
+  build-and-smoke:
+    name: ${{ matrix.os }} / Node ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Contract schemas
+        run: pnpm run check:contract-schemas
+
+      - name: Unit tests (core)
+        run: pnpm run test:core
+
+      - name: Pipeline preview (baseline)
+        run: pnpm run cli:preview -- pipelines/baseline-check.json
+
+      - name: Pipeline preview (meeting proxy)
+        run: pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json
+
+      - name: Pipeline shell independence
+        run: pnpm run check:pipeline-shell-independence
+
+      - name: Customer aggregation smoke
+        env:
+          KYBERION_CUSTOMER: smoke-test
+          KYBERION_PERSONA: ecosystem_architect
+          MISSION_ROLE: mission_controller
+        run: |
+          # Verify customer overlay path resolution doesn't panic on either OS.
+          node -e "
+          const r = require('./dist/libs/core/customer-resolver.js');
+          if (!r.activeCustomer({ KYBERION_CUSTOMER: 'smoke-test' })) {
+            console.error('customer resolver failed to detect active slug');
+            process.exit(1);
+          }
+          console.log('customer resolver OK');
+          "
+
+      - name: Contract semver baseline check
+        run: pnpm run check:contract-semver

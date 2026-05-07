@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, pathResolver, resolveVars, evaluateCondition, getPathValue } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, persistTrace, pathResolver, resolveVars, evaluateCondition, getPathValue } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -547,10 +547,18 @@ async function executePipeline(steps: PipelineStep[], sessionId: string, options
     }
   }
 
-  // Finalize structured trace and attach to result context
+  // Finalize structured trace and attach to result context.
+  // Also persist to JSONL so it can be picked up by Chronos / observability tooling.
   const trace = traceCtx.finalize();
   ctx.trace = trace;
   ctx.trace_summary = traceCtx.summary();
+  try {
+    const tracePath = persistTrace(trace);
+    ctx.trace_persisted_path = tracePath;
+  } catch (err: any) {
+    // Persistence failure must not break the pipeline. Log and continue.
+    logger.warn(`[BROWSER_PIPELINE] Failed to persist trace: ${err?.message || err}`);
+  }
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
 }

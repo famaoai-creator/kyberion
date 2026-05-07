@@ -10,7 +10,10 @@
     "platform": "auto",
     "listen_duration_sec": 30,
     "transcript_output": "{{mission_evidence_dir}}/meeting-transcript.txt",
-    "action_items_output": "{{mission_evidence_dir}}/action-items.json"
+    "action_items_output": "{{mission_evidence_dir}}/action-items.json",
+    "join_action_json": "active/shared/tmp/meeting-proxy-join-{{mission_id}}.json",
+    "listen_action_json": "active/shared/tmp/meeting-proxy-listen-{{mission_id}}.json",
+    "leave_action_json": "active/shared/tmp/meeting-proxy-leave-{{mission_id}}.json"
   },
   "steps": [
     {
@@ -20,16 +23,34 @@
       }
     },
     {
+      "id": "write_join_action",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{join_action_json}}",
+        "content": "{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}"
+      }
+    },
+    {
+      "id": "join_meeting",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}')",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{join_action_json}}",
         "export_as": "join_result"
       }
     },
     {
+      "id": "write_listen_action",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{listen_action_json}}",
+        "content": "{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}"
+      }
+    },
+    {
+      "id": "listen_meeting",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}')",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{listen_action_json}}",
         "export_as": "listen_result"
       }
     },
@@ -52,9 +73,18 @@
       }
     },
     {
+      "id": "write_leave_action",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{leave_action_json}}",
+        "content": "{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}"
+      }
+    },
+    {
+      "id": "leave_meeting",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input <(echo '{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}')",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{leave_action_json}}",
         "export_as": "leave_result"
       }
     }

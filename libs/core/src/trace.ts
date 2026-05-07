@@ -4,6 +4,10 @@
  */
 
 import { randomUUID } from 'crypto';
+import * as path from 'node:path';
+import * as pathResolver from '../path-resolver.js';
+import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
+import { safeMkdir, safeAppendFileSync, safeExistsSync } from '../secure-io.js';
 
 export interface TraceEvent {
   name: string;
@@ -159,4 +163,53 @@ export class TraceContext {
       errors: countErrors(this.trace.rootSpan),
     };
   }
+}
+
+/**
+ * Resolve the directory where traces should be persisted as JSONL.
+ * - When KYBERION_CUSTOMER is active: customer/{slug}/logs/traces/
+ * - Otherwise: active/shared/logs/traces/
+ *
+ * Creates the directory if it does not exist.
+ */
+export function traceLogDir(): string {
+  let baseDir: string;
+  if (customerIsConfigured()) {
+    baseDir = path.join(customerRoot('logs/traces')!);
+  } else {
+    baseDir = path.join(pathResolver.shared('logs/traces'));
+  }
+  if (!safeExistsSync(baseDir)) safeMkdir(baseDir, { recursive: true });
+  return baseDir;
+}
+
+/**
+ * Persist a finalized Trace as a single JSONL line for the calendar day.
+ * Returns the path of the file the trace was appended to.
+ *
+ * Format: one JSON object per line ({...trace, _persistedAt}).
+ * The day-rotated file makes it cheap for downstream tools (e.g. Chronos viewer)
+ * to scan recent activity without parsing the whole history.
+ */
+export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
+  const dir = opts?.dir ?? traceLogDir();
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const file = path.join(dir, `traces-${day}.jsonl`);
+  const record = { ...trace, _persistedAt: new Date().toISOString() };
+  safeAppendFileSync(file, JSON.stringify(record) + '\n');
+  return file;
+}
+
+/**
+ * Convenience: finalize a TraceContext and persist it in one call.
+ * Returns the finalized trace and the path it was written to.
+ */
+export function finalizeAndPersist(
+  ctx: TraceContext,
+  opts?: { dir?: string },
+): { trace: Trace; path: string } {
+  const trace = ctx.finalize();
+  const p = persistTrace(trace, opts);
+  return { trace, path: p };
 }

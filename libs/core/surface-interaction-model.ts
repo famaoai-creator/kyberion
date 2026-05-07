@@ -17,6 +17,7 @@ import type {
   ChronosSurfaceMetadata,
   PresenceSurfaceMetadata,
   SlackSurfaceMetadata,
+  IMessageSurfaceMetadata,
   SlackSurfaceInput,
   SurfaceAsyncChannel,
   SurfaceAsyncRequestRecord,
@@ -151,6 +152,14 @@ const SURFACE_PROVIDER_CAPABILITIES: Record<SurfaceProviderId, SurfaceCapability
     responding: true,
   },
   chronos: {
+    reply: true,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
+  imessage: {
     reply: true,
     edit: false,
     react: false,
@@ -436,11 +445,11 @@ export function buildSurfaceConversationInputFromMessage(
         channel: message.channel,
       } satisfies SlackSurfaceMetadata
       : {
-        surface: message.surface,
+        surface: message.surface as 'chronos' | 'presence' | 'imessage',
         actorId: message.actorId,
         threadTs: message.threadTs,
         channel: message.channel,
-      } satisfies ChronosSurfaceMetadata | PresenceSurfaceMetadata,
+      } satisfies ChronosSurfaceMetadata | PresenceSurfaceMetadata | IMessageSurfaceMetadata,
     cwd: options.cwd,
     forcedReceiver: options.forcedReceiver,
     missionId: options.missionId,

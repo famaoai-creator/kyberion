@@ -1,0 +1,7 @@
+[
+  {
+    "id": "baseline-check",
+    "pipeline": "pipelines/baseline-check.json",
+    "note": "Session-start health check. The shape of its output is stable: any change is either intentional or a regression."
+  }
+]
