@@ -13,6 +13,8 @@ import {
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
+  nativeTtsSpeak,
+  probeNativeTts,
 } from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -1151,6 +1153,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }));
       return { ...ctx, [params.export_as || 'sampled_traces']: results };
     }
+    case 'list_running_apps': {
+      const { platform } = await import('@agent/core');
+      const apps = await platform.listRunningApps();
+      return { ...ctx, [params.export_as || 'running_apps']: apps };
+    }
     default: 
       throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }
@@ -1237,6 +1244,55 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const { say } = await import('@agent/core');
       await say(resolve(params.text || '{{last_capture}}'));
       break;
+    case 'native_tts_speak': {
+      // Phase A-5 voice tier 0: speak via OS-native TTS (say / espeak / SAPI).
+      const text = String(resolve(params.text || '{{last_capture}}'));
+      const result = await nativeTtsSpeak(text, {
+        voice: params.voice ? String(resolve(params.voice)) : undefined,
+        rate: typeof params.rate === 'number' ? params.rate : undefined,
+        timeoutMs: typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined,
+        silent: true,
+      });
+      ctx = { ...ctx, [params.export_as || 'last_tts_result']: result };
+      if (!result.ok) {
+        logger.warn(`[NATIVE_TTS] Speak failed: ${result.error}`);
+      }
+      break;
+    }
+    case 'check_native_tts': {
+      // Preflight: detect availability of OS-native TTS for tier-0 voice.
+      const status = await probeNativeTts();
+      ctx = { ...ctx, [params.export_as || 'tts_status']: status };
+      if (!status.available) {
+        // Don't throw — preflight is informational; the caller decides whether to abort.
+        logger.warn(`[NATIVE_TTS] ${status.reason ?? 'native TTS unavailable'}`);
+      }
+      break;
+    }
+    case 'open_url': {
+      // Open a URL in the user's default browser. Cross-platform best-effort.
+      const url = String(resolve(params.url || ''));
+      if (!url) throw new Error('open_url requires "url" param');
+      // Reject anything that isn't an obvious http(s)/file URL to avoid arg injection.
+      if (!/^(https?|file):\/\//.test(url)) {
+        throw new Error(`open_url refused unsupported URL scheme: ${url.slice(0, 64)}`);
+      }
+      const platform = process.platform;
+      try {
+        if (platform === 'darwin') {
+          safeExec('open', [url], { cwd: rootDir });
+        } else if (platform === 'win32') {
+          safeExec('cmd', ['/c', 'start', '', url], { cwd: rootDir });
+        } else {
+          safeExec('xdg-open', [url], { cwd: rootDir });
+        }
+        ctx = { ...ctx, [params.export_as || 'opened_url']: url };
+      } catch (err: any) {
+        logger.warn(`[OPEN_URL] Failed to open ${url}: ${err.message}`);
+        ctx = { ...ctx, [params.export_as || 'opened_url']: null };
+      }
+      break;
+    }
     case 'notify': logger.info(`🔔 [NOTIFICATION] ${resolve(params.text)}`); break;
     case 'write_file':
     case 'write_artifact':

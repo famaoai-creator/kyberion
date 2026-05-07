@@ -10,7 +10,7 @@
     {
       "op": "system:shell",
       "params": {
-        "cmd": "echo '# Kyberion System Health Report\n\nGenerated on: $(date)\n\n## Vital Check\n```\n{{vital_results}}\n```\n\n## Diagnostics\n```\n{{diag_results}}\n```\n\n## Productivity Audit\n```\n{{prod_results}}\n```' > HEALTH_REPORT.md",
+        "cmd": "echo '# Kyberion System Health Report\n\nGenerated on: {{run_utc_now}}\n\n## Vital Check\n```\n{{vital_results}}\n```\n\n## Diagnostics\n```\n{{diag_results}}\n```\n\n## Productivity Audit\n```\n{{prod_results}}\n```' > HEALTH_REPORT.md",
         "export_as": "report_status"
       }
     },

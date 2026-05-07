@@ -1,0 +1,16 @@
+{
+  "seed_id": "vertical-it-saas-inventory",
+  "version": "1.0.0",
+  "title": "IT SaaS Inventory",
+  "summary": "Audit active SaaS accounts, cross-reference HR, flag anomalies.",
+  "mission_class": "operational_workflow",
+  "delivery_shape": "report_with_evidence",
+  "risk_profile": "low",
+  "default_persona": "operations_steward",
+  "expected_outputs": [
+    "inventory.json — flat list of (service, account, status, plan)",
+    "flags.json — orphans / expiring / over-provisioned",
+    "report.md — human-readable summary"
+  ],
+  "review_gates": []
+}

@@ -621,6 +621,141 @@
       },
       "status": "active",
       "notes": "Use for deterministic utility operations exposed by managed plugins."
+    },
+    {
+      "capability_id": "cli.native.claude_headless_prompt",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "prompt",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session", "mission"],
+        "intents": ["reason-over-code", "structured-query", "headless-prompt"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Claude CLI headless mode (claude -p / --print) is the primary non-interactive reasoning surface. Mirrors the codex/gemini headless prompt entries."
+    },
+    {
+      "capability_id": "cli.native.claude_agent_loop",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "agent-loop",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "high_risk_only"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["agent-session", "resume-session", "interactive-reason"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "agent-actuator"
+      },
+      "status": "active",
+      "notes": "Interactive Claude Code session with full tool surface (Edit, Bash, Read, etc.) and resumable state. High-risk by virtue of mutating tools; execution receipts must record the resume session id."
+    },
+    {
+      "capability_id": "cli.native.claude_agents_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "agents",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["agent-management", "discover-agents"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "agent-actuator"
+      },
+      "status": "active",
+      "notes": "claude agents — manage background and configured agents. Mirrors gemini-cli skills/extensions for discovery semantics."
+    },
+    {
+      "capability_id": "cli.native.claude_plugin_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "plugins",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["plugin-management", "install-plugin", "discover-plugins"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "claude plugin / plugins — install and manage Claude Code plugins. Plugin install changes the tool surface for subsequent sessions and should be approval-gated, matching gemini-cli extension management semantics."
+    },
+    {
+      "capability_id": "cli.native.claude_mcp_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "mcp",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["mcp-server-management", "connect-mcp"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "claude mcp — configure and manage MCP servers. Same governance class as gemini-cli mcp; toggling MCP servers changes the agent's reachable tool surface and requires explicit registration."
     }
   ]
 }

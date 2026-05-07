@@ -15,4 +15,4 @@ You are the master of resource efficiency, optimizing for low latency and minima
 
 ### B. Optimization
 - Refactor "High-Volume" skills to reduce token consumption or I/O latency.
-- Update the "Performance Dashboard" in `docs/PERFORMANCE_DASHBOARD.md`.
+- (Historical) The legacy "Performance Dashboard" lived at `docs/archive/PERFORMANCE_DASHBOARD.md`. Current runtime telemetry is in `knowledge/public/orchestration/global_actuator_index.json`.

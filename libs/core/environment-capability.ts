@@ -20,6 +20,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
@@ -100,7 +101,10 @@ export interface CapabilityStatus {
 export interface SetupReceipt {
   manifest_id: string;
   manifest_version: string;
+  manifest_fingerprint: string;
+  host_fingerprint: string;
   generated_at: string;
+  expires_at: string;
   host_platform: NodeJS.Platform;
   satisfied: CapabilityStatus[];
   unsatisfied: CapabilityStatus[];
@@ -115,9 +119,12 @@ export interface ReadinessReport {
   ready: boolean;
   manifest_id: string;
   generated_at: string;
+  receipt_expires_at: string | null;
   missing: CapabilityStatus[];
   receipt_age_minutes: number | null;
 }
+
+const DEFAULT_RECEIPT_TTL_MINUTES = 60 * 24 * 7;
 
 /* ------------------------------------------------------------------ *
  * Probe registry — for `probe.kind === 'probe'` plug-ins so audio
@@ -146,6 +153,38 @@ export function resetEnvironmentCapabilityProbeRegistry(): void {
 function appliesToHost(cap: EnvironmentCapability): boolean {
   if (!cap.applies_to_platforms || cap.applies_to_platforms.length === 0) return true;
   return cap.applies_to_platforms.includes(process.platform);
+}
+
+function stableManifestFingerprint(manifest: EnvironmentManifest): string {
+  const normalized = {
+    manifest_id: manifest.manifest_id,
+    version: manifest.version,
+    capabilities: manifest.capabilities.map((cap) => ({
+      capability_id: cap.capability_id,
+      kind: cap.kind,
+      required_for: [...cap.required_for].sort(),
+      applies_to_platforms: [...(cap.applies_to_platforms || [])].sort(),
+      probe: cap.probe,
+      optional: Boolean(cap.optional),
+    })),
+  };
+  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+function stableHostFingerprint(): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        platform: process.platform,
+        arch: process.arch,
+        node: process.versions.node,
+      }),
+    )
+    .digest('hex');
+}
+
+function addMinutes(isoTimestamp: string, minutes: number): string {
+  return new Date(new Date(isoTimestamp).getTime() + minutes * 60_000).toISOString();
 }
 
 async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ available: boolean; reason?: string }> {
@@ -300,7 +339,7 @@ export async function bootstrapManifest(
       command: cap.install.command,
       args: cap.install.args,
       exit_code: installResult.status ?? -1,
-      tenant_slug: opts.mission_id,
+      mission_id: opts.mission_id,
     });
     installsPerformed.push({
       capability_id: cap.capability_id,
@@ -333,7 +372,10 @@ export async function bootstrapManifest(
   const receipt: SetupReceipt = {
     manifest_id: manifest.manifest_id,
     manifest_version: manifest.version,
+    manifest_fingerprint: stableManifestFingerprint(manifest),
+    host_fingerprint: stableHostFingerprint(),
     generated_at: new Date().toISOString(),
+    expires_at: addMinutes(new Date().toISOString(), DEFAULT_RECEIPT_TTL_MINUTES),
     host_platform: process.platform,
     satisfied,
     unsatisfied,
@@ -356,6 +398,7 @@ export function verifyReady(
       ready: false,
       manifest_id: manifest.manifest_id,
       generated_at: new Date().toISOString(),
+      receipt_expires_at: null,
       missing: manifest.capabilities.map((c) => ({
         capability_id: c.capability_id,
         satisfied: false,
@@ -366,26 +409,48 @@ export function verifyReady(
   }
   const ageMs = Date.now() - new Date(receipt.generated_at).getTime();
   const ageMin = ageMs / 60_000;
-  const stale = opts.max_age_minutes !== undefined && ageMin > opts.max_age_minutes;
+  const manifestFingerprint = stableManifestFingerprint(manifest);
+  const hostFingerprint = stableHostFingerprint();
+  const receiptExpiresAt = receipt.expires_at || null;
+  const expiresAtMs = receiptExpiresAt ? new Date(receiptExpiresAt).getTime() : Number.POSITIVE_INFINITY;
+  const stale =
+    (opts.max_age_minutes !== undefined && ageMin > opts.max_age_minutes) ||
+    Date.now() > expiresAtMs;
   // Optional capabilities never block readiness.
   const blocking = receipt.unsatisfied.filter((u) => {
     const cap = manifest.capabilities.find((c) => c.capability_id === u.capability_id);
     return cap && !cap.optional;
   });
+  if (receipt.manifest_fingerprint !== manifestFingerprint) {
+    blocking.push({
+      capability_id: '__manifest_fingerprint__',
+      satisfied: false,
+      reason: 'receipt fingerprint does not match the current manifest — re-run pnpm env:bootstrap',
+    });
+  }
+  if (receipt.host_fingerprint !== hostFingerprint) {
+    blocking.push({
+      capability_id: '__host_fingerprint__',
+      satisfied: false,
+      reason: 'receipt was generated on a different host fingerprint — re-run pnpm env:bootstrap',
+    });
+  }
+  if (stale) {
+    blocking.push({
+      capability_id: '__receipt_age__',
+      satisfied: false,
+      reason:
+        receiptExpiresAt && Date.now() > expiresAtMs
+          ? `receipt expired at ${receiptExpiresAt}`
+          : `receipt is ${ageMin.toFixed(1)}m old; max_age_minutes=${opts.max_age_minutes}`,
+    });
+  }
   return {
-    ready: blocking.length === 0 && !stale,
+    ready: blocking.length === 0,
     manifest_id: manifest.manifest_id,
     generated_at: receipt.generated_at,
-    missing: stale
-      ? [
-          ...blocking,
-          {
-            capability_id: '__receipt_age__',
-            satisfied: false,
-            reason: `receipt is ${ageMin.toFixed(1)}m old; max_age_minutes=${opts.max_age_minutes}`,
-          },
-        ]
-      : blocking,
+    receipt_expires_at: receiptExpiresAt,
+    missing: blocking,
     receipt_age_minutes: ageMin,
   };
 }

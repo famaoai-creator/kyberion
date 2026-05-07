@@ -35,6 +35,7 @@ import {
   listOperatorSelfPending,
   listOthersPending,
   listActionItems,
+  summarizeActionItemLifecycle,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { readTextFile } from './refactor/cli-input.js';
@@ -77,13 +78,28 @@ function runPipeline(name: string, context: Record<string, unknown>): void {
 
 function summarize(missionId: string): void {
   const all = listActionItems(missionId);
+  const lifecycle = summarizeActionItemLifecycle(missionId);
   const selfPending = listOperatorSelfPending(missionId);
   const othersPending = listOthersPending(missionId);
   logger.info('');
   logger.info(`📋 Mission ${missionId} action-item summary:`);
   logger.info(`   total recorded: ${all.length}`);
+  logger.info(`   pending: ${lifecycle.by_status.pending}`);
+  logger.info(`   in_progress: ${lifecycle.by_status.in_progress}`);
+  logger.info(`   completed: ${lifecycle.by_status.completed}`);
+  logger.info(`   blocked: ${lifecycle.by_status.blocked}`);
+  logger.info(`   cancelled: ${lifecycle.by_status.cancelled}`);
   logger.info(`   operator_self pending: ${selfPending.length}`);
   logger.info(`   team_member pending: ${othersPending.length}`);
+  logger.info(
+    `   owner kinds: self=${lifecycle.by_owner_kind.operator_self} team=${lifecycle.by_owner_kind.team_member} external=${lifecycle.by_owner_kind.external} unassigned=${lifecycle.by_owner_kind.unassigned}`,
+  );
+  if (lifecycle.blocked_items.length > 0) {
+    logger.info('   blocked reasons:');
+    for (const blocked of lifecycle.blocked_items.slice(0, 5)) {
+      logger.info(`   - ${blocked.item_id} (${blocked.owner_kind}): ${blocked.blocked_reason}`);
+    }
+  }
   for (const item of all) {
     const tag =
       item.assignee.kind === 'operator_self'

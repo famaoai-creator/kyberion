@@ -50,17 +50,17 @@ export function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt
     userMessage,
   };
 }
-
-export function surfaceChannelFromAgentId(agentId: string): 'slack' | 'chronos' | 'presence' {
+export function surfaceChannelFromAgentId(agentId: string): 'slack' | 'chronos' | 'presence' | 'imessage' {
   if (agentId.includes('slack')) return 'slack';
   if (agentId.includes('presence')) return 'presence';
   if (agentId.includes('chronos')) return 'chronos';
+  if (agentId.includes('imessage')) return 'imessage';
   return 'slack';
 }
 
 export function deriveSurfaceDelegationReceiver(
   text: string,
-  surface: 'slack' | 'chronos' | 'presence' = 'slack',
+  surface: 'slack' | 'chronos' | 'presence' | 'imessage' = 'slack',
 ): SurfaceDelegationReceiver | undefined {
   return deriveSurfaceDelegationReceiverForProvider(surface, text);
 }
@@ -74,12 +74,12 @@ export function normalizeSurfaceDelegationReceiver(value?: string): SurfaceDeleg
 }
 
 export function resolveSurfaceConversationReceiver(
-  forcedReceiver?: SurfaceDelegationReceiver,
-  compiledFlow?: UserIntentFlow | null,
-  surface: 'slack' | 'chronos' | 'presence' = 'slack',
+  forcedReceiver: string | undefined,
+  compiledFlow: UserIntentFlow | null | undefined,
+  surface: 'slack' | 'chronos' | 'presence' | 'imessage' = 'slack',
 ): SurfaceDelegationReceiver | undefined {
-  if (forcedReceiver) return forcedReceiver;
-  return resolveSurfaceConversationReceiverForProvider(surface, compiledFlow);
+  if (forcedReceiver) return forcedReceiver as SurfaceDelegationReceiver;
+  return resolveSurfaceConversationReceiverForProvider(surface, compiledFlow) || 'chronos-mirror';
 }
 
 export function surfaceRoutingText(input: SurfaceConversationInput): { text: string; parsedSlackPrompt: ParsedSlackSurfacePrompt | null } {

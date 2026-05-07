@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
@@ -41,6 +42,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
   let savedRole: string | undefined;
   let savedSudo: string | undefined;
   let savedMission: string | undefined;
+  let savedUnitSharedGroup: string | null;
 
   beforeEach(() => {
     savedTenant = process.env.KYBERION_TENANT;
@@ -48,10 +50,17 @@ describe('tier-guard tenant scope (IP-1)', () => {
     savedRole = process.env.MISSION_ROLE;
     savedSudo = process.env.KYBERION_SUDO;
     savedMission = process.env.MISSION_ID;
+    const groupPath = path.join(ROOT, 'knowledge/confidential/tenant-groups/unit-shared.json');
+    savedUnitSharedGroup = fs.existsSync(groupPath) ? fs.readFileSync(groupPath, 'utf8') : null;
     delete process.env.MISSION_ID;
   });
 
   afterEach(() => {
+    const groupPath = path.join(ROOT, 'knowledge/confidential/tenant-groups/unit-shared.json');
+    try {
+      if (savedUnitSharedGroup === null) fs.rmSync(groupPath, { force: true });
+      else fs.writeFileSync(groupPath, savedUnitSharedGroup);
+    } catch {}
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
@@ -129,6 +138,30 @@ describe('tier-guard tenant scope (IP-1)', () => {
     }
   });
 
+  it('allows run_pipeline to persist traces and temp artifacts', () => {
+    delete process.env.KYBERION_TENANT;
+    delete process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'run_pipeline';
+
+    const traceTarget = path.join(ROOT, 'active/shared/logs/traces/traces-2026-05-08.jsonl');
+    const tmpTarget = path.join(ROOT, 'active/shared/tmp/pipeline-step.json');
+
+    expect(validateWritePermission(traceTarget).allowed).toBe(true);
+    expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+  });
+
+  it('allows run_super_pipeline to write temporary dispatch artifacts', () => {
+    delete process.env.KYBERION_TENANT;
+    delete process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'run_super_pipeline';
+
+    const traceTarget = path.join(ROOT, 'active/shared/logs/traces/traces-2026-05-08.jsonl');
+    const tmpTarget = path.join(ROOT, 'active/shared/tmp/super-pipeline.json');
+
+    expect(validateWritePermission(traceTarget).allowed).toBe(true);
+    expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+  });
+
   it('legacy non-slug confidential paths are not tenant-scoped', () => {
     // Existing single-tenant layouts use confidential/{MSN-...}/ which are not slugs.
     process.env.KYBERION_TENANT = 'acme-corp';
@@ -149,6 +182,51 @@ describe('tier-guard tenant scope (IP-1)', () => {
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
     expect(ctx.tenantSlug).toBeUndefined();
+  });
+
+  it('allows a tenant to access its active confidential shared group', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'unit-shared.json'),
+      JSON.stringify({
+        tenant_group_id: 'unit-shared',
+        display_name: 'Unit Shared',
+        status: 'active',
+        member_tenants: ['acme-corp', 'beta-co'],
+        shared_prefixes: ['knowledge/confidential/shared/unit-shared/'],
+      }),
+    );
+
+    const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
+    const result = validateWritePermission(target);
+    if (!result.allowed) {
+      expect(result.reason).not.toMatch(/tenant\.group_scope_violation|tenant\.group_unknown/);
+    }
+  });
+
+  it('denies a tenant outside a confidential shared group', () => {
+    process.env.KYBERION_TENANT = 'gamma-org';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'unit-shared.json'),
+      JSON.stringify({
+        tenant_group_id: 'unit-shared',
+        display_name: 'Unit Shared',
+        status: 'active',
+        member_tenants: ['acme-corp', 'beta-co'],
+        shared_prefixes: ['knowledge/confidential/shared/unit-shared/'],
+      }),
+    );
+
+    const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
+    const result = validateWritePermission(target);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/tenant\.group_scope_violation/);
   });
 });
 

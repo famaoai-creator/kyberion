@@ -1,8 +1,11 @@
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import AjvModule from 'ajv';
+import AjvFormats from 'ajv-formats';
 import chalk from 'chalk';
 import {
+  ensureDefaultTenantProfile,
+  tenantProfileDir,
   compileSchemaFromPath,
   pathResolver,
   safeExistsSync,
@@ -14,7 +17,9 @@ import {
 } from '@agent/core';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
+const addFormats: any = (AjvFormats as any).default || AjvFormats;
 const onboardingStateAjv = new AjvCtor({ allErrors: true });
+addFormats(onboardingStateAjv);
 const onboardingStateValidate = compileSchemaFromPath(
   onboardingStateAjv,
   pathResolver.rootResolve('knowledge/public/schemas/onboarding-state.schema.json'),
@@ -378,9 +383,24 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
 async function runTenantsPhase(state: OnboardingState): Promise<void> {
   console.log('\n🏢 Phase 3 — Multi-Tenant Registration\n');
   const entries: TenantDraft[] = [];
+  const defaultTenant = withExecutionContext(
+    'knowledge_steward',
+    () => ensureDefaultTenantProfile(),
+    'ecosystem_architect',
+  );
   const wantsTenantSetup = isAffirmative(await ask('Register a tenant now? (y/N): ', 'n'));
-  const tenantDir = pathResolver.knowledge('personal/tenants');
+  const tenantDir = tenantProfileDir();
   if (!safeExistsSync(tenantDir)) safeMkdir(tenantDir, { recursive: true });
+  entries.push({
+    tenant_slug: defaultTenant.tenant_slug,
+    tenant_id: defaultTenant.tenant_id,
+    display_name: defaultTenant.display_name,
+    status: defaultTenant.status,
+    assigned_role: defaultTenant.assigned_role,
+    created_at: typeof defaultTenant.metadata?.created_at === 'string'
+      ? defaultTenant.metadata.created_at
+      : new Date().toISOString(),
+  });
 
   if (wantsTenantSetup) {
     let tenantSlug = '';
@@ -491,6 +511,8 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
 }
 
 async function runOnboarding() {
+  process.env.MISSION_ROLE = 'sovereign_concierge';
+  process.env.KYBERION_PERSONA = 'sovereign';
   const rootDir = pathResolver.rootDir();
   const personalDir = pathResolver.knowledge('personal');
 

@@ -1,0 +1,16 @@
+{
+  "seed_id": "vertical-lifestyle-reservation",
+  "version": "1.0.0",
+  "title": "Lifestyle Reservation",
+  "summary": "Search candidates, propose 2–3 with rationale, reserve after confirm.",
+  "mission_class": "decision_support",
+  "delivery_shape": "exploratory_to_deterministic_conversion",
+  "risk_profile": "low",
+  "default_persona": "personal_concierge",
+  "expected_outputs": [
+    "candidates.json — top N options with score & rationale",
+    "reservation.json — final reservation details (id, time, confirmation #)",
+    "calendar-entry.json — calendar event payload"
+  ],
+  "review_gates": ["STAKEHOLDER_ALIGNMENT"]
+}
