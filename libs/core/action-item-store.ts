@@ -143,9 +143,22 @@ export interface ActionItem {
   created_at: string;
   updated_at?: string;
   completed_at?: string;
+  blocked_reason?: string;
   tenant_slug?: string;
   reminders?: ActionItemReminder[];
   execution?: ActionItemExecution;
+}
+
+export interface ActionItemLifecycleSummary {
+  mission_id: string;
+  total: number;
+  by_status: Record<ActionItemStatus, number>;
+  by_owner_kind: Record<ActionItemAssigneeKind, number>;
+  blocked_items: Array<{
+    item_id: string;
+    owner_kind: ActionItemAssigneeKind;
+    blocked_reason: string;
+  }>;
 }
 
 const ITEM_ID_RE = /^AI-[A-Z0-9-]{2,40}$/;
@@ -292,6 +305,7 @@ export function updateActionItemStatus(input: {
   status: ActionItemStatus;
   execution?: ActionItemExecution;
   completed_at?: string;
+  blocked_reason?: string;
 }): ActionItem | null {
   const events = readAll(input.mission_id);
   const view = reduceLatest(events);
@@ -304,6 +318,9 @@ export function updateActionItemStatus(input: {
     ...(input.completed_at ? { completed_at: input.completed_at } : {}),
     ...(input.status === 'completed' && !input.completed_at
       ? { completed_at: nowIso() }
+      : {}),
+    ...(input.status === 'blocked'
+      ? { blocked_reason: input.blocked_reason ?? input.execution?.result_summary ?? 'blocked' }
       : {}),
     ...(input.execution ? { execution: { ...current.execution, ...input.execution } } : {}),
   };
@@ -351,6 +368,43 @@ export function listActionItems(missionId: string): ActionItem[] {
   return Array.from(view.values()).sort((a, b) =>
     a.item_id.localeCompare(b.item_id),
   );
+}
+
+export function summarizeActionItemLifecycle(missionId: string): ActionItemLifecycleSummary {
+  const items = listActionItems(missionId);
+  const byStatus: Record<ActionItemStatus, number> = {
+    pending: 0,
+    in_progress: 0,
+    completed: 0,
+    blocked: 0,
+    cancelled: 0,
+  };
+  const byOwnerKind: Record<ActionItemAssigneeKind, number> = {
+    operator_self: 0,
+    team_member: 0,
+    external: 0,
+    unassigned: 0,
+  };
+  const blockedItems: ActionItemLifecycleSummary['blocked_items'] = [];
+  for (const item of items) {
+    byStatus[item.status] += 1;
+    byOwnerKind[item.assignee.kind] += 1;
+    if (item.status === 'blocked') {
+      blockedItems.push({
+        item_id: item.item_id,
+        owner_kind: item.assignee.kind,
+        blocked_reason:
+          item.blocked_reason ?? item.execution?.result_summary ?? 'blocked',
+      });
+    }
+  }
+  return {
+    mission_id: missionId,
+    total: items.length,
+    by_status: byStatus,
+    by_owner_kind: byOwnerKind,
+    blocked_items: blockedItems,
+  };
 }
 
 /**

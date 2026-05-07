@@ -43,6 +43,28 @@ export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } fr
 
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
+export * as customerResolver from './customer-resolver.js';
+
+// Error Classification (Phase A-7)
+export {
+  classifyError,
+  formatClassification,
+  getRuleIds as getErrorClassifierRuleIds,
+} from './error-classifier.js';
+export type { ErrorCategory, ErrorClassification } from './error-classifier.js';
+
+// Native OS TTS (Phase A-5, voice tier 0)
+export {
+  speak as nativeTtsSpeak,
+  probeNativeTts,
+  currentPlatform as nativeTtsCurrentPlatform,
+  hasBuiltInTts as nativeTtsHasBuiltIn,
+} from './native-tts.js';
+export type {
+  SpeakOptions as NativeTtsSpeakOptions,
+  SpeakResult as NativeTtsSpeakResult,
+  Platform as NativeTtsPlatform,
+} from './native-tts.js';
 export {
   rootDir,
   knowledge,
@@ -220,6 +242,7 @@ export * from './voice-profile-registry.js';
 export * from './voice-profile-promotion.js';
 export * from './presentation-preference-registry.js';
 export * from './imessage-bridge.js';
+export * from './imessage-utils.js';
 export * from './voice-engine-registry.js';
 export * from './voice-sample-ingestion-policy.js';
 export * from './voice-sample-collection.js';
@@ -495,6 +518,12 @@ export type {
   MeetingParticipationReport,
 } from './meeting-participation-coordinator.js';
 export {
+  redactMeetingUrl,
+  resolveMeetingPlatform,
+  resolveMeetingPlatformFromUrl,
+  validateMeetingTarget,
+} from './meeting-join-driver.js';
+export {
   recordActionItem,
   updateActionItemStatus,
   appendReminder,
@@ -507,6 +536,7 @@ export {
   clearPartialState,
   confirmActionItemBySpeaker,
   nextActionItemId,
+  summarizeActionItemLifecycle,
 } from './action-item-store.js';
 export type {
   ActionItem,
@@ -521,6 +551,7 @@ export type {
   ActionItemReminderRelationship,
   ActionItemReviewState,
   ActionItemStatus,
+  ActionItemLifecycleSummary,
 } from './action-item-store.js';
 export type {
   DesignSpec,
@@ -737,6 +768,7 @@ export * from './apple-event-bridge.js';
 export * from './os-app-adapters.js';
 export * from './service-binding.js';
 export * from './oauth-broker.js';
+export * from './tenant-registry.js';
 export * from './generation-scheduler.js';
 export * from './src/pipeline-scheduler.js';
 export * from './src/pipeline-preview.js';
@@ -768,7 +800,7 @@ export * from './src/pfc/ServiceValidator.js';
 export * from './src/pfc/SovereignSentinel.js';
 
 // Observability (Unified Trace Model)
-export { TraceContext } from './src/trace.js';
+export { TraceContext, persistTrace, finalizeAndPersist, traceLogDir } from './src/trace.js';
 export type { Trace, TraceSpan, TraceEvent, TraceArtifact } from './src/trace.js';
 
 // Feedback Loop (Closed-Loop Automation)

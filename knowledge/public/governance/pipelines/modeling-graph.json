@@ -23,13 +23,13 @@
       "id": "write-graph",
       "type": "apply",
       "op": "write_file",
-      "params": { "path": "docs/architecture/dependency-graph.mmd", "from": "mermaid_code" }
+      "params": { "path": "docs/developer/architecture/dependency-graph.mmd", "from": "mermaid_code" }
     },
     {
       "id": "log-success",
       "type": "apply",
       "op": "log",
-      "params": { "message": "Mermaid dependency graph generated at docs/architecture/dependency-graph.mmd" }
+      "params": { "message": "Mermaid dependency graph generated at docs/developer/architecture/dependency-graph.mmd" }
     }
   ]
 }

@@ -1,0 +1,67 @@
+{
+  "action": "pipeline",
+  "name": "security-incident-containment",
+  "description": "Fragment for Scenario 9: Security incident response with audit logging and approval gates.",
+  "context": {
+    "threat_type": "unknown",
+    "affected_resources": [],
+    "mission_id": "MSN-EXAMPLE"
+  },
+  "steps": [
+    {
+      "id": "triage_incident",
+      "type": "capture",
+      "op": "wisdom:knowledge_search",
+      "params": {
+        "query": "incident triage procedures for {{threat_type}}",
+        "export_as": "triage_plan"
+      }
+    },
+    {
+      "id": "collect_evidence",
+      "type": "capture",
+      "op": "system:collect_logs",
+      "params": {
+        "scope": "{{affected_resources}}",
+        "export_path": "active/shared/tmp/{{mission_id}}/evidence.log"
+      }
+    },
+    {
+      "id": "audit_record_start",
+      "type": "apply",
+      "op": "blockchain:record_event",
+      "params": {
+        "event": "INCIDENT_TRIAGE_STARTED",
+        "evidence_hash": "sha256:{{evidence_log_hash}}"
+      }
+    },
+    {
+      "id": "approval_gate_containment",
+      "type": "control",
+      "op": "approval:request",
+      "params": {
+        "title": "Incident Containment Approval",
+        "description": "Approve isolation of {{affected_resources}} based on triage plan.",
+        "risk_level": "high"
+      }
+    },
+    {
+      "id": "execute_containment",
+      "type": "apply",
+      "op": "system:execute_procedure",
+      "params": {
+        "procedure": "isolate_resources",
+        "args": { "resources": "{{affected_resources}}" }
+      }
+    },
+    {
+      "id": "audit_record_finish",
+      "type": "apply",
+      "op": "blockchain:record_event",
+      "params": {
+        "event": "INCIDENT_CONTAINMENT_EXECUTED",
+        "outcome": "success"
+      }
+    }
+  ]
+}

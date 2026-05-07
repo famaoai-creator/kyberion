@@ -37,12 +37,15 @@ import {
   registerMeetingJoinDriver,
   resolveAudioBus,
   verifyReady,
+  TraceContext,
+  finalizeAndPersist,
   type AudioFormat,
   type ConversationAgent,
   type MeetingJoinDriver,
   type MeetingTarget,
   type TranscriptChunk,
   getReasoningBackend,
+  validateMeetingTarget,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 // Side-effect imports register the audio-bus capability probes so the
@@ -117,6 +120,67 @@ async function loadDriver(driverId: string): Promise<MeetingJoinDriver> {
   return new StubMeetingJoinDriver();
 }
 
+export interface MeetingBootstrapGateResult {
+  ready: boolean;
+  skipped: boolean;
+}
+
+export async function evaluateMeetingBootstrapGate(
+  missionId: string,
+  trace: TraceContext,
+  opts: {
+    skipBootstrapCheck: boolean;
+    loadManifest?: typeof loadEnvironmentManifest;
+    readinessCheck?: typeof verifyReady;
+  },
+): Promise<MeetingBootstrapGateResult> {
+  const loadManifest = opts.loadManifest ?? loadEnvironmentManifest;
+  const readinessCheck = opts.readinessCheck ?? verifyReady;
+
+  trace.startSpan('meeting_participate.bootstrap_gate', {
+    skipped: opts.skipBootstrapCheck,
+  });
+
+  try {
+    if (opts.skipBootstrapCheck) {
+      trace.addEvent('meeting_participate.bootstrap_gate_skipped', {
+        mission_id: missionId,
+      });
+      trace.endSpan('ok');
+      return { ready: true, skipped: true };
+    }
+
+    const manifest = loadManifest('meeting-participation-runtime');
+    const ready = readinessCheck(manifest, { mission_id: missionId });
+    if (!ready.ready) {
+      trace.addEvent('meeting_participate.bootstrap_gate_failed', {
+        manifest_id: manifest.manifest_id,
+        missing: ready.missing.length,
+      });
+      for (const missing of ready.missing) {
+        trace.addEvent('meeting_participate.bootstrap_gate_missing', {
+          capability_id: missing.capability_id,
+        });
+      }
+      trace.endSpan('error', 'environment-capability gate is not satisfied');
+      return { ready: false, skipped: false };
+    }
+
+    trace.addEvent('meeting_participate.bootstrap_gate_ready', {
+      manifest_id: manifest.manifest_id,
+      missing: 0,
+    });
+    trace.endSpan('ok');
+    return { ready: true, skipped: false };
+  } catch (err: any) {
+    trace.addEvent('meeting_participate.bootstrap_gate_error', {
+      error: err?.message ?? String(err),
+    });
+    trace.endSpan('error', err?.message ?? String(err));
+    return { ready: false, skipped: false };
+  }
+}
+
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('mission', { type: 'string', demandOption: true })
@@ -134,88 +198,102 @@ async function main(): Promise<void> {
 
   const missionId = String(argv.mission);
   process.env.MISSION_ID = missionId;
+  const trace = new TraceContext(`meeting_participate:${missionId}`, {
+    missionId,
+    actuator: 'meeting-participate',
+  });
+  let exitCode = 0;
 
-  // Fail-closed on missing environment-capability receipt unless the
-  // operator explicitly opts out. Run `pnpm env:bootstrap --manifest
-  // meeting-participation-runtime --apply [--force]` to satisfy it.
-  if (!argv['skip-bootstrap-check']) {
-    try {
-      const manifest = loadEnvironmentManifest('meeting-participation-runtime');
-      const ready = verifyReady(manifest, { mission_id: missionId });
-      if (!ready.ready) {
-        logger.error(
-          `[participate-cli] environment-capability gate is not satisfied for manifest '${manifest.manifest_id}'.`,
-        );
-        for (const m of ready.missing) {
-          logger.error(`   - ${m.capability_id}: ${m.reason ?? 'unsatisfied'}`);
-        }
-        logger.error(
-          'Run `pnpm env:bootstrap --manifest meeting-participation-runtime --apply [--force]` to install,',
-        );
-        logger.error(
-          'or pass --skip-bootstrap-check (only for incident response — every skip is audited downstream).',
-        );
-        process.exit(2);
-      }
-    } catch (err: any) {
-      logger.warn(
-        `[participate-cli] could not load manifest 'meeting-participation-runtime'; proceeding without gate (${err?.message ?? err})`,
+  try {
+    // Fail-closed on missing environment-capability receipt unless the
+    // operator explicitly opts out. Run `pnpm env:bootstrap --manifest
+    // meeting-participation-runtime --apply [--force]` to satisfy it.
+    const gate = await evaluateMeetingBootstrapGate(missionId, trace, {
+      skipBootstrapCheck: Boolean(argv['skip-bootstrap-check']),
+    });
+    if (!gate.ready) {
+      logger.error(
+        `[participate-cli] environment-capability gate is not satisfied for mission ${missionId}.`,
       );
+      logger.error(
+        'Run `pnpm env:bootstrap --manifest meeting-participation-runtime --apply [--force]` to install,',
+      );
+      logger.error(
+        'or pass --skip-bootstrap-check (only for incident response — every skip is audited downstream).',
+      );
+      exitCode = 2;
+      return;
+    }
+
+    // Try to register optional shell bridges from env. If they fail, the
+    // registry stays at stub.
+    installShellStreamingSttBridgeFromEnv();
+    installShellStreamingTtsBridgeFromEnv();
+
+    const target: MeetingTarget = {
+      url: String(argv['meeting-url']),
+      platform: (argv.platform as MeetingTarget['platform']) ?? 'auto',
+      display_name: String(argv['display-name']),
+    };
+    const validatedTarget = validateMeetingTarget(target);
+
+    const driver = await loadDriver(String(argv.driver));
+    const bus = resolveAudioBus((argv['audio-bus'] as any) || undefined);
+    const busProbe = await bus.probe();
+    if (!busProbe.available) {
+      logger.warn(`[participate-cli] audio bus '${bus.bus_id}' unavailable: ${busProbe.reason}`);
+      trace.addEvent('meeting_participate.audio_bus_unavailable', {
+        bus_id: bus.bus_id,
+      });
+    }
+
+    const coordinator = new MeetingParticipationCoordinator({
+      driver,
+      bus,
+      stt: getStreamingSttBridge(),
+      tts: getStreamingTtsBridge(),
+      vad: new EnergyVad(),
+      agent: new ReasoningBackendAgent(missionId, String(argv.persona)),
+      trace,
+    });
+
+    logger.info(
+      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform})`,
+    );
+
+    const report = await coordinator.run(validatedTarget, {
+      max_minutes: Number(argv['max-minutes']),
+      voice_profile_id: String(argv['voice-profile-id']),
+      audio_format: FORMAT,
+    });
+    logger.info('');
+    logger.info(`📋 Participation report:`);
+    logger.info(`   session_id: ${report.session_id}`);
+    logger.info(`   joined_at:  ${report.joined_at}`);
+    logger.info(`   left_at:    ${report.left_at}`);
+    logger.info(`   utterances heard:  ${report.utterances_received}`);
+    logger.info(`   utterances spoken: ${report.utterances_spoken}`);
+    logger.info(`   ended_by_timeout:  ${report.ended_by_timeout}`);
+  } catch (err: any) {
+    trace.addEvent('meeting_participate.cli_error', {
+      error: err?.message ?? String(err),
+    });
+    logger.error(err?.message ?? String(err));
+    exitCode = 1;
+  } finally {
+    const persisted = finalizeAndPersist(trace);
+    logger.info(`📋 meeting_participate trace: ${persisted.path}`);
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
     }
   }
-
-  // Try to register optional shell bridges from env. If they fail, the
-  // registry stays at stub.
-  installShellStreamingSttBridgeFromEnv();
-  installShellStreamingTtsBridgeFromEnv();
-
-  const target: MeetingTarget = {
-    url: String(argv['meeting-url']),
-    platform: (argv.platform as MeetingTarget['platform']) ?? 'auto',
-    display_name: String(argv['display-name']),
-  };
-
-  const driver = await loadDriver(String(argv.driver));
-  const bus = resolveAudioBus((argv['audio-bus'] as any) || undefined);
-  const busProbe = await bus.probe();
-  if (!busProbe.available) {
-    logger.warn(`[participate-cli] audio bus '${bus.bus_id}' unavailable: ${busProbe.reason}`);
-  }
-
-  const coordinator = new MeetingParticipationCoordinator({
-    driver,
-    bus,
-    stt: getStreamingSttBridge(),
-    tts: getStreamingTtsBridge(),
-    vad: new EnergyVad(),
-    agent: new ReasoningBackendAgent(missionId, String(argv.persona)),
-  });
-
-  logger.info(
-    `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${target.platform})`,
-  );
-
-  const report = await coordinator.run(target, {
-    max_minutes: Number(argv['max-minutes']),
-    voice_profile_id: String(argv['voice-profile-id']),
-    audio_format: FORMAT,
-  });
-
-  logger.info('');
-  logger.info(`📋 Participation report:`);
-  logger.info(`   session_id: ${report.session_id}`);
-  logger.info(`   joined_at:  ${report.joined_at}`);
-  logger.info(`   left_at:    ${report.left_at}`);
-  logger.info(`   utterances heard:  ${report.utterances_received}`);
-  logger.info(`   utterances spoken: ${report.utterances_spoken}`);
-  logger.info(`   ended_by_timeout:  ${report.ended_by_timeout}`);
 }
 
 const isDirect = process.argv[1] && /meeting_participate\.(ts|js)$/.test(process.argv[1]);
 if (isDirect) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

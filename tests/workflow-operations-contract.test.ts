@@ -38,4 +38,14 @@ describe('Workflow operations contract', () => {
     expect(workflowReadme).toContain('pnpm surfaces:status');
     expect(workflowReadme).toContain('Codex unified exec sessions');
   });
+
+  it('keeps the cross-os workflow on representative schema, preview, and shell checks', () => {
+    const crossOs = read('.github/workflows/cross-os.yml');
+    expect(crossOs).toContain('pnpm run check:contract-schemas');
+    expect(crossOs).toContain('pnpm run test:core');
+    expect(crossOs).toContain('pnpm run cli:preview -- pipelines/baseline-check.json');
+    expect(crossOs).toContain('pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json');
+    expect(crossOs).toContain('pnpm run check:pipeline-shell-independence');
+    expect(crossOs).not.toContain('|| true');
+  });
 });

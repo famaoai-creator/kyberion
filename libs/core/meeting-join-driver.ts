@@ -37,6 +37,59 @@ export interface MeetingJoinDriver {
   join(target: MeetingTarget, bus: AudioBus): Promise<MeetingSession>;
 }
 
+const ALLOWED_MEETING_HOSTS: Record<'meet' | 'zoom' | 'teams', readonly string[]> = {
+  meet: ['meet.google.com'],
+  zoom: ['zoom.us', 'zoom.com'],
+  teams: ['teams.microsoft.com', 'teams.live.com'],
+};
+
+export function redactMeetingUrl(url: string | undefined): string {
+  if (!url) return 'missing-url';
+  try {
+    return new URL(url).host;
+  } catch {
+    return 'invalid-url';
+  }
+}
+
+export function resolveMeetingPlatformFromUrl(url: string): 'meet' | 'zoom' | 'teams' | null {
+  try {
+    const host = new URL(url).host.toLowerCase();
+    if (host.endsWith('meet.google.com')) return 'meet';
+    if (host.endsWith('zoom.us') || host.endsWith('zoom.com')) return 'zoom';
+    if (host.endsWith('teams.microsoft.com') || host.endsWith('teams.live.com')) return 'teams';
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+export function resolveMeetingPlatform(target: MeetingTarget): 'meet' | 'zoom' | 'teams' {
+  if (target.platform !== 'auto') return target.platform;
+  const inferred = resolveMeetingPlatformFromUrl(target.url);
+  if (!inferred) {
+    throw new Error(
+      `[browser-driver] unsupported meeting URL for auto platform detection: ${redactMeetingUrl(target.url)}; pass --platform explicitly`,
+    );
+  }
+  return inferred;
+}
+
+export function validateMeetingTarget(target: MeetingTarget): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' } {
+  const platform = resolveMeetingPlatform(target);
+  const host = redactMeetingUrl(target.url).toLowerCase();
+  if (!host || host === 'invalid-url' || host === 'missing-url') {
+    throw new Error(`[browser-driver] invalid meeting URL host: ${redactMeetingUrl(target.url)}`);
+  }
+  const allowlist = ALLOWED_MEETING_HOSTS[platform];
+  if (!allowlist.includes(host)) {
+    throw new Error(
+      `[browser-driver] meeting URL host '${host}' is not allow-listed for platform '${platform}'. Allowed hosts: ${allowlist.join(', ')}.`,
+    );
+  }
+  return { ...target, platform };
+}
+
 /* ------------------------------------------------------------------ *
  * Registry
  * ------------------------------------------------------------------ */
