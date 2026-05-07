@@ -644,6 +644,13 @@
       "deliverable_kind": "report",
       "downloadable": false,
       "previewable": true
+    },
+    "gateway_adapter_created": {
+      "label": "Gateway adapter created",
+      "description": "A new Gateway API or SaaS service adapter profile was generated and registered in the workspace.",
+      "deliverable_kind": "report",
+      "downloadable": true,
+      "previewable": true
     }
   }
 }

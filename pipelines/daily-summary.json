@@ -21,7 +21,7 @@
     {
       "op": "system:shell",
       "params": {
-        "cmd": "echo '{\"summary\": \"Kyberion Status: {{total_capabilities}} capabilities active across {{mission_count}} missions.\", \"timestamp\": \"$(date)\"}'",
+        "cmd": "echo '{\"summary\": \"Kyberion Status: {{total_capabilities}} capabilities active across {{mission_count}} missions.\", \"timestamp\": \"{{run_utc_now}}\"}'",
         "export_as": "presence_payload"
       }
     },

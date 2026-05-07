@@ -1,7 +1,11 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   EnergyVad,
   MeetingParticipationCoordinator,
+  TraceContext,
+  finalizeAndPersist,
   StubAudioBus,
   StubMeetingJoinDriver,
   StubStreamingSpeechToTextBridge,
@@ -10,8 +14,10 @@ import {
   type ConversationAgent,
   type MeetingTarget,
   type TranscriptChunk,
+  pathResolver,
 } from './index.js';
 
+const ROOT = pathResolver.rootDir();
 const FORMAT: AudioFormat = {
   encoding: 'pcm_s16le',
   sample_rate_hz: 16000,
@@ -28,11 +34,13 @@ function makeChunk(byteLength = 320): { format: AudioFormat; payload: Uint8Array
 
 describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
   it('joins, hears 3 stub utterances, replies once each, leaves cleanly', async () => {
+    const traceDir = fs.mkdtempSync(path.join(ROOT, 'active/shared/tmp/kyberion-meeting-trace-'));
     const bus = new StubAudioBus();
     const driver = new StubMeetingJoinDriver();
     const stt = new StubStreamingSpeechToTextBridge(1); // one final per chunk
     const tts = new StubStreamingTextToSpeechBridge();
     const vad = new EnergyVad();
+    const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-1' });
 
     const heard: TranscriptChunk[] = [];
     const agent: ConversationAgent = {
@@ -50,6 +58,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
       tts,
       vad,
       agent,
+      trace,
     });
 
     // Inject some inbound chunks BEFORE running so the bus has data.
@@ -72,6 +81,12 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(report.utterances_spoken).toBeGreaterThanOrEqual(1);
     expect(report.session_id).toMatch(/^stub-/);
     expect(report.left_at).toBeDefined();
+
+    const persisted = finalizeAndPersist(trace, { dir: traceDir });
+    const persistedText = fs.readFileSync(persisted.path, 'utf8');
+    expect(persistedText).toContain('meeting_participation.run');
+    expect(persistedText).toContain('meeting_participation.spoke');
+    fs.rmSync(traceDir, { recursive: true, force: true });
   });
 
   it('agent.leave=true on first utterance ends the session immediately', async () => {
@@ -86,6 +101,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
         return { leave: true };
       },
     };
+    const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-2' });
 
     bus.injectInbound(makeChunk());
     bus.injectInbound(makeChunk());
@@ -100,6 +116,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
       tts,
       vad,
       agent,
+      trace,
     }).run(target, {
       max_minutes: 1,
       voice_profile_id: 'operator-default-v1',
@@ -107,6 +124,8 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     });
     expect(report.utterances_spoken).toBe(0);
     expect(report.utterances_received).toBeGreaterThanOrEqual(1);
+    const summary = trace.summary();
+    expect(summary.spans).toBeGreaterThanOrEqual(2);
   });
 });
 

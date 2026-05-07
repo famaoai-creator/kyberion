@@ -29,6 +29,7 @@ Actuator 固有のサンプルや検証用 pipeline はここに置かず、各 
 | `full-security-audit`      | Deep security audit (scanner + supply chain + red team)     |
 | `intelligent-code-review`  | AI-assisted code review pipeline                            |
 | `knowledge-extraction`     | Extract knowledge from codebases and documents              |
+| `project-kickstart`        | **[NEW]** Autonomous project lifecycle starter (Concept -> Req -> Design -> Tasks -> Repo) |
 | `living-docs`              | Generate and maintain living documentation                  |
 | `mobile-webview-handoff-runner-android` | Android runtime handoff capture -> browser import orchestration |
 | `mobile-webview-handoff-runner-ios` | iOS runtime handoff capture -> browser import orchestration |

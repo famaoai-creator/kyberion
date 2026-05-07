@@ -1,301 +1,29 @@
 # Kyberion
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Repository](https://img.shields.io/badge/GitHub-kyberion-181717.svg?logo=github)](https://github.com/famaoai-creator/kyberion)
 [![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D22.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
+[![CI](https://github.com/famaoai-creator/kyberion/actions/workflows/ci.yml/badge.svg)](https://github.com/famaoai-creator/kyberion/actions/workflows/ci.yml)
 
-Kyberion is an Organization Work Loop engine.
+> **An organization work loop engine.**
+> You phrase outcomes. Kyberion plans, runs, and remembers — with audit trails.
 
-It turns organizational intent into governed execution, evidence, and reusable memory.
-
-For the top-level architecture, see [knowledge/public/architecture/organization-work-loop.md](knowledge/public/architecture/organization-work-loop.md).
-For the canonical concept baseline, see [knowledge/public/architecture/kyberion-canonical-concept-index.md](knowledge/public/architecture/kyberion-canonical-concept-index.md).
-
-The intended user experience is simple:
-
-1. Tell Kyberion what you want.
-2. Kyberion decides how to do it.
-3. Kyberion asks only when approval is required.
-4. Kyberion returns a result, an artifact, or a clear next step.
-
-Internally, Kyberion uses missions, task sessions, actuators, ADF pipelines, runtime supervision, and governed knowledge. Those are implementation details of a durable execution model, not the interface you should have to think about first.
-
-For practical request phrasing, use outcome-first prompts:
-
-- `6/6-6/8で沖縄に行くのでおすすめのホテルを探して`
-- `今夜のレストランを予約したい`
-- `この要件定義を説明する資料を作って`
-- `voice-hub の状態を見て`
-
-Kyberion will turn those requests into a brief, ask follow-up questions only when needed, and choose the right execution path itself.
-
-For the operator-oriented view of Slack, Chronos, directories, and daily commands, see [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md).
-
-CLI operators can also follow the same governed control path directly:
-
-```text
-Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleton -> Mission Seed -> Mission
+```
+Intent → Plan → Result
 ```
 
-Representative commands:
+You ask `今週の進捗レポートを作って` or `この PDF をパワポにして` — Kyberion picks the right actuators, runs the work, asks only when something is genuinely ambiguous, and gives you a result + an artifact + a trace that next runs can learn from.
 
-```bash
-pnpm control presence tracks
-pnpm control chronos tracks
-pnpm control chronos mission-seeds
-pnpm control chronos ref knowledge/public/templates/blueprints/requirements-traceability-matrix.md
-```
+**Why this matters**: knowledge work is moving from "I do this manually with LLM help" to "I delegate and verify". The winning system is not the most chat-fluent model — it's the engine that captures intent reliably, has evidence and audit, and accumulates organizational memory. See [`docs/WHY.md`](./docs/WHY.md) for the full thesis ([日本語版](./docs/WHY.ja.md)).
 
-## The Product Model
+---
 
-Kyberion should feel like this:
+## First win smoke
 
-```text
-Intent -> Plan -> Result
-```
+Kyberion's first visible result comes in three short paths:
 
-This is the user-facing simplification of a larger organizational model:
-
-```text
-Intent -> Context -> Resolution -> Outcome Design -> Teaming -> Authority -> Execution -> Accounting -> Learning
-```
-
-Examples:
-
-- `このPDFをパワポにして`
-- `日経新聞を開いて`
-- `今週の進捗レポートを作って`
-- `voice-hub の状態を見て`
-
-What Kyberion does next:
-
-- interprets the request as an intent
-- resolves the right execution path
-- proposes or applies a short plan
-- runs the work through governed execution
-- returns a result, artifact, or approval request
-
-## What The User Should See
-
-Kyberion should expose four things clearly:
-
-- `Intent`
-  - what the user asked for
-- `Plan`
-  - what the system is about to do in human terms
-- `State`
-  - running, waiting for input, waiting for approval, completed, failed
-- `Result`
-  - artifact, answer, or concrete next action
-
-Kyberion should not require the user to think in terms of:
-
-- actuator names
-- raw ADF JSON
-- runtime supervisors
-- internal mission events
-
-Those remain important, but they belong behind the user-facing interface.
-
-## Surfaces
-
-Kyberion can be used through multiple surfaces, but they should all present the same mental model.
-
-### Terminal
-
-Best for:
-
-- coding work
-- debugging
-- test-driven development
-- precise review and iteration
-
-### Slack
-
-Best for:
-
-- lightweight remote requests
-- approvals and follow-ups
-- receiving results back in-thread
-
-### Chronos Mirror
-
-Best for:
-
-- observing what the system is doing
-- inspecting runtime state and mission state
-- intervening when something needs operator attention
-
-### Presence Studio
-
-Best for:
-
-- conversational interaction
-- voice interaction
-- live browser and task assistance
-
-## Intent, Plan, and Result
-
-The central design rule is:
-
-```text
-Natural language request
-  -> intent resolution
-  -> execution plan
-  -> governed execution
-  -> observable result
-```
-
-In practice:
-
-- simple questions may return a direct answer
-- operational requests may create a task session
-- broader durable work may become a mission
-- risky changes may pause for approval
-
-The user should not need to choose between these paths explicitly.
-
-## Internal Model
-
-Kyberion stays reliable by separating the user-facing model from the execution model.
-
-### Intent
-
-The human request.
-
-Examples:
-
-- `このPDFをパワポにして`
-- `Chrome で日経新聞を開いて`
-- `今のミッション一覧を教えて`
-
-### Resolution
-
-The structured interpretation of what the user means.
-
-Examples:
-
-- direct answer
-- browser operation
-- knowledge query
-- task session
-- durable mission
-
-### Plan
-
-A short execution plan in human terms, usually rendered as a few steps.
-
-Examples:
-
-- `PDF を解析 -> スライド構成を復元 -> PPTX を生成`
-- `検索 -> サイトを開く`
-- `状態を取得 -> 要点を返す`
-
-### Execution
-
-The internal layer where Kyberion uses projects, missions, task sessions, actuators, and ADF.
-
-This layer exists for durability, governance, replayability, and safety.
-
-## Missions and Task Sessions
-
-Kyberion has two important durable work shapes.
-
-### Task Session
-
-A lightweight execution contract for conversational work.
-
-Use cases:
-
-- create a PowerPoint
-- create a report
-- inspect a service
-- capture a photo
-- operate the browser interactively
-
-Task sessions are good when the work should feel conversational and return quickly with artifacts or follow-up prompts.
-
-### Mission
-
-A larger durable unit of work with its own evidence trail and lifecycle.
-
-Use cases:
-
-- multi-step engineering work
-- long-running delivery work
-- auditable cross-agent execution
-- reusable evidence and distillation
-
-Mission lifecycle:
-
-```text
-planned -> active -> validating -> distilling -> completed -> archived
-```
-
-Rule of thumb:
-
-- `simple request` -> direct answer or task session
-- `durable work` -> mission
-
-## Why Missions Still Matter
-
-Kyberion is not trying to expose missions because users love lifecycle state machines.
-It uses missions because they provide:
-
-- durable ownership
-- replayable evidence
-- explicit validation
-- safe delegation
-- knowledge distillation after completion
-
-The UX goal is not to remove the mission model.
-It is to make the mission model feel invisible until the user needs it.
-
-## Actuators and ADF
-
-Actuators are Kyberion's execution body.
-ADF is the structured contract used to connect reasoning and execution.
-
-Kyberion ships with 25+ actuators covering browser automation, media processing, system operations, file handling, voice, vision, code generation, agent orchestration, and more. The full list lives in `libs/actuators/`, each with a `manifest.json` declaring its capabilities.
-
-Examples of ADF-backed work:
-
-- PDF to PPTX conversion
-- browser navigation and page interaction
-- report generation
-- service inspection
-- controlled secret mutation
-
-Users should usually ask for outcomes.
-Kyberion decides which actuators and ADF contracts to use.
-
-## Architecture
-
-```text
-Intent
-  -> surface ingress (Terminal / Slack / Presence / Chronos)
-  -> intent resolution
-  -> short plan / confirmation
-  -> task session or mission
-  -> runtime supervisor / orchestration
-  -> actuators and ADF pipelines
-  -> artifacts, answers, and notifications
-```
-
-Core locations:
-
-| Path                 | Role                                                                              |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `libs/core/`         | shared kernel: secure I/O, resolution, routing, runtime state, governance helpers |
-| `libs/actuators/`    | execution capabilities                                                            |
-| `knowledge/`         | reusable governed knowledge                                                       |
-| `scripts/`           | operational entry points                                                          |
-| `pipelines/`         | declarative execution plans                                                       |
-| `active/`            | runtime state, missions, artifacts, and logs                                      |
-| `satellites/`        | channel bridges such as Slack                                                     |
-| `presence/displays/` | operator and conversational displays                                              |
-
-## Getting Started
+- 30 seconds: run `pnpm doctor` and see what is missing
+- 5 minutes: run the voice smoke and hear Kyberion reply
+- 15 minutes: run the browser session smoke and get a screenshot artifact
 
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
@@ -303,46 +31,115 @@ cd kyberion
 pnpm install
 pnpm build
 pnpm onboard
-pnpm surfaces:reconcile
+pnpm doctor
 ```
 
-Fastest daily-use docs:
-
-- [docs/QUICKSTART.md](docs/QUICKSTART.md)
-- [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md)
-
-## Local Control Plane
+Then pick a smoke path:
 
 ```bash
-pnpm agent-runtime:supervisor
-pnpm mission:orchestrator
-export KYBERION_LOCALHOST_AUTOADMIN=true
-pnpm chronos:dev
+# Voice smoke: browser speech in, OS-native speech out
+pnpm pipeline --input pipelines/voice-hello.json
+
+# Session smoke: persist a browser session, then verify it with a screenshot artifact
+pnpm pipeline --input pipelines/enterprise-login.json
+pnpm pipeline --input pipelines/verify-session.json
 ```
 
-## Working With Missions Directly
+For the full setup, see [`docs/QUICKSTART.md`](./docs/QUICKSTART.md). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
-If you need direct mission control, use the mission controller.
+---
 
-```bash
-MC="node dist/scripts/mission_controller.js"
-$MC start MY-FEATURE confidential
-$MC checkpoint task-1 "Implemented auth module"
-$MC verify MY-FEATURE verified "All tests pass"
-$MC finish MY-FEATURE
-```
+## What's in the box
 
-Direct mission commands are for operators and internal control.
-They are not the primary user-facing interface.
+23+ actuators covering:
 
-## Documents Worth Reading
+- **Browser** (Playwright-driven): record any web flow once, replay forever. RPA without the brittleness.
+- **Voice** (3 tiers, OS-native default → cloud → local self-hosted).
+- **File / Media**: PDF, PPTX, XLSX, DOCX, image, video — read, transform, generate.
+- **Code**: refactor, scaffold, analyze.
+- **Network**: governed fetch, A2A transport.
+- **Service**: unified Slack / Google / Notion / Microsoft 365 connection layer.
+- **System**: shell, screenshots, OS-level introspection.
+- **Wisdom**: knowledge tier search, distillation, reusable hint generation.
 
-- [docs/USE_CASES.md](docs/USE_CASES.md) — 業務自動化ユースケース集
-- [docs/CEO_SCENARIOS.md](docs/CEO_SCENARIOS.md) — CEO 業務シナリオ評価（実行パス検証済み）
-- [docs/QUICKSTART.md](docs/QUICKSTART.md)
-- [docs/OPERATOR_UX_GUIDE.md](docs/OPERATOR_UX_GUIDE.md)
-- [docs/GLOSSARY.md](docs/GLOSSARY.md)
-- [docs/COMPONENT_MAP.md](docs/COMPONENT_MAP.md)
-- [CAPABILITIES_GUIDE.md](CAPABILITIES_GUIDE.md)
-- [knowledge/public/architecture/kyberion-surface-ux-architecture.md](knowledge/public/architecture/kyberion-surface-ux-architecture.md)
-- [knowledge/public/architecture/agent-mission-control-model.md](knowledge/public/architecture/agent-mission-control-model.md)
+Plus:
+
+- **ADF pipeline format** — declarative, schema-validated, sub-pipeline composable. With `on_error` recovery semantics.
+- **Mission lifecycle** — each piece of work is a mission with its own git repo, state, evidence. Survives 24h+ runs.
+- **Three-tier knowledge isolation** — `personal/` / `confidential/` / `public/` enforced at the file-IO boundary.
+- **Customer aggregation** — `customer/{slug}/` overlay for FDE / implementation-support engagements without forks.
+- **Trace + audit** — OTel-inspired structured tracing per run, append-only audit chain.
+
+For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/public/architecture/organization-work-loop.md`](./knowledge/public/architecture/organization-work-loop.md).
+
+---
+
+## Status
+
+**OSS, in active development.** Pre-1.0. The roadmap is in [`docs/PRODUCTIZATION_ROADMAP.md`](./docs/PRODUCTIZATION_ROADMAP.md):
+
+- **Phase A** — Make first-win 5 minutes. (in progress)
+- **Phase B** — Make it survive 30 days of continuous use. (foundations landed)
+- **Phase C'** — Make it contributable in under a week.
+- **Phase D'** — Make FDE / implementation-support engagements possible without forks.
+
+The strategic positioning is **OSS-first, with paid implementation support / FDE** as the eventual revenue model. SaaS only after a clear user base exists. See `docs/PRODUCTIZATION_ROADMAP.md` §0 for the explicit "yes / no" list.
+
+---
+
+## Documentation map
+
+| If you want to | Read |
+|---|---|
+| Understand why this exists | [`docs/WHY.md`](./docs/WHY.md) / [`.ja.md`](./docs/WHY.ja.md) |
+| Try it in 5 minutes | [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) |
+| Deploy it for a customer | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md) |
+| Browse what it can automate | [`docs/USE_CASES.md`](./docs/USE_CASES.md) |
+| Understand the architecture | [`knowledge/public/architecture/organization-work-loop.md`](./knowledge/public/architecture/organization-work-loop.md) |
+| Author a new actuator / pipeline | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) |
+| Customize for a customer | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |
+| Contribute | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| Understand the data flow / privacy | [`docs/PRIVACY.md`](./docs/PRIVACY.md) / [`.ja.md`](./docs/PRIVACY.ja.md) |
+| Report a security issue | [`SECURITY.md`](./SECURITY.md) |
+
+Three audiences, three folders:
+
+- [`docs/user/`](./docs/user/) — using Kyberion to get work done.
+- [`docs/operator/`](./docs/operator/) — running Kyberion as a service.
+- [`docs/developer/`](./docs/developer/) — extending Kyberion.
+
+---
+
+## How it compares
+
+| You've used | What Kyberion adds |
+|---|---|
+| **ChatGPT / Claude.ai** | Stateful missions, governed execution, a catalog of actuators (browser, file, voice, …), audit chain, reusable memory across runs. |
+| **Cursor** | Code is one actuator among many. The unit of work is a long-running mission with persistent state, not a single chat. |
+| **Computer Use / browser agents** | Mission-scoped state, tier-isolated knowledge, customer aggregation. The browser is one tool, not the substrate. |
+| **Zapier / n8n / RPA** | Replaces brittle rule chains with intent-driven plans. Plans survive site changes via Trace-fed reusable hints. |
+| **AI Ops / agent SaaS** | OSS, self-hostable, customer-data-stays-local. No central server. FDE-ready for implementation engagements. |
+
+---
+
+## License
+
+MIT — see [`LICENSE`](./LICENSE).
+
+Third-party dependencies and their licenses are inventoried by `pnpm license:audit` (output at [`docs/legal/third-party-licenses.json`](./docs/legal/third-party-licenses.json)).
+
+## Code of Conduct
+
+We follow the [Contributor Covenant](https://www.contributor-covenant.org/) — see [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+
+## Governance
+
+Decision-making process: [`GOVERNANCE.md`](./GOVERNANCE.md). Maintainers: [`MAINTAINERS.md`](./MAINTAINERS.md). Code owners: [`CODEOWNERS`](./CODEOWNERS).
+
+## Contributing
+
+PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Security disclosure: [`SECURITY.md`](./SECURITY.md). Roadmap context: [`docs/PRODUCTIZATION_ROADMAP.md`](./docs/PRODUCTIZATION_ROADMAP.md).
+
+---
+
+> Kyberion is operator-facing in English, conceptually-authored in Japanese. Both languages are first-class. See [`docs/DOCUMENTATION_LOCALIZATION_POLICY.md`](./docs/DOCUMENTATION_LOCALIZATION_POLICY.md).

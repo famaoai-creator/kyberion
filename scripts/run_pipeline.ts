@@ -1,4 +1,17 @@
-import { logger, safeExec, resolveVars, evaluateCondition, capabilityEntry, findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core';
+import {
+  TraceContext,
+  finalizeAndPersist,
+  classifyError,
+  formatClassification,
+  logger,
+  safeExec,
+  resolveVars,
+  evaluateCondition,
+  capabilityEntry,
+  findMissionPath,
+  missionEvidenceDir,
+  pathResolver,
+} from '@agent/core';
 import * as nodePath from 'node:path';
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -9,6 +22,10 @@ import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
 const dispatchCache: Record<string, DispatchFunc> = {};
+
+interface RunStepsOptions {
+  trace?: TraceContext;
+}
 
 async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
   if (dispatchCache[domain]) return dispatchCache[domain];
@@ -129,31 +146,56 @@ function shouldUseSubagentForReasoningStep(params: Record<string, unknown>): boo
   return mode === 'subagent' || mode === 'delegate';
 }
 
-export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<string, unknown> = {}) {
+export function formatPipelineFailure(err: unknown): {
+  classification: ReturnType<typeof classifyError>;
+  summary: string;
+} {
+  const classification = classifyError(err);
+  return {
+    classification,
+    summary: formatClassification(classification).replace(/\n+/g, ' | '),
+  };
+}
+
+export async function runSteps(
+  steps: PipelineAdfStep[],
+  initialCtx: Record<string, unknown> = {},
+  opts: RunStepsOptions = {},
+) {
   let ctx: Record<string, unknown> = { ...initialCtx };
   const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
-  const shellBin = process.env.SHELL || 'bash';
+  const shellBin = 'bash';
   const rootDir = pathResolver.rootDir();
 
   for (const step of steps) {
+    const normalizedOp = normalizePipelineOp(step.op);
     try {
-      const normalizedOp = normalizePipelineOp(step.op);
       const [domain, action] = normalizedOp.split(':');
       const params = (step.params || {}) as Record<string, unknown>;
+      opts.trace?.startSpan(normalizedOp, {
+        step_index: results.length,
+        ...(step.type ? { step_type: step.type } : {}),
+      });
+      opts.trace?.addEvent('step.started');
 
       if (domain === 'system' && action === 'log') {
         logger.info(resolveLogMessage(params, ctx));
       } else if (domain === 'system' && action === 'shell') {
         const cmd = String(resolveVars(params.cmd || '', ctx));
-        const env = (params.env || {}) as Record<string, string>;
-        const output = safeExec(shellBin, ['-lc', cmd], { cwd: rootDir, env }).trim();
+        const env = Object.fromEntries(
+          Object.entries((params.env || {}) as Record<string, unknown>).map(([key, value]) => [
+            key,
+            typeof value === 'string' ? String(resolveVars(value, ctx)) : String(value),
+          ]),
+        ) as Record<string, string>;
+        const output = safeExec(shellBin, ['-c', cmd], { cwd: rootDir, env }).trim();
         if (params.export_as && typeof params.export_as === 'string') {
           ctx = { ...ctx, [params.export_as]: output };
         }
       } else if (domain === 'core' && action === 'if') {
         const branch = evaluateCondition(params.condition, ctx) ? params.then : params.else;
         if (Array.isArray(branch)) {
-          const nested = await runSteps(branch as PipelineAdfStep[], ctx);
+          const nested = await runSteps(branch as PipelineAdfStep[], ctx, opts);
           ctx = nested.context;
           results.push(...nested.results);
         }
@@ -173,8 +215,18 @@ export async function runSteps(steps: PipelineAdfStep[], initialCtx: Record<stri
       }
 
       results.push({ op: normalizedOp, status: 'success' });
+      opts.trace?.addEvent('step.completed');
+      opts.trace?.endSpan('ok');
     } catch (err: any) {
-      results.push({ op: normalizePipelineOp(step.op), status: 'failed', error: err.message });
+      const message = err?.message ?? String(err);
+      const failure = formatPipelineFailure(err);
+      results.push({ op: normalizedOp, status: 'failed', error: message });
+      opts.trace?.addEvent('step.failed', {
+        error: message,
+        error_category: failure.classification.category,
+        error_rule_id: failure.classification.ruleId,
+      });
+      opts.trace?.endSpan('error', failure.summary);
       return { status: derivePipelineStatus(results), results, context: ctx };
     }
   }
@@ -221,29 +273,56 @@ export async function main() {
     }
   }
   autoContext.browser_session_id = `${pipeline.pipeline_id || path.basename(String(argv.input), path.extname(String(argv.input)))}`;
+  autoContext.repo_root = pathResolver.rootDir();
+  autoContext.platform_name = process.platform;
+  autoContext.node_options = process.env.NODE_OPTIONS || '';
+  autoContext.run_utc_now = new Date().toISOString();
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
 
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
   logger.info(`   [PIPELINE] Mission ID: ${missionId || 'NONE'}`);
   logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
 
+  const pipelineId = String(
+    pipeline.pipeline_id || pipeline.id || path.basename(String(argv.input), path.extname(String(argv.input))),
+  );
+  const trace = new TraceContext(`pipeline:${pipelineId}`, {
+    ...(missionId ? { missionId } : {}),
+    pipelineId,
+  });
+  trace.addArtifact('file', String(argv.input), 'Pipeline ADF input');
+
   try {
     const result = await runSteps(
       (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
       mergedContext,
+      { trace },
     );
+    const persisted = finalizeAndPersist(trace);
+    result.context.trace_summary = persisted.trace.rootSpan.status;
+    result.context.trace_persisted_path = nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
+    logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
     } else {
       const failed = result.results.find((entry) => entry.status === 'failed');
       if (failed) {
-        logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failed.error || 'unknown error'}`);
+        const failure = formatPipelineFailure(failed.error || 'unknown error');
+        logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failure.summary}`);
       }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
       process.exit(1);
     }
   } catch (err: any) {
-    logger.error(`❌ [PIPELINE] Error: ${err.message}`);
+    const failure = formatPipelineFailure(err);
+    trace.addEvent('pipeline.error', {
+      error: err?.message ?? String(err),
+      error_category: failure.classification.category,
+      error_rule_id: failure.classification.ruleId,
+    });
+    const persisted = finalizeAndPersist(trace);
+    logger.info(`   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`);
+    logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
     process.exit(1);
   }
 }

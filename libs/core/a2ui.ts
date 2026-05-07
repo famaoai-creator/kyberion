@@ -15,7 +15,12 @@ export type A2UIComponentType =
   | 'kb-status-orbit'
   | 'kb-mission-card'
   | 'kb-artifact-tile'
-  | 'kb-intervention-panel';
+  | 'kb-intervention-panel'
+  // Presence Specific Components
+  | 'presence.status'
+  | 'presence.subtitle'
+  | 'presence.transcript'
+  | 'presence.avatar';
 
 export interface A2UIComponent {
   id: string;

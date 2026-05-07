@@ -6,5 +6,8 @@
   "main": "../../../dist/libs/shared-business/src/index.js",
   "types": "../../../dist/libs/shared-business/src/index.d.ts",
   "scripts": { "build": "tsc" },
-  "dependencies": { "@agent/core": "workspace:*" }
+  "dependencies": { "@agent/core": "workspace:*" },
+  "devDependencies": {
+    "fast-check": "4.6.0"
+  }
 }

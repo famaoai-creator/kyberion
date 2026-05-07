@@ -1,0 +1,31 @@
+{
+  "pipeline_id": "verify-session",
+  "version": "1.0.0",
+  "description": "Re-open the persisted enterprise-sync profile (from enterprise-login.json) and confirm that authenticated session state survives. Captures a screenshot under active/shared/tmp/ as evidence.",
+  "action": "pipeline",
+  "options": {
+    "headless": false,
+    "browser_channel": "chrome",
+    "keep_alive": true,
+    "user_data_dir": "active/browser-session/enterprise-sync"
+  },
+  "steps": [
+    {
+      "id": "check-state",
+      "type": "capture",
+      "op": "evaluate",
+      "params": {
+        "expression": "({ title: document.title, url: location.href, cookiesPresent: document.cookie.length > 0 })",
+        "export_as": "session_state"
+      }
+    },
+    {
+      "id": "screenshot-verify",
+      "type": "capture",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/enterprise-login-success.png"
+      }
+    }
+  ]
+}

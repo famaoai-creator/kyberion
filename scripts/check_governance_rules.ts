@@ -1,6 +1,7 @@
 import * as AjvModule from 'ajv';
-import { pathResolver } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
+import { fileURLToPath } from 'node:url';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -10,6 +11,8 @@ type GovernanceRuleCheck = {
   schemaPath: string;
   dataPath: string;
 };
+
+const GOVERNANCE_DIR = 'knowledge/public/governance';
 
 const CHECKS: GovernanceRuleCheck[] = [
   {
@@ -178,6 +181,14 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/public/governance/mission-orchestration-scenario-pack.json',
   },
 ];
+
+export function findDeterministicCatalogViolations(): string[] {
+  const dir = pathResolver.rootResolve(GOVERNANCE_DIR);
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => /-deterministic\.json$/i.test(entry))
+    .map((entry) => `${GOVERNANCE_DIR}/${entry}`);
+}
 
 function readJson<T>(relativePath: string): T {
   return readJsonFile<T>(pathResolver.rootResolve(relativePath));
@@ -999,10 +1010,15 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
 
 }
 
-function main() {
+export function main() {
   const violations: string[] = [];
   for (const check of CHECKS) {
     validateRuleFile(check, violations);
+  }
+  for (const deterministicCatalog of findDeterministicCatalogViolations()) {
+    violations.push(
+      `governance-catalog: deterministic catalog must be removed or migrated (${deterministicCatalog})`
+    );
   }
 
   if (violations.length > 0) {
@@ -1017,4 +1033,8 @@ function main() {
   console.log('[check:governance-rules] OK');
 }
 
-main();
+const isDirectRun = process.argv[1] && pathResolver.rootResolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main();
+}

@@ -16,12 +16,21 @@ knowledge/personal/
 # Per-user experimental / confidential project scaffolds
 projects/
 
+# Customer aggregation: per-customer dirs are gitignored, but README and _template/ are committed.
+/customer/*
+!/customer/README.md
+!/customer/_template/
+
+# Auto-generated audit reports (regenerate via pnpm license:audit / pnpm find:dead-code)
+/docs/legal/third-party-licenses.json
+/docs/legal/dead-code-candidates.json
+
 # Next.js build output
 .next/
 
 # Runtime artifacts
 active/
-archive/
+/archive/
 work/
 temp_ppt/
 tests/_tmp/
@@ -41,6 +50,8 @@ libs/core/**/*.js.map
 libs/core/**/*.d.ts
 libs/core/**/*.d.ts.map
 libs/core/tsconfig.tsbuildinfo
+# Workspace package build artifacts (TypeScript incremental build info)
+libs/shared-*/tsconfig.tsbuildinfo
 # Hand-written JS (no .ts source)
 !libs/core/finance.js
 !libs/core/mcp-client-engine.js

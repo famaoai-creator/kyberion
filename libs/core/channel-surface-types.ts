@@ -187,10 +187,18 @@ export interface PresenceSurfaceMetadata {
   threadTs: string;
 }
 
+export interface IMessageSurfaceMetadata {
+  surface: 'imessage';
+  actorId?: string;
+  channel: string;
+  threadTs: string;
+}
+
 export type SurfaceConversationMetadata =
   | SlackSurfaceMetadata
   | ChronosSurfaceMetadata
-  | PresenceSurfaceMetadata;
+  | PresenceSurfaceMetadata
+  | IMessageSurfaceMetadata;
 
 interface SurfaceConversationInputBase {
   agentId: string;
@@ -208,6 +216,7 @@ export type SurfaceConversationInput =
   | (SurfaceConversationInputBase & { surface: 'slack'; surfaceMetadata?: SlackSurfaceMetadata })
   | (SurfaceConversationInputBase & { surface: 'chronos'; surfaceMetadata?: ChronosSurfaceMetadata })
   | (SurfaceConversationInputBase & { surface: 'presence'; surfaceMetadata?: PresenceSurfaceMetadata })
+  | (SurfaceConversationInputBase & { surface: 'imessage'; surfaceMetadata?: IMessageSurfaceMetadata })
   | (SurfaceConversationInputBase & { surface?: SurfaceAsyncChannel; surfaceMetadata?: SurfaceConversationMetadata });
 
 interface SurfaceConversationMessageInputBase {
@@ -231,6 +240,13 @@ export type SurfaceConversationMessageInput =
       threadTs: string;
       actorId?: string;
       metadata?: Omit<SlackSurfaceMetadata, 'surface' | 'channel' | 'threadTs'>;
+    })
+  | (SurfaceConversationMessageInputBase & {
+      surface: 'imessage';
+      channel: string;
+      threadTs: string;
+      actorId?: string;
+      metadata?: Record<string, any>;
     })
   | (SurfaceConversationMessageInputBase & {
       surface: 'chronos';
@@ -269,7 +285,7 @@ export interface SurfaceDelegationResult {
   authorityRole?: string;
 }
 
-export type SurfaceAsyncChannel = 'slack' | 'chronos' | 'presence';
+export type SurfaceAsyncChannel = 'slack' | 'chronos' | 'presence' | 'imessage';
 
 export interface SurfaceAsyncRequestRecord {
   request_id: string;

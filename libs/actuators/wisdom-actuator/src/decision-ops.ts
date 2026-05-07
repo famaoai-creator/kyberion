@@ -1341,6 +1341,7 @@ export async function executeSelfActionItemsOp(input: {
       mission_id: input.mission_id,
       item_id: item.item_id,
       status: 'blocked',
+      blocked_reason: reason,
       execution: { executed_via: 'agent_delegate', result_summary: reason },
     });
     return {
@@ -1395,6 +1396,7 @@ export async function executeSelfActionItemsOp(input: {
         mission_id: input.mission_id,
         item_id: item.item_id,
         status: 'blocked',
+        blocked_reason: `delegateTask failed: ${err?.message ?? err}`,
         execution: {
           executed_via: 'agent_delegate',
           result_summary: `delegateTask failed: ${err?.message ?? err}`,

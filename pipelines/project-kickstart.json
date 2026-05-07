@@ -1,0 +1,122 @@
+{
+  "action": "pipeline",
+  "name": "Project Kickstart (The Ultimate Starter)",
+  "description": "A high-fidelity project lifecycle pipeline that transitions from a conceptual brief (transcript or prompt) to a physicalized project structure with requirements, design, test plan, and task plan. Implements Suggestion 4 expansion.",
+  "context": {
+    "mission_id": "",
+    "project_name": "new-project",
+    "project_tier": "confidential",
+    "transcript_path": "",
+    "initial_prompt": "Create a new project based on the following concept: {{concept}}",
+    "concept": "A sample project to demonstrate Kyberion's autonomous project kickstart capability.",
+    "language": "ja",
+    "customer_name": "Internal",
+    "customer_org": "Kyberion",
+    "app_id": "com.kyberion.gen.{{project_name}}",
+    "project_root": "active/projects/{{project_name}}"
+  },
+  "steps": [
+    {
+      "id": "prepare_root",
+      "type": "apply",
+      "op": "mkdir",
+      "params": {
+        "path": "{{project_root}}"
+      }
+    },
+    {
+      "id": "requirements",
+      "type": "apply",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{transcript_path}}",
+        "source_type": "meeting_notes",
+        "fallback_prompt": "{{initial_prompt}}",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_org": "{{customer_org}}",
+        "export_as": "requirements"
+      }
+    },
+    {
+      "id": "design",
+      "type": "apply",
+      "op": "wisdom:extract_design_spec",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "additional_context": "Generate a modern, robust architecture spec for {{project_name}}.",
+        "export_as": "design"
+      }
+    },
+    {
+      "id": "test_plan",
+      "type": "apply",
+      "op": "wisdom:extract_test_plan",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "app_id": "{{app_id}}",
+        "export_as": "test_plan"
+      }
+    },
+    {
+      "id": "task_plan",
+      "type": "apply",
+      "op": "wisdom:decompose_into_tasks",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "export_as": "task_plan"
+      }
+    },
+    {
+      "id": "physicalize_docs",
+      "type": "apply",
+      "op": "write_artifact",
+      "params": {
+        "role": "specification",
+        "path": "{{project_root}}/requirements.json",
+        "content": "{{requirements}}"
+      }
+    },
+    {
+      "id": "physicalize_design",
+      "type": "apply",
+      "op": "write_artifact",
+      "params": {
+        "role": "specification",
+        "path": "{{project_root}}/design.json",
+        "content": "{{design}}"
+      }
+    },
+    {
+      "id": "physicalize_tasks",
+      "type": "apply",
+      "op": "write_artifact",
+      "params": {
+        "role": "specification",
+        "path": "{{project_root}}/task-plan.json",
+        "content": "{{task_plan}}"
+      }
+    },
+    {
+      "id": "init_git",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "cd {{project_root}} && git init && echo '# {{project_name}}' > README.md && git add README.md && git commit -m 'Initial kickstart'"
+      }
+    },
+    {
+      "id": "summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Project {{project_name}} kickstarted at {{project_root}}. Next: pnpm mission:start --project-id {{project_name}} --track-id kickstart-01 --task-id task_plan.tasks[0].id"
+      }
+    }
+  ]
+}

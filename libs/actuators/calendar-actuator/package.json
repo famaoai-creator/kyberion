@@ -1,0 +1,15 @@
+{
+  "name": "@actuator/calendar",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "macOS Calendar.app integration for cross-account schedule coordination",
+  "main": "../../../dist/libs/actuators/calendar-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/calendar-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

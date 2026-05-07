@@ -13,11 +13,13 @@ import {
   missionDir as resolveMissionDir,
   pathResolver,
   inferMissionOutcomeContract,
+  ensureDefaultTenantProfile,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
   transitionStatus,
+  withExecutionContext,
   writeMissionTeamPlan,
 } from '@agent/core';
 import { readJsonFile } from './cli-input.js';
@@ -72,6 +74,7 @@ export async function createMission(
       `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`,
     );
   }
+  withExecutionContext('knowledge_steward', () => ensureDefaultTenantProfile(), 'ecosystem_architect');
 
   const upperId = id.toUpperCase();
   const isEphemeral = process.argv.includes('--ephemeral');

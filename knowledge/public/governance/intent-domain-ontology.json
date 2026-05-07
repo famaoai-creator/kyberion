@@ -1902,6 +1902,24 @@
       "actuator_requirements": ["approval-actuator", "system-actuator"],
       "readiness_required": ["kyberion-runtime-baseline"],
       "evidence_required": ["execution-receipt"]
+    },
+    {
+      "intent_id": "assimilate-gateway-capability",
+      "category": "environment_setup",
+      "legacy_category": "surface",
+      "target": "external_service",
+      "action": "create",
+      "object": "gateway_capability_adapter",
+      "exposed_to_surface": true,
+      "execution_shape": "pipeline",
+      "mission_class": "platform_onboarding",
+      "workflow_template": "platform-onboarding-stage-gated",
+      "team_template": "operations",
+      "risk_profile": "review_required",
+      "outcome_ids": ["gateway_adapter_created"],
+      "actuator_requirements": ["wisdom-actuator", "system-actuator", "orchestrator-actuator"],
+      "readiness_required": ["kyberion-runtime-baseline", "schema-integrity"],
+      "evidence_required": ["execution-receipt", "delivery-pack"]
     }
   ]
 }

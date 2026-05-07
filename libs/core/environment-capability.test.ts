@@ -173,8 +173,49 @@ describe('verifyReady', () => {
       apply: true,
     });
     expect(receipt.unsatisfied).toHaveLength(0);
+    expect(receipt.manifest_fingerprint).toHaveLength(64);
+    expect(receipt.host_fingerprint).toHaveLength(64);
+    expect(receipt.expires_at).toBeTruthy();
     const report = verifyReady(manifest, { mission_id: FIX_MISSION });
     expect(report.ready).toBe(true);
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
+  it('invalidates a receipt when the manifest fingerprint changes', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-f',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.env-ok',
+          kind: 'env-var',
+          description: 'env present',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    await bootstrapManifest(manifest, {
+      mission_id: FIX_MISSION,
+      apply: true,
+    });
+    const mutatedManifest = {
+      ...manifest,
+      capabilities: [
+        ...manifest.capabilities,
+        {
+          capability_id: 'cap.new-guard',
+          kind: 'env-var' as const,
+          description: 'new requirement',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    const report = verifyReady(mutatedManifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing.some((m) => m.capability_id === '__manifest_fingerprint__')).toBe(true);
     delete process.env.PROBE_VERIFY_READY;
   });
 });

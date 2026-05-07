@@ -21,6 +21,7 @@
 
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
+import { TraceContext } from './src/trace.js';
 import type { AudioBus } from './audio-bus.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
 import type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
@@ -79,6 +80,7 @@ export class MeetingParticipationCoordinator {
       tts: StreamingTextToSpeechBridge;
       vad: VoiceActivityDetector;
       agent: ConversationAgent;
+      trace?: TraceContext;
     },
   ) {}
 
@@ -92,13 +94,44 @@ export class MeetingParticipationCoordinator {
     let utterancesSpoken = 0;
     let endedByTimeout = false;
     let session: MeetingSession | null = null;
+    let traceEnded = false;
+    const closeTrace = (status: 'ok' | 'error', error?: string): void => {
+      if (!this.deps.trace || traceEnded) return;
+      this.deps.trace.endSpan(status, error);
+      traceEnded = true;
+    };
+
+    if (this.deps.trace) {
+      this.deps.trace.startSpan('meeting_participation.run', {
+        platform: target.platform,
+        driver: this.deps.driver.driver_id,
+      });
+      this.deps.trace.addEvent('meeting_participation.start', {
+        platform: target.platform,
+        driver: this.deps.driver.driver_id,
+      });
+    }
 
     // 1. Open the bus + join.
     await this.deps.bus.open(options.audio_format);
+    this.deps.trace?.addEvent('meeting_participation.bus_open', {
+      format: options.audio_format.encoding,
+      sample_rate_hz: options.audio_format.sample_rate_hz,
+    });
     this.recordAudit('meeting_participation.join', target, 'allowed');
     try {
+      this.deps.trace?.addEvent('meeting_participation.join_requested', {
+        platform: target.platform,
+      });
       session = await this.deps.driver.join(target, this.deps.bus);
+      this.deps.trace?.addEvent('meeting_participation.joined', {
+        session_id: session.state.session_id,
+      });
     } catch (err: any) {
+      this.deps.trace?.addEvent('meeting_participation.join_failed', {
+        error: err?.message ?? String(err),
+      });
+      closeTrace('error', err?.message ?? String(err));
       this.recordAudit('meeting_participation.join_failed', target, 'error', err?.message);
       await this.deps.bus.close();
       throw err;
@@ -121,30 +154,65 @@ export class MeetingParticipationCoordinator {
       for await (const utterance of transcriptIterator) {
         if (Date.now() > deadline) {
           endedByTimeout = true;
+          this.deps.trace?.addEvent('meeting_participation.timeout', {
+            max_minutes: options.max_minutes,
+          });
           break;
         }
         if (!utterance.is_final) continue;
         utterancesReceived += 1;
+        this.deps.trace?.addEvent('meeting_participation.transcript', {
+          utterance_index: utterancesReceived,
+          chars: utterance.text.length,
+          speaker: utterance.speaker_label ?? 'unknown',
+        });
         const decision = await this.deps.agent.onUtterance(utterance);
         if (decision.leave) {
+          this.deps.trace?.addEvent('meeting_participation.agent_leave', {
+            utterance_index: utterancesReceived,
+          });
           this.recordAudit('meeting_participation.agent_leave', target, 'allowed');
           break;
         }
         if (decision.speech) {
+          this.deps.trace?.addEvent('meeting_participation.speak_requested', {
+            chars: decision.speech.length,
+          });
           await this.speak(session, decision.speech, options.voice_profile_id);
           utterancesSpoken += 1;
+          this.deps.trace?.addEvent('meeting_participation.spoke', {
+            utterance_index: utterancesReceived,
+            chars: decision.speech.length,
+          });
           this.recordAudit('meeting_participation.spoke', target, 'allowed', decision.speech);
         }
       }
+      this.deps.trace?.addEvent('meeting_participation.loop_finished', {
+        utterances_received: utterancesReceived,
+        utterances_spoken: utterancesSpoken,
+        ended_by_timeout: endedByTimeout,
+      });
     } catch (err: any) {
+      this.deps.trace?.addEvent('meeting_participation.error', {
+        error: err?.message ?? String(err),
+      });
+      closeTrace('error', err?.message ?? String(err));
       this.recordAudit('meeting_participation.error', target, 'error', err?.message);
       throw err;
     } finally {
       await session.leave().catch((err: any) => {
         logger.warn(`[participation-coordinator] leave failed: ${err?.message ?? err}`);
+        this.deps.trace?.addEvent('meeting_participation.leave_failed', {
+          error: err?.message ?? String(err),
+        });
+      });
+      this.deps.trace?.addEvent('meeting_participation.leave', {
+        session_id: session.state.session_id,
       });
       this.recordAudit('meeting_participation.leave', target, 'allowed');
     }
+
+    closeTrace('ok');
 
     return {
       session_id: session.state.session_id,
@@ -166,10 +234,20 @@ export class MeetingParticipationCoordinator {
     text: string,
     voiceProfileId: string,
   ): Promise<void> {
+    this.deps.trace?.startSpan('meeting_participation.tts', {
+      chars: text.length,
+      voice_profile_id: voiceProfileId,
+    });
     async function* singleSegment(): AsyncIterable<string> {
       yield text;
     }
-    await session.audioOutput(this.deps.tts.synthesizeStream(singleSegment(), voiceProfileId));
+    try {
+      await session.audioOutput(this.deps.tts.synthesizeStream(singleSegment(), voiceProfileId));
+      this.deps.trace?.endSpan('ok');
+    } catch (err: any) {
+      this.deps.trace?.endSpan('error', err?.message ?? String(err));
+      throw err;
+    }
   }
 
   /**

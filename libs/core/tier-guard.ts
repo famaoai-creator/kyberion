@@ -151,6 +151,72 @@ function extractTenantFromProtectedPrefix(
   return null;
 }
 
+interface TenantGroupProfile {
+  tenant_group_id: string;
+  status?: string;
+  member_tenants?: string[];
+  shared_prefixes?: string[];
+}
+
+function extractTenantGroupFromSharedPath(relativePath: string): string | null {
+  const match = relativePath.match(/^knowledge\/confidential\/shared\/([a-z][a-z0-9-]{1,30})(?:\/|$)/);
+  return match?.[1] ?? null;
+}
+
+function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
+  const file = pathResolver.knowledge(`confidential/tenant-groups/${groupId}.json`);
+  try {
+    if (!rawExistsSync(file)) return null;
+    return JSON.parse(rawReadTextFile(file)) as TenantGroupProfile;
+  } catch (_) {
+    return null;
+  }
+}
+
+function checkTenantGroupScope(
+  relativePath: string,
+  tenantSlug: string | undefined,
+  brokeredTenants: string[] | undefined,
+): { allowed: boolean; reason?: string } | null {
+  const groupId = extractTenantGroupFromSharedPath(relativePath);
+  if (!groupId) return null;
+
+  const group = loadTenantGroupProfile(groupId);
+  if (!group || group.status !== 'active') {
+    return {
+      allowed: false,
+      reason: `[POLICY_VIOLATION] tenant.group_unknown — shared tenant group '${groupId}' is missing or inactive for '${relativePath}'.`,
+    };
+  }
+
+  const members = Array.isArray(group.member_tenants) ? group.member_tenants : [];
+  const sharedPrefixes = Array.isArray(group.shared_prefixes) && group.shared_prefixes.length > 0
+    ? group.shared_prefixes
+    : [`knowledge/confidential/shared/${groupId}/`];
+  if (!sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix))) {
+    return {
+      allowed: false,
+      reason: `[POLICY_VIOLATION] tenant.group_prefix_violation — '${relativePath}' is not declared in tenant group '${groupId}'.`,
+    };
+  }
+
+  if (!tenantSlug && !brokeredTenants) return null;
+  if (tenantSlug && members.includes(tenantSlug)) {
+    recordGroupAccess({ relativePath, groupId, tenantSlug });
+    return null;
+  }
+  if (brokeredTenants?.some((tenant) => members.includes(tenant))) {
+    recordGroupAccess({ relativePath, groupId, tenantSlug: tenantSlug ?? '(brokered)' });
+    return null;
+  }
+
+  const actor = tenantSlug ? `tenant '${tenantSlug}'` : 'brokered tenant set';
+  return {
+    allowed: false,
+    reason: `[POLICY_VIOLATION] tenant.group_scope_violation — ${actor} is not a member of shared tenant group '${groupId}' for '${relativePath}'.`,
+  };
+}
+
 /**
  * Validates write permission based on security-policy.json ADF and Persona.
  */
@@ -183,6 +249,8 @@ function checkTenantScope(
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
   const cfg = tenantScopeConfig(policy);
+  const groupDenial = checkTenantGroupScope(relativePath, tenantSlug, brokeredTenants);
+  if (groupDenial) return groupDenial;
   if (cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix))) return null;
 
   const scoped = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
@@ -273,6 +341,28 @@ function recordBrokerAccess(input: {
       metadata: {
         target_tenant: input.targetTenant,
         broker_tenants: input.brokerTenants,
+      },
+    });
+  }).catch(() => {
+    /* best-effort */
+  });
+}
+
+function recordGroupAccess(input: {
+  relativePath: string;
+  groupId: string;
+  tenantSlug: string;
+}): void {
+  import('./audit-chain.js').then(({ auditChain }) => {
+    auditChain.record({
+      agentId: 'tier-guard',
+      action: 'tenant.group_access',
+      operation: input.relativePath,
+      result: 'allowed',
+      reason: `Tenant '${input.tenantSlug}' accessed shared tenant group '${input.groupId}'.`,
+      metadata: {
+        tenant_slug: input.tenantSlug,
+        tenant_group_id: input.groupId,
       },
     });
   }).catch(() => {

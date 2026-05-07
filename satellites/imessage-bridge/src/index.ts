@@ -1,6 +1,15 @@
 import express from 'express';
-import { createStandardYargs, logger, pathResolver, safeReadFile } from '@agent/core';
-import { describeIMessageBridgeHealth, sendIMessage, type IMessageSendRequest } from '@agent/core';
+import { 
+  createStandardYargs, 
+  logger, 
+  pathResolver, 
+  safeReadFile,
+  describeIMessageBridgeHealth, 
+  sendIMessage, 
+  getRecentIMessages,
+  runSurfaceMessageConversation,
+  type IMessageSendRequest 
+} from '@agent/core';
 
 interface BridgeInput {
   action?: string;
@@ -8,6 +17,9 @@ interface BridgeInput {
   text?: string;
   serviceName?: string;
 }
+
+const IMESSAGE_SURFACE_AGENT_ID = 'imessage-surface-agent';
+let lastSeenRowId = 0;
 
 function isDarwin(): boolean {
   return process.platform === 'darwin';
@@ -22,10 +34,48 @@ async function handleSend(request: IMessageSendRequest) {
   return sendIMessage(request);
 }
 
+async function pollIMessages() {
+  try {
+    const newMessages = getRecentIMessages(lastSeenRowId);
+    for (const msg of newMessages) {
+      lastSeenRowId = Math.max(lastSeenRowId, Number(msg.id));
+      
+      if (msg.isFromMe) continue;
+
+      logger.info(`📥 [iMessageBridge] Message from ${msg.sender}: ${msg.text}`);
+
+      const conversation = await runSurfaceMessageConversation({
+        surface: 'imessage',
+        text: msg.text,
+        channel: msg.chatId,
+        threadTs: msg.id,
+        correlationId: `imsg-${msg.id}`,
+        receivedAt: msg.date,
+        actorId: msg.sender,
+        senderAgentId: 'kyberion:imessage-bridge',
+        agentId: IMESSAGE_SURFACE_AGENT_ID,
+        delegationSummaryInstruction: 
+          'Produce a concise iMessage reply in the user language. Do not use A2A blocks.'
+      } as any);
+
+      if (conversation.text) {
+        logger.info(`📤 [iMessageBridge] Replying to ${msg.sender}: ${conversation.text}`);
+        await sendIMessage({
+          recipient: msg.sender,
+          text: conversation.text
+        });
+      }
+    }
+  } catch (err: any) {
+    logger.error(`❌ [iMessageBridge] Poll failed: ${err.message}`);
+  }
+}
+
 async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string' })
     .option('port', { type: 'number', default: Number(process.env.IMESSAGE_BRIDGE_PORT || '3034') })
+    .option('poll', { type: 'boolean', default: true, description: 'Enable background message polling' })
     .parseSync();
 
   if (argv.input) {
@@ -46,6 +96,19 @@ async function main() {
     logger.warn('iMessage bridge is macOS-only. Health endpoints remain available, but send operations will fail until launched on Darwin.');
   }
 
+  if (isDarwin()) {
+    const existing = getRecentIMessages(0);
+    if (existing.length > 0) {
+      lastSeenRowId = Math.max(...existing.map(m => Number(m.id)));
+      logger.info(`🚀 [iMessageBridge] Initialized. Last message ID: ${lastSeenRowId}`);
+    }
+
+    if (argv.poll) {
+      logger.info('🔍 [iMessageBridge] Starting background polling (every 5s)...');
+      setInterval(pollIMessages, 5000).unref();
+    }
+  }
+
   const app = express();
   app.use(express.json({ limit: '1mb' }));
 
@@ -53,7 +116,6 @@ async function main() {
     res.json({
       ok: true,
       service: 'imessage-bridge',
-      platform: process.platform,
       ...describeIMessageBridgeHealth(),
     });
   });

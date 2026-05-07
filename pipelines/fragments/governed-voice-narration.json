@@ -1,0 +1,50 @@
+{
+  "action": "pipeline",
+  "name": "governed-voice-narration",
+  "description": "Fragment for adding narrated voice-overs to presentations using the Governed Voice Stack.",
+  "context": {
+    "pptx_path": "active/shared/tmp/input.pptx",
+    "voice_profile_id": "default",
+    "mission_id": "MSN-EXAMPLE"
+  },
+  "steps": [
+    {
+      "id": "extract_script",
+      "type": "capture",
+      "op": "media:pptx_slide_text",
+      "params": {
+        "source": "{{pptx_path}}",
+        "export_as": "slide_scripts"
+      }
+    },
+    {
+      "id": "generate_narration",
+      "type": "apply",
+      "op": "voice:generate_narration_bulk",
+      "params": {
+        "scripts": "{{slide_scripts}}",
+        "voice_profile": "{{voice_profile_id}}",
+        "export_dir": "active/shared/tmp/{{mission_id}}/audio/"
+      }
+    },
+    {
+      "id": "compile_video_brief",
+      "type": "transform",
+      "op": "media:narrated-video-brief-compiler",
+      "params": {
+        "pptx_path": "{{pptx_path}}",
+        "audio_dir": "active/shared/tmp/{{mission_id}}/audio/",
+        "export_as": "video_brief"
+      }
+    },
+    {
+      "id": "render_preview",
+      "type": "apply",
+      "op": "video:render_preview",
+      "params": {
+        "brief": "{{video_brief}}",
+        "export_path": "active/shared/artifacts/{{mission_id}}/preview.mp4"
+      }
+    }
+  ]
+}
