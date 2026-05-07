@@ -1,5 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { TraceContext } from './trace.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { TraceContext, persistTrace, finalizeAndPersist } from './trace.js';
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const TEST_TMP_BASE = path.join(PROJECT_ROOT, 'tests', '_tmp');
+
+function makeTestTmpDir(label: string): string {
+  if (!fs.existsSync(TEST_TMP_BASE)) fs.mkdirSync(TEST_TMP_BASE, { recursive: true });
+  return fs.mkdtempSync(path.join(TEST_TMP_BASE, `trace-${label}-`));
+}
 
 describe('trace', () => {
   describe('TraceContext', () => {
@@ -119,6 +130,93 @@ describe('trace', () => {
 
       const summary = ctx.summary();
       expect(summary.spans).toBe(4); // root + 3 levels
+    });
+  });
+
+  describe('persistTrace', () => {
+    let savedPersona: string | undefined;
+    let savedRole: string | undefined;
+
+    beforeEach(() => {
+      savedPersona = process.env.KYBERION_PERSONA;
+      savedRole = process.env.MISSION_ROLE;
+      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      process.env.MISSION_ROLE = 'mission_controller';
+    });
+
+    afterEach(() => {
+      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = savedRole;
+    });
+
+    it('appends a single JSONL line and creates the directory', () => {
+      const tmpDir = makeTestTmpDir('persist');
+      const ctx = new TraceContext('persist-test', { actuator: 'test-actuator' });
+      ctx.startSpan('child');
+      ctx.addEvent('did-something');
+      ctx.endSpan('ok');
+      const trace = ctx.finalize();
+
+      const written = persistTrace(trace, { dir: tmpDir });
+      expect(fs.existsSync(written)).toBe(true);
+
+      const lines = fs.readFileSync(written, 'utf-8').trim().split('\n');
+      expect(lines).toHaveLength(1);
+      const parsed = JSON.parse(lines[0]);
+      expect(parsed.traceId).toBe(trace.traceId);
+      expect(parsed.rootSpan.name).toBe('persist-test');
+      expect(parsed._persistedAt).toBeTruthy();
+
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('appends multiple traces to the same daily file', () => {
+      const tmpDir = makeTestTmpDir('persist');
+
+      for (let i = 0; i < 3; i++) {
+        const ctx = new TraceContext(`trace-${i}`);
+        const trace = ctx.finalize();
+        persistTrace(trace, { dir: tmpDir });
+      }
+
+      const files = fs.readdirSync(tmpDir);
+      expect(files).toHaveLength(1);
+      const lines = fs.readFileSync(path.join(tmpDir, files[0]), 'utf-8').trim().split('\n');
+      expect(lines).toHaveLength(3);
+
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('finalizeAndPersist', () => {
+    let savedPersona: string | undefined;
+    let savedRole: string | undefined;
+
+    beforeEach(() => {
+      savedPersona = process.env.KYBERION_PERSONA;
+      savedRole = process.env.MISSION_ROLE;
+      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      process.env.MISSION_ROLE = 'mission_controller';
+    });
+
+    afterEach(() => {
+      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = savedRole;
+    });
+
+    it('finalizes the context and persists in one call', () => {
+      const tmpDir = makeTestTmpDir('persist');
+      const ctx = new TraceContext('combined');
+      const { trace, path: written } = finalizeAndPersist(ctx, { dir: tmpDir });
+
+      expect(trace.rootSpan.endTime).toBeTruthy();
+      expect(fs.existsSync(written)).toBe(true);
+
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     });
   });
 });

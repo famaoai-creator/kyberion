@@ -1,0 +1,37 @@
+{
+  "pipeline_id": "attach-to-browser-sample",
+  "version": "1.0.0",
+  "description": "Sample pipeline that attaches to an already-running Chrome instance via CDP (Chrome DevTools Protocol). Useful when the user has manually started Chrome with --remote-debugging-port=9222 and authenticated through device-restricted SSO that cannot be automated.",
+  "action": "pipeline",
+  "options": {
+    "connect_over_cdp": true,
+    "cdp_port": 9222
+  },
+  "steps": [
+    {
+      "id": "announce",
+      "type": "apply",
+      "op": "log",
+      "params": {
+        "message": "Connected to active browser via CDP on port 9222. Inspecting the active tab..."
+      }
+    },
+    {
+      "id": "get-info",
+      "type": "capture",
+      "op": "evaluate",
+      "params": {
+        "expression": "({ title: document.title, url: location.href })",
+        "export_as": "tab_info"
+      }
+    },
+    {
+      "id": "screenshot",
+      "type": "capture",
+      "op": "screenshot",
+      "params": {
+        "path": "active/shared/tmp/active-browser-check.png"
+      }
+    }
+  ]
+}

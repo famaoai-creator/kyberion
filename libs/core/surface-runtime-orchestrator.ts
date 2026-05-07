@@ -1130,7 +1130,7 @@ async function routeMissionTeamDelegation(
     ...result,
     missionId,
     teamRole,
-    authorityRole: assignment.authority_role,
+    authorityRole: assignment.authority_role || undefined,
   }));
 }
 

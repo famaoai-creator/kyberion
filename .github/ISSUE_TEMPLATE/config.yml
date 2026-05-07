@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/famaoai-creator/kyberion/security/advisories/new
+    about: Please report security vulnerabilities privately, not as a public issue. See SECURITY.md.
+  - name: Question / Discussion
+    url: https://github.com/famaoai-creator/kyberion/discussions
+    about: For open-ended questions and design discussions.

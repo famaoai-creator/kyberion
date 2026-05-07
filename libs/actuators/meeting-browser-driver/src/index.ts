@@ -28,6 +28,7 @@ import {
   logger,
   type AudioBus,
   type AudioChunk,
+  validateMeetingTarget,
   type MeetingJoinDriver,
   type MeetingSession,
   type MeetingSessionState,
@@ -104,7 +105,8 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const probe = await this.probe();
     if (!probe.available) throw new Error(`[browser-driver] ${probe.reason}`);
     const { chromium } = await loadPlaywright();
-    const platform = target.platform === 'auto' ? inferPlatform(target.url) : target.platform;
+    const validatedTarget = validateMeetingTarget(target);
+    const platform = validatedTarget.platform;
     const selectors = this.opts.selectors_override?.[platform as 'meet' | 'zoom' | 'teams']
       ?? selectorsForPlatform(platform);
     const accountSlug = this.opts.account_slug ?? 'default';
@@ -139,11 +141,11 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     };
 
     try {
-      await page.goto(target.url, { waitUntil: 'domcontentloaded', timeout: stepTimeout });
+      await page.goto(validatedTarget.url, { waitUntil: 'domcontentloaded', timeout: stepTimeout });
       // Best-effort fill display name (guest path — Meet only).
-      if (target.display_name) {
+      if (validatedTarget.display_name) {
         await trySelectors(page, selectors.name_input, async (sel) => {
-          await page.fill(sel, target.display_name!);
+          await page.fill(sel, validatedTarget.display_name!);
         });
       }
       // Mute mic + camera before joining (the AI controls speech via
@@ -222,18 +224,6 @@ async function trySelectors(
     }
   }
   return false;
-}
-
-function inferPlatform(url: string): 'meet' | 'zoom' | 'teams' {
-  try {
-    const host = new URL(url).host;
-    if (host.endsWith('meet.google.com')) return 'meet';
-    if (host.endsWith('zoom.us') || host.endsWith('zoom.com')) return 'zoom';
-    if (host.endsWith('teams.microsoft.com') || host.endsWith('teams.live.com')) return 'teams';
-  } catch {
-    /* fall through */
-  }
-  return 'meet';
 }
 
 export {

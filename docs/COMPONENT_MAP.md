@@ -295,8 +295,8 @@ The charter assumes strict isolation between these tiers.
 
 ## Supporting architecture docs
 
-- `docs/architecture/AUTONOMY_SYSTEM_GUIDE.md`: shared memory, reflexes, dynamic permission, cluster concepts
-- `docs/architecture/NERVE_SYSTEM_GUIDE.md`: background daemons, messaging bus, observability, and policies
+- `docs/developer/architecture/AUTONOMY_SYSTEM_GUIDE.md`: shared memory, reflexes, dynamic permission, cluster concepts
+- `docs/developer/architecture/NERVE_SYSTEM_GUIDE.md`: background daemons, messaging bus, observability, and policies
 - `docs/PACKAGING_CONTRACT.md`: workspace/package import rules and boundary expectations
   - runtime code uses package imports only
   - white-box source imports in tests must stay explicitly whitelisted

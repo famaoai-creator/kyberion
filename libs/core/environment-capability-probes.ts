@@ -9,7 +9,7 @@
  *
  *   reasoning-backend.any-real   — at least one non-stub backend usable
  *   audit-chain.integrity        — audit-chain hashes verify
- *   repo-build.receipt           — libs/core/dist/index.js is fresh
+ *   repo-build.receipt           — libs/core/dist/ is fresh enough
  *
  * Importing this module triggers `installCoreEnvironmentProbes()` for
  * its side effect; tests that reset the probe registry can re-arm by
@@ -95,18 +95,18 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
 }
 
 async function probeRepoBuild(): Promise<{ available: boolean; reason?: string }> {
-  const distEntry = pathResolver.rootResolve('libs/core/dist/index.js');
-  if (!safeExistsSync(distEntry)) {
+  const distDir = pathResolver.rootResolve('libs/core/dist');
+  if (!safeExistsSync(distDir)) {
     return {
       available: false,
-      reason: 'libs/core/dist/index.js missing — run `pnpm build`',
+      reason: 'libs/core/dist missing — run `pnpm build`',
     };
   }
   try {
-    const distMtime = safeStat(distEntry).mtimeMs;
+    const distMtime = newestOutputMtimeUnder(distDir);
     const newestTs = newestTsMtimeUnder(pathResolver.rootResolve('libs/core'));
     if (newestTs === null) return { available: true };
-    if (newestTs > distMtime + 5_000) {
+    if (distMtime !== null && newestTs > distMtime + 5_000) {
       return {
         available: false,
         reason: `libs/core has TypeScript newer than the dist build by ${((newestTs - distMtime) / 1000).toFixed(0)}s — run \`pnpm build\``,
@@ -139,6 +139,31 @@ function newestTsMtimeUnder(dir: string): number | null {
         if (stat.isDirectory()) {
           walk(full);
         } else if (full.endsWith('.ts') && !full.endsWith('.d.ts')) {
+          if (stat.mtimeMs > newest) newest = stat.mtimeMs;
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+}
+
+function newestOutputMtimeUnder(dir: string): number | null {
+  try {
+    if (!safeExistsSync(dir)) return null;
+    let newest = 0;
+    walk(dir);
+    return newest === 0 ? null : newest;
+
+    function walk(current: string): void {
+      const entries = listDir(current);
+      for (const name of entries) {
+        if (name === 'node_modules' || name === '.git') continue;
+        const full = path.join(current, name);
+        const stat = safeStat(full);
+        if (stat.isDirectory()) {
+          walk(full);
+        } else if (/\.(js|cjs|mjs|d\.ts|map)$/.test(full)) {
           if (stat.mtimeMs > newest) newest = stat.mtimeMs;
         }
       }

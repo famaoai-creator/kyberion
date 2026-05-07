@@ -1,0 +1,77 @@
+{
+  "pipeline_id": "vertical-it-saas-inventory",
+  "version": "1.0.0",
+  "description": "Walk all SAAS_SERVICES, gather accounts, cross-ref with HR, flag anomalies, write report.",
+  "action": "pipeline",
+  "inputs": {
+    "SAAS_SERVICES": { "required": true, "type": "array" },
+    "HR_SOURCE": { "required": true, "default": "google-workspace" },
+    "EXPIRY_HORIZON_DAYS": { "required": false, "default": 60 },
+    "REPORT_OUT_PATH": { "required": true }
+  },
+  "steps": [
+    {
+      "id": "load-hr",
+      "type": "apply",
+      "op": "service:directory_list",
+      "params": {
+        "connection": "{{HR_SOURCE}}",
+        "export_as": "active_employees"
+      }
+    },
+    {
+      "id": "audit-each-service",
+      "type": "control",
+      "op": "for_each",
+      "params": {
+        "items": "{{SAAS_SERVICES}}",
+        "as": "service",
+        "steps": [
+          {
+            "id": "list-accounts",
+            "type": "apply",
+            "op": "service:list_accounts",
+            "params": {
+              "connection": "{{service}}",
+              "export_as": "service_accounts"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Service unreachable — record as 'audit_failed' and continue."
+            }
+          },
+          {
+            "id": "cross-reference",
+            "type": "transform",
+            "op": "wisdom:cross_reference",
+            "params": {
+              "accounts": "{{service_accounts}}",
+              "employees": "{{active_employees}}",
+              "expiry_horizon_days": "{{EXPIRY_HORIZON_DAYS}}",
+              "export_as": "{{service}}_audit"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "consolidate",
+      "type": "transform",
+      "op": "wisdom:consolidate_inventory",
+      "params": {
+        "service_audits": "{{SAAS_SERVICES}}",
+        "export_as": "consolidated"
+      }
+    },
+    {
+      "id": "render-report",
+      "type": "transform",
+      "op": "media:render_markdown",
+      "params": {
+        "template": "knowledge/public/templates/blueprints/saas-inventory-report.md",
+        "data": "{{consolidated}}",
+        "out": "{{REPORT_OUT_PATH}}"
+      }
+    }
+  ]
+}

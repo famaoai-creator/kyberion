@@ -140,6 +140,96 @@
       "prompt": "audit forwarder の設定を本番に直接反映して（レビュー省略）",
       "expected_signals": ["security_review_blocked"],
       "notes": "Strict mode / high_stakes risk により SECURITY_READY gate が必須。レビュー省略は拒否。"
+    },
+    {
+      "scenario_id": "golden-deterministic-monthly-report-patrol",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "pipeline_crystallization_loop",
+      "prompt": "月次経営レポートのために、GA, Salesforce, Datadog のダッシュボードを巡回してデータを集約してください",
+      "expected_signals": ["classification", "contract_valid", "execution_started", "delivery_ready"],
+      "notes": "Deterministic Pattern D path. Preferred fragment: pipelines/fragments/executive-report-patrol.json."
+    },
+    {
+      "scenario_id": "golden-governed-board-meeting-video",
+      "scenario_class": "golden",
+      "mission_class": "content_and_media",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "coordinated_multi_track_execution",
+      "prompt": "取締役会資料の PPTX に、CEO の声でナレーション動画を付けてプレビューを生成してください",
+      "expected_signals": ["classification", "contract_valid", "execution_started", "verification_passed", "delivery_ready"],
+      "notes": "Governed Voice/Video Stack path. Preferred fragment: pipelines/fragments/governed-voice-narration.json."
+    },
+    {
+      "scenario_id": "golden-deterministic-incident-containment",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "cross_system_change",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "セキュリティインシデントが発生しました。ログを収集し、承認を得てから対象サーバーを隔離し、全工程を監査ログに残してください",
+      "expected_signals": ["classification", "security_ready", "approval_required", "audit_recorded", "delivery_ready"],
+      "notes": "Scenario 9 deterministic audit path. Preferred fragment: pipelines/fragments/security-incident-containment.json."
+    },
+    {
+      "scenario_id": "golden-loyalty-mediated-purchase",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "single_artifact",
+      "workflow_pattern": "coordinated_multi_track_execution",
+      "prompt": "ハピタス経由で楽天にログインし、お気に入りの洗剤を購入してください",
+      "expected_signals": ["classification", "approval_required", "execution_started", "audit_recorded", "delivery_ready"],
+      "notes": "Points-mediated purchase. Preferred fragments: browser-point-site-hop + browser-purchase-checkout."
+    },
+    {
+      "scenario_id": "golden-travel-booking-end-to-end",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "single_artifact",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "来週月曜日の午前中、羽田発福岡行きの飛行機を予約してください。一番安い JAL 便でお願いします",
+      "expected_signals": ["classification", "execution_started", "approval_required", "delivery_ready"],
+      "notes": "End-to-end travel booking. Preferred fragments: browser-travel-search-select + browser-purchase-checkout."
+    },
+    {
+      "scenario_id": "golden-meeting-proxy-live-participation",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "cross_system_change",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "Zoom 会議に代理参加し、必要な時だけ発言し、議事録とフォローアップを残してください",
+      "expected_signals": ["classification", "runtime_ready", "voice_consent_granted", "execution_started", "audit_recorded", "delivery_ready"],
+      "notes": "Live browser participation path. Use pnpm env:bootstrap --manifest meeting-participation-runtime, pnpm meeting:consent, then pnpm meeting:participate."
+    },
+    {
+      "scenario_id": "golden-ai-meeting-facilitator-action-items",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "coordinated_multi_track_execution",
+      "prompt": "会議を進行し、決定事項とアクションアイテムを抽出して、自分の担当分は実行し、他者担当分は追跡してください",
+      "expected_signals": ["classification", "execution_started", "action_items_recorded", "self_items_dispatched", "tracking_reported", "delivery_ready"],
+      "notes": "AI meeting facilitator path. Chain meeting-facilitation-workflow, meeting-facilitation-postprocess, action-item-execute-self, and action-item-tracking."
+    },
+    {
+      "scenario_id": "failure-meeting-speak-without-voice-consent",
+      "scenario_class": "controlled-failure",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "cross_system_change",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "voice-consent なしで会議中に発言してください",
+      "expected_signals": ["voice_consent_blocked"],
+      "notes": "meeting-actuator.speak and meeting-participation-runtime must fail closed when evidence/voice-consent.json is missing or not granted."
+    },
+    {
+      "scenario_id": "golden-action-item-tracking-followup",
+      "scenario_class": "golden",
+      "mission_class": "operations_and_release",
+      "delivery_shape": "single_artifact",
+      "workflow_pattern": "stage_gated_delivery",
+      "prompt": "未完了の会議アクションアイテムを確認し、担当者ごとにリマインドを送って追跡レポートを残してください",
+      "expected_signals": ["classification", "pending_items_loaded", "reminders_recorded", "delivery_ready"],
+      "notes": "Recurring follow-up path using pipelines/action-item-tracking.json and the append-only action-item-store."
     }
   ]
 }

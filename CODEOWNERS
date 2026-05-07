@@ -1,0 +1,56 @@
+# CODEOWNERS for Kyberion
+# Lines that match a path will request review from the listed owner(s).
+# Defaults: any unowned path goes to core maintainers.
+#
+# Format: <pattern> <owner> [<owner>...]
+# Owners may be GitHub @users or @teams.
+#
+# See MAINTAINERS.md for the canonical list of maintainers and their scopes.
+
+# --- Global default ---
+*                                           @famaoai-creator
+
+# --- Actuator framework ---
+/libs/actuators/                            @famaoai-creator
+/libs/actuators/browser-actuator/           @famaoai-creator
+/libs/actuators/voice-actuator/             @famaoai-creator
+/libs/actuators/wisdom-actuator/            @famaoai-creator
+/schemas/*-action.schema.json               @famaoai-creator
+/schemas/*-pipeline.schema.json             @famaoai-creator
+
+# --- Mission lifecycle ---
+/scripts/mission_controller.ts              @famaoai-creator
+/scripts/refactor/mission-*                 @famaoai-creator
+/libs/core/mission-*                        @famaoai-creator
+
+# --- Knowledge & governance ---
+/knowledge/public/governance/               @famaoai-creator
+/libs/core/tier-guard.ts                    @famaoai-creator
+/docs/developer/CUSTOMER_AGGREGATION.md     @famaoai-creator
+/docs/developer/CUSTOMER_AGGREGATION.ja.md  @famaoai-creator
+
+# --- Voice / surfaces ---
+/presence/                                  @famaoai-creator
+/satellites/voice-hub/                      @famaoai-creator
+
+# --- Build / release / CI ---
+/package.json                               @famaoai-creator
+/pnpm-workspace.yaml                        @famaoai-creator
+/.github/workflows/                         @famaoai-creator
+/scripts/check_*.ts                         @famaoai-creator
+/migration/                                 @famaoai-creator
+/CHANGELOG.md                               @famaoai-creator
+
+# --- Stable contracts (extra review burden) ---
+/docs/developer/EXTENSION_POINTS.md         @famaoai-creator
+/scripts/contract-baseline.json             @famaoai-creator
+/libs/core/customer-resolver.ts             @famaoai-creator
+
+# --- Privacy / Security / Legal ---
+/docs/PRIVACY.md                            @famaoai-creator
+/docs/PRIVACY.ja.md                         @famaoai-creator
+/SECURITY.md                                @famaoai-creator
+/LICENSE                                    @famaoai-creator
+/CODE_OF_CONDUCT.md                         @famaoai-creator
+/MAINTAINERS.md                             @famaoai-creator
+/GOVERNANCE.md                              @famaoai-creator

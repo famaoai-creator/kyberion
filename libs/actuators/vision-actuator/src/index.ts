@@ -38,8 +38,12 @@ async function inspectImage(params: any) {
 async function ocrImage(params: any) {
   const logicalPath = String(params.path || '');
   if (!logicalPath) throw new Error('ocr_image requires params.path');
-  const tesseract = await import('tesseract.js');
-  const result = await tesseract.recognize(pathResolver.rootResolve(logicalPath), params.language || 'eng');
+  
+  const { createWorker } = await import('tesseract.js');
+  const worker = await createWorker(params.language || 'eng');
+  const result = await worker.recognize(pathResolver.rootResolve(logicalPath));
+  await worker.terminate();
+
   return {
     status: 'succeeded',
     path: logicalPath,
