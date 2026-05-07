@@ -1,0 +1,38 @@
+{
+  "pipeline_id": "enterprise-login",
+  "version": "1.0.0",
+  "description": "Open a real Chrome window pointed at an enterprise login URL and let the user complete device-restricted MFA / SSO manually. Persists the cookie state to active/browser-session/enterprise-sync/ so subsequent pipelines (verify-session.json) can re-attach.",
+  "action": "pipeline",
+  "options": {
+    "headless": false,
+    "browser_channel": "chrome",
+    "keep_alive": true,
+    "user_data_dir": "active/browser-session/enterprise-sync",
+    "lease_ms": 600000
+  },
+  "inputs": {
+    "LOGIN_URL": {
+      "required": false,
+      "default": "https://mail.google.com",
+      "description": "Where to land. Override per-customer via mission inputs."
+    }
+  },
+  "steps": [
+    {
+      "id": "goto-login",
+      "type": "apply",
+      "op": "goto",
+      "params": {
+        "url": "{{LOGIN_URL}}"
+      }
+    },
+    {
+      "id": "instructions",
+      "type": "apply",
+      "op": "log",
+      "params": {
+        "message": "Browser opened with persisted profile. Complete the login (device passkey / SMS / SSO) in the visible window. Cookies and storage are saved to active/browser-session/enterprise-sync. Run verify-session.json afterward to confirm."
+      }
+    }
+  ]
+}

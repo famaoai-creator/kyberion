@@ -325,10 +325,102 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
   };
 }
 
+/**
+ * Pattern used to mark test-only tracks. Promotion is suppressed for these so
+ * that running the test suite (or any TEST-tier mission) does not pollute the
+ * committed `knowledge/public/common/.../generated/` directories with
+ * fixture-shaped records.
+ */
+const TEST_TRACK_PATTERN = /^TRK-TEST-/i;
+
+/**
+ * Generic fallback titles emitted by buildPromotedMemoryRecord when the source
+ * candidate had no real title. A record matching one of these is, by
+ * definition, all-fallback content and adds no new knowledge.
+ */
+const GENERIC_TITLE_PATTERN = /^reusable (pattern|sop|sop\s+candidate|hint|knowledge\s+hint|template|report\s+template|memory)$/i;
+const MIN_TITLE_LENGTH = 8;
+const MIN_SUMMARY_LENGTH = 25;
+
+/**
+ * Thrown when a promotion candidate fails the value threshold and would
+ * otherwise have produced a generic / fallback record. Callers (e.g. the
+ * memory-promotion workflow) should catch this and mark the candidate as
+ * `rejected` rather than `promoted`.
+ */
+export class NotMeaningfulPromotionCandidateError extends Error {
+  constructor(public readonly reason: string, public readonly candidateId: string) {
+    super(`Promotion candidate ${candidateId} not meaningful: ${reason}`);
+    this.name = 'NotMeaningfulPromotionCandidateError';
+  }
+}
+
+export interface MeaningfulCheckResult {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Returns true iff the candidate carries enough non-fallback content to be
+ * worth writing as a promoted memory record. Pure function — exported for
+ * unit testing.
+ */
+export function isMeaningfulPromotionCandidate(
+  candidate: DistillCandidateRecord,
+): MeaningfulCheckResult {
+  if (candidate.track_id && TEST_TRACK_PATTERN.test(candidate.track_id)) {
+    return { ok: false, reason: `test track (${candidate.track_id}) — promotion suppressed` };
+  }
+  const title = (candidate.title || '').trim();
+  if (title.length < MIN_TITLE_LENGTH) {
+    return { ok: false, reason: `title too short: "${title || '<empty>'}"` };
+  }
+  if (GENERIC_TITLE_PATTERN.test(title)) {
+    return { ok: false, reason: `title is the generic fallback shape: "${title}"` };
+  }
+  const summary = (candidate.summary || '').trim();
+  if (summary.length < MIN_SUMMARY_LENGTH) {
+    return { ok: false, reason: `summary too short (< ${MIN_SUMMARY_LENGTH} chars)` };
+  }
+  const md = (candidate.metadata || {}) as Record<string, unknown>;
+  if (candidate.target_kind === 'pattern') {
+    const hasApplicability = normalizeLines(md.applicability).length > 0;
+    const hasSteps = normalizeLines(md.reusable_steps).length > 0;
+    const hasOutcome = typeof md.expected_outcome === 'string' && md.expected_outcome.trim().length > 0;
+    if (!hasApplicability && !hasSteps && !hasOutcome) {
+      return { ok: false, reason: 'pattern has no applicability/steps/outcome metadata — would be all fallback' };
+    }
+  } else if (candidate.target_kind === 'sop_candidate') {
+    const hasSteps = normalizeLines(md.procedure_steps).length > 0;
+    if (!hasSteps) {
+      return { ok: false, reason: 'sop_candidate has no procedure_steps metadata — would be all fallback' };
+    }
+  } else if (candidate.target_kind === 'knowledge_hint') {
+    const hasScope = typeof md.hint_scope === 'string' && md.hint_scope.trim().length > 0;
+    const hasTriggers = normalizeLines(md.hint_triggers).length > 0;
+    if (!hasScope && !hasTriggers) {
+      return { ok: false, reason: 'knowledge_hint has no scope or triggers — would be all fallback' };
+    }
+  } else if (candidate.target_kind === 'report_template') {
+    const hasSections = normalizeLines(md.template_sections).length > 0;
+    if (!hasSections) {
+      return { ok: false, reason: 'report_template has no template_sections — would be all fallback' };
+    }
+  }
+  return { ok: true };
+}
+
 export function savePromotedMemoryRecord(
   candidate: DistillCandidateRecord,
   options: { executionRole?: PromotedMemoryExecutionRole } = {},
 ): { logicalPath: string; record: PromotedMemoryRecord } {
+  const meaningful = isMeaningfulPromotionCandidate(candidate);
+  if (!meaningful.ok) {
+    throw new NotMeaningfulPromotionCandidateError(
+      meaningful.reason || 'unknown reason',
+      candidate.candidate_id,
+    );
+  }
   const executionRole = options.executionRole || 'mission_controller';
   return withPromotedMemoryExecutionContext(executionRole, () => {
     const record = buildPromotedMemoryRecord(candidate);

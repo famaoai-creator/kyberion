@@ -162,5 +162,36 @@ describe('meeting-actuator voice-consent gate', () => {
     // Either bridge succeeds or fails on platform issue, but not via consent denial.
     expect(result.status).not.toBe('denied');
   });
-});
 
+  it('allows speak() after consent is granted and emits a meeting audit entry', async () => {
+    fs.writeFileSync(
+      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+      JSON.stringify({
+        consent: 'granted',
+        mission_id: FIX_MISSION,
+        operator_handle: 'operator',
+        granted_at: '2026-05-07T00:00:00.000Z',
+      }),
+    );
+
+    const auditPath = path2.join(
+      ROOT,
+      'active/audit',
+      `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+    );
+    const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'speak',
+      params: { platform: 'auto', text: 'hello world' },
+    });
+
+    expect(result.status).not.toBe('denied');
+    expect(result.audit_event_id).toBeTruthy();
+
+    const after = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
+    expect(after.length).toBeGreaterThan(before.length);
+    expect(after).toContain('meeting.speak');
+    expect(after).toContain('voice-consent.json');
+  });
+});

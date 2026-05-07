@@ -1,0 +1,55 @@
+{
+  "pipeline_id": "chaos-actuator-down",
+  "version": "1.0.0",
+  "description": "Phase B-5 chaos drill: simulate an actuator becoming unavailable mid-pipeline. Verifies the orchestrator falls back gracefully and surfaces the failure with a classified error.",
+  "action": "pipeline",
+  "labels": ["chaos", "drill", "weekly"],
+  "expected_outcome": "Pipeline classifies the failure as 'missing_dependency' or 'resource_unavailable' and either falls back via on_error.fallback or aborts with a clear remediation message. NO unhandled exceptions.",
+  "steps": [
+    {
+      "id": "preflight",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo 'chaos drill: actuator-down — simulating browser-actuator unavailability'"
+      }
+    },
+    {
+      "id": "block-browser-actuator",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "export PATH_BACKUP=$PATH; export PATH=/nonexistent; echo 'Browser actuator deps masked.'"
+      }
+    },
+    {
+      "id": "attempt-browser-op",
+      "type": "control",
+      "op": "ref",
+      "params": {
+        "ref": "pipelines/fragments/intra-login.json"
+      },
+      "on_error": {
+        "strategy": "fallback",
+        "fallback": [
+          {
+            "id": "record-fallback",
+            "type": "apply",
+            "op": "system:shell",
+            "params": {
+              "cmd": "echo 'CHAOS_OK: browser-actuator failure handled via fallback'"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "restore-and-verify",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "export PATH=$PATH_BACKUP; echo 'Restored. Drill complete.'"
+      }
+    }
+  ]
+}

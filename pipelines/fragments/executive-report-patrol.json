@@ -1,0 +1,65 @@
+{
+  "action": "pipeline",
+  "name": "executive-report-patrol",
+  "description": "Fragment for Pattern D: Multi-site dashboard data collection. Navigates, captures, and stages data.",
+  "context": {
+    "session_path": "active/shared/runtime/browser/session-handoff.json",
+    "targets": [],
+    "mission_id": "MSN-EXAMPLE"
+  },
+  "steps": [
+    {
+      "id": "init_session",
+      "type": "capture",
+      "op": "browser:import_session_handoff",
+      "params": {
+        "source": "{{session_path}}"
+      }
+    },
+    {
+      "id": "patrol_loop",
+      "type": "control",
+      "op": "for_each",
+      "params": {
+        "items": "{{targets}}",
+        "as": "target",
+        "pipeline": [
+        {
+          "id": "visit_site",
+          "type": "apply",
+          "op": "browser:goto",
+          "params": {
+            "url": "{{target.url}}"
+          }
+        },
+        {
+          "id": "capture_data",
+          "type": "capture",
+          "op": "browser:snapshot",
+          "params": {
+            "export_as": "raw_content"
+          }
+        },
+        {
+          "id": "stage_data",
+          "type": "apply",
+          "op": "file:write",
+          "params": {
+            "path": "active/shared/tmp/{{mission_id}}/{{target.id}}.json",
+            "content": "{{raw_content}}"
+          }
+        }
+        ]
+      }
+    },
+    {
+      "id": "aggregate_data",
+      "type": "transform",
+      "op": "wisdom:knowledge_inject",
+      "params": {
+        "source_dir": "active/shared/tmp/{{mission_id}}/",
+        "topic": "executive_data_aggregation"
+      }
+    }
+  ]
+}

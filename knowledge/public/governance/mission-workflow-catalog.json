@@ -102,6 +102,96 @@
       "phases": ["intake", "classification", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
     },
     {
+      "id": "deterministic-patrol-aggregation",
+      "pattern": "pipeline_crystallization_loop",
+      "description": "Deterministic multi-site patrol workflow. Use pipelines/fragments/executive-report-patrol.json after session handoff and target list are bound.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["generate-report"]
+      },
+      "phases": ["intake", "planning", "session_handoff", "execution", "normalization", "delivery"]
+    },
+    {
+      "id": "governed-content-narration",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "Governed presentation narration workflow. Use pipelines/fragments/governed-voice-narration.json when PPTX input and voice profile are available.",
+      "match": {
+        "mission_classes": ["content_and_media"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["generate-presentation"]
+      },
+      "phases": ["intake", "design", "generation", "narration_layer", "rendering", "delivery"]
+    },
+    {
+      "id": "gated-incident-containment",
+      "pattern": "stage_gated_delivery",
+      "description": "High-integrity security incident containment workflow. Use pipelines/fragments/security-incident-containment.json with explicit approval and audit gates.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["cross_system_change"],
+        "risk_profiles": ["high_stakes", "approval_required"]
+      },
+      "phases": ["triage", "evidence_collection", "approval_gate", "containment", "audit_finalization", "delivery"]
+    },
+    {
+      "id": "loyalty-mediated-purchase",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "Purchase workflow through point/loyalty sites. Chain browser-point-site-hop and browser-purchase-checkout fragments, with payment approval gated.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["single_artifact"],
+        "risk_profiles": ["approval_required"]
+      },
+      "phases": ["intake", "point_site_hop", "item_selection", "checkout_preflight", "approval_gate", "payment", "delivery"]
+    },
+    {
+      "id": "travel-booking-end-to-end",
+      "pattern": "stage_gated_delivery",
+      "description": "End-to-end travel booking workflow. Chain browser-travel-search-select and browser-purchase-checkout fragments with selection rationale and payment approval.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["single_artifact"],
+        "risk_profiles": ["approval_required"]
+      },
+      "phases": ["intake", "search_options", "selection_recommendation", "checkout_preflight", "approval_gate", "payment", "delivery"]
+    },
+    {
+      "id": "meeting-proxy-live-participation",
+      "pattern": "stage_gated_delivery",
+      "description": "Live meeting proxy workflow for Zoom/Teams/Meet browser participation. Requires meeting-participation-runtime readiness and voice consent before speaking.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
+        "risk_profiles": ["approval_required", "high_stakes"],
+        "intent_ids": ["meeting-operations"]
+      },
+      "phases": ["intake", "briefing", "environment_bootstrap", "voice_consent", "browser_participation", "transcript_capture", "postprocess", "delivery"]
+    },
+    {
+      "id": "ai-meeting-facilitator-followup",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "AI meeting facilitator workflow. Run the live meeting flow, extract action items, dispatch operator-owned work, and track team-member follow-up.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["meeting-operations"],
+        "task_types": ["meeting_operations"]
+      },
+      "phases": ["intake", "agenda_and_role_boundary", "live_facilitation", "postprocess", "self_execution", "team_tracking", "delivery"]
+    },
+    {
+      "id": "action-item-tracking-followup",
+      "pattern": "stage_gated_delivery",
+      "description": "Cron-able action-item follow-up workflow backed by action-item-store. Restricted or non-declarative items remain gated until explicit confirmation.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["single_artifact", "long_running_job"],
+        "risk_profiles": ["review_required"]
+      },
+      "phases": ["load_pending_items", "policy_filter", "reminder_generation", "append_reminder_receipts", "delivery"]
+    },
+    {
       "id": "single-track-default",
       "pattern": "single_track_execution",
       "description": "Default workflow for straightforward bounded work.",

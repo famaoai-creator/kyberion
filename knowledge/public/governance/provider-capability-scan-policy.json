@@ -94,6 +94,68 @@
         "max_output_mb": 1,
         "evidence": "gh --help"
       }
+    },
+    {
+      "provider": "claude-cli",
+      "primary_probe": {
+        "command": "claude",
+        "args": ["--version"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "claude --version"
+      },
+      "evidence_probes": [
+        {
+          "capability_ids": ["cli.native.claude_headless_prompt"],
+          "probe": {
+            "command": "claude",
+            "args": ["--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "claude -p / --print"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.claude_agent_loop"],
+          "probe": {
+            "command": "claude",
+            "args": ["--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "claude (interactive) / --resume"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.claude_agents_management"],
+          "probe": {
+            "command": "claude",
+            "args": ["agents", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "claude agents --help"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.claude_plugin_management"],
+          "probe": {
+            "command": "claude",
+            "args": ["plugin", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "claude plugin --help"
+          }
+        },
+        {
+          "capability_ids": ["cli.native.claude_mcp_management"],
+          "probe": {
+            "command": "claude",
+            "args": ["mcp", "--help"],
+            "timeout_ms": 10000,
+            "max_output_mb": 1,
+            "evidence": "claude mcp --help"
+          }
+        }
+      ]
     }
   ]
 }

@@ -55,10 +55,31 @@
               "then": [
                 {
                   "id": "preflight_runtime_tools",
-                  "op": "system:shell",
+                  "op": "core:if",
                   "params": {
-                    "cmd": "if [ \"$(uname -s)\" = \"Darwin\" ]; then command -v say >/dev/null; else command -v espeak >/dev/null; fi && command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && echo ok",
-                    "export_as": "preflight_result"
+                    "condition": {
+                      "from": "platform_name",
+                      "operator": "eq",
+                      "value": "darwin"
+                    },
+                    "then": [
+                      {
+                        "op": "system:shell",
+                        "params": {
+                          "cmd": "command -v say >/dev/null && command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && echo ok",
+                          "export_as": "preflight_result"
+                        }
+                      }
+                    ],
+                    "else": [
+                      {
+                        "op": "system:shell",
+                        "params": {
+                          "cmd": "command -v espeak >/dev/null && command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && echo ok",
+                          "export_as": "preflight_result"
+                        }
+                      }
+                    ]
                   }
                 }
               ],
@@ -135,7 +156,10 @@
       "id": "generate_video",
       "op": "system:shell",
       "params": {
-        "cmd": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--require=$(pwd)/scripts/hyperframes-localhost-preload.cjs\" KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH={{video_render_policy_json}} node dist/libs/actuators/video-composition-actuator/src/index.js --input {{video_action_json}}",
+        "cmd": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH={{video_render_policy_json}} node dist/libs/actuators/video-composition-actuator/src/index.js --input {{video_action_json}}",
+        "env": {
+          "NODE_OPTIONS": "{{node_options}} --require={{repo_root}}/scripts/hyperframes-localhost-preload.cjs"
+        },
         "export_as": "video_gen_result"
       }
     },

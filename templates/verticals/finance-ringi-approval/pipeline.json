@@ -1,0 +1,101 @@
+{
+  "pipeline_id": "vertical-finance-ringi-approval",
+  "version": "1.0.0",
+  "description": "Process pending ringi approvals. Customer customizes selectors & policy. See README in this directory.",
+  "action": "pipeline",
+  "inputs": {
+    "WORKFLOW_BASE_URL": { "required": true },
+    "INBOX_PATH": { "required": true, "default": "/approvals/pending?assignee=me" },
+    "APPROVE_BUTTON_SELECTOR": { "required": true },
+    "REJECT_BUTTON_SELECTOR": { "required": true },
+    "POLICY_PATH": { "required": false, "default": "{{seed_dir}}/mission-seed.json" }
+  },
+  "steps": [
+    {
+      "id": "login",
+      "type": "control",
+      "op": "ref",
+      "params": {
+        "ref": "pipelines/fragments/intra-login.json",
+        "vars": { "BASE_URL": "{{WORKFLOW_BASE_URL}}" }
+      },
+      "on_error": {
+        "strategy": "abort",
+        "remediation": "Login fragment failed. Check secret-actuator credentials and login URL."
+      }
+    },
+    {
+      "id": "navigate-to-inbox",
+      "type": "control",
+      "op": "goto",
+      "params": {
+        "url": "{{WORKFLOW_BASE_URL}}{{INBOX_PATH}}"
+      }
+    },
+    {
+      "id": "list-pending-items",
+      "type": "capture",
+      "op": "extract",
+      "params": {
+        "selector": "[data-pending-item]",
+        "fields": ["id", "amount", "title", "submitter", "submitted_at"],
+        "export_as": "pending_items"
+      }
+    },
+    {
+      "id": "decide-each",
+      "type": "control",
+      "op": "for_each",
+      "params": {
+        "items": "{{pending_items}}",
+        "as": "item",
+        "steps": [
+          {
+            "id": "decide",
+            "type": "apply",
+            "op": "wisdom:decide_approval",
+            "params": {
+              "item": "{{item}}",
+              "policy_path": "{{POLICY_PATH}}",
+              "export_as": "decision"
+            }
+          },
+          {
+            "id": "act",
+            "type": "control",
+            "op": "ref",
+            "params": {
+              "ref": "pipelines/fragments/ringi-approve-single.json",
+              "vars": {
+                "DECISION": "{{decision}}",
+                "APPROVE_SELECTOR": "{{APPROVE_BUTTON_SELECTOR}}",
+                "REJECT_SELECTOR": "{{REJECT_BUTTON_SELECTOR}}"
+              }
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Single-item action failed; continue with remaining items."
+            }
+          },
+          {
+            "id": "screenshot-evidence",
+            "type": "capture",
+            "op": "screenshot",
+            "params": {
+              "export_as": "last_screenshot"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "summarize",
+      "type": "transform",
+      "op": "summarize_decisions",
+      "params": {
+        "decisions": "{{pending_items}}",
+        "out": "summary.md"
+      }
+    }
+  ]
+}

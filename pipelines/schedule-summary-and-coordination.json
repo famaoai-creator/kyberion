@@ -1,0 +1,107 @@
+{
+  "pipeline_id": "schedule-summary-and-coordination",
+  "version": "1.0.0",
+  "description": "Orchestrates macOS Calendar.app retrieval and produces a coordination report (today's schedule + N free 30-minute slots within working hours). Uses calendar-actuator (which validates input via JSON schema and runs JXA-injection-safe queries) instead of inlined osascript.",
+  "action": "pipeline",
+  "labels": ["schedule", "calendar", "coordination"],
+  "inputs": {
+    "OWNER_LABEL": {
+      "required": false,
+      "default": "the user",
+      "description": "Display label for whose calendar this is — e.g. 'famao', 'CEO Tanaka'. Avoid committing real identifiers; pass via mission inputs."
+    },
+    "TARGET_CALENDARS": {
+      "required": false,
+      "type": "array",
+      "description": "Optional list of calendar names to filter. When omitted, all visible calendars are scanned."
+    },
+    "WORKING_HOURS_START": { "required": false, "default": "09:00" },
+    "WORKING_HOURS_END":   { "required": false, "default": "18:00" },
+    "FREE_SLOT_COUNT":     { "required": false, "default": 3 },
+    "FREE_SLOT_MINUTES":   { "required": false, "default": 30 }
+  },
+  "expected_outcome": "Markdown summary describing today's events on the named calendars + the requested number of free slots, plus a structured JSON record persisted to active/shared/tmp/schedule-report.json.",
+  "steps": [
+    {
+      "id": "prepare-list-input",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "active/shared/tmp/calendar-list.json",
+        "content": "{\"op\": \"list_calendars\"}"
+      }
+    },
+    {
+      "id": "get-calendars",
+      "type": "capture",
+      "op": "shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/calendar-actuator/src/index.js --input active/shared/tmp/calendar-list.json",
+        "export_as": "calendars_raw"
+      }
+    },
+    {
+      "id": "prepare-events-input",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "active/shared/tmp/calendar-events.json",
+        "content_template": {
+          "op": "list_events",
+          "params": { "calendar_names": "{{TARGET_CALENDARS}}" }
+        }
+      }
+    },
+    {
+      "id": "fetch-today-events",
+      "type": "capture",
+      "op": "shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/calendar-actuator/src/index.js --input active/shared/tmp/calendar-events.json",
+        "export_as": "events_raw"
+      }
+    },
+    {
+      "id": "summarize-schedule",
+      "type": "apply",
+      "op": "wisdom:reasoning",
+      "params": {
+        "context": "Owner: {{OWNER_LABEL}}\nCalendars (JSON): {{calendars_raw}}\nEvents (JSON): {{events_raw}}\nWorking hours: {{WORKING_HOURS_START}} – {{WORKING_HOURS_END}}",
+        "instruction": "Summarize today's schedule for {{OWNER_LABEL}}. Then identify {{FREE_SLOT_COUNT}} free {{FREE_SLOT_MINUTES}}-minute slots during working hours that do not conflict with the listed events. Output a concise markdown report.",
+        "export_as": "schedule_report",
+        "on_error": {
+          "strategy": "fallback",
+          "fallback": [
+            {
+              "id": "fallback-summary",
+              "type": "transform",
+              "op": "json_query",
+              "params": {
+                "from": "events_raw",
+                "path": "$",
+                "export_as": "schedule_report"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "persist-report",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "active/shared/tmp/schedule-report.json",
+        "content": "{{schedule_report}}"
+      }
+    },
+    {
+      "id": "final-report",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "schedule-report.json written to active/shared/tmp/. Summary follows: {{schedule_report}}"
+      }
+    }
+  ]
+}

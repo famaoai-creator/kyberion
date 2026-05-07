@@ -17,6 +17,8 @@ import {
   safeWriteFile,
   withLock,
   appendMissionExecutionLedgerEntry,
+  TraceContext,
+  persistTrace,
   type MissionActorType,
 } from '@agent/core';
 import { listActiveMissions, listMissionsInSearchDirs, loadState, saveState } from './mission-state.js';
@@ -98,22 +100,46 @@ async function recordCheckpointForMission(
   const state = loadState(activeMissionId);
   if (!state) return;
 
+  // Phase B-1.5: every checkpoint emits a Trace, so the structured observability
+  // pipeline (Chronos viewer, distill, error-classifier) can correlate
+  // checkpoint events with surrounding actuator activity.
+  const traceCtx = new TraceContext(`mission_controller:checkpoint:${activeMissionId}`, {
+    actuator: 'mission_controller',
+    missionId: activeMissionId,
+  });
+  traceCtx.addEvent('checkpoint.requested', { task_id: taskId, note: note.slice(0, 200) });
+
   logger.info(`📸 Checkpoint for ${activeMissionId}: ${taskId}...`);
+  let traceStatus: 'ok' | 'error' = 'ok';
   try {
     await withLock(`mission-${activeMissionId}`, async () => {
-      safeExec('git', ['add', '.'], { cwd: missionPath });
+      const stageSpan = traceCtx.startSpan('git.stage');
+      try {
+        safeExec('git', ['add', '.'], { cwd: missionPath });
+        traceCtx.endSpan('ok');
+      } catch (err: any) {
+        traceCtx.endSpan('error', err?.message);
+        throw err;
+      }
 
       let commitCreated = true;
+      const commitSpan = traceCtx.startSpan('git.commit');
       try {
         safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], {
           cwd: missionPath,
         });
+        traceCtx.endSpan('ok');
       } catch (_) {
+        // git commit fails when there are no staged changes — that is the
+        // "state-only checkpoint" path, NOT an error condition.
         logger.info('No new changes in mission repo — recording state-only checkpoint.');
         commitCreated = false;
+        traceCtx.addEvent('git.commit.skipped_no_changes');
+        traceCtx.endSpan('ok');
       }
 
       const hash = getGitHash(missionPath);
+      const saveSpan = traceCtx.startSpan('state.save');
       const currentState = loadState(activeMissionId)!;
       currentState.git.latest_commit = hash;
       currentState.git.checkpoints.push({
@@ -122,21 +148,85 @@ async function recordCheckpointForMission(
         ts: new Date().toISOString(),
       });
       await saveState(activeMissionId, currentState, { alreadyLocked: true });
+      traceCtx.addEvent('checkpoint.recorded', {
+        commit_hash: hash,
+        commit_created: commitCreated,
+        checkpoint_count: currentState.git.checkpoints.length,
+      });
+      traceCtx.endSpan('ok');
 
       logger.success(
         `✅ Recorded checkpoint ${hash} in mission repo${commitCreated ? '' : ' (state-only)'}.`
       );
     });
-    await syncProjectLedgerIfLinked(activeMissionId);
-    await emitMissionLifecycleIntentSnapshot({
-      missionId: activeMissionId,
-      stage: 'execution',
-      text: note || taskId,
-      source: 'mission_state',
-    });
+
+    const ledgerSpan = traceCtx.startSpan('project_ledger.sync');
+    try {
+      await syncProjectLedgerIfLinked(activeMissionId);
+      traceCtx.endSpan('ok');
+    } catch (err: any) {
+      // Ledger sync failure must not fail the checkpoint, but we record it.
+      traceCtx.endSpan('error', err?.message);
+      throw err;
+    }
+
+    const intentSpan = traceCtx.startSpan('intent_delta.emit');
+    try {
+      await emitMissionLifecycleIntentSnapshot({
+        missionId: activeMissionId,
+        stage: 'execution',
+        text: note || taskId,
+        source: 'mission_state',
+      });
+      traceCtx.endSpan('ok');
+    } catch (err: any) {
+      traceCtx.endSpan('error', err?.message);
+      throw err;
+    }
   } catch (err: any) {
+    traceStatus = 'error';
     logger.error(`Checkpoint failed: ${err.message}`);
+  } finally {
+    // Persistence must never break the checkpoint flow itself.
+    try {
+      const trace = traceCtx.finalize();
+      // If finalize ran via the inner try/finally already setting status, force
+      // the rootSpan status to reflect outer outcome (children may have all been ok
+      // but a step after the lock could still have thrown).
+      if (traceStatus === 'error' && trace.rootSpan.status !== 'error') {
+        trace.rootSpan.status = 'error';
+      }
+      persistTrace(trace);
+    } catch (persistErr: any) {
+      logger.warn(
+        `[mission-maintenance] Failed to persist checkpoint trace: ${persistErr?.message || persistErr}`,
+      );
+    }
   }
+}
+
+/**
+ * Window in milliseconds during which repeated RESUME calls are coalesced
+ * into a single history entry. Prevents history bloat across orchestrator
+ * restarts / supervisor flapping for long-running (24h+) missions.
+ */
+export const RESUME_IDEMPOTENCY_WINDOW_MS = 60_000;
+
+/**
+ * Returns true if a fresh RESUME entry should be skipped because the most
+ * recent history entry is already a RESUME within the idempotency window.
+ * Pure function — exported for unit testing.
+ */
+export function shouldSkipResumeEntry(
+  history: Array<{ ts: string; event: string }>,
+  now: Date = new Date(),
+  windowMs: number = RESUME_IDEMPOTENCY_WINDOW_MS,
+): boolean {
+  const last = history[history.length - 1];
+  if (!last || last.event !== 'RESUME') return false;
+  const lastMs = new Date(last.ts).getTime();
+  if (Number.isNaN(lastMs)) return false;
+  return now.getTime() - lastMs < windowMs;
 }
 
 export async function resumeMission(
@@ -162,16 +252,17 @@ export async function resumeMission(
     }
   }
 
-  const state = loadState(targetId);
-  if (!state) throw new Error(`Mission ${targetId} not found.`);
+  // Pre-flight read (no mutation) — used only for branch switch decision and flight recorder display.
+  const preState = loadState(targetId);
+  if (!preState) throw new Error(`Mission ${targetId} not found.`);
 
   logger.info(`🔄 Resuming Mission: ${targetId}...`);
   const missionPath = findMissionPath(targetId);
   if (!missionPath) throw new Error(`Mission ${targetId} path not found.`);
 
   const currentBranch = args.getCurrentBranch(missionPath);
-  if (currentBranch !== state.git.branch) {
-    safeExec('git', ['checkout', state.git.branch], { cwd: missionPath });
+  if (currentBranch !== preState.git.branch) {
+    safeExec('git', ['checkout', preState.git.branch], { cwd: missionPath });
   }
 
   const flightRecorderPath = path.join(missionPath, 'LATEST_TASK.json');
@@ -181,12 +272,28 @@ export async function resumeMission(
     logger.info('Please verify the physical state and continue from this point.');
   }
 
-  state.history.push({
-    ts: new Date().toISOString(),
-    event: 'RESUME',
-    note: 'Session re-established.',
+  // Atomic RESUME: re-load fresh state inside the lock to avoid clobbering
+  // a concurrent checkpoint, and dedupe RESUMEs within the idempotency window.
+  await withLock(`mission-${targetId}`, async () => {
+    const fresh = loadState(targetId!)!;
+    const now = new Date();
+    if (shouldSkipResumeEntry(fresh.history, now)) {
+      const lastTs = new Date(fresh.history[fresh.history.length - 1].ts).getTime();
+      logger.info(
+        `↳ Skipping RESUME entry (last RESUME was ${Math.round(
+          (now.getTime() - lastTs) / 1000,
+        )}s ago, within idempotency window).`,
+      );
+    } else {
+      fresh.history.push({
+        ts: now.toISOString(),
+        event: 'RESUME',
+        note: 'Session re-established.',
+      });
+      await saveState(targetId!, fresh, { alreadyLocked: true });
+    }
   });
-  await saveState(targetId, state);
+
   await args.syncProjectLedgerIfLinked(targetId);
   args.writeFocusedMissionId(targetId);
   logger.success(`✅ Mission ${targetId} is back in focus.`);

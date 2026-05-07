@@ -25,9 +25,11 @@ import {
   verifyReady,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
 // Register every probe so the manifest's `kind: 'probe'` entries
 // resolve. This import is for side effects only.
+import '@agent/core/environment-capability-probes';
 import '@agent/core/blackhole-audio-bus';
 import '@agent/core/pulse-audio-bus';
 
@@ -56,12 +58,9 @@ async function processManifest(
     const probes = await probeManifest(manifest, {
       ...(opts.mission_id ? { mission_id: opts.mission_id } : {}),
     });
-    logger.info(`📋 ${manifest.manifest_id} (${manifest.version}) — dry-run probe:`);
-    for (const status of probes) {
-      const tag = status.not_applicable ? '⚪ N/A' : status.satisfied ? '🟢 OK' : '🔴 MISSING';
-      logger.info(
-        `   ${tag.padEnd(13)} ${status.capability_id}${status.reason ? ` — ${status.reason}` : ''}`,
-      );
+    const summary = summarizeManifestDoctor(manifest, probes);
+    for (const line of formatDoctorSummary(summary)) {
+      logger.info(line);
     }
     const missing = probes.filter((p) => !p.satisfied).length;
     return { ok: missing === 0, unsatisfied: missing };
@@ -76,8 +75,15 @@ async function processManifest(
   logger.info(`   satisfied:    ${receipt.satisfied.length}`);
   logger.info(`   unsatisfied:  ${receipt.unsatisfied.length}`);
   logger.info(`   installs:     ${receipt.installs_performed.length}`);
-  for (const u of receipt.unsatisfied) {
-    logger.warn(`   ⚠️  ${u.capability_id}: ${u.reason ?? 'unsatisfied'}`);
+  logger.info(`   expires_at:   ${receipt.expires_at}`);
+  logger.info(`   manifest_fp:  ${receipt.manifest_fingerprint.slice(0, 12)}...`);
+  logger.info(`   host_fp:      ${receipt.host_fingerprint.slice(0, 12)}...`);
+  const receiptSummary = summarizeManifestDoctor(
+    manifest,
+    [...receipt.satisfied, ...receipt.unsatisfied],
+  );
+  for (const line of formatDoctorSummary(receiptSummary)) {
+    logger.info(line);
   }
   return { ok: receipt.unsatisfied.length === 0, unsatisfied: receipt.unsatisfied.length };
 }

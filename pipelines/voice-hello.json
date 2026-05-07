@@ -1,0 +1,92 @@
+{
+  "pipeline_id": "voice-hello",
+  "version": "1.0.0",
+  "description": "Phase A-5 first-win pipeline (tier 0, zero external deps): browser-side Web Speech API for input + OS native TTS for output. The 'Hello Kyberion' demo.",
+  "action": "pipeline",
+  "labels": ["first-win", "voice", "tier-0", "demo"],
+  "inputs": {
+    "USER_NAME": { "required": false, "default": "there" },
+    "INTENT": { "required": false, "description": "Optional pre-set intent. When omitted, the pipeline opens the presence surface and waits for spoken input." }
+  },
+  "expected_outcome": "User hears 'Hello, <name>. What would you like me to do?' from OS TTS, speaks an intent in the browser surface, Kyberion runs it and reads back a result in <= 60s.",
+  "steps": [
+    {
+      "id": "preflight",
+      "type": "apply",
+      "op": "system:check_native_tts",
+      "params": {
+        "export_as": "tts_status"
+      },
+      "on_error": {
+        "strategy": "abort",
+        "remediation": "Native TTS not available. macOS/Windows: built-in. Linux: sudo apt-get install espeak."
+      }
+    },
+    {
+      "id": "open-presence-surface",
+      "type": "apply",
+      "op": "system:open_url",
+      "params": {
+        "url": "http://127.0.0.1:3031/voice-hello"
+      }
+    },
+    {
+      "id": "greet-with-tts",
+      "type": "apply",
+      "op": "system:native_tts_speak",
+      "params": {
+        "text": "Hello, {{USER_NAME}}. I'm Kyberion. What would you like me to do?"
+      }
+    },
+    {
+      "id": "wait-for-spoken-intent",
+      "type": "control",
+      "op": "wait_for",
+      "params": {
+        "source": "presence-surface",
+        "topic": "voice-hello.user-spoke",
+        "timeout_ms": 60000,
+        "fallback_input": "{{INTENT}}",
+        "export_as": "intent_text"
+      }
+    },
+    {
+      "id": "resolve-intent",
+      "type": "apply",
+      "op": "wisdom:resolve_intent",
+      "params": {
+        "text": "{{intent_text}}",
+        "export_as": "resolution"
+      }
+    },
+    {
+      "id": "execute",
+      "type": "control",
+      "op": "ref",
+      "params": {
+        "ref_from": "{{resolution.pipeline_path}}"
+      },
+      "on_error": {
+        "strategy": "fallback",
+        "fallback": [
+          {
+            "id": "say-cant",
+            "type": "apply",
+            "op": "system:native_tts_speak",
+            "params": {
+              "text": "I tried but couldn't complete that. Check the screen for details."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "speak-result",
+      "type": "apply",
+      "op": "system:native_tts_speak",
+      "params": {
+        "text": "{{resolution.summary_for_voice}}"
+      }
+    }
+  ]
+}

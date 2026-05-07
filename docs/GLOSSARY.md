@@ -150,7 +150,7 @@ The layer where evidence, reports, distillation output, and accumulated operatio
 
 ### Nerve System
 
-Kyberion's background messaging, daemon, and observability model. See `docs/architecture/NERVE_SYSTEM_GUIDE.md`.
+Kyberion's background messaging, daemon, and observability model. See `docs/developer/architecture/NERVE_SYSTEM_GUIDE.md`.
 
 ### Runtime Supervisor
 

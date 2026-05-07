@@ -14,6 +14,7 @@
       "knowledge/confidential/"
     ],
     "shared_prefixes": [
+      "knowledge/confidential/tenant-groups/",
       "knowledge/confidential/heuristics/",
       "knowledge/confidential/relationships/"
     ],
@@ -166,6 +167,18 @@
         "knowledge/evolution/",
         "vault/private/wisdom/",
         "registry.json"
+      ]
+    },
+    "run_pipeline": {
+      "allow_write": [
+        "active/shared/tmp/",
+        "active/shared/logs/traces/"
+      ]
+    },
+    "run_super_pipeline": {
+      "allow_write": [
+        "active/shared/tmp/",
+        "active/shared/logs/traces/"
       ]
     },
     "software_developer": {

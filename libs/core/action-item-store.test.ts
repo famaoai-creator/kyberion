@@ -9,6 +9,7 @@ import {
   listOperatorSelfPending,
   listOthersPending,
   nextActionItemId,
+  summarizeActionItemLifecycle,
 } from './action-item-store.js';
 import * as pathResolver from './path-resolver.js';
 
@@ -123,6 +124,36 @@ describe('action-item-store', () => {
 
     const view = listActionItems(FIX_MISSION);
     expect(view[0].status).toBe('completed');
+  });
+
+  it('persists blocked_reason on blocked transitions and summarizes owner kinds', () => {
+    recordActionItem({
+      item_id: 'AI-BLOCK-1',
+      mission_id: FIX_MISSION,
+      title: 'blocked item needs a manual hold',
+      assignee: { kind: 'team_member', label: 'Alice' },
+    });
+    const blocked = updateActionItemStatus({
+      mission_id: FIX_MISSION,
+      item_id: 'AI-BLOCK-1',
+      status: 'blocked',
+      blocked_reason: 'manual approval still pending',
+      execution: { executed_via: 'manual', result_summary: 'manual approval still pending' },
+    });
+    expect(blocked?.blocked_reason).toBe('manual approval still pending');
+    expect(listActionItems(FIX_MISSION)[0].blocked_reason).toBe('manual approval still pending');
+
+    const summary = summarizeActionItemLifecycle(FIX_MISSION);
+    expect(summary.by_owner_kind.team_member).toBeGreaterThan(0);
+    expect(summary.blocked_items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          item_id: 'AI-BLOCK-1',
+          owner_kind: 'team_member',
+          blocked_reason: 'manual approval still pending',
+        }),
+      ]),
+    );
   });
 
   it('returns null on update of unknown item', () => {

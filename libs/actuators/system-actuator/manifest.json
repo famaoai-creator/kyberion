@@ -1,6 +1,6 @@
 {
   "actuator_id": "system-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "OS-level control, diagnostics, and short-lived local execution",
   "contract_schema": "schemas/system-pipeline.schema.json",
   "capabilities": [

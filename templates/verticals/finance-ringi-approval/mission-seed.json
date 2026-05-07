@@ -1,0 +1,23 @@
+{
+  "seed_id": "vertical-finance-ringi-approval",
+  "version": "1.0.0",
+  "title": "Ringi Approval Automation",
+  "summary": "Process pending ringi (申請・稟議) approvals against a configurable policy.",
+  "mission_class": "operational_workflow",
+  "delivery_shape": "decisions_with_evidence",
+  "risk_profile": "medium",
+  "default_persona": "operations_steward",
+  "policy": {
+    "auto_approve_below": 1000000,
+    "require_human_above": 1000000,
+    "reject_keywords": ["再提出"],
+    "hold_if_missing": ["budget_code"]
+  },
+  "expected_outputs": [
+    "decisions.jsonl — one line per item processed (id, decision, rationale)",
+    "evidence/screenshots/<item-id>.png — per-decision screenshot",
+    "summary.md — human-readable run summary"
+  ],
+  "review_gates": ["STAKEHOLDER_ALIGNMENT"],
+  "notes": "Per-customer customization in templates/verticals/finance-ringi-approval/README.md"
+}

@@ -1,7 +1,7 @@
 {
-  "v": "2.0.0",
-  "t": 23,
-  "u": "2026-03-24T21:07:52.452Z",
+  "v": "2.1.0",
+  "t": 26,
+  "u": "2026-05-08T10:00:00.000Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -58,13 +58,13 @@
       "contract_schema": "schemas/browser-pipeline.schema.json"
     },
     {
-      "n": "meeting-actuator",
-      "path": "libs/actuators/meeting-actuator",
-      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+      "n": "calendar-actuator",
+      "path": "libs/actuators/calendar-actuator",
+      "d": "macOS Calendar.app integration for cross-account schedule coordination",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 6,
-      "contract_schema": "schemas/meeting-action.schema.json"
+      "capability_count": 3,
+      "contract_schema": "schemas/calendar-action.schema.json"
     },
     {
       "n": "code-actuator",
@@ -108,8 +108,17 @@
       "d": "Generative image, video, music, and screen capture actuator",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 10,
+      "capability_count": 11,
       "contract_schema": "schemas/media-generation-action.schema.json"
+    },
+    {
+      "n": "meeting-actuator",
+      "path": "libs/actuators/meeting-actuator",
+      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6,
+      "contract_schema": "schemas/meeting-action.schema.json"
     },
     {
       "n": "modeling-actuator",
@@ -180,7 +189,7 @@
       "d": "OS-level control, diagnostics, and short-lived local execution",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 3,
+      "capability_count": 4,
       "contract_schema": "schemas/system-pipeline.schema.json"
     },
     {
@@ -191,6 +200,15 @@
       "version": "1.0.0",
       "capability_count": 5,
       "contract_schema": "schemas/terminal-action.schema.json"
+    },
+    {
+      "n": "video-composition-actuator",
+      "path": "libs/actuators/video-composition-actuator",
+      "d": "Governed deterministic composed-video bundle preparation actuator",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6,
+      "contract_schema": "N/A"
     },
     {
       "n": "vision-actuator",

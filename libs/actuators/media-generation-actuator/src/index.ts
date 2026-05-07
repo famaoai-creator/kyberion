@@ -413,6 +413,18 @@ async function handleSingleAction(input: any) {
   if (action === 'get_generation_job') return getGenerationJob(params);
   if (action === 'wait_generation_job') return waitGenerationJob(params);
   if (action === 'collect_generation_artifact') return collectGenerationArtifact(params);
+
+  if (action === 'capture_screen' || action === 'capture_focused_window') {
+    const { platform, pathResolver } = await import('@agent/core');
+    const outputPath = pathResolver.rootResolve(params.output || `active/shared/tmp/capture-${Date.now()}.jpg`);
+    if (action === 'capture_screen') {
+      await platform.captureScreen(outputPath);
+    } else {
+      await platform.captureFocusedWindow(outputPath);
+    }
+    return { status: 'succeeded', path: params.output || outputPath };
+  }
+
   logger.info(`🎬 [MEDIA-GEN:PROXY] Dispatching "${action}" to Service Engine...`);
   return await executeServicePreset('media-generation', action, params);
 }

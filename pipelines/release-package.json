@@ -7,7 +7,8 @@
     "from_ref": "main",
     "to_ref": "HEAD",
     "project_name": "",
-    "output_dir": "active/missions/{{mission_id}}/evidence"
+    "output_dir": "active/missions/{{mission_id}}/evidence",
+    "generated_at": "{{run_utc_now}}"
   },
   "steps": [
     {
@@ -24,7 +25,7 @@
       "type": "apply",
       "op": "system:shell",
       "params": {
-        "cmd": "printf '# CHANGELOG (%s..%s)\\n\\nProject: %s\\nGenerated: %s\\n\\n## Commits\\n\\n' '{{from_ref}}' '{{to_ref}}' '{{project_name}}' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > {{output_dir}}/CHANGELOG.md && cat {{output_dir}}/commit-range.txt >> {{output_dir}}/CHANGELOG.md"
+        "cmd": "printf '# CHANGELOG (%s..%s)\\n\\nProject: %s\\nGenerated: %s\\n\\n## Commits\\n\\n' '{{from_ref}}' '{{to_ref}}' '{{project_name}}' '{{generated_at}}' > {{output_dir}}/CHANGELOG.md && cat {{output_dir}}/commit-range.txt >> {{output_dir}}/CHANGELOG.md"
       }
     },
     {

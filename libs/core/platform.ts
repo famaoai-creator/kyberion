@@ -31,6 +31,8 @@ async function commandExists(cmd: string): Promise<boolean> {
 
 export interface OSDriver {
   captureScreen(outputPath: string): Promise<void>;
+  captureFocusedWindow(outputPath: string): Promise<void>;
+  listRunningApps(): Promise<string[]>;
   speak(text: string, options?: { voice?: string; rate?: number }): Promise<void>;
   playSound(path: string): Promise<void>;
   open(target: string): Promise<void>;
@@ -52,11 +54,48 @@ class MacOSDriver implements OSDriver {
     await safeExec('screencapture', ['-x', '-t', 'jpg', outputPath]);
   }
 
+  async captureFocusedWindow(outputPath: string): Promise<void> {
+    if (!(await commandExists('osascript'))) throw new Error('osascript not found');
+    if (!(await commandExists('screencapture'))) throw new Error('screencapture not found');
+
+    const areaScript = 'tell application "System Events" to tell (first application process whose frontmost is true) to tell window 1 to return (item 1 of (get position) as text) & "," & (item 2 of (get position) as text) & "," & (item 1 of (get size) as text) & "," & (item 2 of (get size) as text)';
+    let area = '';
+    try {
+      area = safeExec('osascript', ['-e', areaScript]).trim();
+    } catch (err) {
+      logger.warn(`[MacOSDriver] Failed to get focused window area: ${err}`);
+    }
+
+    if (!area || area.split(',').length !== 4) {
+      logger.info('[MacOSDriver] No focused window area found, falling back to full screen capture.');
+      return this.captureScreen(outputPath);
+    }
+
+    // Use -R (rect) for precise window capture based on coordinates
+    await safeExec('screencapture', [`-R${area}`, '-x', '-t', 'jpg', outputPath]);
+  }
+
+  async listRunningApps(): Promise<string[]> {
+    if (!(await commandExists('osascript'))) return [];
+    const script = 'tell application "System Events" to get name of every application process whose background only is false';
+    try {
+      const output = safeExec('osascript', ['-e', script]);
+      return output.split(',').map((s) => s.trim());
+    } catch (err) {
+      logger.warn(`[MacOSDriver] Failed to list running apps: ${err}`);
+      return [];
+    }
+  }
+
   async speak(text: string, options?: { voice?: string; rate?: number }): Promise<void> {
     if (!(await commandExists('say'))) return;
     const args = [text];
-    if (options?.voice) { args.push('-v', options.voice); }
-    if (options?.rate) { args.push('-r', String(options.rate)); }
+    if (options?.voice) {
+      args.push('-v', options.voice);
+    }
+    if (options?.rate) {
+      args.push('-r', String(options.rate));
+    }
     await safeExec('say', args);
   }
 
@@ -75,7 +114,7 @@ class MacOSDriver implements OSDriver {
       hasScreenCapture: await commandExists('screencapture'),
       hasAudioPlayback: await commandExists('afplay'),
       hasFFmpeg: await commandExists('ffmpeg'),
-      nativeTerminal: 'Terminal.app'
+      nativeTerminal: 'Terminal.app',
     };
   }
 
@@ -95,12 +134,33 @@ class WindowsDriver implements OSDriver {
     return await commandExists(cmd);
   }
 
-  async captureScreen(): Promise<void> {
-    logger.warn('[Platform] Screen capture not yet implemented for Windows.');
+  async captureScreen(outputPath: string): Promise<void> {
+    if (!(await commandExists('powershell'))) throw new Error('powershell not found');
+    logger.warn('[Platform] Full screen capture via PowerShell GDI+ is experimental on Windows.');
+    // Stub: complex PowerShell script for GDI+ capture could go here.
+  }
+
+  async captureFocusedWindow(outputPath: string): Promise<void> {
+    logger.warn('[Platform] Focused window capture not yet implemented for Windows.');
+  }
+
+  async listRunningApps(): Promise<string[]> {
+    if (!(await commandExists('powershell'))) return [];
+    try {
+      const script = 'Get-Process | Where-Object {$_.MainWindowTitle} | Select-Object -ExpandProperty Name';
+      const output = safeExec('powershell', ['-Command', script]);
+      return output.split('\r\n').map((s) => s.trim()).filter(Boolean);
+    } catch (err) {
+      logger.warn(`[WindowsDriver] Failed to list running apps: ${err}`);
+      return [];
+    }
   }
 
   async speak(text: string): Promise<void> {
-    await safeExec('powershell', ['-Command', `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text.replace(/'/g, "''")}')`]);
+    await safeExec('powershell', [
+      '-Command',
+      `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text.replace(/'/g, "''")}')`,
+    ]);
   }
 
   async playSound(path: string): Promise<void> {
@@ -117,7 +177,7 @@ class WindowsDriver implements OSDriver {
       hasScreenCapture: false,
       hasAudioPlayback: true,
       hasFFmpeg: await commandExists('ffmpeg'),
-      nativeTerminal: 'powershell.exe'
+      nativeTerminal: 'powershell.exe',
     };
   }
 
@@ -141,6 +201,36 @@ class LinuxDriver implements OSDriver {
     await safeExec('import', ['-window', 'root', outputPath]);
   }
 
+  async captureFocusedWindow(outputPath: string): Promise<void> {
+    if (await commandExists('import') && await commandExists('xprop')) {
+      try {
+        const activeWindowId = safeExec('sh', ['-c', "xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}'"]).trim();
+        if (activeWindowId && activeWindowId !== '0x0') {
+          await safeExec('import', ['-window', activeWindowId, outputPath]);
+          return;
+        }
+      } catch (err) {
+        logger.warn(`[LinuxDriver] Failed to get focused window ID via xprop: ${err}`);
+      }
+    }
+    return this.captureScreen(outputPath);
+  }
+
+  async listRunningApps(): Promise<string[]> {
+    if (await commandExists('wmctrl')) {
+      try {
+        const output = safeExec('wmctrl', ['-l']);
+        return output.split('\n').map((line) => {
+          const parts = line.split(/\s+/);
+          return parts.slice(3).join(' '); // App title is usually from 4th column onwards
+        }).filter(Boolean);
+      } catch (err) {
+        logger.warn(`[LinuxDriver] Failed to list running apps via wmctrl: ${err}`);
+      }
+    }
+    return [];
+  }
+
   async speak(text: string): Promise<void> {
     await safeExec('espeak', [text]);
   }
@@ -159,7 +249,7 @@ class LinuxDriver implements OSDriver {
       hasScreenCapture: await commandExists('import'),
       hasAudioPlayback: await commandExists('aplay'),
       hasFFmpeg: await commandExists('ffmpeg'),
-      nativeTerminal: 'xterm'
+      nativeTerminal: 'xterm',
     };
   }
 
@@ -172,15 +262,29 @@ class LinuxDriver implements OSDriver {
 }
 
 class UnknownDriver implements OSDriver {
-  async checkBinary(): Promise<boolean> { return false; }
+  async checkBinary(): Promise<boolean> {
+    return false;
+  }
   async captureScreen() {}
+  async captureFocusedWindow() {}
+  async listRunningApps(): Promise<string[]> {
+    return [];
+  }
   async speak() {}
   async playSound() {}
   async open() {}
   async getCapabilities(): Promise<PlatformCapabilities> {
-    return { hasSpeech: false, hasScreenCapture: false, hasAudioPlayback: false, hasFFmpeg: false, nativeTerminal: 'sh' };
+    return {
+      hasSpeech: false,
+      hasScreenCapture: false,
+      hasAudioPlayback: false,
+      hasFFmpeg: false,
+      nativeTerminal: 'sh',
+    };
   }
-  async runMediaCommand(): Promise<string> { throw new Error('Unsupported platform'); }
+  async runMediaCommand(): Promise<string> {
+    throw new Error('Unsupported platform');
+  }
 }
 
 /**

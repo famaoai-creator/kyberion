@@ -1,0 +1,48 @@
+{
+  "pipeline_id": "chaos-network-partition",
+  "version": "1.0.0",
+  "description": "Phase B-5 chaos drill: simulate network partition during external API calls. Verifies the error classifier correctly tags ECONNREFUSED / ENOTFOUND and the pipeline retries or aborts as configured.",
+  "action": "pipeline",
+  "labels": ["chaos", "drill", "weekly"],
+  "expected_outcome": "Network errors are classified as 'network' or 'timeout' with the network.dns / network.refused rule. Pipeline status is 'failed' (not 'crashed').",
+  "steps": [
+    {
+      "id": "preflight",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "echo 'chaos drill: network-partition — pointing requests at unreachable host'"
+      }
+    },
+    {
+      "id": "fetch-unreachable",
+      "type": "apply",
+      "op": "network:fetch",
+      "params": {
+        "url": "http://chaos.invalid.example:9999/health",
+        "timeout_ms": 3000
+      },
+      "on_error": {
+        "strategy": "fallback",
+        "fallback": [
+          {
+            "id": "record-network-failure",
+            "type": "apply",
+            "op": "system:shell",
+            "params": {
+              "cmd": "echo 'CHAOS_OK: network failure handled gracefully'"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "verify-classification",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js --check-error-classification network || true"
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "actuator_id": "calendar-actuator",
+  "version": "1.0.0",
+  "description": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
+  "contract_schema": "schemas/calendar-action.schema.json",
+  "capabilities": [
+    { "op": "list_calendars", "description": "Lists all available calendars on the system", "platforms": ["darwin"] },
+    { "op": "list_events", "description": "Lists events for specific calendars within a date range", "platforms": ["darwin"] },
+    { "op": "create_event", "description": "Creates a new event in a specific calendar", "platforms": ["darwin"] }
+  ]
+}

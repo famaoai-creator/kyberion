@@ -5,7 +5,7 @@
   "required": ["action", "params"],
   "properties": {
     "action": {
-      "enum": ["generate_image", "generate_video", "generate_music", "submit_generation", "get_generation_job", "wait_generation_job", "collect_generation_artifact", "capture_screen", "record_screen", "run_workflow"]
+      "enum": ["generate_image", "generate_video", "generate_music", "submit_generation", "get_generation_job", "wait_generation_job", "collect_generation_artifact", "capture_screen", "capture_focused_window", "record_screen", "run_workflow"]
     },
     "params": { "type": "object" }
   }

@@ -1,0 +1,11 @@
+{
+  "slug": "your-customer-slug",
+  "display_name": "Your Customer Inc.",
+  "engagement_type": "fde",
+  "primary_contact": {
+    "name": "TBD",
+    "email": "tbd@example.com"
+  },
+  "engagement_started_at": "YYYY-MM-DD",
+  "notes": "Free-form notes about this customer engagement. Not parsed by Kyberion."
+}

@@ -107,7 +107,7 @@ AGI/ASI 時代は推論層が可換。したがって Kyberion の schema / prim
 
 ## 参照
 
-- `docs/CONCEPT_INTEGRATION_BACKLOG.md` — 本概念に沿った実装タスク
+- `docs/archive/CONCEPT_INTEGRATION_BACKLOG.md` — 本概念に沿った実装タスク（アーカイブ済 — 主要項目は完了、残りは `docs/PRODUCTIZATION_ROADMAP.md` で追跡）
 - `knowledge/public/architecture/kyberion-concept-map.md` — 既存コンセプト地図（要更新）
 - `knowledge/public/architecture/hardening-backlog.md` — 実行細部の担保計画
 - `knowledge/public/architecture/cli-harness-coordination-model.md` — 可換層の責務分割

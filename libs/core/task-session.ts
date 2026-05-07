@@ -27,7 +27,7 @@ import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 
-export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
+export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage';
 export type TaskSessionType =
   | 'browser'
   | 'capture_photo'

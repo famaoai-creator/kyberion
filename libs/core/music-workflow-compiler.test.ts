@@ -70,6 +70,7 @@ describe('compileMusicGenerationADF', () => {
       inputs: {
         audio: ['18', 0],
         filename_prefix: 'anniversary-song',
+        quality: 'V0',
       },
     });
   });

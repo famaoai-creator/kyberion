@@ -100,7 +100,7 @@
                         "type": "capture",
                         "op": "system:shell",
                         "params": {
-                          "cmd": "test \"$(uname -s)\" = \"Darwin\" && echo darwin || echo unsupported",
+                          "cmd": "case \"{{platform_name}}\" in darwin) echo darwin ;; *) echo unsupported ;; esac",
                           "export_as": "host_platform"
                         }
                       },
