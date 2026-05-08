@@ -17,6 +17,13 @@ describe('Workflow operations contract', () => {
     expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
   });
 
+  it('keeps validate on the docs example check as well as the other release gates', () => {
+    const packageJson = read('package.json');
+    expect(packageJson).toContain('pnpm run check:doc-examples');
+    expect(packageJson).toContain('pnpm run check:first-win-smoke');
+    expect(packageJson).toContain('pnpm run check:mos-no-write-api');
+  });
+
   it('does not invoke removed skills/bootstrap/schema scripts from CI workflows', () => {
     const ci = read('.github/workflows/ci.yml');
     expect(ci).not.toContain('dist/scripts/bootstrap.js');
