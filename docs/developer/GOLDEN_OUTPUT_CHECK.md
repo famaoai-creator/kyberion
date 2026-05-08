@@ -93,6 +93,6 @@ The check assumes determinism. To get there:
 
 - [x] Script + registry framework
 - [x] Initial registry entry: `baseline-check`
-- [ ] Run on PR via CI (Phase B-4 follow-up after running once on `main` to record stable snapshots)
+- [x] Run on PR via CI
 - [ ] Add: voice-hello (Phase A-5 first win)
 - [ ] Add: a representative browser pipeline (after stub mock for browser is in place)

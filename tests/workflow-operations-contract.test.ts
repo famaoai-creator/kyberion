@@ -39,6 +39,11 @@ describe('Workflow operations contract', () => {
     expect(prValidation).not.toContain('npx tsx scripts/vital_check.ts');
   });
 
+  it('runs golden output checks in PR validation once stable snapshots exist', () => {
+    const prValidation = read('.github/workflows/pr-validation.yml');
+    expect(prValidation).toContain('pnpm run check:golden');
+  });
+
   it('documents the distinction between local terminal residue and managed surfaces', () => {
     const workflowReadme = read('.github/workflows/README.md');
     expect(workflowReadme).toContain('Waited for background terminal');
