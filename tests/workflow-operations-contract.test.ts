@@ -12,6 +12,7 @@ describe('Workflow operations contract', () => {
   it('keeps CI aligned with built capability and runtime-surface commands', () => {
     const ci = read('.github/workflows/ci.yml');
     expect(ci).toContain('pnpm install --frozen-lockfile');
+    expect(ci).toContain('pnpm run check:commit-subject');
     expect(ci).toContain('node dist/scripts/capability_discovery.js');
     expect(ci).toContain('node dist/scripts/surface_runtime.js --action status');
     expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
@@ -35,6 +36,7 @@ describe('Workflow operations contract', () => {
 
   it('keeps PR validation on built build-size measurement', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
+    expect(prValidation).toContain('pnpm run check:pr-title');
     expect(prValidation).toContain('node dist/scripts/vital_check.js --format text');
     expect(prValidation).not.toContain('npx tsx scripts/vital_check.ts');
   });
