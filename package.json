@@ -44,6 +44,7 @@
     "check:intent-domain-coverage": "node dist/scripts/check_intent_domain_coverage.js",
     "check:contract-schemas": "node dist/scripts/check_contract_schemas.js",
     "check:contract-semver": "node dist/scripts/check_contract_semver.js",
+    "check:pr-title": "pnpm tsx scripts/check_pr_title.ts",
     "check:pipeline-shell-independence": "node dist/scripts/check_pipeline_shell_independence.js",
     "license:audit": "node dist/scripts/license_audit.js",
     "check:golden": "node dist/scripts/check_golden_output.js",
