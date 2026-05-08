@@ -41,6 +41,7 @@ describe('Workflow operations contract', () => {
 
   it('runs golden output checks in PR validation once stable snapshots exist', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
+    expect(prValidation).toContain('KYBERION_REASONING_BACKEND: stub');
     expect(prValidation).toContain('pnpm run check:golden');
   });
 
