@@ -47,6 +47,8 @@ jobs:
         run: pnpm run test:coverage
 
       - name: Check golden outputs
+        env:
+          KYBERION_REASONING_BACKEND: stub
         run: pnpm run check:golden
 
       - name: Check coverage threshold
