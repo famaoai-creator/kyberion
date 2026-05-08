@@ -1,0 +1,75 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "judgment-job",
+  "name": "AI Judgment Job",
+  "description": "Runs the standard judgment sequence (judge → ace_consensus → alignment_mirror) using the reasoning backend. Replaces scripts/run_judgment_job.ts. Override context vars mission_id, job_id, and subject as needed.",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 [JUDGMENT] Starting judgment job (mission: {{mission_id}})" }
+    },
+    {
+      "id": "judge",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Evaluate the quality, correctness, and alignment of the subject matter against the mission criteria and Kyberion governance standards. Provide a structured judgment with scores and rationale.",
+        "context": ["{{mission_id}}", "{{job_id}}", "{{subject}}"],
+        "judgeType": "primary",
+        "export_as": "judgment_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Primary judgment complete." }
+    },
+    {
+      "id": "ace-consensus",
+      "type": "capture",
+      "op": "reasoning:synthesize",
+      "params": {
+        "instruction": "Review the primary judgment and produce an ACE (Aggregated Consensus Evaluation) by identifying points of agreement, contention, and the final consensus position.",
+        "context": ["{{judgment_result}}", "{{mission_id}}"],
+        "judgeType": "ace_consensus",
+        "export_as": "ace_consensus_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ ACE consensus complete." }
+    },
+    {
+      "id": "alignment-mirror",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Reflect on both the primary judgment and the ACE consensus. Identify any misalignments with the sovereign's values and long-term vision, and suggest corrective directions.",
+        "context": ["{{judgment_result}}", "{{ace_consensus_result}}"],
+        "judgeType": "alignment_mirror",
+        "export_as": "alignment_mirror_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Alignment mirror complete." }
+    },
+    {
+      "id": "write-results",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "active/shared/tmp/judgment-results-{{job_id}}.json",
+        "content": {
+          "judgment": "{{judgment_result}}",
+          "ace_consensus": "{{ace_consensus_result}}",
+          "alignment_mirror": "{{alignment_mirror_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ [JUDGMENT] Judgment job complete. Results written to active/shared/tmp/judgment-results-{{job_id}}.json" }
+    }
+  ]
+}

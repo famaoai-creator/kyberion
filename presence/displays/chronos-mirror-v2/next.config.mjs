@@ -6,8 +6,8 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: path.resolve(__dirname, "../../.."),
   typescript: {
-    // @agent/core uses its own tsconfig (non-strict). Skip re-checking here.
     ignoreBuildErrors: true,
   },
   transpilePackages: ["@agent/core"],

@@ -91,15 +91,24 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
     return cachedRegistry;
   }
 
+  let parsed: VoiceProfileRegistry;
   try {
     const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<VoiceProfileRegistry>(raw, 'voice profile registry');
-    if (!overlayPath) {
-      cachedRegistryPath = cacheKey;
-      cachedRegistry = parsed;
-      return parsed;
-    }
+    parsed = safeJsonParse<VoiceProfileRegistry>(raw, 'voice profile registry');
+  } catch (error: any) {
+    logger.warn(`[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`);
+    cachedRegistryPath = cacheKey;
+    cachedRegistry = FALLBACK_REGISTRY;
+    return cachedRegistry;
+  }
 
+  if (!overlayPath) {
+    cachedRegistryPath = cacheKey;
+    cachedRegistry = parsed;
+    return parsed;
+  }
+
+  try {
     const overlayRaw = safeReadFile(overlayPath, { encoding: 'utf8' }) as string;
     const overlay = safeJsonParse<VoiceProfileRegistry>(overlayRaw, 'personal voice profile registry');
     const merged = mergeRegistries(parsed, overlay);
@@ -107,11 +116,10 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
     cachedRegistry = merged;
     return merged;
   } catch (error: any) {
-    const target = overlayPath ? `${registryPath} or overlay ${overlayPath}` : registryPath;
-    logger.warn(`[VOICE_PROFILE_REGISTRY] Failed to load registry at ${target}: ${error.message}`);
+    logger.warn(`[VOICE_PROFILE_REGISTRY] Personal overlay unavailable (${overlayPath}): ${error.message} — using base registry only`);
     cachedRegistryPath = cacheKey;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
+    cachedRegistry = parsed;
+    return parsed;
   }
 }
 

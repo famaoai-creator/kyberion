@@ -115,6 +115,16 @@ export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): Surfa
   return value;
 }
 
+export function saveSurfaceManifest(manifest: SurfaceRuntimeManifest, manifestPath = surfaceManifestPath()): void {
+  const validate = ensureSurfaceManifestValidator();
+  if (!validate(manifest)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid surface manifest for saving: ${errors}`);
+  }
+  ensureParentDir(manifestPath);
+  safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
 export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {
   if (!safeExistsSync(statePath)) {
     return { version: 1, surfaces: {} };
@@ -132,7 +142,7 @@ export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string 
 }
 
 export function normalizeSurfaceDefinition(definition: SurfaceRuntimeDefinition): SurfaceRuntimeDefinition {
-  return {
+  const normalized = {
     ...definition,
     args: definition.args || [],
     cwd: resolveSurfaceCwd(definition),
@@ -141,6 +151,32 @@ export function normalizeSurfaceDefinition(definition: SurfaceRuntimeDefinition)
     ownerType: definition.ownerType || 'surface-runtime-manifest',
     enabled: definition.enabled !== false,
   };
+  validateSurfaceDefinition(normalized);
+  return normalized;
+}
+
+/**
+ * UI surfaces must declare a port — they always own an HTTP listener.
+ * Gateways may run socket-mode (e.g. Slack Bolt) and need no local port.
+ * Services may or may not bind a port; we don't require it.
+ * Validation throws for the unambiguous failure case (UI without port) and
+ * warns for missing healthPath where it would otherwise prevent reconcile
+ * from probing already_healthy.
+ */
+function validateSurfaceDefinition(d: SurfaceRuntimeDefinition): void {
+  if (!d.enabled) return;
+  if (d.kind === 'ui' && (typeof d.port !== 'number' || d.port <= 0)) {
+    throw new Error(
+      `[SURFACE_MANIFEST] UI surface "${d.id}" has no valid port. ` +
+      `Add "port": <number> to active-surfaces.json, or change kind to "service" if it has no listening socket.`,
+    );
+  }
+  if (typeof d.port === 'number' && d.port > 0 && !d.healthPath) {
+    console.warn(
+      `[SURFACE_MANIFEST] Surface "${d.id}" declares port ${d.port} but no healthPath. ` +
+      `Add "healthPath": "/..." for accurate already_healthy probing during reconcile.`,
+    );
+  }
 }
 
 export async function probeSurfaceHealth(definition: SurfaceRuntimeDefinition): Promise<SurfaceHealthStatus> {

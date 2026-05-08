@@ -172,13 +172,17 @@
     "run_pipeline": {
       "allow_write": [
         "active/shared/tmp/",
-        "active/shared/logs/traces/"
+        "active/shared/logs/traces/",
+        "knowledge/public/governance/voice-profile-registry.json",
+        "knowledge/public/governance/voice-engine-registry.json"
       ]
     },
     "run_super_pipeline": {
       "allow_write": [
         "active/shared/tmp/",
-        "active/shared/logs/traces/"
+        "active/shared/logs/traces/",
+        "knowledge/public/governance/voice-profile-registry.json",
+        "knowledge/public/governance/voice-engine-registry.json"
       ]
     },
     "software_developer": {

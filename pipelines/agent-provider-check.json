@@ -1,32 +1,32 @@
 {
   "action": "pipeline",
   "name": "Agent Provider Availability Check",
-  "description": "Checks availability and version of all LLM agent providers (Gemini, Claude, Copilot, Codex). Verifies CLI installation, authentication, and basic prompt execution.",
+  "description": "Checks availability and version of all LLM agent providers dynamically using core:foreach.",
+  "context": {
+    "providers": [
+      { "name": "Gemini", "bin": "gemini", "ping_args": "-p 'Reply with only the word PONG'" },
+      { "name": "Claude", "bin": "claude", "ping_args": "-p 'Reply with only the word PONG' --output-format text" },
+      { "name": "GitHub Copilot", "bin": "gh copilot --", "ping_args": "-p 'Reply with only the word PONG' --allow-all" }
+    ]
+  },
   "steps": [
     { "op": "system:log", "params": { "message": "🔍 Checking Agent Provider Availability..." } },
-
-    { "op": "system:log", "params": { "message": "\n=== Gemini CLI ===" } },
-    { "op": "system:shell", "params": { "cmd": "which gemini 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "gemini_installed" } },
-    { "op": "system:shell", "params": { "cmd": "gemini --version 2>/dev/null || echo 'N/A'", "export_as": "gemini_version" } },
-    { "op": "system:shell", "params": { "cmd": "echo 'ping' | gemini -p 'Reply with only the word PONG' 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "gemini_ping" } },
-    { "op": "system:log", "params": { "message": "  Install: {{gemini_installed}}" } },
-    { "op": "system:log", "params": { "message": "  Version: {{gemini_version}}" } },
-    { "op": "system:log", "params": { "message": "  Ping:    {{gemini_ping}}" } },
-
-    { "op": "system:log", "params": { "message": "\n=== Claude Code CLI ===" } },
-    { "op": "system:shell", "params": { "cmd": "which claude 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "claude_installed" } },
-    { "op": "system:shell", "params": { "cmd": "claude --version 2>/dev/null || echo 'N/A'", "export_as": "claude_version" } },
-    { "op": "system:shell", "params": { "cmd": "claude -p 'Reply with only the word PONG' --output-format text 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "claude_ping" } },
-    { "op": "system:log", "params": { "message": "  Install: {{claude_installed}}" } },
-    { "op": "system:log", "params": { "message": "  Version: {{claude_version}}" } },
-    { "op": "system:log", "params": { "message": "  Ping:    {{claude_ping}}" } },
-
-    { "op": "system:log", "params": { "message": "\n=== GitHub Copilot CLI ===" } },
-    { "op": "system:shell", "params": { "cmd": "gh copilot -- --version 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "copilot_installed" } },
-    { "op": "system:shell", "params": { "cmd": "gh copilot -- -p 'Reply with only the word PONG' --allow-all 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "copilot_ping" } },
-    { "op": "system:log", "params": { "message": "  Install: {{copilot_installed}}" } },
-    { "op": "system:log", "params": { "message": "  Ping:    {{copilot_ping}}" } },
-
+    {
+      "op": "core:foreach",
+      "params": {
+        "items": "{{providers}}",
+        "as": "p",
+        "do": [
+          { "op": "system:log", "params": { "message": "\n=== {{p.name}} CLI ===" } },
+          { "op": "system:shell", "params": { "cmd": "which {{p.bin}} 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "status" } },
+          { "op": "system:shell", "params": { "cmd": "{{p.bin}} --version 2>/dev/null || echo 'N/A'", "export_as": "version" } },
+          { "op": "system:shell", "params": { "cmd": "echo 'ping' | {{p.bin}} {{p.ping_args}} 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "ping" } },
+          { "op": "system:log", "params": { "message": "  Install: {{status}}" } },
+          { "op": "system:log", "params": { "message": "  Version: {{version}}" } },
+          { "op": "system:log", "params": { "message": "  Ping:    {{ping}}" } }
+        ]
+      }
+    },
     { "op": "system:log", "params": { "message": "\n=== OpenAI Codex CLI ===" } },
     { "op": "system:shell", "params": { "cmd": "which codex 2>/dev/null && echo 'INSTALLED' || npx codex --version 2>/dev/null && echo 'INSTALLED (npx)' || echo 'NOT_FOUND'", "export_as": "codex_installed" } },
     { "op": "system:log", "params": { "message": "  Install: {{codex_installed}}" } },

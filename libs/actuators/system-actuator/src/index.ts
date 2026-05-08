@@ -28,6 +28,16 @@ import {
   clickAt,
   rightClickAt,
   moveMouse,
+  scrollAt,
+  dragFrom,
+  runAppleScript,
+  getScreenSize,
+  getWindowList,
+  quitApplication,
+  systemNotify,
+  clipboardRead,
+  clipboardWrite,
+  takeScreenshot,
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
@@ -1036,19 +1046,90 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
     case 'read_json':
-      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string) };
+      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(pathResolver.rootResolve(resolve(params.path)), { encoding: 'utf8' }) as string) };
+    case 'probe': {
+      const targetPath = pathResolver.rootResolve(resolve(params.path));
+      let exists = false;
+      let kind = 'unknown';
+      try {
+        exists = safeExistsSync(targetPath);
+        if (exists) {
+          const { safeStat } = await import('@agent/core/secure-io');
+          const stats = safeStat(targetPath);
+          kind = stats.isDirectory() ? 'dir' : 'file';
+        }
+      } catch (err) {
+        // Gracefully handle permission/role violations during probing
+        exists = false;
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_probe']: {
+          path: resolve(params.path),
+          exists,
+          kind,
+        }
+      };
+    }
     case 'glob_files':
-      return { ...ctx, [params.export_as || 'file_list']: getAllFiles(path.resolve(rootDir, resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(rootDir, f)) };
+      return { ...ctx, [params.export_as || 'file_list']: getAllFiles(pathResolver.rootResolve(resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(pathResolver.rootDir(), f)) };
+    case 'scan_directory': {
+      const { safeStat, safeReaddir, safeExistsSync: scanExists } = await import('@agent/core/secure-io');
+      const scanRoot = pathResolver.rootResolve(resolve(params.path || '.'));
+      if (!scanExists(scanRoot)) {
+        return { ...ctx, [params.export_as || 'scan_result']: { files: [], count: 0, dir: resolve(params.path || '.') } };
+      }
+      const recursive = params.recursive !== false;
+      const includeMetadata = params.include_metadata === true;
+      const excludePatterns: string[] = Array.isArray(params.exclude) ? params.exclude : (params.exclude ? [params.exclude] : []);
+      const patternStr: string | undefined = params.pattern ? String(params.pattern) : undefined;
+      const patternRe = patternStr ? new RegExp(patternStr) : undefined;
+      const maxDepth = typeof params.max_depth === 'number' ? params.max_depth : Infinity;
+
+      const isExcluded = (rel: string): boolean =>
+        excludePatterns.some(p => rel.includes(p) || rel.split(path.sep).some(seg => seg === p));
+
+      const scanDir = (dir: string, depth: number): any[] => {
+        if (depth > maxDepth) return [];
+        let entries: string[];
+        try { entries = safeReaddir(dir); } catch { return []; }
+        const results: any[] = [];
+        for (const entry of entries) {
+          if (entry.startsWith('.')) continue;
+          const abs = path.join(dir, entry);
+          const rel = path.relative(pathResolver.rootDir(), abs);
+          if (isExcluded(rel)) continue;
+          let stats: ReturnType<typeof safeStat> | null = null;
+          try { stats = safeStat(abs); } catch { continue; }
+          if (stats.isDirectory()) {
+            if (recursive) results.push(...scanDir(abs, depth + 1));
+          } else {
+            if (patternRe && !patternRe.test(rel)) continue;
+            const entry_result: any = { path: rel };
+            if (includeMetadata) {
+              entry_result.size = stats.size;
+              entry_result.mtime = stats.mtimeMs;
+            }
+            results.push(entry_result);
+          }
+        }
+        return results;
+      };
+
+      const files = scanDir(scanRoot, 0);
+      const data = { files, count: files.length, dir: resolve(params.path || '.') };
+      return { ...ctx, [params.export_as || 'scan_result']: data };
+    }
     case 'vision_consult':
       return { ...ctx, [params.export_as || 'vision_decision']: await visionJudge.consultVision(resolve(params.context), params.tie_break_options) };
     case 'pulse_status':
       const { ledger } = await import('@agent/core');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
     case 'list_missions': {
-      const missionRoot = path.resolve(rootDir, 'active/missions');
+      const missionRoot = pathResolver.rootResolve('active/missions');
       const tiers = ['personal', 'confidential', 'public'];
       const requestedStatus = typeof params.status === 'string' && params.status.trim() ? params.status.trim() : undefined;
-      const allMissions: string[] = [];
+      const allMissions: any[] = [];
       for (const tier of tiers) {
         const tierPath = path.join(missionRoot, tier);
         if (safeExistsSync(tierPath)) {
@@ -1056,28 +1137,77 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           const missions = safeReaddir(tierPath);
           for (const missionId of missions.filter((m) => !m.startsWith('.'))) {
             const missionPath = path.join(tierPath, missionId);
-            if (!safeExistsSync(path.join(missionPath, 'mission-state.json'))) {
-              if (!requestedStatus) {
-                allMissions.push(`${tier}/${missionId}`);
-              }
-              continue;
+            const statePath = path.join(missionPath, 'mission-state.json');
+            let state: any = null;
+            if (safeExistsSync(statePath)) {
+              try {
+                state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+              } catch {}
             }
-            if (!requestedStatus) {
-              allMissions.push(`${tier}/${missionId}`);
-              continue;
-            }
-            try {
-              const state = JSON.parse(safeReadFile(path.join(missionPath, 'mission-state.json'), { encoding: 'utf8' }) as string);
-              if (state?.status === requestedStatus) {
-                allMissions.push(`${tier}/${missionId}`);
-              }
-            } catch {
-              /* ignore unreadable missions */
-            }
+            
+            if (requestedStatus && state?.status !== requestedStatus) continue;
+
+            allMissions.push({
+              id: missionId,
+              tier,
+              status: state?.status || 'unknown',
+              path: path.relative(pathResolver.rootDir(), missionPath),
+              metadata: state || {}
+            });
           }
         }
       }
-      return { ...ctx, [params.export_as || 'mission_list']: allMissions };
+      const data = { status: 'ok', mission_list: allMissions, count: allMissions.length };
+      return { ...ctx, [params.export_as || 'mission_list_data']: data };
+    }
+    case 'list_projects': {
+      const { listProjectRecords } = await import('@agent/core');
+      const projects = listProjectRecords();
+      const data = { status: 'ok', project_list: projects, count: projects.length };
+      return { ...ctx, [params.export_as || 'project_list_data']: data };
+    }
+    case 'list_capabilities': {
+      const actuatorRoot = pathResolver.rootResolve('libs/actuators');
+      const { safeReaddir } = await import('@agent/core/secure-io');
+      const capabilities: any[] = [];
+      if (safeExistsSync(actuatorRoot)) {
+        const entries = safeReaddir(actuatorRoot);
+        for (const entry of entries) {
+          const actuatorPath = path.join(actuatorRoot, entry);
+          const pkgPath = path.join(actuatorPath, 'package.json');
+          if (safeExistsSync(pkgPath)) {
+            try {
+              const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+              capabilities.push({
+                id: entry,
+                name: pkg.name,
+                description: pkg.description,
+                version: pkg.version
+              });
+            } catch {}
+          }
+        }
+      }
+      const data = { status: 'ok', capability_list: capabilities, count: capabilities.length };
+      return { ...ctx, [params.export_as || 'capability_list_data']: data };
+    }
+    case 'list_incidents':
+    case 'list_knowledge': {
+      // list_knowledge is kept as an alias for backward compatibility; prefer list_incidents
+      const incidentRoot = pathResolver.rootResolve('knowledge/incidents');
+      const { safeReaddir: readIncidentDir } = await import('@agent/core/secure-io');
+      const incidents: any[] = [];
+      if (safeExistsSync(incidentRoot)) {
+        const entries = readIncidentDir(incidentRoot);
+        for (const entry of entries.filter(e => e.endsWith('.md'))) {
+          incidents.push({
+            id: entry.replace(/\.md$/, ''),
+            path: path.join('knowledge/incidents', entry)
+          });
+        }
+      }
+      const data = { status: 'ok', incident_list: incidents, count: incidents.length };
+      return { ...ctx, [params.export_as || 'incident_list_data']: data };
     }
     case 'collect_artifacts': {
       const missionRoot = path.resolve(rootDir, 'active/missions');
@@ -1085,13 +1215,34 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         const relative = path.relative(basePath, targetPath);
         return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
       };
+      const missionObjectToRelPath = (m: any): string =>
+        typeof m?.path === 'string'
+          ? path.relative(missionRoot, path.resolve(rootDir, m.path))
+          : `${m?.tier ?? 'confidential'}/${m?.id ?? ''}`;
+
       const resolveList = (value: unknown): string[] => {
         const input = Array.isArray(value) ? value : [value];
         return input.flatMap((item) => {
-          if (typeof item !== 'string') return [];
+          if (typeof item !== 'string') {
+            // Structured mission object from list_missions
+            if (item && typeof item === 'object' && ('id' in (item as object) || 'path' in (item as object))) {
+              return [missionObjectToRelPath(item)];
+            }
+            return [];
+          }
           const resolved = resolve(item);
+          // Structured list_missions output: { status, mission_list, count }
+          if (resolved && typeof resolved === 'object' && !Array.isArray(resolved) && 'mission_list' in resolved) {
+            return ((resolved as any).mission_list as any[]).map(missionObjectToRelPath);
+          }
           if (Array.isArray(resolved)) {
-            return resolved.filter((entry): entry is string => typeof entry === 'string');
+            return resolved.flatMap((entry) => {
+              if (typeof entry === 'string') return [entry];
+              if (entry && typeof entry === 'object' && ('id' in entry || 'path' in entry)) {
+                return [missionObjectToRelPath(entry)];
+              }
+              return [];
+            });
           }
           if (typeof resolved === 'string') return [resolved];
           return [];
@@ -1158,7 +1309,37 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const apps = await platform.listRunningApps();
       return { ...ctx, [params.export_as || 'running_apps']: apps };
     }
-    default: 
+    case 'screenshot': {
+      const screenshotDir = pathResolver.shared('runtime/computer/screenshots');
+      if (!safeExistsSync(screenshotDir)) safeMkdir(screenshotDir, { recursive: true });
+      const filename = params.path ? pathResolver.rootResolve(resolve(params.path)) : path.join(screenshotDir, `screenshot-${Date.now()}.png`);
+      const result = takeScreenshot(filename, { displayIndex: params.display_index });
+      return { ...ctx, [params.export_as || 'screenshot_path']: result };
+    }
+    case 'clipboard_read': {
+      const content = clipboardRead();
+      return { ...ctx, [params.export_as || 'clipboard_content']: content };
+    }
+    case 'get_focused_input': {
+      const focusedInput = detectFocusedInput();
+      return { ...ctx, [params.export_as || 'focused_input']: focusedInput };
+    }
+    case 'get_screen_size': {
+      const size = getScreenSize();
+      return { ...ctx, [params.export_as || 'screen_size']: size };
+    }
+    case 'window_list': {
+      const appName = String(resolve(params.application || ''));
+      if (!appName) throw new Error('window_list requires "application" param');
+      const windows = getWindowList(appName);
+      return { ...ctx, [params.export_as || 'window_list']: windows };
+    }
+    case 'chrome_tab_list': {
+      const browser = String(resolve(params.application || 'Google Chrome'));
+      const tabs = listChromeTabs(browser);
+      return { ...ctx, [params.export_as || 'chrome_tabs']: tabs };
+    }
+    default:
       throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }
 }
@@ -1203,7 +1384,23 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'shell':
     case 'exec':
     case 'cli_health_check':
-      return opCapture(op, params, ctx, resolve);
+    case 'probe':
+    case 'read_json':
+    case 'scan_directory':
+    case 'glob_files':
+    case 'list_missions':
+    case 'list': // Alias for list_missions
+    case 'list_projects':
+    case 'list_capabilities':
+    case 'list_incidents':
+    case 'list_knowledge': // alias for list_incidents
+    case 'screenshot':
+    case 'clipboard_read':
+    case 'get_focused_input':
+    case 'get_screen_size':
+    case 'window_list':
+    case 'chrome_tab_list':
+      return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
     case 'keyboard':
       keystrokeText(String(resolve(params.text || '{{last_capture}}')));
       break;
@@ -1304,7 +1501,86 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
     case 'log': logger.info(`[SYSTEM_LOG] ${resolve(params.message || 'Action completed')}`); break;
-    default: 
+    case 'write_json': {
+      const targetPath = pathResolver.rootResolve(resolve(params.path));
+      const content = params.content ? resolve(params.content) : (params.from ? getPathValue(ctx, params.from) : ctx.last_capture_data);
+      if (!safeExistsSync(path.dirname(targetPath))) safeMkdir(path.dirname(targetPath), { recursive: true });
+      safeWriteFile(targetPath, JSON.stringify(content, null, 2));
+      break;
+    }
+    case 'scroll': {
+      const direction = (String(resolve(params.direction || 'down'))) as 'up' | 'down' | 'left' | 'right';
+      scrollAt(Number(resolve(params.x || 0)), Number(resolve(params.y || 0)), direction, Number(resolve(params.amount || 3)));
+      break;
+    }
+    case 'drag': {
+      dragFrom(
+        Number(resolve(params.from_x || 0)),
+        Number(resolve(params.from_y || 0)),
+        Number(resolve(params.to_x || 0)),
+        Number(resolve(params.to_y || 0)),
+      );
+      break;
+    }
+    case 'run_applescript': {
+      assertUnsafeShellAllowed();
+      const script = String(resolve(params.script || ''));
+      if (!script) throw new Error('run_applescript requires "script" param');
+      const result = runAppleScript(script);
+      ctx = { ...ctx, [params.export_as || 'applescript_result']: result };
+      break;
+    }
+    case 'system_notify': {
+      const title = String(resolve(params.title || 'Kyberion'));
+      const message = String(resolve(params.message || ''));
+      const subtitle = params.subtitle ? String(resolve(params.subtitle)) : undefined;
+      systemNotify(title, message, subtitle);
+      break;
+    }
+    case 'open_file': {
+      const filePath = String(resolve(params.path || ''));
+      if (!filePath) throw new Error('open_file requires "path" param');
+      const absPath = pathResolver.rootResolve(filePath);
+      const rel = path.relative(rootDir, absPath);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        throw new Error(`open_file: path must be within repo root: ${filePath}`);
+      }
+      const platform = process.platform;
+      if (platform === 'darwin') {
+        safeExec('open', [absPath], { cwd: rootDir });
+      } else if (platform === 'win32') {
+        safeExec('cmd', ['/c', 'start', '', absPath], { cwd: rootDir });
+      } else {
+        safeExec('xdg-open', [absPath], { cwd: rootDir });
+      }
+      break;
+    }
+    case 'process_kill': {
+      assertUnsafeShellAllowed();
+      if (params.pid) {
+        const pid = Number(resolve(params.pid));
+        if (!Number.isInteger(pid) || pid <= 0) throw new Error(`process_kill: invalid pid "${params.pid}"`);
+        process.kill(pid, params.signal || 'SIGTERM');
+      } else if (params.name) {
+        const name = String(resolve(params.name));
+        safeExec('pkill', ['-f', name], { cwd: rootDir });
+      } else {
+        throw new Error('process_kill requires "pid" or "name" param');
+      }
+      break;
+    }
+    case 'app_quit': {
+      const appName = String(resolve(params.application || ''));
+      if (!appName) throw new Error('app_quit requires "application" param');
+      quitApplication(appName);
+      break;
+    }
+    case 'clipboard_write': {
+      const text = String(resolve(params.text || ''));
+      clipboardWrite(text);
+      break;
+    }
+    default:
       throw new Error(`Unsupported apply operator in System-Actuator: ${op}`);
   }
   return ctx;

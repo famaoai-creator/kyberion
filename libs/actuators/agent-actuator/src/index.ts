@@ -49,7 +49,7 @@ import { safeReadFile } from '@agent/core';
  */
 
 interface AgentAction {
-  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart' | 'team_plan' | 'team_role' | 'staff_mission' | 'prewarm_mission';
+  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart' | 'team_plan' | 'team_role' | 'staff_mission' | 'prewarm_mission' | 'list_manifests' | 'list_runtimes';
   params: {
     agentId?: string;
     provider?: AgentProvider;
@@ -64,13 +64,33 @@ interface AgentAction {
     envelope?: A2AMessage;
     filter?: { status?: string; provider?: string };
     teamRole?: string;
+    export_as?: string;
   };
 }
 
-export async function handleAction(input: AgentAction) {
-  const { action, params } = input;
+interface AgentPipelineDispatch {
+  action: 'pipeline';
+  steps: Array<{ op: string; params: AgentAction['params']; type?: string }>;
+  context?: Record<string, unknown>;
+}
+
+export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
+  const { action } = input;
+  const ctx = (input as AgentPipelineDispatch).context || {};
+
+  if (action === 'pipeline') {
+    const dispatch = input as AgentPipelineDispatch;
+    if (!dispatch.steps || dispatch.steps.length === 0) {
+      return { status: 'error', message: 'Empty pipeline steps' };
+    }
+    const step = dispatch.steps[0];
+    return handleAction({ action: step.op as AgentAction['action'], params: step.params, ...({ context: ctx } as any) });
+  }
+
+  const { params } = input as AgentAction;
 
   switch (action) {
+
     case 'spawn': {
       if (!params.provider) throw new Error('provider is required for spawn');
       const spawnPayload = {
@@ -148,6 +168,24 @@ export async function handleAction(input: AgentAction) {
     case 'list': {
       const agents = agentRegistry.list(params.filter as any);
       return { status: 'ok', agents, count: agents.length };
+    }
+
+    case 'list_manifests': {
+      const { loadAgentManifests } = await import('@agent/core/agent-manifest');
+      const manifests = loadAgentManifests();
+      const data = { status: 'ok', manifests, count: manifests.length };
+      return params.export_as ? { ...data, context: { ...ctx, [params.export_as]: data } } : data;
+    }
+
+    case 'list_runtimes': {
+      let runtimes;
+      try {
+        runtimes = await listAgentRuntimesViaDaemon();
+      } catch (_) {
+        runtimes = listAgentRuntimeSnapshots();
+      }
+      const data = { status: 'ok', runtimes, count: runtimes.length };
+      return params.export_as ? { ...data, context: { ...ctx, [params.export_as]: data } } : data;
     }
 
     case 'health': {

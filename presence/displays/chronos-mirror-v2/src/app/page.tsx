@@ -6,6 +6,8 @@ import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { FocusedOperatorView } from "../components/FocusedOperatorView";
 import { SovereignChat } from "../components/SovereignChat";
 import { AgentPanel } from "../components/AgentPanel";
+import { FirstRunBanner } from "../components/FirstRunBanner";
+import { IdentityBadge } from "../components/IdentityBadge";
 import { MissionIntelligence } from "../components/MissionIntelligence";
 import { MISSION_CYCLE, OPERATOR_VIEW_LINKS, SURFACE_ROLES } from "../lib/operator-console";
 import { uxText } from "../lib/ux-vocabulary";
@@ -195,15 +197,20 @@ export default function ChronosMirrorV2() {
               </div>
             </div>
 
-            <button
-              onClick={() => setAgentPanelOpen(true)}
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400"
-            >
-              <Cpu size={12} />
-              <span>{uxText("chronos_agent_runtimes", "Agent Runtimes", locale)}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <IdentityBadge />
+              <button
+                onClick={() => setAgentPanelOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400"
+              >
+                <Cpu size={12} />
+                <span>{uxText("chronos_agent_runtimes", "Agent Runtimes", locale)}</span>
+              </button>
+            </div>
           </div>
         </header>
+
+        <FirstRunBanner />
 
         <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
           <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">

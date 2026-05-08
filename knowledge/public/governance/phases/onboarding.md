@@ -27,10 +27,14 @@ Inject the Sovereign's unique "Soul" into the established vessel.
 - **Effect**: Wizard guides the Sovereign through identity, service readiness, tenant scope, and a safe first tutorial.
 
 #### Path B: Non-Interactive / Agent Environment (非対話環境)
-When running within a CLI agent (e.g., Claude Code) where stdin is unavailable:
-1. Agent reads `scripts/onboarding_wizard.ts` to understand the required schema.
-2. Agent conducts the hearing conversationally, asking the Sovereign the same questions.
-3. Agent writes the output files directly, conforming to the schema in `knowledge/public/templates/my-identity.schema.json`.
+When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, the wizard refuses to run by design — it would otherwise apply silent defaults. Pick one of:
+
+1. **Sanctioned CLI**: `pnpm onboard:apply --identity path/to/identity.json` (or pipe JSON via stdin) — runs the same artifact-writing flow as `pnpm onboard` without prompts.
+2. **Agent conversation + direct write**:
+   - Agent reads `scripts/onboarding_wizard.ts` to understand the required schema.
+   - Agent conducts the hearing conversationally with the Sovereign.
+   - Agent writes output files directly, conforming to `knowledge/public/templates/my-identity.schema.json` and `knowledge/public/schemas/onboarding-state.schema.json`.
+3. **Defaults bypass** (evaluation only): `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — accepts every default. Use only when defaults are knowingly acceptable.
 
 - **Output**:
   - `knowledge/personal/my-identity.json`: Defines values, domain, and role.

@@ -1,0 +1,24 @@
+{
+  "action": "pipeline",
+  "name": "Ecosystem Discovery Verification",
+  "steps": [
+    { "op": "system:log", "params": { "message": "🔍 Verifying Global Discovery Operations..." } },
+    
+    { "op": "agent:list-manifests", "params": { "export_as": "agents" } },
+    { "op": "system:log", "params": { "message": "✅ Agents: {{agents.count}} manifests found." } },
+
+    { "op": "agent:list-runtimes", "params": { "export_as": "runtimes" } },
+    { "op": "system:log", "params": { "message": "✅ Runtimes: {{runtimes.count}} active instances." } },
+
+    { "op": "project:list", "params": { "export_as": "projects" } },
+    { "op": "system:log", "params": { "message": "✅ Projects: {{projects.count}} project records found." } },
+
+    { "op": "capability:list", "params": { "export_as": "caps" } },
+    { "op": "system:log", "params": { "message": "✅ Capabilities: {{caps.count}} actuators installed." } },
+
+    { "op": "knowledge:list", "params": { "export_as": "know" } },
+    { "op": "system:log", "params": { "message": "✅ Knowledge: {{know.count}} incidents recorded." } },
+    
+    { "op": "system:log", "params": { "message": "\n🚀 Discovery Verification Complete." } }
+  ]
+}

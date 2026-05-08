@@ -5,6 +5,8 @@ import {
   pathResolver,
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
+  withExecutionContext,
   type A2UIMessage,
 } from '@agent/core';
 
@@ -98,6 +100,43 @@ if (!safeExistsSync(staticDir)) {
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
+
+app.get('/favicon.ico', (_req, res) => {
+  res.status(204).end();
+});
+
+app.get('/api/identity', (_req, res) => {
+  try {
+    const personalDir = pathResolver.knowledge('personal');
+    const result = withExecutionContext('ecosystem_architect', () => {
+      const idPath = path.join(personalDir, 'my-identity.json');
+      const agentPath = path.join(personalDir, 'agent-identity.json');
+      const visionPath = path.join(personalDir, 'my-vision.md');
+      const sovereign = safeExistsSync(idPath)
+        ? JSON.parse(safeReadFile(idPath, { encoding: 'utf8' }) as string)
+        : null;
+      const agent = safeExistsSync(agentPath)
+        ? JSON.parse(safeReadFile(agentPath, { encoding: 'utf8' }) as string)
+        : null;
+      const visionRaw = safeExistsSync(visionPath)
+        ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
+        : null;
+      const vision = visionRaw
+        ? visionRaw.replace(/^#[^\n]*\n+/, '').trim().slice(0, 600)
+        : null;
+      return { sovereign, agent, vision };
+    });
+    res.json({
+      ok: true,
+      onboarded: Boolean(result.sovereign && result.agent),
+      sovereign: result.sovereign,
+      agent: result.agent,
+      vision: result.vision,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message || String(err) });
+  }
+});
 
 app.get('/health', (_req, res) => {
   res.json({

@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeExistsSync, safeReaddir } from './secure-io.js';
+import { safeReadFile, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
 
@@ -143,12 +143,41 @@ export function resolveSelectionHints(
   return { provider, modelId };
 }
 
+interface ManifestCacheEntry {
+  manifests: AgentManifest[];
+  loadedAt: number;
+  dirMtimeMs: number;
+}
+
+const manifestCache = new Map<string, ManifestCacheEntry>();
+const MANIFEST_CACHE_TTL_MS = 5_000;
+
+function readDirMtime(dir: string): number {
+  try {
+    return safeStat(dir).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * Load all agent manifests from knowledge/agents/
+ * Load all agent manifests from knowledge/agents/.
+ * Cached for {@link MANIFEST_CACHE_TTL_MS} ms per rootDir, invalidated when the
+ * agents directory mtime changes. Without this cache, every API call in a
+ * surface re-parses every manifest and emits a duplicate `[AGENT_MANIFEST]
+ * Loaded N agent definitions` log line.
  */
 export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   const root = rootDir || findProjectRoot();
   const agentsDir = path.join(root, 'knowledge', 'agents');
+
+  const cached = manifestCache.get(agentsDir);
+  const now = Date.now();
+  const currentMtime = readDirMtime(agentsDir);
+  if (cached && now - cached.loadedAt < MANIFEST_CACHE_TTL_MS && cached.dirMtimeMs === currentMtime) {
+    return cached.manifests;
+  }
+
   const profileSelectionHints = loadAgentProfileSelectionHints(root);
 
   if (!safeExistsSync(agentsDir)) {
@@ -213,7 +242,13 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   }
 
   logger.info(`[AGENT_MANIFEST] Loaded ${manifests.length} agent definitions: ${manifests.map(m => m.agentId).join(', ')}`);
+  manifestCache.set(agentsDir, { manifests, loadedAt: now, dirMtimeMs: currentMtime });
   return manifests;
+}
+
+/** Test/dev helper: clear the manifest cache (e.g. after editing a manifest). */
+export function clearAgentManifestCache(): void {
+  manifestCache.clear();
 }
 
 /**
