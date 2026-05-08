@@ -64,7 +64,7 @@
     "env:bootstrap": "node dist/scripts/bootstrap_environment.js",
     "meeting:consent": "node dist/scripts/voice_consent.js",
     "typecheck": "tsc --noEmit",
-    "validate": "pnpm run build && pnpm run typecheck && pnpm run check:esm && pnpm run check:catalogs && pnpm run check:governance-rules && pnpm run check:intent-domain-coverage && pnpm run check:contract-schemas && pnpm run check:contract-semver && pnpm run check:pipeline-shell-independence && pnpm run check:first-win-smoke && pnpm run check:tier-hygiene && pnpm run check:mos-no-write-api",
+    "validate": "pnpm run build && pnpm run typecheck && pnpm run check:esm && pnpm run check:catalogs && pnpm run check:governance-rules && pnpm run check:intent-domain-coverage && pnpm run check:contract-schemas && pnpm run check:contract-semver && pnpm run check:pipeline-shell-independence && pnpm run check:first-win-smoke && pnpm run check:doc-examples && pnpm run check:tier-hygiene && pnpm run check:mos-no-write-api",
     "check:mos-no-write-api": "pnpm --filter @presence/operator-surface exec vitest run --config vitest.config.mjs",
     "doctor": "node dist/scripts/run_doctor.js",
     "generate-index": "node dist/scripts/cli.js list > /dev/null",

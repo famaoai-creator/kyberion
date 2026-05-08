@@ -29,6 +29,8 @@
             "properties": {
               "list_voices": { "type": "boolean" },
               "playback": { "type": "boolean" },
+              "voice_clone": { "type": "boolean" },
+              "icl_ref_audio": { "type": "boolean" },
               "artifact_formats": {
                 "type": "array",
                 "items": { "type": "string", "enum": ["wav", "mp3", "ogg", "aiff"] }
@@ -36,6 +38,9 @@
             },
             "required": ["list_voices", "playback", "artifact_formats"]
           },
+          "model_id": { "type": "string", "minLength": 1 },
+          "bridge_script": { "type": "string", "minLength": 1 },
+          "stt_bridge_script": { "type": "string", "minLength": 1 },
           "fallback_engine_id": { "type": "string", "minLength": 1 },
           "notes": { "type": "string" }
         },
