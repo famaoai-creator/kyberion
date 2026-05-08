@@ -1,8 +1,8 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { pathResolver } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
 
 interface CheckResult {
   id: string;
@@ -11,10 +11,10 @@ interface CheckResult {
   detail?: string;
 }
 
-function fileCheck(id: string, label: string, relPath: string, kind: 'file' | 'dir'): CheckResult {
-  const full = path.join(pathResolver.rootDir(), relPath);
+export function fileCheck(id: string, label: string, relPath: string, kind: 'file' | 'dir'): CheckResult {
+  const full = pathResolver.resolve(relPath);
   try {
-    const stat = fs.statSync(full);
+    const stat = safeStat(relPath);
     const expected = kind === 'dir' ? stat.isDirectory() : stat.isFile();
     return expected ? { id, label, status: 'ok', detail: full } : { id, label, status: 'error', detail: `expected ${kind} at ${full}` };
   } catch {
@@ -22,43 +22,43 @@ function fileCheck(id: string, label: string, relPath: string, kind: 'file' | 'd
   }
 }
 
-function activeMissionCount(): number {
-  const roots = ['active/missions', 'knowledge/personal/missions'].map((r) => path.join(pathResolver.rootDir(), r));
+export function activeMissionCount(): number {
+  const roots = ['active/missions', 'knowledge/personal/missions'];
   let count = 0;
   for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
+    if (!safeExistsSync(root)) continue;
     const stack: string[] = [root];
     while (stack.length) {
       const dir = stack.pop()!;
-      let entries: fs.Dirent[] = [];
       try {
-        entries = fs.readdirSync(dir, { withFileTypes: true });
+        const entries = safeReaddir(dir);
+        for (const entryName of entries) {
+          const full = path.join(dir, entryName);
+          try {
+            const stat = safeStat(full);
+            if (stat.isDirectory()) {
+              stack.push(full);
+            } else if (stat.isFile() && entryName === 'mission-state.json') {
+              try {
+                const txt = safeReadFile(full, { encoding: 'utf8' }) as string;
+                if (/"status"\s*:\s*"active"/.test(txt)) count += 1;
+              } catch {
+                // skip unreadable state files
+              }
+            }
+          } catch {
+            // skip entries we cannot inspect
+          }
+        }
       } catch {
         continue;
-      }
-      for (const entry of entries) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          stack.push(full);
-        } else if (entry.isFile() && entry.name === 'mission-state.json') {
-          try {
-            const txt = fs.readFileSync(full, 'utf8');
-            if (/"status"\s*:\s*"active"/.test(txt)) count += 1;
-          } catch { /* skip */ }
-        }
       }
     }
   }
   return count;
 }
 
-async function main() {
-  const argv = await yargs(hideBin(process.argv))
-    .option('format', { type: 'string', choices: ['json', 'text'] as const, default: 'json' })
-    .option('exit-on-missing', { type: 'boolean', default: true })
-    .strict()
-    .parse();
-
+export function buildVitalReport() {
   const checks: CheckResult[] = [
     fileCheck('physical_foundation', 'Physical Foundation', 'node_modules', 'dir'),
     fileCheck('system_build', 'System Build', 'dist', 'dir'),
@@ -78,18 +78,28 @@ async function main() {
     error: checks.filter((c) => c.status === 'error').length,
   };
 
-  const result = {
+  return {
     generated_at: new Date().toISOString(),
     overall: summary.missing === 0 && summary.error === 0 ? 'healthy' : 'attention',
     summary,
     checks,
     active_mission_count: activeMissionCount(),
   };
+}
+
+async function main() {
+  const argv = await yargs(hideBin(process.argv))
+    .option('format', { type: 'string', choices: ['json', 'text'] as const, default: 'json' })
+    .option('exit-on-missing', { type: 'boolean', default: true })
+    .strict()
+    .parse();
+
+  const result = buildVitalReport();
 
   if (argv.format === 'json') {
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   } else {
-    for (const c of checks) {
+    for (const c of result.checks) {
       const icon = c.status === 'ok' ? '✅' : c.status === 'missing' ? '⚠️ ' : '❌';
       console.log(`${icon} ${c.label}: ${c.status.toUpperCase()}${c.detail ? ` (${c.detail})` : ''}`);
     }
@@ -102,7 +112,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('vital_check failed:', err.message || err);
-  process.exit(1);
-});
+const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error('vital_check failed:', err.message || err);
+    process.exit(1);
+  });
+}
