@@ -15,7 +15,10 @@ describe('reference drift contract', () => {
     '.github/workflows/README.md',
     'package.json',
     'knowledge/public/governance/phases/onboarding.md',
+    'docs/developer/LOCAL_DEV.md',
+    'docs/PRODUCTIZATION_ROADMAP.md',
     'pipelines/fragments/capability-docs-sync.json',
+    'pipelines/orchestration-jobs.json',
     'tests/workflow-operations-contract.test.ts',
     'tests/fixtures/governance-import-baseline.json',
   ];
