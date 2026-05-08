@@ -2,7 +2,7 @@
   "action": "pipeline",
   "pipeline_id": "orchestration-jobs",
   "name": "Ecosystem Orchestration Jobs",
-  "description": "Reads knowledge/governance/orchestration-config.json and executes each configured job via orchestrator-actuator. Replaces scripts/run_orchestration_job.ts.",
+  "description": "Reads knowledge/governance/orchestration-config.json and executes each configured job via orchestrator-actuator.",
   "steps": [
     {
       "op": "system:log",
