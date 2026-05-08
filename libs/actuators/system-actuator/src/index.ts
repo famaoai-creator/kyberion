@@ -143,6 +143,67 @@ interface ComputerInteractionAction {
   };
 }
 
+export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
+  'screenshot',
+  'clipboard_read',
+  'get_focused_input',
+  'get_screen_size',
+  'window_list',
+  'chrome_tab_list',
+  'read_file',
+  'read_json',
+  'probe',
+  'glob_files',
+  'scan_directory',
+  'exec',
+  'shell',
+  'cli_health_check',
+  'list_missions',
+  'list_projects',
+  'list_capabilities',
+  'list_knowledge',
+  'list_running_apps',
+  'collect_artifacts',
+  'sample_traces',
+  'vision_consult',
+] as const;
+
+export const SYSTEM_ACTUATOR_APPLY_OPS = [
+  'scroll',
+  'drag',
+  'clipboard_write',
+  'system_notify',
+  'open_file',
+  'app_quit',
+  'process_kill',
+  'run_applescript',
+  'keyboard',
+  'paste_text',
+  'press_key',
+  'mouse_click',
+  'mouse_move',
+  'activate_application',
+  'open_url',
+  'write_file',
+  'write_artifact',
+  'write_json',
+  'mkdir',
+  'log',
+  'voice',
+  'native_tts_speak',
+  'wait',
+] as const;
+
+export const SYSTEM_ACTUATOR_CONTROL_OPS = [
+  'if',
+  'while',
+] as const;
+
+const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
+  ...SYSTEM_ACTUATOR_CAPTURE_OPS,
+  'list',
+]);
+
 /**
  * Main Entry Point
  */
@@ -1380,27 +1441,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  if (SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS.has(op)) {
+    return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
+  }
   switch (op) {
-    case 'shell':
-    case 'exec':
-    case 'cli_health_check':
-    case 'probe':
-    case 'read_json':
-    case 'scan_directory':
-    case 'glob_files':
-    case 'list_missions':
-    case 'list': // Alias for list_missions
-    case 'list_projects':
-    case 'list_capabilities':
-    case 'list_incidents':
-    case 'list_knowledge': // alias for list_incidents
-    case 'screenshot':
-    case 'clipboard_read':
-    case 'get_focused_input':
-    case 'get_screen_size':
-    case 'window_list':
-    case 'chrome_tab_list':
-      return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
     case 'keyboard':
       keystrokeText(String(resolve(params.text || '{{last_capture}}')));
       break;
