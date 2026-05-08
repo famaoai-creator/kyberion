@@ -86,7 +86,7 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2)+'\n');
 pnpm run check:contract-semver -- --rebaseline
 
 # 7. Commit the release prep.
-git add CHANGELOG.md package.json scripts/contract-baseline.json
+git add CHANGELOG.md package.json scripts/contract-baseline.json migration/
 git commit -m "chore(release): v${NEW_VERSION}"
 
 # 8. Tag the release.
@@ -139,4 +139,4 @@ We support the latest minor of the latest major + the latest minor of the previo
 - [x] `migration/` directory + README
 - [ ] PR title / commit message linter (Phase D'-4 follow-up)
 - [x] Automated release workflow (`.github/workflows/release.yml`)
-- [ ] Migration runner (`scripts/run_migrations.ts`) — Phase D'-4 follow-up
+- [x] Migration runner (`scripts/run_migrations.ts`)

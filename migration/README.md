@@ -51,14 +51,14 @@ The runner records each completed migration in `active/shared/runtime/migrations
 node migration/<script>.js
 
 # Or run all pending in order:
-pnpm tsx scripts/run_migrations.ts        # TODO: not yet implemented; see Phase D'-4 follow-up
+pnpm migration:run
 ```
 
 For now (until the runner ships), maintainers should call out each required migration in the release notes and `CHANGELOG.md`.
 
 ## Rollback
 
-`migration/run_migrations.ts --rollback` (TODO: same as above) reverses the most recent migration, when the script declares an `rollback` export.
+`pnpm migration:rollback` reverses the most recent migration, when the script declares a `rollback` export.
 
 Not all migrations are safely reversible. When a migration has no `rollback` (or `rollback` throws), users must restore from backup to downgrade.
 

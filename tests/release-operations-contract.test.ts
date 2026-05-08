@@ -19,9 +19,11 @@ describe('Release operations contract', () => {
     expect(workflow).toContain('gh release create "${{ github.ref_name }}"');
   });
 
-  it('documents the release notes extractor and leaves migration runner as the remaining follow-up', () => {
+  it('documents the release notes extractor and migration runner contract', () => {
     const packageJson = read('package.json');
     expect(packageJson).toContain('"release:notes": "node dist/scripts/extract_changelog_section.js"');
+    expect(packageJson).toContain('"migration:run": "pnpm tsx scripts/run_migrations.ts"');
+    expect(packageJson).toContain('"migration:rollback": "pnpm tsx scripts/run_migrations.ts --rollback"');
 
     const releaseOps = read('docs/developer/RELEASE_OPERATIONS.md');
     expect(releaseOps).toContain('pnpm run release:notes -- --ref "v${NEW_VERSION}" --output active/shared/tmp/release-notes.md');
