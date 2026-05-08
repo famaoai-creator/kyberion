@@ -9,10 +9,11 @@ import {
   pathResolver,
   auditChain,
 } from '@agent/core';
+import { fileURLToPath } from 'node:url';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
 
-const main = async () => {
+export const main = async () => {
   const argv = await createStandardYargs()
     .option('action', {
       type: 'string',
@@ -68,7 +69,7 @@ const main = async () => {
   }
 };
 
-async function listRunningAgents() {
+export async function listRunningAgents() {
   const agents = agentRegistry.list();
   if (agents.length === 0) {
     console.log('\nNo agents currently running.\n');
@@ -96,7 +97,7 @@ async function listRunningAgents() {
   console.log('');
 }
 
-async function listManifests() {
+export async function listManifests() {
   const manifests = loadAgentManifests();
   if (manifests.length === 0) {
     console.log('\nNo agent manifests found in knowledge/agents/.\n');
@@ -118,7 +119,7 @@ async function listManifests() {
   console.log('');
 }
 
-async function spawnAgent(manifestId: string, overrides: { provider?: any, modelId?: string, missionId?: string }) {
+export async function spawnAgent(manifestId: string, overrides: { provider?: any, modelId?: string, missionId?: string }) {
   const manifest = getAgentManifest(manifestId);
   if (!manifest) throw new Error(`Agent manifest "${manifestId}" not found.`);
 
@@ -145,7 +146,7 @@ async function spawnAgent(manifestId: string, overrides: { provider?: any, model
   console.log(JSON.stringify(handle.getRecord(), null, 2));
 }
 
-async function shutdownAgent(agentId: string) {
+export async function shutdownAgent(agentId: string) {
   const agent = agentRegistry.get(agentId);
   if (!agent) throw new Error(`Agent "${agentId}" not found.`);
 
@@ -161,7 +162,7 @@ async function shutdownAgent(agentId: string) {
   logger.success(`✅ Agent "${agentId}" shut down.`);
 }
 
-async function inspectAgent(agentId: string) {
+export async function inspectAgent(agentId: string) {
   const snapshot = agentLifecycle.getSnapshot(agentId);
   if (!snapshot) {
     // Try to find in registry even if lifecycle handle is gone
@@ -194,7 +195,11 @@ async function inspectAgent(agentId: string) {
   console.log('');
 }
 
-main().catch((err: any) => {
-  logger.error(err.message);
-  process.exit(1);
-});
+const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+
+if (isMainModule) {
+  main().catch((err: any) => {
+    logger.error(err.message);
+    process.exit(1);
+  });
+}
