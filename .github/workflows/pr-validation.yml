@@ -46,6 +46,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm run test:coverage
 
+      - name: Check golden outputs
+        run: pnpm run check:golden
+
       - name: Check coverage threshold
         env:
           COVERAGE_THRESHOLD: ${{ vars.COVERAGE_THRESHOLD || '60' }}
