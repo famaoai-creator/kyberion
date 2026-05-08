@@ -122,6 +122,8 @@
     "pipeline:super": "node dist/scripts/run_super_pipeline.js",
     "intent:run": "node dist/scripts/run_intent.js",
     "release:notes": "node dist/scripts/extract_changelog_section.js",
+    "migration:run": "pnpm tsx scripts/run_migrations.ts",
+    "migration:rollback": "pnpm tsx scripts/run_migrations.ts --rollback",
     "catalog": "node dist/scripts/generate_docs.js",
     "build:all": "pnpm run typecheck",
     "clean": "rm -rf dist coverage .tsbuildinfo",
