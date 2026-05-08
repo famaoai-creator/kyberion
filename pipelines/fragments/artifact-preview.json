@@ -1,0 +1,52 @@
+{
+  "action": "pipeline",
+  "name": "artifact-preview-fragment",
+  "description": "Opens a generated artifact in the OS default handler and sends a desktop notification. Append after any write_artifact step. Required context var: artifact_path (relative to repo root). Optional: notify_title, notify_message.",
+  "steps": [
+    {
+      "id": "probe_artifact",
+      "type": "capture",
+      "op": "system:probe",
+      "params": {
+        "path": "{{artifact_path}}",
+        "export_as": "artifact_probe"
+      }
+    },
+    {
+      "id": "open_or_warn",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "artifact_probe.exists", "operator": "equals", "value": true },
+        "then": [
+          {
+            "id": "open_artifact",
+            "type": "apply",
+            "op": "system:open_file",
+            "params": { "path": "{{artifact_path}}" }
+          },
+          {
+            "id": "notify_opened",
+            "type": "apply",
+            "op": "system:system_notify",
+            "params": {
+              "title": "{{notify_title|Artifact Ready}}",
+              "message": "{{notify_message|成果物が生成されました}}",
+              "subtitle": "{{artifact_path}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "warn_missing",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "[ARTIFACT PREVIEW] File not found: {{artifact_path}}"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -38,11 +38,246 @@
         align-items: baseline;
         margin-bottom: 20px;
       }
+      .hint-text {
+        display: inline-block;
+        margin-top: 4px;
+        color: rgba(237, 246, 255, 0.45);
+        font-size: 11px;
+        line-height: 1.45;
+      }
       .eyebrow {
         font-size: 12px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
         color: var(--warm);
+      }
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .conn-stamp {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .updated-text {
+        color: var(--muted);
+      }
+      .conn-pill {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(125, 211, 252, 0.25);
+        background: rgba(34, 211, 238, 0.08);
+        color: rgba(189, 224, 254, 0.85);
+      }
+      .conn-pill.conn-live {
+        border-color: rgba(74, 222, 128, 0.45);
+        background: rgba(74, 222, 128, 0.12);
+        color: rgba(190, 242, 200, 0.95);
+      }
+      .conn-pill.conn-retrying {
+        border-color: rgba(253, 230, 138, 0.45);
+        background: rgba(253, 230, 138, 0.12);
+        color: rgba(254, 240, 178, 0.95);
+      }
+      .conn-pill.conn-offline {
+        border-color: rgba(248, 113, 113, 0.45);
+        background: rgba(248, 113, 113, 0.12);
+        color: rgba(254, 202, 202, 0.95);
+      }
+      .conn-pill.conn-pending {
+        opacity: 0.6;
+      }
+      .identity-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(34, 211, 238, 0.35);
+        background: rgba(34, 211, 238, 0.05);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(237, 246, 255, 0.85);
+      }
+      .identity-badge.hidden {
+        display: none;
+      }
+      .identity-badge .badge-id {
+        color: rgba(125, 211, 252, 0.95);
+      }
+      .identity-badge .badge-tier {
+        color: rgba(237, 246, 255, 0.55);
+      }
+      .identity-badge .badge-sep {
+        color: rgba(237, 246, 255, 0.3);
+      }
+      .identity-badge.identity-badge-warn {
+        border-color: rgba(253, 230, 138, 0.55);
+        background: rgba(253, 230, 138, 0.1);
+        color: rgba(253, 230, 138, 0.9);
+      }
+      .first-run-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 14px 16px;
+        margin-top: 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(34, 211, 238, 0.25);
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(125, 211, 252, 0.03) 60%, transparent);
+      }
+      .first-run-banner.hidden {
+        display: none;
+      }
+      .first-run-icon {
+        font-size: 20px;
+        line-height: 1;
+        margin-top: 2px;
+      }
+      .first-run-body {
+        flex: 1;
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: rgba(237, 246, 255, 0.85);
+      }
+      .first-run-eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: rgba(125, 211, 252, 0.85);
+      }
+      .first-run-title {
+        margin-top: 4px;
+      }
+      .first-run-title .first-run-sub {
+        margin-left: 6px;
+        color: rgba(237, 246, 255, 0.6);
+      }
+      .first-run-steps {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: rgba(237, 246, 255, 0.65);
+        font-size: 11.5px;
+      }
+      .first-run-steps strong {
+        color: rgba(237, 246, 255, 0.9);
+      }
+      .first-run-steps code {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 11px;
+        background: rgba(0,0,0,0.25);
+        padding: 0 4px;
+        border-radius: 3px;
+        color: rgba(189, 224, 254, 0.9);
+      }
+      .first-run-close {
+        background: transparent;
+        border: none;
+        color: rgba(237, 246, 255, 0.5);
+        font-size: 18px;
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+      }
+      .first-run-close:hover {
+        color: rgba(237, 246, 255, 0.9);
+      }
+      .dev-panel {
+        margin-top: 24px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(11, 22, 36, 0.5);
+      }
+      .dev-panel[open] {
+        background: rgba(11, 22, 36, 0.65);
+      }
+      .dev-panel-summary {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        list-style: none;
+        font-size: 12px;
+      }
+      .dev-panel-summary::-webkit-details-marker {
+        display: none;
+      }
+      .dev-panel-icon {
+        font-size: 14px;
+      }
+      .dev-panel-title {
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: rgba(237, 246, 255, 0.9);
+      }
+      .dev-panel-hint {
+        color: rgba(237, 246, 255, 0.45);
+      }
+      .dev-panel-body {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .dev-panel-section {
+        min-width: 0;
+      }
+      .dev-panel-label {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(237, 246, 255, 0.55);
+        margin-bottom: 6px;
+      }
+      .dev-panel-body textarea,
+      .dev-panel-body pre {
+        width: 100%;
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        background: rgba(0,0,0,0.45);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px;
+        color: rgba(237, 246, 255, 0.9);
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      .dev-panel-body textarea {
+        resize: vertical;
+      }
+      .dev-panel-body pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 0;
+      }
+      .dev-panel-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .dev-panel-result {
+        font-size: 11px;
+        color: rgba(237, 246, 255, 0.55);
+      }
+      .dev-panel-result.ok { color: rgba(190, 242, 200, 0.95); }
+      .dev-panel-result.err { color: rgba(254, 202, 202, 0.95); }
+      .button-ghost {
+        background: transparent !important;
+        border: 1px solid rgba(255,255,255,0.16) !important;
+      }
+      @media (max-width: 720px) {
+        .dev-panel-body {
+          grid-template-columns: 1fr;
+        }
       }
       h1 {
         margin: 6px 0 0;
@@ -284,12 +519,34 @@
     <div class="shell">
       <div class="header">
         <div>
-          <div class="eyebrow">Expressive Surface MVP</div>
+          <div class="eyebrow">Expressive Surface</div>
           <h1 id="title">Presence Studio</h1>
         </div>
-        <div class="mono" id="updated">waiting for state</div>
+        <div class="header-meta">
+          <div id="identity-badge" class="identity-badge hidden" title=""></div>
+          <div class="conn-stamp">
+            <span id="conn-pill" class="conn-pill conn-pending" title="SSE connection state">…</span>
+            <span id="updated" class="mono updated-text">waiting for state</span>
+          </div>
+        </div>
       </div>
       <div class="sub">A governed realtime surface for subtitles, expression state, transcript, and voice-channel stimuli.</div>
+      <div id="first-run-banner" class="first-run-banner hidden">
+        <div class="first-run-icon">✨</div>
+        <div class="first-run-body">
+          <div class="first-run-eyebrow">First Run</div>
+          <div class="first-run-title">
+            <span id="first-run-greeting">Welcome.</span>
+            <span class="first-run-sub">No live surface activity yet — try one of these to wake the studio.</span>
+          </div>
+          <ol class="first-run-steps">
+            <li><strong>Hold To Talk</strong> or press <strong>Start Native Mic</strong> to send your first stimulus through voice-hub.</li>
+            <li>Open the <strong>Developer</strong> panel below and post a sample <code>/a2ui/dispatch</code> message.</li>
+            <li>Promote the simulated tutorial in <code>knowledge/personal/onboarding/tutorial-plan.md</code> to a real mission.</li>
+          </ol>
+        </div>
+        <button id="first-run-close" class="first-run-close" aria-label="Dismiss first run banner">×</button>
+      </div>
       <div class="grid" style="margin-top: 22px;">
         <section class="panel avatar">
           <img class="avatar-media hidden" id="avatar-image" alt="Kyberion avatar" />
@@ -311,6 +568,7 @@
             </select>
             <select class="select" id="native-device"></select>
             <select class="select" id="stt-backend"></select>
+            <div class="hint" id="stt-availability-hint"></div>
             <div class="hint" id="mic-hint">Browser speech recognition is idle.</div>
           </div>
           <div class="footer" id="voice-presence-state">Voice state: idle</div>
@@ -407,10 +665,219 @@
           <div class="list" id="memory-detail"></div>
         </section>
       </div>
+      <details class="dev-panel" id="dev-panel">
+        <summary class="dev-panel-summary">
+          <span class="dev-panel-icon">⚙</span>
+          <span class="dev-panel-title">Developer · A2UI dispatch sandbox</span>
+          <span class="dev-panel-hint">Send a sample message to /a2ui/dispatch and watch the surface state update live.</span>
+        </summary>
+        <div class="dev-panel-body">
+          <div class="dev-panel-section">
+            <label class="dev-panel-label" for="dev-a2ui-payload">A2UI message body (JSON)</label>
+            <textarea id="dev-a2ui-payload" rows="8" spellcheck="false">{
+  "type": "presence.subtitle",
+  "surface_id": "presence-studio",
+  "props": {
+    "text": "Hello from the developer panel"
+  }
+}</textarea>
+            <div class="dev-panel-actions">
+              <button id="dev-a2ui-send" class="button" type="button">Dispatch</button>
+              <button id="dev-a2ui-reset" class="button button-ghost" type="button">Reset</button>
+              <span id="dev-a2ui-result" class="dev-panel-result"></span>
+            </div>
+          </div>
+          <div class="dev-panel-section">
+            <label class="dev-panel-label">Equivalent curl</label>
+            <pre class="dev-panel-pre"><code id="dev-a2ui-curl"></code></pre>
+          </div>
+        </div>
+      </details>
     </div>
     <script>
       const titleEl = document.getElementById("title");
       const updatedEl = document.getElementById("updated");
+      const identityBadgeEl = document.getElementById("identity-badge");
+      const connPillEl = document.getElementById("conn-pill");
+
+      function formatTimestamp(value) {
+        if (!value) return "waiting for state";
+        const dt = typeof value === "string" ? new Date(value) : value;
+        if (isNaN(dt.getTime())) return String(value);
+        try {
+          const fmt = new Intl.DateTimeFormat(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+          });
+          return fmt.format(dt);
+        } catch (_) {
+          return dt.toLocaleTimeString();
+        }
+      }
+
+      function setConnState(state) {
+        if (!connPillEl) return;
+        const map = {
+          live: { text: "LIVE", className: "conn-pill conn-live", title: "SSE stream connected" },
+          retrying: { text: "RETRY", className: "conn-pill conn-retrying", title: "Reconnecting..." },
+          offline: { text: "OFFLINE", className: "conn-pill conn-offline", title: "SSE stream closed" },
+          pending: { text: "…", className: "conn-pill conn-pending", title: "Awaiting first event" },
+        };
+        const target = map[state] || map.pending;
+        connPillEl.textContent = target.text;
+        connPillEl.className = target.className;
+        connPillEl.title = target.title;
+      }
+
+      function renderIdentityBadge(payload) {
+        if (!identityBadgeEl || !payload) return;
+        if (!payload.onboarded) {
+          identityBadgeEl.classList.remove("hidden");
+          identityBadgeEl.classList.add("identity-badge-warn");
+          identityBadgeEl.textContent = "Onboarding required";
+          identityBadgeEl.title = "knowledge/personal/my-identity.json was not found.";
+          return;
+        }
+        const name = payload.sovereign && payload.sovereign.name ? payload.sovereign.name : "Sovereign";
+        const agentId = payload.agent && payload.agent.agent_id ? payload.agent.agent_id : "agent";
+        const tier = payload.agent && payload.agent.trust_tier ? payload.agent.trust_tier : "—";
+        identityBadgeEl.classList.remove("hidden");
+        identityBadgeEl.classList.remove("identity-badge-warn");
+        identityBadgeEl.innerHTML =
+          '<span class="badge-name">' + escapeHtml(name) + '</span>' +
+          '<span class="badge-sep">·</span>' +
+          '<span class="badge-id">' + escapeHtml(agentId) + '</span>' +
+          '<span class="badge-sep">·</span>' +
+          '<span class="badge-tier">' + escapeHtml(String(tier).toUpperCase()) + '</span>';
+        identityBadgeEl.title = payload.vision || "";
+      }
+
+      let identityPayloadCache = null;
+      fetch("/api/identity")
+        .then((r) => r.json())
+        .then((payload) => {
+          identityPayloadCache = payload;
+          renderIdentityBadge(payload);
+          maybeShowFirstRunBanner(payload);
+        })
+        .catch(() => { /* leave badge hidden */ });
+
+      const FIRST_RUN_KEY = "presence-studio.first-run.dismissed";
+      function maybeShowFirstRunBanner(identityPayload) {
+        const banner = document.getElementById("first-run-banner");
+        if (!banner) return;
+        let dismissed = false;
+        try { dismissed = localStorage.getItem(FIRST_RUN_KEY) === "1"; } catch (_) {}
+        if (dismissed) return;
+        if (!identityPayload || !identityPayload.onboarded) return;
+
+        Promise.all([
+          fetch("/health").then((r) => r.json()).catch(() => ({ recentStimuli: 0 })),
+          fetch("/api/state").then((r) => r.json()).catch(() => ({ recentStimuli: [] })),
+        ]).then(([health, state]) => {
+          const stimuliCount = (state && Array.isArray(state.recentStimuli) ? state.recentStimuli.length : 0)
+            || (health && typeof health.recentStimuli === "number" ? health.recentStimuli : 0);
+          if (stimuliCount > 0) return;
+          const greeting = document.getElementById("first-run-greeting");
+          if (greeting && identityPayload.sovereign && identityPayload.sovereign.name) {
+            greeting.textContent = "Welcome, " + identityPayload.sovereign.name + ".";
+          }
+          banner.classList.remove("hidden");
+        });
+      }
+      const firstRunCloseBtn = document.getElementById("first-run-close");
+      if (firstRunCloseBtn) {
+        firstRunCloseBtn.addEventListener("click", () => {
+          const banner = document.getElementById("first-run-banner");
+          if (banner) banner.classList.add("hidden");
+          try { localStorage.setItem(FIRST_RUN_KEY, "1"); } catch (_) {}
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // Developer panel — A2UI dispatch sandbox
+      // ---------------------------------------------------------------
+      const devA2uiPayload = document.getElementById("dev-a2ui-payload");
+      const devA2uiSend = document.getElementById("dev-a2ui-send");
+      const devA2uiReset = document.getElementById("dev-a2ui-reset");
+      const devA2uiResult = document.getElementById("dev-a2ui-result");
+      const devA2uiCurl = document.getElementById("dev-a2ui-curl");
+      const DEV_A2UI_DEFAULT = devA2uiPayload ? devA2uiPayload.value : "";
+
+      function refreshDevCurl() {
+        if (!devA2uiCurl || !devA2uiPayload) return;
+        const raw = devA2uiPayload.value;
+        let pretty;
+        try {
+          pretty = JSON.stringify(JSON.parse(raw));
+        } catch (_) {
+          pretty = raw.replace(/\s+/g, " ").trim();
+        }
+        const escaped = pretty.replace(/'/g, "'\\''");
+        const origin = window.location.origin;
+        devA2uiCurl.textContent =
+          `curl -X POST ${origin}/a2ui/dispatch \\\n` +
+          `  -H 'Content-Type: application/json' \\\n` +
+          `  -d '${escaped}'`;
+      }
+      if (devA2uiPayload) {
+        devA2uiPayload.addEventListener("input", refreshDevCurl);
+        refreshDevCurl();
+      }
+      if (devA2uiReset) {
+        devA2uiReset.addEventListener("click", () => {
+          if (devA2uiPayload) devA2uiPayload.value = DEV_A2UI_DEFAULT;
+          if (devA2uiResult) {
+            devA2uiResult.textContent = "";
+            devA2uiResult.className = "dev-panel-result";
+          }
+          refreshDevCurl();
+        });
+      }
+      if (devA2uiSend) {
+        devA2uiSend.addEventListener("click", async () => {
+          if (!devA2uiPayload) return;
+          let payload;
+          try {
+            payload = JSON.parse(devA2uiPayload.value);
+          } catch (err) {
+            if (devA2uiResult) {
+              devA2uiResult.textContent = "Invalid JSON: " + (err.message || err);
+              devA2uiResult.className = "dev-panel-result err";
+            }
+            return;
+          }
+          devA2uiSend.disabled = true;
+          if (devA2uiResult) {
+            devA2uiResult.textContent = "Dispatching…";
+            devA2uiResult.className = "dev-panel-result";
+          }
+          try {
+            const response = await fetch("/a2ui/dispatch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || body.ok === false) {
+              throw new Error(body.error || ("HTTP " + response.status));
+            }
+            if (devA2uiResult) {
+              devA2uiResult.textContent = "OK · applied " + (body.applied || 1) + " · watch the surface above.";
+              devA2uiResult.className = "dev-panel-result ok";
+            }
+          } catch (err) {
+            if (devA2uiResult) {
+              devA2uiResult.textContent = "Dispatch failed: " + (err.message || err);
+              devA2uiResult.className = "dev-panel-result err";
+            }
+          } finally {
+            devA2uiSend.disabled = false;
+          }
+        });
+      }
       const expressionEl = document.getElementById("expression");
       const avatarImageEl = document.getElementById("avatar-image");
       const statusEl = document.getElementById("status");
@@ -641,8 +1108,28 @@
         }
       }
 
+      const STT_BACKEND_HINTS = {
+        server: {
+          label: "Server",
+          enableHint: "Set VOICE_HUB_STT_SERVER_URL to your hosted STT endpoint, then restart voice-hub.",
+          enableHintJa: "VOICE_HUB_STT_SERVER_URL を設定し voice-hub を再起動すると有効になります。",
+        },
+        whisperCpp: {
+          label: "whisper.cpp",
+          enableHint: "Install whisper.cpp and point WHISPER_CLI_PATH to the compiled binary, then restart voice-hub.",
+          enableHintJa: "whisper.cpp をビルドし WHISPER_CLI_PATH に CLI のパスを設定して voice-hub を再起動すると有効になります。",
+        },
+        nativeSpeech: {
+          label: "Native Speech",
+          enableHint: "Native Speech requires the host OS speech APIs. Grant the relevant microphone & speech permission to Node.",
+          enableHintJa: "Native Speech は OS の音声 API を使います。Node に音声・マイクの権限を付与してください。",
+        },
+      };
+
       async function loadSttBackends() {
         sttBackendEl.innerHTML = "";
+        const hintEl = document.getElementById("stt-availability-hint");
+        if (hintEl) hintEl.textContent = "";
         try {
           const response = await fetch("/api/voice/stt-backends");
           const body = await response.json();
@@ -651,15 +1138,34 @@
           }
           const options = [
             { value: "auto", label: `Auto (${(body.selected || []).join(" -> ") || "none"})` },
-            { value: "server", label: `Server${body.available?.server ? "" : " (Unavailable)"}` },
-            { value: "whisper_cpp", label: `whisper.cpp${body.available?.whisperCpp ? "" : " (Unavailable)"}` },
-            { value: "native_speech", label: `Native Speech${body.available?.nativeSpeech ? "" : " (Unavailable)"}` }
+            { value: "server", label: `Server${body.available?.server ? "" : " (Unavailable)"}`, key: "server" },
+            { value: "whisper_cpp", label: `whisper.cpp${body.available?.whisperCpp ? "" : " (Unavailable)"}`, key: "whisperCpp" },
+            { value: "native_speech", label: `Native Speech${body.available?.nativeSpeech ? "" : " (Unavailable)"}`, key: "nativeSpeech" }
           ];
           for (const item of options) {
             const option = document.createElement("option");
             option.value = item.value;
             option.textContent = item.label;
+            if (item.key && body.available && !body.available[item.key]) {
+              const hint = STT_BACKEND_HINTS[item.key];
+              if (hint) {
+                option.title = uiText(hint.enableHint, hint.enableHintJa);
+              }
+            }
             sttBackendEl.appendChild(option);
+          }
+
+          // Build a one-line summary for any unavailable backend the user might wonder about.
+          if (hintEl) {
+            const unavailable = Object.entries(body.available || {})
+              .filter(([, ok]) => !ok)
+              .map(([k]) => STT_BACKEND_HINTS[k]?.label || k);
+            if (unavailable.length > 0) {
+              hintEl.textContent = uiText(
+                `Unavailable: ${unavailable.join(", ")}. Hover an option for setup steps.`,
+                `未接続: ${unavailable.join(", ")} — 各オプションにマウスを置くと設定手順が出ます。`,
+              );
+            }
           }
         } catch (error) {
           const option = document.createElement("option");
@@ -766,7 +1272,7 @@
       function renderStandardIntents() {
         const items = Array.isArray(standardIntents) ? standardIntents : [];
         if (!items.length) {
-          agentCatalogEl.innerHTML = `<div class="item small">No common requests available yet.</div>`;
+          agentCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No common requests available yet.", "common request はまだありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Add a commonRequests array to the agent's manifest under knowledge/agents/<id>.agent.md to populate this list.", "knowledge/agents/<id>.agent.md の commonRequests に追加すると、ここに表示されます。"))}</span></div>`;
           return;
         }
         renderList(agentCatalogEl, items.slice(0, 8), (item) =>
@@ -1026,7 +1532,7 @@
       function renderProjectCatalog() {
         const items = Array.isArray(projectCatalog) ? projectCatalog : [];
         if (!items.length) {
-          projectCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No projects registered yet.", "まだ project は登録されていません。"))}</div>`;
+          projectCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No projects registered yet.", "まだ project は登録されていません。"))}<br><span class="hint-text">${escapeHtml(uiText("Drop a project record under knowledge/public/projects/<slug>/project.json (or use mission_controller create) to see it here.", "knowledge/public/projects/<slug>/project.json を作成するか mission_controller create で生成すると表示されます。"))}</span></div>`;
           return;
         }
         renderList(projectCatalogEl, items.slice(0, 8), (item) => {
@@ -1046,7 +1552,7 @@
       function renderTrackCatalog() {
         const items = Array.isArray(trackCatalog) ? trackCatalog : [];
         if (!items.length) {
-          trackCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No tracks registered yet.", "まだ track は登録されていません。"))}</div>`;
+          trackCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No tracks registered yet.", "まだ track は登録されていません。"))}<br><span class="hint-text">${escapeHtml(uiText("Tracks live alongside their parent project (project.tracks[]). Add one to a project record to see it here.", "track は project.tracks[] に追記すると表示されます。"))}</span></div>`;
           return;
         }
         renderList(trackCatalogEl, items.slice(0, 8), (item) =>
@@ -1064,7 +1570,7 @@
       function renderBindingCatalog() {
         const items = Array.isArray(bindingCatalog) ? bindingCatalog : [];
         if (!items.length) {
-          bindingCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No service bindings registered yet.", "まだ service binding は登録されていません。"))}</div>`;
+          bindingCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No service bindings registered yet.", "まだ service binding は登録されていません。"))}<br><span class="hint-text">${escapeHtml(uiText("Approve a service connection in onboarding (knowledge/personal/connections/) to bind it here.", "onboarding (knowledge/personal/connections/) で service connection を承認すると binding されます。"))}</span></div>`;
           return;
         }
         renderList(bindingCatalogEl, items.slice(0, 8), (item) =>
@@ -1077,7 +1583,7 @@
       function renderMissionSeedCatalog() {
         const items = Array.isArray(missionSeedCatalog) ? missionSeedCatalog : [];
         if (!items.length) {
-          missionSeedCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No mission seeds recorded yet.", "まだ mission seed はありません。"))}</div>`;
+          missionSeedCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No mission seeds recorded yet.", "まだ mission seed はありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Run mission_controller create or have an agent submit a seed via the surface stimuli pipeline.", "mission_controller create か surface 経由の stimuli で seed を作ると表示されます。"))}</span></div>`;
           return;
         }
         renderList(missionSeedCatalogEl, items.slice(0, 8), (item) => {
@@ -1104,7 +1610,7 @@
         const items = Array.isArray(approvals) ? approvals : [];
         approvalInboxEl.innerHTML = "";
         if (!items.length) {
-          approvalInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No approvals are waiting.", "承認待ちはありません。"))}</div>`;
+          approvalInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No approvals are waiting.", "承認待ちはありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Controlled actions (secret mutation, governed shell) queue here when an agent requests them.", "secret 変更や governed shell など、agent からの承認リクエストがここに集まります。"))}</span></div>`;
           return;
         }
         for (const item of items.slice(0, 8)) {
@@ -1147,7 +1653,7 @@
       function renderOutcomeInbox() {
         const items = Array.isArray(outcomes) ? outcomes : [];
         if (!items.length) {
-          outcomeInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No recent outcomes yet.", "最近の outcome はまだありません。"))}</div>`;
+          outcomeInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No recent outcomes yet.", "最近の outcome はまだありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Mission completions emit artifacts that appear here. Run pnpm mission:start … to generate the first one.", "mission 完了で生まれた artifact がここに表示されます。pnpm mission:start … が起点です。"))}</span></div>`;
           return;
         }
         renderList(outcomeInboxEl, items.slice(0, 8), (item) =>
@@ -1292,7 +1798,7 @@
         const data = surface.data || {};
         const derivedVoiceUiState = deriveVoiceUiState(data);
         titleEl.textContent = data.title || "Presence Studio";
-        updatedEl.textContent = data.updatedAt || state.lastUpdatedAt || "waiting for state";
+        updatedEl.textContent = formatTimestamp(data.updatedAt || state.lastUpdatedAt);
         expressionEl.textContent = derivedVoiceUiState.expression || data.expression || "neutral";
         statusEl.textContent = derivedVoiceUiState.status || data.status || "idle";
         subtitleEl.textContent = derivedVoiceUiState.subtitle || data.subtitle || "Ready for your next request.";
@@ -1392,7 +1898,7 @@
         const selected = ensureSelectedTaskSession();
         taskSessionActiveEl.innerHTML = "";
         if (!items.length) {
-          taskSessionActiveEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No requested work yet.", "まだ依頼された work はありません。"))}</div>`;
+          taskSessionActiveEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No requested work yet.", "まだ依頼された work はありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Task contracts emitted by an agent (or the operator) appear as work items here.", "agent / operator が発行した task contract が work item として並びます。"))}</span></div>`;
           taskSessionDetailEl.innerHTML = `<div class="item small">${escapeHtml(uiText("Select a work item to inspect its progress and results.", "work を選ぶと進捗と結果を確認できます。"))}</div>`;
           return;
         }
@@ -1760,7 +2266,12 @@
         loadSpeechState(),
       ]).then(() => fetch("/api/state").then((res) => res.json()).then(render));
       const source = new EventSource("/api/stream");
+      source.addEventListener("open", () => setConnState("live"));
+      source.addEventListener("error", () => {
+        setConnState(source.readyState === EventSource.CONNECTING ? "retrying" : "offline");
+      });
       source.addEventListener("state", (event) => {
+        setConnState("live");
         loadAsyncState().then(() => render(JSON.parse(event.data)));
       });
       source.addEventListener("speech_state", (event) => {

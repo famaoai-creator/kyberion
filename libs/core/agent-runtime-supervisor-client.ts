@@ -1,7 +1,7 @@
 import * as net from 'node:net';
 import { spawnManagedProcess } from './managed-process.js';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeUnlinkSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeUnlinkSync, safeCreateExclusiveFileSync, safeStat } from './secure-io.js';
 import type { AgentHandle, SpawnOptions } from './agent-lifecycle.js';
 import type { AgentRecord } from './agent-registry.js';
 
@@ -62,6 +62,7 @@ export interface AgentRuntimeSupervisorAskPayload {
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
+const SPAWN_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-spawn.lock`;
 const START_TIMEOUT_MS = 12_000;
 const HEALTH_TIMEOUT_MS = 4_000;
 const ENSURE_TIMEOUT_MS = 30_000;
@@ -146,36 +147,56 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
     return await waitForSupervisorHealth(750);
   } catch (_) {}
 
-  const targetSocket = socketPath();
-  if (safeExistsSync(targetSocket)) {
+  ensureSocketDir();
+
+  // Multi-spawn guard: use atomic file creation as a mutex
+  try {
+    safeCreateExclusiveFileSync(SPAWN_LOCK_PATH, process.pid.toString());
+  } catch (err: any) {
+    // If lock already exists, wait for health or check if it's stale
     try {
-      safeUnlinkSync(targetSocket);
+      const stats = safeStat(SPAWN_LOCK_PATH);
+      if (Date.now() - stats.mtimeMs > 15000) {
+        // Stale lock detected
+        safeUnlinkSync(SPAWN_LOCK_PATH);
+        return ensureAgentRuntimeSupervisorDaemon();
+      }
     } catch (_) {}
+    
+    return waitForSupervisorHealth();
   }
 
-  spawnManagedProcess({
-    resourceId: 'agent-runtime-supervisor-daemon',
-    kind: 'service',
-    ownerId: 'agent-runtime-supervisor-daemon',
-    ownerType: 'runtime-supervisor',
-    command: 'node',
-    args: ['dist/scripts/agent_runtime_supervisor_daemon.js'],
-    spawnOptions: {
-      cwd: rootDir(),
-      env: process.env,
-      detached: true,
-      stdio: 'ignore',
-    },
-    shutdownPolicy: 'detached',
-    metadata: {
-      socketPath: targetSocket,
-    },
-  }).child.unref();
+  try {
+    const targetSocket = socketPath();
+    spawnManagedProcess({
+      resourceId: 'agent-runtime-supervisor-daemon',
+      kind: 'service',
+      ownerId: 'agent-runtime-supervisor-daemon',
+      ownerType: 'runtime-supervisor',
+      command: 'node',
+      args: ['dist/scripts/agent_runtime_supervisor_daemon.js'],
+      spawnOptions: {
+        cwd: rootDir(),
+        env: process.env,
+        detached: true,
+        stdio: 'ignore',
+      },
+      shutdownPolicy: 'detached',
+      metadata: {
+        socketPath: targetSocket,
+      },
+    }).child.unref();
 
-  return waitForSupervisorHealth();
+    return await waitForSupervisorHealth();
+  } finally {
+    try {
+      if (safeExistsSync(SPAWN_LOCK_PATH)) safeUnlinkSync(SPAWN_LOCK_PATH);
+    } catch (_) {}
+  }
 }
 
 export async function getAgentRuntimeSupervisorHealth(): Promise<AgentRuntimeSupervisorHealth> {
+
   return ensureAgentRuntimeSupervisorDaemon();
 }
 

@@ -31,18 +31,24 @@ export function getPathValue(ctx: any, pathLike?: string): any {
 
 export function resolveVars(val: any, ctx: any): any {
   if (typeof val !== 'string') return val;
-  
-  // Single variable match: "{{var}}" returns the raw data (maintains type)
+
+  // Single variable match: "{{var}}" or "{{var|default}}" — returns raw value (preserves type)
   const singleVarMatch = val.match(/^{{(.*?)}}$/);
   if (singleVarMatch) {
-    const current = getPathValue(ctx, singleVarMatch[1].trim());
-    return current !== undefined ? current : '';
+    const [varName, defaultValue] = singleVarMatch[1].split('|').map((s) => s.trim());
+    const current = getPathValue(ctx, varName);
+    if (current !== undefined) return current;
+    return defaultValue !== undefined ? defaultValue : '';
   }
 
-  // Multi-variable match or string mix: returns interpolated string
+  // Multi-variable or mixed string: "Hello {{name|World}}" → interpolated string
   return val.replace(/{{(.*?)}}/g, (_, p) => {
-    const current = getPathValue(ctx, p.trim());
-    return current !== undefined ? (typeof current === 'object' ? JSON.stringify(current) : String(current)) : '';
+    const [varName, defaultValue] = p.split('|').map((s: string) => s.trim());
+    const current = getPathValue(ctx, varName);
+    if (current !== undefined) {
+      return typeof current === 'object' ? JSON.stringify(current) : String(current);
+    }
+    return defaultValue !== undefined ? defaultValue : '';
   });
 }
 
@@ -51,6 +57,11 @@ export function resolveVars(val: any, ctx: any): any {
  */
 export function evaluateCondition(cond: any, ctx: any): boolean {
   if (!cond) return true;
+  
+  if (typeof cond === 'string') {
+    return !!getPathValue(ctx, cond);
+  }
+
   const val = getPathValue(ctx, cond.from);
   
   switch (cond.operator) {
@@ -62,6 +73,10 @@ export function evaluateCondition(cond: any, ctx: any): boolean {
     case 'ne': return val !== cond.value;
     case 'gt': return Number(val) > cond.value;
     case 'lt': return Number(val) < cond.value;
+    case 'and': 
+      return Array.isArray(cond.conditions) && cond.conditions.every((c: any) => evaluateCondition(c, ctx));
+    case 'or':
+      return Array.isArray(cond.conditions) && cond.conditions.some((c: any) => evaluateCondition(c, ctx));
     default: return !!val;
   }
 }

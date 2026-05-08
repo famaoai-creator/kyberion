@@ -6,13 +6,17 @@ import {
   runtimeSupervisor,
   spawnManagedProcess,
   stopManagedProcess,
+  loadSurfaceManifest,
+  loadSurfaceState,
 } from '@agent/core';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 interface ProcessAction {
-  action: 'spawn' | 'stop' | 'list' | 'status';
+  action: 'spawn' | 'stop' | 'list' | 'status' | 'list-surfaces' | 'pipeline';
+  steps?: any[];
+  context?: any;
   params: {
     resourceId?: string;
     ownerId?: string;
@@ -23,11 +27,21 @@ interface ProcessAction {
     cwd?: string;
     env?: Record<string, string>;
     shutdownPolicy?: RuntimeShutdownPolicy;
+    export_as?: string;
   };
 }
 
 export async function handleAction(input: ProcessAction) {
-  const { action, params } = input;
+  const { action, params, steps, context } = input;
+
+  // Pipeline dispatcher: single-step only — process-actuator does not orchestrate multi-step pipelines.
+  if (action === 'pipeline') {
+    if (!steps || steps.length === 0) return { status: 'error', message: 'Empty pipeline steps' };
+    if (steps.length > 1) throw new Error('process-actuator pipeline dispatch supports only a single step; use the main pipeline runner for multi-step sequences');
+    const step = steps[0];
+    const result = await handleAction({ action: step.op as any, params: step.params, context });
+    return { ...result, context: (result as any).context || context };
+  }
 
   switch (action) {
     case 'spawn': {
@@ -70,8 +84,40 @@ export async function handleAction(input: ProcessAction) {
     case 'list':
       return { status: 'ok', resources: runtimeSupervisor.snapshot() };
 
+    case 'list-surfaces': {
+      const manifest = loadSurfaceManifest();
+      const state = loadSurfaceState();
+
+      const results = manifest.surfaces.map((s) => {
+        const record = state.surfaces[s.id];
+        const running = record && isProcessRunning(record.pid);
+        return {
+          id: s.id,
+          kind: s.kind,
+          enabled: s.enabled !== false,
+          running: !!running,
+          port: s.port,
+          url: s.port ? `http://localhost:${s.port}${s.healthPath || '/'}` : null,
+          home_url: s.port ? `http://localhost:${s.port}/` : null,
+        };
+      });
+      const data = { status: 'ok', surfaces: results };
+      return params.export_as ? { ...data, context: { ...context, [params.export_as]: results } } : data;
+    }
+
+
     default:
       throw new Error(`Unsupported process action: ${action}`);
+  }
+}
+
+function isProcessRunning(pid: number): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 

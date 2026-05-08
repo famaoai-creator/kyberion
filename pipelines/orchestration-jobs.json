@@ -1,0 +1,56 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "orchestration-jobs",
+  "name": "Ecosystem Orchestration Jobs",
+  "description": "Reads knowledge/governance/orchestration-config.json and executes each configured job via orchestrator-actuator. Replaces scripts/run_orchestration_job.ts.",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 [ORCHESTRATION] Starting orchestration jobs..." }
+    },
+    {
+      "id": "load-config",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "knowledge/governance/orchestration-config.json",
+        "format": "json",
+        "fallback_path": "knowledge/public/governance/orchestration-config.json",
+        "export_as": "orchestration_config"
+      }
+    },
+    {
+      "id": "run-jobs",
+      "type": "control",
+      "op": "core:foreach",
+      "params": {
+        "items": "{{orchestration_config.jobs}}",
+        "as": "orch_job",
+        "do": [
+          {
+            "op": "system:log",
+            "params": { "message": "🚀 Running orchestration job: {{orch_job.name}}" }
+          },
+          {
+            "type": "apply",
+            "op": "orchestrator:run_execution_plan_set",
+            "params": {
+              "job_id": "{{orch_job.id}}",
+              "name": "{{orch_job.name}}",
+              "steps": "{{orch_job.steps}}",
+              "export_as": "orch_job_result"
+            }
+          },
+          {
+            "op": "system:log",
+            "params": { "message": "✅ Job complete: {{orch_job.name}}" }
+          }
+        ]
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ [ORCHESTRATION] All jobs complete." }
+    }
+  ]
+}

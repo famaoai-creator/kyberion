@@ -1,0 +1,60 @@
+{
+  "description": "Maintenance pipeline: Opens browser tabs ONLY for active UI surfaces in a single browser instance.",
+  "action": "pipeline",
+  "options": {
+    "headless": false,
+    "browser_channel": "chrome",
+    "keep_alive": true,
+    "lease_ms": 300000
+  },
+  "steps": [
+    {
+      "id": "get-active-surfaces",
+      "type": "capture",
+      "op": "process:list-surfaces",
+      "params": {
+        "export_as": "surfaces"
+      }
+    },
+    {
+      "id": "inspect-each-surface",
+      "type": "control",
+      "op": "core:foreach",
+      "params": {
+        "items": "{{surfaces}}",
+        "as": "surface",
+        "do": [
+          {
+            "type": "control",
+            "op": "core:if",
+            "params": {
+              "condition": {
+                "operator": "and",
+                "conditions": [
+                  "surface.running",
+                  "surface.port",
+                  {
+                    "operator": "eq",
+                    "from": "surface.kind",
+                    "value": "ui"
+                  }
+                ]
+              },
+              "then": [
+                {
+                  "type": "control",
+                  "op": "browser:open_tab",
+                  "params": {
+                    "url": "{{surface.home_url}}",
+                    "tab_id": "tab-{{surface.id}}",
+                    "waitUntil": "domcontentloaded"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

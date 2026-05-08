@@ -5,6 +5,8 @@ import {
   formatClassification,
   logger,
   safeExec,
+  safeReadFile,
+  safeExistsSync,
   resolveVars,
   evaluateCondition,
   capabilityEntry,
@@ -22,9 +24,11 @@ import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
 const dispatchCache: Record<string, DispatchFunc> = {};
+const moduleCache: Record<string, any> = {};
 
 interface RunStepsOptions {
   trace?: TraceContext;
+  _includeStack?: ReadonlySet<string>;
 }
 
 async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
@@ -55,11 +59,9 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
     return dispatchCache[domain];
   }
 
-  // Check for Provider Bridge (Gemini, GH, Codex native tools)
   const { resolveProviderCapabilityId, invokeProviderCapability } = await import('@agent/core/provider-bridge');
 
   dispatchCache[domain] = async (op, params, ctx, type) => {
-    // Try to resolve a registered capability for this domain:op
     const resolvedId = resolveProviderCapabilityId(domain, op);
     if (resolvedId) {
       const result = await invokeProviderCapability({
@@ -75,23 +77,24 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
 
     let result = { handled: false, ctx };
 
-    // Standard actuator lookup fallback...
     try {
-      const entry = capabilityEntry(`${domain}-actuator`);
-      const mod = await import(pathToFileURL(entry).href);
+      if (!moduleCache[domain]) {
+        const entry = capabilityEntry(`${domain}-actuator`);
+        moduleCache[domain] = await import(pathToFileURL(entry).href);
+      }
+      const mod = moduleCache[domain];
       
-      // Priority 1: dispatchDecisionOp
       if (typeof mod.dispatchDecisionOp === 'function') {
         result = await mod.dispatchDecisionOp(op, params, ctx);
       }
       
-      // Priority 2: handleAction
       if (!result.handled && typeof mod.handleAction === 'function') {
         try {
           const actionResult = await mod.handleAction({ 
             action: 'pipeline', 
             steps: [{ type: type || 'apply', op, params }], 
-            context: ctx 
+            context: ctx,
+            options: ctx.__pipeline_options
           });
           result = { handled: true, ctx: actionResult };
         } catch (err: any) {
@@ -107,15 +110,24 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
         }
       }
     } catch (err) {}
-
     return result;
   };
-  
   return dispatchCache[domain];
 }
 
 export function normalizePipelineOp(op: string): string {
-  if (op.includes(':')) return op;
+  if (op.includes(':')) {
+    const [domain, action] = op.split(':');
+    if (domain === 'mission' && action === 'list') return 'system:list_missions';
+    if (domain === 'project' && action === 'list') return 'system:list_projects';
+    if (domain === 'knowledge' && action === 'list') return 'system:list_knowledge';
+    if (domain === 'capability' && action === 'list') return 'system:list_capabilities';
+    if (domain === 'agent' && (action === 'list-manifests' || action === 'list_manifests')) return 'agent:list_manifests';
+    if (domain === 'agent' && (action === 'list-runtimes' || action === 'list_runtimes')) return 'agent:list_runtimes';
+    
+    if (domain === 'mission') return `system:${action}`;
+    return op;
+  }
   if (op === 'if') return 'core:if';
   return `system:${op}`;
 }
@@ -138,6 +150,21 @@ function matchesArtifactPattern(filePath: string, pattern: string): boolean {
   const basename = path.posix.basename(normalizedPath);
   const matcher = globToRegExp(pattern.replace(/\\/g, '/'));
   return matcher.test(normalizedPath) || matcher.test(basename);
+}
+
+function resolveFragmentPath(ref: string): string {
+  if (path.isAbsolute(ref)) {
+    throw new Error(`core:include: absolute paths are not allowed: ${ref}`);
+  }
+  const normalized = ref.startsWith('./') ? ref.slice(2) : ref;
+  const pipelinesDir = path.join(pathResolver.rootDir(), 'pipelines');
+  const relativeRef = normalized.startsWith('pipelines/') ? normalized.slice('pipelines/'.length) : normalized;
+  const resolved = path.resolve(pipelinesDir, relativeRef);
+  const rel = path.relative(pipelinesDir, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error(`core:include: path must be within pipelines/: ${ref}`);
+  }
+  return resolved;
 }
 
 function shouldUseSubagentForReasoningStep(params: Record<string, unknown>): boolean {
@@ -193,11 +220,83 @@ export async function runSteps(
           ctx = { ...ctx, [params.export_as]: output };
         }
       } else if (domain === 'core' && action === 'if') {
-        const branch = evaluateCondition(params.condition, ctx) ? params.then : params.else;
+        const cond = params.condition;
+        const conditionResult = evaluateCondition(cond, ctx);
+        const branch = conditionResult ? params.then : params.else;
         if (Array.isArray(branch)) {
           const nested = await runSteps(branch as PipelineAdfStep[], ctx, opts);
           ctx = nested.context;
           results.push(...nested.results);
+        }
+      } else if (domain === 'core' && action === 'foreach') {
+        const items = resolveVars(params.items, ctx);
+        const subSteps = params.do as PipelineAdfStep[];
+        if (Array.isArray(items) && Array.isArray(subSteps)) {
+          const itemName = (params.as as string) || 'item';
+          const originalItemValue = ctx[itemName];
+          for (const item of items) {
+            const loopCtx = { ...ctx, [itemName]: item };
+            const nested = await runSteps(subSteps, loopCtx, opts);
+            ctx = { ...nested.context };
+            if (originalItemValue === undefined) delete ctx[itemName];
+            else ctx[itemName] = originalItemValue;
+            results.push(...nested.results);
+            if (nested.status === 'failed') break;
+          }
+        }
+      } else if (domain === 'core' && action === 'include') {
+        const fragmentRef = String(resolveVars(params.fragment || '', ctx));
+        if (!fragmentRef) throw new Error('core:include requires "fragment" param');
+        const fragmentPath = resolveFragmentPath(fragmentRef);
+        if (!safeExistsSync(fragmentPath)) {
+          throw new Error(`core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`);
+        }
+        // Circular include detection
+        const includeStack = opts._includeStack ?? new Set<string>();
+        if (includeStack.has(fragmentPath)) {
+          throw new Error(`core:include: circular reference detected — ${fragmentRef} is already in the include chain`);
+        }
+        const fragmentJson = JSON.parse(String(safeReadFile(fragmentPath, { encoding: 'utf8' })));
+        const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({ ...s, params: s.params || {} }));
+        // Merge optional inline context overrides, resolving any template vars in values.
+        const inlineCtx: Record<string, unknown> = params.context && typeof params.context === 'object'
+          ? Object.fromEntries(
+              Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
+                k,
+                typeof v === 'string' ? resolveVars(v, ctx) : v,
+              ]),
+            )
+          : {};
+        const childOpts: RunStepsOptions = { ...opts, _includeStack: new Set([...includeStack, fragmentPath]) };
+        const nested = await runSteps(fragmentSteps, { ...ctx, ...inlineCtx }, childOpts);
+        ctx = nested.context;
+        results.push(...nested.results);
+        if (nested.status === 'failed') {
+          return { status: derivePipelineStatus(results), results, context: ctx };
+        }
+      } else if (domain === 'core' && action === 'wait') {
+        const ms = Number(resolveVars(params.duration_ms || params.ms || 1000, ctx));
+        await new Promise((resolve) => setTimeout(resolve, ms));
+      } else if (domain === 'core' && action === 'transform') {
+        const { Buffer } = await import('node:buffer');
+        const vm = await import('node:vm');
+        const util = await import('node:util');
+        const input = resolveVars(params.input || ctx, ctx);
+        const script = String(params.script || 'input');
+        const sandbox = { 
+          Buffer, 
+          input, 
+          ctx: { ...ctx },
+          console: { 
+            log: (...args: any[]) => logger.info(`[TRANSFORM-LOG] ${args.map(a => typeof a === 'object' ? util.inspect(a) : a).join(' ')}`),
+          } 
+        };
+        vm.createContext(sandbox);
+        const result = await new vm.Script(script).runInContext(sandbox);
+        if (params.export_as && typeof params.export_as === 'string') {
+          ctx = { ...ctx, [params.export_as]: result };
+        } else {
+          ctx.last_transform = result;
         }
       } else {
         const dispatch = await loadActuatorDispatch(domain);
@@ -277,6 +376,7 @@ export async function main() {
   autoContext.platform_name = process.platform;
   autoContext.node_options = process.env.NODE_OPTIONS || '';
   autoContext.run_utc_now = new Date().toISOString();
+  autoContext.__pipeline_options = pipeline.options || {}; // Inject options
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
 
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
@@ -304,6 +404,11 @@ export async function main() {
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
+      if (autoContext.__pipeline_options && (autoContext.__pipeline_options as any).keep_alive) {
+        logger.info('   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.');
+      } else {
+        process.exit(0);
+      }
     } else {
       const failed = result.results.find((entry) => entry.status === 'failed');
       if (failed) {

@@ -1119,6 +1119,16 @@ function collectPendingApprovals(): PendingApprovalSummary[] {
     .slice(0, 24);
 }
 
+function isPidAlive(pid: number | undefined): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
   const manifest = loadSurfaceManifest();
   const state = loadSurfaceState();
@@ -1126,15 +1136,17 @@ async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
 
   for (const entry of manifest.surfaces.map(normalizeSurfaceDefinition)) {
     const record = state.surfaces[entry.id];
+    const pidAlive = record ? isPidAlive(record.pid) : false;
     const health = await probeSurfaceHealth(entry);
-    const controlSummary = !record
+    const trulyRunning = pidAlive || health.status === 'healthy';
+    const controlSummary = !trulyRunning
       ? 'stopped'
       : health.status === 'healthy'
         ? 'stable'
         : health.status === 'unhealthy'
           ? 'needs attention'
           : 'needs restart';
-    const controlTone: SurfaceSummary['controlTone'] = !record
+    const controlTone: SurfaceSummary['controlTone'] = !trulyRunning
       ? 'offline'
       : health.status === 'healthy'
         ? 'stable'
@@ -1144,8 +1156,8 @@ async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
       kind: entry.kind,
       startupMode: entry.startupMode,
       enabled: entry.enabled !== false,
-      running: Boolean(record),
-      pid: record?.pid,
+      running: trulyRunning,
+      pid: pidAlive ? record?.pid : undefined,
       health: health.status,
       detail: health.detail,
       controlSummary,
