@@ -22,6 +22,7 @@ describe('Release operations contract', () => {
   it('documents the release notes extractor and migration runner contract', () => {
     const packageJson = read('package.json');
     expect(packageJson).toContain('"release:notes": "node dist/scripts/extract_changelog_section.js"');
+    expect(packageJson).toContain('"check:pr-title": "pnpm tsx scripts/check_pr_title.ts"');
     expect(packageJson).toContain('"migration:run": "pnpm tsx scripts/run_migrations.ts"');
     expect(packageJson).toContain('"migration:rollback": "pnpm tsx scripts/run_migrations.ts --rollback"');
 
@@ -29,6 +30,7 @@ describe('Release operations contract', () => {
     expect(releaseOps).toContain('pnpm run release:notes -- --ref "v${NEW_VERSION}" --output active/shared/tmp/release-notes.md');
     expect(releaseOps).toContain('Automated release workflow (`.github/workflows/release.yml`)');
     expect(releaseOps).toContain('Migration runner (`scripts/run_migrations.ts`)');
+    expect(releaseOps).toContain('PR titles that do not match the pattern');
   });
 
   it('extracts a tagged changelog section with the built helper contract', async () => {
