@@ -1,0 +1,35 @@
+{
+  "action": "pipeline",
+  "name": "screenshot-vision-gate-fragment",
+  "description": "Takes a desktop screenshot, asks the reasoning backend to evaluate a visual condition, and sets vision_gate_passed (yes/no string) in context. Required context var: vision_question. Optional: display_index (integer, 0-based), screenshot_export_path.",
+  "steps": [
+    {
+      "id": "capture_screen",
+      "type": "capture",
+      "op": "system:screenshot",
+      "params": {
+        "path": "{{screenshot_export_path}}",
+        "display_index": "{{display_index}}",
+        "export_as": "screenshot_path"
+      }
+    },
+    {
+      "id": "vision_evaluate",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Look at the screenshot at path '{{screenshot_path}}' and answer the following question with ONLY 'yes' or 'no': {{vision_question}}",
+        "context": ["{{screenshot_path}}", "{{vision_question}}"],
+        "export_as": "vision_gate_passed"
+      }
+    },
+    {
+      "id": "log_result",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "[VISION GATE] {{vision_question}} → {{vision_gate_passed}}"
+      }
+    }
+  ]
+}

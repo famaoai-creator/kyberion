@@ -1,0 +1,60 @@
+{
+  "action": "pipeline",
+  "name": "clipboard-transform-fragment",
+  "description": "Reads the clipboard, transforms the content via LLM, writes the result back, and notifies. Required context var: transform_instruction (e.g. 'Translate to English', 'Summarize in 3 bullets', 'Fix grammar').",
+  "steps": [
+    {
+      "id": "read_clipboard",
+      "type": "capture",
+      "op": "system:clipboard_read",
+      "params": { "export_as": "clipboard_input" }
+    },
+    {
+      "id": "guard_empty",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": "clipboard_input",
+        "then": [
+          {
+            "id": "transform",
+            "type": "capture",
+            "op": "reasoning:analyze",
+            "params": {
+              "instruction": "{{transform_instruction}}",
+              "context": ["{{clipboard_input}}"],
+              "export_as": "clipboard_output"
+            }
+          },
+          {
+            "id": "write_back",
+            "type": "apply",
+            "op": "system:clipboard_write",
+            "params": { "text": "{{clipboard_output}}" }
+          },
+          {
+            "id": "notify_done",
+            "type": "apply",
+            "op": "system:system_notify",
+            "params": {
+              "title": "Kyberion",
+              "message": "クリップボードを更新しました",
+              "subtitle": "{{transform_instruction}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "notify_empty",
+            "type": "apply",
+            "op": "system:system_notify",
+            "params": {
+              "title": "Kyberion",
+              "message": "クリップボードが空です"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -6,7 +6,9 @@
       "kind": "ui",
       "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
       "command": "node",
-      "args": ["dist/presence/displays/presence-studio/server.js"],
+      "args": [
+        "dist/presence/displays/presence-studio/server.js"
+      ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
@@ -20,7 +22,9 @@
       "kind": "ui",
       "description": "Live computer interaction surface for governed browser and terminal sessions.",
       "command": "node",
-      "args": ["dist/presence/displays/computer-surface/server.js"],
+      "args": [
+        "dist/presence/displays/computer-surface/server.js"
+      ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
@@ -34,7 +38,9 @@
       "kind": "service",
       "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
       "command": "node",
-      "args": ["dist/satellites/voice-hub/server.js"],
+      "args": [
+        "dist/satellites/voice-hub/server.js"
+      ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",
@@ -50,7 +56,9 @@
       "service_id": "slack",
       "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
       "command": "node",
-      "args": ["dist/satellites/slack-bridge/src/index.js"],
+      "args": [
+        "dist/satellites/slack-bridge/src/index.js"
+      ],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
         "KYBERION_PERSONA": "sovereign",
@@ -67,7 +75,9 @@
       "kind": "service",
       "description": "Managed macOS Messages bridge for declared iMessage sending and governed runtime supervision",
       "command": "node",
-      "args": ["dist/satellites/imessage-bridge/src/index.js"],
+      "args": [
+        "dist/satellites/imessage-bridge/src/index.js"
+      ],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
         "KYBERION_PERSONA": "sovereign",
@@ -86,7 +96,9 @@
       "kind": "service",
       "description": "Background system nerve daemon for stimuli routing and terminal dispatch",
       "command": "node",
-      "args": ["dist/presence/bridge/nexus-daemon.js"],
+      "args": [
+        "dist/presence/bridge/nexus-daemon.js"
+      ],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-NERVE",
         "KYBERION_PERSONA": "sovereign",
@@ -103,7 +115,11 @@
       "kind": "service",
       "description": "Background terminal bridge service for runtime sessions",
       "command": "pnpm",
-      "args": ["--dir", "presence/bridge/terminal", "start"],
+      "args": [
+        "--dir",
+        "presence/bridge/terminal",
+        "start"
+      ],
       "env": {
         "KYBERION_PERSONA": "sovereign",
         "MISSION_ROLE": "infrastructure_sentinel"
@@ -119,7 +135,15 @@
       "kind": "ui",
       "description": "Interactive Chronos control surface served as a workspace application",
       "command": "pnpm",
-      "args": ["--dir", "presence/displays/chronos-mirror-v2", "start", "-H", "127.0.0.1", "-p", "3000"],
+      "args": [
+        "--dir",
+        "presence/displays/chronos-mirror-v2",
+        "start",
+        "-H",
+        "127.0.0.1",
+        "-p",
+        "3000"
+      ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
@@ -133,7 +157,9 @@
       "kind": "service",
       "description": "Loopback-only OAuth callback receiver that completes token exchange into Personal-tier connections.",
       "command": "node",
-      "args": ["dist/scripts/oauth_callback_surface.js"],
+      "args": [
+        "dist/scripts/oauth_callback_surface.js"
+      ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",

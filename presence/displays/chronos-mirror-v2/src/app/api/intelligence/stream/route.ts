@@ -72,12 +72,15 @@ async function collectManagedRuntimeTopology() {
       .map(normalizeSurfaceDefinition)
       .map((surface) => {
         const record = loadSurfaceState().surfaces[surface.id];
+        const alive = record ? (() => {
+          try { process.kill(record.pid, 0); return true; } catch { return false; }
+        })() : false;
         return {
           id: surface.id,
           kind: surface.kind,
-          running: Boolean(record),
+          running: alive,
           startupMode: surface.startupMode,
-          pid: record?.pid,
+          pid: alive ? record?.pid : undefined,
         };
       }),
     runtimeSummary: {
@@ -99,13 +102,25 @@ export async function GET(req: NextRequest) {
   const encoder = new TextEncoder();
   let previousPayload = "";
   let interval: NodeJS.Timeout | null = null;
+  let closed = false;
+
+  const closeStream = () => {
+    if (closed) return;
+    closed = true;
+    if (interval) {
+      clearInterval(interval);
+      interval = null;
+    }
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const push = async () => {
+        if (closed) return;
         const agentMessages = collectAgentMessages();
         const a2aHandoffs = collectA2AHandoffs();
         const { managedRuntimes, surfaces, runtimeSummary } = await collectManagedRuntimeTopology();
+        if (closed) return;
         const payload = {
           ts: new Date().toISOString(),
           accessRole,
@@ -141,23 +156,30 @@ export async function GET(req: NextRequest) {
         const serialized = JSON.stringify(payload);
         if (serialized === previousPayload) return;
         previousPayload = serialized;
-        controller.enqueue(encoder.encode(sseChunk(payload)));
+        try {
+          controller.enqueue(encoder.encode(sseChunk(payload)));
+        } catch {
+          closeStream();
+        }
       };
 
-      controller.enqueue(encoder.encode("retry: 3000\n\n"));
+      try {
+        controller.enqueue(encoder.encode("retry: 3000\n\n"));
+      } catch {
+        closeStream();
+        return;
+      }
       void push();
       interval = setInterval(() => {
         void push();
       }, 2000);
     },
     cancel() {
-      if (interval) clearInterval(interval);
+      closeStream();
     },
   });
 
-  req.signal.addEventListener("abort", () => {
-    if (interval) clearInterval(interval);
-  });
+  req.signal.addEventListener("abort", closeStream);
 
   return new Response(stream, {
     headers: {

@@ -1,7 +1,10 @@
 import * as path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import {
   createStandardYargs,
   loadSurfaceManifest,
+  saveSurfaceManifest,
   readSurfaceLogTail,
   loadSurfaceState,
   logger,
@@ -19,9 +22,36 @@ import {
   surfaceResourceId,
   surfaceStatePath,
   validateServiceAuth,
+  auditChain,
 } from '@agent/core';
+import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 
-type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status';
+type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status' | 'list-units' | 'enable' | 'disable' | 'register' | 'unregister';
+
+const execFileAsync = promisify(execFile);
+
+async function describePortHolder(port: number): Promise<{ pid: number; cwd: string | null } | null> {
+  if (process.platform !== 'darwin' && process.platform !== 'linux') return null;
+  try {
+    const { stdout } = await execFileAsync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fpn']);
+    const lines = stdout.split('\n');
+    const pidLine = lines.find((l) => l.startsWith('p'));
+    if (!pidLine) return null;
+    const pid = Number(pidLine.slice(1));
+    if (!Number.isFinite(pid) || pid <= 0) return null;
+    let cwd: string | null = null;
+    try {
+      const { stdout: cwdOut } = await execFileAsync('lsof', ['-a', '-d', 'cwd', '-p', String(pid), '-Fn']);
+      const nLine = cwdOut.split('\n').find((l) => l.startsWith('n'));
+      if (nLine) cwd = nLine.slice(1);
+    } catch {
+      // best-effort
+    }
+    return { pid, cwd };
+  } catch {
+    return null;
+  }
+}
 
 function isRunning(pid: number): boolean {
   try {
@@ -32,7 +62,7 @@ function isRunning(pid: number): boolean {
   }
 }
 
-function registerRunningSurfaceFromState(record: ReturnType<typeof loadSurfaceState>['surfaces'][string]) {
+function registerRunningSurfaceFromState(record: any) {
   runtimeSupervisor.update(record.resourceId, {
     pid: record.pid,
     state: 'running',
@@ -126,7 +156,14 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   if (normalized.port) {
     const portStatus = await probeSurfacePort(normalized.port);
     if (portStatus.occupied) {
-      throw new Error(`Surface "${surfaceId}" port ${normalized.port} is already in use`);
+      const offender = await describePortHolder(normalized.port);
+      const ownCwd = pathResolver.rootDir();
+      const foreignNote = offender && offender.cwd && offender.cwd !== ownCwd
+        ? ` Holder appears to run from ${offender.cwd} (pid ${offender.pid}) — different from this repo at ${ownCwd}. Stop the foreign process or change "${surfaceId}".port in active-surfaces.json.`
+        : offender
+          ? ` Held by pid ${offender.pid}.`
+          : '';
+      throw new Error(`Surface "${surfaceId}" port ${normalized.port} is already in use.${foreignNote}`);
     }
   }
 
@@ -229,8 +266,14 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
       results.push({ id: definition.id, status: 'running', pid: existing.pid });
       continue;
     }
-    const started = await startSurfaceById(definition.id, manifestPath);
-    results.push(started);
+    try {
+      const started = await startSurfaceById(definition.id, manifestPath);
+      results.push(started);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`⚠️  [SURFACE] Failed to start "${definition.id}": ${message}. Continuing with the next surface.`);
+      results.push({ id: definition.id, status: 'failed', reason: message });
+    }
   }
 
   if (cleanup) {
@@ -289,6 +332,151 @@ async function statusSurfaces() {
   };
 }
 
+async function listUnits() {
+  const manifest = loadSurfaceManifest();
+  const state = loadSurfaceState();
+  
+  const results = await Promise.all(manifest.surfaces.map(async (d) => {
+    const normalized = normalizeSurfaceDefinition(d);
+    const record = state.surfaces[d.id];
+    const running = record && isRunning(record.pid);
+    const health = await probeSurfaceHealth(normalized);
+    
+    return {
+      unit: d.id,
+      kind: d.kind,
+      enabled: d.enabled !== false ? 'enabled' : 'disabled',
+      status: running ? 'running' : 'stopped',
+      health: health.status,
+      port: d.port || '-',
+      pid: record?.pid || '-'
+    };
+  }));
+
+  console.log('');
+  const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
+  console.log(header);
+  console.log('-'.repeat(header.length + 5));
+  
+  for (const r of results) {
+    const statusColor = r.status === 'running' ? '🟢' : '⚪';
+    const enabledColor = r.enabled === 'enabled' ? '✅' : '❌';
+    console.log(
+      `${r.unit.padEnd(25)} ${r.kind.padEnd(10)} ${enabledColor} ${r.enabled.padEnd(8)} ${statusColor} ${r.status.padEnd(8)} ${r.health.padEnd(10)} ${String(r.port).padEnd(6)} ${r.pid}`
+    );
+  }
+  console.log('');
+}
+
+async function enableSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const definition = manifest.surfaces.find(s => s.id === surfaceId);
+  if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
+  
+  if (definition.enabled === true) {
+    logger.info(`Surface "${surfaceId}" is already enabled.`);
+  } else {
+    definition.enabled = true;
+    saveSurfaceManifest(manifest, manifestPath);
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'operator',
+      action: 'surface.enable',
+      operation: surfaceId,
+      result: 'completed',
+      metadata: { surfaceId, manifestPath }
+    });
+    logger.success(`✅ Enabled surface "${surfaceId}".`);
+  }
+  
+  return startSurfaceById(surfaceId, manifestPath);
+}
+
+async function disableSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const definition = manifest.surfaces.find(s => s.id === surfaceId);
+  if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
+  
+  if (definition.enabled === false) {
+    logger.info(`Surface "${surfaceId}" is already disabled.`);
+  } else {
+    definition.enabled = false;
+    saveSurfaceManifest(manifest, manifestPath);
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'operator',
+      action: 'surface.disable',
+      operation: surfaceId,
+      result: 'completed',
+      metadata: { surfaceId, manifestPath }
+    });
+    logger.success(`✅ Disabled surface "${surfaceId}".`);
+  }
+  
+  return stopSurfaceById(surfaceId);
+}
+
+async function registerSurface(params: {
+  id: string,
+  kind: SurfaceRuntimeKind,
+  command: string,
+  args?: string[],
+  port?: number,
+  description?: string,
+  manifestPath: string
+}) {
+  const manifest = loadSurfaceManifest(params.manifestPath);
+  if (manifest.surfaces.some(s => s.id === params.id)) {
+    throw new Error(`Surface "${params.id}" is already registered.`);
+  }
+  
+  const newSurface: SurfaceRuntimeDefinition = {
+    id: params.id,
+    kind: params.kind,
+    description: params.description || `Surface ${params.id}`,
+    command: params.command,
+    args: params.args || [],
+    port: params.port,
+    enabled: true,
+    startupMode: params.kind === 'ui' ? 'workspace-app' : 'background',
+    shutdownPolicy: 'detached',
+    ownerType: 'surface-runtime-manifest'
+  };
+  
+  manifest.surfaces.push(newSurface);
+  saveSurfaceManifest(manifest, params.manifestPath);
+  
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'operator',
+    action: 'surface.register',
+    operation: params.id,
+    result: 'completed',
+    metadata: { ...newSurface, manifestPath: params.manifestPath }
+  });
+  
+  logger.success(`✅ Registered new surface "${params.id}".`);
+  return reconcileSurfaces(params.manifestPath);
+}
+
+async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const index = manifest.surfaces.findIndex(s => s.id === surfaceId);
+  if (index === -1) throw new Error(`Surface "${surfaceId}" not found.`);
+  
+  const [removed] = manifest.surfaces.splice(index, 1);
+  saveSurfaceManifest(manifest, manifestPath);
+  
+  await stopSurfaceById(surfaceId);
+
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'operator',
+    action: 'surface.unregister',
+    operation: surfaceId,
+    result: 'completed',
+    metadata: { surfaceId, removed, manifestPath }
+  });
+  
+  logger.success(`✅ Unregistered surface "${surfaceId}".`);
+}
+
 async function reconcileHealth(manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
   const restarted: string[] = [];
@@ -311,10 +499,15 @@ async function reconcileHealth(manifestPath: string) {
 
 const main = async () => {
   const argv = await createStandardYargs()
-    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status'] as const, required: true })
+    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status', 'list-units', 'enable', 'disable', 'register', 'unregister'] as const, required: true })
     .option('surface', { type: 'string' })
     .option('manifest', { type: 'string', default: surfaceManifestPath() })
     .option('cleanup', { type: 'boolean', default: false })
+    .option('kind', { type: 'string', choices: ['ui', 'service', 'gateway'] })
+    .option('command', { type: 'string' })
+    .option('args', { type: 'string' })
+    .option('port', { type: 'number' })
+    .option('description', { type: 'string' })
     .parseSync();
 
   const action = argv.action as SurfaceAction;
@@ -339,11 +532,42 @@ const main = async () => {
     case 'status':
       result = await statusSurfaces();
       break;
+    case 'list-units':
+      await listUnits();
+      break;
+    case 'enable':
+      if (!argv.surface) throw new Error('--surface is required for enable');
+      result = await enableSurfaceById(argv.surface as string, manifestPath);
+      break;
+    case 'disable':
+      if (!argv.surface) throw new Error('--surface is required for disable');
+      result = await disableSurfaceById(argv.surface as string, manifestPath);
+      break;
+    case 'register':
+      if (!argv.surface || !argv.kind || !argv.command) {
+        throw new Error('--surface, --kind, and --command are required for register');
+      }
+      result = await registerSurface({
+        id: argv.surface as string,
+        kind: argv.kind as SurfaceRuntimeKind,
+        command: argv.command as string,
+        args: argv.args ? (() => { try { return JSON.parse(argv.args as string); } catch { return (argv.args as string).split(' '); } })() : [],
+        port: argv.port as number,
+        description: argv.description as string,
+        manifestPath
+      });
+      break;
+    case 'unregister':
+      if (!argv.surface) throw new Error('--surface is required for unregister');
+      result = await unregisterSurfaceById(argv.surface as string, manifestPath);
+      break;
     default:
       throw new Error(`Unsupported action: ${action}`);
   }
 
-  console.log(JSON.stringify(result, null, 2));
+  if (result !== undefined) {
+    console.log(JSON.stringify(result, null, 2));
+  }
 };
 
 const isMain = process.argv[1] && (

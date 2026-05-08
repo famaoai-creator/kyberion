@@ -8,6 +8,16 @@ export {
   rightClickAt,
   moveMouse,
   toAppleScriptString,
+  scrollAt,
+  dragFrom,
+  runAppleScript,
+  getScreenSize,
+  getWindowList,
+  quitApplication,
+  systemNotify,
+  clipboardRead,
+  clipboardWrite,
+  takeScreenshot,
 } from './apple-event-bridge.js';
 export {
   listKnownAppCapabilities,

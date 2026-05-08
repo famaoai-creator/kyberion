@@ -516,6 +516,21 @@ async function runOnboarding() {
   const rootDir = pathResolver.rootDir();
   const personalDir = pathResolver.knowledge('personal');
 
+  if (!interactive && process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK !== '1') {
+    console.error(chalk.red('\n❌ Refusing to run interactive onboarding without a TTY.'));
+    console.error('  This wizard would otherwise silently apply default values for every prompt,');
+    console.error('  producing an identity that does not reflect the Sovereign\'s intent.');
+    console.error('\n  Options:');
+    console.error('    1. Run from a real terminal: pnpm onboard');
+    console.error('    2. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write');
+    console.error('       knowledge/personal/{my-identity.json,my-vision.md,agent-identity.json,');
+    console.error('       onboarding/onboarding-state.json,onboarding/onboarding-summary.md}');
+    console.error('       directly per the schemas under knowledge/public/{schemas,templates}.');
+    console.error('    3. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1');
+    rl.close();
+    process.exit(2);
+  }
+
   console.log('\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n');
   console.log('This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n');
 

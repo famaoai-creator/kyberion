@@ -5,24 +5,36 @@ import {
   getVoiceSampleIngestionPolicy,
   getVoiceEngineRecord,
   getVoiceProfileRecord,
+  getVoiceProfileRegistry,
   getVoiceRuntimePolicy,
   getVoiceTtsLanguageConfig,
   logger,
   pathResolver,
   recordInteraction,
+  resolveVars,
   resolveVoiceEngineForPlatform,
   recordVoiceSample,
   safeExec,
+  safeExecResult,
+  safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
   validateVoiceProfileRegistration,
   VoiceGenerationRuntime,
+  writeVoiceProfileRegistry,
   splitVoiceTextIntoChunks,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+
+function resolvePythonBin(): string {
+  if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const venvPython = pathResolver.rootResolve('.venv/bin/python3');
+  if (safeExistsSync(venvPython)) return venvPython;
+  return 'python3';
+}
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -119,6 +131,12 @@ export async function handleSingleAction(input: VoiceAction) {
       : input;
     return registerVoiceProfile(payload as any);
   }
+  if (input.action === 'transcribe_voice_sample') {
+    const payload = (input as any).params
+      ? { action: 'transcribe_voice_sample', ...((input as any).params || {}) }
+      : input;
+    return transcribeVoiceSample(payload as any);
+  }
   if ((input as any).action === 'record_interaction') {
     const p = (input as any).params ?? {};
     if (!p.person_slug || !p.org || !p.summary) {
@@ -153,7 +171,7 @@ async function collectAndRegisterVoiceProfile(input: {
     notes?: string;
   };
   samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
-  policy?: { strict_personal_voice?: boolean };
+  policy?: { strict_personal_voice?: boolean; allow_update?: boolean };
 }): Promise<any> {
   const collected = collectVoiceSamples({
     action: 'collect_voice_samples',
@@ -316,7 +334,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
 
       let artifactRefs: string[] = [];
       if (deliveryMode === 'artifact' || deliveryMode === 'artifact_and_playback') {
-        const artifactRef = renderNativeArtifact(String(input.text || ''), {
+        const artifactRef = await renderNativeArtifact(String(input.text || ''), {
           requestId: jobId,
           voice: defaults.voice,
           rate: defaults.rate,
@@ -324,6 +342,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
           engineId: engine.engine_id,
           supportsFormats: engine.supports.artifact_formats,
           outputPath: input.delivery?.artifact_path,
+          profile,
         });
         artifactRefs = [artifactRef];
       }
@@ -353,6 +372,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             voice: defaults.voice,
             rate: defaults.rate,
             engineId: engine.engine_id,
+            profile,
           });
         }
       }
@@ -395,20 +415,47 @@ async function registerVoiceProfile(input: {
     notes?: string;
   };
   samples: Array<{ sample_id: string; path: string; language?: string }>;
-  policy?: { strict_personal_voice?: boolean };
+  policy?: { strict_personal_voice?: boolean; allow_update?: boolean };
 }): Promise<any> {
   if (!String(input.request_id || '').trim()) {
     throw new Error('register_voice_profile requires request_id');
   }
-  const policy = getVoiceSampleIngestionPolicy();
-  const validation = validateVoiceProfileRegistration(input, policy);
+  const ingestionPolicy = getVoiceSampleIngestionPolicy();
+  const validation = validateVoiceProfileRegistration(
+    { ...input, policy: { ...input.policy, strict_personal_voice: input.policy?.strict_personal_voice } },
+    ingestionPolicy,
+  );
   if (!validation.ok) {
     return {
       status: 'blocked',
       action: 'register_voice_profile',
       request_id: input.request_id,
-      policy_version: policy.version,
+      policy_version: ingestionPolicy.version,
       violations: validation.violations,
+      summary: validation.summary,
+    };
+  }
+
+  // Direct upsert: update existing profile's sample_refs in registry
+  if (input.policy?.allow_update) {
+    const registry = getVoiceProfileRegistry();
+    const sampleRefs = input.samples.map((s) => s.path);
+    const existing = registry.profiles.find((p) => p.profile_id === input.profile.profile_id);
+    const updated = existing
+      ? { ...existing, ...input.profile, sample_refs: sampleRefs, status: existing.status }
+      : { ...input.profile, sample_refs: sampleRefs, status: 'active' as const };
+    const nextProfiles = existing
+      ? registry.profiles.map((p) => (p.profile_id === input.profile.profile_id ? updated : p))
+      : [...registry.profiles, updated];
+    writeVoiceProfileRegistry({ ...registry, profiles: nextProfiles });
+    logger.info(`[VOICE] ${existing ? 'updated' : 'created'} profile ${input.profile.profile_id} with ${sampleRefs.length} sample(s)`);
+    return {
+      status: 'succeeded',
+      action: 'register_voice_profile',
+      request_id: input.request_id,
+      profile_id: input.profile.profile_id,
+      sample_refs: sampleRefs,
+      upserted: true,
       summary: validation.summary,
     };
   }
@@ -427,7 +474,7 @@ async function registerVoiceProfile(input: {
         profile: input.profile,
         samples: input.samples,
         summary: validation.summary,
-        policy_version: policy.version,
+        policy_version: ingestionPolicy.version,
       },
       null,
       2,
@@ -444,13 +491,76 @@ async function registerVoiceProfile(input: {
   };
 }
 
+async function transcribeVoiceSample(input: {
+  action: 'transcribe_voice_sample';
+  audio_path: string;
+  language?: string;
+  model?: string;
+  write_sidecar?: boolean;
+}): Promise<any> {
+  const audioPath = String(input.audio_path || '').trim();
+  if (!audioPath) throw new Error('transcribe_voice_sample requires audio_path');
+
+  const bridgeScript = pathResolver.rootResolve(
+    'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py',
+  );
+  const payload = JSON.stringify({
+    action: 'transcribe',
+    params: {
+      audio_path: pathResolver.rootResolve(audioPath),
+      ...(input.language ? { language: input.language } : {}),
+      ...(input.model ? { model: input.model } : {}),
+    },
+  });
+
+  const result = safeExecResult(resolvePythonBin(), [bridgeScript], { input: payload });
+  if (result.error || result.status !== 0) {
+    throw new Error(`mlx_audio_stt_bridge failed: ${result.stderr || result.error?.message}`);
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`mlx_audio_stt_bridge returned non-JSON: ${result.stdout}`);
+  }
+
+  if (parsed.status !== 'success') {
+    throw new Error(`mlx_audio_stt_bridge error: ${parsed.error}`);
+  }
+
+  if (input.write_sidecar !== false) {
+    const sidecarPath = pathResolver.rootResolve(`${audioPath}.transcript.txt`);
+    const sidecarDir = path.dirname(sidecarPath);
+    safeMkdir(sidecarDir, { recursive: true });
+    safeWriteFile(sidecarPath, parsed.text);
+    logger.info(`[VOICE] transcript written to ${sidecarPath}`);
+  }
+
+  return {
+    status: 'succeeded',
+    action: 'transcribe_voice_sample',
+    audio_path: audioPath,
+    transcript: parsed.text,
+    language: parsed.language,
+    model: parsed.model,
+  };
+}
+
 async function performPlayback(
   text: string,
-  options: { language: string; voice: string; rate: number; engineId: string },
+  options: { language: string; voice: string; rate: number; engineId: string; profile?: any },
 ): Promise<void> {
   const engine = resolveVoiceEngineForPlatform(options.engineId);
   if (!engine.supports.playback) {
     throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
+  }
+
+  if (engine.engine_id === 'mlx_audio_qwen3') {
+    const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
+    await runMlxAudioGenerate(text, tmpPath, options.profile);
+    safeExec('open', [tmpPath]);
+    return;
   }
 
   if (process.platform === 'darwin') {
@@ -472,6 +582,59 @@ async function performPlayback(
   throw new Error(`Unsupported voice playback platform: ${process.platform}`);
 }
 
+async function runMlxAudioGenerate(text: string, outputPath: string, profile?: any): Promise<void> {
+  const bridgeScript = pathResolver.rootResolve(
+    'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py',
+  );
+
+  const refAudio = resolveProfileRefAudio(profile);
+  const refText = refAudio ? resolveRefTranscript(refAudio) : undefined;
+
+  const payload = JSON.stringify({
+    action: 'generate',
+    params: {
+      text,
+      output_path: outputPath,
+      ...(refAudio ? { ref_audio: refAudio } : {}),
+      ...(refText ? { ref_text: refText } : {}),
+    },
+  });
+
+  const result = safeExecResult(resolvePythonBin(), [bridgeScript], { input: payload });
+  if (result.error || result.status !== 0) {
+    throw new Error(`mlx_audio_tts_bridge failed: ${result.stderr || result.error?.message}`);
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`mlx_audio_tts_bridge returned non-JSON: ${result.stdout}`);
+  }
+
+  if (parsed.status !== 'success') {
+    throw new Error(`mlx_audio_tts_bridge error: ${parsed.error}`);
+  }
+}
+
+function resolveProfileRefAudio(profile?: any): string | undefined {
+  if (!profile) return undefined;
+  const samples: string[] = profile.sample_refs || [];
+  if (samples.length === 0) return undefined;
+  const absPath = pathResolver.rootResolve(samples[0]);
+  return absPath;
+}
+
+function resolveRefTranscript(refAudioPath: string): string | undefined {
+  const sidecarPath = `${refAudioPath}.transcript.txt`;
+  try {
+    const content = safeReadFile(sidecarPath, { encoding: 'utf8' });
+    return typeof content === 'string' ? content.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function renderNativeArtifact(
   text: string,
   options: {
@@ -482,14 +645,19 @@ function renderNativeArtifact(
     engineId: string;
     supportsFormats: VoiceArtifactFormat[];
     outputPath?: string;
+    profile?: any;
   },
-): string {
+): string | Promise<string> {
   if (!options.supportsFormats.includes(options.format)) {
     throw new Error(`Voice engine ${options.engineId} does not support artifact format ${options.format}`);
   }
   const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });
+
+  if (options.engineId === 'mlx_audio_qwen3') {
+    return runMlxAudioGenerate(text, artifactPath, options.profile).then(() => artifactPath);
+  }
 
   if (process.platform === 'darwin') {
     safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
@@ -523,6 +691,36 @@ async function waitForVoiceJob(runtime: VoiceGenerationRuntime, jobId: string): 
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`voice job timed out: ${jobId}`);
+}
+
+function deepResolve(val: any, ctx: any): any {
+  if (typeof val === 'string') return resolveVars(val, ctx);
+  if (Array.isArray(val)) return val.map((item) => deepResolve(item, ctx));
+  if (val !== null && typeof val === 'object') {
+    const result: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) result[k] = deepResolve(v, ctx);
+    return result;
+  }
+  return val;
+}
+
+export async function dispatchDecisionOp(
+  op: string,
+  params: Record<string, any>,
+  ctx: Record<string, any>,
+): Promise<{ handled: boolean; ctx: any }> {
+  const resolvedParams = deepResolve(params, ctx);
+  const payload = { action: op, ...resolvedParams };
+  try {
+    const result = await handleSingleAction(payload as any);
+    const exportAs = resolvedParams.export_as;
+    return {
+      handled: true,
+      ctx: exportAs ? { ...ctx, [exportAs]: result } : { ...ctx, last_voice_result: result },
+    };
+  } catch (err: any) {
+    throw err;
+  }
 }
 
 const main = async () => {

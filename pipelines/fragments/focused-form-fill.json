@@ -1,0 +1,89 @@
+{
+  "action": "pipeline",
+  "name": "focused-form-fill-fragment",
+  "description": "Checks if the currently focused UI element is editable, pastes fill_text into it, and optionally submits. Required context var: fill_text. Optional: auto_submit (boolean string 'true'/'false', default false), application (activates the app before checking focus).",
+  "steps": [
+    {
+      "id": "activate_app",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": "application",
+        "then": [
+          {
+            "id": "activate",
+            "type": "apply",
+            "op": "system:activate_application",
+            "params": { "application": "{{application}}" }
+          }
+        ]
+      }
+    },
+    {
+      "id": "check_focus",
+      "type": "capture",
+      "op": "system:get_focused_input",
+      "params": { "export_as": "focused_input" }
+    },
+    {
+      "id": "fill_or_warn",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "focused_input.editable", "operator": "equals", "value": true },
+        "then": [
+          {
+            "id": "stage_clipboard",
+            "type": "apply",
+            "op": "system:clipboard_write",
+            "params": { "text": "{{fill_text}}" }
+          },
+          {
+            "id": "paste",
+            "type": "apply",
+            "op": "system:paste_text",
+            "params": { "text": "{{fill_text}}" }
+          },
+          {
+            "id": "maybe_submit",
+            "type": "apply",
+            "op": "core:if",
+            "params": {
+              "condition": { "from": "auto_submit", "operator": "equals", "value": "true" },
+              "then": [
+                {
+                  "id": "submit",
+                  "type": "apply",
+                  "op": "system:press_key",
+                  "params": { "key": "enter" }
+                }
+              ]
+            }
+          },
+          {
+            "id": "notify_success",
+            "type": "apply",
+            "op": "system:system_notify",
+            "params": {
+              "title": "Kyberion",
+              "message": "入力しました",
+              "subtitle": "{{focused_input.application}} — {{focused_input.windowTitle}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "notify_not_editable",
+            "type": "apply",
+            "op": "system:system_notify",
+            "params": {
+              "title": "Kyberion",
+              "message": "入力フォームにフォーカスがありません",
+              "subtitle": "role: {{focused_input.role}}"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

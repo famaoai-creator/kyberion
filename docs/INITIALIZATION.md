@@ -40,7 +40,10 @@ pnpm onboard
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
 - **物理的変化**:
   - `dist/` ディレクトリが生成され、全ソースコードがビルドされます。
+  - `presence/displays/chronos-mirror-v2/.next/` が生成されます（`build:ui` step）。
   - workspace 間の runtime contract が再構築されます。
+- **ステップ構成**: `build:packages` → `build:actuators` → `build:repo` → `build:ui`。
+  個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
 
 ### Stage 3: Runtime Surface Reconciliation
 - **実行コマンド**: `pnpm surfaces:reconcile`
@@ -53,6 +56,10 @@ pnpm onboard
 ### Stage 4: 魂の注入 (Soul Infusion)
 - **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
+- **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
+  - `pnpm onboard:apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
+  - エージェントが直接 `knowledge/personal/` 配下のスキーマ準拠ファイルを書き込み（CLAUDE.md の Path B）
+  - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
 - **物理的変化**:
   - `knowledge/personal/my-identity.json` が生成されます。
   - `knowledge/personal/my-vision.md` が生成（または更新）されます。

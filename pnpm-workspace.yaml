@@ -5,3 +5,13 @@ packages:
   - 'satellites/*'
   - 'presence/displays/*'
   - 'presence/bridge/*'
+allowBuilds:
+  '@scarf/scarf': false
+  esbuild: true
+  node-pty: true
+  protobufjs: true
+  puppeteer: true
+  sharp: true
+  sqlite3: true
+  tesseract.js: true
+  unrs-resolver: true

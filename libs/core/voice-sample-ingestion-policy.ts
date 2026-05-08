@@ -41,6 +41,7 @@ export interface VoiceProfileRegistrationRequest {
   }>;
   policy?: {
     strict_personal_voice?: boolean;
+    allow_update?: boolean;
   };
 }
 
@@ -128,9 +129,11 @@ export function validateVoiceProfileRegistration(
     violations.push('profile.languages must include at least one language');
   }
 
-  const existingProfiles = new Set((getVoiceProfileRegistry().profiles || []).map((profile) => String(profile.profile_id || '')));
-  if (existingProfiles.has(request.profile.profile_id)) {
-    violations.push(`profile.profile_id already exists (${request.profile.profile_id})`);
+  if (!request.policy?.allow_update) {
+    const existingProfiles = new Set((getVoiceProfileRegistry().profiles || []).map((profile) => String(profile.profile_id || '')));
+    if (existingProfiles.has(request.profile.profile_id)) {
+      violations.push(`profile.profile_id already exists (${request.profile.profile_id})`);
+    }
   }
 
   const engines = new Set(listVoiceEngines('all').map((engine) => engine.engine_id));
