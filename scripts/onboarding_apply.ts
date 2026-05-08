@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import AjvModule from 'ajv';
 import AjvFormats from 'ajv-formats';
 import yargs from 'yargs';
@@ -42,11 +43,11 @@ const ONBOARDING_ROOT = pathResolver.knowledge('personal/onboarding');
 const STATE_PATH = path.join(ONBOARDING_ROOT, 'onboarding-state.json');
 const SUMMARY_PATH = path.join(ONBOARDING_ROOT, 'onboarding-summary.md');
 
-function ensureDir(p: string) {
+export function ensureDir(p: string) {
   if (!safeExistsSync(p)) safeMkdir(p, { recursive: true });
 }
 
-async function readInput(file?: string): Promise<ApplyInput> {
+export async function readInput(file?: string): Promise<ApplyInput> {
   if (file) {
     if (!safeExistsSync(file)) throw new Error(`identity file not found: ${file}`);
     return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as ApplyInput;
@@ -60,7 +61,7 @@ async function readInput(file?: string): Promise<ApplyInput> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as ApplyInput;
 }
 
-function validateInput(input: ApplyInput) {
+export function validateInput(input: ApplyInput) {
   if (!input?.identity) throw new Error('identity block is required');
   const { name, language, interaction_style, primary_domain, vision, agent_id } = input.identity;
   if (!name || !language || !interaction_style || !primary_domain || !vision || !agent_id) {
@@ -76,7 +77,7 @@ function validateInput(input: ApplyInput) {
   }
 }
 
-async function writeJson(filePath: string, payload: unknown, lockName: string) {
+export async function writeJson(filePath: string, payload: unknown, lockName: string) {
   await withLock(lockName, async () => {
     withExecutionContext('sovereign_concierge', () => {
       ensureDir(path.dirname(filePath));
@@ -85,7 +86,7 @@ async function writeJson(filePath: string, payload: unknown, lockName: string) {
   });
 }
 
-async function writeText(filePath: string, content: string, lockName: string) {
+export async function writeText(filePath: string, content: string, lockName: string) {
   await withLock(lockName, async () => {
     withExecutionContext('sovereign_concierge', () => {
       ensureDir(path.dirname(filePath));
@@ -94,7 +95,7 @@ async function writeText(filePath: string, content: string, lockName: string) {
   });
 }
 
-async function applyIdentity(input: ApplyInput, now: string) {
+export async function applyIdentity(input: ApplyInput, now: string) {
   const personalDir = pathResolver.knowledge('personal');
   ensureDir(personalDir);
   ensureDir(ONBOARDING_ROOT);
@@ -124,7 +125,7 @@ async function applyIdentity(input: ApplyInput, now: string) {
   }, 'onboarding-agent-identity');
 }
 
-async function applyTenants(input: ApplyInput, now: string): Promise<Array<Record<string, unknown>>> {
+export async function applyTenants(input: ApplyInput, now: string): Promise<Array<Record<string, unknown>>> {
   const tenants = input.tenants || [];
   const tenantDir = pathResolver.knowledge('personal/tenants');
   ensureDir(tenantDir);
@@ -155,7 +156,7 @@ async function applyTenants(input: ApplyInput, now: string): Promise<Array<Recor
   return entries;
 }
 
-async function applyTutorial(input: ApplyInput, now: string) {
+export async function applyTutorial(input: ApplyInput, now: string) {
   const mode = input.tutorial?.mode || 'simulate';
   const summary = input.tutorial?.summary || 'Demonstrate the initial Kyberion setup with a safe dry-run.';
   const planPath = path.join(ONBOARDING_ROOT, 'tutorial-plan.md');
@@ -174,7 +175,7 @@ async function applyTutorial(input: ApplyInput, now: string) {
   return { mode, summary, plan_path: planPath };
 }
 
-function buildState(input: ApplyInput, now: string, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string; plan_path: string }) {
+export function buildState(input: ApplyInput, now: string, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string; plan_path: string }) {
   return {
     version: '1.0.0' as const,
     status: 'complete' as const,
@@ -189,7 +190,7 @@ function buildState(input: ApplyInput, now: string, tenantEntries: Array<Record<
   };
 }
 
-function buildSummary(input: ApplyInput, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string }) {
+export function buildSummary(input: ApplyInput, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string }) {
   const id = input.identity;
   const lines = [
     '# Kyberion Onboarding Summary',
@@ -222,7 +223,7 @@ function buildSummary(input: ApplyInput, tenantEntries: Array<Record<string, unk
   return lines.join('\n');
 }
 
-async function main() {
+export async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('identity', { type: 'string', describe: 'Path to identity JSON (or pipe JSON via stdin)' })
     .option('dry-run', { type: 'boolean', default: false })
@@ -268,7 +269,11 @@ async function main() {
   }, null, 2));
 }
 
-main().catch((err) => {
-  console.error('onboarding_apply failed:', err.message || err);
-  process.exit(1);
-});
+const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error('onboarding_apply failed:', err.message || err);
+    process.exit(1);
+  });
+}
