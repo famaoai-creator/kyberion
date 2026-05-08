@@ -29,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check commit subject
+        if: github.event_name == 'push'
+        run: pnpm run check:commit-subject
+
       - name: Build project
         run: pnpm run build
 
