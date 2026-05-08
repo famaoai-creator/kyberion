@@ -157,5 +157,5 @@ jobs:
       - name: Security audit (blocking on critical)
         run: pnpm audit --audit-level=critical
 
-      - name: Build size audit
-        run: node dist/scripts/measure-build-size.js --json --no-save > /tmp/build-size-report.json
+      - name: Vital check audit
+        run: node dist/scripts/vital_check.js --format json --exit-on-missing=false > /tmp/vital-check-report.json
