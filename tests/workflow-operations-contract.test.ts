@@ -14,7 +14,7 @@ describe('Workflow operations contract', () => {
     expect(ci).toContain('pnpm install --frozen-lockfile');
     expect(ci).toContain('node dist/scripts/capability_discovery.js');
     expect(ci).toContain('node dist/scripts/surface_runtime.js --action status');
-    expect(ci).toContain('node dist/scripts/measure-build-size.js --json --no-save');
+    expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
   });
 
   it('does not invoke removed skills/bootstrap/schema scripts from CI workflows', () => {
@@ -28,8 +28,8 @@ describe('Workflow operations contract', () => {
 
   it('keeps PR validation on built build-size measurement', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
-    expect(prValidation).toContain('node dist/scripts/measure-build-size.js');
-    expect(prValidation).not.toContain('npx tsx scripts/measure-build-size.ts');
+    expect(prValidation).toContain('node dist/scripts/vital_check.js --format text');
+    expect(prValidation).not.toContain('npx tsx scripts/vital_check.ts');
   });
 
   it('documents the distinction between local terminal residue and managed surfaces', () => {

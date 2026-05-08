@@ -75,7 +75,7 @@
     "libs/core/src/pfc/PhysicalLayer.ts",
     "libs/core/video-render-backend.ts",
     "satellites/voice-hub/server.ts",
-    "scripts/measure-build-size.ts",
+    "scripts/vital_check.ts",
     "scripts/run_generation_schedule_daemon.ts",
     "tests/knowledge-taxonomy-contract.test.ts",
     "tests/managed-process.test.ts",

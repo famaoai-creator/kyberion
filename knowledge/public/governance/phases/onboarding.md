@@ -13,7 +13,7 @@ Establish the neurological link between modules.
 
 ### Stage 2: System Manifestation (システムの具現化)
 Construct the physical structure and activate services based on governance.
-- **Action**: `node dist/scripts/run_orchestration_job.js` (Running the "System Onboarding" job).
+- **Action**: `pnpm onboard` (interactive) or `pnpm onboard:apply --identity path/to/identity.json` (non-interactive).
 - **Effect**:
   - Build artifacts (`dist/`) are generated.
   - `presence` (external interface) services are initialized.
@@ -49,7 +49,7 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, 
 
 ## Success Metrics [L3]
 1. **Physical Integrity**: `pnpm install` completed with no resolution errors.
-2. **Operational Status**: `scripts/run_orchestration_job.ts` returns `status: "finished"`.
+2. **Operational Status**: `pnpm onboard:apply` returns `status: "complete"` after persisting the onboarding state.
 3. **Identity Alignment**: `my-identity.json`, `my-vision.md`, and `agent-identity.json` all exist in the Personal Tier.
 4. **Onboarding Summary**: `onboarding/onboarding-state.json` and `onboarding/onboarding-summary.md` are persisted.
 
