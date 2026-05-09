@@ -46,5 +46,6 @@ describe('Customer aggregation contract', () => {
     expect(customerReadme).toContain('required customer.json / identity.json / vision.md files are present');
     expect(customerReadme).toContain('pnpm customer:migrate-from-personal acme-corp');
     expect(customerReadme).toContain('pnpm customer:switch acme-corp');
+    expect(customerReadme).toContain('customer:switch requires customer.json / identity.json / vision.md to be present');
   });
 });
