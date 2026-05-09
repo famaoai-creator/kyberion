@@ -80,7 +80,9 @@ pnpm voice:upgrade-local
 # Pulls model files (1.2 GB), starts local server, verifies.
 ```
 
-Both upgrade scripts are not yet implemented — see Phase A-5.8 in the roadmap.
+The upgrade commands are implemented as configurators and validate prerequisites.
+What is still pending is full end-to-end runtime switching for the voice surface;
+see Phase A-5.8 in the roadmap.
 
 ## Why tier 0 matters
 
