@@ -1,4 +1,8 @@
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from "@agent/core";
+import {
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+} from "@agent/core/intelligence-primitives";
 
 export interface OrchestrationEventSummary {
   ts: string;

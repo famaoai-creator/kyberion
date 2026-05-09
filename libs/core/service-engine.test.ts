@@ -47,6 +47,10 @@ describe('executeServicePreset', () => {
         },
         vision: { preset_path: 'knowledge/public/orchestration/service-presets/vision.json' },
         voice: { preset_path: 'knowledge/public/orchestration/service-presets/voice.json' },
+        'google-workspace': {
+          preset_path: 'knowledge/public/orchestration/service-presets/google-workspace.json',
+          allow_unsafe_cli: true,
+        },
         notion: { preset_path: 'p.json', base_url: 'https://api.notion.com/v1' },
         canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
         youtube: { preset_path: 'knowledge/public/orchestration/service-presets/youtube.json' },
@@ -390,6 +394,43 @@ describe('executeServicePreset', () => {
       'dist/scripts/stage_youtube_upload_package.js',
       'knowledge/public/schemas/narrated-video-publish-plan.example.json',
       'active/shared/runtime/youtube/upload-packages/kyberion.json',
+    ]);
+  });
+
+  it('executes google workspace helper commands through gws', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('google-workspace.json')) {
+        return JSON.stringify({
+          auth_strategy: 'session',
+          allow_unsafe_cli: true,
+          operations: {
+            drive_files_list: {
+              type: 'cli',
+              command: 'gws',
+              args: ['drive', 'files', 'list', '--params', '{{params}}', '--page-all'],
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeExec.mockReturnValue(JSON.stringify({ files: [{ name: 'Q1 Budget' }] }));
+
+    await expect(
+      executeServicePreset('google-workspace', 'drive_files_list', {
+        params: { pageSize: 5 },
+      })
+    ).resolves.toEqual({ files: [{ name: 'Q1 Budget' }] });
+
+    expect(mocks.safeExec).toHaveBeenCalledWith('gws', [
+      'drive',
+      'files',
+      'list',
+      '--params',
+      JSON.stringify({ pageSize: 5 }),
+      '--page-all',
     ]);
   });
 });

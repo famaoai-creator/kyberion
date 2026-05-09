@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 
 import { getChronosAccessRoleOrThrow, guardRequest, roleToMissionRole } from "../../../lib/api-guard";
-import { pathResolver, safeExistsSync, safeReadFile, safeStat } from "@agent/core";
+import { pathResolver } from "@agent/core/path-resolver";
+import { safeExistsSync, safeReadFile, safeStat } from "@agent/core/secure-io";
 
 const ALLOWED_PREFIXES = ["deliverables/", "artifacts/", "outputs/", "evidence/"] as const;
 
