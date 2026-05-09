@@ -67,7 +67,7 @@ The JSON format of `pipelines/*.json`.
 
 ### 2.3 Plugin Format — **Beta**
 
-The `plugins/` directory format. The plugin authoring guide (Phase C'-5) will lift this to v1.
+The `plugins/` directory format. See [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md) for the current authoring guide. Phase D'-1 will lift this to v1.
 
 **Beta**:
 
