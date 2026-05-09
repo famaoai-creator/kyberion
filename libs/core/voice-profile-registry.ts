@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
@@ -22,6 +23,7 @@ export interface VoiceProfileRegistry {
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/voice-profile-registry.json');
+const DEFAULT_CUSTOMER_OVERLAY_PATH = 'voice/profile-registry.json';
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/voice/profile-registry.json');
 
 const FALLBACK_REGISTRY: VoiceProfileRegistry = {
@@ -50,6 +52,12 @@ function getPersonalOverlayPath(): string | null {
   if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) return null;
   const configured = process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_PERSONAL_OVERLAY_PATH;
   return safeExistsSync(configured) ? configured : null;
+}
+
+function getCustomerOverlayPath(): string | null {
+  if (process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) return null;
+  const configured = customerResolver.customerRoot(DEFAULT_CUSTOMER_OVERLAY_PATH);
+  return configured && safeExistsSync(configured) ? configured : null;
 }
 
 export function getPersonalVoiceProfileRegistryPath(): string {
@@ -81,8 +89,9 @@ export function resetVoiceProfileRegistryCache(): void {
 
 export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryPath = getRegistryPath();
+  const customerOverlayPath = getCustomerOverlayPath();
   const overlayPath = getPersonalOverlayPath();
-  const cacheKey = overlayPath ? `${registryPath}::${overlayPath}` : registryPath;
+  const cacheKey = [registryPath, customerOverlayPath, overlayPath].filter(Boolean).join('::');
   if (cachedRegistryPath === cacheKey && cachedRegistry) return cachedRegistry;
 
   if (!safeExistsSync(registryPath)) {
@@ -102,24 +111,39 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
     return cachedRegistry;
   }
 
-  if (!overlayPath) {
+  let customerOverlay: VoiceProfileRegistry | null = null;
+  if (customerOverlayPath) {
+    try {
+      const customerRaw = safeReadFile(customerOverlayPath, { encoding: 'utf8' }) as string;
+      customerOverlay = safeJsonParse<VoiceProfileRegistry>(customerRaw, 'customer voice profile registry');
+    } catch (error: any) {
+      logger.warn(`[VOICE_PROFILE_REGISTRY] Customer overlay unavailable (${customerOverlayPath}): ${error.message} — using base registry only`);
+    }
+  }
+
+  if (!overlayPath && !customerOverlay) {
     cachedRegistryPath = cacheKey;
     cachedRegistry = parsed;
     return parsed;
   }
 
   try {
-    const overlayRaw = safeReadFile(overlayPath, { encoding: 'utf8' }) as string;
-    const overlay = safeJsonParse<VoiceProfileRegistry>(overlayRaw, 'personal voice profile registry');
-    const merged = mergeRegistries(parsed, overlay);
+    const personalOverlay = overlayPath
+      ? safeJsonParse<VoiceProfileRegistry>(
+          safeReadFile(overlayPath, { encoding: 'utf8' }) as string,
+          'personal voice profile registry',
+        )
+      : null;
+    const baseWithPersonal = personalOverlay ? mergeRegistries(parsed, personalOverlay) : parsed;
+    const merged = customerOverlay ? mergeRegistries(baseWithPersonal, customerOverlay) : baseWithPersonal;
     cachedRegistryPath = cacheKey;
     cachedRegistry = merged;
     return merged;
   } catch (error: any) {
     logger.warn(`[VOICE_PROFILE_REGISTRY] Personal overlay unavailable (${overlayPath}): ${error.message} — using base registry only`);
     cachedRegistryPath = cacheKey;
-    cachedRegistry = parsed;
-    return parsed;
+    cachedRegistry = customerOverlay ? mergeRegistries(parsed, customerOverlay) : parsed;
+    return cachedRegistry;
   }
 }
 
