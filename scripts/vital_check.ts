@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import { customerResolver, pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
 
 interface CheckResult {
   id: string;
@@ -58,6 +58,14 @@ export function activeMissionCount(): number {
   return count;
 }
 
+function profileRoot(): string {
+  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+}
+
+function profilePath(subPath: string): string {
+  return path.join(profileRoot(), subPath);
+}
+
 export function buildVitalReport() {
   const checks: CheckResult[] = [
     fileCheck('physical_foundation', 'Physical Foundation', 'node_modules', 'dir'),
@@ -65,10 +73,10 @@ export function buildVitalReport() {
     fileCheck('chronos_build', 'Chronos UI Build', 'presence/displays/chronos-mirror-v2/.next', 'dir'),
     fileCheck('surface_manifest', 'Surface Manifest', 'knowledge/public/governance/active-surfaces.json', 'file'),
     fileCheck('surface_state', 'Surface Runtime State', 'active/shared/runtime/surfaces/state.json', 'file'),
-    fileCheck('sovereign_identity', 'Sovereign Identity', 'knowledge/personal/my-identity.json', 'file'),
-    fileCheck('agent_identity', 'Agent Identity', 'knowledge/personal/agent-identity.json', 'file'),
-    fileCheck('sovereign_vision', 'Sovereign Vision', 'knowledge/personal/my-vision.md', 'file'),
-    fileCheck('onboarding_summary', 'Onboarding Summary', 'knowledge/personal/onboarding/onboarding-summary.md', 'file'),
+    fileCheck('sovereign_identity', 'Sovereign Identity', profilePath('my-identity.json'), 'file'),
+    fileCheck('agent_identity', 'Agent Identity', profilePath('agent-identity.json'), 'file'),
+    fileCheck('sovereign_vision', 'Sovereign Vision', profilePath('my-vision.md'), 'file'),
+    fileCheck('onboarding_summary', 'Onboarding Summary', profilePath('onboarding/onboarding-summary.md'), 'file'),
   ];
 
   const summary = {
