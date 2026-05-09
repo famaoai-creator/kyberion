@@ -58,27 +58,27 @@ pnpm onboard
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
   - `pnpm onboard:apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
-  - エージェントが直接 `knowledge/personal/` 配下のスキーマ準拠ファイルを書き込み（CLAUDE.md の Path B）
+  - エージェントが直接 `customer/{slug}/` を優先し、未設定時のみ `knowledge/personal/` 配下のスキーマ準拠ファイルを書き込み
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
 - **物理的変化**:
-  - `knowledge/personal/my-identity.json` が生成されます。
-  - `knowledge/personal/my-vision.md` が生成（または更新）されます。
-  - `knowledge/personal/onboarding/onboarding-state.json` が生成されます。
-  - `knowledge/personal/onboarding/onboarding-summary.md` が生成されます。
+  - `customer/{slug}/my-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json` になります。
+  - `customer/{slug}/my-vision.md` が生成（または更新）されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-vision.md` になります。
+  - `customer/{slug}/onboarding/onboarding-state.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/onboarding-state.json` になります。
+  - `customer/{slug}/onboarding/onboarding-summary.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/onboarding-summary.md` になります。
 
 ### Stage 5: 邂逅と命名の儀式 (Greeting & Naming)
 - **内容**: アイデンティティ設定の最後に、エージェントが自ら自己紹介を行い、主権者との間で「Agent ID」を合意します。
 - **目的**: A2A 通信やブロックチェーン記録に使用する、エージェントの公的な名前（Agent ID）を決定します。
 - **物理的変化**:
-  - `knowledge/personal/agent-identity.json` が生成されます。
+  - `customer/{slug}/agent-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/agent-identity.json` になります。
 
 ### Stage 6: 接続・領域・チュートリアルの下準備
 - **内容**: サービス接続の候補、テナント 1 件分の登録、最初の tutorial plan を個別に整えます。
 - **目的**: 初回実行で副作用を強制せず、提案・承認・適用を分離します。
 - **物理的変化**:
-  - `knowledge/personal/connections/*.json` が候補として生成されます。
-  - `knowledge/personal/tenants/*.json` が 1 件ずつ生成されます。
-  - `knowledge/personal/onboarding/tutorial-plan.md` が生成されます。
+  - `customer/{slug}/connections/*.json` が候補として生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/connections/*.json` になります。
+  - `customer/{slug}/tenants/*.json` が 1 件ずつ生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/tenants/*.json` になります。
+  - `customer/{slug}/onboarding/tutorial-plan.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/tutorial-plan.md` になります。
 
 ---
 
