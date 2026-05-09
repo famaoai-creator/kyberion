@@ -29,6 +29,8 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain('single customerless fallback');
     expect(doc).toContain('legacy `knowledge/personal/` behavior');
     expect(doc).toContain('knowledge/personal/` remains the legacy fallback when no customer is active');
+    expect(doc).toContain('Legacy personal fallback (`knowledge/personal/`)');
+    expect(doc).toContain('knowledge/personal/{path}     ← existing, legacy fallback');
     expect(jp).toContain('[x] `pnpm customer:create`');
     expect(jp).toContain('[x] `customer:list`');
     expect(jp).toContain('[x] `customer:switch`');
