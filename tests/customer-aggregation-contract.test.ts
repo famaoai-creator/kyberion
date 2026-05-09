@@ -43,6 +43,7 @@ describe('Customer aggregation contract', () => {
     expect(jp).toContain('[x] slack onboarding consumer (`libs/core/slack-onboarding.ts`)');
     expect(customerReadme).toContain('pnpm customer:create acme-corp');
     expect(customerReadme).toContain('pnpm customer:list');
+    expect(customerReadme).toContain('required customer.json / identity.json / vision.md files are present');
     expect(customerReadme).toContain('pnpm customer:migrate-from-personal acme-corp');
     expect(customerReadme).toContain('pnpm customer:switch acme-corp');
   });

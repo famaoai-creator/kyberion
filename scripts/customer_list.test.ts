@@ -41,6 +41,9 @@ describe('customer_list', () => {
     fs.mkdirSync(path.join(customerRoot, '_template'), { recursive: true });
     fs.mkdirSync(path.join(customerRoot, 'acme'), { recursive: true });
     fs.mkdirSync(path.join(customerRoot, 'client_a'), { recursive: true });
+    fs.writeFileSync(path.join(customerRoot, 'acme', 'customer.json'), '{}');
+    fs.writeFileSync(path.join(customerRoot, 'acme', 'identity.json'), '{}');
+    fs.writeFileSync(path.join(customerRoot, 'acme', 'vision.md'), '# vision');
     fs.writeFileSync(path.join(customerRoot, 'README.md'), 'readme');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
@@ -50,8 +53,14 @@ describe('customer_list', () => {
 
     const mod = await import('./customer_list.js');
     expect(mod.listCustomers()).toEqual([
-      { slug: 'acme', path: 'customer/acme', active: true },
-      { slug: 'client_a', path: 'customer/client_a', active: false },
+      { slug: 'acme', path: 'customer/acme', active: true, ready: true, missing: [] },
+      {
+        slug: 'client_a',
+        path: 'customer/client_a',
+        active: false,
+        ready: false,
+        missing: ['customer.json', 'identity.json', 'vision.md'],
+      },
     ]);
   });
 
@@ -60,5 +69,26 @@ describe('customer_list', () => {
     mocks.safeExistsSync.mockReturnValue(false);
     const mod = await import('./customer_list.js');
     expect(mod.listCustomers()).toEqual([]);
+  });
+
+  it('prints readiness in text mode', async () => {
+    const entries = [
+      { slug: 'acme', path: 'customer/acme', active: true, ready: true, missing: [] },
+      {
+        slug: 'client_a',
+        path: 'customer/client_a',
+        active: false,
+        ready: false,
+        missing: ['customer.json', 'vision.md'],
+      },
+    ];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const mod = await import('./customer_list.js');
+    mod.printText(entries);
+
+    expect(logSpy.mock.calls.map((call) => call[0])).toEqual([
+      '* acme\tready\tcustomer/acme',
+      '  client_a\tmissing customer.json, vision.md\tcustomer/client_a',
+    ]);
   });
 });
