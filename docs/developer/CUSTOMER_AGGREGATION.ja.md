@@ -91,7 +91,7 @@ export KYBERION_CUSTOMER=acme-corp
 顧客オーバーレイ構造に変換する場合:
 
 ```bash
-pnpm customer:create my-org   # Phase D'-1 follow-up（未実装）
+pnpm customer:create my-org
 export KYBERION_CUSTOMER=my-org
 ```
 
@@ -120,7 +120,8 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 
 - [x] ディレクトリ構造
 - [x] Resolver API + テスト
-- [ ] `pnpm customer:create` / `customer:list` / `customer:switch`
+- [x] `pnpm customer:create`
+- [ ] `customer:list` / `customer:switch`
 - [ ] onboarding wizard 統合
 - [ ] 移行ヘルパ
 - [ ] 各 caller のオーバーレイ対応

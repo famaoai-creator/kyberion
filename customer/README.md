@@ -36,7 +36,7 @@ customer/
 
 ```bash
 # 1. Copy the template into a new customer slug (lowercase, hyphenated, no spaces)
-cp -R customer/_template customer/acme-corp
+pnpm customer:create acme-corp
 
 # 2. Fill in customer/acme-corp/customer.json, identity.json, vision.md
 $EDITOR customer/acme-corp/customer.json

@@ -109,7 +109,7 @@ For users who already have a `knowledge/personal/` filled in:
 1. **Do nothing** — the existing setup keeps working when `KYBERION_CUSTOMER` is unset.
 2. To convert to a customer-overlay structure:
    ```bash
-   pnpm customer:create my-org             # (Phase D'-1 follow-up: not yet implemented)
+   pnpm customer:create my-org
    # Copies knowledge/personal/* into customer/my-org/* with appropriate renames.
    export KYBERION_CUSTOMER=my-org
    ```
@@ -161,7 +161,7 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [x] Directory structure (`customer/`, `customer/_template/`, `.gitignore` rules)
 - [x] Resolver API (`libs/core/customer-resolver.ts`)
 - [x] Resolver tests (`libs/core/customer-resolver.test.ts`)
-- [ ] CLI: `pnpm customer:create <slug>` (copies from `_template/`)
+- [x] CLI: `pnpm customer:create <slug>` (copies from `_template/`)
 - [ ] CLI: `pnpm customer:list`
 - [ ] CLI: `pnpm customer:switch <slug>` (validates + sets in env profile)
 - [ ] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
