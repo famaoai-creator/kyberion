@@ -1,0 +1,24 @@
+{
+  "role": "software_developer",
+  "description": "Implementation authority for test and product code paths.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/projects/",
+    "tests/",
+    "libs/actuators/"
+  ],
+  "scope_classes": [
+    "project_delivery",
+    "codebase_core",
+    "quality_validation"
+  ],
+  "allowed_actuators": [
+    "code-actuator",
+    "file-actuator",
+    "system-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   checkBinary: vi.fn(),
   secureFetch: vi.fn(),
   resolveOverlay: vi.fn(() => null),
+  loadServiceEndpointsCatalog: vi.fn(),
 }));
 
 vi.mock('./index.js', async () => {
@@ -17,6 +18,7 @@ vi.mock('./index.js', async () => {
     safeExec: mocks.safeExec,
     resolveServiceBinding: mocks.resolveServiceBinding,
     secureFetch: mocks.secureFetch,
+    loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
     platform: {
       ...actual.platform,
       checkBinary: mocks.checkBinary,
@@ -34,18 +36,27 @@ describe('executeServicePreset', () => {
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
     delete process.env.KYBERION_CUSTOMER;
     mocks.resolveServiceBinding.mockReturnValue({ accessToken: 'test-token' });
+    mocks.loadServiceEndpointsCatalog.mockReturnValue({
+      default_pattern: 'https://api.{service_id}.com/v1',
+      services: {
+        'test-service': { preset_path: 'mock/path.json', base_url: 'https://api.test.com' },
+        slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
+        'media-generation': {
+          preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
+          base_url: 'http://127.0.0.1:8188',
+        },
+        vision: { preset_path: 'knowledge/public/orchestration/service-presets/vision.json' },
+        voice: { preset_path: 'knowledge/public/orchestration/service-presets/voice.json' },
+        notion: { preset_path: 'p.json', base_url: 'https://api.notion.com/v1' },
+        canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
+        youtube: { preset_path: 'knowledge/public/orchestration/service-presets/youtube.json' },
+      },
+    });
   });
 
   it('falls back to API when CLI binary is missing', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            'test-service': { preset_path: 'mock/path.json', base_url: 'https://api.test.com' },
-          },
-        });
-      }
       if (filePath.includes('mock/path.json')) {
         return JSON.stringify({
           operations: {
@@ -75,13 +86,6 @@ describe('executeServicePreset', () => {
 
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
-          },
-        });
-      }
       if (filePath.includes('customer/acme/connections/slack.json')) {
         return JSON.stringify({
           path_segment: 'customer-route',
@@ -120,13 +124,6 @@ describe('executeServicePreset', () => {
 
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
-          },
-        });
-      }
       if (filePath.includes('customer/acme/connections/slack.json')) {
         throw new Error('missing overlay');
       }
@@ -163,16 +160,6 @@ describe('executeServicePreset', () => {
   it('supports media-generation workflow prompts through structured API payloads', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            'media-generation': {
-              preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
-              base_url: 'http://127.0.0.1:8188',
-            },
-          },
-        });
-      }
       if (filePath.includes('media-generation.json')) {
         return JSON.stringify({
           base_url: 'http://127.0.0.1:8188',
@@ -213,13 +200,6 @@ describe('executeServicePreset', () => {
   it('returns raw output when no output mapping is configured', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            vision: { preset_path: 'knowledge/public/orchestration/service-presets/vision.json' },
-          },
-        });
-      }
       if (filePath.includes('vision.json')) {
         return JSON.stringify({
           operations: {
@@ -244,13 +224,6 @@ describe('executeServicePreset', () => {
   it('preserves structured values in CLI templates', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            voice: { preset_path: 'knowledge/public/orchestration/service-presets/voice.json' },
-          },
-        });
-      }
       if (filePath.includes('voice.json')) {
         return JSON.stringify({
           operations: {
@@ -278,13 +251,6 @@ describe('executeServicePreset', () => {
   it('resolves API payload templates without JSON string hacks', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            notion: { preset_path: 'p.json', base_url: 'https://api.notion.com/v1' },
-          },
-        });
-      }
       if (filePath.includes('p.json')) {
         return JSON.stringify({
           auth_strategy: 'Bearer',
@@ -335,13 +301,6 @@ describe('executeServicePreset', () => {
 
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
-          },
-        });
-      }
       if (filePath.includes('canva.json')) {
         return JSON.stringify({
           auth_strategy: 'Bearer',
@@ -392,13 +351,6 @@ describe('executeServicePreset', () => {
   it('stages a youtube upload package through the youtube service preset', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            youtube: { preset_path: 'knowledge/public/orchestration/service-presets/youtube.json' },
-          },
-        });
-      }
       if (filePath.includes('youtube.json')) {
         return JSON.stringify({
           operations: {

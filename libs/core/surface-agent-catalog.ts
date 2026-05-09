@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { loadAgentManifests, resolveAgentSelectionHints, type AgentManifest } from './agent-manifest.js';
+import { loadAgentProfileIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
 
 export interface SurfaceAgentCatalogEntry {
   agentId: string;
@@ -24,17 +24,7 @@ interface AgentProfileIndexEntry {
   authority_roles?: string[];
   team_roles?: string[];
   capabilities?: string[];
-  selection_hints?: {
-    preferred_provider?: string;
-    preferred_modelId?: string;
-  };
 }
-
-interface AgentProfileIndex {
-  agents?: Record<string, AgentProfileIndexEntry>;
-}
-
-const AGENT_PROFILE_INDEX_PATH = pathResolver.knowledge('public/orchestration/agent-profile-index.json');
 
 function titleCaseAgentId(agentId: string): string {
   return agentId
@@ -94,13 +84,6 @@ function extractDelegationTargets(body: string): string[] {
   return [...targets];
 }
 
-function loadAgentProfileIndex(): Record<string, AgentProfileIndexEntry> {
-  if (!safeExistsSync(AGENT_PROFILE_INDEX_PATH)) return {};
-  const raw = safeReadFile(AGENT_PROFILE_INDEX_PATH, { encoding: 'utf8' }) as string;
-  const parsed = safeJsonParse<AgentProfileIndex>(raw, 'agent profile index');
-  return parsed.agents || {};
-}
-
 function isSurfaceAgent(manifest: AgentManifest, profile?: AgentProfileIndexEntry): boolean {
   const manifestCaps = new Set(manifest.capabilities || []);
   const profileRoles = new Set(profile?.team_roles || []);
@@ -126,7 +109,11 @@ export function listSurfaceAgentCatalog(): SurfaceAgentCatalogEntry[] {
   return manifests
     .filter((manifest) => isSurfaceAgent(manifest, profileIndex[manifest.agentId]))
     .map((manifest) => {
-      const profile = profileIndex[manifest.agentId] || {};
+      const profile = (profileIndex[manifest.agentId] || {}) as {
+        capabilities?: string[];
+        authority_roles?: string[];
+        team_roles?: string[];
+      };
       const body = loadAgentBody(manifest.agentId);
       let selectionProvider: string;
       let selectionModel: string;

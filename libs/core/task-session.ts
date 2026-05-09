@@ -27,7 +27,8 @@ import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 
-export type TaskSessionSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage';
+export type TaskSessionSurface = string; // Replaces 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage' | 'discord'
+
 export type TaskSessionType =
   | 'browser'
   | 'capture_photo'
@@ -316,8 +317,6 @@ export function createTaskSession(input: {
   };
 }
 
-type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
-
 function analysisContractId(intentId: string): string | undefined {
   return resolveAnalysisExecutionContract(intentId)?.contract_id;
 }
@@ -453,118 +452,129 @@ function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
   return 'default';
 }
 
-// Intent resolution decides "what the user means".
-// Task-session builders decide "which runtime bindings and missing inputs are needed".
-const TASK_SESSION_INTENT_BUILDERS: Record<string, TaskSessionIntentBuilder> = {
-  'bootstrap-project': (trimmed) => buildPolicyBackedIntent('bootstrap-project', trimmed),
-  'capture-photo': (trimmed) => buildPolicyBackedIntent('capture-photo', trimmed),
-  'generate-workbook': (trimmed) => buildPolicyBackedIntent('generate-workbook', trimmed),
-  'generate-presentation': (trimmed) => {
-    const base = buildPolicyBackedIntent('generate-presentation', trimmed);
-    return {
-      ...base,
-      payload: {
-        ...(base.payload || {}),
-        slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
-          ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
-          : undefined,
-        theme_hint: derivePresentationThemeHint(base.payload?.deck_purpose),
-      },
-    };
-  },
-  'generate-report': (trimmed) => buildPolicyBackedIntent('generate-report', trimmed),
-  'lifestyle-booking': (trimmed) => {
-    const base = buildPolicyBackedIntent('lifestyle-booking', trimmed);
-    return {
-      ...base,
-      payload: {
-        ...(base.payload || {}),
-        booking_category: deriveBookingCategory(trimmed),
-      },
-    };
-  },
-  'schedule-coordination': (trimmed) => {
-    const base = buildPolicyBackedIntent('schedule-coordination', trimmed);
-    return {
-      ...base,
-      payload: {
-        ...(base.payload || {}),
-        coordination_mode: deriveScheduleCoordinationMode(trimmed),
-        calendar_surface_hint: deriveScheduleCalendarHint(trimmed),
-        handoff_intent_id: deriveScheduleCoordinationLeafIntent(trimmed),
-        handoff_reason: isMeetingScheduleCoordination(trimmed)
-          ? 'Meeting schedule changes can be handed off to meeting-operations when role boundary or live meeting handling matters.'
-          : undefined,
-      },
-    };
-  },
-  'cross-project-remediation': (trimmed) => {
-    const base = buildPolicyBackedIntent('cross-project-remediation', trimmed);
-    return {
-      ...base,
-      payload: {
-        ...(base.payload || {}),
-        analysis_contract_id: analysisContractId('cross-project-remediation'),
-      },
-    };
-  },
-  'incident-informed-review': (trimmed) => {
-    const base = buildPolicyBackedIntent('incident-informed-review', trimmed);
-    return {
-      ...base,
-      payload: {
-        ...(base.payload || {}),
-        analysis_contract_id: analysisContractId('incident-informed-review'),
-      },
-    };
-  },
-  'evolve-agent-harness': (trimmed) => {
-    const base = buildPolicyBackedIntent('evolve-agent-harness', trimmed);
-    return {
-      ...base,
-      payload: {
-        ...(base.payload || {}),
-        analysis_contract_id: analysisContractId('evolve-agent-harness'),
-      },
-    };
-  },
-  'inspect-service': (trimmed) => {
-    const base = buildPolicyBackedIntent('inspect-service', trimmed);
-    const serviceMatch =
-      trimmed.match(
-        /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i
-      ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
-    const intent: TaskSessionIntent = {
-      ...base,
-      requirements: {
-        missing: serviceMatch ? [] : ['service_name'],
-        collected: {},
-      },
-      payload: {
-        ...(base.payload || {}),
-        service_name: serviceMatch?.[1],
-        log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
-      },
-    };
-    const approvalApplied = applyApprovalPolicy(
-      intent.intentId!,
-      intent.payload || {},
-      intent.requirements!
-    );
-    return {
-      ...intent,
-      requirements: approvalApplied.requirements,
-      payload: approvalApplied.payload,
-    };
-  },
-};
+// ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
+export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
+
+const _taskIntentRegistry = new Map<string, TaskSessionIntentBuilder>();
+
+export function registerTaskIntentBuilder(intentId: string, builder: TaskSessionIntentBuilder): void {
+  _taskIntentRegistry.set(intentId, builder);
+}
+
+export function getTaskIntentBuilder(intentId: string): TaskSessionIntentBuilder | undefined {
+  return _taskIntentRegistry.get(intentId);
+}
+
+// ─── Default Builders (Auto-registered) ──────────────────────────────────────
+
+registerTaskIntentBuilder('bootstrap-project', (trimmed) => buildPolicyBackedIntent('bootstrap-project', trimmed));
+registerTaskIntentBuilder('capture-photo', (trimmed) => buildPolicyBackedIntent('capture-photo', trimmed));
+registerTaskIntentBuilder('generate-workbook', (trimmed) => buildPolicyBackedIntent('generate-workbook', trimmed));
+registerTaskIntentBuilder('generate-report', (trimmed) => buildPolicyBackedIntent('generate-report', trimmed));
+registerTaskIntentBuilder('cross-project-remediation', (trimmed) => {
+  const base = buildPolicyBackedIntent('cross-project-remediation', trimmed);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload || {}),
+      analysis_contract_id: analysisContractId('cross-project-remediation'),
+    },
+  };
+});
+registerTaskIntentBuilder('incident-informed-review', (trimmed) => {
+  const base = buildPolicyBackedIntent('incident-informed-review', trimmed);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload || {}),
+      analysis_contract_id: analysisContractId('incident-informed-review'),
+    },
+  };
+});
+registerTaskIntentBuilder('evolve-agent-harness', (trimmed) => {
+  const base = buildPolicyBackedIntent('evolve-agent-harness', trimmed);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload || {}),
+      analysis_contract_id: analysisContractId('evolve-agent-harness'),
+    },
+  };
+});
+registerTaskIntentBuilder('inspect-service', (trimmed) => {
+  const base = buildPolicyBackedIntent('inspect-service', trimmed);
+  const serviceMatch =
+    trimmed.match(
+      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i
+    ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing: serviceMatch ? [] : ['service_name'],
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      service_name: serviceMatch?.[1],
+      log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
+    },
+  };
+  const approvalApplied = applyApprovalPolicy(
+    intent.intentId!,
+    intent.payload || {},
+    intent.requirements!
+  );
+  return {
+    ...intent,
+    requirements: approvalApplied.requirements,
+    payload: approvalApplied.payload,
+  };
+});
+registerTaskIntentBuilder('generate-presentation', (trimmed) => {
+  const base = buildPolicyBackedIntent('generate-presentation', trimmed);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload || {}),
+      slide_count_hint: /(\d+)\s*(枚|slides?)/i.test(trimmed)
+        ? Number(trimmed.match(/(\d+)\s*(枚|slides?)/i)?.[1] || 0)
+        : undefined,
+      theme_hint: derivePresentationThemeHint(base.payload?.deck_purpose),
+    },
+  };
+});
+registerTaskIntentBuilder('lifestyle-booking', (trimmed) => {
+  const base = buildPolicyBackedIntent('lifestyle-booking', trimmed);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload || {}),
+      booking_category: deriveBookingCategory(trimmed),
+    },
+  };
+});
+registerTaskIntentBuilder('schedule-coordination', (trimmed) => {
+  const base = buildPolicyBackedIntent('schedule-coordination', trimmed);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload || {}),
+      coordination_mode: deriveScheduleCoordinationMode(trimmed),
+      calendar_surface_hint: deriveScheduleCalendarHint(trimmed),
+      handoff_intent_id: deriveScheduleCoordinationLeafIntent(trimmed),
+      handoff_reason: isMeetingScheduleCoordination(trimmed)
+        ? 'Meeting schedule changes can be handed off to meeting-operations when role boundary or live meeting handling matters.'
+        : undefined,
+    },
+  };
+});
 
 export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
   const packet = resolveIntentResolutionPacket(trimmed);
   const intentId = packet.selected_intent_id;
-  const builder = intentId ? TASK_SESSION_INTENT_BUILDERS[intentId] : undefined;
+  const builder = intentId ? getTaskIntentBuilder(intentId) : undefined;
   if (builder) return builder(trimmed);
   if (!intentId) return null;
 

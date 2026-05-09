@@ -1,0 +1,35 @@
+{
+  "pipeline_id": "kyberion-config-provisioner",
+  "version": "1.0.0",
+  "name": "Kyberion Actuator 設定プロビジョナー",
+  "description": "組織プロファイルから接続設定を抽出し、エンドポイントの雛形を作成します。",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "read-profile",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "knowledge/public/tmp-profile.md",
+        "export_as": "profile_content"
+      }
+    },
+    {
+      "id": "analyze-provisioning-needs",
+      "type": "apply",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "組織プロファイルの内容 {{profile_content}} を分析し、有効化すべきActuator（Notion, Slack, GitHub）の設定JSON（雛形）を生成せよ。各JSONにはプレースホルダーを含め、ユーザーがAPIキーを入れるべき場所を明示せよ。",
+        "export_as": "config_drafts"
+      }
+    },
+    {
+      "id": "propose-configs",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "\n--- Kyberion Configuration Proposals ---\n\nプロファイルに基づき、以下の設定ファイルを準備しました。内容を確認し、秘密情報をVaultに登録してください。\n\n{{config_drafts}}\n\n※ これらの雛形は `active/shared/tmp/provisioning/` に出力されました。承認後、`knowledge/public/orchestration/service-endpoints/` に配置されます。"
+      }
+    }
+  ]
+}

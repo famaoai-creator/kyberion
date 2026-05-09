@@ -1,0 +1,57 @@
+{
+  "pipeline_id": "persona-beginner-product-concept",
+  "version": "1.0.0",
+  "description": "初心者のための新商品企画ビジュアライザー。トピックからコンセプト、イメージ画像、BGM、PPTを一括生成します。",
+  "action": "pipeline",
+  "variables": {
+    "topic": {
+      "type": "string",
+      "description": "新商品のテーマ（例：未来のスマートウォッチ）",
+      "default": "エコフレンドリーな空飛ぶ靴"
+    }
+  },
+  "steps": [
+    {
+      "id": "create-brief",
+      "type": "transform",
+      "op": "wisdom:synthesize",
+      "params": {
+        "instruction": "テーマ「{{topic}}」に基づき、商品のキャッチコピー、ターゲット層、主要機能をまとめた企画ブリーフを作成してください。また、画像生成用のプロンプトと音楽生成用のスタイル指定も含めてください。",
+        "export_as": "product_brief"
+      }
+    },
+    {
+      "id": "gen-image",
+      "type": "apply",
+      "op": "media-generation:generate_image",
+      "params": {
+        "image_adf": {
+          "intent": "product_visual",
+          "prompt": "{{product_brief.image_prompt}}",
+          "output": { "target_path": "active/shared/exports/{{topic}}_concept.png" }
+        }
+      }
+    },
+    {
+      "id": "gen-music",
+      "type": "apply",
+      "op": "media-generation:generate_music",
+      "params": {
+        "music_adf": {
+          "intent": "product_bgm",
+          "style": "{{product_brief.music_style}}",
+          "output": { "target_path": "active/shared/exports/{{topic}}_bgm.mp3" }
+        }
+      }
+    },
+    {
+      "id": "render-pptx",
+      "type": "apply",
+      "op": "media:pptx_render",
+      "params": {
+        "brief_from": "product_brief",
+        "path": "active/shared/exports/{{topic}}_企画書.pptx"
+      }
+    }
+  ]
+}

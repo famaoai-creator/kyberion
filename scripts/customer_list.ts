@@ -2,9 +2,9 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  activeCustomer,
   classifyError,
   formatClassification,
+  customerResolver,
   pathResolver,
   safeExistsSync,
   safeLstat,
@@ -27,7 +27,7 @@ export function listCustomers(): CustomerEntry[] {
     return [];
   }
 
-  const current = activeCustomer() ?? null;
+  const current = customerResolver.activeCustomer() ?? null;
   const entries: CustomerEntry[] = [];
 
   for (const entry of safeReaddir(customerRoot).sort()) {

@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "default_engine_id": "local_say",
+  "engines": [
+    {
+      "engine_id": "mlx_audio_qwen3",
+      "display_name": "mlx-audio Qwen3-TTS (ICL Voice Clone)",
+      "kind": "voice_clone_service",
+      "provider": "mlx_audio",
+      "status": "active",
+      "platforms": ["darwin"],
+      "model_id": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py",
+      "stt_bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py",
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"],
+        "voice_clone": true,
+        "icl_ref_audio": true
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "8-bit quantized Qwen3-TTS 1.7B via mlx-audio. ICL voice cloning using ref_audio + ref_text — no fine-tuning required. Requires Apple Silicon (M1+) and: pip install mlx-audio mlx-whisper. Shadow until governance promotion."
+    }
+  ]
+}

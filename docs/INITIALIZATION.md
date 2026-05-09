@@ -47,11 +47,15 @@ pnpm onboard
 
 ### Stage 3: Runtime Surface Reconciliation
 - **実行コマンド**: `pnpm surfaces:reconcile`
-- **目的**: `slack-bridge`、`imessage-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface を manifest から標準起動します。
+- **目的**: `slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface を manifest から標準起動します。
 - **物理的変化**:
   - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
   - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。
   - `runtime-supervisor` に surface runtime が登録されます。
+- **補助コマンド**:
+  - `pnpm surfaces:status` で起動状態を確認できます。
+  - `pnpm surfaces:start -- --surface <surface-id>` で個別 surface を開始できます。
+  - `pnpm surfaces:stop -- --surface <surface-id>` で個別 surface を停止できます。
 
 ### Stage 4: 魂の注入 (Soul Infusion)
 - **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)

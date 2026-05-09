@@ -2,19 +2,25 @@
   "version": 1,
   "surfaces": [
     {
-      "id": "presence-studio",
+      "id": "chronos-mirror-v2",
       "kind": "ui",
-      "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
-      "command": "node",
+      "description": "Interactive Chronos control surface served as a workspace application",
+      "command": "pnpm",
       "args": [
-        "dist/presence/displays/presence-studio/server.js"
+        "--dir",
+        "presence/displays/chronos-mirror-v2",
+        "start",
+        "-H",
+        "127.0.0.1",
+        "-p",
+        "3000"
       ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
-      "port": 3031,
-      "healthPath": "/health",
+      "port": 3000,
+      "healthPath": "/api/agents",
       "enabled": true
     },
     {
@@ -34,41 +40,23 @@
       "enabled": true
     },
     {
-      "id": "voice-hub",
-      "kind": "service",
-      "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
-      "command": "node",
-      "args": [
-        "dist/satellites/voice-hub/server.js"
-      ],
-      "cwd": ".",
-      "shutdownPolicy": "detached",
-      "startupMode": "background",
-      "ownerType": "surface-runtime-manifest",
-      "port": 3032,
-      "healthPath": "/health",
-      "enabled": true
-    },
-    {
-      "id": "slack-bridge",
+      "id": "discord-bridge",
       "kind": "gateway",
-      "description": "Slack Socket Mode ingress gateway and surface-agent host",
-      "service_id": "slack",
-      "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
+      "description": "Discord Bot ingress gateway and surface-agent host",
       "command": "node",
       "args": [
-        "dist/satellites/slack-bridge/src/index.js"
+        "dist/satellites/discord-bridge/src/index.js"
       ],
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
         "KYBERION_PERSONA": "sovereign",
-        "MISSION_ROLE": "slack_bridge"
+        "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "imessage-bridge",
@@ -81,7 +69,7 @@
       "env": {
         "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
         "KYBERION_PERSONA": "sovereign",
-        "MISSION_ROLE": "imessage_bridge"
+        "MISSION_ROLE": "surface_runtime"
       },
       "cwd": ".",
       "shutdownPolicy": "detached",
@@ -111,6 +99,80 @@
       "enabled": true
     },
     {
+      "id": "oauth-callback-surface",
+      "kind": "service",
+      "description": "Loopback-only OAuth callback receiver that completes token exchange into Personal-tier connections.",
+      "command": "node",
+      "args": [
+        "dist/scripts/oauth_callback_surface.js"
+      ],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 8787,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
+      "id": "presence-studio",
+      "kind": "ui",
+      "description": "Expressive realtime surface for subtitles, transcript, and voice-channel presence state.",
+      "command": "node",
+      "args": [
+        "dist/presence/displays/presence-studio/server.js"
+      ],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3031,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
+      "id": "slack-bridge",
+      "kind": "gateway",
+      "description": "Slack Socket Mode ingress gateway and surface-agent host",
+      "service_id": "slack",
+      "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
+      "command": "node",
+      "args": [
+        "dist/satellites/slack-bridge/src/index.js"
+      ],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "slack_bridge"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    },
+    {
+      "id": "telegram-bridge",
+      "kind": "gateway",
+      "description": "Telegram ingress gateway and surface-agent host",
+      "command": "node",
+      "args": [
+        "dist/satellites/telegram-bridge/src/index.js"
+      ],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "surface_runtime"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3035,
+      "healthPath": "/health",
+      "enabled": true
+    },
+    {
       "id": "terminal-bridge",
       "kind": "service",
       "description": "Background terminal bridge service for runtime sessions",
@@ -131,40 +193,18 @@
       "enabled": true
     },
     {
-      "id": "chronos-mirror-v2",
-      "kind": "ui",
-      "description": "Interactive Chronos control surface served as a workspace application",
-      "command": "pnpm",
-      "args": [
-        "--dir",
-        "presence/displays/chronos-mirror-v2",
-        "start",
-        "-H",
-        "127.0.0.1",
-        "-p",
-        "3000"
-      ],
-      "cwd": ".",
-      "shutdownPolicy": "detached",
-      "startupMode": "workspace-app",
-      "ownerType": "surface-runtime-manifest",
-      "port": 3000,
-      "healthPath": "/api/agents",
-      "enabled": true
-    },
-    {
-      "id": "oauth-callback-surface",
+      "id": "voice-hub",
       "kind": "service",
-      "description": "Loopback-only OAuth callback receiver that completes token exchange into Personal-tier connections.",
+      "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
       "command": "node",
       "args": [
-        "dist/scripts/oauth_callback_surface.js"
+        "dist/satellites/voice-hub/server.js"
       ],
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "port": 8787,
+      "port": 3032,
       "healthPath": "/health",
       "enabled": true
     }

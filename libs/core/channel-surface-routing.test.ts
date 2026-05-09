@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveSlackExecutionMode, deriveSlackIntentLabel, deriveSurfaceDelegationReceiver, resolveSurfaceConversationReceiver, shouldForceSlackDelegation } from './channel-surface.js';
+import { surfaceChannelFromAgentId } from './surface-runtime-router.js';
 
 describe('channel-surface routing helpers', () => {
   it('routes mission and system queries to chronos-mirror', () => {
@@ -99,5 +100,13 @@ describe('channel-surface routing helpers', () => {
   it('forces slack delegation unless the message matches lightweight rules', () => {
     expect(shouldForceSlackDelegation('thanks')).toBe(false);
     expect(shouldForceSlackDelegation('この設計をレビューして')).toBe(true);
+  });
+
+  it('infers surface ids from manifest-backed agent ids', () => {
+    expect(surfaceChannelFromAgentId('kyberion:slack-bridge')).toBe('slack');
+    expect(surfaceChannelFromAgentId('kyberion:imessage-bridge')).toBe('imessage');
+    expect(surfaceChannelFromAgentId('kyberion:discord-bridge')).toBe('discord');
+    expect(surfaceChannelFromAgentId('kyberion:telegram-bridge')).toBe('telegram');
+    expect(surfaceChannelFromAgentId('imessage-surface-agent')).toBe('imessage');
   });
 });

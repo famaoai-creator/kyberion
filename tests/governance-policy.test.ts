@@ -23,6 +23,22 @@ describe('Governance Policy-as-Code Enforcement', () => {
     expect(safeExistsSync(TEST_FILE)).toBe(true);
   });
 
+  it('Scenario: sovereign persona can write customer overlay files during onboarding', () => {
+    const CUSTOMER_FILE = pathResolver.rootResolve('customer/story-demo/customer.json');
+    process.env.KYBERION_PERSONA = 'sovereign';
+    process.env.MISSION_ROLE = 'sovereign_concierge';
+    const check = validateWritePermission(CUSTOMER_FILE);
+    expect(check.allowed).toBe(true);
+  });
+
+  it('Scenario: knowledge_steward can write customer tenant drafts during onboarding', () => {
+    const TENANT_FILE = pathResolver.rootResolve('customer/story-demo/tenants/acme.json');
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.MISSION_ROLE = 'knowledge_steward';
+    const check = validateWritePermission(TENANT_FILE);
+    expect(check.allowed).toBe(true);
+  });
+
   it('Scenario: unknown role cannot write to knowledge/confidential (Blocked by Tier Policy)', async () => {
     const CONFIDENTIAL_FILE = pathResolver.knowledge('confidential/test-block.md');
     

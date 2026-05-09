@@ -18,6 +18,8 @@ import {
   safeOpenAppendFile,
   spawnManagedProcess,
   surfaceLogPath,
+  surfaceManifestDirectoryPath,
+  surfaceManifestFilePath,
   surfaceManifestPath,
   surfaceResourceId,
   surfaceStatePath,
@@ -159,7 +161,7 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
       const offender = await describePortHolder(normalized.port);
       const ownCwd = pathResolver.rootDir();
       const foreignNote = offender && offender.cwd && offender.cwd !== ownCwd
-        ? ` Holder appears to run from ${offender.cwd} (pid ${offender.pid}) — different from this repo at ${ownCwd}. Stop the foreign process or change "${surfaceId}".port in active-surfaces.json.`
+        ? ` Holder appears to run from ${offender.cwd} (pid ${offender.pid}) — different from this repo at ${ownCwd}. Stop the foreign process or change ${surfaceManifestFilePath(surfaceId)}.`
         : offender
           ? ` Held by pid ${offender.pid}.`
           : '';
@@ -289,6 +291,7 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
   return {
     status: 'reconciled',
     manifestPath,
+    manifestDirectory: surfaceManifestDirectoryPath(),
     statePath: surfaceStatePath(),
     results,
     runtime: runtimeSupervisor.snapshot(),
@@ -324,6 +327,7 @@ async function statusSurfaces() {
   return {
     status: 'ok',
     manifestPath: surfaceManifestPath(),
+    manifestDirectory: surfaceManifestDirectoryPath(),
     statePath: surfaceStatePath(),
     surfaces: state.surfaces,
     health,

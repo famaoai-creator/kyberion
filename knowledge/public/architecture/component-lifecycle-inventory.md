@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-24
+last_updated: 2026-05-09
 ---
 
 # Component Lifecycle Inventory
@@ -13,8 +13,8 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 
 ## Current Runtime Surface
 
-- Source of truth: [global_actuator_index.json](knowledge/public/orchestration/global_actuator_index.json)
-- Count: 23
+- Source of truth: `libs/actuators/*/manifest.json`
+- Count: 27
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (6 ops, v1.0.0, schema schemas/agent-action.schema.json)
@@ -23,11 +23,14 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Immutable Ledger Anchoring System (2 ops, v1.0.0, schema schemas/blockchain-action.schema.json)
 - `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.0.0, schema schemas/browser-pipeline.schema.json)
+- `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (2 ops, v2.1.0, schema schemas/code-pipeline.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.0.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.0.0, schema schemas/mobile-device-pipeline.schema.json)
-- `media-actuator`: Document and asset generation engine (1 ops, v1.0.0, schema schemas/media-pipeline.schema.json)
-- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (10 ops, v1.0.0, schema schemas/media-generation-action.schema.json)
+- `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
+- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (10 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
+- `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.0.0, schema schemas/meeting-action.schema.json)
+- `meeting-browser-driver`: Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Implements libs/core MeetingJoinDriver and writes captured audio to an AudioBus. (2 ops, v1.0.0)
 - `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema schemas/modeling-pipeline.schema.json)
 - `network-actuator`: ADF-driven secure fetch and A2A transport pipeline engine (1 ops, v2.2.0, schema schemas/network-pipeline.schema.json)
 - `orchestrator-actuator`: Mission/control-plane transformation and execution-plan orchestration actuator (2 ops, v1.0.0, schema schemas/orchestrator-pipeline.schema.json)
@@ -35,15 +38,16 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema schemas/process-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge (3 ops, v1.0.0, schema schemas/secret-action.schema.json)
 - `service-actuator`: Unified External SaaS/API Reachability Layer (6 ops, v1.0.0, schema schemas/service-action.schema.json)
-- `system-actuator`: OS-level control, diagnostics, and short-lived local execution (3 ops, v1.0.0, schema schemas/system-pipeline.schema.json)
+- `system-actuator`: OS-level control, diagnostics, and short-lived local execution (3 ops, v1.1.0, schema schemas/system-pipeline.schema.json)
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema schemas/terminal-action.schema.json)
+- `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (6 ops, v1.0.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
-- `voice-actuator`: Local Generative TTS Actuator (Style-Bert-VITS2) (2 ops, v1.0.0, schema schemas/voice-action.schema.json)
-- `wisdom-actuator`: Knowledge-tier search, injection, import, and export actuator (4 ops, v1.0.0, schema schemas/wisdom-action.schema.json)
+- `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (7 ops, v1.2.0, schema schemas/voice-action.schema.json)
+- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (32 ops, v1.1.0, schema schemas/wisdom-action.schema.json)
 
 ## Legacy Review Queue
 
-- Source of truth: [legacy_component_index.json](knowledge/public/orchestration/legacy_component_index.json)
+- Source of truth: [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
 - Count: 2
 
 - `daemon-actuator`: Launchd-era runtime management overlaps with surface-runtime and managed process supervision.

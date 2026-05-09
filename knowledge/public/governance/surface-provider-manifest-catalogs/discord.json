@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "discord",
+      "channel": "discord",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "shipped",
+      "summary": "Discord surface provider manifest and routing policy."
+    }
+  ]
+}

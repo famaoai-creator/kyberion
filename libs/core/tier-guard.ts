@@ -80,12 +80,15 @@ function checkProjectScope(
   return null;
 }
 
-function expandMissionPath(pattern: string, missionId?: string): string {
-  return pattern.replace('${MISSION_ID}', missionId || 'NONE');
+function expandPolicyPath(pattern: string, missionId?: string): string {
+  const customerSlug = process.env.KYBERION_CUSTOMER?.trim() || 'NONE';
+  return pattern
+    .replace('${MISSION_ID}', missionId || 'NONE')
+    .replace('${KYBERION_CUSTOMER}', customerSlug);
 }
 
 function matchesAny(relativePath: string, patterns: string[] = [], missionId?: string): boolean {
-  return patterns.some((p) => pathStartsWith(relativePath, expandMissionPath(p, missionId)));
+  return patterns.some((p) => pathStartsWith(relativePath, expandPolicyPath(p, missionId)));
 }
 
 function hasScopedSudoAccess(relativePath: string, sudoScope?: string[]): boolean {
@@ -389,19 +392,19 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   const tenantDenial = checkTenantScope(policy, relativePath, tenantSlug, brokeredTenants, brokerApproval, authorities);
   if (tenantDenial) return tenantDenial;
 
-  const defaultAllow = (policy.default_allow || []).map((p: string) => expandMissionPath(p, currentMission));
+  const defaultAllow = (policy.default_allow || []).map((p: string) => expandPolicyPath(p, currentMission));
   if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };
   if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write')) return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
-  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, currentMission)))) {
+  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, currentMission)))) {
     return { allowed: true };
   }
 
   const personaRules = policy.persona_permissions?.[currentPersona];
-  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, currentMission)))) {
+  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, currentMission)))) {
     return { allowed: true };
   }
 
@@ -464,12 +467,12 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write')) return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
-  if (roleRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
-  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (roleRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
 
   const personaRules = policy.persona_permissions?.[currentPersona];
-  if (personaRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
-  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandMissionPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (personaRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
 
   // Project scope check for confidential tier (before generic tier restrictions)
   const projectDenial = checkProjectScope(relativePath, policy, currentPersona, authorities);

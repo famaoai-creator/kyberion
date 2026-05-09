@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "role",
+    "description",
+    "required_capabilities",
+    "compatible_authority_roles",
+    "allowed_delegate_team_roles",
+    "escalation_parent_team_role",
+    "required_scope_classes",
+    "ownership_scope",
+    "autonomy_level"
+  ],
+  "properties": {
+    "role": { "type": "string" },
+    "description": { "type": "string" },
+    "required_capabilities": { "type": "array", "items": { "type": "string" } },
+    "compatible_authority_roles": { "type": "array", "items": { "type": "string" } },
+    "allowed_delegate_team_roles": { "type": "array", "items": { "type": "string" } },
+    "escalation_parent_team_role": { "type": ["string", "null"] },
+    "required_scope_classes": { "type": "array", "items": { "type": "string" } },
+    "ownership_scope": { "type": "string" },
+    "selection_hints": {
+      "type": "object",
+      "properties": {
+        "preferred_agents": { "type": "array", "items": { "type": "string" } },
+        "preferred_models": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "autonomy_level": { "enum": ["low", "medium", "high"] }
+  }
+}

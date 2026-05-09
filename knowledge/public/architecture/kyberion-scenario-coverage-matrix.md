@@ -106,7 +106,7 @@ the canonical surface(s) involved.
 | G1 | Microphone capture | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder` | ✅ |
 | G2 | STT (audio → text) | `SpeechToTextBridge` + `KYBERION_STT_COMMAND` | ✅ |
 | G3 | Audio → requirements | `audio-to-requirements` | ✅ |
-| G4 | TTS / synthesis | `voice-engine-registry.json` + voice-actuator | ✅ |
+| G4 | TTS / synthesis | `voice-engines/*.json` + `voice-engine-registry.json` snapshot + voice-actuator | ✅ |
 | G5 | Voice profile management / promotion | `voice-profile-registry.json` + `promote-voice-profile.md` | ✅ |
 | G6 | Real-time meeting coaching | `real-time-coaching-protocol.md` + `meeting-actuator` (`join` / `leave` / `speak` / `listen` / `chat` / `status`) + `pipelines/meeting-proxy-workflow.json` | ✅ |
 
