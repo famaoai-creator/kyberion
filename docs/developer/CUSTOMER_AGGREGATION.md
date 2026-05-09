@@ -64,7 +64,7 @@ When unset, Kyberion falls back to the legacy `knowledge/personal/` behavior.
 For a given config sub-path (e.g. `connections/slack.json`):
 
 1. **Customer overlay**: `customer/{slug}/connections/slack.json` if it exists.
-2. **Personal fallback**: `knowledge/personal/connections/slack.json` if it exists.
+2. **Legacy personal fallback**: `knowledge/personal/connections/slack.json` if it exists.
 3. **Public default**: for policy files, `knowledge/public/governance/slack.json` etc.
 
 The resolver returns the first existing path. For writes, when a customer is active, writes go to the customer overlay path.
@@ -91,7 +91,7 @@ Secrets must **never** live in the customer overlay, even though `customer/{slug
 
 ## 3. What Goes Where
 
-| File | Customer overlay (`customer/{slug}/`) | Personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
+| File | Customer overlay (`customer/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
 |---|---|---|---|
 | Identity | `identity.json` | `my-identity.json` | — |
 | Vision | `vision.md` | `my-vision.md` | — |
@@ -149,7 +149,7 @@ The customer overlay is an **additional resolution layer** on top of the existin
 ```
 Read order for config:
   customer/{slug}/{path}        ← new, per-customer
-  knowledge/personal/{path}     ← existing, single-sovereign
+  knowledge/personal/{path}     ← existing, legacy fallback
   knowledge/confidential/...    ← existing, project-scoped
   knowledge/public/{path}       ← existing, reusable
 ```
