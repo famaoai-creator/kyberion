@@ -20,6 +20,8 @@ describe('Customer onboarding contract', () => {
     expect(wizard).toContain('customer_switch');
     expect(readme).toContain('pnpm customer:switch acme-corp');
     expect(operator).toContain('pnpm customer:create customer-slug');
+    expect(operator).toContain('interactive identity setup → customer/{slug}/ (fallback: knowledge/personal/)');
+    expect(operator).toContain('/app/customer');
     expect(init).toContain('customer/{slug}/my-identity.json');
     expect(init).toContain('`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json`');
   });
