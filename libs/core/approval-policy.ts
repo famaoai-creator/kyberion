@@ -1,5 +1,6 @@
+import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 export interface ApprovalPolicyRule {
   id: string;
@@ -29,7 +30,11 @@ let approvalPolicyCache: ApprovalPolicyFile | null = null;
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
   if (approvalPolicyCache) return approvalPolicyCache;
-  const filePath = pathResolver.knowledge('public/governance/approval-policy.json');
+  const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+  const filePath =
+    customerPolicyPath && safeExistsSync(customerPolicyPath)
+      ? customerPolicyPath
+      : pathResolver.knowledge('public/governance/approval-policy.json');
   approvalPolicyCache = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ApprovalPolicyFile;
   return approvalPolicyCache;
 }
