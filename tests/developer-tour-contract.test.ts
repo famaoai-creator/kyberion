@@ -29,7 +29,6 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('libs/actuators/meeting-browser-driver/');
     expect(ext).toContain('PLUGIN_AUTHORING.md');
     expect(ext).toContain('Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset');
-    expect(ext).toContain('Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset');
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');
     expect(readme).toContain('PLUGIN_AUTHORING.md');
