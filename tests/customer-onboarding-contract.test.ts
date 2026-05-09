@@ -18,6 +18,7 @@ describe('Customer onboarding contract', () => {
     const ux = read('docs/OPERATOR_UX_GUIDE.md');
     const cli = read('scripts/cli.ts');
     const dashboard = read('scripts/sovereign_dashboard.ts');
+    const localDev = read('docs/developer/LOCAL_DEV.md');
 
     expect(wizard).toContain('Set up a customer overlay now?');
     expect(wizard).toContain('customer_create');
@@ -32,5 +33,6 @@ describe('Customer onboarding contract', () => {
     expect(ux).toContain('customer overlay material goes in `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set');
     expect(cli).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(dashboard).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
+    expect(localDev).toContain('Customer-specific identity, connections, and onboarding artifacts resolve under customer/{slug}/ when set');
   });
 });
