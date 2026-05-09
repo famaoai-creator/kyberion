@@ -63,4 +63,17 @@ describe('Workflow operations contract', () => {
     expect(crossOs).toContain('pnpm run check:pipeline-shell-independence');
     expect(crossOs).not.toContain('|| true');
   });
+
+  it('keeps the stale workflow enabled for issues and pull requests', () => {
+    const stale = read('.github/workflows/stale.yml');
+    const triage = read('docs/developer/ISSUE_TRIAGE.md');
+
+    expect(stale).toContain('actions/stale@v9');
+    expect(stale).toContain('days-before-issue-stale: 90');
+    expect(stale).toContain('days-before-pr-stale: 30');
+    expect(stale).toContain('stale-issue-label: stale');
+    expect(stale).toContain('stale-pr-label: stale');
+    expect(triage).toContain('runs via `.github/workflows/stale.yml`');
+    expect(triage).not.toContain('TODO: not yet enabled');
+  });
 });
