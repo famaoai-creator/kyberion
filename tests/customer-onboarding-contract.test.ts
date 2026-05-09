@@ -30,7 +30,8 @@ describe('Customer onboarding contract', () => {
     expect(init).toContain('customer/{slug}/my-identity.json');
     expect(init).toContain('`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json`');
     expect(quickstart).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
-    expect(ux).toContain('customer overlay material goes in `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set');
+    expect(ux).toContain('connection material goes in the active private overlay');
+    expect(ux).toContain('otherwise `knowledge/personal/connections/`');
     expect(cli).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(dashboard).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(localDev).toContain('Customer-specific identity, connections, and onboarding artifacts resolve under customer/{slug}/ when set');
