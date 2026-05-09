@@ -122,7 +122,7 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 - [x] Resolver API + テスト
 - [x] `pnpm customer:create`
 - [x] `customer:list`
-- [ ] `customer:switch`
+- [x] `customer:switch`
 - [ ] onboarding wizard 統合
 - [x] 移行ヘルパ
 - [ ] 各 caller のオーバーレイ対応
