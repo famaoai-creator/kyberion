@@ -18,6 +18,7 @@ describe('Developer tour contract', () => {
     expect(tour).toContain('libs/actuators/browser-actuator/src/index.ts');
     expect(tour).toContain('meeting-actuator/');
     expect(tour).toContain('meeting-browser-driver/');
+    expect(tour).toContain('customer/{slug}/` becomes the preferred overlay root');
     expect(tour).toContain('EXTENSION_POINTS.md');
   });
 
@@ -27,6 +28,7 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('release:notes');
     expect(ext).toContain('libs/actuators/meeting-browser-driver/');
     expect(ext).toContain('PLUGIN_AUTHORING.md');
+    expect(ext).toContain('KYBERION_CUSTOMER is set');
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');
     expect(readme).toContain('PLUGIN_AUTHORING.md');
