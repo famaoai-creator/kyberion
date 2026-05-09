@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
+  customerResolver,
   findMissionPath,
   logger,
   missionDir as resolveMissionDir,
@@ -95,7 +96,7 @@ export function writeFocusedMissionId(missionFocusPath: string, missionId: strin
 export function checkPrerequisites(): void {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
 
-  const identityPath = pathResolver.knowledge('personal/my-identity.json');
+  const identityPath = customerResolver.customerRoot('my-identity.json') ?? pathResolver.knowledge('personal/my-identity.json');
   if (!safeExistsSync(identityPath)) {
     throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
   }
