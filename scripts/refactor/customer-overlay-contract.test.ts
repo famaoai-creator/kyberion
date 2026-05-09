@@ -18,6 +18,8 @@ describe('mission refactor customer overlay contract', () => {
     expect(state).toContain('my-identity.json');
     expect(state).toContain('my-vision.md');
     expect(state).toContain('agent-identity.json');
+    expect(state).toContain('Sovereign profile incomplete');
+    expect(state).toContain('complete customer onboarding');
     expect(creation).toContain('customerResolver.customerRoot(\'my-vision.md\')');
     expect(creation).toContain('profileVisionRef()');
     expect(llm).toContain('customerResolver.customerRoot(\'my-identity.json\')');

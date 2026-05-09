@@ -100,8 +100,12 @@ export function checkPrerequisites(): void {
   const requiredFiles = ['my-identity.json', 'my-vision.md', 'agent-identity.json'].map((name) =>
     path.join(profileRoot, name),
   );
-  if (requiredFiles.some((filePath) => !safeExistsSync(filePath))) {
-    throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
+  const missingFiles = requiredFiles.filter((filePath) => !safeExistsSync(filePath));
+  if (missingFiles.length > 0) {
+    throw new Error(
+      `CRITICAL: Sovereign profile incomplete. Missing: ${missingFiles.map((filePath) => path.basename(filePath)).join(', ')}. ` +
+      'Please run "pnpm onboard" (or complete customer onboarding) before creating missions.',
+    );
   }
 
   const tiers = [
