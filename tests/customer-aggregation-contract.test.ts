@@ -28,7 +28,7 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain('[x] Slack onboarding consumer (`libs/core/slack-onboarding.ts`)');
     expect(doc).toContain('legacy single-user fallback');
     expect(doc).toContain('legacy `knowledge/personal/` behavior');
-    expect(doc).toContain('knowledge/personal/` remains the legacy fallback when no customer is active');
+    expect(doc).toContain('knowledge/personal/` remains the legacy personal fallback when no customer is active');
     expect(doc).toContain('Legacy personal fallback (`knowledge/personal/`)');
     expect(doc).toContain('knowledge/personal/{path}     ← existing, legacy fallback');
     expect(jp).toContain('[x] `pnpm customer:create`');
