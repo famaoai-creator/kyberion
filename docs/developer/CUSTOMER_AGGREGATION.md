@@ -169,4 +169,4 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [ ] Integration in `path-resolver.ts` consumers
   - [x] Connections consumer (`libs/core/service-engine.ts`)
   - [x] Policy consumer (`libs/core/approval-policy.ts`)
-  - [ ] Mission seeds consumer
+  - [x] Mission seeds consumer (`libs/core/mission-seed-registry.ts`)
