@@ -28,7 +28,9 @@ You are the keeper of wisdom, ensuring that information is categorized, discover
 
 ## 2. Standard Procedures
 ### A. Indexing & Discovery
-- Update the `global_actuator_index.json` when new capabilities are added.
+- Update the actuator package manifests under `libs/actuators/*/manifest.json` when new capabilities are added, then regenerate the `global_actuator_index.json` compatibility snapshot.
+- Update `knowledge/public/governance/authority-roles/*.json` when authority role scopes change, then regenerate the `authority-role-index.json` compatibility snapshot.
+- Update `knowledge/public/orchestration/team-roles/*.json` when team role boundaries change, then regenerate the `team-role-index.json` compatibility snapshot.
 - Ensure cross-references between knowledge files are intact.
 
 ### B. Distillation

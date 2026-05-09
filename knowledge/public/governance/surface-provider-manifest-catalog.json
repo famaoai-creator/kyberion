@@ -10,6 +10,30 @@
       "summary": "Presence surface provider manifest and routing policy."
     },
     {
+      "id": "imessage",
+      "channel": "imessage",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "shipped",
+      "summary": "iMessage surface provider manifest and routing policy."
+    },
+    {
+      "id": "discord",
+      "channel": "discord",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "shipped",
+      "summary": "Discord surface provider manifest and routing policy."
+    },
+    {
+      "id": "telegram",
+      "channel": "telegram",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "shipped",
+      "summary": "Telegram surface provider manifest and routing policy."
+    },
+    {
       "id": "slack",
       "channel": "slack",
       "manifest_path": "public/governance/surface-provider-manifests.json",

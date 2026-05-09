@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, derivePipelineStatus, pathResolver, determineActuatorStepType } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, safeExistsSync, safeUnlinkSync, derivePipelineStatus, pathResolver, determineActuatorStepType, classifyError, getReasoningBackend } from '@agent/core';
 import * as path from 'node:path';
 
 /**
@@ -57,25 +57,67 @@ export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessa
     
     logger.info(`  [NERVE] [Step ${state.stepCount}] Executing ${step.op}...`);
     
-    try {
-      const [domain, action] = step.op.split(':');
-      
-      if (domain === 'core') {
-        // Handle core actions and update local context
-        ctx = await handleCoreAction(action, step.params, ctx, options, state);
-      } else {
-        // Dispatch to actuators and update local context with result
-        ctx = await dispatchToActuator(domain, action, step.params, ctx);
+    let attempt = 0;
+    while (attempt < 2) { // Allow 1 retry after repair
+      try {
+        const [domain, action] = step.op.split(':');
+        
+        if (domain === 'core') {
+          // Handle core actions and update local context
+          ctx = await handleCoreAction(action, step.params, ctx, options, state);
+        } else {
+          // Dispatch to actuators and update local context with result
+          ctx = await dispatchToActuator(domain, action, step.params, ctx);
+        }
+        results.push({ op: step.op, status: 'success' });
+        break; // Success, exit attempt loop
+      } catch (err: any) {
+        const failure = classifyError(err);
+        if (attempt === 0 && failure.repairAction) {
+          logger.warn(`  [NERVE] Step failed: ${failure.label}. Attempting autonomous repair...`);
+          const repaired = await attemptAutonomousRepair(step, failure, ctx);
+          if (repaired) {
+            logger.success(`  [NERVE] Repair successful. Retrying step ${step.op}...`);
+            attempt++;
+            continue; // Retry once
+          }
+        }
+        
+        logger.error(`  [NERVE] Step failed (${step.op}): ${err.message}`);
+        results.push({ op: step.op, status: 'failed', error: err.message });
+        return { status: derivePipelineStatus(results), results, context: ctx }; // Abort on final failure
       }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [NERVE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break; // Abort on failure
     }
   }
 
   return { status: derivePipelineStatus(results), results, context: ctx };
+}
+
+async function attemptAutonomousRepair(step: SuperPipelineStep, failure: any, ctx: any): Promise<boolean> {
+  try {
+    const backend = getReasoningBackend();
+    const instruction = `
+The following pipeline step failed in Kyberion:
+Step Operation: ${step.op}
+Step Params: ${JSON.stringify(step.params)}
+Error Category: ${failure.category}
+Error Detail: ${failure.detail}
+
+Repair Action Hint: ${failure.repairAction}
+
+Your Task:
+Perform the necessary actions (file edits, config updates, etc.) to repair this failure so the step can be retried successfully.
+Assume the persona of a "Self-Healing SRE Agent".
+Once finished, provide a brief summary of what you fixed.
+`.trim();
+
+    const report = await backend.delegateTask(instruction, `Self-Healing Mission for ${step.op}`);
+    logger.info(`  [NERVE:REPAIR] Sub-agent report: ${report}`);
+    return true; // Assume success if delegateTask completed without crashing
+  } catch (err: any) {
+    logger.error(`  [NERVE:REPAIR] Failed to perform repair: ${err.message}`);
+    return false;
+  }
 }
 
 async function handleCoreAction(action: string, params: any, ctx: any, options: any, state: any): Promise<any> {
@@ -141,6 +183,9 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
       }
       return ctx;
     }
+  }
+
+  if (action === 'log' || action === 'pulse_status') {
     if (action === 'log') {
       if (params?.message) logger.info(String(resolveVars(params.message, ctx)));
       return ctx;
@@ -155,24 +200,18 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
     }
   }
 
-  const domainMap: Record<string, string> = {
-    'file': 'dist/libs/actuators/file-actuator/src/index.js',
-    'system': 'dist/libs/actuators/system-actuator/src/index.js',
-    'wisdom': 'dist/libs/actuators/wisdom-actuator/src/index.js',
-    'network': 'dist/libs/actuators/network-actuator/src/index.js',
-    'browser': 'dist/libs/actuators/browser-actuator/src/index.js',
-    'code': 'dist/libs/actuators/code-actuator/src/index.js',
-    'orchestrator': 'dist/libs/actuators/orchestrator-actuator/src/index.js',
-    'modeling': 'dist/libs/actuators/modeling-actuator/src/index.js',
-    'media': 'dist/libs/actuators/media-actuator/src/index.js',
-    'service': 'dist/libs/actuators/service-actuator/src/index.js'
-  };
+  // Dynamic domain resolution via pathResolver
+  let actuatorId = domain.endsWith('-actuator') ? domain : `${domain}-actuator`;
+  let builtActuatorPath = pathResolver.capabilityEntry(actuatorId);
 
-  const actuatorPath = domainMap[domain];
-  if (!actuatorPath) throw new Error(`Unknown actuator domain: ${domain}`);
-  const builtActuatorPath = pathResolver.rootResolve(actuatorPath);
   if (!safeExistsSync(builtActuatorPath)) {
-    throw new Error(`Built actuator not found for ${domain}. Expected ${actuatorPath}. Run pnpm build first.`);
+    // Try without -actuator suffix if direct ID was provided but doesn't follow convention
+    if (safeExistsSync(pathResolver.capabilityEntry(domain))) {
+      actuatorId = domain;
+      builtActuatorPath = pathResolver.capabilityEntry(actuatorId);
+    } else {
+      throw new Error(`Unknown actuator domain: ${domain}. Built actuator not found at ${builtActuatorPath}. Run pnpm build first.`);
+    }
   }
 
   const tempAdfPath = pathResolver.sharedTmp(

@@ -12,9 +12,17 @@ describe('Workflow operations contract', () => {
   it('keeps CI aligned with built capability and runtime-surface commands', () => {
     const ci = read('.github/workflows/ci.yml');
     expect(ci).toContain('pnpm install --frozen-lockfile');
+    expect(ci).toContain('pnpm run check:commit-subject');
     expect(ci).toContain('node dist/scripts/capability_discovery.js');
     expect(ci).toContain('node dist/scripts/surface_runtime.js --action status');
-    expect(ci).toContain('node dist/scripts/measure-build-size.js --json --no-save');
+    expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
+  });
+
+  it('keeps validate on the docs example check as well as the other release gates', () => {
+    const packageJson = read('package.json');
+    expect(packageJson).toContain('pnpm run check:doc-examples');
+    expect(packageJson).toContain('pnpm run check:first-win-smoke');
+    expect(packageJson).toContain('pnpm run check:mos-no-write-api');
   });
 
   it('does not invoke removed skills/bootstrap/schema scripts from CI workflows', () => {
@@ -28,8 +36,15 @@ describe('Workflow operations contract', () => {
 
   it('keeps PR validation on built build-size measurement', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
-    expect(prValidation).toContain('node dist/scripts/measure-build-size.js');
-    expect(prValidation).not.toContain('npx tsx scripts/measure-build-size.ts');
+    expect(prValidation).toContain('pnpm run check:pr-title');
+    expect(prValidation).toContain('node dist/scripts/vital_check.js --format text');
+    expect(prValidation).not.toContain('npx tsx scripts/vital_check.ts');
+  });
+
+  it('runs golden output checks in PR validation once stable snapshots exist', () => {
+    const prValidation = read('.github/workflows/pr-validation.yml');
+    expect(prValidation).toContain('KYBERION_REASONING_BACKEND: stub');
+    expect(prValidation).toContain('pnpm run check:golden');
   });
 
   it('documents the distinction between local terminal residue and managed surfaces', () => {
@@ -47,5 +62,18 @@ describe('Workflow operations contract', () => {
     expect(crossOs).toContain('pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json');
     expect(crossOs).toContain('pnpm run check:pipeline-shell-independence');
     expect(crossOs).not.toContain('|| true');
+  });
+
+  it('keeps the stale workflow enabled for issues and pull requests', () => {
+    const stale = read('.github/workflows/stale.yml');
+    const triage = read('docs/developer/ISSUE_TRIAGE.md');
+
+    expect(stale).toContain('actions/stale@v9');
+    expect(stale).toContain('days-before-issue-stale: 90');
+    expect(stale).toContain('days-before-pr-stale: 30');
+    expect(stale).toContain('stale-issue-label: stale');
+    expect(stale).toContain('stale-pr-label: stale');
+    expect(triage).toContain('runs via `.github/workflows/stale.yml`');
+    expect(triage).not.toContain('TODO: not yet enabled');
   });
 });

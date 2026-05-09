@@ -21,7 +21,7 @@ When you request a bridge activation, Kyberion executes the `setup-messaging-bri
 1.  **Platform Identification**: Kyberion requires an explicit `platform_id` in pipeline context.
 2.  **Declared Bridge Check**: Kyberion verifies that the requested bridge implementation exists in `satellites/<platform>-bridge`.
 3.  **Host Constraint Check**: iMessage activations require macOS before any startup is attempted.
-4.  **Reconciliation**: Kyberion reconciles `knowledge/public/governance/active-surfaces.json` through `scripts/surface_runtime.ts` / `service-actuator`.
+4.  **Reconciliation**: Kyberion reconciles `knowledge/public/governance/surfaces/*.json` through `scripts/surface_runtime.ts` / `service-actuator`, with `active-surfaces.json` as a compatibility snapshot.
 5.  **Service Startup**: The declared bridge is started as part of the managed reconcile flow.
 
 ## 3. Managing Services

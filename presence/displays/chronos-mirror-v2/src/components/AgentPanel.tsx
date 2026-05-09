@@ -307,8 +307,23 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         {/* Agent List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {agents.length === 0 && !showSpawn && (
-            <div className="text-center text-[11px] opacity-30 italic py-8">
-              {at("chronos_no_agents_running", "No agents running. Spawn one to get started.")}
+            <div className="flex flex-col items-center gap-3 py-10 px-6 text-center">
+              <div className="text-[11px] uppercase tracking-[0.25em] text-white/30">
+                {at("chronos_no_agents_running", "No agents running yet")}
+              </div>
+              <div className="max-w-[260px] text-[11px] leading-relaxed text-white/45">
+                {at(
+                  "chronos_no_agents_hint",
+                  "Spawn the first agent to begin Mission control. You can pick a pre-configured manifest or define a custom provider/model.",
+                )}
+              </div>
+              <button
+                onClick={() => setShowSpawn(true)}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-300 transition hover:bg-cyan-400/20"
+              >
+                <Plus size={12} />
+                <span>{at("chronos_spawn_first_agent", "Spawn First Agent")}</span>
+              </button>
             </div>
           )}
           {agents.map((agent) => (

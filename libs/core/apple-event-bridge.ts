@@ -130,3 +130,100 @@ export function moveMouse(x: number, y: number) {
   }
   safeExec('osascript', ['-e', `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`]);
 }
+
+function execCliclick(args: string[]): void {
+  try {
+    safeExec('cliclick', args);
+  } catch (err: any) {
+    const msg = String(err?.message ?? err);
+    if (msg.includes('ENOENT') || msg.includes('not found') || msg.includes('No such file')) {
+      throw new Error(`This op requires cliclick. Install with: brew install cliclick`);
+    }
+    throw err;
+  }
+}
+
+export function scrollAt(x: number, y: number, direction: 'up' | 'down' | 'left' | 'right', amount = 3) {
+  if (!isDarwin()) return;
+  const dirCode = { up: 'su', down: 'sd', left: 'sl', right: 'sr' }[direction];
+  execCliclick([`${dirCode}:${x},${y},${amount}`]);
+}
+
+export function dragFrom(x1: number, y1: number, x2: number, y2: number) {
+  if (!isDarwin()) return;
+  execCliclick([`dd:${x1},${y1}`, `du:${x2},${y2}`]);
+}
+
+export function runAppleScript(script: string): string {
+  if (!isDarwin()) return '';
+  return String(safeExec('osascript', ['-e', script])).trim();
+}
+
+export function getScreenSize(): { width: number; height: number } {
+  if (!isDarwin()) return { width: 0, height: 0 };
+  try {
+    const output = runAppleScript('tell application "Finder" to get bounds of window of desktop');
+    const parts = output.split(',').map(s => Number(s.trim()));
+    return { width: parts[2] ?? 0, height: parts[3] ?? 0 };
+  } catch {
+    return { width: 0, height: 0 };
+  }
+}
+
+export function getWindowList(appName: string): string[] {
+  if (!isDarwin()) return [];
+  const script = [
+    `tell application "${toAppleScriptString(appName)}"`,
+    'try',
+    'set windowNames to name of every window',
+    'set output to ""',
+    'repeat with w in windowNames',
+    'set output to output & w & linefeed',
+    'end repeat',
+    'return output',
+    'on error',
+    'return ""',
+    'end try',
+    'end tell',
+  ].join('\n');
+  try {
+    return runAppleScript(script).split('\n').map(s => s.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export function quitApplication(appName: string) {
+  if (!isDarwin()) return;
+  safeExec('osascript', ['-e', `tell application "${toAppleScriptString(appName)}" to quit`]);
+}
+
+export function systemNotify(title: string, message: string, subtitle?: string) {
+  if (!isDarwin()) return;
+  const sub = subtitle ? ` subtitle "${toAppleScriptString(subtitle)}"` : '';
+  safeExec('osascript', [
+    '-e',
+    `display notification "${toAppleScriptString(message)}" with title "${toAppleScriptString(title)}"${sub}`,
+  ]);
+}
+
+export function clipboardRead(): string {
+  if (!isDarwin()) return '';
+  return runAppleScript('return the clipboard');
+}
+
+export function clipboardWrite(text: string): void {
+  if (!isDarwin()) return;
+  safeExec('osascript', ['-e', `set the clipboard to "${toAppleScriptString(text)}"`]);
+}
+
+export function takeScreenshot(outputPath: string, options?: { silent?: boolean; displayIndex?: number }): string {
+  if (!isDarwin()) return '';
+  const args = ['-x'];
+  if (options?.displayIndex !== undefined) {
+    args.push('-D', String(options.displayIndex + 1));
+  }
+  args.push(outputPath);
+  safeExec('screencapture', args);
+  return outputPath;
+}

@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "document-specialist": {
+      "label": "Document Specialist",
+      "description": "Creates decks, reports, and structured workbook artifacts.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["planner", "implementer", "reviewer"],
+      "capabilities": ["presentation_deck", "report_document", "workbook_wbs", "artifact_generation"]
+    }
+  }
+}

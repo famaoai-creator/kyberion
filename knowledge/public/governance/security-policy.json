@@ -41,6 +41,7 @@
       "allow_read": [
         ".git/",
         "active/",
+        "customer/",
         "docs/",
         "knowledge/",
         "libs/",
@@ -66,6 +67,7 @@
       "allow_write": [
         ".git/",
         "active/",
+        "customer/",
         "docs/",
         "knowledge/",
         "libs/",
@@ -169,16 +171,32 @@
         "registry.json"
       ]
     },
+    "knowledge_steward": {
+      "allow_read": [
+        "customer/"
+      ],
+      "allow_write": [
+        "customer/"
+      ]
+    },
     "run_pipeline": {
       "allow_write": [
         "active/shared/tmp/",
-        "active/shared/logs/traces/"
+        "active/shared/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/traces/",
+        "knowledge/public/governance/voice-profile-registry.json",
+        "knowledge/public/governance/voice-engine-registry.json",
+        "knowledge/public/governance/voice-engines/"
       ]
     },
     "run_super_pipeline": {
       "allow_write": [
         "active/shared/tmp/",
-        "active/shared/logs/traces/"
+        "active/shared/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/traces/",
+        "knowledge/public/governance/voice-profile-registry.json",
+        "knowledge/public/governance/voice-engine-registry.json",
+        "knowledge/public/governance/voice-engines/"
       ]
     },
     "software_developer": {
@@ -290,12 +308,22 @@
       "allow_read": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
+        "knowledge/public/governance/surfaces/",
+        "knowledge/public/governance/active-surfaces.json",
+        "active/shared/coordination/channels/imessage/",
+        "active/shared/coordination/channels/discord/",
+        "active/shared/coordination/channels/telegram/",
         "presence/bridge/runtime/",
         "active/audit/"
       ],
       "allow_write": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
+        "knowledge/public/governance/surfaces/",
+        "knowledge/public/governance/active-surfaces.json",
+        "active/shared/coordination/channels/imessage/",
+        "active/shared/coordination/channels/discord/",
+        "active/shared/coordination/channels/telegram/",
         "presence/bridge/runtime/",
         "active/audit/"
       ]

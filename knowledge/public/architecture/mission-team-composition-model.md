@@ -26,9 +26,10 @@ Kyberion separates two kinds of roles:
 
 ## Indexes
 
-- `knowledge/public/governance/authority-role-index.json`
-- `knowledge/public/orchestration/team-role-index.json`
-- `knowledge/public/orchestration/agent-profile-index.json`
+- `knowledge/public/governance/authority-roles/` canonical directory, with `knowledge/public/governance/authority-role-index.json` as the compatibility snapshot
+- `knowledge/public/orchestration/team-roles/` canonical directory, with `knowledge/public/orchestration/team-role-index.json` as the compatibility snapshot
+- `knowledge/public/orchestration/agent-profiles/*.json` canonical
+- `knowledge/public/orchestration/agent-profile-index.json` compatibility snapshot
 - `knowledge/public/orchestration/mission-team-templates.json`
 
 ## Output Artifact

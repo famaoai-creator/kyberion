@@ -75,9 +75,11 @@ Three-tier filesystem isolation for what an agent reads and writes:
 
 | Tier | Path | Audience |
 |---|---|---|
-| Personal | `knowledge/personal/` (gitignored) | The single sovereign |
+| Legacy personal fallback | `knowledge/personal/` (gitignored) | Legacy personal fallback when no customer overlay is active |
 | Confidential | `knowledge/confidential/{project}/` (gitignored) | One project / org |
 | Public | `knowledge/public/` (committed) | Reusable, shared |
+
+When `KYBERION_CUSTOMER` is set, `customer/{slug}/` becomes the preferred overlay root for customer-specific identity, vision, connections, policy, voice, and onboarding state before falling back to `knowledge/personal/`.
 
 Enforced at the file-IO boundary by `secure-io.ts` + `tier-guard.ts`. There is no "trusted code" exception — everything goes through the boundary.
 
@@ -198,6 +200,7 @@ kyberion/
 │   ├── slack-bridge/
 │   ├── voice-hub/
 │   ├── imessage-bridge/
+│   ├── telegram-bridge/
 │   └── macos-camera/
 │
 ├── pipelines/              # 75 ADF pipelines (committed)

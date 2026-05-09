@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-db-perf",
+  "name": "Audit Database Schema for Performance Optimization",
+  "description": "Analyzes database schemas to identify bottlenecks and optimization opportunities.",
+  "variables": {
+    "schema_path": "schemas/database/main_schema.sql",
+    "output_path": "active/shared/tmp/audit-db-perf.json"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 Starting Database Performance Audit for {{schema_path}}" }
+    },
+    {
+      "id": "audit-db-perf",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Analyze the database schema for performance issues. Identify missing indexes, inefficient data types, and potential normalization/denormalization trade-offs.",
+        "context": ["{{schema_path}}"],
+        "analysisType": "performance_audit",
+        "export_as": "audit_result"
+      }
+    },
+    {
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{audit_result}}",
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Performance Audit complete. Results saved to {{output_path}}" }
+    }
+  ]
+}

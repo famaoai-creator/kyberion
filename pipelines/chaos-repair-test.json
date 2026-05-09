@@ -1,0 +1,31 @@
+{
+  "pipeline_id": "chaos-repair-test",
+  "version": "1.0.0",
+  "name": "自己修復エンジン：規律ある権限解決テスト",
+  "description": "セキュリティ違反に対し、AIが正当なRoleを設定して復旧できるか検証します。",
+  "context": {
+    "KYBERION_PERSONA": "sovereign",
+    "MISSION_ROLE": "mission_controller",
+    "KYBERION_SUDO": "true"
+  },
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "step-fail-expected",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "knowledge/confidential/chaos-test-source.md",
+        "export_as": "secret_data"
+      }
+    },
+    {
+      "id": "step-after-repair",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "🎉 正規の権限で復旧成功！読み取った内容: {{secret_data}}"
+      }
+    }
+  ]
+}

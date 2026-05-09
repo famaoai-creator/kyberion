@@ -60,7 +60,7 @@ For each new PR:
 - **Issues**: 90 days of no activity → bot tags `stale`. After 14 more days of no response, close with a "feel free to reopen" message.
 - **PRs**: 30 days of no activity from author → comment requesting status. After 14 more days, close (PR can be reopened).
 
-Stale automation is opt-in per repo and runs via `.github/workflows/stale.yml` (TODO: not yet enabled — see Phase C'-8 follow-up).
+Stale automation is opt-in per repo and runs via `.github/workflows/stale.yml`.
 
 ## Repro request template
 

@@ -6,6 +6,9 @@ phase: execution
 owner: runtime_governance
 applies_to:
   - slack-bridge
+  - imessage-bridge
+  - discord-bridge
+  - telegram-bridge
   - chronos-mirror-v2
   - nexus-daemon
   - terminal-bridge
@@ -26,7 +29,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
 
 1. `gateway`
    External ingress that receives events from a channel or protocol.
-   Examples: `slack-bridge`, `imessage-bridge`
+   Examples: `slack-bridge`, `imessage-bridge`, `discord-bridge`, `telegram-bridge`
 
 2. `ui`
    Interactive control surface or workspace application.
@@ -40,11 +43,12 @@ This model defines how long-running human-facing surfaces and supporting bridges
 
 - `runtime-supervisor` owns the in-process runtime registration.
 - `scripts/surface_runtime.ts` owns durable startup and shutdown orchestration.
-- `knowledge/public/governance/active-surfaces.json` is the canonical startup manifest.
+- `knowledge/public/governance/surfaces/*.json` are the canonical startup manifests.
+- `knowledge/public/governance/active-surfaces.json` is the compatibility snapshot generated from them.
 
 ## Startup Rules
 
-- Background surfaces must be declared in `active-surfaces.json`.
+- Background surfaces must be declared in `knowledge/public/governance/surfaces/*.json`.
 - Each surface must declare:
   - `kind`
   - `command`
@@ -52,7 +56,7 @@ This model defines how long-running human-facing surfaces and supporting bridges
   - `cwd`
   - `shutdownPolicy`
   - `startupMode`
-- `slack-bridge`, `imessage-bridge`, and `nexus-daemon` are `background` services.
+- `slack-bridge`, `imessage-bridge`, `discord-bridge`, `telegram-bridge`, and `nexus-daemon` are `background` services.
 - `chronos-mirror-v2` is a `workspace-app` and may require a prior build.
 
 ## Shutdown Rules
@@ -68,6 +72,8 @@ node dist/scripts/surface_runtime.js --action reconcile
 node dist/scripts/surface_runtime.js --action status
 node dist/scripts/surface_runtime.js --action start --surface slack-bridge
 node dist/scripts/surface_runtime.js --action start --surface imessage-bridge
+node dist/scripts/surface_runtime.js --action start --surface discord-bridge
+node dist/scripts/surface_runtime.js --action start --surface telegram-bridge
 node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
 ```
 
@@ -75,6 +81,7 @@ node dist/scripts/surface_runtime.js --action stop --surface chronos-mirror-v2
 
 - Local editor warnings such as `Waited for background terminal` are not canonical proof of a Kyberion runtime leak.
 - The canonical runtime view is:
+  - `knowledge/public/governance/surfaces/*.json`
   - `knowledge/public/governance/active-surfaces.json`
   - `active/shared/runtime/surfaces/state.json`
   - `node dist/scripts/surface_runtime.js --action status`

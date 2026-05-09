@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "surface-concierge": {
+      "label": "Surface Concierge",
+      "description": "Receives natural-language requests, fills missing slots, and keeps the conversation smooth.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["surface_liaison"],
+      "capabilities": ["conversation", "slot_filling", "routing"]
+    }
+  }
+}

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -73,6 +73,7 @@ export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
 }
 
 const DEFAULT_MANIFEST_PATH = 'knowledge/public/governance/active-surfaces.json';
+const DEFAULT_MANIFEST_DIR = 'knowledge/public/governance/surfaces';
 const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const LOG_DIR = pathResolver.shared('logs/surfaces');
 let surfaceManifestValidateFn: ValidateFunction | null = null;
@@ -92,6 +93,14 @@ export function surfaceManifestPath(): string {
   return pathResolver.resolve(DEFAULT_MANIFEST_PATH);
 }
 
+export function surfaceManifestDirectoryPath(): string {
+  return pathResolver.resolve(DEFAULT_MANIFEST_DIR);
+}
+
+export function surfaceManifestFilePath(surfaceId: string): string {
+  return path.join(surfaceManifestDirectoryPath(), `${surfaceId}.json`);
+}
+
 export function surfaceStatePath(): string {
   return STATE_PATH;
 }
@@ -105,14 +114,87 @@ export function surfaceResourceId(surfaceId: string): string {
   return `surface:${surfaceId}`;
 }
 
-export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
-  const value = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as SurfaceRuntimeManifest;
+function readSurfaceManifestFile(filePath: string): SurfaceRuntimeManifest {
+  const value = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as SurfaceRuntimeManifest;
   const validate = ensureSurfaceManifestValidator();
   if (!validate(value)) {
     const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
-    throw new Error(`Invalid surface manifest: ${errors}`);
+    throw new Error(`Invalid surface manifest file "${filePath}": ${errors}`);
+  }
+  if (value.surfaces.length !== 1) {
+    throw new Error(`Surface manifest file "${filePath}" must contain exactly one surface.`);
   }
   return value;
+}
+
+function readSurfaceManifestDirectory(manifestDir = surfaceManifestDirectoryPath()): SurfaceRuntimeManifest | null {
+  if (!safeExistsSync(manifestDir)) return null;
+  const surfaces = safeReaddir(manifestDir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .flatMap((entry) => readSurfaceManifestFile(path.join(manifestDir, entry)).surfaces);
+  if (!surfaces.length) return null;
+  return { version: 1, surfaces };
+}
+
+export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
+  const resolvedManifestPath = pathResolver.resolve(manifestPath);
+  if (resolvedManifestPath === surfaceManifestPath() && safeExistsSync(surfaceManifestDirectoryPath())) {
+    const directoryManifest = readSurfaceManifestDirectory(surfaceManifestDirectoryPath());
+    if (directoryManifest) return directoryManifest;
+  }
+  if (safeExistsSync(resolvedManifestPath)) {
+    const value = JSON.parse(safeReadFile(resolvedManifestPath, { encoding: 'utf8' }) as string) as SurfaceRuntimeManifest;
+    const validate = ensureSurfaceManifestValidator();
+    if (!validate(value)) {
+      const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+      throw new Error(`Invalid surface manifest: ${errors}`);
+    }
+    return value;
+  }
+  const directoryManifest = readSurfaceManifestDirectory(resolvedManifestPath);
+  if (directoryManifest) return directoryManifest;
+  throw new Error(`Surface manifest not found: ${resolvedManifestPath}`);
+}
+
+export function saveSurfaceManifest(manifest: SurfaceRuntimeManifest, manifestPath = surfaceManifestPath()): void {
+  const validate = ensureSurfaceManifestValidator();
+  if (!validate(manifest)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid surface manifest for saving: ${errors}`);
+  }
+  const surfaces = [...manifest.surfaces].sort((left, right) => left.id.localeCompare(right.id));
+  const resolvedManifestPath = pathResolver.resolve(manifestPath);
+  const writeDirectoryManifests = resolvedManifestPath === surfaceManifestPath();
+
+  if (writeDirectoryManifests) {
+    const manifestDir = surfaceManifestDirectoryPath();
+    if (!safeExistsSync(manifestDir)) {
+      safeMkdir(manifestDir, { recursive: true });
+    }
+
+    const expectedPaths = new Set<string>();
+    for (const surface of surfaces) {
+      const surfaceManifest = {
+        version: 1 as const,
+        surfaces: [surface],
+      };
+      const filePath = surfaceManifestFilePath(surface.id);
+      expectedPaths.add(pathResolver.resolve(filePath));
+      ensureParentDir(filePath);
+      safeWriteFile(filePath, JSON.stringify(surfaceManifest, null, 2));
+    }
+
+    for (const entry of safeReaddir(manifestDir)) {
+      if (!entry.endsWith('.json')) continue;
+      const filePath = path.join(manifestDir, entry);
+      if (expectedPaths.has(pathResolver.resolve(filePath))) continue;
+      safeUnlinkSync(filePath);
+    }
+  }
+
+  ensureParentDir(resolvedManifestPath);
+  safeWriteFile(resolvedManifestPath, JSON.stringify({ version: 1, surfaces }, null, 2));
 }
 
 export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {
@@ -132,7 +214,7 @@ export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string 
 }
 
 export function normalizeSurfaceDefinition(definition: SurfaceRuntimeDefinition): SurfaceRuntimeDefinition {
-  return {
+  const normalized = {
     ...definition,
     args: definition.args || [],
     cwd: resolveSurfaceCwd(definition),
@@ -141,6 +223,32 @@ export function normalizeSurfaceDefinition(definition: SurfaceRuntimeDefinition)
     ownerType: definition.ownerType || 'surface-runtime-manifest',
     enabled: definition.enabled !== false,
   };
+  validateSurfaceDefinition(normalized);
+  return normalized;
+}
+
+/**
+ * UI surfaces must declare a port — they always own an HTTP listener.
+ * Gateways may run socket-mode (e.g. Slack Bolt) and need no local port.
+ * Services may or may not bind a port; we don't require it.
+ * Validation throws for the unambiguous failure case (UI without port) and
+ * warns for missing healthPath where it would otherwise prevent reconcile
+ * from probing already_healthy.
+ */
+function validateSurfaceDefinition(d: SurfaceRuntimeDefinition): void {
+  if (!d.enabled) return;
+  if (d.kind === 'ui' && (typeof d.port !== 'number' || d.port <= 0)) {
+    throw new Error(
+      `[SURFACE_MANIFEST] UI surface "${d.id}" has no valid port. ` +
+      `Add "port": <number> to knowledge/public/governance/surfaces/${d.id}.json, or change kind to "service" if it has no listening socket.`,
+    );
+  }
+  if (typeof d.port === 'number' && d.port > 0 && !d.healthPath) {
+    console.warn(
+      `[SURFACE_MANIFEST] Surface "${d.id}" declares port ${d.port} but no healthPath. ` +
+      `Add "healthPath": "/..." for accurate already_healthy probing during reconcile.`,
+    );
+  }
 }
 
 export async function probeSurfaceHealth(definition: SurfaceRuntimeDefinition): Promise<SurfaceHealthStatus> {

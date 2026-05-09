@@ -57,19 +57,19 @@ pnpm build
 
 ```bash
 pnpm surfaces:reconcile     # bring up background surfaces
-pnpm onboard                # interactive identity setup → knowledge/personal/
+pnpm onboard                # interactive identity setup → customer/{slug}/ (fallback: knowledge/personal/)
 ```
 
 ### 1.4 Configure (FDE / customer overlay)
 
 ```bash
-cp -R customer/_template customer/customer-slug
+pnpm customer:create customer-slug
 $EDITOR customer/customer-slug/customer.json
 $EDITOR customer/customer-slug/identity.json
 $EDITOR customer/customer-slug/vision.md
 
-export KYBERION_CUSTOMER=customer-slug
-echo "export KYBERION_CUSTOMER=customer-slug" >> ~/.zshrc
+pnpm customer:switch customer-slug
+source active/shared/runtime/customer.env
 pnpm onboard
 ```
 
@@ -235,8 +235,8 @@ Mount these volumes if you want state to survive container restarts:
 | Container path | Purpose |
 |---|---|
 | `/app/active` | Mission state, traces, audit |
-| `/app/knowledge/personal` | Identity (single-user mode) |
-| `/app/customer` | Customer overlay (FDE mode) |
+| `/app/customer` | Customer overlay (FDE mode, preferred) |
+| `/app/knowledge/personal` | Identity fallback for single-user mode |
 
 ### 3.5 Production Docker (FDE)
 

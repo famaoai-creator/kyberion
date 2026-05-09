@@ -11,7 +11,37 @@
         "type": "object",
         "properties": {
           "base_url": { "type": "string" },
-          "preset_path": { "type": "string" }
+          "preset_path": { "type": "string" },
+          "credential_suffixes": {
+            "type": "object",
+            "properties": {
+              "accessToken": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "appToken": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "refreshToken": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "clientId": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "clientSecret": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "redirectUri": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "anyOf": [
           { "required": ["base_url"] },

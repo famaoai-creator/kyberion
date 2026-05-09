@@ -5,6 +5,7 @@
 
 import { z, type ZodType } from 'zod';
 import {
+  customerResolver,
   logger,
   pathResolver,
   safeExistsSync,
@@ -124,7 +125,7 @@ function registerDefaultStructuredRunners(): void {
 }
 
 export function loadUserLlmTools(): UserLlmTools {
-  const identityPath = pathResolver.knowledge('personal/my-identity.json');
+  const identityPath = customerResolver.customerRoot('my-identity.json') ?? pathResolver.knowledge('personal/my-identity.json');
   if (!safeExistsSync(identityPath)) return {};
   try {
     const identity = readJsonFile<{ llm_tools?: UserLlmTools }>(identityPath);

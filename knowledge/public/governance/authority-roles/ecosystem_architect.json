@@ -1,0 +1,28 @@
+{
+  "role": "ecosystem_architect",
+  "description": "Core architecture and repo evolution authority.",
+  "default_persona": "ecosystem_architect",
+  "write_scopes": [
+    "knowledge/",
+    "libs/core/",
+    "libs/actuators/",
+    "scripts/",
+    "pipelines/",
+    "schemas/",
+    "active/missions/"
+  ],
+  "scope_classes": [
+    "knowledge_core",
+    "codebase_core",
+    "mission_state"
+  ],
+  "allowed_actuators": [
+    "code-actuator",
+    "orchestrator-actuator",
+    "artifact-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

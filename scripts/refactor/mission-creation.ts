@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import {
   composeMissionTeamPlan,
+  customerResolver,
   findMissionPath,
   initializeMissionTeamBindings,
   ledger,
@@ -36,6 +37,10 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
   const trimmed = String(value).trim();
   if (!trimmed) return undefined;
   return TENANT_SLUG_RE.test(trimmed) ? trimmed : undefined;
+}
+
+function profileVisionRef(): string {
+  return customerResolver.customerRoot('my-vision.md') ?? pathResolver.knowledge('personal/my-vision.md');
 }
 
 export async function createMission(
@@ -103,7 +108,7 @@ export async function createMission(
   const gitHash = getGitHash(rootDir);
   const now = new Date().toISOString();
   const owner = process.env.USER || 'famao';
-  const resolvedVision = visionRef || '/knowledge/personal/my-vision.md';
+  const resolvedVision = visionRef || profileVisionRef();
 
   for (const file of template.files) {
     const content = file.content_template

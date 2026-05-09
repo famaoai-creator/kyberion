@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "operator-ja-default",
+  "profiles": [
+    {
+      "profile_id": "operator-ja-default",
+      "display_name": "Operator Japanese Default",
+      "tier": "public",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [],
+      "default_engine_id": "local_say",
+      "status": "active",
+      "notes": "Default narrated operator output profile for Japanese."
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "presence-surface-agent": {
+      "authority_roles": [
+        "surface_runtime",
+        "chronos_operator"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "presence",
+        "surface",
+        "conversation",
+        "realtime"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
+    }
+  }
+}

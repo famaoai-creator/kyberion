@@ -48,6 +48,11 @@ describe('Slack and Chronos governance contract', () => {
     expect(securityPolicy.authority_role_permissions.chronos_localadmin.allow_write).toContain('active/shared/coordination/orchestration/');
     expect(securityPolicy.authority_role_permissions.chronos_localadmin.allow_write).toContain('active/shared/runtime/');
     expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/runtime/');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('knowledge/public/governance/surfaces/');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('knowledge/public/governance/active-surfaces.json');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/coordination/channels/imessage/');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/coordination/channels/discord/');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/coordination/channels/telegram/');
 
     expect(roleAccess.roles.slack_bridge.allow).toContain('active/shared/coordination/channels/slack/');
     expect(roleAccess.roles.slack_bridge.allow).toContain('active/shared/coordination/channels/chronos/outbox/');
@@ -57,6 +62,11 @@ describe('Slack and Chronos governance contract', () => {
     expect(roleAccess.roles.chronos_operator.allow).toEqual([]);
     expect(roleAccess.roles.chronos_localadmin.allow).toContain('active/shared/coordination/orchestration/');
     expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/runtime/');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('knowledge/public/governance/surfaces/');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('knowledge/public/governance/active-surfaces.json');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/coordination/channels/imessage/');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/coordination/channels/discord/');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/coordination/channels/telegram/');
   });
 
   it('ships the Slack and Chronos control model architecture reference', () => {

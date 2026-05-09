@@ -1,0 +1,67 @@
+{
+  "action": "pipeline",
+  "name": "voice-health-check",
+  "description": "Verify mlx-audio TTS and mlx-whisper STT are installed and functional. Returns health status for both bridges.",
+  "steps": [
+    {
+      "id": "check_tts",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "python3",
+        "args": ["-c", "import sys,json; sys.stdin.close(); import subprocess; r=subprocess.run(['python3','libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'],input='{\"action\":\"health\"}',capture_output=True,text=True); print(r.stdout)"],
+        "export_as": "tts_health_raw"
+      }
+    },
+    {
+      "id": "check_tts_direct",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": {
+        "command": "python3",
+        "args": ["-c", "import mlx_audio; print('ok')"],
+        "timeout_ms": 15000,
+        "export_as": "mlx_audio_health"
+      }
+    },
+    {
+      "id": "check_stt",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": {
+        "command": "python3",
+        "args": ["-c", "import mlx_whisper; print('ok')"],
+        "timeout_ms": 15000,
+        "export_as": "mlx_whisper_health"
+      }
+    },
+    {
+      "id": "check_recorder",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": {
+        "command": "sox",
+        "args": ["--version"],
+        "export_as": "sox_health"
+      }
+    },
+    {
+      "id": "log_summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "[voice-health-check] mlx_audio={{mlx_audio_health.available}}, mlx_whisper={{mlx_whisper_health.available}}, sox={{sox_health.available}}"
+      }
+    },
+    {
+      "id": "notify_health",
+      "type": "apply",
+      "op": "system:system_notify",
+      "params": {
+        "title": "Voice Health Check",
+        "message": "mlx_audio: {{mlx_audio_health.available}} | mlx_whisper: {{mlx_whisper_health.available}} | sox: {{sox_health.available}}",
+        "subtitle": "voice-health-check"
+      }
+    }
+  ]
+}

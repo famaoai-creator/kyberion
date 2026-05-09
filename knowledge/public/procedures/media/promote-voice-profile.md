@@ -31,6 +31,7 @@ pnpm voice:profile:promote \
 The command:
 
 - appends the promoted profile to the voice profile registry
+- updates the canonical `knowledge/public/governance/voice-profiles/*.json` entry when using the public registry
 - optionally updates `default_profile_id`
 - writes a promotion receipt under:
   - `active/shared/tmp/voice-profile-promotion/<request_id>.json`
@@ -39,6 +40,7 @@ Tier routing:
 
 - `personal` profiles are written to `knowledge/personal/voice/profile-registry.json` by default
 - `confidential` and `public` profiles continue to use `knowledge/public/governance/voice-profile-registry.json`
+- the public registry also maintains `knowledge/public/governance/voice-profiles/*.json` as the canonical directory
 - `KYBERION_VOICE_PROFILE_REGISTRY_PATH` still overrides the target registry explicitly
 
 ## Important Constraint

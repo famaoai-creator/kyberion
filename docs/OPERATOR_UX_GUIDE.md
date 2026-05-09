@@ -89,6 +89,24 @@ Use when you want:
 - live task detail and artifact access
 - immediate project bootstrap context
 
+### Background Bridges
+
+Use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
+
+Typical managed entries include:
+
+- `slack-bridge`
+- `imessage-bridge`
+- `discord-bridge`
+- `telegram-bridge`
+- `chronos-mirror-v2`
+- `nexus-daemon`
+- `terminal-bridge`
+
+Use `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
+
+The lifecycle details live in [`knowledge/public/architecture/runtime-surface-lifecycle-model.md`](../knowledge/public/architecture/runtime-surface-lifecycle-model.md).
+
 ### CEO UX
 
 Use when you want:
@@ -244,7 +262,7 @@ The most useful directory model for operators is by purpose.
 
 Practical rules:
 
-- personal connection material goes in `knowledge/personal/connections/`
+- connection material goes in the active private overlay: `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set, otherwise `knowledge/personal/connections/`
 - durable mission evidence goes in `active/missions/`
 - shared logs and tmp artifacts go in `active/shared/`
 - reusable policies, schemas, and procedures belong in `knowledge/public/`

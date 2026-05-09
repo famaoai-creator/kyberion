@@ -21,7 +21,7 @@ That model is now legacy. Kyberion has two explicit runtime ownership models:
 ## Migration Mapping
 
 - `register`, `run-once`, `start`, `stop`, `status`, `unregister`
-  - move to `knowledge/public/governance/active-surfaces.json` plus `scripts/surface_runtime.ts`
+  - move to `knowledge/public/governance/surfaces/*.json` plus `scripts/surface_runtime.ts`
 - ad hoc process lifetime management
   - move to `process-actuator`
 - `post-msg`, `wait-msg`
@@ -29,7 +29,7 @@ That model is now legacy. Kyberion has two explicit runtime ownership models:
 
 ## Surface Runtime Pattern
 
-Use [`knowledge/public/governance/active-surfaces.json`](/Users/famao/kyberion/knowledge/public/governance/active-surfaces.json) as the declaration source, then reconcile with:
+Use [`knowledge/public/governance/surfaces/`](/Users/famao/kyberion/knowledge/public/governance/surfaces/) as the declaration source, then reconcile with:
 
 ```bash
 pnpm surfaces:reconcile

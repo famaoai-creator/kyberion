@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "operator-en-default",
+  "profiles": [
+    {
+      "profile_id": "operator-en-default",
+      "display_name": "Operator English Default",
+      "tier": "public",
+      "languages": [
+        "en"
+      ],
+      "sample_refs": [],
+      "default_engine_id": "local_say",
+      "status": "active",
+      "notes": "Default narrated operator output profile for English."
+    }
+  ]
+}

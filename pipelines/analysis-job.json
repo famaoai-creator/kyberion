@@ -1,0 +1,59 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "analysis-job",
+  "name": "Strategic Analysis Job",
+  "description": "Runs the standard analysis sequence (skill co-occurrence + knowledge graph) using the reasoning backend. Replaces scripts/run_analysis_job.ts. Override context vars mission_id and job_id as needed.",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 [ANALYSIS] Starting analysis job (mission: {{mission_id}})" }
+    },
+    {
+      "id": "skill-cooccurrence",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Analyze skill co-occurrence patterns across the Kyberion agent manifest and knowledge graph. Identify which capabilities are most frequently deployed together in missions.",
+        "context": ["{{mission_id}}", "{{job_id}}"],
+        "analysisType": "skill_cooccurrence",
+        "export_as": "skill_cooccurrence_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Skill co-occurrence analysis complete." }
+    },
+    {
+      "id": "knowledge-graph",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Build a knowledge graph summary from the current mission evidence and agent knowledge base. Identify key concepts, their relationships, and knowledge gaps.",
+        "context": ["{{skill_cooccurrence_result}}", "{{mission_id}}"],
+        "analysisType": "knowledge_graph",
+        "export_as": "knowledge_graph_result"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Knowledge graph analysis complete." }
+    },
+    {
+      "id": "write-results",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "active/shared/tmp/analysis-results-{{job_id}}.json",
+        "content": {
+          "skill_cooccurrence": "{{skill_cooccurrence_result}}",
+          "knowledge_graph": "{{knowledge_graph_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ [ANALYSIS] Analysis job complete. Results written to active/shared/tmp/analysis-results-{{job_id}}.json" }
+    }
+  ]
+}

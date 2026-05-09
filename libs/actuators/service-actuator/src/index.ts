@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -30,7 +30,6 @@ interface ServiceAction {
 
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
 function serviceResourceId(serviceId: string): string {
   return `service:${serviceId}`;
 }
@@ -68,15 +67,13 @@ function emitRecoveryStimulus(serviceId: string) {
 }
 
 function resolveServiceBaseUrl(serviceId: string): string {
-  if (safeExistsSync(SERVICE_ENDPOINTS_PATH)) {
-    try {
-      const catalog = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
-      const baseUrl = catalog?.services?.[serviceId]?.base_url;
-      if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim();
-      const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
-      if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
-    } catch (_) {}
-  }
+  try {
+    const catalog = loadServiceEndpointsCatalog();
+    const baseUrl = catalog?.services?.[serviceId]?.base_url;
+    if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim();
+    const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
+    if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
+  } catch (_) {}
 
   if (serviceId === 'moltbook') return 'https://www.moltbook.com/api/v1';
   if (serviceId === 'slack') return 'https://slack.com/api';

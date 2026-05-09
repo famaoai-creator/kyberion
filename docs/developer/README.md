@@ -7,12 +7,14 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 | Doc | When to read |
 |---|---|
 | [EXTENSION_POINTS.md](./EXTENSION_POINTS.md) | What's stable, what's beta, what's internal. **Read first** before patching anything. |
+| [ROLE_PERSONA_MATRIX.md](./ROLE_PERSONA_MATRIX.md) | How to reason about personas, authority roles, and what they do not imply. |
 | [CUSTOMER_AGGREGATION.md](./CUSTOMER_AGGREGATION.md) / [.ja.md](./CUSTOMER_AGGREGATION.ja.md) | How per-customer config layers on top of the codebase. |
 | [TRACE_MIGRATION_TEMPLATE.md](./TRACE_MIGRATION_TEMPLATE.md) | How to add Trace observability to an existing actuator. |
 | [MISSION_LIFECYCLE_AUDIT.md](./MISSION_LIFECYCLE_AUDIT.md) | Why the mission lifecycle is shaped the way it is. |
 | [GOLDEN_OUTPUT_CHECK.md](./GOLDEN_OUTPUT_CHECK.md) | Semantic regression detection for stable pipelines. |
 | [CHAOS_DRILLS.md](./CHAOS_DRILLS.md) | Recurring failure-injection runs. |
 | [VOICE_FIRST_WIN.md](./VOICE_FIRST_WIN.md) | Tier-0 voice setup (Phase A-5). |
+| [REGISTRY_SPLIT_PLAN.md](./REGISTRY_SPLIT_PLAN.md) | Taskized backlog for moving global catalogs to per-item canonical files. |
 | [RELEASE_OPERATIONS.md](./RELEASE_OPERATIONS.md) | How releases get cut. |
 | [GOOD_FIRST_ISSUES.md](./GOOD_FIRST_ISSUES.md) | Starter slices for first-time contributors. |
 | [PRODUCTION_READINESS_PLAN.ja.md](./PRODUCTION_READINESS_PLAN.ja.md) | Implementation backlog and verification scenarios before production-grade OSS release. |
@@ -39,7 +41,7 @@ If you're authoring an actuator or a vertical template:
 
 | Need | Doc |
 |---|---|
-| New actuator | [`EXTENSION_POINTS.md` §2.1](./EXTENSION_POINTS.md) (TODO: full plugin authoring guide is Phase C'-5) |
+| New actuator / plugin | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md) |
 | New vertical template | [`templates/verticals/README.md`](../../templates/verticals/README.md) |
 | Adding Trace to an existing actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md) |
 | Customer-specific config | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) |

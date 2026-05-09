@@ -1,0 +1,59 @@
+{
+  "pipeline_id": "kyberion-autonomous-onboarding",
+  "version": "1.0.0",
+  "name": "Kyberion 自律導入 & ナレッジ・マイニング",
+  "description": "組織内の情報資産を特定し、Kyberionへの連携を自動設定またはガイドします。",
+  "action": "pipeline",
+  "variables": {
+    "focus_area": "全社業務自動化",
+    "scan_depth": "medium"
+  },
+  "steps": [
+    {
+      "id": "environment-discovery",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": {
+        "command": "git",
+        "export_as": "git_status"
+      }
+    },
+    {
+      "id": "codebase-intent-mining",
+      "type": "apply",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "現在のディレクトリ構造とpackage.json等の設定ファイルから、この組織がどのような業務（開発、デザイン、会計等）を行っており、どのツール（GitHub, Slack, Jira等）を外部連携として使っているか推測せよ。",
+        "context": ["package.json", ".env.example", "README.md", "docs/"],
+        "export_as": "business_context"
+      }
+    },
+    {
+      "id": "knowledge-source-interview",
+      "type": "apply",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "推測されたビジネスコンテキストに基づき、より深い連携（Notionのドキュメント、特定のDB、非公開のAPI等）を行うために人間に聞くべき『5つの核心的な質問』を作成せよ。",
+        "context": ["{{business_context}}"],
+        "export_as": "interview_questions"
+      }
+    },
+    {
+      "id": "output-guidance",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "\n--- Kyberion Onboarding Intelligence ---\n\n【現状の分析結果】\n{{business_context}}\n\n【次のアクション（質問）】\n{{interview_questions}}\n\n※ これらの回答を `knowledge/confidential/organization-profile.md` に追記いただければ、自動的に関連Actuatorの設定を提案します。"
+      }
+    },
+    {
+      "id": "profile-setup",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/organization-profile.md",
+        "content": "# 組織ナレッジ・プロファイル\n\n## 1. 現状分析\n{{business_context}}\n\n## 2. 核心的な質問への回答依頼\n{{interview_questions}}\n"
+      }
+    }
+  ]
+}

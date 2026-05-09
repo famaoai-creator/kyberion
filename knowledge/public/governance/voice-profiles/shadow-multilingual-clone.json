@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "shadow-multilingual-clone",
+  "profiles": [
+    {
+      "profile_id": "shadow-multilingual-clone",
+      "display_name": "Shadow Multilingual Clone",
+      "tier": "confidential",
+      "languages": [
+        "en",
+        "ja"
+      ],
+      "sample_refs": [
+        "knowledge/confidential/voice/profiles/shadow-multilingual-clone/sample-01.wav"
+      ],
+      "default_engine_id": "open_voice_clone",
+      "default_effects_preset_id": "clean-voice",
+      "status": "shadow",
+      "notes": "Shadow-only profile for future governed voice-clone evaluation."
+    }
+  ]
+}

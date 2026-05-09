@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-report-gdpr",
+  "name": "Audit Compliance Report for GDPR Compliance",
+  "description": "Audits existing compliance reports to ensure they meet GDPR disclosure standards.",
+  "variables": {
+    "report_path": "docs/compliance/internal_audit_2024.md",
+    "output_path": "active/shared/tmp/audit-report-gdpr.json"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 Starting Compliance Report GDPR Audit for {{report_path}}" }
+    },
+    {
+      "id": "audit-report-gdpr",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Audit the compliance report for GDPR alignment. Verify if data retention policies, user consent mechanisms, and breach notification procedures are accurately described.",
+        "context": ["{{report_path}}"],
+        "analysisType": "compliance_audit",
+        "export_as": "audit_result"
+      }
+    },
+    {
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{audit_result}}",
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Report Audit complete. Results saved to {{output_path}}" }
+    }
+  ]
+}
