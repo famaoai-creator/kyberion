@@ -166,4 +166,7 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [x] CLI: `pnpm customer:switch <slug>` (validates + writes `active/shared/runtime/customer.env`)
 - [x] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
 - [x] Migration helper: `pnpm customer:migrate-from-personal`
-- [ ] Integration in `path-resolver.ts` consumers (callers opt in to overlay one at a time, starting with connections, policy, mission seeds)
+- [ ] Integration in `path-resolver.ts` consumers
+  - [x] Connections consumer (`libs/core/service-engine.ts`)
+  - [x] Policy consumer (`libs/core/approval-policy.ts`)
+  - [ ] Mission seeds consumer

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveServiceBinding: vi.fn(() => ({ accessToken: 'test-token' })),
   checkBinary: vi.fn(),
   secureFetch: vi.fn(),
+  resolveOverlay: vi.fn(() => null),
 }));
 
 vi.mock('./index.js', async () => {
@@ -23,10 +24,15 @@ vi.mock('./index.js', async () => {
   };
 });
 
+vi.mock('./customer-resolver.js', () => ({
+  resolveOverlay: mocks.resolveOverlay,
+}));
+
 describe('executeServicePreset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
+    delete process.env.KYBERION_CUSTOMER;
     mocks.resolveServiceBinding.mockReturnValue({ accessToken: 'test-token' });
   });
 
@@ -61,6 +67,97 @@ describe('executeServicePreset', () => {
     await expect(executeServicePreset('test-service', 'do_action', {}, 'none')).resolves.toEqual({
       res: 'api-success',
     });
+  });
+
+  it('prefers a customer overlay connection when active', async () => {
+    process.env.KYBERION_CUSTOMER = 'acme';
+    mocks.resolveOverlay.mockReturnValue('/virtual/customer/acme/connections/slack.json');
+
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('service-endpoints.json')) {
+        return JSON.stringify({
+          services: {
+            slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
+          },
+        });
+      }
+      if (filePath.includes('customer/acme/connections/slack.json')) {
+        return JSON.stringify({
+          path_segment: 'customer-route',
+          token: 'customer-token',
+        });
+      }
+      if (filePath.includes('slack.json')) {
+        return JSON.stringify({
+          operations: {
+            post_message: {
+              type: 'api',
+              path: '{{path_segment}}',
+              method: 'POST',
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+
+    await executeServicePreset('slack', 'post_message', { text: 'hello' }, 'none');
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.example.com/customer-route',
+        data: { text: 'hello' },
+        params: undefined,
+      }),
+    );
+  });
+
+  it('falls back to personal connection when no customer overlay exists', async () => {
+    process.env.KYBERION_CUSTOMER = 'acme';
+    mocks.resolveOverlay.mockReturnValue('/virtual/customer/acme/connections/slack.json');
+
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('service-endpoints.json')) {
+        return JSON.stringify({
+          services: {
+            slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
+          },
+        });
+      }
+      if (filePath.includes('customer/acme/connections/slack.json')) {
+        throw new Error('missing overlay');
+      }
+      if (filePath.includes('knowledge/personal/connections/slack.json')) {
+        return JSON.stringify({
+          path_segment: 'personal-route',
+          token: 'personal-token',
+        });
+      }
+      if (filePath.includes('slack.json')) {
+        return JSON.stringify({
+          operations: {
+            post_message: {
+              type: 'api',
+              path: '{{path_segment}}',
+              method: 'POST',
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+
+    await executeServicePreset('slack', 'post_message', { text: 'hello' }, 'none');
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.example.com/personal-route',
+      }),
+    );
   });
 
   it('supports media-generation workflow prompts through structured API payloads', async () => {
