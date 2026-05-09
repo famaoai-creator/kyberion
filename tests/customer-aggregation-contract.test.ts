@@ -15,7 +15,10 @@ describe('Customer aggregation contract', () => {
     const customerReadme = read('customer/README.md');
     expect(doc).toContain('pnpm customer:create <slug>');
     expect(doc).toContain('[x] CLI: `pnpm customer:create <slug>`');
+    expect(doc).toContain('[x] CLI: `pnpm customer:list`');
     expect(jp).toContain('[x] `pnpm customer:create`');
+    expect(jp).toContain('[x] `customer:list`');
     expect(customerReadme).toContain('pnpm customer:create acme-corp');
+    expect(customerReadme).toContain('pnpm customer:list');
   });
 });
