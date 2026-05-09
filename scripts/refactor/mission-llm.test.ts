@@ -5,6 +5,7 @@ import {
   registerStructuredRunner,
   resolveLlmConfig,
   runStructuredLlmProfile,
+  runAdaptiveStructuredLlmProfile,
 } from './mission-llm.js';
 
 describe('mission-llm resolution', () => {
@@ -113,5 +114,38 @@ describe('mission-llm resolution', () => {
     );
 
     expect(result).toEqual({ answer: 11 });
+  });
+
+  it('automatically falls back to the next profile on QUOTA_EXHAUSTED', async () => {
+    const calls: string[] = [];
+    registerStructuredRunner('quota-first', async () => {
+      calls.push('heavy');
+      const error = new Error('QUOTA_EXHAUSTED');
+      (error as any).cause = { code: 429 };
+      throw error;
+    });
+    registerStructuredRunner('quota-second', async ({ prompt }) => {
+      calls.push('standard');
+      return { answer: prompt.length };
+    });
+
+    const result = await runAdaptiveStructuredLlmProfile(
+      'test-purpose',
+      'hello world',
+      z.object({ answer: z.number() }),
+      {
+        isCommandAvailable: (command) => ({ available: command === 'heavy-cmd' || command === 'standard-cmd' }),
+        policy: {
+          default_profile: 'heavy',
+          profiles: {
+            heavy: { command: 'heavy-cmd', args: [], adapter: 'quota-first' },
+            standard: { command: 'standard-cmd', args: [], adapter: 'quota-second' },
+          },
+        },
+      },
+    );
+
+    expect(result).toEqual({ answer: 11 });
+    expect(calls).toEqual(['heavy', 'standard']);
   });
 });

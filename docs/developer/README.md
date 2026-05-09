@@ -13,6 +13,7 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 | [MISSION_LIFECYCLE_AUDIT.md](./MISSION_LIFECYCLE_AUDIT.md) | Why the mission lifecycle is shaped the way it is. |
 | [GOLDEN_OUTPUT_CHECK.md](./GOLDEN_OUTPUT_CHECK.md) | Semantic regression detection for stable pipelines. |
 | [CHAOS_DRILLS.md](./CHAOS_DRILLS.md) | Recurring failure-injection runs. |
+| [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or risky in the current Kyberion runtime. Pair it with `pnpm setup:report`. |
 | [VOICE_FIRST_WIN.md](./VOICE_FIRST_WIN.md) | Tier-0 voice setup (Phase A-5). |
 | [REGISTRY_SPLIT_PLAN.md](./REGISTRY_SPLIT_PLAN.md) | Taskized backlog for moving global catalogs to per-item canonical files. |
 | [RELEASE_OPERATIONS.md](./RELEASE_OPERATIONS.md) | How releases get cut. |

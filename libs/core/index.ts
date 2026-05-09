@@ -206,6 +206,11 @@ export { transform, getValueByPath } from './transformer.js';
 
 export * as serviceEngine from './service-engine.js';
 export { executeServicePreset } from './service-engine.js';
+export {
+  getServiceEndpointRecord,
+  loadServiceEndpointsCatalog,
+  resolveServiceBinding,
+} from './service-binding.js';
 export { compileMusicGenerationADF } from './music-workflow-compiler.js';
 export {
   compileImageGenerationADF,

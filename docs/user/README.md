@@ -8,6 +8,7 @@ For people **using** Kyberion to get work done. If you're trying to operate / de
 |---|---|
 | [WHY.md](../WHY.md) | First. What is this thing and why does it exist. |
 | [QUICKSTART.md](../QUICKSTART.md) | Then. 5 minutes from clone to first working smoke. |
+| [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or environment-dependent in normal use. Pair it with `pnpm setup:report`. |
 | [USE_CASES.md](../USE_CASES.md) | Browse the catalog of automated workflows you can ask Kyberion to do. |
 | [customer-overlay-use-cases.md](./customer-overlay-use-cases.md) | Customer overlay story: create, inspect, activate, onboard, and switch engagements. |
 | [meeting-facilitator.md](./meeting-facilitator.md) | How Kyberion joins meetings, keeps consent boundaries, and handles follow-up. |

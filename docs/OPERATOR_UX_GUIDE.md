@@ -91,7 +91,13 @@ Use when you want:
 
 ### Background Bridges
 
-Use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
+Use `pnpm surfaces:setup` first when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. Then use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
+
+Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs.
+
+Use `pnpm setup:report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
+
+`pnpm doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 
 Typical managed entries include:
 
@@ -103,7 +109,7 @@ Typical managed entries include:
 - `nexus-daemon`
 - `terminal-bridge`
 
-Use `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
+Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
 
 The lifecycle details live in [`knowledge/public/architecture/runtime-surface-lifecycle-model.md`](../knowledge/public/architecture/runtime-surface-lifecycle-model.md).
 
