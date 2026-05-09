@@ -15,7 +15,7 @@ describe('extractMissionControllerPositionalArgs', () => {
       '--tenant-id',
       'tenant-a',
       '--vision-ref',
-      '/knowledge/personal/my-vision.md',
+      '/customer/demo/my-vision.md',
       '--project-id',
       'proj-123',
     ];
