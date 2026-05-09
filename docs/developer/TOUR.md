@@ -200,6 +200,7 @@ kyberion/
 │   ├── slack-bridge/
 │   ├── voice-hub/
 │   ├── imessage-bridge/
+│   ├── telegram-bridge/
 │   └── macos-camera/
 │
 ├── pipelines/              # 75 ADF pipelines (committed)

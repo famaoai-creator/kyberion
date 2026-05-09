@@ -72,7 +72,7 @@ describe('vital_check', () => {
 
   it('builds a report that mirrors the mission count helper', () => {
     const report = buildVitalReport();
-    expect(report.summary.total).toBe(9);
+    expect(report.summary.total).toBe(10);
     expect(report.active_mission_count).toBe(activeMissionCount());
   });
 

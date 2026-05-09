@@ -149,7 +149,10 @@ If temporary artifacts are needed, prefer governed runtime storage under `active
 - `scripts/capability_discovery.ts`
 - `scripts/cli.ts`
 - `scripts/check_esm_integrity.ts`
-- `knowledge/public/orchestration/global_actuator_index.json`
+- `libs/actuators/*/manifest.json`
+- `knowledge/public/governance/authority-roles/` (compatibility snapshot: `knowledge/public/governance/authority-role-index.json`)
+- `knowledge/public/orchestration/team-roles/` (compatibility snapshot: `knowledge/public/orchestration/team-role-index.json`)
+- `knowledge/public/orchestration/global_actuator_index.json` (compatibility snapshot)
 - `libs/actuators/*`
 
 This path tells users what is available and lets them run an actuator.
@@ -160,6 +163,7 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check:esm`.
 
 - `satellites/slack-bridge/`
 - `satellites/imessage-bridge/`
+- `satellites/telegram-bridge/`
 - `presence/bridge/nexus-daemon.ts`
 - `presence/displays/chronos-mirror-v2/`
 - `knowledge/public/architecture/slack-chronos-control-model.md`
@@ -199,6 +203,7 @@ Chronos does not directly own mission state. It delegates to:
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`
 - `libs/actuators/system-actuator/`
+- `knowledge/public/orchestration/service-endpoints/` (compatibility snapshot: `service-endpoints.json`)
 
 This path defines how authenticated external service access is separated from channel delivery and from local OS execution.
 It is the practical boundary between "how we authenticate to a service", "how we deliver to a channel", and "how we run local commands".
@@ -231,6 +236,7 @@ Actuators are the execution layer. Current major groups include:
 - `code-actuator`: code analysis/refactoring helpers
 - `network-actuator`: secure API and A2A transport
 - `wisdom-actuator`: knowledge distillation and evolution
+- `knowledge/public/orchestration/specialists/` (compatibility snapshot: `specialist-catalog.json`)
 - `media-actuator`: document and diagram generation
 - `browser-actuator`: browser automation
 - `system-actuator`: OS-level operations
@@ -250,7 +256,7 @@ Kyberion uses four separate concepts here:
 
 - `gateway`
   - receives external events
-  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `chronos-mirror-v2` API routes
+  - examples: `satellites/slack-bridge`, `satellites/imessage-bridge`, `satellites/telegram-bridge`, `chronos-mirror-v2` API routes
 - `service binding`
   - resolves authenticated service access from governed secrets
   - examples: `libs/core/service-binding.ts`, `service-actuator`
@@ -264,7 +270,7 @@ Kyberion uses four separate concepts here:
 This means Slack and Chronos are not part of `system-actuator`.
 They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
 
-Background surfaces and bridges are not started ad hoc. Their canonical startup manifest is `knowledge/public/governance/active-surfaces.json`, and their lifecycle is coordinated through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
+Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/public/governance/surfaces/*.json`, with `knowledge/public/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
 
 ## Mission control model
 

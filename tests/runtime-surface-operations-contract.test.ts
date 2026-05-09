@@ -21,17 +21,22 @@ describe('Runtime surface operations contract', () => {
     const vital = JSON.parse(read('pipelines/vital-check.json')) as { steps: Array<{ params?: { message?: string; cmd?: string } }> };
     const rendered = JSON.stringify(vital.steps);
     expect(rendered).toContain('active-surfaces.json');
+    expect(rendered).toContain('knowledge/public/governance/surfaces');
     expect(rendered).toContain('runtime/surfaces/state.json');
   });
 
   it('mentions runtime surfaces in the operator dashboard and onboarding next steps', () => {
     const dashboard = read('scripts/sovereign_dashboard.ts');
     const onboarding = read('scripts/onboarding_wizard.ts');
+    const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('Next:');
     expect(dashboard).toContain('Focused view: onboarding setup, connection review, tenant context, starter mission.');
     expect(dashboard).toContain('RUNTIME SURFACES');
     expect(onboarding).toContain('pnpm surfaces:reconcile');
+    expect(operatorGuide).toContain('discord-bridge');
+    expect(operatorGuide).toContain('telegram-bridge');
+    expect(operatorGuide).toContain('pnpm surfaces:start -- --surface <surface-id>');
   });
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
@@ -43,5 +48,7 @@ describe('Runtime surface operations contract', () => {
     expect(surfaceRuntime).toContain('lastKnownState');
     expect(lifecycleModel).toContain('Waited for background terminal');
     expect(lifecycleModel).toContain('active/shared/runtime/surfaces/state.json');
+    expect(lifecycleModel).toContain('discord-bridge');
+    expect(lifecycleModel).toContain('telegram-bridge');
   });
 });

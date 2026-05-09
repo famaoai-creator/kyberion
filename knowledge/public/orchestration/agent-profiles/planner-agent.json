@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "planner-agent": {
+      "authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "team_roles": [
+        "planner"
+      ],
+      "capabilities": [
+        "planning",
+        "strategy",
+        "decomposition",
+        "coordination"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "strict"
+    }
+  }
+}

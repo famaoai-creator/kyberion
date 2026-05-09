@@ -1,0 +1,40 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-api-pci",
+  "name": "Audit API Documentation for PCI-DSS Compliance",
+  "description": "Automatically audits API documentation against PCI-DSS standards. Parameterized for path and version.",
+  "variables": {
+    "api_doc_path": "docs/api/swagger.json",
+    "pci_version": "4.0",
+    "output_path": "active/shared/tmp/audit-pci-{{pci_version}}.json"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 Starting PCI-DSS Audit for {{api_doc_path}} (Version: {{pci_version}})" }
+    },
+    {
+      "id": "audit-pci",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Audit the following API documentation for PCI-DSS {{pci_version}} compliance. Check for sensitive data exposure, improper authentication, and lack of encryption in transit.",
+        "context": ["{{api_doc_path}}"],
+        "analysisType": "compliance_audit",
+        "export_as": "audit_result"
+      }
+    },
+    {
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{audit_result}}",
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Audit complete. Results saved to {{output_path}}" }
+    }
+  ]
+}

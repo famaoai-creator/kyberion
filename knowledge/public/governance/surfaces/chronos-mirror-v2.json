@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "chronos-mirror-v2",
+      "kind": "ui",
+      "description": "Interactive Chronos control surface served as a workspace application",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "presence/displays/chronos-mirror-v2",
+        "start",
+        "-H",
+        "127.0.0.1",
+        "-p",
+        "3000"
+      ],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3000,
+      "healthPath": "/api/agents",
+      "enabled": true
+    }
+  ]
+}

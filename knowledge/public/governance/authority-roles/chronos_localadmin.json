@@ -1,0 +1,29 @@
+{
+  "role": "chronos_localadmin",
+  "description": "Chronos local admin authority for deterministic mission, runtime, and surface control from the local control plane.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/coordination/channels/",
+    "active/shared/coordination/chronos/",
+    "active/shared/coordination/orchestration/",
+    "active/shared/observability/",
+    "active/shared/runtime/",
+    "active/audit/"
+  ],
+  "scope_classes": [
+    "communication_surface",
+    "coordination_runtime",
+    "observability",
+    "operations_runtime",
+    "audit"
+  ],
+  "allowed_actuators": [
+    "presence-actuator",
+    "artifact-actuator",
+    "approval-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

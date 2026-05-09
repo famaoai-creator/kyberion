@@ -346,6 +346,222 @@
           }
         ]
       }
+    },
+    "imessage": {
+      "id": "imessage",
+      "displayName": "iMessage",
+      "agentId": "imessage-surface-agent",
+      "channel": "imessage",
+      "interactionMode": "threaded",
+      "capabilities": {
+        "reply": true,
+        "edit": false,
+        "react": false,
+        "notify": true,
+        "asyncRequest": true,
+        "responding": true
+      },
+      "delivery": {
+        "directReply": "notification",
+        "supportsOutbox": false,
+        "supportsNotifications": true
+      },
+      "routing": {
+        "text_routing": {
+          "greeting_patterns": [
+            {
+              "type": "regex",
+              "value": "^(ping|test|hello|hi|thanks?|ok|こんにちは|こんばんは|おはよう|やあ|もしもし|ありがとう|了解)[!.?。！？]?$"
+            }
+          ],
+          "receiver_rules": [
+            {
+              "id": "imessage-status-queries",
+              "receiver": "chronos-mirror",
+              "patterns": [
+                { "type": "contains", "value": "ミッション一覧" },
+                { "type": "contains", "value": "current mission" },
+                { "type": "contains", "value": "system status" },
+                { "type": "contains", "value": "runtime status" },
+                { "type": "contains", "value": "health check" }
+              ]
+            },
+            {
+              "id": "imessage-heavy-reasoning",
+              "receiver": "nerve-agent",
+              "patterns": [
+                { "type": "contains", "value": "レビュー" },
+                { "type": "contains", "value": "review" },
+                { "type": "contains", "value": "設計" },
+                { "type": "contains", "value": "architecture" },
+                { "type": "contains", "value": "analysis" },
+                { "type": "contains", "value": "調査" },
+                { "type": "contains", "value": "fix" },
+                { "type": "contains", "value": "実装" },
+                { "type": "contains", "value": "plan" }
+              ]
+            }
+          ]
+        },
+        "compiled_flow_rules": [
+          {
+            "id": "imessage-heavy-task-types",
+            "receiver": "nerve-agent",
+            "task_types": [
+              "analysis",
+              "presentation_deck",
+              "report_document",
+              "workbook_wbs",
+              "service_operation",
+              "meeting_operations"
+            ]
+          }
+        ]
+      }
+    },
+    "discord": {
+      "id": "discord",
+      "displayName": "Discord",
+      "agentId": "discord-surface-agent",
+      "channel": "discord",
+      "interactionMode": "threaded",
+      "capabilities": {
+        "reply": true,
+        "edit": true,
+        "react": true,
+        "notify": true,
+        "asyncRequest": true,
+        "responding": true
+      },
+      "delivery": {
+        "directReply": "outbox",
+        "supportsOutbox": true,
+        "supportsNotifications": true
+      },
+      "routing": {
+        "text_routing": {
+          "greeting_patterns": [
+            {
+              "type": "regex",
+              "value": "^(ping|test|hello|hi|thanks?|ok|こんにちは|こんばんは|おはよう|やあ|もしもし|ありがとう|了解)[!.?。！？]?$"
+            }
+          ],
+          "receiver_rules": [
+            {
+              "id": "discord-status-queries",
+              "receiver": "chronos-mirror",
+              "patterns": [
+                { "type": "contains", "value": "ミッション一覧" },
+                { "type": "contains", "value": "current mission" },
+                { "type": "contains", "value": "system status" },
+                { "type": "contains", "value": "runtime status" },
+                { "type": "contains", "value": "health check" }
+              ]
+            },
+            {
+              "id": "discord-heavy-reasoning",
+              "receiver": "nerve-agent",
+              "patterns": [
+                { "type": "contains", "value": "レビュー" },
+                { "type": "contains", "value": "review" },
+                { "type": "contains", "value": "設計" },
+                { "type": "contains", "value": "architecture" },
+                { "type": "contains", "value": "analysis" },
+                { "type": "contains", "value": "調査" },
+                { "type": "contains", "value": "fix" },
+                { "type": "contains", "value": "実装" },
+                { "type": "contains", "value": "plan" }
+              ]
+            }
+          ]
+        },
+        "compiled_flow_rules": [
+          {
+            "id": "discord-heavy-task-types",
+            "receiver": "nerve-agent",
+            "task_types": [
+              "analysis",
+              "presentation_deck",
+              "report_document",
+              "workbook_wbs",
+              "service_operation",
+              "meeting_operations"
+            ]
+          }
+        ]
+      }
+    },
+    "telegram": {
+      "id": "telegram",
+      "displayName": "Telegram",
+      "agentId": "telegram-surface-agent",
+      "channel": "telegram",
+      "interactionMode": "threaded",
+      "capabilities": {
+        "reply": true,
+        "edit": true,
+        "react": false,
+        "notify": true,
+        "asyncRequest": true,
+        "responding": true
+      },
+      "delivery": {
+        "directReply": "outbox",
+        "supportsOutbox": true,
+        "supportsNotifications": true
+      },
+      "routing": {
+        "text_routing": {
+          "greeting_patterns": [
+            {
+              "type": "regex",
+              "value": "^(ping|test|hello|hi|thanks?|ok|こんにちは|こんばんは|おはよう|やあ|もしもし|ありがとう|了解)[!.?。！？]?$"
+            }
+          ],
+          "receiver_rules": [
+            {
+              "id": "telegram-status-queries",
+              "receiver": "chronos-mirror",
+              "patterns": [
+                { "type": "contains", "value": "ミッション一覧" },
+                { "type": "contains", "value": "current mission" },
+                { "type": "contains", "value": "system status" },
+                { "type": "contains", "value": "runtime status" },
+                { "type": "contains", "value": "health check" }
+              ]
+            },
+            {
+              "id": "telegram-heavy-reasoning",
+              "receiver": "nerve-agent",
+              "patterns": [
+                { "type": "contains", "value": "レビュー" },
+                { "type": "contains", "value": "review" },
+                { "type": "contains", "value": "設計" },
+                { "type": "contains", "value": "architecture" },
+                { "type": "contains", "value": "analysis" },
+                { "type": "contains", "value": "調査" },
+                { "type": "contains", "value": "fix" },
+                { "type": "contains", "value": "実装" },
+                { "type": "contains", "value": "plan" }
+              ]
+            }
+          ]
+        },
+        "compiled_flow_rules": [
+          {
+            "id": "telegram-heavy-task-types",
+            "receiver": "nerve-agent",
+            "task_types": [
+              "analysis",
+              "presentation_deck",
+              "report_document",
+              "workbook_wbs",
+              "service_operation",
+              "meeting_operations"
+            ]
+          }
+        ]
+      }
     }
   }
 }

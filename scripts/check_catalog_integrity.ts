@@ -1,5 +1,6 @@
 import * as AjvModule from 'ajv';
-import { pathResolver, safeExistsSync } from '@agent/core';
+import * as path from 'node:path';
+import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
@@ -52,6 +53,11 @@ const CHECKS: CatalogCheck[] = [
     schemaPath: 'knowledge/public/schemas/user-facing-vocabulary.schema.json',
     dataPath: 'knowledge/public/orchestration/user-facing-vocabulary.json',
   },
+  {
+    id: 'specialist-catalog',
+    schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
+    dataPath: 'knowledge/public/orchestration/specialist-catalog.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -71,10 +77,53 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
   }
 
   if (check.id === 'service-endpoints') {
-    const typed = data as { services?: Record<string, { base_url?: string }> };
+    const typed = data as { default_pattern?: string; services?: Record<string, { base_url?: string }> };
     const services = typed.services || {};
     if (Object.keys(services).length === 0) {
       violations.push('service-endpoints: services must not be empty');
+    }
+
+    const directory = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
+    if (!safeExistsSync(directory)) {
+      violations.push('service-endpoints: canonical directory is missing');
+      return;
+    }
+
+    const fileNames = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+    if (fileNames.length === 0) {
+      violations.push('service-endpoints: canonical directory is empty');
+      return;
+    }
+
+    const directoryServiceIds: string[] = [];
+    for (const fileName of fileNames) {
+      const filePath = pathResolver.rootResolve(path.join(directory, fileName));
+      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { default_pattern?: string; services?: Record<string, unknown> };
+      const payloadValidate = ajv.compile(schema);
+      if (!payloadValidate(payload)) {
+        for (const error of payloadValidate.errors || []) {
+          violations.push(`service-endpoints: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        }
+      }
+      const payloadServices = payload.services || {};
+      const payloadServiceIds = Object.keys(payloadServices);
+      if (payloadServiceIds.length !== 1) {
+        violations.push(`service-endpoints: ${fileName} must contain exactly one service`);
+        continue;
+      }
+      const serviceId = payloadServiceIds[0];
+      if (fileName.replace(/\.json$/i, '') !== serviceId) {
+        violations.push(`service-endpoints: ${fileName} must match service id ${serviceId}`);
+      }
+      if (payload.default_pattern !== typed.default_pattern) {
+        violations.push(`service-endpoints: ${fileName} default_pattern must match the snapshot`);
+      }
+      directoryServiceIds.push(serviceId);
+    }
+
+    const snapshotServiceIds = Object.keys(services).sort();
+    if (directoryServiceIds.sort().join(',') !== snapshotServiceIds.join(',')) {
+      violations.push('service-endpoints: directory services must match snapshot services');
     }
   }
 
@@ -127,6 +176,56 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
           violations.push(`user-facing-vocabulary: ${domainName}.${entryKey} must define the default locale "${defaultLocale}"`);
         }
       }
+    }
+  }
+
+  if (check.id === 'specialist-catalog') {
+    const typed = data as { version?: string; specialists?: Record<string, unknown> };
+    const specialists = typed.specialists || {};
+    if (Object.keys(specialists).length === 0) {
+      violations.push('specialist-catalog: specialists must not be empty');
+    }
+
+    const directory = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
+    if (!safeExistsSync(directory)) {
+      violations.push('specialist-catalog: canonical directory is missing');
+      return;
+    }
+
+    const fileNames = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+    if (fileNames.length === 0) {
+      violations.push('specialist-catalog: canonical directory is empty');
+      return;
+    }
+
+    const directoryIds: string[] = [];
+    for (const fileName of fileNames) {
+      const filePath = pathResolver.rootResolve(path.join(directory, fileName));
+      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { version?: string; specialists?: Record<string, unknown> };
+      const payloadValidate = ajv.compile(schema);
+      if (!payloadValidate(payload)) {
+        for (const error of payloadValidate.errors || []) {
+          violations.push(`specialist-catalog: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        }
+      }
+      const payloadSpecialists = payload.specialists || {};
+      const specialistIds = Object.keys(payloadSpecialists);
+      if (specialistIds.length !== 1) {
+        violations.push(`specialist-catalog: ${fileName} must contain exactly one specialist`);
+        continue;
+      }
+      const specialistId = specialistIds[0];
+      if (fileName.replace(/\.json$/i, '') !== specialistId) {
+        violations.push(`specialist-catalog: ${fileName} must match specialist id ${specialistId}`);
+      }
+      if (payload.version !== typed.version) {
+        violations.push(`specialist-catalog: ${fileName} version must match the snapshot`);
+      }
+      directoryIds.push(specialistId);
+    }
+
+    if (directoryIds.sort().join(',') !== Object.keys(specialists).sort().join(',')) {
+      violations.push('specialist-catalog: directory specialists must match snapshot specialists');
     }
   }
 }

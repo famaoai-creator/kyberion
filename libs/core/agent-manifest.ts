@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { loadAgentProfileIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import * as path from 'node:path';
@@ -87,19 +88,10 @@ function parseValue(raw: string): any {
 }
 
 function loadAgentProfileSelectionHints(rootDir: string): Record<string, AgentSelectionHints> {
-  const profilePath = path.join(rootDir, 'knowledge', 'public', 'orchestration', 'agent-profile-index.json');
-  if (!safeExistsSync(profilePath)) return {};
   try {
-    const raw = JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as {
-      agents?: Record<string, {
-        selection_hints?: {
-          preferred_provider?: AgentProvider;
-          preferred_modelId?: string;
-        };
-      }>;
-    };
+    const profiles = loadAgentProfileIndex(rootDir);
     const result: Record<string, AgentSelectionHints> = {};
-    for (const [agentId, entry] of Object.entries(raw.agents || {})) {
+    for (const [agentId, entry] of Object.entries(profiles)) {
       result[agentId] = {
         preferred_provider: entry.selection_hints?.preferred_provider,
         preferred_modelId: entry.selection_hints?.preferred_modelId,

@@ -1,0 +1,29 @@
+{
+  "role": "implementer",
+  "description": "Produces the main code and configuration changes.",
+  "required_capabilities": [
+    "code",
+    "implementation",
+    "refactoring"
+  ],
+  "compatible_authority_roles": [
+    "software_developer",
+    "ecosystem_architect"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "planner",
+  "required_scope_classes": [
+    "codebase_core"
+  ],
+  "ownership_scope": "Owns bounded implementation changes inside assigned modules.",
+  "selection_hints": {
+    "preferred_agents": [
+      "implementation-architect",
+      "nerve-agent"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

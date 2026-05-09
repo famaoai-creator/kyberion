@@ -4,6 +4,7 @@ import { getReasoningBackend, resetReasoningBackend } from './reasoning-backend.
 import {
   getInstalledReasoningMode,
   installReasoningBackends,
+  normalizeReasoningBackendMode,
   resetReasoningBootstrap,
 } from './reasoning-bootstrap.js';
 import { getVoiceBridge, resetVoiceBridge } from './voice-bridge.js';
@@ -38,5 +39,10 @@ describe('reasoning-bootstrap', () => {
     expect(installed).toBe(true);
     expect(getInstalledReasoningMode()).toBe('local');
     expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
+  it('normalizes gemini-api to the CLI-backed gemini mode', () => {
+    expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');
+    expect(normalizeReasoningBackendMode('claude-agent')).toBe('claude-agent');
   });
 });

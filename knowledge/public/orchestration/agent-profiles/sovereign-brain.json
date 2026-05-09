@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "sovereign-brain": {
+      "authority_roles": [
+        "mission_controller",
+        "knowledge_steward",
+        "ecosystem_architect"
+      ],
+      "team_roles": [
+        "owner",
+        "planner",
+        "reviewer",
+        "product_strategist"
+      ],
+      "capabilities": [
+        "reasoning",
+        "strategy",
+        "coordination",
+        "analysis"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "strict"
+    }
+  }
+}

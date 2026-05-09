@@ -11,6 +11,10 @@
  *   `anthropic`     — use @anthropic-ai/sdk directly. Requires ANTHROPIC_API_KEY.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
  *
+ * `gemini-api` is kept as a deprecated alias and resolves to `gemini-cli`.
+ * Kyberion does not maintain a separate Gemini API backend here; Gemini
+ * auth is consumed through the CLI-backed adapter.
+ *
  * Auto-selection when mode is unset:
  *   - If ANTHROPIC_API_KEY is present → `anthropic`
  *   - Otherwise (including inside Claude Code without the key) → `claude-agent`
@@ -37,11 +41,17 @@ import { CodexCliIntentExtractor } from './codex-cli-intent-extractor.js';
 import { CodexCliVoiceBridge } from './codex-cli-voice-bridge.js';
 import { buildCodexCliQueryOptionsFromEnv } from './codex-cli-query.js';
 import { buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
-import { buildShellClaudeCliBackendFromEnv } from './shell-claude-cli-backend.js';
+import { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
+import { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
+import { buildClaudeCliOptionsFromEnv } from './claude-cli-backend.js';
+import { buildShellClaudeCliBackendFromEnv } from './claude-cli-backend.js';
+import { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
+import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
 import {
   OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
 } from './openai-compatible-backend.js';
+import { InSessionReasoningBackend } from './insession-reasoning-backend.js';
 import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
 import { registerVoiceBridge } from './voice-bridge.js';
@@ -64,6 +74,16 @@ export type ReasoningBackendMode =
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
 
+export function normalizeReasoningBackendMode(
+  mode: ReasoningBackendMode,
+): Exclude<ReasoningBackendMode, 'gemini-api'> {
+  if (mode === 'gemini-api') {
+    logger.warn('[reasoning-bootstrap] mode=gemini-api is deprecated; using gemini-cli instead.');
+    return 'gemini-cli';
+  }
+  return mode;
+}
+
 export interface InstallReasoningOptions {
   /** Explicit mode selection. Overrides KYBERION_REASONING_BACKEND env var. */
   mode?: ReasoningBackendMode;
@@ -81,24 +101,26 @@ export interface InstallReasoningOptions {
 export type InstallAnthropicOptions = InstallReasoningOptions;
 
 function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
-  if (options.mode) return options.mode;
+  if (options.mode) return normalizeReasoningBackendMode(options.mode);
   const envMode = process.env.KYBERION_REASONING_BACKEND as ReasoningBackendMode | undefined;
-  const validModes: ReasoningBackendMode[] = [
+  const validModes: Array<Exclude<ReasoningBackendMode, 'gemini-api'>> = [
     'claude-cli',
     'codex-cli',
     'claude-agent',
     'anthropic',
     'gemini-cli',
-    'gemini-api',
     'local',
     'stub',
   ];
-  if (envMode && validModes.includes(envMode)) {
-    return envMode;
+  if (envMode) {
+    const normalizedEnvMode = normalizeReasoningBackendMode(envMode);
+    if (validModes.includes(normalizedEnvMode)) {
+      return normalizedEnvMode;
+    }
   }
   // Auto-selection logic
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
-  if (process.env.GEMINI_API_KEY) return 'gemini-api';
+  if (process.env.GEMINI_API_KEY) return 'gemini-cli';
   if (process.env.KYBERION_LOCAL_LLM_URL) return 'local';
 
   const providers = discoverProviders(shouldRefreshProviders(options));
@@ -184,6 +206,9 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
       return false;
     }
     registerReasoningBackend(cliBackend);
+    const claudeOptions = buildClaudeCliOptionsFromEnv();
+    registerIntentExtractor(new ClaudeCliIntentExtractor(claudeOptions));
+    registerVoiceBridge(new ClaudeCliVoiceBridge(claudeOptions));
     installed = true;
     installedMode = 'claude-cli';
     logger.success(
@@ -244,7 +269,20 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
       installedMode = 'stub';
       return false;
     }
-    registerReasoningBackend(geminiBackend);
+
+    if (process.env.KYBERION_IN_SESSION_SUBAGENT === '1') {
+      registerReasoningBackend(new InSessionReasoningBackend(geminiBackend));
+      logger.success('[reasoning-bootstrap] ⚡ In-Session Subagent mode enabled');
+    } else {
+      registerReasoningBackend(geminiBackend);
+    }
+    const geminiOptions = {
+      bin: process.env.KYBERION_GEMINI_CLI_BIN?.trim() || undefined,
+      model: options.model ?? (process.env.KYBERION_GEMINI_CLI_MODEL?.trim() || undefined),
+    };
+    registerIntentExtractor(new GeminiCliIntentExtractor(geminiOptions));
+    registerVoiceBridge(new GeminiCliVoiceBridge(geminiOptions));
+    
     installed = true;
     installedMode = 'gemini-cli';
     logger.success(

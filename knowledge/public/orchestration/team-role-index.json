@@ -1,187 +1,406 @@
 {
   "version": "1.0.0",
   "team_roles": {
-    "owner": {
-      "description": "Mission owner with final accountability, checkpoint, verify, and finish authority.",
-      "required_capabilities": ["reasoning", "coordination", "analysis"],
-      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
-      "allowed_delegate_team_roles": ["planner", "implementer", "reviewer", "tester", "product_strategist", "experience_designer", "operator", "surface_liaison", "devils_advocate", "counterparty_persona", "facilitator", "relationship_curator"],
-      "escalation_parent_team_role": null,
-      "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns end-to-end mission objective, integration, and final acceptance.",
-      "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
-      },
-      "autonomy_level": "high"
-    },
-    "planner": {
-      "description": "Breaks mission intent into an execution strategy and task graph.",
-      "required_capabilities": ["reasoning", "strategy", "planning"],
-      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
-      "allowed_delegate_team_roles": ["implementer", "reviewer", "tester"],
-      "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns decomposition, sequencing, and contract completeness.",
-      "selection_hints": {
-        "preferred_agents": ["planner-agent", "nerve-agent", "implementation-architect", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
-      },
-      "autonomy_level": "high"
-    },
-    "implementer": {
-      "description": "Produces the main code and configuration changes.",
-      "required_capabilities": ["code", "implementation", "refactoring"],
-      "compatible_authority_roles": ["software_developer", "ecosystem_architect"],
+    "counterparty_persona": {
+      "description": "Synthesizes a counterparty persona for negotiation or stakeholder rehearsal without touching real relationship nodes.",
+      "required_capabilities": [
+        "reasoning",
+        "role_play",
+        "persona_modeling"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "mission_controller"
+      ],
       "allowed_delegate_team_roles": [],
-      "escalation_parent_team_role": "planner",
-      "required_scope_classes": ["codebase_core"],
-      "ownership_scope": "Owns bounded implementation changes inside assigned modules.",
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns synthetic persona artifacts and rehearsal transcripts; never updates relationship-graph nodes.",
       "selection_hints": {
-        "preferred_agents": ["implementation-architect", "nerve-agent"],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
       },
       "autonomy_level": "medium"
     },
-    "reviewer": {
-      "description": "Reviews risk, regression potential, and boundary compliance.",
-      "required_capabilities": ["review", "analysis", "architecture"],
-      "compatible_authority_roles": ["ecosystem_architect", "knowledge_steward"],
+    "devils_advocate": {
+      "description": "Argues the opposite position to force divergence before convergence in decision-support missions.",
+      "required_capabilities": [
+        "reasoning",
+        "critique",
+        "analysis"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "mission_controller"
+      ],
       "allowed_delegate_team_roles": [],
       "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["knowledge_core"],
-      "ownership_scope": "Owns review verdicts, risk findings, and gate readiness evidence.",
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns dissent hypotheses, cross-critique output, and dissent-log entries.",
       "selection_hints": {
-        "preferred_agents": ["implementation-architect", "nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
-      },
-      "autonomy_level": "medium"
-    },
-    "tester": {
-      "description": "Owns validation strategy and test execution planning.",
-      "required_capabilities": ["testing", "analysis", "quality"],
-      "compatible_authority_roles": ["software_developer", "ecosystem_architect"],
-      "allowed_delegate_team_roles": [],
-      "escalation_parent_team_role": "planner",
-      "required_scope_classes": ["codebase_core"],
-      "ownership_scope": "Owns test strategy, execution evidence, and regression confidence.",
-      "selection_hints": {
-        "preferred_agents": ["nerve-agent", "implementation-architect"],
-        "preferred_models": ["auto-gemini-3"]
-      },
-      "autonomy_level": "medium"
-    },
-    "product_strategist": {
-      "description": "Shapes product direction, requirements, prioritization, and value hypotheses.",
-      "required_capabilities": ["strategy", "product", "analysis"],
-      "compatible_authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
-      "allowed_delegate_team_roles": ["planner", "experience_designer"],
-      "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns product intent framing, priorities, and scope tradeoffs.",
-      "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
       },
       "autonomy_level": "high"
     },
     "experience_designer": {
       "description": "Designs product flows, interaction models, and UX tradeoffs.",
-      "required_capabilities": ["design", "ux", "analysis"],
-      "compatible_authority_roles": ["ecosystem_architect", "software_developer"],
-      "allowed_delegate_team_roles": ["implementer"],
+      "required_capabilities": [
+        "design",
+        "ux",
+        "analysis"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "software_developer"
+      ],
+      "allowed_delegate_team_roles": [
+        "implementer"
+      ],
       "escalation_parent_team_role": "product_strategist",
-      "required_scope_classes": ["codebase_core"],
+      "required_scope_classes": [
+        "codebase_core"
+      ],
       "ownership_scope": "Owns UX interaction contracts and experience-level design decisions.",
       "selection_hints": {
-        "preferred_agents": ["implementation-architect", "nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
-      },
-      "autonomy_level": "medium"
-    },
-    "operator": {
-      "description": "Handles runtime, deployment, and operational control surfaces.",
-      "required_capabilities": ["operations", "runtime", "monitoring"],
-      "compatible_authority_roles": ["chronos_operator", "chronos_gateway", "mission_controller"],
-      "allowed_delegate_team_roles": ["surface_liaison"],
-      "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["communication_surface"],
-      "ownership_scope": "Owns operational execution state, runtime visibility, and control actions.",
-      "selection_hints": {
-        "preferred_agents": ["chronos-mirror", "nerve-agent"],
-        "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"]
-      },
-      "autonomy_level": "medium"
-    },
-    "surface_liaison": {
-      "description": "Maintains human-facing communication quality on Slack or Chronos.",
-      "required_capabilities": ["surface", "conversation", "delegation"],
-      "compatible_authority_roles": ["slack_bridge", "chronos_operator", "chronos_gateway", "sovereign_concierge"],
-      "allowed_delegate_team_roles": [],
-      "escalation_parent_team_role": "operator",
-      "required_scope_classes": ["communication_surface"],
-      "ownership_scope": "Owns user-facing updates, handoff clarity, and interaction continuity.",
-      "selection_hints": {
-        "preferred_agents": ["slack-surface-agent", "chronos-mirror", "onboarding-surface-agent"],
-        "preferred_models": ["gemini-2.5-flash", "auto-gemini-3"]
-      },
-      "autonomy_level": "low"
-    },
-    "devils_advocate": {
-      "description": "Argues the opposite position to force divergence before convergence in decision-support missions.",
-      "required_capabilities": ["reasoning", "critique", "analysis"],
-      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
-      "allowed_delegate_team_roles": [],
-      "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns dissent hypotheses, cross-critique output, and dissent-log entries.",
-      "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
-      },
-      "autonomy_level": "high"
-    },
-    "counterparty_persona": {
-      "description": "Synthesizes a counterparty persona for negotiation or stakeholder rehearsal without touching real relationship nodes.",
-      "required_capabilities": ["reasoning", "role_play", "persona_modeling"],
-      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
-      "allowed_delegate_team_roles": [],
-      "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["mission_state"],
-      "ownership_scope": "Owns synthetic persona artifacts and rehearsal transcripts; never updates relationship-graph nodes.",
-      "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_agents": [
+          "implementation-architect",
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
       },
       "autonomy_level": "medium"
     },
     "facilitator": {
       "description": "Runs stakeholder consensus 1-on-1s (nemawashi / round_table / pre_read_memo variants) and aggregates readiness_matrix evidence.",
-      "required_capabilities": ["facilitation", "listening", "coordination"],
-      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
-      "allowed_delegate_team_roles": ["relationship_curator"],
+      "required_capabilities": [
+        "facilitation",
+        "listening",
+        "coordination"
+      ],
+      "compatible_authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "allowed_delegate_team_roles": [
+        "relationship_curator"
+      ],
       "escalation_parent_team_role": "owner",
-      "required_scope_classes": ["mission_state"],
+      "required_scope_classes": [
+        "mission_state"
+      ],
       "ownership_scope": "Owns session orchestration, dissent signal extraction, and readiness_matrix assembly.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
       },
       "autonomy_level": "medium"
     },
+    "implementer": {
+      "description": "Produces the main code and configuration changes.",
+      "required_capabilities": [
+        "code",
+        "implementation",
+        "refactoring"
+      ],
+      "compatible_authority_roles": [
+        "software_developer",
+        "ecosystem_architect"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "planner",
+      "required_scope_classes": [
+        "codebase_core"
+      ],
+      "ownership_scope": "Owns bounded implementation changes inside assigned modules.",
+      "selection_hints": {
+        "preferred_agents": [
+          "implementation-architect",
+          "nerve-agent"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "medium"
+    },
+    "operator": {
+      "description": "Handles runtime, deployment, and operational control surfaces.",
+      "required_capabilities": [
+        "operations",
+        "runtime",
+        "monitoring"
+      ],
+      "compatible_authority_roles": [
+        "chronos_operator",
+        "chronos_gateway",
+        "mission_controller"
+      ],
+      "allowed_delegate_team_roles": [
+        "surface_liaison"
+      ],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "communication_surface"
+      ],
+      "ownership_scope": "Owns operational execution state, runtime visibility, and control actions.",
+      "selection_hints": {
+        "preferred_agents": [
+          "chronos-mirror",
+          "nerve-agent"
+        ],
+        "preferred_models": [
+          "gemini-2.5-flash",
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "medium"
+    },
+    "owner": {
+      "description": "Mission owner with final accountability, checkpoint, verify, and finish authority.",
+      "required_capabilities": [
+        "reasoning",
+        "coordination",
+        "analysis"
+      ],
+      "compatible_authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "allowed_delegate_team_roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "tester",
+        "product_strategist",
+        "experience_designer",
+        "operator",
+        "surface_liaison",
+        "devils_advocate",
+        "counterparty_persona",
+        "facilitator",
+        "relationship_curator"
+      ],
+      "escalation_parent_team_role": null,
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns end-to-end mission objective, integration, and final acceptance.",
+      "selection_hints": {
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "high"
+    },
+    "planner": {
+      "description": "Breaks mission intent into an execution strategy and task graph.",
+      "required_capabilities": [
+        "reasoning",
+        "strategy",
+        "planning"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "mission_controller"
+      ],
+      "allowed_delegate_team_roles": [
+        "implementer",
+        "reviewer",
+        "tester"
+      ],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns decomposition, sequencing, and contract completeness.",
+      "selection_hints": {
+        "preferred_agents": [
+          "planner-agent",
+          "nerve-agent",
+          "implementation-architect",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "high"
+    },
+    "product_strategist": {
+      "description": "Shapes product direction, requirements, prioritization, and value hypotheses.",
+      "required_capabilities": [
+        "strategy",
+        "product",
+        "analysis"
+      ],
+      "compatible_authority_roles": [
+        "mission_controller",
+        "ecosystem_architect",
+        "knowledge_steward"
+      ],
+      "allowed_delegate_team_roles": [
+        "planner",
+        "experience_designer"
+      ],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns product intent framing, priorities, and scope tradeoffs.",
+      "selection_hints": {
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "high"
+    },
     "relationship_curator": {
       "description": "Maintains the confidential relationship-graph: trust_level, history, outstanding_asks, ng_topics.",
-      "required_capabilities": ["memory_management", "privacy", "curation"],
-      "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
+      "required_capabilities": [
+        "memory_management",
+        "privacy",
+        "curation"
+      ],
+      "compatible_authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
       "allowed_delegate_team_roles": [],
       "escalation_parent_team_role": "facilitator",
-      "required_scope_classes": ["knowledge_core"],
+      "required_scope_classes": [
+        "knowledge_core"
+      ],
       "ownership_scope": "Owns relationship-node updates triggered by presence / voice actuator events; enforces tier boundaries.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
-        "preferred_models": ["auto-gemini-3"]
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
       },
       "autonomy_level": "low"
+    },
+    "reviewer": {
+      "description": "Reviews risk, regression potential, and boundary compliance.",
+      "required_capabilities": [
+        "review",
+        "analysis",
+        "architecture"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "knowledge_steward"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "knowledge_core"
+      ],
+      "ownership_scope": "Owns review verdicts, risk findings, and gate readiness evidence.",
+      "selection_hints": {
+        "preferred_agents": [
+          "implementation-architect",
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "medium"
+    },
+    "surface_liaison": {
+      "description": "Maintains human-facing communication quality on Slack or Chronos.",
+      "required_capabilities": [
+        "surface",
+        "conversation",
+        "delegation"
+      ],
+      "compatible_authority_roles": [
+        "slack_bridge",
+        "chronos_operator",
+        "chronos_gateway",
+        "sovereign_concierge"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "operator",
+      "required_scope_classes": [
+        "communication_surface"
+      ],
+      "ownership_scope": "Owns user-facing updates, handoff clarity, and interaction continuity.",
+      "selection_hints": {
+        "preferred_agents": [
+          "slack-surface-agent",
+          "chronos-mirror",
+          "onboarding-surface-agent"
+        ],
+        "preferred_models": [
+          "gemini-2.5-flash",
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "low"
+    },
+    "tester": {
+      "description": "Owns validation strategy and test execution planning.",
+      "required_capabilities": [
+        "testing",
+        "analysis",
+        "quality"
+      ],
+      "compatible_authority_roles": [
+        "software_developer",
+        "ecosystem_architect"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "planner",
+      "required_scope_classes": [
+        "codebase_core"
+      ],
+      "ownership_scope": "Owns test strategy, execution evidence, and regression confidence.",
+      "selection_hints": {
+        "preferred_agents": [
+          "nerve-agent",
+          "implementation-architect"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "medium"
     }
   }
 }
