@@ -71,4 +71,27 @@ describe('ServiceValidator (3-Tier Service Validation)', () => {
     expect(inspection.missingSecrets).toContain('UNIT-TEST-SERVICE_ACCESS_TOKEN');
     expect(inspection.setupHint).toContain('UNIT-TEST-SERVICE_ACCESS_TOKEN');
   });
+
+  it('uses a preset-specific setup hint for session-backed CLI services', () => {
+    safeMkdir(TMP_ROOT, { recursive: true });
+    const presetPath = path.join(TMP_ROOT, 'google-workspace.json');
+    safeWriteFile(presetPath, JSON.stringify({
+      auth_strategy: 'session',
+      setup_hint: 'Run gws auth setup, then gws auth login.',
+      operations: {
+        auth_status: {
+          type: 'cli',
+          command: 'gws',
+          args: ['auth', 'status'],
+          health_check: 'gws auth status',
+        },
+      },
+    }, null, 2));
+
+    const inspection = inspectServiceAuth('google-workspace', presetPath);
+
+    expect(inspection.valid).toBe(false);
+    expect(inspection.cliFallbacks).toContain('gws');
+    expect(inspection.setupHint).toContain('Run gws auth setup');
+  });
 });

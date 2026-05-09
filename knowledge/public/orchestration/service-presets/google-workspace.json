@@ -1,0 +1,46 @@
+{
+  "service_id": "google-workspace",
+  "name": "Google Workspace CLI Presets",
+  "auth_strategy": "session",
+  "setup_hint": "Install gws, run gws auth setup, then gws auth login.",
+  "allow_unsafe_cli": true,
+  "operations": {
+    "auth_status": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["auth", "status"],
+      "health_check": "gws auth status",
+      "description": "Check whether Google Workspace CLI authentication is available."
+    },
+    "schema_method": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["schema", "{{method}}"],
+      "description": "Inspect the request/response schema for a Google Workspace discovery method.",
+      "parameters": {
+        "method": { "required": true, "type": "string" }
+      }
+    },
+    "drive_files_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["drive", "files", "list", "--params", "{{params}}", "--page-all"],
+      "description": "List Google Drive files using the discovery-backed CLI.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "gmail_triage": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+triage"],
+      "description": "Summarize unread Gmail inbox items."
+    },
+    "calendar_agenda": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "+agenda"],
+      "description": "Show the upcoming Google Calendar agenda."
+    }
+  }
+}

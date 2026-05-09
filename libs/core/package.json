@@ -51,6 +51,10 @@
       "types": "./dist/agent-runtime-supervisor-client.d.ts",
       "default": "./dist/agent-runtime-supervisor-client.js"
     },
+    "./approval-store": {
+      "types": "./dist/approval-store.d.ts",
+      "default": "./dist/approval-store.js"
+    },
     "./app-profiles": {
       "types": "./dist/app-profiles.d.ts",
       "default": "./dist/app-profiles.js"
@@ -82,6 +86,10 @@
     "./governance": {
       "types": "./dist/governance.d.ts",
       "default": "./dist/governance.js"
+    },
+    "./generation-scheduler": {
+      "types": "./dist/generation-scheduler.d.ts",
+      "default": "./dist/generation-scheduler.js"
     },
     "./media-contracts": {
       "types": "./dist/media-contracts.d.ts",
@@ -139,6 +147,10 @@
       "types": "./dist/pipeline-contract.d.ts",
       "default": "./dist/pipeline-contract.js"
     },
+    "./pty-engine": {
+      "types": "./dist/pty-engine.d.ts",
+      "default": "./dist/pty-engine.js"
+    },
     "./pulse-audio-bus": {
       "types": "./dist/pulse-audio-bus.d.ts",
       "default": "./dist/pulse-audio-bus.js"
@@ -194,6 +206,10 @@
     "./intent-contract": {
       "types": "./dist/intent-contract.d.ts",
       "default": "./dist/intent-contract.js"
+    },
+    "./intelligence-primitives": {
+      "types": "./dist/intelligence-primitives.d.ts",
+      "default": "./dist/intelligence-primitives.js"
     },
     "./surface-runtime": {
       "types": "./dist/surface-runtime.d.ts",

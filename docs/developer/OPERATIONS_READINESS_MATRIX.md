@@ -21,13 +21,14 @@ with environment prerequisites, and what still needs caution.
 | Mission lifecycle | Ready | `create`, `resume`, `verify`, `distill`, and state persistence are in place and tested. |
 | Customer overlay | Ready | `customer:create`, `customer:list`, `customer:switch`, and migration flows are wired end to end. |
 | Onboarding / doctor | Ready | `pnpm onboard` and `pnpm doctor` give actionable readiness checks. |
+| Toolchain preflight | Ready | `pnpm prereq:check` confirms the local Node/pnpm/git/tooling baseline before you build from source. |
 | Consolidated readiness | Ready | `pnpm setup:report` shows surfaces, services, reasoning, and doctor in one pass. |
 | Baseline / vital pipelines | Ready | `pnpm vital:json` and `pnpm pipeline --input pipelines/baseline-check.json` are used as real gates. |
 | Governance / contracts | Ready | Registry splits, schema checks, and policy checks are enforced by tests and scripts. |
 | Surface lifecycle management | Ready | Individual surface enable/disable/status flows work and are managed per gateway. |
 | Reasoning backend selection | Ready with guardrails | `claude-cli`, `gemini-cli`, `codex-cli`, and `anthropic` are selectable, but availability depends on local auth and provider quota. |
 | Gemini quota fallback | Ready with guardrails | Quota exhaustion falls through to the next candidate profile instead of stopping early. |
-| Slack / iMessage / Discord / Telegram gateways | Conditional | They work when the local machine has the required permissions, tokens, and host integrations. |
+| Slack / iMessage / Discord / Telegram / Google Workspace gateways | Conditional | They work when the local machine has the required permissions, tokens, and host integrations. |
 | Voice workflows | Conditional | They depend on platform permissions, installed engines, and profile setup. |
 | Browser / host automation | Conditional | They depend on browser access, OS permissions, and host-specific capabilities. |
 | UI / Next.js surface | Conditional | The app builds and runs, but there are still known warnings in the UI build path. |
@@ -49,11 +50,12 @@ Use this matrix as an execution guide:
 Recommended default flows:
 
 1. `pnpm pipeline --input pipelines/baseline-check.json`
-2. `pnpm setup:report`
-3. `pnpm run doctor`
-4. `pnpm vital:json`
-5. `pnpm onboard`
-6. `pnpm customer:list`
+2. `pnpm prereq:check`
+3. `pnpm setup:report`
+4. `pnpm run doctor`
+5. `pnpm vital:json`
+6. `pnpm onboard`
+7. `pnpm customer:list`
 
 When those pass, the workspace is usually good enough for normal operator work.
 
