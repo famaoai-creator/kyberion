@@ -6,6 +6,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import {
   compileSchemaFromPath,
+  customerResolver,
   pathResolver,
   safeExistsSync,
   safeMkdir,
@@ -39,9 +40,21 @@ interface ApplyInput {
   };
 }
 
-const ONBOARDING_ROOT = pathResolver.knowledge('personal/onboarding');
-const STATE_PATH = path.join(ONBOARDING_ROOT, 'onboarding-state.json');
-const SUMMARY_PATH = path.join(ONBOARDING_ROOT, 'onboarding-summary.md');
+function profileRoot(): string {
+  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+}
+
+function onboardingRoot(): string {
+  return path.join(profileRoot(), 'onboarding');
+}
+
+function statePath(): string {
+  return path.join(onboardingRoot(), 'onboarding-state.json');
+}
+
+function summaryPath(): string {
+  return path.join(onboardingRoot(), 'onboarding-summary.md');
+}
 
 export function ensureDir(p: string) {
   if (!safeExistsSync(p)) safeMkdir(p, { recursive: true });
@@ -96,13 +109,13 @@ export async function writeText(filePath: string, content: string, lockName: str
 }
 
 export async function applyIdentity(input: ApplyInput, now: string) {
-  const personalDir = pathResolver.knowledge('personal');
-  ensureDir(personalDir);
-  ensureDir(ONBOARDING_ROOT);
+  const profileDir = profileRoot();
+  ensureDir(profileDir);
+  ensureDir(onboardingRoot());
 
   const id = input.identity;
 
-  await writeJson(path.join(personalDir, 'my-identity.json'), {
+  await writeJson(path.join(profileDir, 'my-identity.json'), {
     name: id.name,
     language: id.language,
     interaction_style: id.interaction_style,
@@ -112,9 +125,9 @@ export async function applyIdentity(input: ApplyInput, now: string) {
     version: '1.0.0',
   }, 'onboarding-my-identity');
 
-  await writeText(path.join(personalDir, 'my-vision.md'), `# Sovereign Vision\n\n${id.vision}\n`, 'onboarding-my-vision');
+  await writeText(path.join(profileDir, 'my-vision.md'), `# Sovereign Vision\n\n${id.vision}\n`, 'onboarding-my-vision');
 
-  await writeJson(path.join(personalDir, 'agent-identity.json'), {
+  await writeJson(path.join(profileDir, 'agent-identity.json'), {
     agent_id: id.agent_id,
     version: '1.0.0',
     role: 'Ecosystem Architect / Senior Partner',
@@ -127,7 +140,7 @@ export async function applyIdentity(input: ApplyInput, now: string) {
 
 export async function applyTenants(input: ApplyInput, now: string): Promise<Array<Record<string, unknown>>> {
   const tenants = input.tenants || [];
-  const tenantDir = pathResolver.knowledge('personal/tenants');
+  const tenantDir = path.join(profileRoot(), 'tenants');
   ensureDir(tenantDir);
   const entries: Array<Record<string, unknown>> = [];
   for (const t of tenants) {
@@ -159,7 +172,7 @@ export async function applyTenants(input: ApplyInput, now: string): Promise<Arra
 export async function applyTutorial(input: ApplyInput, now: string) {
   const mode = input.tutorial?.mode || 'simulate';
   const summary = input.tutorial?.summary || 'Demonstrate the initial Kyberion setup with a safe dry-run.';
-  const planPath = path.join(ONBOARDING_ROOT, 'tutorial-plan.md');
+  const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
   await writeText(planPath, [
     '# Onboarding Tutorial Plan',
     '',
@@ -256,16 +269,16 @@ export async function main() {
   if (!validateState(state)) {
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
-  await writeJson(STATE_PATH, state, 'onboarding-state');
-  await writeText(SUMMARY_PATH, buildSummary(input, tenantEntries, tutorial), 'onboarding-summary');
+  await writeJson(statePath(), state, 'onboarding-state');
+  await writeText(summaryPath(), buildSummary(input, tenantEntries, tutorial), 'onboarding-summary');
 
   console.log(JSON.stringify({
     status: 'complete',
     identity_name: input.identity.name,
     agent_id: input.identity.agent_id,
     tenants: tenantEntries.length,
-    state_path: STATE_PATH,
-    summary_path: SUMMARY_PATH,
+    state_path: statePath(),
+    summary_path: summaryPath(),
   }, null, 2));
 }
 
