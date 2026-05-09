@@ -104,6 +104,7 @@
     "voice:health": "pnpm pipeline --input pipelines/voice-health-check.json",
     "voice:clone": "pnpm pipeline --input pipelines/clone-my-voice.json",
     "voice:speak": "pnpm pipeline --input pipelines/speak-with-my-voice.json",
+    "customer:create": "pnpm tsx scripts/customer_create.ts",
     "slack:bridge": "node dist/satellites/slack-bridge/src/index.js",
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
     "chronos:lint": "pnpm --dir presence/displays/chronos-mirror-v2 lint",
