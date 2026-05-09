@@ -30,6 +30,9 @@ describe('Customer aggregation contract', () => {
     expect(jp).toContain('[x] `customer:list`');
     expect(jp).toContain('[x] `customer:switch`');
     expect(jp).toContain('[x] 移行ヘルパ');
+    expect(jp).toContain('customer overlay がない単一利用前提');
+    expect(jp).toContain('レガシーフォールバック');
+    expect(jp).toContain('レガシーフォールバックとして使う');
     expect(jp).toContain('[x] baseline check consumer (`scripts/run_baseline_check.ts`)');
     expect(jp).toContain('[x] onboarding apply consumer (`scripts/onboarding_apply.ts`)');
     expect(jp).toContain('[x] slack onboarding consumer (`libs/core/slack-onboarding.ts`)');
