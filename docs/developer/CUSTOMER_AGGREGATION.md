@@ -154,7 +154,7 @@ Read order for config:
   knowledge/public/{path}       ← existing, reusable
 ```
 
-The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules; `knowledge/personal/` remains the legacy fallback when no customer is active.
+The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules; `knowledge/personal/` remains the legacy personal fallback when no customer is active.
 
 ## 8. Implementation Status
 
