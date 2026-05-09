@@ -14,9 +14,9 @@ This document defines the contract. For day-to-day usage, see [`customer/README.
 
 ## 1. Problem
 
-Kyberion's previous configuration model assumed a single sovereign:
+Kyberion's previous configuration model assumed a single customerless fallback:
 
-- `knowledge/personal/` — single-user identity, vision, connections, tenants.
+- `knowledge/personal/` — legacy identity, vision, connections, tenants.
 - `knowledge/confidential/{project}/` — project-scoped governance.
 - `knowledge/public/` — reusable knowledge.
 
@@ -57,7 +57,7 @@ The active customer is selected via the `KYBERION_CUSTOMER` environment variable
 export KYBERION_CUSTOMER=acme-corp
 ```
 
-When unset, Kyberion falls back to the existing single-user behavior (`knowledge/personal/` only).
+When unset, Kyberion falls back to the legacy `knowledge/personal/` behavior.
 
 ### 2.2 Resolution Order
 
@@ -154,7 +154,7 @@ Read order for config:
   knowledge/public/{path}       ← existing, reusable
 ```
 
-The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules.
+The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules; `knowledge/personal/` remains the legacy fallback when no customer is active.
 
 ## 8. Implementation Status
 
