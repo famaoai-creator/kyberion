@@ -22,6 +22,7 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain('[x] Policy consumer (`libs/core/approval-policy.ts`)');
     expect(doc).toContain('[x] Mission seeds consumer (`libs/core/mission-seed-registry.ts`)');
     expect(doc).toContain('[x] Voice profile registry consumer (`libs/core/voice-profile-registry.ts`)');
+    expect(doc).toContain('[x] Vital check consumer (`scripts/vital_check.ts`)');
     expect(jp).toContain('[x] `pnpm customer:create`');
     expect(jp).toContain('[x] `customer:list`');
     expect(jp).toContain('[x] `customer:switch`');

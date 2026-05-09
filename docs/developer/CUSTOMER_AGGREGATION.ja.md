@@ -130,3 +130,4 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
   - [x] policy consumer (`libs/core/approval-policy.ts`)
   - [x] mission seeds consumer (`libs/core/mission-seed-registry.ts`)
   - [x] voice profile registry consumer (`libs/core/voice-profile-registry.ts`)
+  - [x] vital check consumer (`scripts/vital_check.ts`)
