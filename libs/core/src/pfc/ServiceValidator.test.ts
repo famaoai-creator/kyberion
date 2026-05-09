@@ -1,5 +1,9 @@
+import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { ServiceValidator, type ServiceRequirements } from './ServiceValidator.js';
+import { safeMkdir, safeWriteFile } from '../../secure-io.js';
+import { ServiceValidator, inspectServiceAuth, type ServiceRequirements } from './ServiceValidator.js';
+
+const TMP_ROOT = path.join(process.cwd(), 'active/shared/tmp/service-validator-test');
 
 describe('ServiceValidator (3-Tier Service Validation)', () => {
   it('should pass if all 3 tiers (CLI, SDK, API) are valid', async () => {
@@ -50,5 +54,21 @@ describe('ServiceValidator (3-Tier Service Validation)', () => {
     const result = await ServiceValidator.validate(requirements);
     expect(result.valid).toBe(false);
     expect(result.failedTiers).toContain('L5_API');
+  });
+
+  it('inspects service auth readiness with concrete setup hints', () => {
+    safeMkdir(TMP_ROOT, { recursive: true });
+    const presetPath = path.join(TMP_ROOT, 'unit-test-service.json');
+    safeWriteFile(presetPath, JSON.stringify({
+      auth_strategy: 'Bearer',
+      operations: {},
+    }, null, 2));
+
+    const inspection = inspectServiceAuth('unit-test-service', presetPath);
+
+    expect(inspection.valid).toBe(false);
+    expect(inspection.requiredSecrets).toContain('UNIT-TEST-SERVICE_ACCESS_TOKEN');
+    expect(inspection.missingSecrets).toContain('UNIT-TEST-SERVICE_ACCESS_TOKEN');
+    expect(inspection.setupHint).toContain('UNIT-TEST-SERVICE_ACCESS_TOKEN');
   });
 });

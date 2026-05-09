@@ -17,18 +17,43 @@ import {
   safeExistsSync,
   safeOpenAppendFile,
   spawnManagedProcess,
+  inspectServiceAuth,
   surfaceLogPath,
   surfaceManifestDirectoryPath,
   surfaceManifestFilePath,
   surfaceManifestPath,
   surfaceResourceId,
   surfaceStatePath,
-  validateServiceAuth,
   auditChain,
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 
-type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status' | 'list-units' | 'enable' | 'disable' | 'register' | 'unregister';
+type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status' | 'list-units' | 'setup' | 'enable' | 'disable' | 'register' | 'unregister';
+
+type SurfaceSetupRow = {
+  surface: string;
+  enabled: 'enabled' | 'disabled';
+  auth: 'ready' | 'missing' | 'n/a';
+  strategy: string;
+  secrets: string;
+  cli: string;
+  hint: string;
+};
+
+type RankedSurfaceSetupRow = SurfaceSetupRow & { priority: number };
+
+function setupRowPriority(row: Pick<SurfaceSetupRow, 'auth' | 'enabled' | 'surface'>): number {
+  if (row.auth === 'missing') return row.enabled === 'enabled' ? 0 : 1;
+  if (row.auth === 'ready') return row.enabled === 'enabled' ? 2 : 3;
+  return row.enabled === 'enabled' ? 4 : 5;
+}
+
+function sortSurfaceSetupRows(rows: SurfaceSetupRow[]): SurfaceSetupRow[] {
+  return rows
+    .map((row) => ({ ...row, priority: setupRowPriority(row) } as RankedSurfaceSetupRow))
+    .sort((a, b) => a.priority - b.priority || a.surface.localeCompare(b.surface))
+    .map(({ priority: _priority, ...row }) => row);
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -119,13 +144,18 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   const serviceId = (definition as any).service_id || surfaceId;
   const presetPath = (definition as any).preset_path;
   if (presetPath) {
-    const authRes = await validateServiceAuth(serviceId, presetPath);
+    const authInspection = inspectServiceAuth(serviceId, presetPath);
+    const authRes = authInspection.valid ? { valid: true as const } : { valid: false as const, reason: authInspection.reason };
     if (!authRes.valid) {
-      logger.error(`⚠️ [SURFACE] Auth validation failed for ${surfaceId}: ${authRes.reason}. Skipping start.`);
+      logger.error(`⚠️ [SURFACE] Auth validation failed for ${surfaceId}: ${authRes.reason}. ${authInspection.setupHint}`);
       return {
         status: 'skipped_auth_required',
         id: surfaceId,
-        reason: authRes.reason
+        reason: authRes.reason,
+        setupHint: authInspection.setupHint,
+        requiredSecrets: authInspection.requiredSecrets,
+        missingSecrets: authInspection.missingSecrets,
+        cliFallbacks: authInspection.cliFallbacks,
       };
     }
   }
@@ -345,6 +375,7 @@ async function listUnits() {
     const record = state.surfaces[d.id];
     const running = record && isRunning(record.pid);
     const health = await probeSurfaceHealth(normalized);
+    const auth = (d as any).preset_path ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path) : null;
     
     return {
       unit: d.id,
@@ -352,24 +383,77 @@ async function listUnits() {
       enabled: d.enabled !== false ? 'enabled' : 'disabled',
       status: running ? 'running' : 'stopped',
       health: health.status,
+      auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
       port: d.port || '-',
+      hint: auth?.setupHint || '',
       pid: record?.pid || '-'
     };
   }));
 
   console.log('');
-  const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
+  const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
   console.log(header);
   console.log('-'.repeat(header.length + 5));
   
   for (const r of results) {
     const statusColor = r.status === 'running' ? '🟢' : '⚪';
     const enabledColor = r.enabled === 'enabled' ? '✅' : '❌';
+    const authColor = r.auth === 'ready' ? '✅' : r.auth === 'missing' ? '⚠️' : '—';
     console.log(
-      `${r.unit.padEnd(25)} ${r.kind.padEnd(10)} ${enabledColor} ${r.enabled.padEnd(8)} ${statusColor} ${r.status.padEnd(8)} ${r.health.padEnd(10)} ${String(r.port).padEnd(6)} ${r.pid}`
+      `${r.unit.padEnd(25)} ${r.kind.padEnd(10)} ${enabledColor} ${r.enabled.padEnd(8)} ${statusColor} ${r.status.padEnd(8)} ${authColor} ${r.auth.padEnd(8)} ${r.health.padEnd(10)} ${String(r.port).padEnd(6)} ${r.pid}`
     );
   }
   console.log('');
+}
+
+export async function setupSurfaces() {
+  const manifest = loadSurfaceManifest();
+  const rows = sortSurfaceSetupRows(await Promise.all(manifest.surfaces.map(async (d) => {
+    const auth = (d as any).preset_path ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path) : null;
+    return {
+      surface: d.id,
+      enabled: d.enabled !== false ? 'enabled' : 'disabled',
+      auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
+      strategy: auth?.authStrategy || 'host-managed',
+      secrets: auth?.requiredSecrets.join(', ') || '',
+      cli: auth?.cliFallbacks.join(', ') || '',
+      hint: auth?.setupHint || 'Host-managed surface or no preset path.',
+    };
+  })));
+
+  const summary = rows.reduce((acc, row) => {
+    acc.total += 1;
+    if (row.enabled === 'enabled') acc.enabled += 1;
+    if (row.enabled === 'disabled') acc.disabled += 1;
+    if (row.auth === 'ready') acc.ready += 1;
+    if (row.auth === 'missing') acc.missing += 1;
+    if (row.auth === 'n/a') acc.hostManaged += 1;
+    return acc;
+  }, { total: 0, enabled: 0, disabled: 0, ready: 0, missing: 0, hostManaged: 0 });
+
+  console.log('');
+  console.log(`Setup summary: ${summary.missing} missing, ${summary.ready} ready, ${summary.hostManaged} host-managed, ${summary.disabled} disabled, ${summary.total} total`);
+  const header = `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`;
+  console.log(header);
+  console.log('-'.repeat(header.length + 8));
+  for (const row of rows) {
+    const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+    console.log(
+      `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
+    );
+    if (row.auth === 'missing' || row.auth === 'n/a') {
+      console.log(`  ↳ ${row.hint}`);
+    }
+  }
+  console.log('');
+
+  return {
+    status: 'ok',
+    manifestPath: surfaceManifestPath(),
+    manifestDirectory: surfaceManifestDirectoryPath(),
+    rows,
+    summary,
+  };
 }
 
 async function enableSurfaceById(surfaceId: string, manifestPath: string) {
@@ -503,7 +587,7 @@ async function reconcileHealth(manifestPath: string) {
 
 const main = async () => {
   const argv = await createStandardYargs()
-    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status', 'list-units', 'enable', 'disable', 'register', 'unregister'] as const, required: true })
+    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status', 'list-units', 'setup', 'enable', 'disable', 'register', 'unregister'] as const, required: true })
     .option('surface', { type: 'string' })
     .option('manifest', { type: 'string', default: surfaceManifestPath() })
     .option('cleanup', { type: 'boolean', default: false })
@@ -538,6 +622,9 @@ const main = async () => {
       break;
     case 'list-units':
       await listUnits();
+      break;
+    case 'setup':
+      result = await setupSurfaces();
       break;
     case 'enable':
       if (!argv.surface) throw new Error('--surface is required for enable');

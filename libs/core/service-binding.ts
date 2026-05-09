@@ -140,14 +140,19 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
   }
 
   if (catalogPath === DEFAULT_SERVICE_ENDPOINTS_PATH && safeExistsSync(pathResolver.rootResolve(catalogDir))) {
-    try {
-      const parsed = loadServiceEndpointsDirectory(catalogDir);
-      cachedServiceEndpointsPath = catalogPath;
-      cachedServiceEndpointsDir = catalogDir;
-      cachedServiceEndpoints = parsed;
-      return parsed;
-    } catch (error: any) {
-      console.warn(`[SERVICE_ENDPOINTS] Failed to load directory at ${catalogDir}: ${error.message}`);
+    const dirEntries = safeReaddir(pathResolver.rootResolve(catalogDir));
+    const hasJsonFiles = dirEntries.some((entry) => entry.endsWith('.json'));
+    if (hasJsonFiles) {
+      try {
+        const parsed = loadServiceEndpointsDirectory(catalogDir);
+        cachedServiceEndpointsPath = catalogPath;
+        cachedServiceEndpointsDir = catalogDir;
+        cachedServiceEndpoints = parsed;
+        return parsed;
+      } catch (_) {
+        // Fall back to the compatibility snapshot silently. The directory may
+        // be partially migrated or intentionally empty during staged rollout.
+      }
     }
   }
 

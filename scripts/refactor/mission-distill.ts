@@ -24,7 +24,7 @@ import { readJsonFile } from './cli-input.js';
 import {
   inspectLlmResolution,
   resolveLlmConfig,
-  runStructuredLlmProfile,
+  runAdaptiveStructuredLlmProfile,
   type LlmPolicyConfig,
 } from './mission-llm.js';
 
@@ -251,16 +251,14 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   let wisdom: any = null;
   try {
     const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy.llm;
-    const llmStatus = inspectLlmResolution('distill', llmPolicy);
-    logger.info(
-      `🤖 Distill LLM check: profile=${llmStatus.selectedProfile ?? 'none'} command=${llmStatus.selectedCommand ?? 'none'}`,
-    );
-    const resolvedProfile = resolveLlmConfig('distill', llmPolicy);
-    wisdom = await runStructuredLlmProfile(
-      resolvedProfile,
+    wisdom = await runAdaptiveStructuredLlmProfile(
+      'distill',
       fullPrompt,
       WISDOM_SCHEMA,
-      { systemPrompt: 'You are Kyberion\'s Wisdom Distiller. Return exactly one JSON object matching the schema.' },
+      { 
+        policy: llmPolicy,
+        systemPrompt: 'You are Kyberion\'s Wisdom Distiller. Return exactly one JSON object matching the schema.' 
+      },
     );
   } catch (err: any) {
     logger.warn(`⚠️ LLM distillation failed: ${err.message}`);

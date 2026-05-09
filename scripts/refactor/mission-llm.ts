@@ -318,17 +318,33 @@ export async function runStructuredLlmProfile<T>(
   options: { systemPrompt?: string } = {},
 ): Promise<T> {
   registerDefaultStructuredRunners();
+  
+  // Custom adapter takes absolute precedence if registered
   const adapter = inferAdapter(profile);
-  const runner = structuredRunners.get(adapter) || structuredRunners.get('shell-json');
-  if (!runner) {
-    throw new Error(`No structured runner registered for adapter "${adapter}"`);
+  if (structuredRunners.has(adapter)) {
+    const runner = structuredRunners.get(adapter)!;
+    return (await runner({
+      profile,
+      prompt,
+      schema,
+      systemPrompt: options.systemPrompt,
+    })) as T;
   }
-  return (await runner({
-    profile,
-    prompt,
-    schema,
-    systemPrompt: options.systemPrompt,
-  })) as T;
+
+  // Fallback to shell invocation only if using standard adapter
+  if (adapter === 'shell-json') {
+    const shellRunner = structuredRunners.get('shell-json');
+    if (shellRunner) {
+      return (await shellRunner({
+        profile,
+        prompt,
+        schema,
+        systemPrompt: options.systemPrompt,
+      })) as T;
+    }
+  }
+
+  throw new Error(`No structured runner registered for adapter "${adapter}"`);
 }
 
 /**
@@ -358,4 +374,56 @@ export function parseLlmResponse(raw: string, responseFormat?: string): any {
   }
 
   return JSON.parse(content.trim());
+}
+
+function isQuotaError(err: any): boolean {
+  return err?.cause?.code === 429 || err?.message?.includes('QUOTA_EXHAUSTED');
+}
+
+/**
+ * Runs a structured LLM query with automatic model fallback on quota exhaustion.
+ */
+export async function runAdaptiveStructuredLlmProfile<T>(
+  purpose: string,
+  prompt: string,
+  schema: ZodType<T>,
+  options: { systemPrompt?: string; policy?: LlmPolicyConfig; isCommandAvailable?: (command: string) => { available: boolean; reason?: string } } = {},
+): Promise<T> {
+  const { policy, systemPrompt, isCommandAvailable } = options;
+  const candidateNames = resolveCandidateProfileNames(purpose, policy);
+  const profiles = policy?.profiles || {};
+
+  logger.info(`🤖 Adaptive LLM loop: candidates=${candidateNames.length}`);
+
+  for (const name of candidateNames) {
+    if (name === 'stub') {
+      logger.info(`  [Skip] ${name}: stub backend`);
+      continue;
+    }
+
+    const profile = profiles[name];
+    if (!profile) {
+      logger.info(`  [Skip] ${name}: not configured`);
+      continue;
+    }
+
+    const availability = isCommandAvailable?.(profile.command) ?? probeLlmCommandAvailability(profile.command);
+    if (!availability.available) {
+      logger.info(`  [Skip] ${name}: ${availability.reason || 'unavailable'}`);
+      continue;
+    }
+
+    logger.info(`  [Try] ${name}: executing`);
+    try {
+      return await runStructuredLlmProfile(profile, prompt, schema, { systemPrompt });
+    } catch (err: any) {
+      if (isQuotaError(err)) {
+        logger.warn(`⚠️ Model "${name}" exhausted, trying next...`);
+        continue;
+      }
+      logger.error(`❌ Model "${name}" failed with non-quota error: ${err.message}`);
+      throw err;
+    }
+  }
+  throw new Error(`All LLM models exhausted for purpose "${purpose}"`);
 }
