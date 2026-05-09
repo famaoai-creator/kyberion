@@ -80,6 +80,7 @@ export KYBERION_REASONING_BACKEND=stub
 
 # Override active customer
 export KYBERION_CUSTOMER=demo-customer
+# Customer-specific identity, connections, and onboarding artifacts resolve under customer/{slug}/ when set
 
 # Bypass tier-guard for tests (use cautiously)
 export KYBERION_PERSONA=ecosystem_architect
