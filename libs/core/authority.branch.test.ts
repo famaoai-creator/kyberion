@@ -2,18 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
+  safeReaddir: vi.fn(),
   safeReadFile: vi.fn(),
   active: vi.fn((p: string) => `/repo/active/${p}`),
+  knowledge: vi.fn((p: string) => `/repo/knowledge/${p}`),
   findMissionPath: vi.fn((_id: string) => null as string | null),
 }));
 
 vi.mock('./secure-io.js', () => ({
   safeExistsSync: mocks.safeExistsSync,
+  safeReaddir: mocks.safeReaddir,
   safeReadFile: mocks.safeReadFile,
 }));
 
 vi.mock('./path-resolver.js', () => ({
   active: mocks.active,
+  knowledge: mocks.knowledge,
   findMissionPath: mocks.findMissionPath,
 }));
 
@@ -24,12 +28,16 @@ describe('authority branch coverage', () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeExistsSync.mockReset();
+    mocks.safeReaddir.mockReset();
     mocks.safeReadFile.mockReset();
     mocks.active.mockReset();
     mocks.active.mockImplementation((p: string) => `/repo/active/${p}`);
+    mocks.knowledge.mockReset();
+    mocks.knowledge.mockImplementation((p: string) => `/repo/knowledge/${p}`);
     mocks.findMissionPath.mockReset();
     mocks.findMissionPath.mockReturnValue(null);
     mocks.safeExistsSync.mockReturnValue(false);
+    mocks.safeReaddir.mockReturnValue([]);
     mocks.safeReadFile.mockReturnValue('{}');
 
     delete process.env.KYBERION_PERSONA;
@@ -100,6 +108,36 @@ describe('authority branch coverage', () => {
     expect(ctx.authorities).toContain('NETWORK_FETCH');
     expect(ctx.authorities).toContain('KNOWLEDGE_WRITE');
     expect(ctx.authorities).toContain('SYSTEM_EXEC');
+  });
+
+  it('prefers the canonical authority-role directory over the snapshot', async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/authority-roles'));
+    mocks.safeReaddir.mockReturnValue(['mission_controller.json']);
+    mocks.safeReadFile.mockImplementation((p: string) => {
+      if (p.endsWith('/authority-roles/mission_controller.json')) {
+        return JSON.stringify({
+          role: 'mission_controller',
+          description: 'Directory override',
+          default_persona: 'analyst',
+          write_scopes: [],
+          scope_classes: [],
+          allowed_actuators: [],
+          tier_access: [],
+        });
+      }
+      if (p.endsWith('/authority-role-index.json')) {
+        return JSON.stringify({
+          authority_roles: {
+            mission_controller: { default_persona: 'worker' },
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const { inferPersonaFromRole } = await import('./authority.js');
+    expect(inferPersonaFromRole('mission_controller')).toBe('analyst');
   });
 
   it('handles malformed grants file without throwing', async () => {

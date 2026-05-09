@@ -259,7 +259,7 @@ Each tenant typically configures its own:
 | Audit forwarder | `KYBERION_AUDIT_FORWARDER_*` set per tenant runtime |
 | Secret resolver | `SecretResolver` chain with tenant-specific provider |
 | Deployment adapter | `KYBERION_DEPLOY_COMMAND` per tenant CI |
-| STT / voice | `voice-engine-registry.json` allows engine_id per tenant |
+| STT / voice | `voice-engines/*.json` canonical engine manifests, with `voice-engine-registry.json` as compatibility snapshot |
 
 A practical pattern is one runtime process per tenant, each with its own
 env, sharing the same code base. This keeps the runtime layer simple and

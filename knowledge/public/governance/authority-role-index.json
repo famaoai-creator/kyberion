@@ -1,8 +1,124 @@
 {
   "version": "1.0.0",
   "authority_roles": {
+    "chronos_gateway": {
+      "description": "Chronos control surface authority for coordination and terminal routing.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/chronos/",
+        "active/shared/observability/mission-control/",
+        "active/shared/runtime/terminal/",
+        "active/audit/"
+      ],
+      "scope_classes": [
+        "communication_surface",
+        "coordination_runtime",
+        "observability",
+        "operations_runtime",
+        "audit"
+      ],
+      "allowed_actuators": [
+        "presence-actuator",
+        "artifact-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
+    },
+    "chronos_localadmin": {
+      "description": "Chronos local admin authority for deterministic mission, runtime, and surface control from the local control plane.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/chronos/",
+        "active/shared/coordination/orchestration/",
+        "active/shared/observability/",
+        "active/shared/runtime/",
+        "active/audit/"
+      ],
+      "scope_classes": [
+        "communication_surface",
+        "coordination_runtime",
+        "observability",
+        "operations_runtime",
+        "audit"
+      ],
+      "allowed_actuators": [
+        "presence-actuator",
+        "artifact-actuator",
+        "approval-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
+    },
+    "chronos_operator": {
+      "description": "Chronos operator authority for read-only mission visibility and runtime observability.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [
+        "communication_surface"
+      ],
+      "allowed_actuators": [
+        "presence-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
+    },
+    "ecosystem_architect": {
+      "description": "Core architecture and repo evolution authority.",
+      "default_persona": "ecosystem_architect",
+      "write_scopes": [
+        "knowledge/",
+        "libs/core/",
+        "libs/actuators/",
+        "scripts/",
+        "pipelines/",
+        "schemas/",
+        "active/missions/"
+      ],
+      "scope_classes": [
+        "knowledge_core",
+        "codebase_core",
+        "mission_state"
+      ],
+      "allowed_actuators": [
+        "code-actuator",
+        "orchestrator-actuator",
+        "artifact-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
+    },
+    "knowledge_steward": {
+      "description": "Knowledge maintenance authority across governed knowledge trees.",
+      "default_persona": "analyst",
+      "write_scopes": [
+        "knowledge/"
+      ],
+      "scope_classes": [
+        "knowledge_core"
+      ],
+      "allowed_actuators": [
+        "wisdom-actuator",
+        "artifact-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
+    },
     "mission_controller": {
       "description": "Mission lifecycle authority with mission state and observability write access.",
+      "default_persona": "worker",
       "write_scopes": [
         "active/missions/",
         "active/archive/missions/",
@@ -15,33 +131,26 @@
         "active/audit/",
         "registry.json"
       ],
-      "scope_classes": ["mission_state", "coordination_runtime", "observability", "audit"],
-      "allowed_actuators": ["artifact-actuator", "approval-actuator", "orchestrator-actuator"],
-      "tier_access": ["public", "confidential", "personal"]
-    },
-    "ecosystem_architect": {
-      "description": "Core architecture and repo evolution authority.",
-      "write_scopes": ["knowledge/", "libs/core/", "libs/actuators/", "scripts/", "pipelines/", "schemas/", "active/missions/"],
-      "scope_classes": ["knowledge_core", "codebase_core", "mission_state"],
-      "allowed_actuators": ["code-actuator", "orchestrator-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
-    },
-    "software_developer": {
-      "description": "Implementation authority for test and product code paths.",
-      "write_scopes": ["active/projects/", "tests/", "libs/actuators/"],
-      "scope_classes": ["project_delivery", "codebase_core", "quality_validation"],
-      "allowed_actuators": ["code-actuator", "file-actuator", "system-actuator"],
-      "tier_access": ["public", "confidential"]
-    },
-    "knowledge_steward": {
-      "description": "Knowledge maintenance authority across governed knowledge trees.",
-      "write_scopes": ["knowledge/"],
-      "scope_classes": ["knowledge_core"],
-      "allowed_actuators": ["wisdom-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
+      "scope_classes": [
+        "mission_state",
+        "coordination_runtime",
+        "observability",
+        "audit"
+      ],
+      "allowed_actuators": [
+        "artifact-actuator",
+        "approval-actuator",
+        "orchestrator-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential",
+        "personal"
+      ]
     },
     "slack_bridge": {
       "description": "Slack gateway authority for channel ingress and observability.",
+      "default_persona": "worker",
       "write_scopes": [
         "presence/bridge/runtime/",
         "active/shared/coordination/channels/slack/",
@@ -50,62 +159,96 @@
         "active/shared/observability/mission-control/",
         "active/audit/"
       ],
-      "scope_classes": ["communication_surface", "coordination_runtime", "observability", "audit"],
-      "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
-      "tier_access": ["public", "confidential"]
-    },
-    "chronos_gateway": {
-      "description": "Chronos control surface authority for coordination and terminal routing.",
-      "write_scopes": [
-        "active/shared/coordination/chronos/",
-        "active/shared/coordination/orchestration/",
-        "active/shared/observability/chronos/",
-        "active/shared/observability/mission-control/",
-        "active/shared/runtime/terminal/",
-        "active/audit/"
+      "scope_classes": [
+        "communication_surface",
+        "coordination_runtime",
+        "observability",
+        "audit"
       ],
-      "scope_classes": ["communication_surface", "coordination_runtime", "observability", "operations_runtime", "audit"],
-      "allowed_actuators": ["presence-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
-    },
-    "chronos_operator": {
-      "description": "Chronos operator authority for read-only mission visibility and runtime observability.",
-      "write_scopes": [],
-      "scope_classes": ["communication_surface"],
-      "allowed_actuators": ["presence-actuator"],
-      "tier_access": ["public", "confidential"]
-    },
-    "chronos_localadmin": {
-      "description": "Chronos local admin authority for deterministic mission, runtime, and surface control from the local control plane.",
-      "write_scopes": [
-        "active/shared/coordination/channels/",
-        "active/shared/coordination/chronos/",
-        "active/shared/coordination/orchestration/",
-        "active/shared/observability/",
-        "active/shared/runtime/",
-        "active/audit/"
+      "allowed_actuators": [
+        "presence-actuator",
+        "artifact-actuator",
+        "approval-actuator"
       ],
-      "scope_classes": ["communication_surface", "coordination_runtime", "observability", "operations_runtime", "audit"],
-      "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
-      "tier_access": ["public", "confidential"]
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
     },
-    "surface_runtime": {
-      "description": "Surface runtime authority for reconciling and supervising managed surfaces.",
+    "software_developer": {
+      "description": "Implementation authority for test and product code paths.",
+      "default_persona": "worker",
       "write_scopes": [
-        "active/shared/runtime/",
-        "active/shared/logs/surfaces/",
-        "active/audit/"
+        "active/projects/",
+        "tests/",
+        "libs/actuators/"
       ],
-      "scope_classes": ["communication_surface", "operations_runtime", "audit"],
-      "allowed_actuators": ["presence-actuator", "artifact-actuator"],
-      "tier_access": ["public", "confidential"]
+      "scope_classes": [
+        "project_delivery",
+        "codebase_core",
+        "quality_validation"
+      ],
+      "allowed_actuators": [
+        "code-actuator",
+        "file-actuator",
+        "system-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
     },
     "sovereign_concierge": {
       "description": "Personal onboarding and identity synchronization authority.",
-      "write_scopes": ["knowledge/personal/", "active/missions/", "active/projects/onboarding/"],
-      "scope_classes": ["knowledge_core", "mission_state", "project_delivery", "communication_surface"],
-      "allowed_actuators": ["artifact-actuator", "approval-actuator", "presence-actuator"],
-      "tier_access": ["personal", "confidential", "public"]
+      "default_persona": "sovereign",
+      "write_scopes": [
+        "knowledge/personal/",
+        "active/missions/",
+        "active/projects/onboarding/"
+      ],
+      "scope_classes": [
+        "knowledge_core",
+        "mission_state",
+        "project_delivery",
+        "communication_surface"
+      ],
+      "allowed_actuators": [
+        "artifact-actuator",
+        "approval-actuator",
+        "presence-actuator"
+      ],
+      "tier_access": [
+        "personal",
+        "confidential",
+        "public"
+      ]
+    },
+    "surface_runtime": {
+      "description": "Surface runtime authority for reconciling and supervising managed surfaces.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/runtime/",
+        "active/shared/logs/surfaces/",
+        "knowledge/public/governance/surfaces/",
+        "knowledge/public/governance/active-surfaces.json",
+        "active/shared/coordination/channels/imessage/",
+        "active/shared/coordination/channels/discord/",
+        "active/shared/coordination/channels/telegram/",
+        "active/audit/"
+      ],
+      "scope_classes": [
+        "communication_surface",
+        "operations_runtime",
+        "audit"
+      ],
+      "allowed_actuators": [
+        "presence-actuator",
+        "artifact-actuator"
+      ],
+      "tier_access": [
+        "public",
+        "confidential"
+      ]
     }
   }
 }

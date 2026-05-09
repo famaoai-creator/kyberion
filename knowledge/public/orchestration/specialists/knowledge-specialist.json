@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "knowledge-specialist": {
+      "label": "Knowledge Specialist",
+      "description": "Searches governed knowledge and distills concise answers.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["planner", "reviewer"],
+      "capabilities": ["knowledge_query", "live_query", "summarization"]
+    }
+  }
+}

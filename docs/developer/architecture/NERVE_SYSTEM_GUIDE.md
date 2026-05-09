@@ -7,7 +7,7 @@ Kyberionのバックグラウンド動作、ログ出力、およびメッセー
 
 ### 1. サーフェスとプロセス管理 (Surface and Process Management)
 
-長寿命の神経系プロセスは `active-surfaces.json` と `surface-runtime` で宣言的に管理します。単発の補助プロセスは `process-actuator` に委譲します。
+長寿命の神経系プロセスは `knowledge/public/governance/surfaces/*.json` と `surface-runtime` で宣言的に管理します。`active-surfaces.json` は互換 snapshot です。単発の補助プロセスは `process-actuator` に委譲します。
 
 #### 常駐サーフェスの反映と起動
 システムの核心となる神経（Slack Bridge, Chronos, OAuth Callback Surface 等）を shared manifest から再調整します。
@@ -62,7 +62,7 @@ pnpm surfaces:status
 
 ### 4. 運用ポリシー (Policies)
 
-1.  **Shield Layer**: durable runtime の定義変更は `knowledge/public/governance/active-surfaces.json` と review を通してください。
+1.  **Shield Layer**: durable runtime の定義変更は `knowledge/public/governance/surfaces/*.json` と review を通してください。`active-surfaces.json` は generated compatibility snapshot です。
 2.  **Clean Room**: 一時的な神経（Ephemeral）は `process-actuator` で owner を持って起動し、明示的に stop してください。
 3.  **Coherence**: 独自のログファイルを作る前に、まず `stimuli.jsonl` と governed runtime logs を利用してください。
 

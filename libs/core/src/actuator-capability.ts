@@ -9,7 +9,8 @@
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import * as path from 'path';
-import { safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
+import { safeExistsSync, safeReadFile } from '../secure-io.js';
+import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
 
 export interface ActuatorCapability {
   op: string;
@@ -28,7 +29,6 @@ export interface ActuatorStatus {
 
 // Registry of capability probe functions
 const capabilityProbes = new Map<string, () => Promise<ActuatorCapability[]>>();
-const actuatorCatalogOrderPath = pathResolver.knowledge('public/orchestration/global_actuator_index.json');
 let actuatorCatalogOrderCache: Map<string, number> | null = null;
 
 export function registerCapabilityProbe(
@@ -41,20 +41,12 @@ export function registerCapabilityProbe(
 function loadActuatorCatalogOrder(): Map<string, number> {
   if (actuatorCatalogOrderCache) return actuatorCatalogOrderCache;
   const order = new Map<string, number>();
-  if (!safeExistsSync(actuatorCatalogOrderPath)) {
-    actuatorCatalogOrderCache = order;
-    return order;
-  }
-
   try {
-    const parsed = JSON.parse(safeReadFile(actuatorCatalogOrderPath, { encoding: 'utf8' }) as string) as {
-      actuators?: Array<{ n?: string }>;
-    };
-    for (const [index, entry] of (parsed.actuators || []).entries()) {
+    for (const [index, entry] of loadActuatorManifestCatalog().entries()) {
       if (entry?.n) order.set(entry.n, index);
     }
   } catch {
-    // Fall back to filesystem order when the index cannot be parsed.
+    // Fall back to lexical order when the manifest catalog cannot be loaded.
   }
 
   actuatorCatalogOrderCache = order;
@@ -110,18 +102,13 @@ export async function checkAllActuatorCapabilities(
   const dir = actuatorsDir ? pathResolver.rootResolve(actuatorsDir) : pathResolver.rootResolve('libs/actuators');
   const results: ActuatorStatus[] = [];
 
-  if (!safeExistsSync(dir)) return results;
-
-  const entries = safeReaddir(dir);
-  for (const entry of entries) {
-    const manifestPath = path.join(dir, entry, 'manifest.json');
-    if (safeExistsSync(manifestPath)) {
-      try {
-        const status = await checkActuatorCapabilities(entry, manifestPath);
-        results.push(status);
-      } catch (e: any) {
-        logger.error(`Failed to check ${entry}: ${e.message}`);
-      }
+  const catalog = loadActuatorManifestCatalog(dir);
+  for (const entry of catalog) {
+    try {
+      const status = await checkActuatorCapabilities(entry.n, pathResolver.rootResolve(entry.manifest_path));
+      results.push(status);
+    } catch (e: any) {
+      logger.error(`Failed to check ${entry.n}: ${e.message}`);
     }
   }
 

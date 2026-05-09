@@ -1,0 +1,44 @@
+{
+  "action": "pipeline",
+  "name": "chrome-tab-triage-fragment",
+  "description": "Lists open Chrome tabs, uses LLM to propose cleanup (duplicates, stale tabs, grouping suggestions), and delivers the result as a desktop notification. Optional context var: application (default: Google Chrome).",
+  "steps": [
+    {
+      "id": "list_tabs",
+      "type": "capture",
+      "op": "system:chrome_tab_list",
+      "params": {
+        "application": "{{application}}",
+        "export_as": "chrome_tabs"
+      }
+    },
+    {
+      "id": "triage",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "You are a tab hygiene assistant. Given this list of open browser tabs, identify: (1) duplicate or near-duplicate URLs, (2) tabs that look stale or unrelated to active work, (3) suggested groupings. Be concise — one line per finding. Max 5 bullet points.",
+        "context": ["{{chrome_tabs}}"],
+        "export_as": "triage_suggestions"
+      }
+    },
+    {
+      "id": "notify_suggestions",
+      "type": "apply",
+      "op": "system:system_notify",
+      "params": {
+        "title": "Tab Triage",
+        "message": "{{triage_suggestions}}",
+        "subtitle": "{{chrome_tabs.length}} tabs open"
+      }
+    },
+    {
+      "id": "log_suggestions",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "[TAB TRIAGE] {{triage_suggestions}}"
+      }
+    }
+  ]
+}

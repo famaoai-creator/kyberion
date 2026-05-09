@@ -1,0 +1,224 @@
+{
+  "action": "pipeline",
+  "name": "clone-my-voice",
+  "description": "声のクローン作成パイプライン。3サンプルを録音・トランスクリプト登録し、mlx_audio_qwen3 エンジンでの ICL クローンプロフィールを作成する。必須 context vars: profile_id, display_name。オプション: duration_sec (default 12), language (default ja)。モデルダウンロード済みであること（HuggingFace 接続が必要、初回のみ）。",
+  "context": {
+    "profile_id": "my-voice-v1",
+    "display_name": "市村 Voice v1",
+    "duration_sec": 12,
+    "language": "ja"
+  },
+  "steps": [
+    {
+      "id": "check_sox",
+      "type": "capture",
+      "op": "system:cli_health_check",
+      "params": {
+        "command": "sox",
+        "args": ["--version"],
+        "export_as": "sox_health"
+      }
+    },
+    {
+      "id": "gate_sox",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "sox_health.available", "operator": "eq", "value": false },
+        "then": [
+          {
+            "id": "error_no_sox",
+            "type": "apply",
+            "op": "system:log",
+            "params": { "message": "[clone-my-voice] sox が見つかりません。brew install sox を実行してください。" }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mkdir_samples",
+      "type": "apply",
+      "op": "system:mkdir",
+      "params": { "path": "active/shared/tmp/voice-samples/{{profile_id}}" }
+    },
+    {
+      "id": "generate_cue_audio",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "say",
+        "args": ["-v", "Eddy (Japanese (Japan))", "-o", "active/shared/tmp/voice-cue.aiff", "録音を開始します。どうぞ"],
+        "export_as": "cue_gen"
+      }
+    },
+
+    {
+      "id": "notify_sample1",
+      "type": "apply",
+      "op": "system:system_notify",
+      "params": {
+        "title": "🎙 録音 1/3",
+        "message": "「こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。」",
+        "subtitle": "合図の後に話し始めてください"
+      }
+    },
+    {
+      "id": "cue_sample1",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "afplay",
+        "args": ["active/shared/tmp/voice-cue.aiff"],
+        "export_as": "cue1"
+      }
+    },
+    {
+      "id": "record_sample1",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "sox",
+        "args": ["-d", "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav", "trim", "0", "{{duration_sec}}"],
+        "timeout_ms": 20000,
+        "export_as": "record1"
+      }
+    },
+    {
+      "id": "transcript_sample1",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav.transcript.txt",
+        "content": "こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。"
+      }
+    },
+
+    {
+      "id": "notify_sample2",
+      "type": "apply",
+      "op": "system:system_notify",
+      "params": {
+        "title": "🎙 録音 2/3",
+        "message": "「Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。」",
+        "subtitle": "合図の後に話し始めてください"
+      }
+    },
+    {
+      "id": "cue_sample2",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "afplay",
+        "args": ["active/shared/tmp/voice-cue.aiff"],
+        "export_as": "cue2"
+      }
+    },
+    {
+      "id": "record_sample2",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "sox",
+        "args": ["-d", "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav", "trim", "0", "{{duration_sec}}"],
+        "timeout_ms": 20000,
+        "export_as": "record2"
+      }
+    },
+    {
+      "id": "transcript_sample2",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav.transcript.txt",
+        "content": "Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。"
+      }
+    },
+
+    {
+      "id": "notify_sample3",
+      "type": "apply",
+      "op": "system:system_notify",
+      "params": {
+        "title": "🎙 録音 3/3",
+        "message": "「本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。」",
+        "subtitle": "合図の後に話し始めてください"
+      }
+    },
+    {
+      "id": "cue_sample3",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "afplay",
+        "args": ["active/shared/tmp/voice-cue.aiff"],
+        "export_as": "cue3"
+      }
+    },
+    {
+      "id": "record_sample3",
+      "type": "capture",
+      "op": "system:exec",
+      "params": {
+        "command": "sox",
+        "args": ["-d", "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav", "trim", "0", "{{duration_sec}}"],
+        "timeout_ms": 20000,
+        "export_as": "record3"
+      }
+    },
+    {
+      "id": "transcript_sample3",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav.transcript.txt",
+        "content": "本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。"
+      }
+    },
+
+    {
+      "id": "copy_transcript1_to_collection",
+      "type": "apply",
+      "op": "system:log",
+      "params": { "message": "[clone-my-voice] 録音完了。プロフィール登録を開始します。" }
+    },
+    {
+      "id": "register_profile",
+      "op": "voice:collect_and_register_voice_profile",
+      "params": {
+        "action": "collect_and_register_voice_profile",
+        "request_id": "clone-{{profile_id}}-{{language}}",
+        "profile": {
+          "profile_id": "{{profile_id}}",
+          "display_name": "{{display_name}}",
+          "tier": "personal",
+          "languages": ["{{language}}"],
+          "default_engine_id": "mlx_audio_qwen3",
+          "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
+        },
+        "samples": [
+          { "sample_id": "sample-01", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav", "language": "{{language}}" },
+          { "sample_id": "sample-02", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav", "language": "{{language}}" },
+          { "sample_id": "sample-03", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav", "language": "{{language}}" }
+        ],
+        "policy": { "allow_update": true },
+        "export_as": "registration_result"
+      }
+    },
+    {
+      "id": "notify_done",
+      "type": "apply",
+      "op": "system:system_notify",
+      "params": {
+        "title": "✅ 声のクローン登録完了",
+        "message": "プロフィール {{profile_id}} が登録されました。pnpm voice:speak で発話テストできます。",
+        "subtitle": "clone-my-voice"
+      }
+    },
+    {
+      "id": "log_result",
+      "type": "apply",
+      "op": "system:log",
+      "params": { "message": "[clone-my-voice] 完了: {{registration_result}}" }
+    }
+  ]
+}

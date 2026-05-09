@@ -1,0 +1,45 @@
+{
+  "pipeline_id": "persona-beginner-news-summary",
+  "version": "1.0.0",
+  "description": "初心者のためのニュースまとめ。キーワードに関連する最新情報を検索し、要点スライドを作成します。",
+  "action": "pipeline",
+  "variables": {
+    "keyword": {
+      "type": "string",
+      "description": "調べたいキーワード",
+      "default": "生成AI"
+    }
+  },
+  "steps": [
+    {
+      "id": "search-news",
+      "type": "apply",
+      "op": "browser:pipeline",
+      "params": {
+        "steps": [
+          { "type": "apply", "op": "goto", "params": { "url": "https://news.google.com/search?q={{keyword}}&hl=ja&gl=JP" } },
+          { "type": "capture", "op": "content", "params": { "export_as": "news_content" } }
+        ]
+      }
+    },
+    {
+      "id": "summarize-news",
+      "type": "transform",
+      "op": "wisdom:synthesize",
+      "params": {
+        "instruction": "ニュース記事の内容から、{{keyword}}に関する最新のトピックを3つ選び、それぞれ要点を簡潔にまとめてPPT用のスライド構成データに変換してください。",
+        "context": ["{{news_content}}"],
+        "export_as": "news_brief"
+      }
+    },
+    {
+      "id": "render-pptx",
+      "type": "apply",
+      "op": "media:pptx_render",
+      "params": {
+        "brief_from": "news_brief",
+        "path": "active/shared/exports/{{keyword}}_ニュースまとめ.pptx"
+      }
+    }
+  ]
+}

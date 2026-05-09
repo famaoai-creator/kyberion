@@ -827,7 +827,7 @@
         "identify the target messaging platform",
         "verify or request the required API tokens or local permissions",
         "confirm the requested platform has a declared bridge implementation",
-        "reconcile active-surfaces.json and start the bridge service"
+        "reconcile surface manifests and start the bridge service"
       ],
       "intake_requirements": ["platform_id"],
       "outcome_ids": ["messaging_bridge_active", "service_started"],

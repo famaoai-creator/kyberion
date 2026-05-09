@@ -13,7 +13,7 @@ Establish the neurological link between modules.
 
 ### Stage 2: System Manifestation (システムの具現化)
 Construct the physical structure and activate services based on governance.
-- **Action**: `node dist/scripts/run_orchestration_job.js` (Running the "System Onboarding" job).
+- **Action**: `pnpm onboard` (interactive) or `pnpm onboard:apply --identity path/to/identity.json` (non-interactive).
 - **Effect**:
   - Build artifacts (`dist/`) are generated.
   - `presence` (external interface) services are initialized.
@@ -27,10 +27,14 @@ Inject the Sovereign's unique "Soul" into the established vessel.
 - **Effect**: Wizard guides the Sovereign through identity, service readiness, tenant scope, and a safe first tutorial.
 
 #### Path B: Non-Interactive / Agent Environment (非対話環境)
-When running within a CLI agent (e.g., Claude Code) where stdin is unavailable:
-1. Agent reads `scripts/onboarding_wizard.ts` to understand the required schema.
-2. Agent conducts the hearing conversationally, asking the Sovereign the same questions.
-3. Agent writes the output files directly, conforming to the schema in `knowledge/public/templates/my-identity.schema.json`.
+When running within a CLI agent (e.g., Claude Code) where stdin is unavailable, the wizard refuses to run by design — it would otherwise apply silent defaults. Pick one of:
+
+1. **Sanctioned CLI**: `pnpm onboard:apply --identity path/to/identity.json` (or pipe JSON via stdin) — runs the same artifact-writing flow as `pnpm onboard` without prompts.
+2. **Agent conversation + direct write**:
+   - Agent reads `scripts/onboarding_wizard.ts` to understand the required schema.
+   - Agent conducts the hearing conversationally with the Sovereign.
+   - Agent writes output files directly, conforming to `knowledge/public/templates/my-identity.schema.json` and `knowledge/public/schemas/onboarding-state.schema.json`.
+3. **Defaults bypass** (evaluation only): `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — accepts every default. Use only when defaults are knowingly acceptable.
 
 - **Output**:
   - `knowledge/personal/my-identity.json`: Defines values, domain, and role.
@@ -45,7 +49,7 @@ When running within a CLI agent (e.g., Claude Code) where stdin is unavailable:
 
 ## Success Metrics [L3]
 1. **Physical Integrity**: `pnpm install` completed with no resolution errors.
-2. **Operational Status**: `scripts/run_orchestration_job.ts` returns `status: "finished"`.
+2. **Operational Status**: `pnpm onboard:apply` returns `status: "complete"` after persisting the onboarding state.
 3. **Identity Alignment**: `my-identity.json`, `my-vision.md`, and `agent-identity.json` all exist in the Personal Tier.
 4. **Onboarding Summary**: `onboarding/onboarding-state.json` and `onboarding/onboarding-summary.md` are persisted.
 

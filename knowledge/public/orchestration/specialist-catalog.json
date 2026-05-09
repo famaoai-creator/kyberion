@@ -1,54 +1,108 @@
 {
   "version": "1.0.0",
   "specialists": {
-    "surface-concierge": {
-      "label": "Surface Concierge",
-      "description": "Receives natural-language requests, fills missing slots, and keeps the conversation smooth.",
-      "conversation_agent": "presence-surface-agent",
-      "team_roles": ["surface_liaison"],
-      "capabilities": ["conversation", "slot_filling", "routing"]
-    },
     "browser-operator": {
       "label": "Browser Operator",
       "description": "Handles browser navigation and step-by-step interactive actions.",
       "conversation_agent": "presence-surface-agent",
-      "team_roles": ["surface_liaison", "operator"],
-      "capabilities": ["browser_navigation", "browser_step", "confirmation"]
+      "team_roles": [
+        "surface_liaison",
+        "operator"
+      ],
+      "capabilities": [
+        "browser_navigation",
+        "browser_step",
+        "confirmation"
+      ]
     },
     "document-specialist": {
       "label": "Document Specialist",
       "description": "Creates decks, reports, and structured workbook artifacts.",
       "conversation_agent": "presence-surface-agent",
-      "team_roles": ["planner", "implementer", "reviewer"],
-      "capabilities": ["presentation_deck", "report_document", "workbook_wbs", "artifact_generation"]
-    },
-    "service-operator": {
-      "label": "Service Operator",
-      "description": "Inspects service state, logs, and controlled service operations.",
-      "conversation_agent": "presence-surface-agent",
-      "team_roles": ["operator", "reviewer"],
-      "capabilities": ["service_operation", "service_summary", "approval"]
-    },
-    "knowledge-specialist": {
-      "label": "Knowledge Specialist",
-      "description": "Searches governed knowledge and distills concise answers.",
-      "conversation_agent": "presence-surface-agent",
-      "team_roles": ["planner", "reviewer"],
-      "capabilities": ["knowledge_query", "live_query", "summarization"]
+      "team_roles": [
+        "planner",
+        "implementer",
+        "reviewer"
+      ],
+      "capabilities": [
+        "presentation_deck",
+        "report_document",
+        "workbook_wbs",
+        "artifact_generation"
+      ]
     },
     "harness-engineer": {
       "label": "Harness Engineer",
       "description": "Improves agent harnesses through benchmark-driven experiments, protected edit boundaries, and governed keep or discard decisions.",
       "conversation_agent": "presence-surface-agent",
-      "team_roles": ["owner", "planner", "implementer", "reviewer"],
-      "capabilities": ["harness_evolution", "benchmark_analysis", "experiment_ledger", "adapter_boundary_guard"]
+      "team_roles": [
+        "owner",
+        "planner",
+        "implementer",
+        "reviewer"
+      ],
+      "capabilities": [
+        "harness_evolution",
+        "benchmark_analysis",
+        "experiment_ledger",
+        "adapter_boundary_guard"
+      ]
+    },
+    "knowledge-specialist": {
+      "label": "Knowledge Specialist",
+      "description": "Searches governed knowledge and distills concise answers.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": [
+        "planner",
+        "reviewer"
+      ],
+      "capabilities": [
+        "knowledge_query",
+        "live_query",
+        "summarization"
+      ]
     },
     "project-lead": {
       "label": "Project Lead",
       "description": "Bootstraps a new project context, framing the long-lived goal, ownership, and next work items.",
       "conversation_agent": "presence-surface-agent",
-      "team_roles": ["owner", "product_strategist", "planner"],
-      "capabilities": ["project_bootstrap", "goal_framing", "work_scoping"]
+      "team_roles": [
+        "owner",
+        "product_strategist",
+        "planner"
+      ],
+      "capabilities": [
+        "project_bootstrap",
+        "goal_framing",
+        "work_scoping"
+      ]
+    },
+    "service-operator": {
+      "label": "Service Operator",
+      "description": "Inspects service state, logs, and controlled service operations.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": [
+        "operator",
+        "reviewer"
+      ],
+      "capabilities": [
+        "service_operation",
+        "service_summary",
+        "approval"
+      ]
+    },
+    "surface-concierge": {
+      "label": "Surface Concierge",
+      "description": "Receives natural-language requests, fills missing slots, and keeps the conversation smooth.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "conversation",
+        "slot_filling",
+        "routing"
+      ]
     }
   }
 }

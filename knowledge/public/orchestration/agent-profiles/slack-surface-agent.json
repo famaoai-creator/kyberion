@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "slack-surface-agent": {
+      "authority_roles": [
+        "slack_bridge",
+        "sovereign_concierge"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "slack",
+        "surface",
+        "conversation",
+        "delegation"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "chronos-mirror": {
+      "authority_roles": [
+        "chronos_operator",
+        "chronos_gateway"
+      ],
+      "team_roles": [
+        "operator",
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "a2ui",
+        "dashboard",
+        "commands",
+        "gateway"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
+    }
+  }
+}

@@ -220,8 +220,8 @@ Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_R
 | Capability | Configuration |
 |---|---|
 | Microphone capture | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder` |
-| TTS engine catalog | `knowledge/public/governance/voice-engine-registry.json` |
-| Voice profile catalog | `knowledge/public/governance/voice-profile-registry.json` |
+| TTS engine catalog | `knowledge/public/governance/voice-engines/*.json` + `voice-engine-registry.json` snapshot |
+| Voice profile catalog | `knowledge/public/governance/voice-profiles/*.json` canonical, `voice-profile-registry.json` compatibility snapshot |
 | Profile lifecycle policy | `voice-runtime-policy.ts` (record → collect → promote) |
 | Profile promotion procedure | `knowledge/public/procedures/media/promote-voice-profile.md` |
 | STT bridge | `SpeechToTextBridge` contract; shell impl driven by `KYBERION_STT_COMMAND` |

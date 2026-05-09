@@ -1,0 +1,19 @@
+{
+  "role": "knowledge_steward",
+  "description": "Knowledge maintenance authority across governed knowledge trees.",
+  "default_persona": "analyst",
+  "write_scopes": [
+    "knowledge/"
+  ],
+  "scope_classes": [
+    "knowledge_core"
+  ],
+  "allowed_actuators": [
+    "wisdom-actuator",
+    "artifact-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "role": "planner",
+  "description": "Breaks mission intent into an execution strategy and task graph.",
+  "required_capabilities": [
+    "reasoning",
+    "strategy",
+    "planning"
+  ],
+  "compatible_authority_roles": [
+    "ecosystem_architect",
+    "mission_controller"
+  ],
+  "allowed_delegate_team_roles": [
+    "implementer",
+    "reviewer",
+    "tester"
+  ],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns decomposition, sequencing, and contract completeness.",
+  "selection_hints": {
+    "preferred_agents": [
+      "planner-agent",
+      "nerve-agent",
+      "implementation-architect",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "high"
+}

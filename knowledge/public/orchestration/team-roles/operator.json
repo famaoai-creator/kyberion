@@ -1,0 +1,33 @@
+{
+  "role": "operator",
+  "description": "Handles runtime, deployment, and operational control surfaces.",
+  "required_capabilities": [
+    "operations",
+    "runtime",
+    "monitoring"
+  ],
+  "compatible_authority_roles": [
+    "chronos_operator",
+    "chronos_gateway",
+    "mission_controller"
+  ],
+  "allowed_delegate_team_roles": [
+    "surface_liaison"
+  ],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "communication_surface"
+  ],
+  "ownership_scope": "Owns operational execution state, runtime visibility, and control actions.",
+  "selection_hints": {
+    "preferred_agents": [
+      "chronos-mirror",
+      "nerve-agent"
+    ],
+    "preferred_models": [
+      "gemini-2.5-flash",
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

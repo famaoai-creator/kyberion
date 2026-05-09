@@ -82,14 +82,159 @@
         font-size: 12px;
         word-break: break-all;
       }
+      .header-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        margin-top: 6px;
+      }
+      .conn-pill {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(125, 211, 252, 0.25);
+        background: rgba(34, 211, 238, 0.08);
+        color: rgba(189, 224, 254, 0.85);
+      }
+      .conn-pill.conn-live { border-color: rgba(74, 222, 128, 0.45); background: rgba(74, 222, 128, 0.12); color: rgba(190, 242, 200, 0.95); }
+      .conn-pill.conn-retrying { border-color: rgba(253, 230, 138, 0.45); background: rgba(253, 230, 138, 0.12); color: rgba(254, 240, 178, 0.95); }
+      .conn-pill.conn-offline { border-color: rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.12); color: rgba(254, 202, 202, 0.95); }
+      .conn-pill.conn-pending { opacity: 0.6; }
+      .updated-text {
+        font-family: ui-monospace, monospace;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .identity-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(34, 211, 238, 0.35);
+        background: rgba(34, 211, 238, 0.05);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(237, 246, 255, 0.85);
+      }
+      .identity-badge.hidden { display: none; }
+      .identity-badge .badge-id { color: rgba(125, 211, 252, 0.95); }
+      .identity-badge .badge-tier { color: rgba(237, 246, 255, 0.55); }
+      .identity-badge .badge-sep { color: rgba(237, 246, 255, 0.3); }
+      .identity-badge.identity-badge-warn {
+        border-color: rgba(253, 230, 138, 0.55);
+        background: rgba(253, 230, 138, 0.1);
+        color: rgba(253, 230, 138, 0.9);
+      }
+      .first-run-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(34, 211, 238, 0.25);
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(125, 211, 252, 0.03) 60%, transparent);
+        font-size: 12.5px;
+        color: rgba(237, 246, 255, 0.85);
+      }
+      .first-run-banner.hidden { display: none; }
+      .first-run-banner .first-run-icon { font-size: 18px; line-height: 1; margin-top: 2px; }
+      .first-run-banner code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; background: rgba(0,0,0,0.3); padding: 0 4px; border-radius: 3px; color: rgba(189, 224, 254, 0.95); }
+      .first-run-banner ol { margin: 6px 0 0; padding-left: 18px; color: rgba(237, 246, 255, 0.65); font-size: 11.5px; }
+      .first-run-banner .first-run-eyebrow { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(125, 211, 252, 0.85); }
+      .first-run-close { background: transparent; border: none; color: rgba(237, 246, 255, 0.5); font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+      .first-run-close:hover { color: rgba(237, 246, 255, 0.9); }
+      .dev-panel {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: rgba(11, 22, 36, 0.5);
+      }
+      .dev-panel summary {
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+      }
+      .dev-panel summary::-webkit-details-marker { display: none; }
+      .dev-panel-title { font-weight: 700; }
+      .dev-panel-hint { color: var(--muted); font-size: 11.5px; }
+      .dev-panel-body { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .dev-panel-body textarea, .dev-panel-body pre {
+        width: 100%;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 12px;
+        background: rgba(0,0,0,0.45);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px;
+        color: rgba(237, 246, 255, 0.9);
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      .dev-panel-body textarea { resize: vertical; min-height: 160px; }
+      .dev-panel-body pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
+      .dev-panel-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+      .dev-panel-actions .button {
+        appearance: none;
+        background: rgba(34, 211, 238, 0.15);
+        border: 1px solid rgba(34, 211, 238, 0.4);
+        color: var(--text);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .dev-panel-actions .button-ghost { background: transparent; border: 1px solid rgba(255,255,255,0.16); }
+      .dev-panel-result { font-size: 11px; color: var(--muted); }
+      .dev-panel-result.ok { color: rgba(190, 242, 200, 0.95); }
+      .dev-panel-result.err { color: rgba(254, 202, 202, 0.95); }
+      .dev-label { display: block; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+      @media (max-width: 720px) { .dev-panel-body { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <main class="shell">
       <section class="panel">
-        <div class="eyebrow">Performance Surface</div>
-        <div class="title">Computer Surface</div>
-        <div class="sub">Live state for governed browser and terminal interactions. This surface receives A2UI state updates from computer interaction executors.</div>
+        <div class="header-row">
+          <div>
+            <div class="eyebrow">Performance Surface</div>
+            <div class="title">Computer Surface</div>
+            <div class="sub">Live state for governed browser and terminal interactions. This surface receives A2UI state updates from computer interaction executors.</div>
+          </div>
+          <div class="header-meta">
+            <div id="identity-badge" class="identity-badge hidden" title=""></div>
+            <span id="conn-pill" class="conn-pill conn-pending" title="SSE connection state">…</span>
+            <span id="last-updated" class="updated-text">waiting for state</span>
+          </div>
+        </div>
+        <div id="first-run-banner" class="first-run-banner hidden">
+          <div class="first-run-icon">✨</div>
+          <div style="flex:1">
+            <div class="first-run-eyebrow">First Run</div>
+            <div><span id="first-run-greeting">Welcome.</span> <span style="color:rgba(237,246,255,0.6)">No browser/terminal interaction yet — try one of these.</span></div>
+            <ol>
+              <li>Run a computer-actuator interaction that posts to <code>/a2ui/dispatch</code>.</li>
+              <li>Or open the <strong>Developer</strong> sandbox below and POST a sample <code>updateDataModel</code> message.</li>
+              <li>Once the executor reports back, Session / Executor / Status fill in automatically.</li>
+            </ol>
+          </div>
+          <button id="first-run-close" class="first-run-close" aria-label="Dismiss">×</button>
+        </div>
       </section>
       <section class="panel">
         <div class="grid">
@@ -104,6 +249,42 @@
         <div class="path" id="metadata"></div>
         <div class="path" id="screenshotPath"></div>
       </section>
+      <details class="dev-panel" id="dev-panel">
+        <summary>
+          <span style="font-size:14px">⚙</span>
+          <span class="dev-panel-title">Developer · A2UI dispatch sandbox</span>
+          <span class="dev-panel-hint">Send a sample updateDataModel and watch the metrics update live.</span>
+        </summary>
+        <div class="dev-panel-body">
+          <div>
+            <label class="dev-label" for="dev-a2ui-payload">A2UI message body (JSON)</label>
+            <textarea id="dev-a2ui-payload" rows="9" spellcheck="false">{
+  "updateDataModel": {
+    "surfaceId": "computer-surface",
+    "data": {
+      "sessionId": "demo-session-1",
+      "executor": "browser",
+      "status": "running",
+      "latestAction": "click",
+      "target": "button#confirm",
+      "actionCount": 1,
+      "detail": "Sample dispatch from the Developer panel.",
+      "updatedAt": "2026-05-08T03:00:00.000Z"
+    }
+  }
+}</textarea>
+            <div class="dev-panel-actions">
+              <button id="dev-a2ui-send" class="button" type="button">Dispatch</button>
+              <button id="dev-a2ui-reset" class="button button-ghost" type="button">Reset</button>
+              <span id="dev-a2ui-result" class="dev-panel-result"></span>
+            </div>
+          </div>
+          <div>
+            <label class="dev-label">Equivalent curl</label>
+            <pre><code id="dev-a2ui-curl"></code></pre>
+          </div>
+        </div>
+      </details>
     </main>
     <script>
       const ids = {
@@ -117,6 +298,86 @@
         metadata: document.getElementById("metadata"),
         screenshotPath: document.getElementById("screenshotPath"),
       };
+      const identityBadgeEl = document.getElementById("identity-badge");
+      const connPillEl = document.getElementById("conn-pill");
+      const lastUpdatedEl = document.getElementById("last-updated");
+      const firstRunBanner = document.getElementById("first-run-banner");
+      const FIRST_RUN_KEY = "computer-surface.first-run.dismissed";
+      let lastActionCount = 0;
+
+      function escapeHtml(value) {
+        return String(value || "").replace(/[&<>"']/g, (ch) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[ch]));
+      }
+
+      function formatTimestamp(value) {
+        if (!value) return "waiting for state";
+        const dt = typeof value === "string" ? new Date(value) : value;
+        if (isNaN(dt.getTime())) return String(value);
+        try {
+          return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(dt);
+        } catch (_) {
+          return dt.toLocaleTimeString();
+        }
+      }
+
+      function setConnState(state) {
+        if (!connPillEl) return;
+        const map = {
+          live: { text: "LIVE", className: "conn-pill conn-live", title: "SSE stream connected" },
+          retrying: { text: "RETRY", className: "conn-pill conn-retrying", title: "Reconnecting..." },
+          offline: { text: "OFFLINE", className: "conn-pill conn-offline", title: "SSE stream closed" },
+          pending: { text: "…", className: "conn-pill conn-pending", title: "Awaiting first event" },
+        };
+        const target = map[state] || map.pending;
+        connPillEl.textContent = target.text;
+        connPillEl.className = target.className;
+        connPillEl.title = target.title;
+      }
+
+      function renderIdentityBadge(payload) {
+        if (!identityBadgeEl || !payload) return;
+        if (!payload.onboarded) {
+          identityBadgeEl.classList.remove("hidden");
+          identityBadgeEl.classList.add("identity-badge-warn");
+          identityBadgeEl.textContent = "Onboarding required";
+          identityBadgeEl.title = "knowledge/personal/my-identity.json was not found.";
+          return;
+        }
+        const name = payload.sovereign?.name || "Sovereign";
+        const agentId = payload.agent?.agent_id || "agent";
+        const tier = (payload.agent?.trust_tier || "—").toString();
+        identityBadgeEl.classList.remove("hidden");
+        identityBadgeEl.classList.remove("identity-badge-warn");
+        identityBadgeEl.innerHTML =
+          '<span class="badge-name">' + escapeHtml(name) + '</span>' +
+          '<span class="badge-sep">·</span>' +
+          '<span class="badge-id">' + escapeHtml(agentId) + '</span>' +
+          '<span class="badge-sep">·</span>' +
+          '<span class="badge-tier">' + escapeHtml(tier.toUpperCase()) + '</span>';
+        identityBadgeEl.title = payload.vision || "";
+      }
+
+      function maybeShowFirstRunBanner(identityPayload) {
+        if (!firstRunBanner) return;
+        let dismissed = false;
+        try { dismissed = localStorage.getItem(FIRST_RUN_KEY) === "1"; } catch (_) {}
+        if (dismissed) return;
+        if (!identityPayload || !identityPayload.onboarded) return;
+        // Only show while no actions have been recorded.
+        if (lastActionCount > 0) return;
+        const greeting = document.getElementById("first-run-greeting");
+        if (greeting && identityPayload.sovereign?.name) greeting.textContent = "Welcome, " + identityPayload.sovereign.name + ".";
+        firstRunBanner.classList.remove("hidden");
+      }
+      const firstRunCloseBtn = document.getElementById("first-run-close");
+      if (firstRunCloseBtn) {
+        firstRunCloseBtn.addEventListener("click", () => {
+          firstRunBanner.classList.add("hidden");
+          try { localStorage.setItem(FIRST_RUN_KEY, "1"); } catch (_) {}
+        });
+      }
 
       function applyState(payload) {
         const surface = payload?.surfaces?.["computer-surface"];
@@ -128,17 +389,85 @@
         ids.target.textContent = data.target || "—";
         ids.actionCount.textContent = String(data.actionCount || 0);
         ids.detail.textContent = data.detail || "No interaction detail yet.";
-        ids.metadata.textContent = data.metadata && Object.keys(data.metadata).length ? `metadata: ${JSON.stringify(data.metadata)}` : "";
-        ids.screenshotPath.textContent = data.screenshotPath ? `screenshot: ${data.screenshotPath}` : "";
+        ids.metadata.textContent = data.metadata && Object.keys(data.metadata).length ? "metadata: " + JSON.stringify(data.metadata) : "";
+        ids.screenshotPath.textContent = data.screenshotPath ? "screenshot: " + data.screenshotPath : "";
+        lastActionCount = Number(data.actionCount || 0);
+        if (lastUpdatedEl) {
+          lastUpdatedEl.textContent = formatTimestamp(data.updatedAt || payload?.lastUpdatedAt);
+        }
+        // Auto-dismiss banner once activity arrives.
+        if (lastActionCount > 0 && firstRunBanner) firstRunBanner.classList.add("hidden");
       }
+
+      let identityCache = null;
+      fetch("/api/identity")
+        .then((r) => r.json())
+        .then((p) => { identityCache = p; renderIdentityBadge(p); maybeShowFirstRunBanner(p); })
+        .catch(() => {});
 
       fetch("/api/state").then((res) => res.json()).then(applyState).catch(() => {});
       const source = new EventSource("/api/stream");
+      source.addEventListener("open", () => setConnState("live"));
+      source.addEventListener("error", () => setConnState(source.readyState === EventSource.CONNECTING ? "retrying" : "offline"));
       source.addEventListener("state", (event) => {
-        try {
-          applyState(JSON.parse(event.data));
-        } catch (_) {}
+        setConnState("live");
+        try { applyState(JSON.parse(event.data)); } catch (_) {}
       });
+
+      // ----------------- Developer dispatch sandbox -----------------
+      const devA2uiPayload = document.getElementById("dev-a2ui-payload");
+      const devA2uiSend = document.getElementById("dev-a2ui-send");
+      const devA2uiReset = document.getElementById("dev-a2ui-reset");
+      const devA2uiResult = document.getElementById("dev-a2ui-result");
+      const devA2uiCurl = document.getElementById("dev-a2ui-curl");
+      const DEV_DEFAULT = devA2uiPayload ? devA2uiPayload.value : "";
+
+      function refreshDevCurl() {
+        if (!devA2uiCurl || !devA2uiPayload) return;
+        const raw = devA2uiPayload.value;
+        let pretty;
+        try { pretty = JSON.stringify(JSON.parse(raw)); }
+        catch (_) { pretty = raw.replace(/\s+/g, " ").trim(); }
+        const escaped = pretty.replace(/'/g, "'\\''");
+        devA2uiCurl.textContent =
+          "curl -X POST " + window.location.origin + "/a2ui/dispatch \\\n" +
+          "  -H 'Content-Type: application/json' \\\n" +
+          "  -d '" + escaped + "'";
+      }
+      if (devA2uiPayload) {
+        devA2uiPayload.addEventListener("input", refreshDevCurl);
+        refreshDevCurl();
+      }
+      if (devA2uiReset) {
+        devA2uiReset.addEventListener("click", () => {
+          if (devA2uiPayload) devA2uiPayload.value = DEV_DEFAULT;
+          if (devA2uiResult) { devA2uiResult.textContent = ""; devA2uiResult.className = "dev-panel-result"; }
+          refreshDevCurl();
+        });
+      }
+      if (devA2uiSend) {
+        devA2uiSend.addEventListener("click", async () => {
+          if (!devA2uiPayload) return;
+          let payload;
+          try { payload = JSON.parse(devA2uiPayload.value); }
+          catch (err) {
+            if (devA2uiResult) { devA2uiResult.textContent = "Invalid JSON: " + (err.message || err); devA2uiResult.className = "dev-panel-result err"; }
+            return;
+          }
+          devA2uiSend.disabled = true;
+          if (devA2uiResult) { devA2uiResult.textContent = "Dispatching…"; devA2uiResult.className = "dev-panel-result"; }
+          try {
+            const r = await fetch("/a2ui/dispatch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok || body.ok === false) throw new Error(body.error || ("HTTP " + r.status));
+            if (devA2uiResult) { devA2uiResult.textContent = "OK · applied " + (body.applied || 1); devA2uiResult.className = "dev-panel-result ok"; }
+          } catch (err) {
+            if (devA2uiResult) { devA2uiResult.textContent = "Dispatch failed: " + (err.message || err); devA2uiResult.className = "dev-panel-result err"; }
+          } finally {
+            devA2uiSend.disabled = false;
+          }
+        });
+      }
     </script>
   </body>
 </html>

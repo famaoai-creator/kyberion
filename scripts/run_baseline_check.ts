@@ -1,11 +1,13 @@
 import * as path from 'node:path';
-import { 
+import {
   SovereignSentinel, 
   validateService, 
+  customerResolver,
   pathResolver, 
   safeExistsSync,
   safeReadFile,
   withExecutionContext,
+  loadServiceEndpointsCatalog,
 } from '@agent/core';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
@@ -50,11 +52,13 @@ function loadConnectionReadinessConfig(): {
   }
 }
 
+function profileRoot(): string {
+  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+}
+
 function checkServiceConnectionReadiness(): boolean {
   return withExecutionContext('mission_controller', () => {
-    const endpointsPath = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints.json');
-    if (!safeExistsSync(endpointsPath)) return false;
-    const endpoints = JSON.parse(safeReadFile(endpointsPath, { encoding: 'utf8' }) as string);
+    const endpoints = loadServiceEndpointsCatalog();
     const services = endpoints?.services || {};
 
     const readinessConfig = loadConnectionReadinessConfig();
@@ -67,7 +71,7 @@ function checkServiceConnectionReadiness(): boolean {
       const presetPath = pathResolver.rootResolve(String(service.preset_path));
       if (!safeExistsSync(presetPath)) return false;
 
-      const connectionPath = pathResolver.rootResolve(`knowledge/personal/connections/${serviceId}.json`);
+      const connectionPath = path.join(profileRoot(), 'connections', `${serviceId}.json`);
       if (!safeExistsSync(connectionPath)) return false;
       const connection = JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
       const requiredAny = Array.isArray(rule?.required_keys_any) ? rule.required_keys_any : [];
@@ -113,14 +117,15 @@ async function main() {
 
   // L3: Identity Layer (Soul)
   sentinel.registerLayer('L3', async () => {
-    const identityPath = pathResolver.rootResolve('knowledge/personal/my-identity.json');
+    const identityPath = path.join(profileRoot(), 'my-identity.json');
     return safeExistsSync(identityPath);
   });
 
   // L4: Surface Layer (Background Daemons)
   sentinel.registerLayer('L4', async () => {
-    const surfacesPath = pathResolver.rootResolve('knowledge/public/governance/active-surfaces.json');
-    return safeExistsSync(surfacesPath);
+    const surfacesDir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
+    const surfacesSnapshot = pathResolver.rootResolve('knowledge/public/governance/active-surfaces.json');
+    return safeExistsSync(surfacesDir) && safeExistsSync(surfacesSnapshot);
   });
 
   // L5: Trust/API Layer (Vault/Credentials)

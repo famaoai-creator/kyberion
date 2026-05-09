@@ -1,0 +1,31 @@
+{
+  "role": "facilitator",
+  "description": "Runs stakeholder consensus 1-on-1s (nemawashi / round_table / pre_read_memo variants) and aggregates readiness_matrix evidence.",
+  "required_capabilities": [
+    "facilitation",
+    "listening",
+    "coordination"
+  ],
+  "compatible_authority_roles": [
+    "mission_controller",
+    "ecosystem_architect"
+  ],
+  "allowed_delegate_team_roles": [
+    "relationship_curator"
+  ],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns session orchestration, dissent signal extraction, and readiness_matrix assembly.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

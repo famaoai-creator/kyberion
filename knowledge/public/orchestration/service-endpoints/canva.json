@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "canva": {
+      "base_url": "https://api.canva.com/rest/v1",
+      "preset_path": "knowledge/public/orchestration/service-presets/canva.json"
+    }
+  }
+}

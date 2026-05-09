@@ -4,8 +4,8 @@ import AjvModule from 'ajv';
 import AjvFormats from 'ajv-formats';
 import chalk from 'chalk';
 import {
+  customerResolver,
   ensureDefaultTenantProfile,
-  tenantProfileDir,
   compileSchemaFromPath,
   pathResolver,
   safeExistsSync,
@@ -15,6 +15,8 @@ import {
   withExecutionContext,
   withLock,
 } from '@agent/core';
+import { createCustomer } from './customer_create.js';
+import { switchCustomer } from './customer_switch.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -85,9 +87,41 @@ interface OnboardingState {
 
 const DEFAULT_SERVICES = ['comfyui', 'whisper', 'tts', 'meeting'] as const;
 const PHASES: OnboardingPhase[] = ['identity', 'services', 'tenants', 'tutorial', 'summary'];
-const ONBOARDING_ROOT = pathResolver.knowledge('personal/onboarding');
-const STATE_PATH = path.join(ONBOARDING_ROOT, 'onboarding-state.json');
-const SUMMARY_PATH = path.join(ONBOARDING_ROOT, 'onboarding-summary.md');
+function profileRoot(): string {
+  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+}
+
+function onboardingRoot(): string {
+  return path.join(profileRoot(), 'onboarding');
+}
+
+function statePath(): string {
+  return path.join(onboardingRoot(), 'onboarding-state.json');
+}
+
+function summaryPath(): string {
+  return path.join(onboardingRoot(), 'onboarding-summary.md');
+}
+
+function identityPath(): string {
+  return path.join(profileRoot(), 'my-identity.json');
+}
+
+function visionPath(): string {
+  return path.join(profileRoot(), 'my-vision.md');
+}
+
+function agentIdentityPath(): string {
+  return path.join(profileRoot(), 'agent-identity.json');
+}
+
+function connectionDir(): string {
+  return path.join(profileRoot(), 'connections');
+}
+
+function tenantDir(): string {
+  return path.join(profileRoot(), 'tenants');
+}
 
 const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
@@ -153,9 +187,10 @@ async function writeTextArtifact(filePath: string, content: string, lockName: st
 }
 
 function loadState(): OnboardingState | null {
-  if (!safeExistsSync(STATE_PATH)) return null;
+  const filePath = statePath();
+  if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(STATE_PATH, { encoding: 'utf8' }) as string) as OnboardingState;
+    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as OnboardingState;
   } catch {
     return null;
   }
@@ -163,7 +198,7 @@ function loadState(): OnboardingState | null {
 
 async function saveState(state: OnboardingState): Promise<void> {
   assertOnboardingStateSchema(state);
-  await writeJsonArtifact(STATE_PATH, state, 'onboarding-state');
+  await writeJsonArtifact(statePath(), state, 'onboarding-state');
 }
 
 function createInitialState(): OnboardingState {
@@ -250,8 +285,7 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
   state.updated_at = new Date().toISOString();
   await saveState(state);
 
-  const personalDir = pathResolver.knowledge('personal');
-  await writeJsonArtifact(path.join(personalDir, 'my-identity.json'), {
+  await writeJsonArtifact(identityPath(), {
     name: identity.name,
     language: identity.language,
     interaction_style: identity.interaction_style,
@@ -261,9 +295,9 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
     version: '1.0.0',
   }, 'onboarding-my-identity');
 
-  await writeTextArtifact(path.join(personalDir, 'my-vision.md'), `# Sovereign Vision\n\n${identity.vision}\n`, 'onboarding-my-vision');
+  await writeTextArtifact(visionPath(), `# Sovereign Vision\n\n${identity.vision}\n`, 'onboarding-my-vision');
 
-  await writeJsonArtifact(path.join(personalDir, 'agent-identity.json'), {
+  await writeJsonArtifact(agentIdentityPath(), {
     agent_id: identity.agent_id,
     version: '1.0.0',
     role: 'Ecosystem Architect / Senior Partner',
@@ -319,8 +353,8 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
   console.log('\n🔌 Phase 2 — Infrastructure & Services\n');
   const wantsServiceSetup = isAffirmative(await ask('Capture service connection candidates now? (y/N): ', 'n'));
   const candidates: ServiceCandidateDraft[] = [];
-  const connectionDir = pathResolver.knowledge('personal/connections');
-  if (!safeExistsSync(connectionDir)) safeMkdir(connectionDir, { recursive: true });
+  const connDir = connectionDir();
+  if (!safeExistsSync(connDir)) safeMkdir(connDir, { recursive: true });
 
   if (wantsServiceSetup) {
     for (const serviceId of DEFAULT_SERVICES) {
@@ -360,7 +394,7 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
 
       if (payload) {
         await writeJsonArtifact(
-          path.join(connectionDir, `${serviceId}.json`),
+          path.join(connDir, `${serviceId}.json`),
           {
             service_id: serviceId,
             status: 'draft',
@@ -389,8 +423,8 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
     'ecosystem_architect',
   );
   const wantsTenantSetup = isAffirmative(await ask('Register a tenant now? (y/N): ', 'n'));
-  const tenantDir = tenantProfileDir();
-  if (!safeExistsSync(tenantDir)) safeMkdir(tenantDir, { recursive: true });
+  const tenantDirPath = tenantDir();
+  if (!safeExistsSync(tenantDirPath)) safeMkdir(tenantDirPath, { recursive: true });
   entries.push({
     tenant_slug: defaultTenant.tenant_slug,
     tenant_id: defaultTenant.tenant_id,
@@ -429,7 +463,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
     entries.push(tenantProfile);
 
     await writeJsonArtifact(
-      path.join(tenantDir, `${tenantSlug}.json`),
+      path.join(tenantDirPath, `${tenantSlug}.json`),
       {
         tenant_slug: tenantSlug,
         tenant_id: tenantSlug,
@@ -465,7 +499,7 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
     ? 'Tutorial skipped during onboarding.'
     : await ask('Describe the first tutorial mission in one sentence: ', 'Demonstrate the initial Kyberion setup with a safe dry-run.');
 
-  const planPath = path.join(ONBOARDING_ROOT, 'tutorial-plan.md');
+  const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
   const planMarkdown = [
     '# Onboarding Tutorial Plan',
     '',
@@ -491,7 +525,7 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
 async function runSummaryPhase(state: OnboardingState): Promise<void> {
   console.log('\n📊 Phase 5 — Summary\n');
   const summary = buildSummaryMarkdown(state);
-  await writeTextArtifact(SUMMARY_PATH, summary, 'onboarding-summary');
+  await writeTextArtifact(summaryPath(), summary, 'onboarding-summary');
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'summary']));
   state.status = 'complete';
   state.current_phase = 'summary';
@@ -501,11 +535,11 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   const identity = state.identity;
   console.log(chalk.green('✅ Onboarding complete.'));
   console.log(`Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`);
-  console.log(`Summary written to: ${SUMMARY_PATH}`);
-  console.log(`State written to: ${STATE_PATH}`);
+  console.log(`Summary written to: ${summaryPath()}`);
+  console.log(`State written to: ${statePath()}`);
   console.log('\nNext steps:');
-  console.log('1. Review the service connection drafts in `knowledge/personal/connections/`.');
-  console.log('2. Review the tenant draft in `knowledge/personal/tenants/`.');
+  console.log(`1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`);
+  console.log(`2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`);
   console.log('3. If the tutorial should become real work, create a mission explicitly after review.');
   console.log('4. Re-run `pnpm surfaces:reconcile` after the workspace is ready.');
 }
@@ -514,7 +548,42 @@ async function runOnboarding() {
   process.env.MISSION_ROLE = 'sovereign_concierge';
   process.env.KYBERION_PERSONA = 'sovereign';
   const rootDir = pathResolver.rootDir();
-  const personalDir = pathResolver.knowledge('personal');
+  let customerSlug = customerResolver.activeCustomer();
+
+  if (!customerSlug && interactive) {
+    const wantsCustomer = isAffirmative(await ask('Set up a customer overlay now? (y/N): ', 'n'));
+    if (wantsCustomer) {
+      while (!customerSlug) {
+        const slugInput = await ask('Customer slug [e.g. acme-corp]: ', '');
+        try {
+          createCustomer(slugInput);
+          switchCustomer(slugInput);
+          customerSlug = slugInput.trim();
+          process.env.KYBERION_CUSTOMER = customerSlug;
+        } catch (error) {
+          console.log(chalk.red(String(error)));
+        }
+      }
+    }
+  }
+
+  const personalDir = profileRoot();
+
+  if (!interactive && process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK !== '1') {
+    console.error(chalk.red('\n❌ Refusing to run interactive onboarding without a TTY.'));
+    console.error('  This wizard would otherwise silently apply default values for every prompt,');
+    console.error('  producing an identity that does not reflect the Sovereign\'s intent.');
+    console.error('\n  Options:');
+    console.error('    1. Run from a real terminal: pnpm onboard');
+    console.error('    2. If you need a customer overlay, create it first with `pnpm customer:create <slug>`');
+    console.error('       and activate it with `pnpm customer:switch <slug>` before onboarding.');
+    console.error('    3. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write the');
+    console.error(`       active profile root (${profileRoot()}/...) directly per the schemas under`);
+    console.error('       knowledge/public/{schemas,templates}.');
+    console.error('    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1');
+    rl.close();
+    process.exit(2);
+  }
 
   console.log('\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n');
   console.log('This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n');
@@ -522,8 +591,8 @@ async function runOnboarding() {
   if (!safeExistsSync(personalDir)) {
     safeMkdir(personalDir, { recursive: true });
   }
-  if (!safeExistsSync(ONBOARDING_ROOT)) {
-    safeMkdir(ONBOARDING_ROOT, { recursive: true });
+  if (!safeExistsSync(onboardingRoot())) {
+    safeMkdir(onboardingRoot(), { recursive: true });
   }
 
   let state = loadState();

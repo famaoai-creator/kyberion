@@ -41,6 +41,8 @@ export interface ErrorClassification {
   detail: string;
   /** Which rule matched (for telemetry / debugging). 'fallback' when no rule matched. */
   ruleId: string;
+  /** (Optional) A hint for an autonomous agent on how to repair this error. */
+  repairAction?: string;
 }
 
 interface ClassifierRule {
@@ -50,17 +52,39 @@ interface ClassifierRule {
   remediation: string;
   /** A predicate over the message + optional code. Should be cheap to evaluate. */
   test: (message: string, code?: string | number) => boolean;
+  /** (Optional) A hint for an autonomous agent on how to repair this error. */
+  repairAction?: string;
 }
 
 const RULES: ClassifierRule[] = [
+  // --- Service / Media specific suggestions (Priority) ---
+  {
+    id: 'service.endpoint-missing',
+    category: 'resource_unavailable',
+    label: 'Service endpoint not configured',
+    remediation:
+      'The requested service (e.g., Image Generation) has no active endpoints. Start your local Service Engine (e.g., ComfyUI) or configure a cloud API in `knowledge/public/orchestration/service-endpoints`.',
+    test: (m) => /Service endpoints directory produced no services|no available services for domain|media-generation/i.test(m),
+    repairAction: 'Locate available service endpoints in knowledge/public/orchestration/service-presets/ and suggest a configuration for service-endpoints/.'
+  },
+  {
+    id: 'media.generation-failed',
+    category: 'resource_unavailable',
+    label: 'Media generation failed',
+    remediation:
+      'The media generator (ComfyUI/Stable Diffusion) is not responding. Ensure the backend is running and reachable at the configured port (default: 8188).',
+    test: (m) => /media-generation.*failed|ComfyUI.*not responding|ECONNREFUSED.*8188/i.test(m),
+    repairAction: 'Check if Service Engine process is running. If not, suggest starting it or switching to a cloud provider fallback.'
+  },
   // --- Permission / governance ---
   {
     id: 'kyberion.tier-guard',
     category: 'tier_violation',
     label: 'Tier guard refused access',
     remediation:
-      'The action tried to read or write across the tier boundary. Run with the right persona/role, or move the data to the correct tier.',
-    test: (m) => /tier[\s_-]?guard|TIER_VIOLATION|tier policy/i.test(m),
+      'Higher tier required. Set `KYBERION_PERSONA` or `MISSION_ROLE` to a role authorized for this tier.',
+    test: (m) => /tier[\s_-]?guard|TIER_VIOLATION|tier policy|returned no data/i.test(m),
+    repairAction: 'Consult organization-profile.md for required roles. Suggest adding `KYBERION_PERSONA=ecosystem_architect` or `MISSION_ROLE=knowledge_steward` to the environment configuration to authorize access.'
   },
   {
     id: 'kyberion.path-scope',
@@ -69,6 +93,7 @@ const RULES: ClassifierRule[] = [
     remediation:
       'The path-scope policy refused this write. Check `KYBERION_PERSONA` / `MISSION_ROLE` env vars match the persona authorized to write this path.',
     test: (m) => /POLICY_VIOLATION.*authorized|path-scope-policy|outside project root/i.test(m),
+    repairAction: 'Adjust the target path to be within the allowed mission or shared workspace root.'
   },
   {
     id: 'kyberion.governance-approval',
@@ -195,6 +220,7 @@ const RULES: ClassifierRule[] = [
       'Fix the pipeline step name or register the missing actuator for that operation.',
     test: (m) => /Unsupported pipeline op|unknown pipeline op|operation not supported/i.test(m),
   },
+  // --- Input / schema ---
   {
     id: 'input.json-parse',
     category: 'invalid_input',
@@ -246,6 +272,7 @@ export function classifyError(err: unknown): ErrorClassification {
           remediation: rule.remediation,
           detail,
           ruleId: rule.id,
+          repairAction: rule.repairAction,
         };
       }
     } catch (_) {

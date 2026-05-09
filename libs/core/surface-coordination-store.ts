@@ -13,9 +13,9 @@ import type {
 } from './channel-surface-types.js';
 
 function surfaceCoordinationRole(surface: SurfaceAsyncChannel): GovernedArtifactRole {
+  if (surface === 'slack') return 'slack_bridge';
   if (surface === 'chronos') return 'chronos_gateway';
-  if (surface === 'presence') return 'surface_runtime';
-  return 'slack_bridge';
+  return 'surface_runtime';
 }
 
 function asyncRequestLogicalPath(surface: SurfaceAsyncChannel, requestId: string): string {
@@ -32,7 +32,7 @@ function surfaceNotificationLogicalPath(surface: SurfaceAsyncChannel, notificati
   return `active/shared/coordination/channels/${surface}/notifications/${notificationId}.json`;
 }
 
-function surfaceOutboxLogicalPath(surface: 'slack' | 'chronos', messageId: string): string {
+function surfaceOutboxLogicalPath(surface: SurfaceAsyncChannel, messageId: string): string {
   return `active/shared/coordination/channels/${surface}/outbox/${messageId}.json`;
 }
 
@@ -148,7 +148,7 @@ export function listSurfaceNotifications(surface: SurfaceAsyncChannel): SurfaceN
 }
 
 export function enqueueSurfaceOutboxMessage(params: {
-  surface: 'slack' | 'chronos';
+  surface: SurfaceAsyncChannel;
   correlationId: string;
   channel: string;
   threadTs: string;
@@ -169,7 +169,7 @@ export function enqueueSurfaceOutboxMessage(params: {
   return writeJsonAs(surfaceCoordinationRole(params.surface), surfaceOutboxLogicalPath(params.surface, record.message_id), record);
 }
 
-export function listSurfaceOutboxMessages(surface: 'slack' | 'chronos'): SurfaceOutboxMessage[] {
+export function listSurfaceOutboxMessages(surface: SurfaceAsyncChannel): SurfaceOutboxMessage[] {
   const dir = pathResolver.resolve(`active/shared/coordination/channels/${surface}/outbox`);
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
@@ -178,7 +178,7 @@ export function listSurfaceOutboxMessages(surface: 'slack' | 'chronos'): Surface
     .map((name) => JSON.parse(safeReadFile(path.join(dir, name), { encoding: 'utf8' }) as string) as SurfaceOutboxMessage);
 }
 
-export function clearSurfaceOutboxMessage(surface: 'slack' | 'chronos', messageId: string): void {
+export function clearSurfaceOutboxMessage(surface: SurfaceAsyncChannel, messageId: string): void {
   const resolved = pathResolver.resolve(surfaceOutboxLogicalPath(surface, messageId));
   if (!safeExistsSync(resolved)) return;
   safeRmSync(resolved, { force: true });

@@ -21,13 +21,16 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 describe('surface-provider-policy', () => {
   it('loads all provider manifest records from governed knowledge', () => {
     const ids = listSurfaceProviderManifestRecords().map((entry) => entry.id).sort();
-    expect(ids).toEqual(['chronos', 'presence', 'slack']);
+    expect(ids).toEqual(['chronos', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
   });
 
   it('derives delegation receivers per provider policy', () => {
     expect(deriveSurfaceDelegationReceiverForProvider('slack', 'ミッション一覧を教えて')).toBe('chronos-mirror');
     expect(deriveSurfaceDelegationReceiverForProvider('presence', 'システム状態を教えて')).toBe('chronos-mirror');
+    expect(deriveSurfaceDelegationReceiverForProvider('imessage', '設計をレビューして')).toBe('nerve-agent');
     expect(deriveSurfaceDelegationReceiverForProvider('chronos', '設計をレビューして')).toBe('nerve-agent');
+    expect(deriveSurfaceDelegationReceiverForProvider('discord', '設計をレビューして')).toBe('nerve-agent');
+    expect(deriveSurfaceDelegationReceiverForProvider('telegram', '設計をレビューして')).toBe('nerve-agent');
   });
 
   it('loads slack-specific intent and execution rules from provider policy', () => {
@@ -96,6 +99,9 @@ describe('surface-provider-policy', () => {
 
     expect(receiver).toBe('nerve-agent');
     expect(getSurfaceProviderManifestRecord('slack').displayName).toBe('Slack');
+    expect(getSurfaceProviderManifestRecord('imessage').displayName).toBe('iMessage');
+    expect(getSurfaceProviderManifestRecord('discord').displayName).toBe('Discord');
+    expect(getSurfaceProviderManifestRecord('telegram').displayName).toBe('Telegram');
   });
 
   it('keeps prompt-mode compiled flows on the direct reply path', () => {

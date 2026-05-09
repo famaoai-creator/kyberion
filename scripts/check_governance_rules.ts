@@ -1,5 +1,6 @@
 import * as AjvModule from 'ajv';
-import { pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
+import * as path from 'node:path';
+import { loadActuatorManifestCatalog, pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import { fileURLToPath } from 'node:url';
 
@@ -74,6 +75,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     id: 'surface-provider-manifests',
     schemaPath: 'knowledge/public/schemas/surface-provider-manifests.schema.json',
     dataPath: 'knowledge/public/governance/surface-provider-manifests.json',
+  },
+  {
+    id: 'surface-provider-manifest-catalog',
+    schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/surface-provider-manifest-catalog.json',
   },
   {
     id: 'model-registry',
@@ -192,6 +198,515 @@ export function findDeterministicCatalogViolations(): string[] {
 
 function readJson<T>(relativePath: string): T {
   return readJsonFile<T>(pathResolver.rootResolve(relativePath));
+}
+
+function validateAgentProfileDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/orchestration/agent-profiles');
+  if (!safeExistsSync(directory)) {
+    violations.push('agent-profile-index: knowledge/public/orchestration/agent-profiles directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('agent-profile-index: knowledge/public/orchestration/agent-profiles directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/agent-profile-index.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ agents?: Record<string, unknown> }>('knowledge/public/orchestration/agent-profile-index.json');
+  const snapshotAgents = snapshot.agents || {};
+  const seenAgentIds = new Set<string>();
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/orchestration/agent-profiles/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`agent-profile-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const agentIds = Object.keys((data.agents as Record<string, unknown>) || {});
+    if (agentIds.length !== 1) {
+      violations.push(`agent-profile-index/${file}: must contain exactly one agent profile`);
+      continue;
+    }
+
+    const agentId = agentIds[0];
+    if (file.replace(/\.json$/i, '') !== agentId) {
+      violations.push(`agent-profile-index/${file}: file name must match agent id ${agentId}`);
+    }
+
+    if (!(agentId in snapshotAgents)) {
+      violations.push(`agent-profile-index/${file}: snapshot is missing agent ${agentId}`);
+    } else if (JSON.stringify((data.agents as Record<string, unknown>)[agentId]) !== JSON.stringify(snapshotAgents[agentId])) {
+      violations.push(`agent-profile-index/${file}: directory entry does not match snapshot`);
+    }
+
+    seenAgentIds.add(agentId);
+  }
+
+  const snapshotIds = Object.keys(snapshotAgents).sort();
+  const directoryIds = [...seenAgentIds].sort();
+  if (JSON.stringify(snapshotIds) !== JSON.stringify(directoryIds)) {
+    violations.push('agent-profile-index: snapshot and canonical directory agent ids diverge');
+  }
+}
+
+function validateVoiceProfileDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/governance/voice-profiles');
+  if (!safeExistsSync(directory)) {
+    violations.push('voice-profile-registry: knowledge/public/governance/voice-profiles directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('voice-profile-registry: knowledge/public/governance/voice-profiles directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/voice-profile-registry.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ default_profile_id?: string; profiles?: Array<{ profile_id?: string }> }>(
+    'knowledge/public/governance/voice-profile-registry.json',
+  );
+  const snapshotProfiles = snapshot.profiles || [];
+  const snapshotIds = new Set(snapshotProfiles.map((profile) => String(profile.profile_id || '')));
+  const directoryIds: string[] = [];
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/governance/voice-profiles/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`voice-profile-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const typed = data as { profiles?: Array<{ profile_id?: string }> };
+    const profileIds = (typed.profiles || []).map((profile) => String(profile.profile_id || '')).filter(Boolean);
+    if (profileIds.length !== 1) {
+      violations.push(`voice-profile-registry/${file}: must contain exactly one profile`);
+      continue;
+    }
+    const profileId = profileIds[0];
+    if (file.replace(/\.json$/i, '') !== profileId) {
+      violations.push(`voice-profile-registry/${file}: file name must match profile id ${profileId}`);
+    }
+    if (!snapshotIds.has(profileId)) {
+      violations.push(`voice-profile-registry/${file}: snapshot is missing profile ${profileId}`);
+    }
+    directoryIds.push(profileId);
+  }
+
+  const sortedDirectoryIds = directoryIds.sort();
+  const sortedSnapshotIds = [...snapshotIds].sort();
+  if (JSON.stringify(sortedDirectoryIds) !== JSON.stringify(sortedSnapshotIds)) {
+    violations.push('voice-profile-registry: snapshot and canonical directory profile ids diverge');
+  }
+
+  if (String(snapshot.default_profile_id || '') && !snapshotIds.has(String(snapshot.default_profile_id || ''))) {
+    violations.push('voice-profile-registry: default_profile_id must reference a profile in the canonical directory');
+  }
+}
+
+function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/governance/authority-roles');
+  if (!safeExistsSync(directory)) {
+    violations.push('authority-role-index: knowledge/public/governance/authority-roles directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('authority-role-index: knowledge/public/governance/authority-roles directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/authority-role.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ authority_roles?: Record<string, unknown> }>(
+    'knowledge/public/governance/authority-role-index.json',
+  );
+  const snapshotRoles = snapshot.authority_roles || {};
+  const seenRoleIds = new Set<string>();
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/governance/authority-roles/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`authority-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const role = String((data as { role?: string }).role || '');
+    if (!role) {
+      violations.push(`authority-role-index/${file}: role must not be empty`);
+      continue;
+    }
+    if (file.replace(/\.json$/i, '') !== role) {
+      violations.push(`authority-role-index/${file}: file name must match role id ${role}`);
+    }
+
+    const snapshotEntry = snapshotRoles[role];
+    if (!snapshotEntry) {
+      violations.push(`authority-role-index/${file}: snapshot is missing role ${role}`);
+    } else {
+      const { role: _role, ...dirRecord } = data as { role?: string; [key: string]: unknown };
+      if (JSON.stringify(dirRecord) !== JSON.stringify(snapshotEntry)) {
+        violations.push(`authority-role-index/${file}: directory entry does not match snapshot`);
+      }
+    }
+
+    seenRoleIds.add(role);
+  }
+
+  const snapshotIds = Object.keys(snapshotRoles).sort();
+  const directoryIds = [...seenRoleIds].sort();
+  if (JSON.stringify(snapshotIds) !== JSON.stringify(directoryIds)) {
+    violations.push('authority-role-index: snapshot and canonical directory role ids diverge');
+  }
+}
+
+function validateTeamRoleDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/orchestration/team-roles');
+  if (!safeExistsSync(directory)) {
+    violations.push('team-role-index: knowledge/public/orchestration/team-roles directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('team-role-index: knowledge/public/orchestration/team-roles directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/team-role.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ team_roles?: Record<string, unknown> }>('knowledge/public/orchestration/team-role-index.json');
+  const snapshotRoles = snapshot.team_roles || {};
+  const seenRoleIds = new Set<string>();
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/orchestration/team-roles/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`team-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const role = String((data as { role?: string }).role || '');
+    if (!role) {
+      violations.push(`team-role-index/${file}: role must not be empty`);
+      continue;
+    }
+    if (file.replace(/\.json$/i, '') !== role) {
+      violations.push(`team-role-index/${file}: file name must match role id ${role}`);
+    }
+
+    const snapshotEntry = snapshotRoles[role];
+    if (!snapshotEntry) {
+      violations.push(`team-role-index/${file}: snapshot is missing role ${role}`);
+    } else {
+      const { role: _role, ...dirRecord } = data as { role?: string; [key: string]: unknown };
+      if (JSON.stringify(dirRecord) !== JSON.stringify(snapshotEntry)) {
+        violations.push(`team-role-index/${file}: directory entry does not match snapshot`);
+      }
+    }
+
+    seenRoleIds.add(role);
+  }
+
+  const snapshotIds = Object.keys(snapshotRoles).sort();
+  const directoryIds = [...seenRoleIds].sort();
+  if (JSON.stringify(snapshotIds) !== JSON.stringify(directoryIds)) {
+    violations.push('team-role-index: snapshot and canonical directory role ids diverge');
+  }
+}
+
+function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifest-catalogs');
+  if (!safeExistsSync(directory)) {
+    violations.push('surface-provider-manifest-catalog: knowledge/public/governance/surface-provider-manifest-catalogs directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('surface-provider-manifest-catalog: knowledge/public/governance/surface-provider-manifest-catalogs directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ entries?: Array<{ id?: string }> }>('knowledge/public/governance/surface-provider-manifest-catalog.json');
+  const snapshotIds = new Set((snapshot.entries || []).map((entry) => String(entry.id || '')));
+  const directoryIds: string[] = [];
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/governance/surface-provider-manifest-catalogs/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`surface-provider-manifest-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const typed = data as { entries?: Array<{ id?: string }> };
+    const ids = (typed.entries || []).map((entry) => String(entry.id || '')).filter(Boolean);
+    if (ids.length !== 1) {
+      violations.push(`surface-provider-manifest-catalog/${file}: must contain exactly one entry`);
+      continue;
+    }
+    const id = ids[0];
+    if (file.replace(/\.json$/i, '') !== id) {
+      violations.push(`surface-provider-manifest-catalog/${file}: file name must match entry id ${id}`);
+    }
+    if (!snapshotIds.has(id)) {
+      violations.push(`surface-provider-manifest-catalog/${file}: snapshot is missing entry ${id}`);
+    }
+    directoryIds.push(id);
+  }
+
+  if (JSON.stringify(directoryIds.sort()) !== JSON.stringify([...snapshotIds].sort())) {
+    violations.push('surface-provider-manifest-catalog: snapshot and canonical directory entry ids diverge');
+  }
+}
+
+function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
+  if (!safeExistsSync(directory)) {
+    violations.push('service-endpoints: knowledge/public/orchestration/service-endpoints directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('service-endpoints: knowledge/public/orchestration/service-endpoints directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/service-endpoints.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ default_pattern?: string; services?: Record<string, unknown> }>('knowledge/public/orchestration/service-endpoints.json');
+  const snapshotIds = new Set(Object.keys(snapshot.services || {}).map((entry) => String(entry || '')));
+  const directoryIds: string[] = [];
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/orchestration/service-endpoints/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`service-endpoints/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const typed = data as { default_pattern?: string; services?: Record<string, unknown> };
+    const ids = Object.keys(typed.services || {}).filter(Boolean);
+    if (ids.length !== 1) {
+      violations.push(`service-endpoints/${file}: must contain exactly one service`);
+      continue;
+    }
+
+    const id = ids[0];
+    if (file.replace(/\.json$/i, '') !== id) {
+      violations.push(`service-endpoints/${file}: file name must match service id ${id}`);
+    }
+    if (typed.default_pattern !== snapshot.default_pattern) {
+      violations.push(`service-endpoints/${file}: default_pattern must match the snapshot`);
+    }
+    if (!snapshotIds.has(id)) {
+      violations.push(`service-endpoints/${file}: snapshot is missing service ${id}`);
+    }
+    directoryIds.push(id);
+  }
+
+  if (JSON.stringify(directoryIds.sort()) !== JSON.stringify([...snapshotIds].sort())) {
+    violations.push('service-endpoints: snapshot and canonical directory service ids diverge');
+  }
+}
+
+function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
+  if (!safeExistsSync(directory)) {
+    violations.push('specialist-catalog: knowledge/public/orchestration/specialists directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('specialist-catalog: knowledge/public/orchestration/specialists directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/specialist-catalog.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>('knowledge/public/orchestration/specialist-catalog.json');
+  const snapshotIds = new Set(Object.keys(snapshot.specialists || {}).map((entry) => String(entry || '')));
+  const directoryIds: string[] = [];
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/orchestration/specialists/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`specialist-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const typed = data as { version?: string; specialists?: Record<string, unknown> };
+    const ids = Object.keys(typed.specialists || {}).filter(Boolean);
+    if (ids.length !== 1) {
+      violations.push(`specialist-catalog/${file}: must contain exactly one specialist`);
+      continue;
+    }
+
+    const id = ids[0];
+    if (file.replace(/\.json$/i, '') !== id) {
+      violations.push(`specialist-catalog/${file}: file name must match specialist id ${id}`);
+    }
+    if (typed.version !== snapshot.version) {
+      violations.push(`specialist-catalog/${file}: version must match the snapshot`);
+    }
+    if (!snapshotIds.has(id)) {
+      violations.push(`specialist-catalog/${file}: snapshot is missing specialist ${id}`);
+    }
+    directoryIds.push(id);
+  }
+
+  if (JSON.stringify(directoryIds.sort()) !== JSON.stringify([...snapshotIds].sort())) {
+    violations.push('specialist-catalog: snapshot and canonical directory specialist ids diverge');
+  }
+}
+
+function validateVoiceEngineDirectoryConsistency(violations: string[]) {
+  const directory = pathResolver.rootResolve('knowledge/public/governance/voice-engines');
+  if (!safeExistsSync(directory)) {
+    violations.push('voice-engine-registry: knowledge/public/governance/voice-engines directory is missing');
+    return;
+  }
+
+  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    violations.push('voice-engine-registry: knowledge/public/governance/voice-engines directory is empty');
+    return;
+  }
+
+  const schemaPath = 'knowledge/public/schemas/voice-engine-registry.schema.json';
+  const schema = readJson<Record<string, unknown>>(schemaPath);
+  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ default_engine_id?: string; engines?: Array<{ engine_id?: string }> }>(
+    'knowledge/public/governance/voice-engine-registry.json',
+  );
+  const snapshotEngines = snapshot.engines || [];
+  const snapshotIds = new Set(snapshotEngines.map((engine) => String(engine.engine_id || '')));
+  const directoryIds: string[] = [];
+
+  for (const file of files) {
+    const relativePath = `knowledge/public/governance/voice-engines/${file}`;
+    const data = readJson<Record<string, unknown>>(relativePath);
+    const ok = validate(data);
+    if (!ok) {
+      for (const error of validate.errors || []) {
+        violations.push(`voice-engine-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      }
+    }
+
+    const typed = data as { engines?: Array<{ engine_id?: string }>; default_engine_id?: string };
+    const engineIds = (typed.engines || []).map((engine) => String(engine.engine_id || '')).filter(Boolean);
+    if (engineIds.length !== 1) {
+      violations.push(`voice-engine-registry/${file}: must contain exactly one engine`);
+      continue;
+    }
+    const engineId = engineIds[0];
+    if (file.replace(/\.json$/i, '') !== engineId) {
+      violations.push(`voice-engine-registry/${file}: file name must match engine id ${engineId}`);
+    }
+    if (!snapshotIds.has(engineId)) {
+      violations.push(`voice-engine-registry/${file}: snapshot is missing engine ${engineId}`);
+    }
+    directoryIds.push(engineId);
+  }
+
+  if (JSON.stringify(directoryIds.sort()) !== JSON.stringify([...snapshotIds].sort())) {
+    violations.push('voice-engine-registry: snapshot and canonical directory engine ids diverge');
+  }
+
+  if (String(snapshot.default_engine_id || '') && !snapshotIds.has(String(snapshot.default_engine_id || ''))) {
+    violations.push('voice-engine-registry: default_engine_id must reference an engine in the canonical directory');
+  }
+}
+
+function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
+  const catalog = loadActuatorManifestCatalog();
+  if (!catalog.length) {
+    violations.push('global_actuator_index: libs/actuators directory has no manifest-backed actuators');
+    return;
+  }
+
+  const snapshot = readJson<{
+    actuators?: Array<{
+      n?: string;
+      path?: string;
+      d?: string;
+      version?: string;
+      capability_count?: number;
+      contract_schema?: string;
+    }>;
+  }>('knowledge/public/orchestration/global_actuator_index.json');
+  const snapshotById = new Map((snapshot.actuators || []).map((entry) => [String(entry.n || ''), entry]));
+  const catalogById = new Map(catalog.map((entry) => [entry.n, entry]));
+
+  for (const entry of catalog) {
+    if (path.basename(entry.path) !== entry.n) {
+      violations.push(`global_actuator_index/${entry.n}: directory name mismatch (${path.basename(entry.path)} !== ${entry.n})`);
+    }
+    const snapshotEntry = snapshotById.get(entry.n);
+    if (!snapshotEntry) {
+      violations.push(`global_actuator_index: snapshot missing actuator ${entry.n}`);
+      continue;
+    }
+    if (snapshotEntry.path !== entry.path) {
+      violations.push(`global_actuator_index/${entry.n}: path mismatch (${snapshotEntry.path} !== ${entry.path})`);
+    }
+    if (snapshotEntry.d !== entry.d) {
+      violations.push(`global_actuator_index/${entry.n}: description mismatch`);
+    }
+    if (snapshotEntry.version !== entry.version) {
+      violations.push(`global_actuator_index/${entry.n}: version mismatch`);
+    }
+    if (snapshotEntry.capability_count !== entry.capability_count) {
+      violations.push(`global_actuator_index/${entry.n}: capability_count mismatch`);
+    }
+    if ((snapshotEntry.contract_schema || '') !== (entry.contract_schema || '')) {
+      violations.push(`global_actuator_index/${entry.n}: contract_schema mismatch`);
+    }
+  }
+
+  for (const entry of snapshot.actuators || []) {
+    if (!catalogById.has(String(entry.n || ''))) {
+      violations.push(`global_actuator_index: snapshot includes unknown actuator ${String(entry.n || '')}`);
+    }
+  }
 }
 
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
@@ -426,6 +941,25 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
   }
 
+  if (check.id === 'surface-provider-manifest-catalog') {
+    validateSurfaceProviderCatalogDirectoryConsistency(violations);
+  }
+
+  if (check.id === 'service-endpoints') {
+    validateServiceEndpointsDirectoryConsistency(violations);
+  }
+
+  if (check.id === 'voice-engine-registry') {
+    validateVoiceEngineDirectoryConsistency(violations);
+  }
+
+  if (check.id === 'specialist-catalog') {
+    validateSpecialistCatalogDirectoryConsistency(violations);
+  }
+
+  if (check.id === 'agent-profile-index') {
+    validateAgentProfileDirectoryConsistency(violations);
+  }
   if (check.id === 'standard-intents') {
     const typed = data as {
       intents?: Array<{
@@ -490,6 +1024,38 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
     if (!(typed.surfaces || []).some((surface) => surface.enabled !== false)) {
       violations.push('active-surfaces: at least one surface must be enabled');
+    }
+    const surfacesDir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
+    if (safeExistsSync(surfacesDir)) {
+      const directorySurfaces: Array<{ id?: string; enabled?: boolean }> = [];
+      for (const entry of safeReaddir(surfacesDir).filter((name) => name.endsWith('.json')).sort()) {
+        const surfaceManifest = readJson<{ version?: number; surfaces?: Array<{ id?: string; enabled?: boolean }> }>(path.join('knowledge/public/governance/surfaces', entry));
+        if (!validate(surfaceManifest)) {
+          for (const error of validate.errors || []) {
+            violations.push(`active-surfaces:${entry}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+          }
+        }
+        if (!(surfaceManifest.surfaces || []).length) {
+          violations.push(`active-surfaces:${entry}: surfaces must not be empty`);
+          continue;
+        }
+        if ((surfaceManifest.surfaces || []).length !== 1) {
+          violations.push(`active-surfaces:${entry}: surface manifest files must contain exactly one surface`);
+          continue;
+        }
+        const surface = surfaceManifest.surfaces[0];
+        const expectedId = entry.replace(/\.json$/i, '');
+        if (String(surface.id || '') !== expectedId) {
+          violations.push(`active-surfaces:${entry}: surface id must match file name (${expectedId})`);
+        }
+        directorySurfaces.push(surface);
+      }
+      const sortById = (items: Array<{ id?: string }>) => [...items].sort((left, right) => String(left.id || '').localeCompare(String(right.id || '')));
+      const snapshotIds = JSON.stringify(sortById(typed.surfaces || []));
+      const directoryIds = JSON.stringify(sortById(directorySurfaces));
+      if (snapshotIds !== directoryIds) {
+        violations.push('active-surfaces: compatibility snapshot must match knowledge/public/governance/surfaces/*.json');
+      }
     }
   }
 
@@ -792,6 +1358,22 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push(`voice-profile-registry: ${profileId} references unknown default_engine_id (${engineId})`);
       }
     }
+    validateVoiceProfileDirectoryConsistency(violations);
+  }
+
+  if (check.id === 'authority-role-index') {
+    const typed = data as {
+      authority_roles?: Record<string, unknown>;
+    };
+    if (!Object.keys(typed.authority_roles || {}).length) {
+      violations.push('authority-role-index: authority_roles must not be empty');
+      return;
+    }
+    validateAuthorityRoleDirectoryConsistency(violations);
+  }
+
+  if (check.id === 'team-role-index') {
+    validateTeamRoleDirectoryConsistency(violations);
   }
 
   if (check.id === 'voice-runtime-policy') {
@@ -1015,6 +1597,7 @@ export function main() {
   for (const check of CHECKS) {
     validateRuleFile(check, violations);
   }
+  validateActuatorCatalogDirectoryConsistency(violations);
   for (const deterministicCatalog of findDeterministicCatalogViolations()) {
     violations.push(
       `governance-catalog: deterministic catalog must be removed or migrated (${deterministicCatalog})`

@@ -1,0 +1,38 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          days-before-stale: 90
+          days-before-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          stale-issue-message: >
+            This issue has been inactive for 90 days and is marked stale.
+            Please comment if the issue is still relevant.
+          stale-pr-message: >
+            This pull request has been inactive for 30 days and is marked stale.
+            Please comment if you still want it to move forward.
+          close-issue-message: >
+            Closing stale issue. Feel free to reopen if this is still relevant.
+          close-pr-message: >
+            Closing stale pull request due to inactivity. Feel free to reopen.
+          exempt-issue-labels: good-first-issue, security, needs-triage
+          exempt-pr-labels: security, needs-triage
+          days-before-pr-stale: 30
+          days-before-issue-stale: 90
+          days-before-pr-close: 14
+          days-before-issue-close: 14

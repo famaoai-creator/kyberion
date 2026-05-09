@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "smoke-test": {
+      "base_url": "https://postman-echo.com",
+      "preset_path": "knowledge/public/orchestration/service-presets/smoke-test.json"
+    }
+  }
+}
