@@ -768,7 +768,7 @@ Mission Input Contract:
     --tenant-id <TENANT>
     --tenant-slug <slug>           # multi-tenant isolation (^[a-z][a-z0-9-]{1,30}$)
     --mission-type <TYPE>
-    --vision-ref <REF>
+    --vision-ref <REF>            Defaults to the active customer vision when KYBERION_CUSTOMER is set
     --persona <NAME>
     --dry-run
     --relationships <JSON>
