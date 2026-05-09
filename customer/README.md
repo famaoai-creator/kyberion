@@ -46,6 +46,7 @@ export KYBERION_CUSTOMER=acme-corp
 
 # 3b. Confirm what customer overlays exist in this checkout
 pnpm customer:list
+# Shows active overlays and whether the required customer.json / identity.json / vision.md files are present.
 
 # Optional: migrate your existing personal setup into this customer overlay
 pnpm customer:migrate-from-personal acme-corp
