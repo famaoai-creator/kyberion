@@ -316,7 +316,7 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  npm run cli -- run file-actuator -- --help');
   console.log('');
   console.log('Useful first-run commands:');
-  console.log('  pnpm onboard         Configure sovereign identity');
+  console.log('  pnpm onboard         Configure sovereign identity (customer/{slug}/ preferred when KYBERION_CUSTOMER is set)');
   console.log('  pnpm capabilities    Check which actuator capabilities fit this environment');
   console.log('  pnpm mission:journal Inspect mission history');
   console.log('');
