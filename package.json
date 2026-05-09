@@ -107,6 +107,7 @@
     "customer:create": "pnpm tsx scripts/customer_create.ts",
     "customer:list": "pnpm tsx scripts/customer_list.ts",
     "customer:migrate-from-personal": "pnpm tsx scripts/customer_migrate_from_personal.ts",
+    "customer:switch": "pnpm tsx scripts/customer_switch.ts",
     "slack:bridge": "node dist/satellites/slack-bridge/src/index.js",
     "chronos:dev": "pnpm --filter @presence/chronos-mirror-v2 dev",
     "chronos:lint": "pnpm --dir presence/displays/chronos-mirror-v2 lint",

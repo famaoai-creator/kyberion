@@ -16,12 +16,15 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain('pnpm customer:create <slug>');
     expect(doc).toContain('[x] CLI: `pnpm customer:create <slug>`');
     expect(doc).toContain('[x] CLI: `pnpm customer:list`');
+    expect(doc).toContain('[x] CLI: `pnpm customer:switch <slug>`');
     expect(doc).toContain('[x] Migration helper: `pnpm customer:migrate-from-personal`');
     expect(jp).toContain('[x] `pnpm customer:create`');
     expect(jp).toContain('[x] `customer:list`');
+    expect(jp).toContain('[x] `customer:switch`');
     expect(jp).toContain('[x] 移行ヘルパ');
     expect(customerReadme).toContain('pnpm customer:create acme-corp');
     expect(customerReadme).toContain('pnpm customer:list');
     expect(customerReadme).toContain('pnpm customer:migrate-from-personal acme-corp');
+    expect(customerReadme).toContain('pnpm customer:switch acme-corp');
   });
 });
