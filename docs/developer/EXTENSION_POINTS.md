@@ -115,7 +115,7 @@ See [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md).
 - The `KYBERION_CUSTOMER` env var as the activation mechanism.
 - The slug pattern `^[a-z0-9][a-z0-9_-]*$`.
 - The resolver API (`activeCustomer`, `customerRoot`, `resolveOverlay`, `overlayCandidates`).
-- Resolution order: customer overlay → personal fallback.
+- Resolution order: customer overlay → legacy personal fallback.
 
 ### 2.7 Trace Format — **Beta** (will be lifted to v1 after Phase B-1)
 
