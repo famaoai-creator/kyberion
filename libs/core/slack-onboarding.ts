@@ -2,6 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
+import { customerResolver } from './customer-resolver.js';
 
 import type {
   OnboardingField,
@@ -12,6 +13,10 @@ import type {
 } from './channel-surface-types.js';
 
 const TEXT_MODAL_FIELDS: OnboardingField[] = ['name', 'primary_domain', 'vision'];
+
+function profileRoot(): string {
+  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+}
 
 function writeJsonAs(logicalPath: string, record: unknown): string {
   return writeGovernedArtifactJson('slack_bridge', logicalPath, record);
@@ -55,9 +60,10 @@ function currentOnboardingField(state: OnboardingState | null): OnboardingField 
 }
 
 export function isEnvironmentInitialized(): boolean {
-  return safeExistsSync(pathResolver.knowledge('personal/my-identity.json')) &&
-    safeExistsSync(pathResolver.knowledge('personal/my-vision.md')) &&
-    safeExistsSync(pathResolver.knowledge('personal/agent-identity.json'));
+  const root = profileRoot();
+  return safeExistsSync(path.join(root, 'my-identity.json')) &&
+    safeExistsSync(path.join(root, 'my-vision.md')) &&
+    safeExistsSync(path.join(root, 'agent-identity.json'));
 }
 
 function loadOnboardingState(channel: string, threadTs: string): OnboardingState | null {
@@ -169,10 +175,11 @@ function persistOnboardingIdentity(state: OnboardingState): void {
   const agentId = (state.answers.agent_id || 'KYBERION-PRIME').trim().toUpperCase();
   const now = new Date().toISOString();
   withExecutionContext('sovereign_concierge', () => {
-    safeMkdir(pathResolver.knowledge('personal'), { recursive: true });
-    safeWriteFile(pathResolver.knowledge('personal/my-identity.json'), JSON.stringify({ name, language, interaction_style: interactionStyle, primary_domain: primaryDomain, created_at: now, status: 'active', version: '1.0.0' }, null, 2));
-    safeWriteFile(pathResolver.knowledge('personal/my-vision.md'), `# Sovereign Vision\n\n${vision}\n`);
-    safeWriteFile(pathResolver.knowledge('personal/agent-identity.json'), JSON.stringify({ agent_id: agentId, version: '1.0.0', role: 'Ecosystem Architect / Senior Partner', owner: name, trust_tier: 'sovereign', created_at: now, description: `The primary autonomous entity of the Kyberion Ecosystem for ${name}.` }, null, 2));
+    const root = profileRoot();
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(path.join(root, 'my-identity.json'), JSON.stringify({ name, language, interaction_style: interactionStyle, primary_domain: primaryDomain, created_at: now, status: 'active', version: '1.0.0' }, null, 2));
+    safeWriteFile(path.join(root, 'my-vision.md'), `# Sovereign Vision\n\n${vision}\n`);
+    safeWriteFile(path.join(root, 'agent-identity.json'), JSON.stringify({ agent_id: agentId, version: '1.0.0', role: 'Ecosystem Architect / Senior Partner', owner: name, trust_tier: 'sovereign', created_at: now, description: `The primary autonomous entity of the Kyberion Ecosystem for ${name}.` }, null, 2));
   });
 }
 

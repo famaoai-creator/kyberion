@@ -24,11 +24,15 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain('[x] Voice profile registry consumer (`libs/core/voice-profile-registry.ts`)');
     expect(doc).toContain('[x] Vital check consumer (`scripts/vital_check.ts`)');
     expect(doc).toContain('[x] Baseline check consumer (`scripts/run_baseline_check.ts`)');
+    expect(doc).toContain('[x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)');
+    expect(doc).toContain('[x] Slack onboarding consumer (`libs/core/slack-onboarding.ts`)');
     expect(jp).toContain('[x] `pnpm customer:create`');
     expect(jp).toContain('[x] `customer:list`');
     expect(jp).toContain('[x] `customer:switch`');
     expect(jp).toContain('[x] 移行ヘルパ');
     expect(jp).toContain('[x] baseline check consumer (`scripts/run_baseline_check.ts`)');
+    expect(jp).toContain('[x] onboarding apply consumer (`scripts/onboarding_apply.ts`)');
+    expect(jp).toContain('[x] slack onboarding consumer (`libs/core/slack-onboarding.ts`)');
     expect(customerReadme).toContain('pnpm customer:create acme-corp');
     expect(customerReadme).toContain('pnpm customer:list');
     expect(customerReadme).toContain('pnpm customer:migrate-from-personal acme-corp');

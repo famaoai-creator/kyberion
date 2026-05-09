@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { safeReadFile } from '@agent/core';
 import { buildState, buildSummary, validateInput } from './onboarding_apply.js';
+
+const ROOT = process.cwd();
+
+function read(relPath: string): string {
+  return String(safeReadFile(path.join(ROOT, relPath), { encoding: 'utf8' }) || '');
+}
 
 const FIXTURE_INPUT = {
   identity: {
@@ -57,5 +65,16 @@ describe('onboarding_apply', () => {
     expect(state.status).toBe('complete');
     expect(state.tenants.entries).toHaveLength(1);
     expect(state.identity.agent_id).toBe('agent-001');
+  });
+
+  it('uses the active customer root for onboarding artifacts', () => {
+    const script = read('scripts/onboarding_apply.ts');
+    expect(script).toContain('customerResolver.customerRoot');
+    expect(script).toContain('function profileRoot()');
+    expect(script).toContain("path.join(profileDir, 'my-identity.json')");
+    expect(script).toContain("path.join(profileRoot(), 'tenants')");
+    expect(script).toContain("path.join(onboardingRoot(), 'tutorial-plan.md')");
+    expect(script).toContain('statePath()');
+    expect(script).toContain('summaryPath()');
   });
 });
