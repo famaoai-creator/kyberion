@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { 
   SovereignSentinel, 
   validateService, 
+  customerResolver,
   pathResolver, 
   safeExistsSync,
   safeReadFile,
@@ -50,6 +51,10 @@ function loadConnectionReadinessConfig(): {
   }
 }
 
+function profileRoot(): string {
+  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+}
+
 function checkServiceConnectionReadiness(): boolean {
   return withExecutionContext('mission_controller', () => {
     const endpointsPath = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints.json');
@@ -67,7 +72,7 @@ function checkServiceConnectionReadiness(): boolean {
       const presetPath = pathResolver.rootResolve(String(service.preset_path));
       if (!safeExistsSync(presetPath)) return false;
 
-      const connectionPath = pathResolver.rootResolve(`knowledge/personal/connections/${serviceId}.json`);
+      const connectionPath = path.join(profileRoot(), 'connections', `${serviceId}.json`);
       if (!safeExistsSync(connectionPath)) return false;
       const connection = JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
       const requiredAny = Array.isArray(rule?.required_keys_any) ? rule.required_keys_any : [];
@@ -113,7 +118,7 @@ async function main() {
 
   // L3: Identity Layer (Soul)
   sentinel.registerLayer('L3', async () => {
-    const identityPath = pathResolver.rootResolve('knowledge/personal/my-identity.json');
+    const identityPath = path.join(profileRoot(), 'my-identity.json');
     return safeExistsSync(identityPath);
   });
 
