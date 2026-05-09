@@ -91,7 +91,7 @@ Use when you want:
 
 ### Background Bridges
 
-Use `pnpm surfaces:setup` first when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. Then use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
+Use `pnpm prereq:check` first when you want to confirm the local toolchain needed to build and run Kyberion from source. Then use `pnpm surfaces:setup` when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. After that, use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
 
 Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs.
 
@@ -108,6 +108,14 @@ Typical managed entries include:
 - `chronos-mirror-v2`
 - `nexus-daemon`
 - `terminal-bridge`
+
+Typical service presets include:
+
+- `google-workspace`
+- `github`
+- `slack`
+- `notion`
+- `jira`
 
 Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
 

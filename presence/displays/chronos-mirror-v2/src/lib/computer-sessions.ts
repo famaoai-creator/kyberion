@@ -1,4 +1,10 @@
-import { pathResolver, ptyEngine, safeExistsSync, safeReadFile, safeReaddir } from "@agent/core";
+import {
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+} from "@agent/core/intelligence-primitives";
+import { ptyEngine } from "@agent/core/pty-engine";
 import path from "node:path";
 
 export interface ComputerSessionSummary {

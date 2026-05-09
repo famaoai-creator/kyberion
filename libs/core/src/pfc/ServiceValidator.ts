@@ -128,6 +128,9 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
     const presetRaw = safeReadFile(resolvedPresetPath, { encoding: 'utf8' }) as string;
     const preset = JSON.parse(presetRaw);
     const strategy = (preset.auth_strategy || 'none').toLowerCase();
+    const presetSetupHint = typeof preset.setup_hint === 'string' && preset.setup_hint.trim().length > 0
+      ? preset.setup_hint.trim()
+      : undefined;
     const endpoint = loadServiceEndpointsCatalog().services[serviceId];
     const suffixes = endpoint?.credential_suffixes || {};
     const requiredSecretNames = unique(
@@ -164,9 +167,9 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
         foundSecrets: [],
         missingSecrets: [],
         cliFallbacks,
-        setupHint: cliFallbacks.length > 0
+        setupHint: presetSetupHint || (cliFallbacks.length > 0
           ? `No secrets needed; CLI fallback available: ${cliFallbacks.join(', ')}`
-          : 'No secrets needed for this preset.',
+          : 'No secrets needed for this preset.'),
       };
     }
 
@@ -219,9 +222,9 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       foundSecrets,
       missingSecrets,
       cliFallbacks,
-      setupHint: requiredSecretNames.length > 0
+      setupHint: presetSetupHint || (requiredSecretNames.length > 0
         ? `Set one of: ${requiredSecretNames.join(', ')}`
-        : 'Add a service preset with either bearer/basic credentials or a CLI fallback.',
+        : 'Add a service preset with either bearer/basic credentials or a CLI fallback.'),
     };
   } catch (err: any) {
     return {

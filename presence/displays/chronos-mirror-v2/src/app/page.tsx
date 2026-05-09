@@ -1,6 +1,6 @@
 "use client";
 
-import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft, ChevronDown, ChevronRight } from "lucide-react";
+import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft, ChevronDown, ChevronRight, ClipboardCheck, CalendarClock } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { FocusedOperatorView } from "../components/FocusedOperatorView";
@@ -40,6 +40,30 @@ type StatusCard = {
 
 
 const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
+  {
+    title: "Prepare",
+    hint: "Check the local toolchain and readiness manifests before you start the operator flow.",
+    icon: ClipboardCheck,
+    accent: "from-emerald-400/16 via-emerald-300/8 to-transparent",
+    accentText: "text-emerald-200/85",
+    actions: [
+      { label: "Prereq Check", query: "chronos://quick-action/prereq-check", icon: "🧰", tone: "verify" },
+      { label: "Setup Report", query: "chronos://quick-action/setup-report", icon: "📑", tone: "verify" },
+      { label: "Doctor", query: "chronos://quick-action/doctor", icon: "🩺", tone: "verify" },
+      { label: "Surface Setup", query: "chronos://quick-action/surfaces-setup", icon: "🛰", tone: "verify" },
+    ],
+  },
+  {
+    title: "Schedule",
+    hint: "Run scheduled generation jobs or inspect the current schedule registry.",
+    icon: CalendarClock,
+    accent: "from-violet-400/16 via-violet-300/8 to-transparent",
+    accentText: "text-violet-200/85",
+    actions: [
+      { label: "Schedule Tick", query: "chronos://quick-action/schedule-tick", icon: "⏱", tone: "operate" },
+      { label: "Schedule List", query: "chronos://quick-action/schedule-list", icon: "🗂", tone: "observe" },
+    ],
+  },
   {
     title: "Observe",
     hint: "Open governed readouts before you intervene.",
@@ -89,6 +113,22 @@ const STATUS_CARDS: StatusCard[] = [
     icon: Shield,
     accent: "border-amber-200/16 bg-amber-300/8 text-amber-100",
     targetId: "mission-control-plane",
+  },
+  {
+    label: "Toolchain",
+    value: "Preflight",
+    detail: "Confirm local prerequisites and setup reports before you work from source.",
+    icon: ClipboardCheck,
+    accent: "border-emerald-200/16 bg-emerald-300/8 text-emerald-100",
+    targetId: "operator-quick-actions",
+  },
+  {
+    label: "Schedules",
+    value: "Registry",
+    detail: "Inspect and tick scheduled generation jobs from the operator console.",
+    icon: CalendarClock,
+    accent: "border-violet-200/16 bg-violet-300/8 text-violet-100",
+    targetId: "operator-quick-actions",
   },
   {
     label: "Runtime Governance",
@@ -215,7 +255,7 @@ export default function ChronosMirrorV2() {
         <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
           <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
             <div className="flex flex-col gap-6">
-              <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
+              <section id="operator-quick-actions" className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between">
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">{uxText("chronos_quick_actions", "Quick Actions", locale)}</div>
