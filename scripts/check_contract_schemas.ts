@@ -432,7 +432,7 @@ function createChecks(): ContractCheck[] {
           tutorial: {
             mode: 'simulate',
             summary: 'Demonstrate the initial Kyberion setup with a safe dry-run.',
-            plan_path: 'knowledge/personal/onboarding/tutorial-plan.md',
+            plan_path: 'customer/acme/onboarding/tutorial-plan.md',
           },
         },
       ],

@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
-import { customerResolver } from './customer-resolver.js';
+import { customerResolver } from '@agent/core';
 
 import type {
   OnboardingField,

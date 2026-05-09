@@ -57,7 +57,7 @@ describe('onboarding_apply', () => {
     const summary = buildSummary(FIXTURE_INPUT, tenantEntries, FIXTURE_INPUT.tutorial);
     const state = buildState(FIXTURE_INPUT, now, tenantEntries, {
       ...FIXTURE_INPUT.tutorial,
-      plan_path: 'knowledge/personal/onboarding/tutorial-plan.md',
+      plan_path: 'customer/acme/onboarding/tutorial-plan.md',
     });
 
     expect(summary).toContain('## Identity');
