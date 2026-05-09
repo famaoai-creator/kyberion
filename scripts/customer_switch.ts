@@ -12,6 +12,7 @@ import {
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 const CUSTOMER_ENV_PATH = pathResolver.shared('runtime/customer.env');
+const REQUIRED_FILES = ['customer.json', 'identity.json', 'vision.md'];
 
 export class InvalidCustomerSlugError extends Error {
   constructor(slug: string) {
@@ -33,6 +34,14 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
   const customerDir = path.join(pathResolver.rootDir(), 'customer', slug);
   if (!safeExistsSync(customerDir)) {
     throw new Error(`Customer overlay not found: ${path.relative(pathResolver.rootDir(), customerDir)}. Run pnpm customer:create first.`);
+  }
+
+  const missing = REQUIRED_FILES.filter((required) => {
+    const requiredPath = path.join(customerDir, required);
+    return !safeExistsSync(requiredPath);
+  });
+  if (missing.length > 0) {
+    throw new Error(`Customer overlay is not ready: ${path.relative(pathResolver.rootDir(), customerDir)} is missing ${missing.join(', ')}. Run pnpm customer:list to inspect readiness.`);
   }
 
   safeMkdir(path.dirname(CUSTOMER_ENV_PATH), { recursive: true });

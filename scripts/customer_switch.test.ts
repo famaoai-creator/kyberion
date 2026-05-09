@@ -39,6 +39,9 @@ describe('customer_switch', () => {
     const customerDir = path.join(tmpDir, 'customer', 'acme');
     const envPath = path.join(tmpDir, 'active', 'shared', 'runtime', 'customer.env');
     fs.mkdirSync(customerDir, { recursive: true });
+    fs.writeFileSync(path.join(customerDir, 'customer.json'), '{}');
+    fs.writeFileSync(path.join(customerDir, 'identity.json'), '{}');
+    fs.writeFileSync(path.join(customerDir, 'vision.md'), '# vision');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
     mocks.pathResolver.shared.mockImplementation((p = '') => path.join(tmpDir, 'active', 'shared', String(p).replace(/^\/+/, '')));
@@ -60,5 +63,18 @@ describe('customer_switch', () => {
     mocks.safeExistsSync.mockReturnValue(false);
     const mod = await import('./customer_switch.js');
     expect(() => mod.switchCustomer('acme')).toThrow('Customer overlay not found');
+  });
+
+  it('rejects incomplete customers with missing required files', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-switch-missing-'));
+    const customerDir = path.join(tmpDir, 'customer', 'acme');
+    fs.mkdirSync(customerDir, { recursive: true });
+    fs.writeFileSync(path.join(customerDir, 'customer.json'), '{}');
+
+    mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
+    mocks.safeExistsSync.mockImplementation((target: string) => fs.existsSync(target));
+
+    const mod = await import('./customer_switch.js');
+    expect(() => mod.switchCustomer('acme')).toThrow('Customer overlay is not ready');
   });
 });

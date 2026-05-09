@@ -55,6 +55,8 @@ pnpm customer:migrate-from-personal acme-corp
 pnpm customer:switch acme-corp
 source active/shared/runtime/customer.env
 
+# customer:switch requires customer.json / identity.json / vision.md to be present.
+
 # 4. Run Kyberion as usual
 pnpm onboard
 pnpm doctor
