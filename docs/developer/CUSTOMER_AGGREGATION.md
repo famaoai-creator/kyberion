@@ -172,3 +172,4 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
   - [x] Mission seeds consumer (`libs/core/mission-seed-registry.ts`)
   - [x] Voice profile registry consumer (`libs/core/voice-profile-registry.ts`)
   - [x] Vital check consumer (`scripts/vital_check.ts`)
+  - [x] Baseline check consumer (`scripts/run_baseline_check.ts`)
