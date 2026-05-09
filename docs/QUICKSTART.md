@@ -26,7 +26,7 @@ git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
 pnpm build
-pnpm onboard
+pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
 pnpm surfaces:reconcile
 ```
 
