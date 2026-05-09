@@ -39,7 +39,7 @@ If you're authoring an actuator or a vertical template:
 
 | Need | Doc |
 |---|---|
-| New actuator | [`EXTENSION_POINTS.md` §2.1](./EXTENSION_POINTS.md) (TODO: full plugin authoring guide is Phase C'-5) |
+| New actuator / plugin | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md) |
 | New vertical template | [`templates/verticals/README.md`](../../templates/verticals/README.md) |
 | Adding Trace to an existing actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md) |
 | Customer-specific config | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) |

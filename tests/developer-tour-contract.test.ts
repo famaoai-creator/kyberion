@@ -23,9 +23,12 @@ describe('Developer tour contract', () => {
 
   it('keeps extension points aligned with the supported CLI and meeting helper boundary', () => {
     const ext = read('docs/developer/EXTENSION_POINTS.md');
+    const readme = read('docs/developer/README.md');
     expect(ext).toContain('release:notes');
     expect(ext).toContain('libs/actuators/meeting-browser-driver/');
+    expect(ext).toContain('PLUGIN_AUTHORING.md');
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');
+    expect(readme).toContain('PLUGIN_AUTHORING.md');
   });
 });
