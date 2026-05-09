@@ -96,8 +96,11 @@ export function writeFocusedMissionId(missionFocusPath: string, missionId: strin
 export function checkPrerequisites(): void {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
 
-  const identityPath = customerResolver.customerRoot('my-identity.json') ?? pathResolver.knowledge('personal/my-identity.json');
-  if (!safeExistsSync(identityPath)) {
+  const profileRoot = customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+  const requiredFiles = ['my-identity.json', 'my-vision.md', 'agent-identity.json'].map((name) =>
+    path.join(profileRoot, name),
+  );
+  if (requiredFiles.some((filePath) => !safeExistsSync(filePath))) {
     throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
   }
 
