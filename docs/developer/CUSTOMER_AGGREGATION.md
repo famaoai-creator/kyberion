@@ -14,7 +14,7 @@ This document defines the contract. For day-to-day usage, see [`customer/README.
 
 ## 1. Problem
 
-Kyberion's previous configuration model assumed a single customerless fallback:
+Kyberion's previous configuration model assumed a legacy single-user fallback:
 
 - `knowledge/personal/` — legacy identity, vision, connections, tenants.
 - `knowledge/confidential/{project}/` — project-scoped governance.
