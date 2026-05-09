@@ -1,0 +1,89 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "kyberion-toolchain",
+  "version": "2026-05-10",
+  "description": "The local toolchain needed to build and test Kyberion from source: Node, pnpm, git, and the core TypeScript runner/test CLI helpers.",
+  "capabilities": [
+    {
+      "capability_id": "node-runtime",
+      "kind": "binary",
+      "description": "Node.js v22+ on PATH (the runtime Kyberion targets).",
+      "required_for": ["all-of-kyberion"],
+      "probe": { "kind": "command", "command": "node", "args": ["--version"] },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Install Node.js 22+ via your version manager: `nvm install 22 && nvm use 22` or `mise install node@22`.",
+        "docs_url": "https://nodejs.org/en/download"
+      }
+    },
+    {
+      "capability_id": "pnpm",
+      "kind": "binary",
+      "description": "pnpm package manager on PATH.",
+      "required_for": ["all-of-kyberion"],
+      "probe": { "kind": "command", "command": "pnpm", "args": ["--version"] },
+      "install": {
+        "operator_confirmed": true,
+        "command": "corepack",
+        "args": ["enable", "pnpm"],
+        "instruction": "Use Corepack (`corepack enable pnpm`) or `npm i -g pnpm`.",
+        "docs_url": "https://pnpm.io/installation",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "git",
+      "kind": "binary",
+      "description": "git on PATH.",
+      "required_for": ["all-of-kyberion"],
+      "probe": { "kind": "command", "command": "git", "args": ["--version"] },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "macOS: `brew install git`. Debian/Ubuntu: `apt-get install -y git`.",
+        "docs_url": "https://git-scm.com/downloads"
+      }
+    },
+    {
+      "capability_id": "typescript-cli",
+      "kind": "npm-package",
+      "description": "TypeScript compiler available through the workspace install.",
+      "required_for": ["source-workflow"],
+      "probe": { "kind": "command", "command": "pnpm", "args": ["exec", "tsc", "--version"] },
+      "install": {
+        "operator_confirmed": false,
+        "command": "pnpm",
+        "args": ["install"],
+        "instruction": "Install workspace dependencies so `pnpm exec tsc` resolves.",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "tsx-cli",
+      "kind": "npm-package",
+      "description": "tsx available for local script execution.",
+      "required_for": ["source-workflow"],
+      "probe": { "kind": "command", "command": "pnpm", "args": ["exec", "tsx", "--version"] },
+      "install": {
+        "operator_confirmed": false,
+        "command": "pnpm",
+        "args": ["install"],
+        "instruction": "Install workspace dependencies so `pnpm exec tsx` resolves.",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "vitest-cli",
+      "kind": "npm-package",
+      "description": "vitest available for local test execution.",
+      "required_for": ["source-workflow"],
+      "probe": { "kind": "command", "command": "pnpm", "args": ["exec", "vitest", "--version"] },
+      "install": {
+        "operator_confirmed": false,
+        "command": "pnpm",
+        "args": ["install"],
+        "instruction": "Install workspace dependencies so `pnpm exec vitest` resolves.",
+        "retry_after_install": true
+      }
+    }
+  ]
+}

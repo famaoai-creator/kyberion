@@ -35,6 +35,11 @@ describe('mission orchestration dashboard contract', () => {
 
     expect(page).toContain('MissionIntelligence');
     expect(page).toContain('Jump to section');
+    expect(page).toContain('Prereq Check');
+    expect(page).toContain('Setup Report');
+    expect(page).toContain('Schedule Tick');
+    expect(page).toContain('Schedule List');
+    expect(page).toContain('Toolchain');
     expect(page).toContain('mission-control-plane');
     expect(page).toContain('runtime-lease-doctor');
     expect(page).toContain('recent-surface-outbox');
@@ -154,8 +159,16 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('collectControlActionAvailability');
     expect(agentRoute).toContain('RUN_PIPELINE_PATTERN');
     expect(agentRoute).toContain('dist/scripts/run_pipeline.js');
+    expect(agentRoute).toContain('prereq-check');
+    expect(agentRoute).toContain('setup-report');
+    expect(agentRoute).toContain('schedule-tick');
+    expect(agentRoute).toContain('schedule-list');
+    expect(agentRoute).toContain('doctor');
+    expect(agentRoute).toContain('surfaces-setup');
+    expect(agentRoute).toContain('services-setup');
+    expect(agentRoute).toContain('reasoning-setup');
     expect(agentRoute).toContain('import("@agent/core/core")');
-    expect(route).toContain("from '@agent/core'");
+    expect(route).toContain("from '@agent/core/intelligence-primitives'");
     expect(route).toContain('emitMissionOrchestrationObservation');
   });
 

@@ -71,6 +71,7 @@ export function FirstRunBanner() {
           <span className="font-mono text-cyan-300">{agentId}</span>, but no agent runtime is live yet.
         </div>
         <ol className="mt-2 list-decimal pl-4 text-white/65 text-[11.5px] space-y-0.5">
+          <li>Run <span className="font-bold text-white/85">Prereq Check</span> and <span className="font-bold text-white/85">Setup Report</span> from the left rail.</li>
           <li>Open <span className="font-bold text-white/85">Agent Runtimes</span> (top-right) and Spawn First Agent.</li>
           <li>Run a Verify check (Vital Check / Diagnostics) to confirm the ecosystem is healthy.</li>
           <li>Promote the simulated Tutorial into a real Mission once you're ready.</li>

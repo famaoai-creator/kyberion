@@ -1,4 +1,9 @@
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from "@agent/core";
+import {
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+} from "@agent/core/intelligence-primitives";
 
 type BrowserSessionControlAction = "close_browser_session" | "restart_browser_session";
 

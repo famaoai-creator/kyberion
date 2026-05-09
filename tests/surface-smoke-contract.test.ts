@@ -13,11 +13,21 @@ describe('surface smoke contract', () => {
     expect(page).toContain('FirstRunBanner');
     expect(page).toContain('IdentityBadge');
     expect(page).toContain('Agent Runtimes');
+    expect(page).toContain('Prereq Check');
+    expect(page).toContain('Setup Report');
+    expect(page).toContain('Schedule Tick');
+    expect(page).toContain('Schedule List');
     expect(page).toContain('Vital Check');
     expect(page).toContain('Build & Test');
+    expect(page).toContain('chronos://quick-action/prereq-check');
+    expect(page).toContain('chronos://quick-action/setup-report');
+    expect(page).toContain('chronos://quick-action/schedule-tick');
+    expect(page).toContain('chronos://quick-action/schedule-list');
     expect(page).toContain('chronos://quick-action/vital-check');
     expect(banner).toContain('First Run');
     expect(banner).toContain('Open');
+    expect(banner).toContain('Prereq Check');
+    expect(banner).toContain('Setup Report');
     expect(banner).toContain('Vital Check');
   });
 
