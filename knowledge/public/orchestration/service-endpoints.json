@@ -16,6 +16,10 @@
       "base_url": "https://api.github.com",
       "preset_path": "knowledge/public/orchestration/service-presets/github.json"
     },
+    "google-workspace": {
+      "preset_path": "knowledge/public/orchestration/service-presets/google-workspace.json",
+      "allow_unsafe_cli": true
+    },
     "jira": {
       "base_url": "https://atlassian.net/rest/api/3",
       "preset_path": "knowledge/public/orchestration/service-presets/jira.json"

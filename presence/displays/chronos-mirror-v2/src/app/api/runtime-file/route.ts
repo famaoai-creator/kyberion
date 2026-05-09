@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { guardRequest, requireChronosAccess } from "../../../lib/api-guard";
-import { pathResolver, safeExistsSync, safeReadFile } from "@agent/core";
+import { pathResolver } from "@agent/core/path-resolver";
+import { safeExistsSync, safeReadFile } from "@agent/core/secure-io";
 
 function isAllowedRuntimeRefPath(logicalPath: string): boolean {
   const normalized = String(logicalPath || "").replace(/^\/+/, "");
