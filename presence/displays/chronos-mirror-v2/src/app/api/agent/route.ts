@@ -60,6 +60,7 @@ async function loadChronosCore() {
     getAgentManifest: agentManifest.getAgentManifest,
     loadAgentManifests: agentManifest.loadAgentManifests,
     safeExec: secureIo.safeExec,
+    safeExecResult: secureIo.safeExecResult,
     emitMissionOrchestrationObservation: orchestrationEvents.emitMissionOrchestrationObservation,
     enqueueMissionOrchestrationEvent: orchestrationEvents.enqueueMissionOrchestrationEvent,
     startMissionOrchestrationWorker: orchestrationEvents.startMissionOrchestrationWorker,
@@ -435,7 +436,162 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
 
   const readJson = (filePath: string) => JSON.parse(core.safeReadFile(filePath, { encoding: "utf8" }) as string);
 
+  const runCommandQuickAction = (title: string, command: string[], description: string) => {
+    const result = core.safeExecResult("pnpm", command, { cwd: PROJECT_ROOT, maxOutputMB: 4 });
+    const output = [result.stdout, result.stderr].map((part) => String(part || "").trim()).filter(Boolean).join("\n");
+    const ok = result.status === 0;
+    return {
+      status: ok ? "ok" : "warning",
+      response: l(
+        locale,
+        `${title} completed${ok ? "" : " with warnings"}.`,
+        `${title} が完了しました${ok ? "" : "（警告あり）"}。`,
+      ),
+      a2ui: [
+        {
+          type: "display:hero",
+          props: {
+            eyebrow: "Readiness",
+            title,
+            description,
+            status: ok ? "ready" : "attention",
+          },
+        },
+        {
+          type: "display:metrics-row",
+          props: {
+            metrics: [
+              { label: "exit", value: result.status ?? -1, trend: ok ? "flat" : "down" },
+              { label: "stdout", value: output ? output.split("\n").length : 0, trend: "flat" },
+              { label: "status", value: ok ? "ok" : "warning", trend: ok ? "flat" : "down" },
+            ],
+          },
+        },
+        {
+          type: "display:log",
+          props: {
+            title: `${title} Output`,
+            lines: output ? output.split("\n").slice(-30) : ["(no output)"],
+          },
+        },
+      ],
+      timestamp: new Date().toISOString(),
+    };
+  };
+
+  const runScheduleQuickAction = async (action: "list" | "tick") => {
+    try {
+      const { runGenerationScheduleAction } = await import("@agent/core/generation-scheduler");
+      const result = await runGenerationScheduleAction({ action });
+      const serialized = JSON.stringify(result, null, 2);
+      return {
+        status: "ok",
+        response: l(
+          locale,
+          `Schedule ${action} completed.`,
+          `schedule ${action} が完了しました。`,
+        ),
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Schedule",
+              title: action === "tick" ? "Schedule Tick" : "Schedule List",
+              description: action === "tick"
+                ? "Tick due generation schedules and submit any ready jobs."
+                : "Inspect the current generation schedule registry.",
+              status: action === "tick" ? "ticked" : "listed",
+            },
+          },
+          {
+            type: "display:log",
+            props: {
+              title: action === "tick" ? "Tick Result" : "Schedule Registry",
+              lines: serialized.split("\n"),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err: any) {
+      const message = String(err?.message || err || "schedule action failed");
+      return {
+        status: "warning",
+        response: l(
+          locale,
+          `Schedule ${action} failed.`,
+          `schedule ${action} に失敗しました。`,
+        ),
+        a2ui: [
+          {
+            type: "display:hero",
+            props: {
+              eyebrow: "Schedule",
+              title: action === "tick" ? "Schedule Tick" : "Schedule List",
+              description: "The schedule registry is reachable, but the action returned an error.",
+              status: "attention",
+            },
+          },
+          {
+            type: "display:log",
+            props: {
+              title: "Schedule Error",
+              lines: message.split("\n").slice(-20),
+            },
+          },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    }
+  };
+
   switch (action) {
+    case "prereq-check": {
+      return runCommandQuickAction(
+        "Kyberion Toolchain Preflight",
+        ["prereq:check"],
+        "Confirm the local Node, pnpm, git, and source-workflow tooling before you build from source.",
+      );
+    }
+    case "setup-report": {
+      return runCommandQuickAction(
+        "Kyberion Setup Report",
+        ["setup:report"],
+        "Inspect surfaces, services, reasoning, and doctor readiness together before you start work.",
+      );
+    }
+    case "doctor": {
+      return runCommandQuickAction(
+        "Kyberion Doctor",
+        ["run", "doctor"],
+        "Run the consolidated readiness check for must / should / nice signals.",
+      );
+    }
+    case "surfaces-setup": {
+      return runCommandQuickAction(
+        "Surface Setup",
+        ["surfaces:setup"],
+        "Inspect surface auth readiness and host-managed bridge prerequisites.",
+      );
+    }
+    case "services-setup": {
+      return runCommandQuickAction(
+        "Service Setup",
+        ["services:setup"],
+        "Inspect external service presets, auth strategies, and connection files.",
+      );
+    }
+    case "reasoning-setup": {
+      return runCommandQuickAction(
+        "Reasoning Setup",
+        ["reasoning:setup"],
+        "Inspect reasoning backend readiness before routing missions through a provider.",
+      );
+    }
+    case "schedule-tick":
+      return runScheduleQuickAction("tick");
+    case "schedule-list":
+      return runScheduleQuickAction("list");
     case "dashboard": {
       const missions = collectActiveMissions();
       const runtime = core.listAgentRuntimeSnapshots();

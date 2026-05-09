@@ -9,7 +9,9 @@ import {
   collectRecentEvents,
 } from "../../../../lib/intelligence-observations";
 import { getChronosAccessRoleOrThrow, guardRequest, roleToMissionRole } from "../../../../lib/api-guard";
-import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots, listApprovalRequests, loadSurfaceManifest, loadSurfaceState, normalizeSurfaceDefinition } from "@agent/core";
+import { listAgentRuntimeLeaseSummaries, listAgentRuntimeSnapshots } from "@agent/core/agent-runtime-supervisor";
+import { listApprovalRequests } from "@agent/core/approval-store";
+import { loadSurfaceManifest, loadSurfaceState, normalizeSurfaceDefinition } from "@agent/core/surface-runtime";
 
 export const runtime = "nodejs";
 

@@ -256,6 +256,10 @@ describe('Kyberion environment manifests load and self-describe', () => {
       contains: ['node-runtime', 'pnpm', 'git', 'repo-build'],
     },
     {
+      id: 'kyberion-toolchain',
+      contains: ['node-runtime', 'pnpm', 'git', 'typescript-cli', 'tsx-cli', 'vitest-cli'],
+    },
+    {
       id: 'reasoning-backend',
       contains: ['reasoning-backend.any-real'],
     },

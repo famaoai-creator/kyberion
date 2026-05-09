@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardRequest } from "../../../lib/api-guard";
-import { pathResolver, safeExistsSync, safeReadFile, withExecutionContext } from "@agent/core";
+import { pathResolver } from "@agent/core/path-resolver";
+import { safeExistsSync, safeReadFile } from "@agent/core/secure-io";
 
 export const runtime = "nodejs";
 
@@ -21,26 +22,22 @@ interface AgentIdentity {
 
 function readJson<T>(relPath: string): T | null {
   const full = pathResolver.knowledge(relPath);
-  return withExecutionContext("ecosystem_architect", () => {
-    if (!safeExistsSync(full)) return null;
-    try {
-      return JSON.parse(safeReadFile(full, { encoding: "utf8" }) as string) as T;
-    } catch {
-      return null;
-    }
-  });
+  if (!safeExistsSync(full)) return null;
+  try {
+    return JSON.parse(safeReadFile(full, { encoding: "utf8" }) as string) as T;
+  } catch {
+    return null;
+  }
 }
 
 function readText(relPath: string): string | null {
   const full = pathResolver.knowledge(relPath);
-  return withExecutionContext("ecosystem_architect", () => {
-    if (!safeExistsSync(full)) return null;
-    try {
-      return safeReadFile(full, { encoding: "utf8" }) as string;
-    } catch {
-      return null;
-    }
-  });
+  if (!safeExistsSync(full)) return null;
+  try {
+    return safeReadFile(full, { encoding: "utf8" }) as string;
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: NextRequest) {
