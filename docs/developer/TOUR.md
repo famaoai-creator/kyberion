@@ -79,6 +79,8 @@ Three-tier filesystem isolation for what an agent reads and writes:
 | Confidential | `knowledge/confidential/{project}/` (gitignored) | One project / org |
 | Public | `knowledge/public/` (committed) | Reusable, shared |
 
+When `KYBERION_CUSTOMER` is set, `customer/{slug}/` becomes the preferred overlay root for customer-specific identity, vision, connections, policy, voice, and onboarding state before falling back to `knowledge/personal/`.
+
 Enforced at the file-IO boundary by `secure-io.ts` + `tier-guard.ts`. There is no "trusted code" exception — everything goes through the boundary.
 
 Code: `libs/core/secure-io.ts`, `libs/core/tier-guard.ts`, `knowledge/`.

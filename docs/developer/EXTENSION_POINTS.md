@@ -174,7 +174,7 @@ For FDE / customer engagements:
 
 | Need | Use this | Avoid |
 |---|---|---|
-| Customer-specific identity / vision | `customer/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` |
+| Customer-specific identity / vision | `customer/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is set |
 | Customer-specific connections | `customer/{slug}/connections/` | Editing `knowledge/personal/connections/` directly when KYBERION_CUSTOMER is set |
 | Customer-specific policy override | `customer/{slug}/policy/` | Editing `knowledge/public/governance/` |
 | Customer-specific mission templates | `customer/{slug}/mission-seeds/` | Modifying core `pipelines/` |
