@@ -47,6 +47,9 @@ export KYBERION_CUSTOMER=acme-corp
 # 3b. Confirm what customer overlays exist in this checkout
 pnpm customer:list
 
+# Optional: migrate your existing personal setup into this customer overlay
+pnpm customer:migrate-from-personal acme-corp
+
 # 4. Run Kyberion as usual
 pnpm onboard
 pnpm doctor
