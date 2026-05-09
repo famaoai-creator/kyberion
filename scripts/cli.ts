@@ -7,6 +7,7 @@ import {
   safeWriteFile,
   safeReaddir,
   safeStat,
+  loadActuatorManifestCatalog,
 } from '@agent/core';
 import { assertValidMobileAppProfileIndex, assertValidWebAppProfileIndex } from '@agent/core/app-profiles';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
@@ -26,12 +27,6 @@ interface RawActuatorEntry {
   s?: string;
   status?: string;
   contract_schema?: string;
-}
-
-interface RawActuatorIndex {
-  s?: RawActuatorEntry[];
-  actuators?: RawActuatorEntry[];
-  skills?: RawActuatorEntry[];
 }
 
 interface ActuatorExampleRecord {
@@ -135,10 +130,6 @@ interface WebAppProfileIndexRecord {
 const rootDir = pathResolver.rootDir();
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
 const vocabularyPath = pathResolver.knowledge('public/orchestration/user-facing-vocabulary.json');
-const indexCandidates = [
-  pathResolver.knowledge('public/orchestration/global_actuator_index.json'),
-  pathResolver.knowledge('orchestration/global_actuator_index.json'),
-];
 
 type VocabularyCatalog = {
   default_locale: string;
@@ -183,16 +174,7 @@ function t(key: string, locale = resolveLocale()): string {
   return entry[locale] || entry[catalog?.default_locale || 'en'] || key;
 }
 
-export function resolveIndexPath(): string {
-  const resolved = indexCandidates.find(candidate => safeExistsSync(candidate));
-  if (!resolved) {
-    throw new Error(`Actuator index not found. Checked: ${indexCandidates.join(', ')}`);
-  }
-
-  return resolved;
-}
-
-export function normalizeActuators(index: RawActuatorIndex): ActuatorRecord[] {
+export function normalizeActuators(index: { s?: RawActuatorEntry[]; actuators?: RawActuatorEntry[]; skills?: RawActuatorEntry[] }): ActuatorRecord[] {
   const rawActuators = index.actuators || index.s || index.skills || [];
 
   return rawActuators
@@ -207,7 +189,13 @@ export function normalizeActuators(index: RawActuatorIndex): ActuatorRecord[] {
 }
 
 export function loadActuators(): ActuatorRecord[] {
-  return normalizeActuators(readJsonFile<RawActuatorIndex>(resolveIndexPath()));
+  return loadActuatorManifestCatalog().map((entry) => ({
+    name: entry.n,
+    path: entry.path,
+    description: entry.d,
+    status: entry.s,
+    contractSchema: entry.contract_schema,
+  }));
 }
 
 export function searchActuators(actuators: ActuatorRecord[], query: string): ActuatorRecord[] {
@@ -280,7 +268,7 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('');
   console.log('Commands:');
   console.log('  help                 Show this help');
-  console.log('  list [--check]       List available actuators in the global actuator index (--check: runtime capability detection)');
+  console.log('  list [--check]       List available actuators in the manifest-backed catalog (--check: runtime capability detection)');
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
   console.log('  examples <name>      List actuator-owned examples for a specific actuator');
@@ -327,7 +315,7 @@ function printActuatorList(actuators: ActuatorRecord[]) {
   printHeader();
 
   if (actuators.length === 0) {
-    console.log('No actuators were found in the actuator index.');
+    console.log('No actuators were found in the actuator catalog.');
     return;
   }
 

@@ -72,6 +72,11 @@
       "allow": [
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
+        "knowledge/public/governance/surfaces/",
+        "knowledge/public/governance/active-surfaces.json",
+        "active/shared/coordination/channels/imessage/",
+        "active/shared/coordination/channels/discord/",
+        "active/shared/coordination/channels/telegram/",
         "active/audit/"
       ]
     },

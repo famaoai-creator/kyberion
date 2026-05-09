@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "telegram-bridge",
+      "kind": "gateway",
+      "description": "Telegram ingress gateway and surface-agent host",
+      "command": "node",
+      "args": [
+        "dist/satellites/telegram-bridge/src/index.js"
+      ],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "surface_runtime"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3035,
+      "healthPath": "/health",
+      "enabled": true
+    }
+  ]
+}

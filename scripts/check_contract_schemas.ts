@@ -9,6 +9,8 @@ import {
   createOutcomeContract,
   createTaskSession,
   pathResolver,
+  safeExistsSync,
+  safeReaddir,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
@@ -17,6 +19,78 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readGovernanceJson(relativePath: string): unknown {
   return readJsonFile(pathResolver.rootResolve(relativePath));
+}
+
+function readSurfaceManifestPayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/governance/surfaces/${entry}`));
+}
+
+function readSurfaceProviderCatalogPayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifest-catalogs');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/governance/surface-provider-manifest-catalogs/${entry}`));
+}
+
+function readServiceEndpointPayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/service-endpoints/${entry}`));
+}
+
+function readAgentProfilePayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/orchestration/agent-profiles');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/agent-profiles/${entry}`));
+}
+
+function readVoiceProfilePayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/governance/voice-profiles');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/governance/voice-profiles/${entry}`));
+}
+
+function readSpecialistPayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/specialists/${entry}`));
+}
+
+function readAuthorityRolePayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/governance/authority-roles');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/governance/authority-roles/${entry}`));
+}
+
+function readTeamRolePayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/public/orchestration/team-roles');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/team-roles/${entry}`));
 }
 
 type ContractCheck = {
@@ -107,7 +181,10 @@ function createChecks(): ContractCheck[] {
     {
       id: 'active-surfaces',
       schemaPath: 'knowledge/public/schemas/runtime-surface-manifest.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/active-surfaces.json')],
+      validPayloads: [
+        ...readSurfaceManifestPayloads(),
+        readGovernanceJson('knowledge/public/governance/active-surfaces.json'),
+      ],
       invalidPayloads: [
         {
           version: 1,
@@ -217,6 +294,7 @@ function createChecks(): ContractCheck[] {
       schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
       validPayloads: [
         readGovernanceJson('knowledge/public/governance/voice-profile-registry.json'),
+        ...readVoiceProfilePayloads(),
       ],
       invalidPayloads: [
         {
@@ -303,6 +381,16 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'authority-role-directory',
+      schemaPath: 'knowledge/public/schemas/authority-role.schema.json',
+      validPayloads: readAuthorityRolePayloads(),
+      invalidPayloads: [
+        {
+          description: 'Missing role',
+        },
+      ],
+    },
+    {
       id: 'team-role-index',
       schemaPath: 'knowledge/public/schemas/team-role-index.schema.json',
       validPayloads: [readGovernanceJson('knowledge/public/orchestration/team-role-index.json')],
@@ -313,11 +401,31 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'team-role-directory',
+      schemaPath: 'knowledge/public/schemas/team-role.schema.json',
+      validPayloads: readTeamRolePayloads(),
+      invalidPayloads: [
+        {
+          description: 'Missing role',
+        },
+      ],
+    },
+    {
       id: 'agent-profile-index',
       schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
       validPayloads: [
         readGovernanceJson('knowledge/public/orchestration/agent-profile-index.json'),
       ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+        },
+      ],
+    },
+    {
+      id: 'agent-profile-directory',
+      schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
+      validPayloads: readAgentProfilePayloads(),
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -2425,11 +2533,39 @@ function createChecks(): ContractCheck[] {
             },
           },
         },
+        ...readServiceEndpointPayloads(),
       ],
       invalidPayloads: [
         {
           default_pattern: 'https://api.{service_id}.com/v1',
           services: {
+            broken: {},
+          },
+        },
+      ],
+    },
+    {
+      id: 'specialist-catalog',
+      schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
+      validPayloads: [
+        {
+          version: '1.0.0',
+          specialists: {
+            'document-specialist': {
+              label: 'Document Specialist',
+              description: 'Creates decks, reports, and structured workbook artifacts.',
+              conversation_agent: 'presence-surface-agent',
+              team_roles: ['planner', 'implementer', 'reviewer'],
+              capabilities: ['presentation_deck', 'report_document', 'workbook_wbs', 'artifact_generation'],
+            },
+          },
+        },
+        ...readSpecialistPayloads(),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          specialists: {
             broken: {},
           },
         },
@@ -2793,6 +2929,20 @@ function createChecks(): ContractCheck[] {
           providers: {
             slack: surfaceProviderManifests.providers.slack,
           },
+        },
+      ],
+    },
+    {
+      id: 'surface-provider-manifest-catalog',
+      schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/surface-provider-manifest-catalog.json'),
+        ...readSurfaceProviderCatalogPayloads(),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          entries: [{ id: 'slack', channel: 'slack' }],
         },
       ],
     },

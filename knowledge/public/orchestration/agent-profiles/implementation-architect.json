@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "implementation-architect": {
+      "authority_roles": [
+        "ecosystem_architect",
+        "software_developer"
+      ],
+      "team_roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "tester",
+        "experience_designer"
+      ],
+      "capabilities": [
+        "architecture",
+        "code",
+        "review",
+        "planning",
+        "a2a"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "preferred",
+      "fallback_providers": [
+        "claude",
+        "codex"
+      ]
+    }
+  }
+}

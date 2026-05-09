@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "presence",
+      "channel": "presence",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "shipped",
+      "summary": "Presence surface provider manifest and routing policy."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "harness-engineer": {
+      "label": "Harness Engineer",
+      "description": "Improves agent harnesses through benchmark-driven experiments, protected edit boundaries, and governed keep or discard decisions.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["owner", "planner", "implementer", "reviewer"],
+      "capabilities": ["harness_evolution", "benchmark_analysis", "experiment_ledger", "adapter_boundary_guard"]
+    }
+  }
+}

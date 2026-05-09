@@ -1,0 +1,29 @@
+{
+  "role": "tester",
+  "description": "Owns validation strategy and test execution planning.",
+  "required_capabilities": [
+    "testing",
+    "analysis",
+    "quality"
+  ],
+  "compatible_authority_roles": [
+    "software_developer",
+    "ecosystem_architect"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "planner",
+  "required_scope_classes": [
+    "codebase_core"
+  ],
+  "ownership_scope": "Owns test strategy, execution evidence, and regression confidence.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "implementation-architect"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

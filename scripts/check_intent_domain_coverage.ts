@@ -1,4 +1,4 @@
-import { pathResolver, safeReaddir } from '@agent/core';
+import { loadActuatorManifestCatalog, pathResolver, safeReaddir } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
 type StandardIntent = {
@@ -48,7 +48,6 @@ function main(): void {
   }>('knowledge/public/governance/mission-classification-policy.json');
   const workflowCatalog = readJson<{ templates: Array<{ id?: string }> }>('knowledge/public/governance/mission-workflow-catalog.json');
   const teamTemplates = readJson<{ templates: Record<string, unknown> }>('knowledge/public/orchestration/mission-team-templates.json');
-  const actuatorIndex = readJson<{ actuators: Array<{ n?: string }> }>('knowledge/public/orchestration/global_actuator_index.json');
   const outcomeCatalog = readJson<{ outcomes: Record<string, unknown> }>('knowledge/public/governance/outcome-catalog.json');
   const manifests = pathResolver.rootResolve('knowledge/public/governance/environment-manifests');
 
@@ -132,7 +131,7 @@ function main(): void {
   ]);
   const workflowIds = new Set((workflowCatalog.templates || []).map((template) => String(template.id || '')));
   const teamTemplateIds = new Set(Object.keys(teamTemplates.templates || {}));
-  const actuatorIds = new Set((actuatorIndex.actuators || []).map((actuator) => String(actuator.n || '')));
+  const actuatorIds = new Set(loadActuatorManifestCatalog().map((actuator) => String(actuator.n || '')));
   const outcomeIds = new Set(Object.keys(outcomeCatalog.outcomes || {}));
 
   for (const entry of ontology.intents || []) {

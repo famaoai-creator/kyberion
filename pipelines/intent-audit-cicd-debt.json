@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-cicd-debt",
+  "name": "Audit CI/CD Pipeline for Technical Debt Reduction",
+  "description": "Examines CI/CD configurations to find inefficiencies and maintenance burdens.",
+  "variables": {
+    "cicd_path": ".github/workflows/main.yml",
+    "output_path": "active/shared/tmp/audit-cicd-debt.json"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 Starting CI/CD Technical Debt Audit for {{cicd_path}}" }
+    },
+    {
+      "id": "audit-cicd-debt",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Evaluate the CI/CD pipeline configuration for technical debt. Look for redundant steps, slow stages that can be parallelized, and fragile deployment scripts.",
+        "context": ["{{cicd_path}}"],
+        "analysisType": "debt_audit",
+        "export_as": "audit_result"
+      }
+    },
+    {
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{audit_result}}",
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ CI/CD Audit complete. Results saved to {{output_path}}" }
+    }
+  ]
+}

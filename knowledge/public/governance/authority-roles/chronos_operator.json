@@ -1,0 +1,16 @@
+{
+  "role": "chronos_operator",
+  "description": "Chronos operator authority for read-only mission visibility and runtime observability.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [
+    "communication_surface"
+  ],
+  "allowed_actuators": [
+    "presence-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

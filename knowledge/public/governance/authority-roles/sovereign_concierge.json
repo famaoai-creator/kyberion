@@ -1,0 +1,26 @@
+{
+  "role": "sovereign_concierge",
+  "description": "Personal onboarding and identity synchronization authority.",
+  "default_persona": "sovereign",
+  "write_scopes": [
+    "knowledge/personal/",
+    "active/missions/",
+    "active/projects/onboarding/"
+  ],
+  "scope_classes": [
+    "knowledge_core",
+    "mission_state",
+    "project_delivery",
+    "communication_surface"
+  ],
+  "allowed_actuators": [
+    "artifact-actuator",
+    "approval-actuator",
+    "presence-actuator"
+  ],
+  "tier_access": [
+    "personal",
+    "confidential",
+    "public"
+  ]
+}

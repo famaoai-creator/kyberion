@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "oauth-callback-surface",
+      "kind": "service",
+      "description": "Loopback-only OAuth callback receiver that completes token exchange into Personal-tier connections.",
+      "command": "node",
+      "args": [
+        "dist/scripts/oauth_callback_surface.js"
+      ],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 8787,
+      "healthPath": "/health",
+      "enabled": true
+    }
+  ]
+}

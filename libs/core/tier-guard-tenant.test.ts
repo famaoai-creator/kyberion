@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 const ROOT = pathResolver.rootDir();
@@ -139,27 +140,25 @@ describe('tier-guard tenant scope (IP-1)', () => {
   });
 
   it('allows run_pipeline to persist traces and temp artifacts', () => {
-    delete process.env.KYBERION_TENANT;
-    delete process.env.KYBERION_PERSONA;
-    process.env.MISSION_ROLE = 'run_pipeline';
-
-    const traceTarget = path.join(ROOT, 'active/shared/logs/traces/traces-2026-05-08.jsonl');
+    process.env.KYBERION_CUSTOMER = 'story-demo';
+    const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/pipeline-step.json');
 
-    expect(validateWritePermission(traceTarget).allowed).toBe(true);
-    expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+    withExecutionContext('run_pipeline', () => {
+      expect(validateWritePermission(traceTarget).allowed).toBe(true);
+      expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+    }, 'unknown');
   });
 
   it('allows run_super_pipeline to write temporary dispatch artifacts', () => {
-    delete process.env.KYBERION_TENANT;
-    delete process.env.KYBERION_PERSONA;
-    process.env.MISSION_ROLE = 'run_super_pipeline';
-
-    const traceTarget = path.join(ROOT, 'active/shared/logs/traces/traces-2026-05-08.jsonl');
+    process.env.KYBERION_CUSTOMER = 'story-demo';
+    const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/super-pipeline.json');
 
-    expect(validateWritePermission(traceTarget).allowed).toBe(true);
-    expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+    withExecutionContext('run_super_pipeline', () => {
+      expect(validateWritePermission(traceTarget).allowed).toBe(true);
+      expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+    }, 'unknown');
   });
 
   it('legacy non-slug confidential paths are not tenant-scoped', () => {

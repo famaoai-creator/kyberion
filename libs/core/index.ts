@@ -601,6 +601,10 @@ export type {
   OpenAiCompatibleBackendAvailability,
 } from './openai-compatible-backend.js';
 export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
+export { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
+export type { GeminiCliIntentExtractorOptions } from './gemini-cli-intent-extractor.js';
+export { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
+export type { GeminiCliVoiceBridgeOptions } from './gemini-cli-voice-bridge.js';
 export type { CodexCliQueryOptions, RunCodexCliQueryParams } from './codex-cli-query.js';
 export { ClaudeAgentReasoningBackend } from './claude-agent-reasoning-backend.js';
 export type { ClaudeAgentReasoningBackendOptions } from './claude-agent-reasoning-backend.js';
@@ -608,6 +612,12 @@ export { ClaudeAgentIntentExtractor } from './claude-agent-intent-extractor.js';
 export type { ClaudeAgentIntentExtractorOptions } from './claude-agent-intent-extractor.js';
 export { ClaudeAgentVoiceBridge } from './claude-agent-voice-bridge.js';
 export type { ClaudeAgentVoiceBridgeOptions } from './claude-agent-voice-bridge.js';
+export { ClaudeCliBackend } from './claude-cli-backend.js';
+export type { ClaudeCliBackendOptions } from './claude-cli-backend.js';
+export { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
+export type { ClaudeCliIntentExtractorOptions } from './claude-cli-intent-extractor.js';
+export { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
+export type { ClaudeCliVoiceBridgeOptions } from './claude-cli-voice-bridge.js';
 export { runClaudeAgentQuery, ClaudeAgentQueryError } from './claude-agent-query.js';
 export type { ClaudeAgentQueryParams, ClaudeAgentQueryResult } from './claude-agent-query.js';
 export {
@@ -792,6 +802,11 @@ export {
   registerCapabilityProbe,
 } from './src/actuator-capability.js';
 export type { ActuatorCapability, ActuatorStatus } from './src/actuator-capability.js';
+export {
+  buildActuatorManifestIndexSnapshot,
+  loadActuatorManifestCatalog,
+} from './src/actuator-manifest-index.js';
+export type { ActuatorCatalogEntry, ActuatorManifestFile } from './src/actuator-manifest-index.js';
 
 // Pre-Flight Check (Sovereign Sentinel)
 export * from './src/pfc/PfcController.js';

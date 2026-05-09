@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "imessage",
+      "channel": "imessage",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "shipped",
+      "summary": "iMessage surface provider manifest and routing policy."
+    }
+  ]
+}

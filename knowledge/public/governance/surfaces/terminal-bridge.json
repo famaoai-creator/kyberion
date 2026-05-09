@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "terminal-bridge",
+      "kind": "service",
+      "description": "Background terminal bridge service for runtime sessions",
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "presence/bridge/terminal",
+        "start"
+      ],
+      "env": {
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "infrastructure_sentinel"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    }
+  ]
+}

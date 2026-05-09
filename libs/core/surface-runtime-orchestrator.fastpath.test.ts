@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
   const classifyTaskSessionIntent = vi.fn();
   const createTaskSession = vi.fn();
   const saveTaskSession = vi.fn();
+  const surfaceChannelFromAgentId = vi.fn(() => 'presence');
   return {
     safeExec,
     secureFetch,
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => {
     classifyTaskSessionIntent,
     createTaskSession,
     saveTaskSession,
+    surfaceChannelFromAgentId,
   };
 });
 
@@ -70,7 +72,7 @@ vi.mock('./surface-runtime-router.js', () => ({
   parseSlackSurfacePrompt: () => null,
   resolveSurfaceConversationReceiver: () => undefined,
   shouldCompileSurfaceIntent: () => true,
-  surfaceChannelFromAgentId: () => 'presence',
+  surfaceChannelFromAgentId: mocks.surfaceChannelFromAgentId,
   surfaceRoutingText: (input: { query: string }) => ({ text: input.query, parsedSlackPrompt: null }),
 }));
 
@@ -284,6 +286,28 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(result.text).toContain('Provider: duckduckgo_html');
     expect(result.text).toContain('Web search results for: OpenAI Responses API');
     expect(result.text).toContain('Result One');
+  });
+
+  it('passes the resolved surface channel into intent compilation for non-slack surfaces', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'live-query',
+      shape: 'direct_reply',
+      routeFamily: 'direct_reply',
+      queryType: 'knowledge_search',
+      queryText: 'mission authority',
+    });
+    mocks.surfaceChannelFromAgentId.mockReturnValue('imessage');
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    await runSurfaceConversation({
+      agentId: 'imessage-surface-agent',
+      query: 'mission authority を教えて',
+      senderAgentId: 'test-sender',
+    });
+    expect(mocks.compileUserIntentFlow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'imessage',
+      })
+    );
   });
 
   it('creates a task session for schedule coordination requests', async () => {

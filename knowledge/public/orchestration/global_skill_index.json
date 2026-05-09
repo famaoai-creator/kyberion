@@ -1,7 +1,7 @@
 {
   "v": "3.0.0",
-  "t": 23,
-  "u": "2026-03-24T21:07:52.464Z",
+  "t": 27,
+  "u": "2026-05-09T14:32:46.634Z",
   "s": [
     {
       "n": "agent-actuator",
@@ -52,12 +52,12 @@
       "capability_count": 2
     },
     {
-      "n": "meeting-actuator",
-      "path": "libs/actuators/meeting-actuator",
-      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+      "n": "calendar-actuator",
+      "path": "libs/actuators/calendar-actuator",
+      "d": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 6
+      "capability_count": 3
     },
     {
       "n": "code-actuator",
@@ -86,9 +86,9 @@
     {
       "n": "media-actuator",
       "path": "libs/actuators/media-actuator",
-      "d": "Document and asset generation engine",
+      "d": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 1
     },
     {
@@ -96,8 +96,24 @@
       "path": "libs/actuators/media-generation-actuator",
       "d": "Generative image, video, music, and screen capture actuator",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 10
+    },
+    {
+      "n": "meeting-actuator",
+      "path": "libs/actuators/meeting-actuator",
+      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6
+    },
+    {
+      "n": "meeting-browser-driver",
+      "path": "libs/actuators/meeting-browser-driver",
+      "d": "Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Implements libs/core MeetingJoinDriver and writes captured audio to an AudioBus.",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 2
     },
     {
       "n": "modeling-actuator",
@@ -160,7 +176,7 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control, diagnostics, and short-lived local execution",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 3
     },
     {
@@ -170,6 +186,14 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 5
+    },
+    {
+      "n": "video-composition-actuator",
+      "path": "libs/actuators/video-composition-actuator",
+      "d": "Governed deterministic composed-video bundle preparation actuator",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6
     },
     {
       "n": "vision-actuator",
@@ -182,18 +206,18 @@
     {
       "n": "voice-actuator",
       "path": "libs/actuators/voice-actuator",
-      "d": "Local Generative TTS Actuator (Style-Bert-VITS2)",
+      "d": "Governed local voice generation actuator with native playback and artifact fallback",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 2
+      "version": "1.2.0",
+      "capability_count": 7
     },
     {
       "n": "wisdom-actuator",
       "path": "libs/actuators/wisdom-actuator",
-      "d": "Knowledge-tier search, injection, import, and export actuator",
+      "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 4
+      "version": "1.1.0",
+      "capability_count": 32
     }
   ]
 }

@@ -1,0 +1,32 @@
+{
+  "role": "experience_designer",
+  "description": "Designs product flows, interaction models, and UX tradeoffs.",
+  "required_capabilities": [
+    "design",
+    "ux",
+    "analysis"
+  ],
+  "compatible_authority_roles": [
+    "ecosystem_architect",
+    "software_developer"
+  ],
+  "allowed_delegate_team_roles": [
+    "implementer"
+  ],
+  "escalation_parent_team_role": "product_strategist",
+  "required_scope_classes": [
+    "codebase_core"
+  ],
+  "ownership_scope": "Owns UX interaction contracts and experience-level design decisions.",
+  "selection_hints": {
+    "preferred_agents": [
+      "implementation-architect",
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

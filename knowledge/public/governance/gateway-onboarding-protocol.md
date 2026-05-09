@@ -23,7 +23,7 @@ last_updated: 2026-05-04
 
 ### Phase 2: トポロジー登録 (Surface Registration)
 - **内容**: システムが「新しい連絡経路」を認識できるように構成定義を更新する。
-- **実務**: `knowledge/public/governance/active-surfaces.json` にサービスID、種別（gateway）、起動コマンド、ポート等を追記する。
+- **実務**: `knowledge/public/governance/surfaces/<surface-id>.json` にサービスID、種別（gateway）、起動コマンド、ポート等を追記する。`active-surfaces.json` は compatibility snapshot として自動生成される。
 - **ガバナンス**: システムが管理対象として認識し、`runtimeSupervisor` の監視下に入る。
 
 ### Phase 3: 秘密の握手 (Secret Handshake / Credentials)

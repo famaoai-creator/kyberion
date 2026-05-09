@@ -1,0 +1,33 @@
+{
+  "role": "surface_liaison",
+  "description": "Maintains human-facing communication quality on Slack or Chronos.",
+  "required_capabilities": [
+    "surface",
+    "conversation",
+    "delegation"
+  ],
+  "compatible_authority_roles": [
+    "slack_bridge",
+    "chronos_operator",
+    "chronos_gateway",
+    "sovereign_concierge"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "operator",
+  "required_scope_classes": [
+    "communication_surface"
+  ],
+  "ownership_scope": "Owns user-facing updates, handoff clarity, and interaction continuity.",
+  "selection_hints": {
+    "preferred_agents": [
+      "slack-surface-agent",
+      "chronos-mirror",
+      "onboarding-surface-agent"
+    ],
+    "preferred_models": [
+      "gemini-2.5-flash",
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "low"
+}

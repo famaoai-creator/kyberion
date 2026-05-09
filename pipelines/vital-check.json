@@ -7,6 +7,7 @@
     
     { "op": "system:probe", "params": { "path": "node_modules", "export_as": "p_node" } },
     { "op": "system:probe", "params": { "path": "dist", "export_as": "p_dist" } },
+    { "op": "system:probe", "params": { "path": "knowledge/public/governance/surfaces", "export_as": "p_manifest_dir" } },
     { "op": "system:probe", "params": { "path": "knowledge/public/governance/active-surfaces.json", "export_as": "p_manifest" } },
     { "op": "system:probe", "params": { "path": "active/shared/runtime/surfaces/state.json", "export_as": "p_state" } },
     { "op": "system:probe", "params": { "path": "knowledge/personal/my-identity.json", "export_as": "p_identity" } },
@@ -16,7 +17,7 @@
     
     { "op": "system:log", "params": { "message": "✅ Physical Foundation: {{p_node.exists}} ({{p_node.kind}})" } },
     { "op": "system:log", "params": { "message": "✅ System Build:       {{p_dist.exists}} ({{p_dist.kind}})" } },
-    { "op": "system:log", "params": { "message": "✅ Surface Manifest:   {{p_manifest.exists}}" } },
+    { "op": "system:log", "params": { "message": "✅ Surface Manifests:  {{p_manifest_dir.exists}} / snapshot: {{p_manifest.exists}}" } },
     { "op": "system:log", "params": { "message": "✅ Runtime State:      {{p_state.exists}}" } },
     { "op": "system:log", "params": { "message": "✅ Identity & Vision:  ID:{{p_identity.exists}} / Vision:{{p_vision.exists}}" } },
     { "op": "system:log", "params": { "message": "🚀 Active Missions:    {{active_missions.count}}" } }

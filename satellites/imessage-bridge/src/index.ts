@@ -38,7 +38,10 @@ async function pollIMessages() {
   try {
     const newMessages = getRecentIMessages(lastSeenRowId);
     for (const msg of newMessages) {
-      lastSeenRowId = Math.max(lastSeenRowId, Number(msg.id));
+      const msgId = Number(msg.id);
+      if (msgId <= lastSeenRowId) continue;
+      
+      lastSeenRowId = msgId;
       
       if (msg.isFromMe) continue;
 

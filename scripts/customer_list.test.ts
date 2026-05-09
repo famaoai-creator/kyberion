@@ -7,18 +7,20 @@ const mocks = vi.hoisted(() => ({
   pathResolver: {
     rootDir: vi.fn(() => '/tmp/kyberion'),
   },
+  customerResolver: {
+    activeCustomer: vi.fn(() => 'acme'),
+  },
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),
   safeReaddir: vi.fn(),
-  activeCustomer: vi.fn(() => 'acme'),
   classifyError: vi.fn((err: any) => ({ category: 'unknown', message: String(err?.message || err) })),
   formatClassification: vi.fn((c: any) => JSON.stringify(c)),
 }));
 
 vi.mock('@agent/core', () => ({
-  activeCustomer: mocks.activeCustomer,
   classifyError: mocks.classifyError,
   formatClassification: mocks.formatClassification,
+  customerResolver: mocks.customerResolver,
   pathResolver: mocks.pathResolver,
   safeExistsSync: mocks.safeExistsSync,
   safeLstat: mocks.safeLstat,

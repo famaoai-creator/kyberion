@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "aws-ce": {
+      "base_url": "https://ce.us-east-1.amazonaws.com",
+      "preset_path": "knowledge/public/orchestration/service-presets/aws-ce.json"
+    }
+  }
+}

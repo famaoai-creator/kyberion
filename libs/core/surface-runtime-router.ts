@@ -4,6 +4,7 @@ import {
   resolveSurfaceConversationReceiverForProvider,
   shouldForceSlackDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
+import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 import type { SurfaceIntentResolution } from './router-contract.js';
 export type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
@@ -50,17 +51,19 @@ export function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt
     userMessage,
   };
 }
-export function surfaceChannelFromAgentId(agentId: string): 'slack' | 'chronos' | 'presence' | 'imessage' {
-  if (agentId.includes('slack')) return 'slack';
-  if (agentId.includes('presence')) return 'presence';
-  if (agentId.includes('chronos')) return 'chronos';
-  if (agentId.includes('imessage')) return 'imessage';
-  return 'slack';
+export function surfaceChannelFromAgentId(agentId: string): string {
+  const normalized = agentId.trim();
+  if (!normalized) return 'slack';
+  const manifests = listSurfaceProviderManifests();
+  const exact = manifests.find((entry) => entry.agentId === normalized);
+  if (exact) return exact.id;
+  const inferred = manifests.find((entry) => normalized.includes(entry.id) || normalized.includes(entry.agentId));
+  return inferred?.id || 'slack';
 }
 
 export function deriveSurfaceDelegationReceiver(
   text: string,
-  surface: 'slack' | 'chronos' | 'presence' | 'imessage' = 'slack',
+  surface: string = 'slack',
 ): SurfaceDelegationReceiver | undefined {
   return deriveSurfaceDelegationReceiverForProvider(surface, text);
 }
@@ -76,7 +79,7 @@ export function normalizeSurfaceDelegationReceiver(value?: string): SurfaceDeleg
 export function resolveSurfaceConversationReceiver(
   forcedReceiver: string | undefined,
   compiledFlow: UserIntentFlow | null | undefined,
-  surface: 'slack' | 'chronos' | 'presence' | 'imessage' = 'slack',
+  surface: string = 'slack',
 ): SurfaceDelegationReceiver | undefined {
   if (forcedReceiver) return forcedReceiver as SurfaceDelegationReceiver;
   return resolveSurfaceConversationReceiverForProvider(surface, compiledFlow) || 'chronos-mirror';

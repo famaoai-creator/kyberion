@@ -1,7 +1,7 @@
 import { logger } from './core.js';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
 export interface VoiceProfileRecord {
@@ -23,6 +23,7 @@ export interface VoiceProfileRegistry {
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/voice-profile-registry.json');
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('public/governance/voice-profiles');
 const DEFAULT_CUSTOMER_OVERLAY_PATH = 'voice/profile-registry.json';
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/voice/profile-registry.json');
 
@@ -44,8 +45,82 @@ const FALLBACK_REGISTRY: VoiceProfileRegistry = {
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: VoiceProfileRegistry | null = null;
 
+function sortRegistry(registry: VoiceProfileRegistry): VoiceProfileRegistry {
+  return {
+    ...registry,
+    profiles: [...registry.profiles].sort((left, right) => left.profile_id.localeCompare(right.profile_id)),
+  };
+}
+
+function readRegistryFile(registryPath: string, label: string): VoiceProfileRegistry {
+  return safeJsonParse<VoiceProfileRegistry>(safeReadFile(registryPath, { encoding: 'utf8' }) as string, label);
+}
+
+function loadRegistryDirectory(dirPath: string, fallbackDefaultProfileId = ''): VoiceProfileRegistry | null {
+  if (!safeExistsSync(dirPath)) return null;
+  const files = safeReaddir(dirPath).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) return null;
+
+  const profiles = new Map<string, VoiceProfileRecord>();
+  let defaultProfileId = '';
+  for (const file of files) {
+    const fullPath = `${dirPath}/${file}`;
+    const payload = readRegistryFile(fullPath, `voice profile registry item ${file}`);
+    const records = payload.profiles || [];
+    if (records.length !== 1) {
+      throw new Error(`Voice profile file ${file} must contain exactly one profile`);
+    }
+    const profile = records[0];
+    if (profile.profile_id !== file.replace(/\.json$/i, '')) {
+      throw new Error(`Voice profile file ${file} must match its profile id (${profile.profile_id})`);
+    }
+    profiles.set(profile.profile_id, profile);
+    if (!defaultProfileId && payload.default_profile_id) {
+      defaultProfileId = payload.default_profile_id;
+    }
+  }
+
+  const resolvedDefault = (fallbackDefaultProfileId && profiles.has(fallbackDefaultProfileId))
+    ? fallbackDefaultProfileId
+    : (defaultProfileId && profiles.has(defaultProfileId))
+      ? defaultProfileId
+      : profiles.keys().next().value as string | undefined;
+
+  return resolvedDefault
+    ? sortRegistry({
+        version: '1.0.0',
+        default_profile_id: resolvedDefault,
+        profiles: [...profiles.values()],
+      })
+    : null;
+}
+
+function writeRegistryDirectory(dirPath: string, registry: VoiceProfileRegistry): void {
+  safeMkdir(dirPath, { recursive: true });
+  const nextIds = new Set(registry.profiles.map((profile) => profile.profile_id));
+  const existing = safeExistsSync(dirPath) ? safeReaddir(dirPath).filter((entry) => entry.endsWith('.json')) : [];
+  for (const file of existing) {
+    const profileId = file.replace(/\.json$/i, '');
+    if (!nextIds.has(profileId)) {
+      safeRmSync(`${dirPath}/${file}`, { force: true });
+    }
+  }
+  for (const profile of registry.profiles) {
+    const payload = {
+      version: registry.version,
+      default_profile_id: registry.default_profile_id === profile.profile_id ? profile.profile_id : registry.default_profile_id,
+      profiles: [profile],
+    };
+    safeWriteFile(`${dirPath}/${profile.profile_id}.json`, JSON.stringify(payload, null, 2));
+  }
+}
+
 function getRegistryPath(): string {
   return process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+}
+
+function getRegistryDir(): string {
+  return process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR?.trim() || DEFAULT_REGISTRY_DIR;
 }
 
 function getPersonalOverlayPath(): string | null {
@@ -91,25 +166,30 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   const registryPath = getRegistryPath();
   const customerOverlayPath = getCustomerOverlayPath();
   const overlayPath = getPersonalOverlayPath();
-  const cacheKey = [registryPath, customerOverlayPath, overlayPath].filter(Boolean).join('::');
+  const useCanonicalDirectory = !process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() || registryPath === DEFAULT_REGISTRY_PATH;
+  const registryDir = useCanonicalDirectory ? getRegistryDir() : null;
+  const cacheKey = [registryPath, registryDir, customerOverlayPath, overlayPath].filter(Boolean).join('::');
   if (cachedRegistryPath === cacheKey && cachedRegistry) return cachedRegistry;
 
   if (!safeExistsSync(registryPath)) {
+    const directoryRegistry = useCanonicalDirectory ? loadRegistryDirectory(registryDir || getRegistryDir()) : null;
     cachedRegistryPath = cacheKey;
-    cachedRegistry = FALLBACK_REGISTRY;
+    cachedRegistry = directoryRegistry || FALLBACK_REGISTRY;
     return cachedRegistry;
   }
 
   let parsed: VoiceProfileRegistry;
   try {
-    const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    parsed = safeJsonParse<VoiceProfileRegistry>(raw, 'voice profile registry');
+    parsed = readRegistryFile(registryPath, 'voice profile registry');
   } catch (error: any) {
     logger.warn(`[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`);
     cachedRegistryPath = cacheKey;
     cachedRegistry = FALLBACK_REGISTRY;
     return cachedRegistry;
   }
+
+  const directoryRegistry = useCanonicalDirectory ? loadRegistryDirectory(registryDir || getRegistryDir(), parsed.default_profile_id) : null;
+  const baseRegistry = directoryRegistry || parsed;
 
   let customerOverlay: VoiceProfileRegistry | null = null;
   if (customerOverlayPath) {
@@ -123,8 +203,8 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
 
   if (!overlayPath && !customerOverlay) {
     cachedRegistryPath = cacheKey;
-    cachedRegistry = parsed;
-    return parsed;
+    cachedRegistry = baseRegistry;
+    return baseRegistry;
   }
 
   try {
@@ -134,7 +214,7 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
           'personal voice profile registry',
         )
       : null;
-    const baseWithPersonal = personalOverlay ? mergeRegistries(parsed, personalOverlay) : parsed;
+    const baseWithPersonal = personalOverlay ? mergeRegistries(baseRegistry, personalOverlay) : baseRegistry;
     const merged = customerOverlay ? mergeRegistries(baseWithPersonal, customerOverlay) : baseWithPersonal;
     cachedRegistryPath = cacheKey;
     cachedRegistry = merged;
@@ -142,7 +222,7 @@ export function getVoiceProfileRegistry(): VoiceProfileRegistry {
   } catch (error: any) {
     logger.warn(`[VOICE_PROFILE_REGISTRY] Personal overlay unavailable (${overlayPath}): ${error.message} — using base registry only`);
     cachedRegistryPath = cacheKey;
-    cachedRegistry = customerOverlay ? mergeRegistries(parsed, customerOverlay) : parsed;
+    cachedRegistry = customerOverlay ? mergeRegistries(baseRegistry, customerOverlay) : baseRegistry;
     return cachedRegistry;
   }
 }
@@ -164,7 +244,11 @@ export function getVoiceProfileRecord(profileId?: string): VoiceProfileRecord {
 }
 
 export function writeVoiceProfileRegistry(registry: VoiceProfileRegistry, registryPath = getRegistryPath()): string {
-  safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
+  const normalized = sortRegistry(registry);
+  safeWriteFile(registryPath, JSON.stringify(normalized, null, 2));
+  if (registryPath === DEFAULT_REGISTRY_PATH || registryPath === getRegistryPath()) {
+    writeRegistryDirectory(getRegistryDir(), normalized);
+  }
   cachedRegistryPath = null;
   cachedRegistry = null;
   return registryPath;

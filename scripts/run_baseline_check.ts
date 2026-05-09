@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { 
+import {
   SovereignSentinel, 
   validateService, 
   customerResolver,
@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   safeReadFile,
   withExecutionContext,
+  loadServiceEndpointsCatalog,
 } from '@agent/core';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
@@ -57,9 +58,7 @@ function profileRoot(): string {
 
 function checkServiceConnectionReadiness(): boolean {
   return withExecutionContext('mission_controller', () => {
-    const endpointsPath = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints.json');
-    if (!safeExistsSync(endpointsPath)) return false;
-    const endpoints = JSON.parse(safeReadFile(endpointsPath, { encoding: 'utf8' }) as string);
+    const endpoints = loadServiceEndpointsCatalog();
     const services = endpoints?.services || {};
 
     const readinessConfig = loadConnectionReadinessConfig();
@@ -124,8 +123,9 @@ async function main() {
 
   // L4: Surface Layer (Background Daemons)
   sentinel.registerLayer('L4', async () => {
-    const surfacesPath = pathResolver.rootResolve('knowledge/public/governance/active-surfaces.json');
-    return safeExistsSync(surfacesPath);
+    const surfacesDir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
+    const surfacesSnapshot = pathResolver.rootResolve('knowledge/public/governance/active-surfaces.json');
+    return safeExistsSync(surfacesDir) && safeExistsSync(surfacesSnapshot);
   });
 
   // L5: Trust/API Layer (Vault/Credentials)

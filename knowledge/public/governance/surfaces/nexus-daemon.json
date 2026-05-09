@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "nexus-daemon",
+      "kind": "service",
+      "description": "Background system nerve daemon for stimuli routing and terminal dispatch",
+      "command": "node",
+      "args": [
+        "dist/presence/bridge/nexus-daemon.js"
+      ],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-NERVE",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "nexus_daemon"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    }
+  ]
+}

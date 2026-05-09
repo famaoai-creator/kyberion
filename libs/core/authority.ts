@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { 
   safeExistsSync, 
+  safeReaddir,
   safeReadFile 
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
@@ -10,7 +11,21 @@ import {
   IdentityContext 
 } from './types.js';
 
-const ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
+type RolePersonaIndex = {
+  authority_roles?: Record<string, { default_persona?: Persona }>;
+};
+
+type AuthorityRoleFile = {
+  role: string;
+  description: string;
+  default_persona?: Persona;
+  write_scopes: string[];
+  scope_classes: string[];
+  allowed_actuators: string[];
+  tier_access: string[];
+};
+
+const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   ecosystem_architect: 'ecosystem_architect',
   sovereign_concierge: 'sovereign',
   mission_controller: 'worker',
@@ -26,6 +41,55 @@ const ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   knowledge_steward: 'analyst',
   cyber_security: 'analyst',
 };
+
+let cachedRolePersonaIndex: RolePersonaIndex | null = null;
+
+function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
+  const directoryPath = pathResolver.knowledge('public/governance/authority-roles');
+  if (!safeExistsSync(directoryPath)) {
+    return null;
+  }
+
+  const files = safeReaddir(directoryPath).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    return null;
+  }
+
+  const authority_roles: Record<string, { default_persona?: Persona }> = {};
+  for (const file of files) {
+    const filePath = pathResolver.knowledge(`public/governance/authority-roles/${file}`);
+    const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as AuthorityRoleFile;
+    const role = String(payload.role || '').trim();
+    if (!role) {
+      throw new Error(`Authority role file ${file} must declare a role id`);
+    }
+    if (file.replace(/\.json$/i, '') !== role) {
+      throw new Error(`Authority role file ${file} must match its role id (${role})`);
+    }
+    authority_roles[role] = {
+      default_persona: payload.default_persona,
+    };
+  }
+
+  return { authority_roles };
+}
+
+function loadRolePersonaIndex(): RolePersonaIndex {
+  if (cachedRolePersonaIndex) return cachedRolePersonaIndex;
+  const directoryIndex = loadRolePersonaIndexDirectory();
+  if (directoryIndex) {
+    cachedRolePersonaIndex = directoryIndex;
+    return cachedRolePersonaIndex;
+  }
+
+  const indexPath = pathResolver.knowledge('public/governance/authority-role-index.json');
+  try {
+    cachedRolePersonaIndex = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string) as RolePersonaIndex;
+  } catch {
+    cachedRolePersonaIndex = {};
+  }
+  return cachedRolePersonaIndex;
+}
 
 /**
  * Authority Manager v1.0
@@ -59,7 +123,9 @@ function resolveRole(): string | undefined {
 
 export function inferPersonaFromRole(role?: string): Persona {
   if (!role) return 'unknown';
-  return ROLE_PERSONA_DEFAULTS[role.toLowerCase().replace(/\s+/g, '_')] || 'unknown';
+  const normalized = role.toLowerCase().replace(/\s+/g, '_');
+  const fromIndex = loadRolePersonaIndex().authority_roles?.[normalized]?.default_persona;
+  return fromIndex || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
 }
 
 export function buildExecutionEnv(

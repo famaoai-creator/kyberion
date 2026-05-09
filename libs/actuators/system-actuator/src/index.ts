@@ -1013,10 +1013,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
       }
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
-
       logger.error(`  [SYS_PIPELINE] Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
-      break; 
+      // Throw to ensure calling runtime (run_pipeline.ts) can catch and repair
+      throw err;
     }
   }
 

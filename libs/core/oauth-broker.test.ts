@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   safeUnlinkSync: vi.fn(),
   safeFsyncFile: vi.fn(),
   resolveServiceBinding: vi.fn(),
+  loadServiceEndpointsCatalog: vi.fn(),
   executeServicePreset: vi.fn(),
   loadConnectionDocument: vi.fn(),
   storeConnectionDocument: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('./secure-io.js', async () => {
 
 vi.mock('./service-binding.js', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
+  loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
 vi.mock('./service-engine.js', () => ({
@@ -59,14 +61,13 @@ describe('oauth-broker', () => {
     mocks.loadConnectionDocument.mockReturnValue({
       redirect_uri: 'http://127.0.0.1:8787/oauth/callback',
     });
+    mocks.loadServiceEndpointsCatalog.mockReturnValue({
+      default_pattern: 'https://api.{service_id}.com/v1',
+      services: {
+        canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
+      },
+    });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
-          },
-        });
-      }
       if (filePath.includes('canva.json')) {
         return JSON.stringify({
           oauth: {
@@ -98,14 +99,13 @@ describe('oauth-broker', () => {
     mocks.safeExistsSync.mockImplementation((filePath: string) =>
       filePath.includes('/active/shared/tmp/oauth/canva') || filePath.includes('/active/shared/tmp/oauth/canva/test-state.json'),
     );
+    mocks.loadServiceEndpointsCatalog.mockReturnValue({
+      default_pattern: 'https://api.{service_id}.com/v1',
+      services: {
+        canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
+      },
+    });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
-          },
-        });
-      }
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
           oauth: {
@@ -195,13 +195,6 @@ describe('oauth-broker', () => {
       return [];
     });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
-      if (filePath.includes('service-endpoints.json')) {
-        return JSON.stringify({
-          services: {
-            canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
-          },
-        });
-      }
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
           oauth: {

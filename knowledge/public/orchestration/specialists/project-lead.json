@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "project-lead": {
+      "label": "Project Lead",
+      "description": "Bootstraps a new project context, framing the long-lived goal, ownership, and next work items.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["owner", "product_strategist", "planner"],
+      "capabilities": ["project_bootstrap", "goal_framing", "work_scoping"]
+    }
+  }
+}

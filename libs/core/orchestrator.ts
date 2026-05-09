@@ -5,32 +5,21 @@ import { logger } from './core.js';
 import { metrics } from './metrics.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
 
 /**
  * Actuator Pipeline Orchestrator - chains actuator steps together with data passing.
  */
 
 const rootDir = pathResolver.rootDir();
-const actuatorIndexCandidates = [
-  path.join(rootDir, 'knowledge/public/orchestration/global_actuator_index.json'),
-  path.join(rootDir, 'knowledge/orchestration/global_actuator_index.json'),
-];
-
-function resolveActuatorIndexPath() {
-  const resolved = actuatorIndexCandidates.find(candidate => safeExistsSync(candidate));
-  if (!resolved) throw new Error(`Actuator index not found. Checked: ${actuatorIndexCandidates.join(', ')}`);
-  return resolved;
-}
-
 export function resolveCapabilityScript(capabilityName: string): string {
-  const index = JSON.parse(safeReadFile(resolveActuatorIndexPath(), { encoding: 'utf8' }) as string);
-  const capabilities = index.actuators || index.s || index.skills;
+  const capabilities = loadActuatorManifestCatalog();
 
   let capability;
   if (capabilityName.includes('/')) {
-    capability = capabilities.find((s: any) => (s.path || '').includes(capabilityName) || (s.n || s.name) === capabilityName);
+    capability = capabilities.find((s) => (s.path || '').includes(capabilityName) || s.n === capabilityName);
   } else {
-    capability = capabilities.find((s: any) => (s.n || s.name) === capabilityName);
+    capability = capabilities.find((s) => s.n === capabilityName);
   }
 
   if (!capability) throw new Error(`Capability "${capabilityName}" not found in index`);
@@ -38,7 +27,7 @@ export function resolveCapabilityScript(capabilityName: string): string {
   const capabilityRelPath = capability.path || capabilityName;
   const capabilityDir = path.join(rootDir, capabilityRelPath);
 
-  const mainPath = capability.m || capability.main;
+  const mainPath = capability.entrypoint;
   if (mainPath) {
     const fullPath = path.join(capabilityDir, mainPath);
     if (safeExistsSync(fullPath)) return fullPath;

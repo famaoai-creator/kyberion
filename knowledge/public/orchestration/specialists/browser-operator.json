@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "browser-operator": {
+      "label": "Browser Operator",
+      "description": "Handles browser navigation and step-by-step interactive actions.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["surface_liaison", "operator"],
+      "capabilities": ["browser_navigation", "browser_step", "confirmation"]
+    }
+  }
+}

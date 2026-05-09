@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "specialists": {
+    "service-operator": {
+      "label": "Service Operator",
+      "description": "Inspects service state, logs, and controlled service operations.",
+      "conversation_agent": "presence-surface-agent",
+      "team_roles": ["operator", "reviewer"],
+      "capabilities": ["service_operation", "service_summary", "approval"]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "onboarding-surface-agent": {
+      "authority_roles": [
+        "sovereign_concierge"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "onboarding",
+        "surface",
+        "identity",
+        "guidance"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
+    }
+  }
+}

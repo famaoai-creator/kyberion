@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "my-voice-v1",
+  "profiles": [
+    {
+      "profile_id": "my-voice-v1",
+      "display_name": "市村 Voice v1",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [
+        "/Users/motonobu.ichimura/k/0508eval/kyberion/active/shared/tmp/voice-sample-collection/clone-my-voice-v1-ja/sample-01.wav",
+        "/Users/motonobu.ichimura/k/0508eval/kyberion/active/shared/tmp/voice-sample-collection/clone-my-voice-v1-ja/sample-02.wav",
+        "/Users/motonobu.ichimura/k/0508eval/kyberion/active/shared/tmp/voice-sample-collection/clone-my-voice-v1-ja/sample-03.wav"
+      ],
+      "default_engine_id": "mlx_audio_qwen3",
+      "status": "active",
+      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
+    }
+  ]
+}

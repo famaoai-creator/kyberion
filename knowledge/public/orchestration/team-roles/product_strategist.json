@@ -1,0 +1,33 @@
+{
+  "role": "product_strategist",
+  "description": "Shapes product direction, requirements, prioritization, and value hypotheses.",
+  "required_capabilities": [
+    "strategy",
+    "product",
+    "analysis"
+  ],
+  "compatible_authority_roles": [
+    "mission_controller",
+    "ecosystem_architect",
+    "knowledge_steward"
+  ],
+  "allowed_delegate_team_roles": [
+    "planner",
+    "experience_designer"
+  ],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns product intent framing, priorities, and scope tradeoffs.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "high"
+}

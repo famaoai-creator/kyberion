@@ -1,0 +1,30 @@
+{
+  "role": "reviewer",
+  "description": "Reviews risk, regression potential, and boundary compliance.",
+  "required_capabilities": [
+    "review",
+    "analysis",
+    "architecture"
+  ],
+  "compatible_authority_roles": [
+    "ecosystem_architect",
+    "knowledge_steward"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "knowledge_core"
+  ],
+  "ownership_scope": "Owns review verdicts, risk findings, and gate readiness evidence.",
+  "selection_hints": {
+    "preferred_agents": [
+      "implementation-architect",
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

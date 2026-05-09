@@ -1,7 +1,8 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
 import { DEFAULT_SPECIALIST_ID } from './specialist-ids.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
 import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
@@ -12,6 +13,8 @@ import { resolveMissionReviewDesign } from './mission-review-gates.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/work-policy.schema.json');
+const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge('public/orchestration/specialist-catalog.json');
+const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('public/orchestration/specialists');
 
 export interface OutcomeDefinition {
   id: string;
@@ -36,6 +39,7 @@ interface OutcomeCatalogFile {
 }
 
 interface SpecialistCatalogFile {
+  version?: string;
   specialists?: Record<string, Omit<SpecialistDefinition, 'id'>>;
 }
 
@@ -253,6 +257,51 @@ function loadJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
 }
 
+function loadSpecialistCatalogFromPath(filePath: string): SpecialistCatalogFile {
+  return loadJson<SpecialistCatalogFile>(filePath);
+}
+
+function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile {
+  const dir = pathResolver.rootResolve(dirPath);
+  if (!safeExistsSync(dir)) {
+    throw new Error(`Specialist catalog directory not found: ${dir}`);
+  }
+
+  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  if (!files.length) {
+    throw new Error(`Specialist catalog directory is empty: ${dir}`);
+  }
+
+  const specialists: Record<string, Omit<SpecialistDefinition, 'id'>> = {};
+  let version = '';
+
+  for (const file of files) {
+    const filePath = pathResolver.rootResolve(path.join(dir, file));
+    if (!safeStat(filePath).isFile()) continue;
+    const parsed = loadSpecialistCatalogFromPath(filePath);
+    const entries = parsed.specialists || {};
+    const specialistIds = Object.keys(entries);
+    if (specialistIds.length !== 1) {
+      throw new Error(`Specialist catalog file ${file} must contain exactly one specialist`);
+    }
+    const specialistId = specialistIds[0];
+    if (file.replace(/\.json$/i, '') !== specialistId) {
+      throw new Error(`Specialist catalog file ${file} must match specialist id ${specialistId}`);
+    }
+    if (parsed.version && !version) {
+      version = parsed.version;
+    } else if (parsed.version && version && parsed.version !== version) {
+      throw new Error(`Specialist catalog version mismatch in ${file}`);
+    }
+    specialists[specialistId] = entries[specialistId];
+  }
+
+  return {
+    version: version || '1.0.0',
+    specialists,
+  };
+}
+
 export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
   const parsed = loadJson<OutcomeCatalogFile>(pathResolver.knowledge('public/governance/outcome-catalog.json'));
   const entries = parsed.outcomes || {};
@@ -262,7 +311,9 @@ export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
 }
 
 export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
-  const parsed = loadJson<SpecialistCatalogFile>(pathResolver.knowledge('public/orchestration/specialist-catalog.json'));
+  const parsed = safeExistsSync(pathResolver.rootResolve(DEFAULT_SPECIALIST_CATALOG_DIR))
+    ? loadSpecialistCatalogDirectory(DEFAULT_SPECIALIST_CATALOG_DIR)
+    : loadSpecialistCatalogFromPath(DEFAULT_SPECIALIST_CATALOG_PATH);
   const entries = parsed.specialists || {};
   return Object.fromEntries(
     Object.entries(entries).map(([id, value]) => [id, { id, ...value }]),

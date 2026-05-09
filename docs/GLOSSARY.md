@@ -344,7 +344,7 @@ The requirement for explicit sovereign approval before riskier or architectural 
 
 ### Global Actuator Index
 
-`knowledge/public/orchestration/global_actuator_index.json`, the compact registry of runnable actuators used by the CLI.
+`libs/actuators/*/manifest.json`, the canonical registry of runnable actuators. `knowledge/public/orchestration/global_actuator_index.json` is the generated compatibility snapshot used by older tooling.
 
 ### Legacy Component Index
 

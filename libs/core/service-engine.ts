@@ -1,4 +1,4 @@
-import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding, secretGuard } from './index.js';
+import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog } from './index.js';
 import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -8,8 +8,6 @@ import { withExecutionContext } from './authority.js';
  * Shared Service Execution Engine v1.0
  * Allows any Actuator to leverage Adaptive Presets (API/CLI).
  */
-
-const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
 
 function loadConnectionWithFallback(serviceId: string): Record<string, any> {
   const connectionPath = customerResolver.resolveOverlay(`connections/${serviceId}.json`);
@@ -166,7 +164,7 @@ function isCliAllowedForOperation(
 }
 
 export async function executeServicePreset(serviceId: string, action: string, params: any, auth: 'none' | 'secret-guard' = 'none') {
-  const endpoints = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
+  const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services[serviceId];
   if (!serviceConfig || !serviceConfig.preset_path) {
     throw new Error(`No preset path defined for service: ${serviceId}`);
