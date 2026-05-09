@@ -14,6 +14,8 @@ describe('Customer onboarding contract', () => {
     const readme = read('customer/README.md');
     const operator = read('docs/operator/DEPLOYMENT.md');
     const init = read('docs/INITIALIZATION.md');
+    const quickstart = read('docs/QUICKSTART.md');
+    const ux = read('docs/OPERATOR_UX_GUIDE.md');
 
     expect(wizard).toContain('Set up a customer overlay now?');
     expect(wizard).toContain('customer_create');
@@ -24,5 +26,7 @@ describe('Customer onboarding contract', () => {
     expect(operator).toContain('/app/customer');
     expect(init).toContain('customer/{slug}/my-identity.json');
     expect(init).toContain('`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json`');
+    expect(quickstart).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
+    expect(ux).toContain('customer overlay material goes in `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set');
   });
 });
