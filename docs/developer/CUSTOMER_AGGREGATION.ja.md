@@ -128,4 +128,4 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
 - [ ] 各 caller のオーバーレイ対応
   - [x] connections consumer (`libs/core/service-engine.ts`)
   - [x] policy consumer (`libs/core/approval-policy.ts`)
-  - [ ] mission seeds consumer
+  - [x] mission seeds consumer (`libs/core/mission-seed-registry.ts`)
