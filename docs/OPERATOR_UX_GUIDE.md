@@ -244,8 +244,7 @@ The most useful directory model for operators is by purpose.
 
 Practical rules:
 
-- personal connection material goes in `knowledge/personal/connections/`
-- customer overlay material goes in `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set
+- connection material goes in the active private overlay: `customer/{slug}/connections/` when `KYBERION_CUSTOMER` is set, otherwise `knowledge/personal/connections/`
 - durable mission evidence goes in `active/missions/`
 - shared logs and tmp artifacts go in `active/shared/`
 - reusable policies, schemas, and procedures belong in `knowledge/public/`
