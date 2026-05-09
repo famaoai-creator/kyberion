@@ -78,6 +78,16 @@ const moveMouse = vi.fn((x: number, y: number) =>
     `tell application "System Events" to do shell script "/usr/bin/env cliclick m:${x},${y}"`,
   ])
 );
+const scrollAt = vi.fn();
+const dragFrom = vi.fn();
+const runAppleScript = vi.fn((_script: string) => 'applescript-result');
+const getScreenSize = vi.fn(() => ({ width: 1920, height: 1080 }));
+const getWindowList = vi.fn((_app: string) => ['Window 1', 'Window 2']);
+const quitApplication = vi.fn();
+const systemNotify = vi.fn();
+const clipboardRead = vi.fn(() => 'clipboard text');
+const clipboardWrite = vi.fn();
+const takeScreenshot = vi.fn((p: string) => p);
 const listKnownAppCapabilities = vi.fn(() => [
   {
     application: 'Google Chrome',
@@ -176,6 +186,16 @@ vi.mock('@agent/core/os-automation', () => ({
   clickAt,
   rightClickAt,
   moveMouse,
+  scrollAt,
+  dragFrom,
+  runAppleScript,
+  getScreenSize,
+  getWindowList,
+  quitApplication,
+  systemNotify,
+  clipboardRead,
+  clipboardWrite,
+  takeScreenshot,
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
@@ -864,13 +884,13 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.status).toBe('succeeded');
   });
 
-  it('handles move_mouse action', async () => {
+  it('handles mouse_move action', async () => {
     const { handleAction } = await import('./index');
     const result = await handleAction({
       version: '0.1',
       kind: 'computer_interaction',
       action: {
-        type: 'move_mouse',
+        type: 'mouse_move',
         coordinate: { x: 300, y: 400 },
       },
     } as any);
@@ -878,13 +898,13 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.status).toBe('succeeded');
   });
 
-  it('handles key_press action', async () => {
+  it('handles key action', async () => {
     const { handleAction } = await import('./index');
     const result = await handleAction({
       version: '0.1',
       kind: 'computer_interaction',
       action: {
-        type: 'key_press',
+        type: 'key',
         key: 'Enter',
       },
     } as any);
@@ -906,19 +926,298 @@ describe('system-actuator computer_interaction adapter', () => {
     expect(result.status).toBe('succeeded');
   });
 
-  it('handles screenshot action', async () => {
+  it('handles screenshot via pipeline API', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeExec).mockReturnValueOnce('');
+    vi.mocked(core.safeExistsSync).mockReturnValue(true);
 
     const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      action: {
-        type: 'screenshot',
-      },
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'screenshot', params: {} }],
     } as any);
 
     expect(result.status).toBe('succeeded');
+    expect(result.context.screenshot_path).toBeDefined();
+  });
+});
+
+describe('system-actuator new OS automation ops (pipeline mode)', () => {
+  describe('capture ops', () => {
+    it('screenshot: creates dir when missing and returns path', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValueOnce(false);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'shot' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(core.safeMkdir).toHaveBeenCalledWith(
+        expect.stringContaining('screenshots'),
+        { recursive: true },
+      );
+      expect(typeof result.context.shot).toBe('string');
+    });
+
+    it('screenshot: uses custom path param', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'screenshot', params: { path: 'active/shared/tmp/snap.png', export_as: 'snap' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(String(result.context.snap)).toContain('snap.png');
+    });
+
+    it('clipboard_read: returns clipboard content', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'clipboard_read', params: { export_as: 'clip' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.clip).toBe('clipboard text');
+    });
+
+    it('get_focused_input: returns focused UI element state', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'get_focused_input', params: { export_as: 'focus' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.focus as any).width).toBeUndefined();
+      expect(result.context.focus).toBeDefined();
+    });
+
+    it('get_screen_size: returns width and height', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'get_screen_size', params: { export_as: 'sz' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.sz as any).width).toBe(1920);
+      expect((result.context.sz as any).height).toBe(1080);
+    });
+
+    it('window_list: returns windows for the given application', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'window_list', params: { application: 'Finder', export_as: 'wins' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.wins as string[]).length).toBe(2);
+      expect(getWindowList).toHaveBeenCalledWith('Finder');
+    });
+
+    it('window_list: throws when application param is missing', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'window_list', params: { export_as: 'wins' } }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/application/);
+    });
+
+    it('chrome_tab_list: returns tabs using default browser', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'chrome_tab_list', params: { export_as: 'tabs' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.tabs as any[]).length).toBe(2);
+      expect(listChromeTabs).toHaveBeenCalledWith('Google Chrome');
+    });
+
+    it('chrome_tab_list: uses custom application param', async () => {
+      const { handleAction } = await import('./index');
+
+      await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'chrome_tab_list', params: { application: 'Brave Browser', export_as: 'tabs' } }],
+      } as any);
+
+      expect(listChromeTabs).toHaveBeenCalledWith('Brave Browser');
+    });
+  });
+
+  describe('apply ops', () => {
+    it('scroll: calls scrollAt with correct coordinates and direction', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'scroll', params: { x: 100, y: 200, direction: 'down', amount: 5 } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(scrollAt).toHaveBeenCalledWith(100, 200, 'down', 5);
+    });
+
+    it('drag: calls dragFrom with from and to coordinates', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'drag', params: { from_x: 10, from_y: 20, to_x: 300, to_y: 400 } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(dragFrom).toHaveBeenCalledWith(10, 20, 300, 400);
+    });
+
+    it('system_notify: calls systemNotify with title, message and subtitle', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'system_notify', params: { title: 'Hi', message: 'Done', subtitle: 'detail' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(systemNotify).toHaveBeenCalledWith('Hi', 'Done', 'detail');
+    });
+
+    it('system_notify: works without subtitle', async () => {
+      const { handleAction } = await import('./index');
+
+      await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'system_notify', params: { title: 'Hi', message: 'Done' } }],
+      } as any);
+
+      expect(systemNotify).toHaveBeenCalledWith('Hi', 'Done', undefined);
+    });
+
+    it('clipboard_write: calls clipboardWrite with text', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'clipboard_write', params: { text: 'hello world' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(clipboardWrite).toHaveBeenCalledWith('hello world');
+    });
+
+    it('app_quit: calls quitApplication with app name', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'app_quit', params: { application: 'Finder' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(quitApplication).toHaveBeenCalledWith('Finder');
+    });
+
+    it('app_quit: throws when application param is missing', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'app_quit', params: {} }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/application/);
+    });
+
+    it('open_file: opens file within repo root on darwin', async () => {
+      mockDarwinPlatform();
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'open_file', params: { path: 'active/shared/tmp/report.html' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(core.safeExec).toHaveBeenCalledWith('open', [expect.stringContaining('report.html')], expect.any(Object));
+      restorePlatform();
+    });
+  });
+
+  describe('security guards', () => {
+    it('run_applescript: throws when KYBERION_ALLOW_UNSAFE_SHELL is not set', async () => {
+      const savedEnv = process.env.KYBERION_ALLOW_UNSAFE_SHELL;
+      delete process.env.KYBERION_ALLOW_UNSAFE_SHELL;
+
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'run_applescript', params: { script: 'return "hi"' } }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/SECURITY|disabled/i);
+
+      process.env.KYBERION_ALLOW_UNSAFE_SHELL = savedEnv;
+    });
+
+    it('process_kill: throws when KYBERION_ALLOW_UNSAFE_SHELL is not set', async () => {
+      const savedEnv = process.env.KYBERION_ALLOW_UNSAFE_SHELL;
+      delete process.env.KYBERION_ALLOW_UNSAFE_SHELL;
+
+      const { handleAction } = await import('./index');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'process_kill', params: { pid: 12345 } }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/SECURITY|disabled/i);
+
+      process.env.KYBERION_ALLOW_UNSAFE_SHELL = savedEnv;
+    });
+
+    it('open_file: rejects path traversal outside repo root', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'open_file', params: { path: '../../etc/passwd' } }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/repo root/);
+    });
+
+    it('open_file: throws when path param is missing', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'open_file', params: {} }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/path/);
+    });
   });
 });

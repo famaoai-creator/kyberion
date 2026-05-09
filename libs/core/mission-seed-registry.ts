@@ -1,4 +1,5 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
+import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
@@ -41,6 +42,16 @@ function seedPath(seedId: string): string {
   return `${SEED_DIR}/${seedId}.json`;
 }
 
+function seedDirs(): string[] {
+  const dirs: string[] = [];
+  const customerSeedDir = customerResolver.customerRoot('mission-seeds');
+  if (customerSeedDir && safeExistsSync(customerSeedDir)) {
+    dirs.push(customerSeedDir);
+  }
+  dirs.push(SEED_DIR);
+  return dirs;
+}
+
 export function validateMissionSeedRecord(value: unknown): value is MissionSeedRecord {
   return Boolean(ensureValidator()(value));
 }
@@ -57,18 +68,31 @@ export function saveMissionSeedRecord(record: MissionSeedRecord): string {
 }
 
 export function loadMissionSeedRecord(seedId: string): MissionSeedRecord | null {
-  const filePath = seedPath(seedId);
-  if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as MissionSeedRecord;
-  return validateMissionSeedRecord(parsed) ? parsed : null;
+  for (const dir of seedDirs()) {
+    const filePath = `${dir}/${seedId}.json`;
+    if (!safeExistsSync(filePath)) continue;
+    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw) as MissionSeedRecord;
+    if (validateMissionSeedRecord(parsed)) return parsed;
+  }
+  return null;
 }
 
 export function listMissionSeedRecords(): MissionSeedRecord[] {
-  if (!safeExistsSync(SEED_DIR)) return [];
-  return safeReaddir(SEED_DIR)
-    .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => loadMissionSeedRecord(entry.replace(/\.json$/, '')))
-    .filter((record): record is MissionSeedRecord => Boolean(record))
-    .sort((a, b) => a.seed_id.localeCompare(b.seed_id));
+  const seen = new Set<string>();
+  const records: MissionSeedRecord[] = [];
+
+  for (const dir of seedDirs()) {
+    if (!safeExistsSync(dir)) continue;
+    for (const entry of safeReaddir(dir).filter((item) => item.endsWith('.json'))) {
+      const seedId = entry.replace(/\.json$/, '');
+      if (seen.has(seedId)) continue;
+      const record = loadMissionSeedRecord(seedId);
+      if (!record) continue;
+      seen.add(seedId);
+      records.push(record);
+    }
+  }
+
+  return records.sort((a, b) => a.seed_id.localeCompare(b.seed_id));
 }

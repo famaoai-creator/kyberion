@@ -1,0 +1,36 @@
+{
+  "action": "pipeline",
+  "name": "speak-with-my-voice",
+  "description": "Generate speech in the operator's cloned voice using mlx-audio Qwen3-TTS ICL. The voice profile must already be registered via clone-my-voice.json. Required context vars: text, profile_id. Optional: output_path, delivery_mode (playback|artifact|artifact_and_playback), language.",
+  "context": {
+    "profile_id": "my-voice-v1",
+    "text": "こんにちは。これはKyberionのボイスクローニング機能のテストです。",
+    "delivery_mode": "artifact_and_playback",
+    "language": "ja",
+    "output_path": ""
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "[speak-with-my-voice] profile={{profile_id}}, mode={{delivery_mode}}"
+      }
+    },
+    {
+      "id": "include_voice_clone_speak",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-clone-speak.json",
+        "context": {
+          "profile_id": "{{profile_id}}",
+          "text": "{{text}}",
+          "delivery_mode": "{{delivery_mode}}",
+          "language": "{{language}}",
+          "output_path": "{{output_path}}"
+        }
+      }
+    }
+  ]
+}

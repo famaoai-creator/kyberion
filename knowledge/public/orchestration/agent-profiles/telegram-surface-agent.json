@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "telegram-surface-agent": {
+      "authority_roles": [
+        "surface_runtime"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "telegram",
+        "surface",
+        "conversation",
+        "delegation"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
+    }
+  }
+}

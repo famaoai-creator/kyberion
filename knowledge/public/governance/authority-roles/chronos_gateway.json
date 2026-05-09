@@ -1,0 +1,28 @@
+{
+  "role": "chronos_gateway",
+  "description": "Chronos control surface authority for coordination and terminal routing.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/coordination/chronos/",
+    "active/shared/coordination/orchestration/",
+    "active/shared/observability/chronos/",
+    "active/shared/observability/mission-control/",
+    "active/shared/runtime/terminal/",
+    "active/audit/"
+  ],
+  "scope_classes": [
+    "communication_surface",
+    "coordination_runtime",
+    "observability",
+    "operations_runtime",
+    "audit"
+  ],
+  "allowed_actuators": [
+    "presence-actuator",
+    "artifact-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

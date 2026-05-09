@@ -26,6 +26,19 @@ describe('logic-utils', () => {
     expect(resolveVars('{{mission.missing}}', ctx)).toBe('');
   });
 
+  it('resolveVars supports {{var|default}} syntax', () => {
+    expect(resolveVars('{{mission.missing|fallback}}', ctx)).toBe('fallback');
+    expect(resolveVars('{{mission.id|fallback}}', ctx)).toBe('MSN-123');
+    expect(resolveVars('Hello {{mission.missing|World}}', ctx)).toBe('Hello World');
+    expect(resolveVars('Hello {{mission.id|World}}', ctx)).toBe('Hello MSN-123');
+  });
+
+  it('resolveVars default preserves type for single-var match', () => {
+    const numCtx = { count: 42 };
+    expect(resolveVars('{{count}}', numCtx)).toBe(42);
+    expect(resolveVars('{{missing|0}}', numCtx)).toBe('0');
+  });
+
   it('resolves deep and indexed path values safely', () => {
     expect(getPathValue({ report: { metrics: [{ count: 3 }] } }, 'report.metrics[0].count')).toBe(3);
     expect(getPathValue({ report: { metrics: { count: 5 } } }, 'report.metrics.count')).toBe(5);

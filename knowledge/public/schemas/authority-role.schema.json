@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["role", "description", "write_scopes", "scope_classes", "allowed_actuators", "tier_access"],
+  "properties": {
+    "role": { "type": "string" },
+    "description": { "type": "string" },
+    "default_persona": { "type": "string" },
+    "write_scopes": { "type": "array", "items": { "type": "string" } },
+    "scope_classes": { "type": "array", "items": { "type": "string" } },
+    "allowed_actuators": { "type": "array", "items": { "type": "string" } },
+    "tier_access": { "type": "array", "items": { "type": "string" } }
+  }
+}

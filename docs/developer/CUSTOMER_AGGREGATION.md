@@ -14,9 +14,9 @@ This document defines the contract. For day-to-day usage, see [`customer/README.
 
 ## 1. Problem
 
-Kyberion's previous configuration model assumed a single sovereign:
+Kyberion's previous configuration model assumed a legacy personal fallback:
 
-- `knowledge/personal/` — single-user identity, vision, connections, tenants.
+- `knowledge/personal/` — legacy identity, vision, connections, tenants.
 - `knowledge/confidential/{project}/` — project-scoped governance.
 - `knowledge/public/` — reusable knowledge.
 
@@ -57,14 +57,14 @@ The active customer is selected via the `KYBERION_CUSTOMER` environment variable
 export KYBERION_CUSTOMER=acme-corp
 ```
 
-When unset, Kyberion falls back to the existing single-user behavior (`knowledge/personal/` only).
+When unset, Kyberion falls back to the legacy `knowledge/personal/` behavior.
 
 ### 2.2 Resolution Order
 
 For a given config sub-path (e.g. `connections/slack.json`):
 
 1. **Customer overlay**: `customer/{slug}/connections/slack.json` if it exists.
-2. **Personal fallback**: `knowledge/personal/connections/slack.json` if it exists.
+2. **Legacy personal fallback**: `knowledge/personal/connections/slack.json` if it exists.
 3. **Public default**: for policy files, `knowledge/public/governance/slack.json` etc.
 
 The resolver returns the first existing path. For writes, when a customer is active, writes go to the customer overlay path.
@@ -91,7 +91,7 @@ Secrets must **never** live in the customer overlay, even though `customer/{slug
 
 ## 3. What Goes Where
 
-| File | Customer overlay (`customer/{slug}/`) | Personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
+| File | Customer overlay (`customer/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
 |---|---|---|---|
 | Identity | `identity.json` | `my-identity.json` | — |
 | Vision | `vision.md` | `my-vision.md` | — |
@@ -109,7 +109,7 @@ For users who already have a `knowledge/personal/` filled in:
 1. **Do nothing** — the existing setup keeps working when `KYBERION_CUSTOMER` is unset.
 2. To convert to a customer-overlay structure:
    ```bash
-   pnpm customer:create my-org             # (Phase D'-1 follow-up: not yet implemented)
+   pnpm customer:create my-org
    # Copies knowledge/personal/* into customer/my-org/* with appropriate renames.
    export KYBERION_CUSTOMER=my-org
    ```
@@ -149,21 +149,30 @@ The customer overlay is an **additional resolution layer** on top of the existin
 ```
 Read order for config:
   customer/{slug}/{path}        ← new, per-customer
-  knowledge/personal/{path}     ← existing, single-sovereign
+  knowledge/personal/{path}     ← existing, legacy fallback
   knowledge/confidential/...    ← existing, project-scoped
   knowledge/public/{path}       ← existing, reusable
 ```
 
-The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules.
+The 3-tier system continues to govern **tier hygiene** (no leaks from confidential to public). Customer overlay sits at the same trust level as `personal` and inherits its tier rules; `knowledge/personal/` remains the legacy personal fallback when no customer is active.
 
 ## 8. Implementation Status
 
 - [x] Directory structure (`customer/`, `customer/_template/`, `.gitignore` rules)
 - [x] Resolver API (`libs/core/customer-resolver.ts`)
 - [x] Resolver tests (`libs/core/customer-resolver.test.ts`)
-- [ ] CLI: `pnpm customer:create <slug>` (copies from `_template/`)
-- [ ] CLI: `pnpm customer:list`
-- [ ] CLI: `pnpm customer:switch <slug>` (validates + sets in env profile)
-- [ ] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
-- [ ] Migration helper: `pnpm customer:migrate-from-personal`
-- [ ] Integration in `path-resolver.ts` consumers (callers opt in to overlay one at a time, starting with connections, policy, mission seeds)
+- [x] CLI: `pnpm customer:create <slug>` (copies from `_template/`)
+- [x] CLI: `pnpm customer:list`
+- [x] CLI: `pnpm customer:switch <slug>` (validates + writes `active/shared/runtime/customer.env`)
+- [x] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
+- [x] Migration helper: `pnpm customer:migrate-from-personal`
+- [ ] Integration in `path-resolver.ts` consumers
+  - [x] Connections consumer (`libs/core/service-engine.ts`)
+  - [x] Policy consumer (`libs/core/approval-policy.ts`)
+  - [x] Mission seeds consumer (`libs/core/mission-seed-registry.ts`)
+  - [x] Voice profile registry consumer (`libs/core/voice-profile-registry.ts`)
+  - [x] Vital check consumer (`scripts/vital_check.ts`)
+  - [x] Baseline check consumer (`scripts/run_baseline_check.ts`)
+- [x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)
+- [x] Slack onboarding consumer (`libs/core/slack-onboarding.ts`)
+  - [x] Mission prerequisites / creation consumer (`scripts/refactor/mission-state.ts`, `scripts/refactor/mission-creation.ts`, `scripts/refactor/mission-llm.ts`)

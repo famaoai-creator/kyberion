@@ -15,16 +15,9 @@ export interface AgentRuntimeRootOptions {
 }
 
 function providerMemoryFile(provider: string): string | null {
-  switch (provider) {
-    case 'gemini':
-      return 'GEMINI.md';
-    case 'claude':
-      return 'CLAUDE.md';
-    case 'codex':
-      return 'CODEX.md';
-    default:
-      return null;
-  }
+  const normalized = provider.trim().replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
+  if (!normalized) return null;
+  return `${normalized}.md`;
 }
 
 function buildProjectedMemory(options: AgentRuntimeRootOptions): string {

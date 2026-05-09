@@ -1,0 +1,28 @@
+{
+  "role": "surface_runtime",
+  "description": "Surface runtime authority for reconciling and supervising managed surfaces.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/runtime/",
+    "active/shared/logs/surfaces/",
+    "knowledge/public/governance/surfaces/",
+    "knowledge/public/governance/active-surfaces.json",
+    "active/shared/coordination/channels/imessage/",
+    "active/shared/coordination/channels/discord/",
+    "active/shared/coordination/channels/telegram/",
+    "active/audit/"
+  ],
+  "scope_classes": [
+    "communication_surface",
+    "operations_runtime",
+    "audit"
+  ],
+  "allowed_actuators": [
+    "presence-actuator",
+    "artifact-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

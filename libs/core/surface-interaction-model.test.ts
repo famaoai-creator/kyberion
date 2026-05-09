@@ -14,6 +14,8 @@ import {
   buildSurfaceConversationInputFromMessage,
   buildSurfaceConversationInput,
   createChronosSurfaceMessage,
+  createDiscordSurfaceMessage,
+  createIMessageSurfaceMessage,
   createPresenceSurfaceMessage,
   createSlackSurfaceMessage,
   createSurfaceSpace,
@@ -24,6 +26,13 @@ import { safeRmSync } from './secure-io.js';
 
 function cleanupSurfaceArtifacts(): void {
   const previousRole = process.env.MISSION_ROLE;
+  process.env.MISSION_ROLE = 'surface_runtime';
+  for (const surface of ['imessage', 'discord', 'telegram'] as const) {
+    for (const message of listSurfaceOutboxMessages(surface)) {
+      clearSurfaceOutboxMessage(surface, message.message_id);
+    }
+    safeRmSync(pathResolver.resolve(`active/shared/coordination/channels/${surface}/notifications`), { recursive: true, force: true });
+  }
   process.env.MISSION_ROLE = 'slack_bridge';
   for (const message of listSurfaceOutboxMessages('slack')) {
     clearSurfaceOutboxMessage('slack', message.message_id);
@@ -57,6 +66,63 @@ describe('surface-interaction-model', () => {
       entry.text === 'acknowledged' &&
       entry.correlation_id === 'corr-1'
     )).toBe(true);
+  });
+
+  it('routes iMessage replies through notifications', () => {
+    const message = createIMessageSurfaceMessage({
+      text: '会話して',
+      channel: 'chat-42',
+      threadTs: 'thread-42',
+      correlationId: 'corr-imessage',
+    });
+
+    const receipt = message.reply({ text: 'iMessage ack', source: 'surface' });
+
+    expect(receipt.mode).toBe('notification');
+    expect(receipt.notification?.surface).toBe('imessage');
+    expect(listSurfaceNotifications('imessage').some((entry) =>
+      entry.channel === 'chat-42' &&
+      entry.thread_ts === 'thread-42' &&
+      entry.text === 'iMessage ack' &&
+      entry.source_agent_id === 'imessage-surface-agent'
+    )).toBe(true);
+  });
+
+  it('routes Discord replies through the outbox', () => {
+    const message = createDiscordSurfaceMessage({
+      text: 'discordで会話して',
+      channel: 'guild-1',
+      threadTs: 'thread-1',
+      actorId: 'alice#0001',
+      correlationId: 'corr-discord',
+    });
+
+    const receipt = message.reply({ text: 'discord ack', source: 'surface' });
+
+    expect(receipt.mode).toBe('outbox');
+    expect(listSurfaceOutboxMessages('discord').some((entry) =>
+      entry.channel === 'guild-1' &&
+      entry.thread_ts === 'thread-1' &&
+      entry.text === 'discord ack' &&
+      entry.correlation_id === 'corr-discord'
+    )).toBe(true);
+  });
+
+  it('builds normalized Telegram surface conversation input', () => {
+    const telegramInput = buildSurfaceConversationInput({
+      surface: 'telegram',
+      text: 'Telegramで会話して',
+      channel: '123',
+      threadTs: '456',
+      senderAgentId: 'kyberion:telegram-bridge',
+      metadata: {
+        actorId: '987',
+      },
+    });
+
+    expect(telegramInput.surface).toBe('telegram');
+    expect(telegramInput.agentId).toBe('telegram-surface-agent');
+    expect(telegramInput.query).toBe('Telegramで会話して');
   });
 
   it('builds normalized surface conversation input from surface messages', () => {
@@ -130,6 +196,34 @@ describe('surface-interaction-model', () => {
       senderAgentId: 'kyberion:voice-hub',
     });
     expect(presenceInput.query).toBe('ブラウザを開いて');
+
+    const imessageMessage = createIMessageSurfaceMessage({
+      text: 'iMessageで会話して',
+      channel: 'chat-42',
+      threadTs: 'thread-42',
+      actorId: 'alice@example.com',
+    });
+    const imessageInput = buildSurfaceConversationInputFromMessage(imessageMessage, {
+      agentId: 'imessage-surface-agent',
+      senderAgentId: 'kyberion:imessage-bridge',
+    });
+    expect(imessageInput.surface).toBe('imessage');
+    expect(imessageInput.query).toBe('iMessageで会話して');
+    expect(imessageInput.surfaceMetadata?.surface).toBe('imessage');
+
+    const unifiedIMessageInput = buildSurfaceConversationInput({
+      surface: 'imessage',
+      text: 'iMessageで会話して',
+      channel: 'chat-42',
+      threadTs: 'thread-42',
+      senderAgentId: 'kyberion:imessage-bridge',
+      metadata: {
+        actorId: 'alice@example.com',
+      },
+    });
+    expect(unifiedIMessageInput.agentId).toBe('imessage-surface-agent');
+    expect(unifiedIMessageInput.surface).toBe('imessage');
+    expect(unifiedIMessageInput.surfaceText).toBe('iMessageで会話して');
 
     const unifiedSlackInput = buildSurfaceConversationInput({
       surface: 'slack',

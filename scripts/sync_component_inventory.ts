@@ -128,7 +128,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(`Total Actuators: ${current.length}`);
   lines.push(`Last updated: ${new Date().toISOString().slice(0, 10)}`);
   lines.push('');
-  lines.push('This guide is generated from manifest-backed actuators. It is the human-readable counterpart to `knowledge/public/orchestration/global_actuator_index.json`.');
+  lines.push('This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/public/orchestration/global_actuator_index.json`.');
   lines.push('');
   lines.push('Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.');
   lines.push('');
@@ -140,7 +140,8 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('');
   lines.push('See also:');
   lines.push('');
-  lines.push(`- [global_actuator_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH)})`);
+  lines.push('- Source manifests: `libs/actuators/*/manifest.json`');
+  lines.push(`- Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH)})`);
   lines.push(`- [legacy_component_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`);
   lines.push(`- [component-lifecycle-inventory.md](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), REPORT_PATH)})`);
   lines.push('');
@@ -164,7 +165,7 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push('');
   lines.push('## Current Runtime Surface');
   lines.push('');
-  lines.push(`- Source of truth: [global_actuator_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH)})`);
+  lines.push('- Source of truth: `libs/actuators/*/manifest.json`');
   lines.push(`- Count: ${current.length}`);
   lines.push('- Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.');
   lines.push('');

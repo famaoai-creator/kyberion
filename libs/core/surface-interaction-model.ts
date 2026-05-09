@@ -8,20 +8,17 @@ import {
 import { getSurfaceProviderManifest } from './surface-provider-manifest.js';
 import {
   createSurfaceAsyncRequest,
-  enqueueChronosOutboxMessage,
-  enqueueSlackOutboxMessage,
+  enqueueSurfaceOutboxMessage,
   enqueueSurfaceNotification,
 } from './surface-coordination-store.js';
 
 import type {
-  ChronosSurfaceMetadata,
-  PresenceSurfaceMetadata,
   SlackSurfaceMetadata,
-  IMessageSurfaceMetadata,
   SlackSurfaceInput,
   SurfaceAsyncChannel,
   SurfaceAsyncRequestRecord,
   SurfaceConversationInput,
+  SurfaceConversationMetadata,
   SurfaceConversationMessageInput,
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
@@ -142,43 +139,23 @@ export class SurfaceUnsupportedActionError extends Error {
   }
 }
 
-const SURFACE_PROVIDER_CAPABILITIES: Record<SurfaceProviderId, SurfaceCapabilityContract> = {
-  slack: {
-    reply: true,
-    edit: false,
-    react: false,
-    notify: true,
-    asyncRequest: true,
-    responding: true,
-  },
-  chronos: {
-    reply: true,
-    edit: false,
-    react: false,
-    notify: true,
-    asyncRequest: true,
-    responding: true,
-  },
-  imessage: {
-    reply: true,
-    edit: false,
-    react: false,
-    notify: true,
-    asyncRequest: true,
-    responding: true,
-  },
-  presence: {
-    reply: false,
-    edit: false,
-    react: false,
-    notify: true,
-    asyncRequest: true,
-    responding: true,
-  },
-};
+// ─── Dynamic Registry ────────────────────────────────────────────────────────
+const _surfaceProviderRegistry = new Map<SurfaceProviderId, SurfaceProviderDefinition>();
 
-function getSurfaceCapabilities(surface: SurfaceProviderId): SurfaceCapabilityContract {
-  return { ...SURFACE_PROVIDER_CAPABILITIES[surface] };
+export function registerSurfaceProvider(definition: SurfaceProviderDefinition): void {
+  _surfaceProviderRegistry.set(definition.id, definition);
+}
+
+export function getSurfaceProviderDefinition(surface: SurfaceProviderId): SurfaceProviderDefinition {
+  const definition = _surfaceProviderRegistry.get(surface);
+  if (!definition) {
+    throw new Error(`Surface provider '${surface}' not found in registry.`);
+  }
+  return definition;
+}
+
+export function getSurfaceCapabilities(surface: SurfaceProviderId): SurfaceCapabilityContract {
+  return getSurfaceProviderDefinition(surface).capabilities;
 }
 
 function ensureCapability(surface: SurfaceProviderId, capabilities: SurfaceCapabilityContract, action: keyof SurfaceCapabilityContract): void {
@@ -190,49 +167,50 @@ function ensureCapability(surface: SurfaceProviderId, capabilities: SurfaceCapab
 function createReplyHandler(space: SurfaceSpaceContext): (input: SurfaceSpaceReplyInput) => SurfaceReplyReceipt {
   return (input) => {
     ensureCapability(space.surface, space.capabilities, 'reply');
-    if (space.surface === 'slack') {
-      const path = enqueueSlackOutboxMessage({
-        correlationId: space.correlationId,
+    const manifest = getSurfaceProviderManifest(space.surface);
+    if (manifest.delivery.directReply === 'notification') {
+      const notification = enqueueSurfaceNotification({
+        surface: space.surface,
         channel: space.channel,
         threadTs: space.threadTs,
+        sourceAgentId: space.actorId || defaultNotificationSourceAgentId(space),
+        title: 'Reply',
         text: input.text,
-        source: input.source,
+        status: 'info',
       });
       return {
         surface: space.surface,
-        mode: 'outbox',
+        mode: 'notification',
         channel: space.channel,
         threadTs: space.threadTs,
         text: input.text,
-        path,
+        notification,
       };
     }
-    if (space.surface === 'chronos') {
-      const path = enqueueChronosOutboxMessage({
-        correlationId: space.correlationId,
-        channel: space.channel,
-        threadTs: space.threadTs,
-        text: input.text,
-        source: input.source,
-      });
-      return {
-        surface: space.surface,
-        mode: 'outbox',
-        channel: space.channel,
-        threadTs: space.threadTs,
-        text: input.text,
-        path,
-      };
-    }
-    throw new SurfaceUnsupportedActionError(space.surface, 'reply');
+
+    const path = enqueueSurfaceOutboxMessage({
+      surface: space.surface,
+      correlationId: space.correlationId,
+      channel: space.channel,
+      threadTs: space.threadTs,
+      text: input.text,
+      source: input.source,
+    });
+    return {
+      surface: space.surface,
+      mode: 'outbox',
+      channel: space.channel,
+      threadTs: space.threadTs,
+      text: input.text,
+      path,
+    };
   };
 }
 
 function defaultNotificationSourceAgentId(space: SurfaceSpaceContext): string {
   if (space.actorId) return space.actorId;
-  if (space.surface === 'chronos') return 'chronos-surface-agent';
-  if (space.surface === 'presence') return 'presence-surface-agent';
-  return 'slack-surface-agent';
+  const manifest = getSurfaceProviderManifest(space.surface);
+  return manifest.agentId || `${space.surface}-surface-agent`;
 }
 
 function createNotifyHandler(space: SurfaceSpaceContext): (input: SurfaceSpaceNotificationInput) => SurfaceNotificationRecord {
@@ -342,32 +320,58 @@ export function createSurfaceMessage(context: Omit<SurfaceMessageContext, 'capab
   };
 }
 
+// ─── Default Provider Registrations ──────────────────────────────────────────
+
 export const slackSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'slack',
-  capabilities: getSurfaceCapabilities('slack'),
+  capabilities: { reply: true, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const chronosSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'chronos',
-  capabilities: getSurfaceCapabilities('chronos'),
+  capabilities: { reply: true, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const presenceSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'presence',
-  capabilities: getSurfaceCapabilities('presence'),
+  capabilities: { reply: false, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
-export function getSurfaceProviderDefinition(surface: SurfaceProviderId): SurfaceProviderDefinition {
-  if (surface === 'slack') return slackSurfaceProviderDefinition;
-  if (surface === 'chronos') return chronosSurfaceProviderDefinition;
-  return presenceSurfaceProviderDefinition;
-}
+export const imessageSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  id: 'imessage',
+  capabilities: { reply: true, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
+  createSpace: createSurfaceSpace,
+  createMessage: createSurfaceMessage,
+};
+
+export const discordSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  id: 'discord',
+  capabilities: { reply: true, edit: true, react: true, notify: true, asyncRequest: true, responding: true },
+  createSpace: createSurfaceSpace,
+  createMessage: createSurfaceMessage,
+};
+
+export const telegramSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  id: 'telegram',
+  capabilities: { reply: true, edit: true, react: false, notify: true, asyncRequest: true, responding: true },
+  createSpace: createSurfaceSpace,
+  createMessage: createSurfaceMessage,
+};
+
+// Auto-register defaults (can be overridden by later registrations)
+registerSurfaceProvider(slackSurfaceProviderDefinition);
+registerSurfaceProvider(chronosSurfaceProviderDefinition);
+registerSurfaceProvider(presenceSurfaceProviderDefinition);
+registerSurfaceProvider(imessageSurfaceProviderDefinition);
+registerSurfaceProvider(discordSurfaceProviderDefinition);
+registerSurfaceProvider(telegramSurfaceProviderDefinition);
+
 
 export function createSlackSurfaceSpace(input: SlackSurfaceInput & { correlationId?: string }): SurfaceSpace {
   return createSurfaceSpace({
@@ -402,8 +406,50 @@ export function createPresenceSurfaceMessage(input: {
   correlationId?: string;
   messageId?: string;
   receivedAt?: string;
-}): SurfaceMessage {
+  }): SurfaceMessage {
   return createSurfaceMessage(buildPresenceSurfaceIngressEnvelope(input));
+}
+
+export function createIMessageSurfaceMessage(input: {
+  text: string;
+  channel: string;
+  threadTs: string;
+  actorId?: string;
+  correlationId?: string;
+  messageId?: string;
+  receivedAt?: string;
+}): SurfaceMessage {
+  return createSurfaceMessage({
+    messageId: input.messageId || input.correlationId || randomUUID(),
+    surface: 'imessage',
+    channel: input.channel,
+    threadTs: input.threadTs,
+    correlationId: input.correlationId || randomUUID(),
+    text: input.text,
+    receivedAt: input.receivedAt || new Date().toISOString(),
+    actorId: input.actorId,
+  });
+}
+
+export function createDiscordSurfaceMessage(input: {
+  text: string;
+  channel: string;
+  threadTs: string;
+  actorId?: string;
+  correlationId?: string;
+  messageId?: string;
+  receivedAt?: string;
+}): SurfaceMessage {
+  return createSurfaceMessage({
+    messageId: input.messageId || input.correlationId || randomUUID(),
+    surface: 'discord',
+    channel: input.channel,
+    threadTs: input.threadTs,
+    correlationId: input.correlationId || randomUUID(),
+    text: input.text,
+    receivedAt: input.receivedAt || new Date().toISOString(),
+    actorId: input.actorId,
+  });
 }
 
 function buildSlackSurfaceConversationQuery(message: SurfaceMessage, options: BuildSurfaceConversationInputOptions): string {
@@ -445,11 +491,11 @@ export function buildSurfaceConversationInputFromMessage(
         channel: message.channel,
       } satisfies SlackSurfaceMetadata
       : {
-        surface: message.surface as 'chronos' | 'presence' | 'imessage',
+        surface: message.surface,
         actorId: message.actorId,
         threadTs: message.threadTs,
         channel: message.channel,
-      } satisfies ChronosSurfaceMetadata | PresenceSurfaceMetadata | IMessageSurfaceMetadata,
+      } satisfies SurfaceConversationMetadata,
     cwd: options.cwd,
     forcedReceiver: options.forcedReceiver,
     missionId: options.missionId,
@@ -482,11 +528,12 @@ export function createSurfaceMessageFromConversationInput(input: SurfaceConversa
       receivedAt: input.receivedAt,
     });
   }
-  return createPresenceSurfaceMessage({
+  return createSurfaceMessage({
     text: input.text,
     channel: input.channel,
     threadTs: input.threadTs,
-    speakerId: input.actorId,
+    surface: input.surface,
+    actorId: input.actorId,
     correlationId: input.correlationId,
     messageId: input.messageId,
     receivedAt: input.receivedAt,

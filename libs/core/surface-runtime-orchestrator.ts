@@ -139,10 +139,9 @@ function resolvedSurfaceIntent(context: SurfaceRuntimeRouteContext): ReturnType<
 }
 
 function deriveSurfaceQueryRole(context: SurfaceRuntimeRouteContext): string | undefined {
-  if (context.input.agentId.includes('presence')) return 'presence_surface_agent';
-  if (context.input.agentId.includes('slack')) return 'slack_surface_agent';
-  if (context.input.agentId.includes('chronos')) return 'chronos_surface_agent';
-  return undefined;
+  const surface = surfaceChannelFromAgentId(context.input.agentId);
+  if (!surface) return undefined;
+  return `${surface.replace(/-/g, '_')}_surface_agent`;
 }
 
 let knowledgeIndexPromise: Promise<KnowledgeHintIndex> | null = null;
@@ -1269,11 +1268,7 @@ export async function runSurfaceConversation(
   )
     ? await compileUserIntentFlow({
         text: routedSurfaceInput.text,
-        channel: input.agentId.includes('slack')
-          ? 'slack'
-          : input.agentId.includes('presence')
-            ? 'presence'
-            : 'surface',
+        channel: surface || 'surface',
       }).catch((error: any) => {
         logger.warn(
           `[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`

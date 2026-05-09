@@ -8,6 +8,7 @@ describe('surface-agent-catalog', () => {
 
     expect(ids).toContain('presence-surface-agent');
     expect(ids).toContain('slack-surface-agent');
+    expect(ids).toContain('telegram-surface-agent');
     expect(ids).toContain('chronos-mirror');
   });
 

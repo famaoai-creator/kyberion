@@ -42,7 +42,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 | `build:` / `ci:` / `chore:` | none |
 | `feat!:` or any with `BREAKING CHANGE:` footer | major |
 
-PRs must use one of these types. CI rejects PRs whose merge commit does not match the pattern (Phase D'-4 follow-up: enforce via lint).
+PRs must use one of these types. CI rejects PR titles that do not match the pattern, and pushes to `main` reject commit subjects that do not match the pattern.
 
 ## Release cadence
 
@@ -86,7 +86,7 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2)+'\n');
 pnpm run check:contract-semver -- --rebaseline
 
 # 7. Commit the release prep.
-git add CHANGELOG.md package.json scripts/contract-baseline.json
+git add CHANGELOG.md package.json scripts/contract-baseline.json migration/
 git commit -m "chore(release): v${NEW_VERSION}"
 
 # 8. Tag the release.
@@ -137,6 +137,6 @@ We support the latest minor of the latest major + the latest minor of the previo
 - [x] CHANGELOG.md initialized
 - [x] `scripts/generate_changelog.ts`
 - [x] `migration/` directory + README
-- [ ] PR title / commit message linter (Phase D'-4 follow-up)
+- [x] PR title / commit message linter
 - [x] Automated release workflow (`.github/workflows/release.yml`)
-- [ ] Migration runner (`scripts/run_migrations.ts`) — Phase D'-4 follow-up
+- [x] Migration runner (`scripts/run_migrations.ts`)

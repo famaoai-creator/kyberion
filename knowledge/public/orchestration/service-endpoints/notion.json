@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "notion": {
+      "base_url": "https://api.notion.com/v1",
+      "preset_path": "knowledge/public/orchestration/service-presets/notion.json"
+    }
+  }
+}

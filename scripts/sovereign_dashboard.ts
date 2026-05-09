@@ -3,6 +3,7 @@ import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   listSurfaceOutboxMessages,
+  loadSurfaceManifest,
   logger,
   pathResolver,
   safeExistsSync,
@@ -258,7 +259,7 @@ function drawOnboardingHome() {
   console.log(`  ${chalk.gray('•')} Tutorial: ${tutorial?.mode ? chalk.cyan(tutorial.mode) : chalk.dim('not started')}`);
 
   const recommendedNextAction = !onboardingComplete
-    ? 'Run `pnpm onboard` and resume the current phase.'
+    ? 'Run `pnpm onboard` (customer/{slug}/ preferred when KYBERION_CUSTOMER is set) and resume the current phase.'
     : blockedServices.length > 0
       ? `Review ${blockedServices.join(', ')} connection drafts.`
       : tenantEntries.length === 0
@@ -491,19 +492,17 @@ function drawA2ATraffic() {
 
 function drawRuntimeSurfaces() {
   const statePath = pathResolver.shared('runtime/surfaces/state.json');
-  const manifestPath = pathResolver.knowledge('public/governance/active-surfaces.json');
+  const snapshotPath = pathResolver.knowledge('public/governance/active-surfaces.json');
+  const surfacesDir = pathResolver.knowledge('public/governance/surfaces');
 
   console.log(chalk.bold.blue(' 🛰️ RUNTIME SURFACES'));
 
-  if (!safeExistsSync(manifestPath)) {
+  if (!safeExistsSync(snapshotPath) && !safeExistsSync(surfacesDir)) {
     console.log(chalk.dim('  (Surface manifest not found)'));
     console.log('');
     return;
   }
-
-  const manifest = readJsonFile<{
-    surfaces: Array<{ id: string; kind: string; startupMode?: string }>;
-  }>(manifestPath);
+  const manifest = loadSurfaceManifest();
   const state = safeExistsSync(statePath)
     ? readJsonFile<{ surfaces: Record<string, { pid: number }> }>(statePath)
     : { surfaces: {} };

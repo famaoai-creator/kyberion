@@ -299,6 +299,26 @@ export interface DecomposedTaskPlan {
   tasks: TaskPlanItem[];
 }
 
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, any>;
+    required?: string[];
+  };
+}
+
+export interface ToolCall {
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface GenerateWithToolsResult {
+  text?: string;
+  toolCalls?: ToolCall[];
+}
+
 export interface ReasoningBackend {
   name: string;
   /** Divergence — produce independent hypotheses per persona. */
@@ -323,6 +343,8 @@ export interface ReasoningBackend {
   delegateTask(instruction: string, context?: string): Promise<string>;
   /** Run a plain prompt against the active reasoning backend. */
   prompt(prompt: string): Promise<string>;
+  /** (Optional) Execute a prompt with tool access (Function Calling / Tool Use). */
+  generateWithTools?(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult>;
 }
 
 let registered: ReasoningBackend | null = null;

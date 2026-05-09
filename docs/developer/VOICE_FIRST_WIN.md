@@ -54,12 +54,12 @@ Tier 0 is the first-win path. This document is about wiring tier 0.
 - [x] `libs/core/native-tts.test.ts` — unit tests for command building, control char sanitization.
 - [x] Exported via `@agent/core` as `nativeTtsSpeak` / `probeNativeTts` / etc.
 - [x] `pipelines/voice-hello.json` — the tier-0 first-win ADF.
+- [x] `system:native_tts_speak` — system actuator wiring from the voice pipeline to `libs/core/native-tts.ts`.
+- [x] `system:check_native_tts` — preflight probe that calls `probeNativeTts()` and exports its status.
 - [x] README / Quickstart now point at the first-win smoke commands.
 
 ## What's NOT implemented yet
 
-- [ ] **`system:native_tts_speak` op** in the system actuator that wires `pipelines/voice-hello.json` to `libs/core/native-tts.ts`. Currently the pipeline references this op symbolically; the wiring is the next concrete TODO.
-- [ ] **`system:check_native_tts` op** — preflight that calls `probeNativeTts()` and exports its status.
 - [ ] **`presence-studio` voice-hello route** — the browser frontend that uses Web Speech API for input.
 - [ ] **`voice-hub` topic** — `voice-hello.user-spoke` for the bridge between surface and pipeline.
 - [ ] **`wait_for` op** in pipeline-engine that suspends the pipeline until a topic is published or a fallback fires.
@@ -80,7 +80,9 @@ pnpm voice:upgrade-local
 # Pulls model files (1.2 GB), starts local server, verifies.
 ```
 
-Both upgrade scripts are not yet implemented — see Phase A-5.8 in the roadmap.
+The upgrade commands are implemented as configurators and validate prerequisites.
+What is still pending is full end-to-end runtime switching for the voice surface;
+see Phase A-5.8 in the roadmap.
 
 ## Why tier 0 matters
 

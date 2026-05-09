@@ -1,22 +1,25 @@
 {
   "action": "pipeline",
   "name": "Ecosystem Vital Check",
-  "description": "Checks for critical ecosystem paths and active missions.",
+  "description": "Checks for critical ecosystem paths and active missions using optimized ADF ops.",
   "steps": [
-    { "op": "system:log", "params": { "message": "🩺 [KYBERION] Ecosystem Vital Report (ADF-driven)" } },
-    { "op": "system:shell", "params": { "cmd": "[ -d node_modules ] && echo 'OK' || echo 'MISSING'", "export_as": "status_node_modules" } },
-    { "op": "system:shell", "params": { "cmd": "[ -d dist ] && echo 'OK' || echo 'MISSING'", "export_as": "status_dist" } },
-    { "op": "system:shell", "params": { "cmd": "[ -f knowledge/public/governance/active-surfaces.json ] && echo 'OK' || echo 'MISSING'", "export_as": "status_surface_manifest" } },
-    { "op": "system:shell", "params": { "cmd": "[ -f active/shared/runtime/surfaces/state.json ] && echo 'OK' || echo 'MISSING'", "export_as": "status_surface_state" } },
-    { "op": "system:shell", "params": { "cmd": "[ -f knowledge/personal/my-identity.json ] && echo 'OK' || echo 'MISSING'", "export_as": "status_identity" } },
-    { "op": "system:shell", "params": { "cmd": "[ -f knowledge/personal/my-vision.md ] && echo 'OK' || echo 'MISSING'", "export_as": "status_vision" } },
-    { "op": "system:shell", "params": { "cmd": "find active/missions knowledge/personal/missions -name 'mission-state.json' -exec grep -l '\"status\": \"active\"' {} + 2>/dev/null | wc -l", "export_as": "active_mission_count" } },
-    { "op": "system:log", "params": { "message": "✅ Physical Foundation: {{status_node_modules}}" } },
-    { "op": "system:log", "params": { "message": "✅ System Build: {{status_dist}}" } },
-    { "op": "system:log", "params": { "message": "✅ Surface Manifest: {{status_surface_manifest}}" } },
-    { "op": "system:log", "params": { "message": "✅ Surface Runtime State: {{status_surface_state}}" } },
-    { "op": "system:log", "params": { "message": "✅ Sovereign Identity: {{status_identity}}" } },
-    { "op": "system:log", "params": { "message": "✅ Sovereign Vision: {{status_vision}}" } },
-    { "op": "system:log", "params": { "message": "🚀 Active Missions: {{active_mission_count}}" } }
+    { "op": "system:log", "params": { "message": "🩺 [KYBERION] Ecosystem Vital Report (Optimized)" } },
+    
+    { "op": "system:probe", "params": { "path": "node_modules", "export_as": "p_node" } },
+    { "op": "system:probe", "params": { "path": "dist", "export_as": "p_dist" } },
+    { "op": "system:probe", "params": { "path": "knowledge/public/governance/surfaces", "export_as": "p_manifest_dir" } },
+    { "op": "system:probe", "params": { "path": "knowledge/public/governance/active-surfaces.json", "export_as": "p_manifest" } },
+    { "op": "system:probe", "params": { "path": "active/shared/runtime/surfaces/state.json", "export_as": "p_state" } },
+    { "op": "system:probe", "params": { "path": "knowledge/personal/my-identity.json", "export_as": "p_identity" } },
+    { "op": "system:probe", "params": { "path": "knowledge/personal/my-vision.md", "export_as": "p_vision" } },
+    
+    { "op": "system:list_missions", "params": { "status": "active", "export_as": "active_missions" } },
+    
+    { "op": "system:log", "params": { "message": "✅ Physical Foundation: {{p_node.exists}} ({{p_node.kind}})" } },
+    { "op": "system:log", "params": { "message": "✅ System Build:       {{p_dist.exists}} ({{p_dist.kind}})" } },
+    { "op": "system:log", "params": { "message": "✅ Surface Manifests:  {{p_manifest_dir.exists}} / snapshot: {{p_manifest.exists}}" } },
+    { "op": "system:log", "params": { "message": "✅ Runtime State:      {{p_state.exists}}" } },
+    { "op": "system:log", "params": { "message": "✅ Identity & Vision:  ID:{{p_identity.exists}} / Vision:{{p_vision.exists}}" } },
+    { "op": "system:log", "params": { "message": "🚀 Active Missions:    {{active_missions.count}}" } }
   ]
 }

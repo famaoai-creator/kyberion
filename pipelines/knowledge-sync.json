@@ -1,0 +1,56 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "knowledge-sync",
+  "name": "Knowledge & Documentation Sync",
+  "description": "Reads knowledge/governance/knowledge-sync-rules.json and runs each configured sync job via wisdom-actuator. Replaces scripts/run_knowledge_sync.ts.",
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🔄 [KNOWLEDGE] Starting knowledge sync..." }
+    },
+    {
+      "id": "load-config",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "knowledge/governance/knowledge-sync-rules.json",
+        "format": "json",
+        "export_as": "sync_config"
+      }
+    },
+    {
+      "id": "run-jobs",
+      "type": "control",
+      "op": "core:foreach",
+      "params": {
+        "items": "{{sync_config.jobs}}",
+        "as": "sync_job",
+        "do": [
+          {
+            "op": "system:log",
+            "params": { "message": "🔄 Running knowledge sync job: {{sync_job.action}}" }
+          },
+          {
+            "type": "apply",
+            "op": "wisdom:knowledge_inject",
+            "params": {
+              "action": "{{sync_job.action}}",
+              "source": "{{sync_job.source}}",
+              "target": "{{sync_job.target}}",
+              "options": "{{sync_job.options}}",
+              "export_as": "sync_job_result"
+            }
+          },
+          {
+            "op": "system:log",
+            "params": { "message": "✅ Job done: {{sync_job.action}}" }
+          }
+        ]
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ [KNOWLEDGE] Knowledge sync complete." }
+    }
+  ]
+}

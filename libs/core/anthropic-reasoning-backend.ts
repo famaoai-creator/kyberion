@@ -31,6 +31,8 @@ import type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
+  GenerateWithToolsResult,
+  ToolDefinition,
 } from './reasoning-backend.js';
 
 const DEFAULT_MODEL = 'claude-opus-4-7' as const;
@@ -649,5 +651,35 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
 
   async prompt(prompt: string): Promise<string> {
     return this.delegateTask(prompt);
+  }
+
+  async generateWithTools(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult> {
+    const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+    }));
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: this.maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+      tools: anthropicTools,
+    });
+
+    const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
+    const text = textBlocks.map((b) => b.text).join('\n');
+
+    const toolCalls = response.content
+      .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+      .map((b) => ({
+        name: b.name,
+        input: b.input as Record<string, unknown>,
+      }));
+
+    return {
+      ...(text ? { text } : {}),
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
   }
 }

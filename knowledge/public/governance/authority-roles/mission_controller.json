@@ -1,0 +1,33 @@
+{
+  "role": "mission_controller",
+  "description": "Mission lifecycle authority with mission state and observability write access.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/missions/",
+    "active/archive/missions/",
+    "knowledge/personal/missions/",
+    "knowledge/personal/governance/",
+    "knowledge/evolution/",
+    "active/shared/coordination/",
+    "active/shared/observability/mission-control/",
+    "active/shared/runtime/mission_queue.jsonl",
+    "active/audit/",
+    "registry.json"
+  ],
+  "scope_classes": [
+    "mission_state",
+    "coordination_runtime",
+    "observability",
+    "audit"
+  ],
+  "allowed_actuators": [
+    "artifact-actuator",
+    "approval-actuator",
+    "orchestrator-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential",
+    "personal"
+  ]
+}

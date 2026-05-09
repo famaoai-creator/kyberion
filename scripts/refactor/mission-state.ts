@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
+  customerResolver,
   findMissionPath,
   logger,
   missionDir as resolveMissionDir,
@@ -95,9 +96,16 @@ export function writeFocusedMissionId(missionFocusPath: string, missionId: strin
 export function checkPrerequisites(): void {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
 
-  const identityPath = pathResolver.knowledge('personal/my-identity.json');
-  if (!safeExistsSync(identityPath)) {
-    throw new Error('CRITICAL: Sovereign Identity missing. Please run "pnpm onboard" first to establish your identity.');
+  const profileRoot = customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+  const requiredFiles = ['my-identity.json', 'my-vision.md', 'agent-identity.json'].map((name) =>
+    path.join(profileRoot, name),
+  );
+  const missingFiles = requiredFiles.filter((filePath) => !safeExistsSync(filePath));
+  if (missingFiles.length > 0) {
+    throw new Error(
+      `CRITICAL: Sovereign profile incomplete. Missing: ${missingFiles.map((filePath) => path.basename(filePath)).join(', ')}. ` +
+      'Please run "pnpm onboard" (or complete customer onboarding) before creating missions.',
+    );
   }
 
   const tiers = [

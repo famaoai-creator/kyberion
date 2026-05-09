@@ -3,7 +3,7 @@ title: Production Readiness Implementation Plan
 category: Developer
 tags: [production-readiness, oss, verification, hardening, meeting]
 importance: 10
-last_updated: 2026-05-08
+last_updated: 2026-05-09
 ---
 
 # Production Readiness Implementation Plan
@@ -64,6 +64,16 @@ last_updated: 2026-05-08
 | P2-2 | Developer tour の実コード追従 | contributor の迷子を減らす | `docs/developer/TOUR.md`, `docs/developer/EXTENSION_POINTS.md` | actuator / pipeline / skill / tenant の入口が現在の構造と一致する |
 | P2-3 | Meeting use-case の operator doc 化 | デモ価値を外部に伝える | `docs/user/`, `knowledge/public/architecture/meeting-facilitator-use-case.md` | consent、安全境界、dry-run、real meeting の違いが明記される |
 | P2-4 | Good-first-issue 分解 | 外部 contributor を受け入れる | `.github/ISSUE_TEMPLATE`, `CONTRIBUTING.md` | P1/P2 の一部が 1-2h タスクとして切り出せる |
+
+### P3: Level-up backlog
+
+| ID | 改善項目 | 目的 | 主な対象 | 受入条件 |
+|---|---|---|---|---|
+| P3-1 | Secure I/O への統一 | 新規 CLI / utility のポリシー逸脱を減らす | `scripts/*.ts`, `libs/*/src/*` | `node:fs` 直叩きが例外なく `@agent/core/secure-io` に置換される |
+| P3-2 | Actuator カタログと実装の整合 | 説明だけ存在する op をなくす | `CAPABILITIES_GUIDE.md`, `libs/actuators/system-actuator`, `pipelines/*.json` | カタログ上の op が実装・ルーティング・テストで一致する |
+| P3-3 | 新規 runtime の回帰固定 | 橋渡しコードの劣化を早期検出する | `scripts/vital_check.ts`, `scripts/onboarding_apply.ts`, `scripts/agent_runtime_manager.ts`, voice bridges | 入出力・失敗時挙動・権限エラーが targeted test で固定される |
+| P3-4 | UI / voice / browser の smoke 強化 | 起動するだけの品質から脱する | `presence/displays/*`, `libs/actuators/voice-actuator`, `pipelines/*-smoke.json` | 起動、主要 API 応答、初回導線、consent gate の smoke が通る |
+| P3-5 | 参照切れの継続監査 | 大きな削除後の運用事故を減らす | `package.json`, workflows, docs, runbooks | 削除済み script / op / path への参照が CI で検出される |
 
 ## 3. 動作確認シナリオ
 
@@ -227,6 +237,7 @@ last_updated: 2026-05-08
 7. P0-7: README first-win と smoke を固定する。
 8. P1-1 以降: error classifier、runtime receipts、action lifecycle、cross-OS CI。
 9. P2: adoption docs と good-first-issue 分解。
+10. P3: secure-io / actuator parity / smoke / 参照切れ監査。
 
 ## 5. 5.4-mini への実装依頼テンプレート
 

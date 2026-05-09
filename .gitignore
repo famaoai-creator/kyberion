@@ -1,4 +1,5 @@
 .gemini/
+.venv/
 *.skill
 tmp/
 .DS_Store

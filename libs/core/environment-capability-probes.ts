@@ -138,7 +138,7 @@ function newestTsMtimeUnder(dir: string): number | null {
         const stat = safeStat(full);
         if (stat.isDirectory()) {
           walk(full);
-        } else if (full.endsWith('.ts') && !full.endsWith('.d.ts')) {
+        } else if (isBuildRelevantTsFile(full)) {
           if (stat.mtimeMs > newest) newest = stat.mtimeMs;
         }
       }
@@ -171,6 +171,11 @@ function newestOutputMtimeUnder(dir: string): number | null {
   } catch {
     return null;
   }
+}
+
+function isBuildRelevantTsFile(full: string): boolean {
+  if (!full.endsWith('.ts') || full.endsWith('.d.ts')) return false;
+  return !/(\.test|\.spec)\.ts$/.test(full);
 }
 
 function listDir(dir: string): string[] {

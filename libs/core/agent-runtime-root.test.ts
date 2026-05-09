@@ -21,4 +21,18 @@ describe('agent-runtime-root', () => {
 
     safeRmSync(root);
   });
+
+  it('projects provider memory for arbitrary providers using canonical names', () => {
+    const root = ensureAgentRuntimeRoot({
+      agentId: 'nerve-agent',
+      provider: 'nova',
+      mode: 'mission',
+    });
+
+    const projected = `${root}/NOVA.md`;
+    expect(safeExistsSync(projected)).toBe(true);
+    expect(safeReadFile(projected, { encoding: 'utf8' })).toContain('Mode: mission');
+
+    safeRmSync(root);
+  });
 });

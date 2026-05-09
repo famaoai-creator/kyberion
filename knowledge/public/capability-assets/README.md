@@ -23,7 +23,7 @@ It should not be treated as the primary conceptual model.
 Current policy:
 
 - executable capabilities live in `libs/actuators/`
-- runnable discovery is defined by `global_actuator_index.json`
+- runnable discovery is defined by `libs/actuators/*/manifest.json`; `global_actuator_index.json` is the compatibility snapshot
 - knowledge retrieval is governed by Knowledge Cards, overlays, and policy graphs
 
 This directory remains only until the remaining capability resources are migrated into a final taxonomy location.

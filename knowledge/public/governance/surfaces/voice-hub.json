@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "voice-hub",
+      "kind": "service",
+      "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
+      "command": "node",
+      "args": [
+        "dist/satellites/voice-hub/server.js"
+      ],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3032,
+      "healthPath": "/health",
+      "enabled": true
+    }
+  ]
+}

@@ -7,6 +7,8 @@ import {
   loadAgentProfileIndex,
   loadAuthorityRoleIndex,
   loadTeamRoleIndex,
+  safeExistsSync,
+  safeReaddir,
   safeReadFile,
 } from '@agent/core';
 
@@ -14,6 +16,30 @@ const rootDir = process.cwd();
 
 function loadJson(filePath: string) {
   return JSON.parse(safeReadFile(path.join(rootDir, filePath), { encoding: 'utf8' }) as string);
+}
+
+function loadAgentProfileDirectoryPayloads() {
+  const dir = path.join(rootDir, 'knowledge/public/orchestration/agent-profiles');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => ({
+      entry,
+      payload: loadJson(`knowledge/public/orchestration/agent-profiles/${entry}`),
+    }));
+}
+
+function loadTeamRoleDirectoryPayloads() {
+  const dir = path.join(rootDir, 'knowledge/public/orchestration/team-roles');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => ({
+      entry,
+      payload: loadJson(`knowledge/public/orchestration/team-roles/${entry}`),
+    }));
 }
 
 describe('Mission team composition contract', () => {
@@ -46,6 +72,56 @@ describe('Mission team composition contract', () => {
       expect(record.selection_hints?.preferred_agents?.length, `missing agent hints for ${teamRole}`).toBeGreaterThan(0);
       expect(record.selection_hints?.preferred_models?.length, `missing model hints for ${teamRole}`).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps the canonical agent profile directory in sync with the snapshot', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const validate = ajv.compile(loadJson('knowledge/public/schemas/agent-profile-index.schema.json'));
+    const snapshot = loadJson('knowledge/public/orchestration/agent-profile-index.json');
+    const snapshotAgents = snapshot.agents || {};
+    const dirPayloads = loadAgentProfileDirectoryPayloads();
+
+    expect(dirPayloads.length).toBeGreaterThan(0);
+
+    const dirAgents: Record<string, unknown> = {};
+    for (const { entry, payload } of dirPayloads) {
+      const valid = validate(payload);
+      expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+
+      const agentIds = Object.keys((payload as { agents?: Record<string, unknown> }).agents || {});
+      expect(agentIds, `${entry} must contain exactly one agent profile`).toHaveLength(1);
+      const agentId = agentIds[0];
+      expect(entry.replace(/\.json$/i, '')).toBe(agentId);
+      dirAgents[agentId] = (payload as { agents: Record<string, unknown> }).agents[agentId];
+      expect(snapshotAgents[agentId], `snapshot missing agent ${agentId}`).toEqual(dirAgents[agentId]);
+    }
+
+    expect(Object.keys(dirAgents).sort()).toEqual(Object.keys(snapshotAgents).sort());
+  });
+
+  it('keeps the canonical team role directory in sync with the snapshot', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const validate = ajv.compile(loadJson('knowledge/public/schemas/team-role.schema.json'));
+    const snapshot = loadJson('knowledge/public/orchestration/team-role-index.json');
+    const snapshotRoles = snapshot.team_roles || {};
+    const dirPayloads = loadTeamRoleDirectoryPayloads();
+
+    expect(dirPayloads.length).toBeGreaterThan(0);
+
+    const dirRoles: Record<string, unknown> = {};
+    for (const { entry, payload } of dirPayloads) {
+      const valid = validate(payload);
+      expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+
+      const roleId = (payload as { role?: string }).role;
+      expect(roleId, `${entry} must declare role`).toBeTruthy();
+      expect(entry.replace(/\.json$/i, '')).toBe(roleId);
+      const { role, ...record } = payload as { role?: string; [key: string]: unknown };
+      dirRoles[roleId!] = record;
+      expect(snapshotRoles[roleId], `snapshot missing role ${roleId}`).toEqual(dirRoles[roleId]);
+    }
+
+    expect(Object.keys(dirRoles).sort()).toEqual(Object.keys(snapshotRoles).sort());
   });
 
   it('composes a development mission team with required assignments', () => {

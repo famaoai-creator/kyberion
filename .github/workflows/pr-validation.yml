@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check PR title
+        run: pnpm run check:pr-title
+
       - name: Build project
         run: pnpm run build
 
@@ -42,6 +45,11 @@ jobs:
 
       - name: Run tests with coverage
         run: pnpm run test:coverage
+
+      - name: Check golden outputs
+        env:
+          KYBERION_REASONING_BACKEND: stub
+        run: pnpm run check:golden
 
       - name: Check coverage threshold
         env:
@@ -75,25 +83,14 @@ jobs:
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
 
-      - name: Measure build size
+      - name: Vital check
         id: build-size
         run: |
-          if [ -d dist/ ]; then
-            echo "📊 Measuring build size..."
-            node dist/scripts/measure-build-size.js > build-size-report.md
-            echo "✅ Build size measured successfully"
-            
-            # Also save JSON format for programmatic access
-            node dist/scripts/measure-build-size.js --json --no-save > build-size-report.json
-            
-            # Display summary in logs
-            cat build-size-report.md
-          else
-            echo "⚠️ dist/ directory not found"
-            exit 1
-          fi
+          node dist/scripts/vital_check.js --format text > vital-check-report.md
+          node dist/scripts/vital_check.js --format json --exit-on-missing=false > vital-check-report.json
+          cat vital-check-report.md
 
-      - name: Comment build size report on PR
+      - name: Comment vital check report on PR
         if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
         with:
@@ -101,12 +98,12 @@ jobs:
             const fs = require('fs');
 
             // Check if report file exists
-            if (!fs.existsSync('build-size-report.md')) {
-              console.log('Build size report not found, skipping comment');
+            if (!fs.existsSync('vital-check-report.md')) {
+              console.log('Vital check report not found, skipping comment');
               return;
             }
 
-            const report = fs.readFileSync('build-size-report.md', 'utf8');
+            const report = fs.readFileSync('vital-check-report.md', 'utf8');
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -117,7 +114,7 @@ jobs:
 
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
-              comment.body.includes('📦 Build Size Report')
+              comment.body.includes('🩺 Vital Check Report')
             );
 
             const commentBody = report;
@@ -130,7 +127,7 @@ jobs:
                 comment_id: botComment.id,
                 body: commentBody
               });
-              console.log('Updated existing build size comment');
+              console.log('Updated existing vital check comment');
             } else {
               // Create new comment
               await github.rest.issues.createComment({
@@ -139,16 +136,16 @@ jobs:
                 issue_number: context.issue.number,
                 body: commentBody
               });
-              console.log('Created new build size comment');
+              console.log('Created new vital check comment');
             }
 
-      - name: Upload build size artifacts
+      - name: Upload vital check artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-size-reports
+          name: vital-check-reports
           path: |
-            build-size-report.md
-            build-size-report.json
-            .kiro/metrics/build-size-history.json
+            vital-check-report.md
+            vital-check-report.json
+            active/shared/logs/traces/traces-*.jsonl
           retention-days: 30

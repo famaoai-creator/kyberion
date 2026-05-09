@@ -1,0 +1,64 @@
+{
+  "action": "pipeline",
+  "name": "voice-clone-speak-fragment",
+  "description": "Reusable fragment: generate speech in a registered voice clone profile via mlx-audio Qwen3-TTS ICL. Append to any pipeline that produces text output needing personal voice synthesis. Required context vars: profile_id, text. Optional: delivery_mode (default artifact_and_playback), language (default ja), output_path.",
+  "steps": [
+    {
+      "id": "generate_cloned_voice",
+      "op": "voice:generate_voice",
+      "params": {
+        "action": "generate_voice",
+        "request_id": "vcspeak-{{profile_id}}",
+        "text": "{{text}}",
+        "profile_ref": {
+          "profile_id": "{{profile_id}}"
+        },
+        "engine": {
+          "engine_id": "mlx_audio_qwen3"
+        },
+        "rendering": {
+          "language": "{{language|ja}}"
+        },
+        "delivery": {
+          "mode": "{{delivery_mode|artifact_and_playback}}",
+          "format": "wav",
+          "artifact_path": "{{output_path}}"
+        },
+        "routing": {
+          "personal_voice_mode": "require_personal_voice"
+        },
+        "export_as": "voice_gen_result"
+      }
+    },
+    {
+      "id": "notify_voice_ready",
+      "type": "apply",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "voice_gen_result.status", "operator": "eq", "value": "succeeded" },
+        "then": [
+          {
+            "id": "notify_ok",
+            "type": "apply",
+            "op": "system:system_notify",
+            "params": {
+              "title": "音声生成完了",
+              "message": "クローン音声の生成が完了しました。",
+              "subtitle": "{{profile_id}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "notify_blocked",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "[voice-clone-speak] generation result: {{voice_gen_result}}"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

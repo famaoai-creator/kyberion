@@ -15,7 +15,10 @@ import {
   runtimeSupervisor,
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
+  safeStat,
   safeUnlinkSync,
+  safeCreateExclusiveFileSync,
   stopAgentRuntime,
 } from '@agent/core';
 
@@ -36,6 +39,7 @@ interface SupervisorResponse {
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
+const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
 
 function toSnapshotResult(agentId: string, snapshot: ReturnType<typeof getAgentRuntimeSnapshot>, lease?: {
   owner_id?: string;
@@ -209,6 +213,42 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
 async function main() {
   process.env.MISSION_ROLE ||= 'surface_runtime';
   ensureSocketDir();
+
+  // Multi-instance guard: use a PID-based lock file for the daemon's lifetime
+  try {
+    safeCreateExclusiveFileSync(DAEMON_LOCK_PATH, process.pid.toString());
+  } catch (err: any) {
+    // If lock already exists, try to read the PID
+    let pid: number | undefined;
+    try {
+      const content = String(safeReadFile(DAEMON_LOCK_PATH, { encoding: 'utf8' })).trim();
+      if (content) {
+        pid = parseInt(content);
+      } else {
+        // Lock exists but empty? Wait and retry.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const retryContent = String(safeReadFile(DAEMON_LOCK_PATH, { encoding: 'utf8' })).trim();
+        if (retryContent) pid = parseInt(retryContent);
+      }
+    } catch (_) {}
+
+    if (pid && pid !== process.pid) {
+      try {
+        process.kill(pid, 0); // Check if process exists
+        logger.info(`[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`);
+        process.exit(0);
+      } catch (killErr: any) {
+        // Process does not exist, stale lock
+        try { safeUnlinkSync(DAEMON_LOCK_PATH); } catch (_) {}
+        try { safeCreateExclusiveFileSync(DAEMON_LOCK_PATH, process.pid.toString()); } catch (_) {}
+      }
+    } else {
+      // No valid PID found, assume stale/broken and try to overwrite
+      try { safeUnlinkSync(DAEMON_LOCK_PATH); } catch (_) {}
+      try { safeCreateExclusiveFileSync(DAEMON_LOCK_PATH, process.pid.toString()); } catch (_) {}
+    }
+  }
+
   if (safeExistsSync(SOCKET_PATH)) {
     try {
       safeUnlinkSync(SOCKET_PATH);
@@ -253,11 +293,20 @@ async function main() {
     try {
       if (safeExistsSync(SOCKET_PATH)) safeUnlinkSync(SOCKET_PATH);
     } catch (_) {}
+    try {
+      if (safeExistsSync(DAEMON_LOCK_PATH)) {
+        const currentPid = String(safeReadFile(DAEMON_LOCK_PATH, { encoding: 'utf8' })).trim();
+        if (currentPid === process.pid.toString()) {
+          safeUnlinkSync(DAEMON_LOCK_PATH);
+        }
+      }
+    } catch (_) {}
   };
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
   process.once('exit', cleanup);
 }
+
 
 main().catch((error: any) => {
   logger.error(error?.message || String(error));

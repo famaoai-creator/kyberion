@@ -1,16 +1,68 @@
 {
   "pipeline_id": "monitor-service-health",
-  "version": "1.0.0",
-  "description": "Verify the response health of messaging bridges.",
+  "version": "2.0.0",
+  "description": "Dynamically verify the response health of all active ecosystem services.",
   "action": "pipeline",
   "steps": [
     {
-      "id": "check-process-uptime",
+      "id": "get-surfaces",
       "type": "capture",
-      "op": "system:shell",
+      "op": "process:list-surfaces",
       "params": {
-        "cmd": "ps -eo pid,etime,comm | grep -E 'slack-bridge|voice-hub|nexus-daemon' || echo 'No active services'",
-        "export_as": "process_uptime"
+        "export_as": "ecosystem_surfaces"
+      }
+    },
+    {
+      "id": "log-summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "📡 [MONITOR] Auditing {{ecosystem_surfaces.length}} registered surfaces..."
+      }
+    },
+    {
+      "id": "audit-loop",
+      "type": "control",
+      "op": "core:foreach",
+      "params": {
+        "items": "{{ecosystem_surfaces}}",
+        "as": "surface",
+        "do": [
+          {
+            "type": "control",
+            "op": "core:if",
+            "params": {
+              "condition": "surface.running",
+              "then": [
+                {
+                  "type": "apply",
+                  "op": "system:log",
+                  "params": {
+                    "message": "  - [OK] {{surface.id}} ({{surface.kind}}) is running on port {{surface.port}}"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "type": "control",
+                  "op": "core:if",
+                  "params": {
+                    "condition": "surface.enabled",
+                    "then": [
+                      {
+                        "type": "apply",
+                        "op": "system:log",
+                        "params": {
+                          "message": "  - [ALERT] {{surface.id}} is ENABLED but NOT RUNNING!"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     {
@@ -18,7 +70,7 @@
       "type": "capture",
       "op": "system:shell",
       "params": {
-        "cmd": "grep -r 'ERROR' active/shared/logs | tail -n 10 || echo 'No recent errors'",
+        "cmd": "grep -r 'ERROR' active/shared/logs/surfaces 2>/dev/null | tail -n 15 || echo 'No recent surface errors'",
         "export_as": "recent_service_errors"
       }
     },
@@ -27,9 +79,9 @@
       "type": "transform",
       "op": "reasoning:analyze",
       "params": {
-        "instruction": "Based on process uptime and recent log errors, evaluate the reliability of communication bridges. Propose restarts for any 'zombie' or flapping services.",
+        "instruction": "Based on the dynamically discovered surface status list and recent log errors, evaluate the overall reliability of the ecosystem. Identify 'zombie' services (enabled but not running) or 'flapping' services with frequent errors. Propose specific recovery actions for the operator.",
         "context": [
-          "{{process_uptime}}",
+          "{{ecosystem_surfaces}}",
           "{{recent_service_errors}}"
         ],
         "export_as": "reliability_report"
@@ -40,7 +92,7 @@
       "type": "apply",
       "op": "system:log",
       "params": {
-        "message": "📡 [SERVICE HEALTH AUDIT]\n{{reliability_report}}"
+        "message": "📊 [RELIABILITY_REPORT]\n{{reliability_report}}"
       }
     }
   ]

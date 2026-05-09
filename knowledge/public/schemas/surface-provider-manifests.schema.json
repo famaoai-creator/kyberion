@@ -10,11 +10,14 @@
     "providers": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["slack", "chronos", "presence"],
+      "required": ["slack", "chronos", "presence", "imessage", "discord", "telegram"],
       "properties": {
         "slack": { "$ref": "#/$defs/providerManifest" },
         "chronos": { "$ref": "#/$defs/providerManifest" },
-        "presence": { "$ref": "#/$defs/providerManifest" }
+        "presence": { "$ref": "#/$defs/providerManifest" },
+        "imessage": { "$ref": "#/$defs/providerManifest" },
+        "discord": { "$ref": "#/$defs/providerManifest" },
+        "telegram": { "$ref": "#/$defs/providerManifest" }
       }
     }
   },
@@ -121,7 +124,7 @@
       "additionalProperties": false,
       "required": ["id", "displayName", "agentId", "channel", "interactionMode", "capabilities", "delivery", "routing"],
       "properties": {
-        "id": { "type": "string", "enum": ["slack", "chronos", "presence"] },
+        "id": { "type": "string", "enum": ["slack", "chronos", "presence", "imessage", "discord", "telegram"] },
         "displayName": { "type": "string" },
         "agentId": { "type": "string" },
         "channel": { "type": "string" },

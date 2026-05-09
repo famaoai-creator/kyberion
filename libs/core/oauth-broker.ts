@@ -10,11 +10,10 @@ import {
   safeUnlinkSync,
   safeFsyncFile,
 } from './secure-io.js';
-import { resolveServiceBinding } from './service-binding.js';
+import { loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
 import { loadConnectionDocument, storeConnectionDocument } from './secret-guard.js';
 
-const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
 const OAUTH_SESSION_ROOT = pathResolver.sharedTmp('oauth');
 
 export interface ServiceOAuthProfile {
@@ -40,8 +39,8 @@ interface PendingOAuthSession {
 }
 
 function loadServicePreset(serviceId: string): any {
-  const endpoints = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
-  const serviceConfig = endpoints?.services?.[serviceId];
+  const endpoints = loadServiceEndpointsCatalog();
+  const serviceConfig = endpoints.services?.[serviceId];
   if (!serviceConfig?.preset_path) {
     throw new Error(`No preset path defined for service: ${serviceId}`);
   }

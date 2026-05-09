@@ -1,0 +1,19 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "slack": {
+      "base_url": "https://slack.com/api",
+      "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
+      "credential_suffixes": {
+        "accessToken": [
+          "ACCESS_TOKEN",
+          "BOT_TOKEN",
+          "TOKEN"
+        ],
+        "appToken": [
+          "APP_TOKEN"
+        ]
+      }
+    }
+  }
+}

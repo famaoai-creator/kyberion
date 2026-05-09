@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "jira": {
+      "base_url": "https://atlassian.net/rest/api/3",
+      "preset_path": "knowledge/public/orchestration/service-presets/jira.json"
+    }
+  }
+}

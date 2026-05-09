@@ -3,7 +3,7 @@ import AjvModule from 'ajv';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { resolveServiceBinding } from './service-binding.js';
+import { getServiceEndpointRecord, loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -132,5 +132,19 @@ describe('service-binding', () => {
     };
     const valid = validate(binding);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('loads canonical service endpoint records from the directory', () => {
+    const catalog = loadServiceEndpointsCatalog();
+    expect(catalog.default_pattern).toBe('https://api.{service_id}.com/v1');
+    expect(catalog.services.slack).toMatchObject({
+      base_url: 'https://slack.com/api',
+      preset_path: 'knowledge/public/orchestration/service-presets/slack.json',
+    });
+
+    expect(getServiceEndpointRecord('github')).toMatchObject({
+      base_url: 'https://api.github.com',
+      preset_path: 'knowledge/public/orchestration/service-presets/github.json',
+    });
   });
 });

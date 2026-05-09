@@ -7,6 +7,7 @@ import { promoteVoiceProfileFromReceipt } from './voice-profile-promotion.js';
 describe('voice profile promotion', () => {
   const tmpDir = pathResolver.sharedTmp('voice-profile-promotion-tests');
   const registryPath = `${tmpDir}/voice-profile-registry.json`;
+  const registryDir = `${tmpDir}/voice-profiles`;
   const personalRegistryPath = `${tmpDir}/voice-profile-registry.personal.json`;
   const receiptPath = `${tmpDir}/receipt.json`;
 
@@ -14,12 +15,14 @@ describe('voice profile promotion', () => {
     safeRmSync(tmpDir, { recursive: true, force: true });
     safeRmSync(pathResolver.sharedTmp('voice-profile-promotion'), { recursive: true, force: true });
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
+    delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR;
     delete process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH;
     resetVoiceProfileRegistryCache();
   });
 
   it('promotes a validated receipt into the registry', () => {
     safeMkdir(tmpDir, { recursive: true });
+    safeMkdir(registryDir, { recursive: true });
     safeWriteFile(
       registryPath,
       JSON.stringify({
@@ -59,6 +62,7 @@ describe('voice profile promotion', () => {
       }),
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = registryPath;
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR = registryDir;
 
     const result = promoteVoiceProfileFromReceipt({
       receiptPath,

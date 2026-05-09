@@ -1,0 +1,29 @@
+{
+  "role": "devils_advocate",
+  "description": "Argues the opposite position to force divergence before convergence in decision-support missions.",
+  "required_capabilities": [
+    "reasoning",
+    "critique",
+    "analysis"
+  ],
+  "compatible_authority_roles": [
+    "ecosystem_architect",
+    "mission_controller"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns dissent hypotheses, cross-critique output, and dissent-log entries.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "high"
+}

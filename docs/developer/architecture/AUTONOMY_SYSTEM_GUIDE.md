@@ -38,7 +38,7 @@ const isUnderAttack = sensoryMemory.hasActiveContext('SECURITY_ALERT', 600000);
 ```
 
 #### 反射の活性化
-反射を常駐化する場合は `knowledge/public/governance/active-surfaces.json` に surface を宣言し、`surface-runtime` で反映します。単発実行なら `process-actuator` か governed pipeline を使います。
+反射を常駐化する場合は `knowledge/public/governance/surfaces/*.json` に surface を宣言し、`surface-runtime` で反映します。`active-surfaces.json` は互換 snapshot です。単発実行なら `process-actuator` か governed pipeline を使います。
 ```bash
 pnpm surfaces:reconcile
 pnpm surfaces:status

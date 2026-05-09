@@ -67,7 +67,7 @@ The JSON format of `pipelines/*.json`.
 
 ### 2.3 Plugin Format — **Beta**
 
-The `plugins/` directory format. The plugin authoring guide (Phase C'-5) will lift this to v1.
+The `plugins/` directory format. See [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md) for the current authoring guide. Phase D'-1 will lift this to v1.
 
 **Beta**:
 
@@ -115,7 +115,7 @@ See [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md).
 - The `KYBERION_CUSTOMER` env var as the activation mechanism.
 - The slug pattern `^[a-z0-9][a-z0-9_-]*$`.
 - The resolver API (`activeCustomer`, `customerRoot`, `resolveOverlay`, `overlayCandidates`).
-- Resolution order: customer overlay → personal fallback.
+- Resolution order: customer overlay → legacy personal fallback.
 
 ### 2.7 Trace Format — **Beta** (will be lifted to v1 after Phase B-1)
 
@@ -174,8 +174,8 @@ For FDE / customer engagements:
 
 | Need | Use this | Avoid |
 |---|---|---|
-| Customer-specific identity / vision | `customer/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` |
-| Customer-specific connections | `customer/{slug}/connections/` | Editing `knowledge/personal/connections/` directly when KYBERION_CUSTOMER is set |
+| Customer-specific identity / vision | `customer/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset |
+| Customer-specific connections | `customer/{slug}/connections/` | Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset |
 | Customer-specific policy override | `customer/{slug}/policy/` | Editing `knowledge/public/governance/` |
 | Customer-specific mission templates | `customer/{slug}/mission-seeds/` | Modifying core `pipelines/` |
 | Customer-specific actuator | A new actuator under `libs/actuators/` with its own version | Patching an existing actuator's behavior |

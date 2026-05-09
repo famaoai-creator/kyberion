@@ -1,0 +1,29 @@
+{
+  "role": "relationship_curator",
+  "description": "Maintains the confidential relationship-graph: trust_level, history, outstanding_asks, ng_topics.",
+  "required_capabilities": [
+    "memory_management",
+    "privacy",
+    "curation"
+  ],
+  "compatible_authority_roles": [
+    "mission_controller",
+    "ecosystem_architect"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "facilitator",
+  "required_scope_classes": [
+    "knowledge_core"
+  ],
+  "ownership_scope": "Owns relationship-node updates triggered by presence / voice actuator events; enforces tier boundaries.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "low"
+}

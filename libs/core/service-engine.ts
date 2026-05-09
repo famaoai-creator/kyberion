@@ -1,5 +1,6 @@
-import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding, secretGuard } from './index.js';
+import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog } from './index.js';
 import * as path from 'node:path';
+import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 
@@ -8,17 +9,24 @@ import { withExecutionContext } from './authority.js';
  * Allows any Actuator to leverage Adaptive Presets (API/CLI).
  */
 
-const SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
-
 function loadConnectionWithFallback(serviceId: string): Record<string, any> {
-  const primary = withExecutionContext('service_actuator', () => secretGuard.loadConnectionDocument(serviceId));
-  if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
+  const connectionPath = customerResolver.resolveOverlay(`connections/${serviceId}.json`);
+  if (connectionPath) {
+    try {
+      const primary = withExecutionContext('service_actuator', () =>
+        JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string)
+      );
+      if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
+    } catch (_) {}
+  }
   try {
     return withExecutionContext('service_actuator', () => {
       const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
       return JSON.parse(safeReadFile(fallbackPath, { encoding: 'utf8' }) as string);
     });
   } catch (_) {
+    const primary = withExecutionContext('service_actuator', () => secretGuard.loadConnectionDocument(serviceId));
+    if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
     return {};
   }
 }
@@ -156,7 +164,7 @@ function isCliAllowedForOperation(
 }
 
 export async function executeServicePreset(serviceId: string, action: string, params: any, auth: 'none' | 'secret-guard' = 'none') {
-  const endpoints = JSON.parse(safeReadFile(SERVICE_ENDPOINTS_PATH, { encoding: 'utf8' }) as string);
+  const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services[serviceId];
   if (!serviceConfig || !serviceConfig.preset_path) {
     throw new Error(`No preset path defined for service: ${serviceId}`);

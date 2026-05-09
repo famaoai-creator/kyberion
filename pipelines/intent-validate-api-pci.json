@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-validate-api-pci",
+  "name": "Validate API Documentation for PCI-DSS Compliance",
+  "description": "Validates that API documentation correctly implements PCI-DSS security controls.",
+  "variables": {
+    "api_doc_path": "docs/api/swagger.json",
+    "output_path": "active/shared/tmp/validate-pci.json"
+  },
+  "steps": [
+    {
+      "op": "system:log",
+      "params": { "message": "🚀 Starting PCI-DSS Validation for {{api_doc_path}}" }
+    },
+    {
+      "id": "validate-pci",
+      "type": "capture",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "Validate the API documentation against PCI-DSS requirements. Specifically, check if credit card numbers (PAN) are being logged or transmitted in plain text according to the schema definitions.",
+        "context": ["{{api_doc_path}}"],
+        "analysisType": "compliance_validation",
+        "export_as": "validation_result"
+      }
+    },
+    {
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{validation_result}}",
+        "format": "json"
+      }
+    },
+    {
+      "op": "system:log",
+      "params": { "message": "✅ Validation complete. Results saved to {{output_path}}" }
+    }
+  ]
+}

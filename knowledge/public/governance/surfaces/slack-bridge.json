@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "slack-bridge",
+      "kind": "gateway",
+      "description": "Slack Socket Mode ingress gateway and surface-agent host",
+      "service_id": "slack",
+      "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
+      "command": "node",
+      "args": [
+        "dist/satellites/slack-bridge/src/index.js"
+      ],
+      "env": {
+        "MISSION_ID": "MSN-SYSTEM-SENSORY-HUB",
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "slack_bridge"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    }
+  ]
+}

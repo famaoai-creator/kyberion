@@ -1,0 +1,29 @@
+{
+  "role": "counterparty_persona",
+  "description": "Synthesizes a counterparty persona for negotiation or stakeholder rehearsal without touching real relationship nodes.",
+  "required_capabilities": [
+    "reasoning",
+    "role_play",
+    "persona_modeling"
+  ],
+  "compatible_authority_roles": [
+    "ecosystem_architect",
+    "mission_controller"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns synthetic persona artifacts and rehearsal transcripts; never updates relationship-graph nodes.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}

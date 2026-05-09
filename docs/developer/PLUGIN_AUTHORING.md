@@ -10,7 +10,7 @@ last_updated: 2026-05-07
 
 How to add a new actuator to Kyberion in ~30 minutes. Phase C'-5 of `docs/PRODUCTIZATION_ROADMAP.md`.
 
-This guide assumes you've read [`TOUR.md`](./TOUR.md) and skimmed [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md). It is for authoring **first-party** actuators inside `libs/actuators/`. Third-party / out-of-tree plugins via the `plugins/` directory are a separate path (Phase D'-1, not yet stabilized).
+This guide assumes you've read [`TOUR.md`](./TOUR.md) and skimmed [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md). It is for authoring **first-party** actuators inside `libs/actuators/`. The separate `plugins/` runtime for skill hooks is documented in [`../../plugins/README.md`](../../plugins/README.md); out-of-tree actuators remain a separate, not-yet-stabilized path.
 
 ## When to add a new actuator
 
@@ -259,11 +259,9 @@ pnpm vitest run libs/actuators/weather-actuator/
 
 ## What about plugins (out-of-tree actuators)?
 
-The `plugins/` directory is the **future** location for third-party actuators. Currently:
+Kyberion already has a separate `plugins/` runtime for skill hooks. See [`../../plugins/README.md`](../../plugins/README.md) for that surface.
 
-- The plugin loader is Beta (per `EXTENSION_POINTS.md` §2.3).
-- Out-of-tree plugins must currently include their own manifest + schema and register via `pnpm plugin install <path>`.
-- Phase D'-1 will stabilize plugin authoring as v1. Until then, in-tree (under `libs/actuators/`) is the recommended path for production work.
+For out-of-tree actuators, the plugin surface is still Beta (per `EXTENSION_POINTS.md` §2.3). There is no dedicated installer yet; out-of-tree work should be treated as an experimental path and kept out of production workflows. For production work, in-tree actuators under `libs/actuators/` are still the recommended path.
 
 ## Reference actuators
 

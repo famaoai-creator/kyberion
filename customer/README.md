@@ -36,13 +36,26 @@ customer/
 
 ```bash
 # 1. Copy the template into a new customer slug (lowercase, hyphenated, no spaces)
-cp -R customer/_template customer/acme-corp
+pnpm customer:create acme-corp
 
 # 2. Fill in customer/acme-corp/customer.json, identity.json, vision.md
 $EDITOR customer/acme-corp/customer.json
 
 # 3. Activate that customer in your shell
 export KYBERION_CUSTOMER=acme-corp
+
+# 3b. Confirm what customer overlays exist in this checkout
+pnpm customer:list
+# Shows active overlays and whether the required customer.json / identity.json / vision.md files are present.
+
+# Optional: migrate your existing personal setup into this customer overlay
+pnpm customer:migrate-from-personal acme-corp
+
+# Optional: write an activation profile for this customer
+pnpm customer:switch acme-corp
+source active/shared/runtime/customer.env
+
+# customer:switch requires customer.json / identity.json / vision.md to be present.
 
 # 4. Run Kyberion as usual
 pnpm onboard

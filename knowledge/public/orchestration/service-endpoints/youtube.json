@@ -1,0 +1,8 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "youtube": {
+      "preset_path": "knowledge/public/orchestration/service-presets/youtube.json"
+    }
+  }
+}
