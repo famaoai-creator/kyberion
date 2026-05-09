@@ -63,13 +63,13 @@ pnpm onboard                # interactive identity setup → knowledge/personal/
 ### 1.4 Configure (FDE / customer overlay)
 
 ```bash
-cp -R customer/_template customer/customer-slug
+pnpm customer:create customer-slug
 $EDITOR customer/customer-slug/customer.json
 $EDITOR customer/customer-slug/identity.json
 $EDITOR customer/customer-slug/vision.md
 
-export KYBERION_CUSTOMER=customer-slug
-echo "export KYBERION_CUSTOMER=customer-slug" >> ~/.zshrc
+pnpm customer:switch customer-slug
+source active/shared/runtime/customer.env
 pnpm onboard
 ```
 
