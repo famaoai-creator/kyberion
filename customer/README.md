@@ -44,6 +44,9 @@ $EDITOR customer/acme-corp/customer.json
 # 3. Activate that customer in your shell
 export KYBERION_CUSTOMER=acme-corp
 
+# 3b. Confirm what customer overlays exist in this checkout
+pnpm customer:list
+
 # 4. Run Kyberion as usual
 pnpm onboard
 pnpm doctor

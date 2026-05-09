@@ -162,7 +162,7 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [x] Resolver API (`libs/core/customer-resolver.ts`)
 - [x] Resolver tests (`libs/core/customer-resolver.test.ts`)
 - [x] CLI: `pnpm customer:create <slug>` (copies from `_template/`)
-- [ ] CLI: `pnpm customer:list`
+- [x] CLI: `pnpm customer:list`
 - [ ] CLI: `pnpm customer:switch <slug>` (validates + sets in env profile)
 - [ ] Onboarding wizard integration (offer to create customer at start when `KYBERION_CUSTOMER` is unset and the user is FDE-mode)
 - [ ] Migration helper: `pnpm customer:migrate-from-personal`
