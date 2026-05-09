@@ -75,7 +75,7 @@ Three-tier filesystem isolation for what an agent reads and writes:
 
 | Tier | Path | Audience |
 |---|---|---|
-| Legacy personal fallback | `knowledge/personal/` (gitignored) | Legacy fallback when no customer overlay is active |
+| Legacy personal fallback | `knowledge/personal/` (gitignored) | Legacy personal fallback when no customer overlay is active |
 | Confidential | `knowledge/confidential/{project}/` (gitignored) | One project / org |
 | Public | `knowledge/public/` (committed) | Reusable, shared |
 

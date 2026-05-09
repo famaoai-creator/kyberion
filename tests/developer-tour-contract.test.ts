@@ -20,7 +20,7 @@ describe('Developer tour contract', () => {
     expect(tour).toContain('meeting-browser-driver/');
     expect(tour).toContain('customer/{slug}/` becomes the preferred overlay root');
     expect(tour).toContain('Legacy personal fallback');
-    expect(tour).toContain('Legacy fallback when no customer overlay is active');
+    expect(tour).toContain('Legacy personal fallback when no customer overlay is active');
     expect(tour).toContain('EXTENSION_POINTS.md');
   });
 
