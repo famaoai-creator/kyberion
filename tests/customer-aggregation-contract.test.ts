@@ -18,6 +18,8 @@ describe('Customer aggregation contract', () => {
     expect(doc).toContain('[x] CLI: `pnpm customer:list`');
     expect(doc).toContain('[x] CLI: `pnpm customer:switch <slug>`');
     expect(doc).toContain('[x] Migration helper: `pnpm customer:migrate-from-personal`');
+    expect(doc).toContain('[x] Connections consumer (`libs/core/service-engine.ts`)');
+    expect(doc).toContain('[x] Policy consumer (`libs/core/approval-policy.ts`)');
     expect(jp).toContain('[x] `pnpm customer:create`');
     expect(jp).toContain('[x] `customer:list`');
     expect(jp).toContain('[x] `customer:switch`');
