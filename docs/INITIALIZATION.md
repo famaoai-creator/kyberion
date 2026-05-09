@@ -17,10 +17,22 @@ pnpm install
 # 2. システムの具現化 (ビルド)
 pnpm build
 
-# 3. バックグラウンド surface の整列
+# 3. バックグラウンド surface の認証準備を確認
+pnpm surfaces:setup
+
+# 4. 外部サービス連携の認証準備を確認
+pnpm services:setup
+
+# 5. reasoning backend の準備を確認
+pnpm reasoning:setup
+
+# 6. 一括 readiness レポートを確認
+pnpm setup:report
+
+# 7. バックグラウンド surface の整列
 pnpm surfaces:reconcile
 
-# 4. 魂の注入 (オンボーディング)
+# 8. 魂の注入 (オンボーディング)
 pnpm onboard
 ```
 
@@ -45,19 +57,44 @@ pnpm onboard
 - **ステップ構成**: `build:packages` → `build:actuators` → `build:repo` → `build:ui`。
   個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
 
-### Stage 3: Runtime Surface Reconciliation
-- **実行コマンド**: `pnpm surfaces:reconcile`
-- **目的**: `slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface を manifest から標準起動します。
+### Stage 3: Runtime Surface Setup
+- **実行コマンド**: `pnpm surfaces:setup`
+- **目的**: `slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface について、認証の不足項目、CLI 代替、ホスト管理 surface を確認します。
 - **物理的変化**:
-  - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
-  - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。
-  - `runtime-supervisor` に surface runtime が登録されます。
+  - 認証と起動準備の要約が表示されます。
 - **補助コマンド**:
+  - `pnpm surfaces:reconcile` で setup 結果をもとに background surface を標準起動します。
   - `pnpm surfaces:status` で起動状態を確認できます。
   - `pnpm surfaces:start -- --surface <surface-id>` で個別 surface を開始できます。
   - `pnpm surfaces:stop -- --surface <surface-id>` で個別 surface を停止できます。
 
-### Stage 4: 魂の注入 (Soul Infusion)
+### Stage 4: External Service Setup
+- **実行コマンド**: `pnpm services:setup`
+- **目的**: GitHub、Slack、Notion、Jira などの service preset について、必要な secret、CLI 代替、customer/personal connection の置き場を先に確認します。
+- **物理的変化**:
+  - まだ実体の変更は行いません。設定不足の候補だけが要約されます。
+
+### Stage 5: Reasoning Backend Setup
+- **実行コマンド**: `pnpm reasoning:setup`
+- **目的**: `claude-cli` / `gemini-cli` / `codex-cli` / `anthropic` / `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します。
+- **物理的変化**:
+  - まだ実体の変更は行いません。利用可能な backend と不足条件が見えるだけです。
+
+### Stage 6: Consolidated Readiness Report
+- **実行コマンド**: `pnpm setup:report`
+- **目的**: `surface` / `service` / `reasoning` / `doctor` の readiness を一度に確認し、初期セットアップの抜けをまとめて潰します。
+- **物理的変化**:
+  - まだ実体の変更は行いません。まとめた readiness summary が表示されます。
+
+### Stage 7: Runtime Surface Reconciliation
+- **実行コマンド**: `pnpm surfaces:reconcile`
+- **目的**: setup で確認した状態をもとに、background surface を manifest から標準起動します。
+- **物理的変化**:
+  - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
+  - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。
+  - `runtime-supervisor` に surface runtime が登録されます。
+
+### Stage 8: 魂の注入 (Soul Infusion)
 - **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
@@ -70,13 +107,13 @@ pnpm onboard
   - `customer/{slug}/onboarding/onboarding-state.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/onboarding-state.json` になります。
   - `customer/{slug}/onboarding/onboarding-summary.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/onboarding-summary.md` になります。
 
-### Stage 5: 邂逅と命名の儀式 (Greeting & Naming)
+### Stage 9: 邂逅と命名の儀式 (Greeting & Naming)
 - **内容**: アイデンティティ設定の最後に、エージェントが自ら自己紹介を行い、主権者との間で「Agent ID」を合意します。
 - **目的**: A2A 通信やブロックチェーン記録に使用する、エージェントの公的な名前（Agent ID）を決定します。
 - **物理的変化**:
   - `customer/{slug}/agent-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/agent-identity.json` になります。
 
-### Stage 6: 接続・領域・チュートリアルの下準備
+### Stage 10: 接続・領域・チュートリアルの下準備
 - **内容**: サービス接続の候補、テナント 1 件分の登録、最初の tutorial plan を個別に整えます。
 - **目的**: 初回実行で副作用を強制せず、提案・承認・適用を分離します。
 - **物理的変化**:

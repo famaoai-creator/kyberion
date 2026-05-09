@@ -63,6 +63,10 @@
       "types": "./dist/blackhole-audio-bus.d.ts",
       "default": "./dist/blackhole-audio-bus.js"
     },
+    "./environment-capability-probes": {
+      "types": "./dist/environment-capability-probes.d.ts",
+      "default": "./dist/environment-capability-probes.js"
+    },
     "./channel-surface": {
       "types": "./dist/channel-surface.d.ts",
       "default": "./dist/channel-surface.js"

@@ -3,16 +3,23 @@ import { listEnvironmentManifestIds, loadEnvironmentManifest, probeManifest } fr
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
-const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline'];
-const MISSION_MANIFESTS = ['kyberion-runtime-baseline', 'meeting-participation-runtime'];
+const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
+const MISSION_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend', 'meeting-participation-runtime'];
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
-    .option('manifest', { type: 'string' })
-    .option('all', { type: 'boolean', default: false })
-    .option('mission', { type: 'string' })
-    .parseSync();
+export interface DoctorRunReport {
+  totalMissing: number;
+  summaries: Array<{
+    manifestId: string;
+    lines: string[];
+    counts: { must: number; should: number; nice: number };
+  }>;
+}
 
+export async function collectDoctorReport(argv: {
+  manifest?: string;
+  all?: boolean;
+  mission?: string;
+}): Promise<DoctorRunReport> {
   const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
   if (missionId) process.env.MISSION_ID = missionId;
 
@@ -22,25 +29,45 @@ async function main(): Promise<void> {
       ? [String(argv.manifest)]
       : missionId ? MISSION_MANIFESTS : DEFAULT_MANIFESTS;
 
+  const summaries: DoctorRunReport['summaries'] = [];
   let totalMissing = 0;
+
   for (const manifestId of manifestIds) {
     const manifest = loadEnvironmentManifest(manifestId);
     const probes = await probeManifest(manifest, {
       ...(missionId ? { mission_id: missionId } : {}),
     });
     const summary = summarizeManifestDoctor(manifest, probes);
-    for (const line of formatDoctorSummary(summary)) {
+    const lines = formatDoctorSummary(summary);
+    summaries.push({ manifestId, lines, counts: summary.counts });
+    totalMissing += summary.counts.must + summary.counts.should;
+  }
+
+  return { totalMissing, summaries };
+}
+
+async function main(): Promise<void> {
+  const argv = await createStandardYargs()
+    .option('manifest', { type: 'string' })
+    .option('all', { type: 'boolean', default: false })
+    .option('mission', { type: 'string' })
+    .parseSync();
+
+  const report = await collectDoctorReport(argv);
+
+  for (const summary of report.summaries) {
+    for (const line of summary.lines) {
       console.log(line);
     }
-    totalMissing += probes.filter((probe) => !probe.satisfied).length;
     console.log('');
   }
 
-  if (totalMissing === 0) {
+  if (report.totalMissing === 0) {
     console.log('All required capabilities are satisfied.');
     process.exit(0);
   }
 
+  const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
   if (!missionId && !argv.manifest && !argv.all) {
     console.log('Tip: pass `--mission <id>` to include mission-scoped meeting checks such as voice consent.');
   }
