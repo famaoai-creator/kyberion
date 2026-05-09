@@ -258,7 +258,7 @@ function drawOnboardingHome() {
   console.log(`  ${chalk.gray('•')} Tutorial: ${tutorial?.mode ? chalk.cyan(tutorial.mode) : chalk.dim('not started')}`);
 
   const recommendedNextAction = !onboardingComplete
-    ? 'Run `pnpm onboard` and resume the current phase.'
+    ? 'Run `pnpm onboard` (customer/{slug}/ preferred when KYBERION_CUSTOMER is set) and resume the current phase.'
     : blockedServices.length > 0
       ? `Review ${blockedServices.join(', ')} connection drafts.`
       : tenantEntries.length === 0
