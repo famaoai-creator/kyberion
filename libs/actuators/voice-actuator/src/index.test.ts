@@ -71,6 +71,7 @@ const mocks = vi.hoisted(() => ({
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
+  withRetry: vi.fn(async (fn: () => Promise<any>) => fn()),
   getVoiceSampleIngestionPolicy: vi.fn(() => ({
     version: 'test',
     sample_limits: {
@@ -150,6 +151,7 @@ vi.mock('@agent/core', async () => {
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
+    withRetry: mocks.withRetry,
     getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
     validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
     splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
@@ -256,6 +258,7 @@ describe('voice actuator', () => {
       resolved_engine_id: 'local_say',
     }));
     expect(mocks.safeExec).toHaveBeenCalledWith('say', ['-v', 'Kyoko', '-r', '180', 'hello world']);
+    expect(mocks.withRetry).toHaveBeenCalled();
   });
 
   it('runs generate_voice through native artifact and playback flow', async () => {
@@ -297,6 +300,7 @@ describe('voice actuator', () => {
       'say',
       ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.wav', 'hello world'],
     );
+    expect(mocks.withRetry).toHaveBeenCalled();
   });
 
   it('blocks generate_voice when personal voice is required but engine falls back', async () => {

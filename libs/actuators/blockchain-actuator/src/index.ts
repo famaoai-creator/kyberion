@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs, pathResolver } from '@agent/core';
+import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs, pathResolver, classifyError, withRetry } from '@agent/core';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,16 @@ import { fileURLToPath } from 'node:url';
  */
 
 const MOCK_CHAIN_PATH = pathResolver.active('audit/mock_blockchain.jsonl');
+const BLOCKCHAIN_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/blockchain-actuator/manifest.json');
+const DEFAULT_BLOCKCHAIN_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 interface BlockchainAction {
   action: 'anchor_mission' | 'anchor_trust' | 'verify_anchor';
@@ -19,6 +29,48 @@ interface BlockchainAction {
     hash?: string;
     score?: number;
     tx_metadata?: any;
+  };
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(BLOCKCHAIN_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_BLOCKCHAIN_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
   };
 }
 
@@ -46,7 +98,9 @@ async function anchorMission(params: any) {
     contract_address: '0xKyberionSovereignEvidenceContractV1'
   };
 
-  _writeToMockChain(tx);
+  await withRetry(async () => {
+    _writeToMockChain(tx);
+  }, buildRetryOptions());
   return { status: 'success', tx_id: tx.tx_id, block: tx.block_number };
 }
 
@@ -66,7 +120,9 @@ async function anchorTrust(params: any) {
     contract_address: '0xKyberionTrustGovernanceContractV1'
   };
 
-  _writeToMockChain(tx);
+  await withRetry(async () => {
+    _writeToMockChain(tx);
+  }, buildRetryOptions());
   return { status: 'success', tx_id: tx.tx_id, block: tx.block_number };
 }
 

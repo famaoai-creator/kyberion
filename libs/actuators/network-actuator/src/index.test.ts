@@ -17,6 +17,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeExistsSync: vi.fn().mockReturnValue(false),
     safeExec: vi.fn().mockReturnValue(''),
     secureFetch: vi.fn().mockResolvedValue({ status: 200, data: {} }),
+    withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
     logger: {
       info: vi.fn(),
       warn: vi.fn(),
@@ -108,6 +109,40 @@ describe('network-actuator', () => {
         expect(result.status).toBe('succeeded');
         expect(result.context.api_response).toBeDefined();
         expect(result.context.api_response.status).toBe(200);
+      });
+
+      it('fetch は manifest の recovery policy と step override をマージして retry する', async () => {
+        const { secureFetch, withRetry } = await import('@agent/core');
+        vi.mocked(secureFetch).mockResolvedValueOnce({ status: 200, data: { result: 'ok' } });
+
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'fetch',
+              params: {
+                url: 'https://api.example.com/data',
+                export_as: 'api_response',
+                max_retries: 5,
+                retry_delay_ms: 250,
+              },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(withRetry).toHaveBeenCalledWith(
+          expect.any(Function),
+          expect.objectContaining({
+            maxRetries: 5,
+            initialDelayMs: 250,
+            maxDelayMs: 10000,
+            factor: 2,
+            jitter: true,
+            shouldRetry: expect.any(Function),
+          }),
+        );
       });
 
       it('fetch でPOSTリクエストを実行する', async () => {

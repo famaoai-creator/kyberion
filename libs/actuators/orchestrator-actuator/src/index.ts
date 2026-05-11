@@ -72,6 +72,16 @@ interface OrchestratorAction {
 }
 
 const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge('public/orchestration/actuator-request-archetypes.json');
+const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/orchestrator-actuator/manifest.json');
+const DEFAULT_ORCHESTRATOR_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 /**
  * Main Entry Point
@@ -80,7 +90,54 @@ async function handleAction(input: OrchestratorAction) {
   if (input.action === 'reconcile') {
     return await performReconcile(input);
   }
+  if (input.action !== 'pipeline') {
+    throw new Error(`Unsupported orchestrator action: ${input.action}`);
+  }
   return await executePipeline(input.steps || [], input.context || {}, input.options);
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(ORCHESTRATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_ORCHESTRATOR_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const message = String(error?.message || '');
+      if (retryableCategories.size > 0) {
+        const category =
+          /ETIMEDOUT|timeout|network/i.test(message) ? 'timeout' :
+          /ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN/i.test(message) ? 'network' :
+          /EADDRINUSE|ENOSPC|resource unavailable|busy/i.test(message) ? 'resource_unavailable' :
+          'unknown';
+        return retryableCategories.has(category);
+      }
+      return /ETIMEDOUT|timeout|network|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EADDRINUSE|ENOSPC/i.test(message);
+    },
+  };
 }
 
 /**
@@ -172,7 +229,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) };
     case 'shell':
       const cmd = resolveVars(params.cmd, ctx);
-      const shellResult = await withRetry(async () => safeExec(cmd), params.retry || { maxRetries: 2 });
+      const shellResult = await withRetry(async () => safeExec(cmd), buildRetryOptions(params.retry));
       return { ...ctx, [params.export_as || 'last_capture']: shellResult.trim() };
     case 'intent_detect':
       const mapping = yaml.load(safeReadFile(path.resolve(rootDir, resolveVars(params.mapping_path, ctx)), { encoding: 'utf8' }) as string) as any;
@@ -1606,7 +1663,7 @@ async function opApply(op: string, params: any, ctx: any) {
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       await withRetry(async () => {
         safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
-      }, params.retry || { maxRetries: 3 });
+      }, buildRetryOptions(params.retry));
       break;
     case 'mkdir': safeMkdir(path.resolve(rootDir, resolveVars(params.path, ctx)), { recursive: true }); break;
     case 'symlink':
@@ -1620,7 +1677,7 @@ async function opApply(op: string, params: any, ctx: any) {
       await withRetry(async () => {
         safeExec('git', ['add', '.'], { cwd: rootDir });
         safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], { cwd: rootDir });
-      }, { maxRetries: 2, initialDelayMs: 1000 });
+      }, buildRetryOptions({ maxRetries: 2, initialDelayMs: 1000 }));
       break;
     case 'log': logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
     case 'write_execution_plan_set': {

@@ -15,6 +15,8 @@ import {
   resolveWriteArtifactSpec,
   nativeTtsSpeak,
   probeNativeTts,
+  classifyError,
+  withRetry,
 } from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -64,6 +66,16 @@ const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
 const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');
+const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/system-actuator/manifest.json');
+const DEFAULT_SYSTEM_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 250,
+  maxDelayMs: 2000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
@@ -75,6 +87,48 @@ function assertUnsafeJsAllowed() {
   if (!ALLOW_UNSAFE_JS) {
     throw new Error('[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.');
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(SYSTEM_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_SYSTEM_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
 }
 
 interface PipelineStep {
@@ -1015,8 +1069,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     } catch (err: any) {
       logger.error(`  [SYS_PIPELINE] Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
-      // Throw to ensure calling runtime (run_pipeline.ts) can catch and repair
-      throw err;
+      break;
     }
   }
 
@@ -1061,16 +1114,16 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       assertUnsafeShellAllowed();
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: safeExec(
+        [params.export_as || 'last_capture']: await withRetry(async () => safeExec(
           process.env.SHELL || '/bin/zsh',
           ['-lc', resolve(params.cmd)],
           { cwd: rootDir, env: params.env || {} },
-        ).trim(),
+        ).trim(), buildRetryOptions(params.retry)),
       };
     case 'cli_health_check': {
       const command = resolve(params.command);
       const args = params.args ? params.args.map((a: any) => resolve(a)) : ['--version'];
-      const result = safeExecResult(command, args, { timeoutMs: params.timeout_ms || 5000 });
+      const result = await withRetry(async () => safeExecResult(command, args, { timeoutMs: params.timeout_ms || 5000 }), buildRetryOptions(params.retry));
       return {
         ...ctx,
         [params.export_as || 'cli_health']: {
@@ -1086,12 +1139,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const command = resolve(params.command);
       const args = params.args ? params.args.map((a: any) => resolve(a)) : [];
       const env = params.env ? params.env : {};
-      const result = safeExecResult(command, args, {
+      const result = await withRetry(async () => safeExecResult(command, args, {
         cwd: params.cwd ? path.resolve(rootDir, resolve(params.cwd)) : rootDir,
         env,
         timeoutMs: params.timeout_ms || 30000,
         input: params.input ? resolve(params.input) : undefined,
-      });
+      }), buildRetryOptions(params.retry));
       if (result.status !== 0 && !params.allow_error) {
         throw new Error(`CLI execution failed with status ${result.status}: ${result.stderr}`);
       }
@@ -1113,10 +1166,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       let exists = false;
       let kind = 'unknown';
       try {
-        exists = safeExistsSync(targetPath);
+        exists = await withRetry(async () => safeExistsSync(targetPath), buildRetryOptions(params.retry));
         if (exists) {
           const { safeStat } = await import('@agent/core/secure-io');
-          const stats = safeStat(targetPath);
+          const stats = await withRetry(async () => safeStat(targetPath), buildRetryOptions(params.retry));
           kind = stats.isDirectory() ? 'dir' : 'file';
         }
       } catch (err) {
@@ -1182,7 +1235,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return { ...ctx, [params.export_as || 'scan_result']: data };
     }
     case 'vision_consult':
-      return { ...ctx, [params.export_as || 'vision_decision']: await visionJudge.consultVision(resolve(params.context), params.tie_break_options) };
+      return { ...ctx, [params.export_as || 'vision_decision']: await withRetry(async () => visionJudge.consultVision(resolve(params.context), params.tie_break_options), buildRetryOptions(params.retry)) };
     case 'pulse_status':
       const { ledger } = await import('@agent/core');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
@@ -1374,7 +1427,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const screenshotDir = pathResolver.shared('runtime/computer/screenshots');
       if (!safeExistsSync(screenshotDir)) safeMkdir(screenshotDir, { recursive: true });
       const filename = params.path ? pathResolver.rootResolve(resolve(params.path)) : path.join(screenshotDir, `screenshot-${Date.now()}.png`);
-      const result = takeScreenshot(filename, { displayIndex: params.display_index });
+      const result = await withRetry(async () => takeScreenshot(filename, { displayIndex: params.display_index }), buildRetryOptions(params.retry));
       return { ...ctx, [params.export_as || 'screenshot_path']: result };
     }
     case 'clipboard_read': {
@@ -1488,12 +1541,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'native_tts_speak': {
       // Phase A-5 voice tier 0: speak via OS-native TTS (say / espeak / SAPI).
       const text = String(resolve(params.text || '{{last_capture}}'));
-      const result = await nativeTtsSpeak(text, {
+      const result = await withRetry(async () => nativeTtsSpeak(text, {
         voice: params.voice ? String(resolve(params.voice)) : undefined,
         rate: typeof params.rate === 'number' ? params.rate : undefined,
         timeoutMs: typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined,
         silent: true,
-      });
+      }), buildRetryOptions(params.retry));
       ctx = { ...ctx, [params.export_as || 'last_tts_result']: result };
       if (!result.ok) {
         logger.warn(`[NATIVE_TTS] Speak failed: ${result.error}`);
@@ -1521,11 +1574,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const platform = process.platform;
       try {
         if (platform === 'darwin') {
-          safeExec('open', [url], { cwd: rootDir });
+          await withRetry(async () => safeExec('open', [url], { cwd: rootDir }), buildRetryOptions(params.retry));
         } else if (platform === 'win32') {
-          safeExec('cmd', ['/c', 'start', '', url], { cwd: rootDir });
+          await withRetry(async () => safeExec('cmd', ['/c', 'start', '', url], { cwd: rootDir }), buildRetryOptions(params.retry));
         } else {
-          safeExec('xdg-open', [url], { cwd: rootDir });
+          await withRetry(async () => safeExec('xdg-open', [url], { cwd: rootDir }), buildRetryOptions(params.retry));
         }
         ctx = { ...ctx, [params.export_as || 'opened_url']: url };
       } catch (err: any) {
@@ -1570,7 +1623,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       assertUnsafeShellAllowed();
       const script = String(resolve(params.script || ''));
       if (!script) throw new Error('run_applescript requires "script" param');
-      const result = runAppleScript(script);
+      const result = await withRetry(async () => runAppleScript(script), buildRetryOptions(params.retry));
       ctx = { ...ctx, [params.export_as || 'applescript_result']: result };
       break;
     }
@@ -1591,11 +1644,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       }
       const platform = process.platform;
       if (platform === 'darwin') {
-        safeExec('open', [absPath], { cwd: rootDir });
+        await withRetry(async () => safeExec('open', [absPath], { cwd: rootDir }), buildRetryOptions(params.retry));
       } else if (platform === 'win32') {
-        safeExec('cmd', ['/c', 'start', '', absPath], { cwd: rootDir });
+        await withRetry(async () => safeExec('cmd', ['/c', 'start', '', absPath], { cwd: rootDir }), buildRetryOptions(params.retry));
       } else {
-        safeExec('xdg-open', [absPath], { cwd: rootDir });
+        await withRetry(async () => safeExec('xdg-open', [absPath], { cwd: rootDir }), buildRetryOptions(params.retry));
       }
       break;
     }
@@ -1604,10 +1657,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       if (params.pid) {
         const pid = Number(resolve(params.pid));
         if (!Number.isInteger(pid) || pid <= 0) throw new Error(`process_kill: invalid pid "${params.pid}"`);
-        process.kill(pid, params.signal || 'SIGTERM');
+        await withRetry(async () => process.kill(pid, params.signal || 'SIGTERM'), buildRetryOptions(params.retry));
       } else if (params.name) {
         const name = String(resolve(params.name));
-        safeExec('pkill', ['-f', name], { cwd: rootDir });
+        await withRetry(async () => safeExec('pkill', ['-f', name], { cwd: rootDir }), buildRetryOptions(params.retry));
       } else {
         throw new Error('process_kill requires "pid" or "name" param');
       }

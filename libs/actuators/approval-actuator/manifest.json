@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Human approval request state transitions and decision handling",
   "contract_schema": "schemas/approval-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "approval_read_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 200,
+      "maxDelayMs": 1500,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["resource_unavailable", "timeout"]
+  },
   "capabilities": [
     { "op": "create", "platforms": ["darwin", "linux", "win32"] },
     { "op": "load", "platforms": ["darwin", "linux", "win32"] },

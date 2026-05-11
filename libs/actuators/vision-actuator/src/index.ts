@@ -1,4 +1,4 @@
-import { logger, safeReadFile, executeServicePreset, pathResolver } from '@agent/core';
+import { logger, safeReadFile, executeServicePreset, pathResolver, classifyError, withRetry } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 
@@ -16,6 +16,59 @@ const LEGACY_MEDIA_GENERATION_ACTIONS = new Set([
   'record_screen',
   'run_workflow',
 ]);
+
+const VISION_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/vision-actuator/manifest.json');
+const DEFAULT_VISION_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(VISION_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_VISION_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
 
 async function inspectImage(params: any) {
   const logicalPath = String(params.path || '');
@@ -61,7 +114,7 @@ async function handleSingleAction(input: any) {
     throw new Error(`Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`);
   }
   logger.warn(`🎨 [VISION:LEGACY] "${action}" is a legacy route. Prefer media-generation-actuator.`);
-  return await executeServicePreset('media-generation', action, params);
+  return await withRetry(async () => executeServicePreset('media-generation', action, params), buildRetryOptions());
 }
 
 export async function handleAction(input: any) {

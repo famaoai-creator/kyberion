@@ -132,6 +132,8 @@ const openFinderPath = vi.fn();
 const emitComputerSurfacePatch = vi.fn();
 const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
 const loadApprovalRequest = vi.fn(() => null);
+const classifyError = vi.fn(() => ({ category: 'timeout' }));
+const withRetry = vi.fn(async (fn: any) => fn());
 const pathResolver = {
   rootDir: vi.fn(() => '/tmp/kyberion'),
   rootResolve: vi.fn((p: string) => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
@@ -153,6 +155,8 @@ vi.mock('@agent/core', () => ({
   getPathValue,
   resolveWriteArtifactSpec,
   safeExec,
+  classifyError,
+  withRetry,
   emitComputerSurfacePatch,
   activateApplication,
   detectFocusedInput,

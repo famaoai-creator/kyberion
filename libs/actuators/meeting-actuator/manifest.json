@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
   "contract_schema": "schemas/meeting-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "bridge_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "join", "platforms": ["darwin", "linux", "win32"] },
     { "op": "leave", "platforms": ["darwin", "linux", "win32"] },

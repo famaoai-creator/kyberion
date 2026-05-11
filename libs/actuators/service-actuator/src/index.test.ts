@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeReadFile: vi.fn(),
   executeServicePreset: vi.fn(),
+  withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -19,6 +20,7 @@ vi.mock('@agent/core', async () => {
     safeExec: mocks.safeExec,
     safeReadFile: mocks.safeReadFile,
     executeServicePreset: mocks.executeServicePreset,
+    withRetry: mocks.withRetry,
   };
 });
 
@@ -26,6 +28,53 @@ describe('service-actuator handleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.KYBERION_ALLOW_UNSAFE_CLI;
+  });
+
+  it('uses the manifest retry policy for service pipeline steps', async () => {
+    mocks.executeServicePreset.mockResolvedValue({ ok: true });
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('service-actuator/manifest.json')) {
+        return JSON.stringify({
+          recovery_policy: {
+            retry: {
+              maxRetries: 4,
+              initialDelayMs: 250,
+              maxDelayMs: 2000,
+              factor: 3,
+              jitter: false,
+            },
+          },
+        });
+      }
+      return '';
+    });
+
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          op: 'preset',
+          params: {
+            service_id: 'backlog',
+            action: 'get_issues',
+            params: { space: 'acme' },
+          },
+        },
+      ],
+    } as any);
+
+    expect(mocks.withRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        maxRetries: 4,
+        initialDelayMs: 250,
+        maxDelayMs: 2000,
+        factor: 3,
+        jitter: false,
+      }),
+    );
   });
 
   it('delegates PRESET mode to the shared service engine', async () => {

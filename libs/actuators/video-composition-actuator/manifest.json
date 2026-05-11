@@ -2,6 +2,18 @@
   "actuator_id": "video-composition-actuator",
   "version": "1.0.0",
   "description": "Governed deterministic composed-video bundle preparation actuator",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "video_bundle_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["resource_unavailable", "timeout"]
+  },
   "capabilities": [
     { "op": "prepare_video_composition", "platforms": ["darwin", "linux", "win32"] },
     { "op": "compile_narrated_video_brief", "platforms": ["darwin", "linux", "win32"] },

@@ -1,4 +1,4 @@
-import { logger, safeReadFile, platform, transform, secureFetch, safeExec, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog } from './index.js';
+import { logger, safeReadFile, platform, transform, secureFetch, safeExec, withRetry, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog, classifyError } from './index.js';
 import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -80,6 +80,55 @@ function normalizePresetResult(output: any, outputMapping?: Record<string, strin
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveRecoveryPolicy(source: Record<string, any> | undefined): Record<string, any> {
+  return isPlainObject(source?.recovery_policy) ? source.recovery_policy : {};
+}
+
+function resolveRetryPolicy(...sources: Array<Record<string, any> | undefined>): RetryPolicy {
+  const merged: RetryPolicy = {};
+  for (const source of sources) {
+    const policy = resolveRecoveryPolicy(source);
+    const retry = policy.retry || policy.default_retry || source?.retry_policy || source?.retry || {};
+    if (isPlainObject(retry)) {
+      Object.assign(merged, retry);
+    }
+  }
+  return merged;
+}
+
+function buildRetryOptions(
+  serviceConfig: Record<string, any>,
+  preset: Record<string, any>,
+  operation: Record<string, any>,
+): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
+  const retryableCategories = new Set<string>();
+  for (const source of [serviceConfig, preset, operation]) {
+    const policy = resolveRecoveryPolicy(source);
+    const categories = Array.isArray(policy.retryable_categories) ? policy.retryable_categories : [];
+    for (const category of categories) retryableCategories.add(String(category));
+  }
+
+  const resolvedRetry = {
+    ...DEFAULT_RETRY_POLICY,
+    ...resolveRetryPolicy(serviceConfig, preset, operation),
+  };
+
+  const shouldRetry = (error: Error) => {
+    const classification = classifyError(error);
+    if (retryableCategories.size > 0) {
+      return retryableCategories.has(classification.category);
+    }
+    return (
+      classification.category === 'network' ||
+      classification.category === 'rate_limit' ||
+      classification.category === 'timeout' ||
+      classification.category === 'resource_unavailable'
+    );
+  };
+
+  return { ...resolvedRetry, shouldRetry };
 }
 
 function resolveRequestEnvelope(params: any): {
@@ -204,6 +253,22 @@ function isUnsafeCliAllowed(): boolean {
   return process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true';
 }
 
+type RetryPolicy = {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  factor?: number;
+  jitter?: boolean;
+};
+
+const DEFAULT_RETRY_POLICY: Required<RetryPolicy> = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
 function isCliAllowedForOperation(
   serviceConfig: Record<string, any>,
   preset: Record<string, any>,
@@ -251,60 +316,64 @@ export async function executeServicePreset(serviceId: string, action: string, pa
         const bin = resolveVars(alt.command, mergedParams);
         if (!(await platform.checkBinary(bin))) continue;
         if (!isCliAllowedForOperation(serviceConfig, preset, alt)) throw new Error('CLI execution disabled.');
-        
-        const args = (alt.args || []).map((a: any) => {
-          const resolved = resolveTemplateValue(a, mergedParams);
-          return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
-        });
-        logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
-        const rawOutput = safeExec(bin, args);
+
+        const rawOutput = await withRetry(async () => {
+          const args = (alt.args || []).map((a: any) => {
+            const resolved = resolveTemplateValue(a, mergedParams);
+            return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
+          });
+          logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
+          return safeExec(bin, args);
+        }, buildRetryOptions(serviceConfig, preset, alt));
         let parsed = rawOutput;
         try { parsed = JSON.parse(rawOutput); } catch (_) {}
         return normalizePresetResult(parsed, alt.output_mapping);
       }
 
       if (alt.type === 'api') {
-        const baseUrl = resolveVars(
-          alt.base_url || preset.base_url || serviceConfig.base_url || connection.base_url,
-          mergedParams,
-        );
-        if (!baseUrl) {
-          throw new Error(`No base_url resolved for service "${serviceId}"`);
-        }
-        const apiPath = resolveVars(alt.path, mergedParams);
-        const method = alt.method || 'GET';
-        const authQuery = buildApiKeyQueryAuth(alt.auth_strategy || preset.auth_strategy, alt.auth_params || preset.auth_params, binding, mergedParams);
-        const rawQuery = envelope.query ?? (method === 'GET' ? params : undefined);
-        const rawPayload = alt.payload_template
-          ? resolveTemplateValue(alt.payload_template, mergedParams)
-          : (envelope.hasBody ? envelope.body : params);
-        const headers = {
-          ...preset.headers,
-          ...alt.headers,
-          ...buildAuthHeaders(alt.auth_strategy || preset.auth_strategy, binding),
-        };
-        const payload = prepareRequestBody(rawPayload, headers);
-        const requestParams = isPlainObject(rawQuery)
-          ? {
-              ...resolveTemplateValue(rawQuery, mergedParams),
-              ...authQuery,
-            }
-          : Object.keys(authQuery).length > 0
-            ? authQuery
-            : undefined;
+        const result = await withRetry(async () => {
+          const baseUrl = resolveVars(
+            alt.base_url || preset.base_url || serviceConfig.base_url || connection.base_url,
+            mergedParams,
+          );
+          if (!baseUrl) {
+            throw new Error(`No base_url resolved for service "${serviceId}"`);
+          }
+          const apiPath = resolveVars(alt.path, mergedParams);
+          const method = alt.method || 'GET';
+          const authQuery = buildApiKeyQueryAuth(alt.auth_strategy || preset.auth_strategy, alt.auth_params || preset.auth_params, binding, mergedParams);
+          const rawQuery = envelope.query ?? (method === 'GET' ? params : undefined);
+          const rawPayload = alt.payload_template
+            ? resolveTemplateValue(alt.payload_template, mergedParams)
+            : (envelope.hasBody ? envelope.body : params);
+          const headers = {
+            ...preset.headers,
+            ...alt.headers,
+            ...buildAuthHeaders(alt.auth_strategy || preset.auth_strategy, binding),
+          };
+          const payload = prepareRequestBody(rawPayload, headers);
+          const requestParams = isPlainObject(rawQuery)
+            ? {
+                ...resolveTemplateValue(rawQuery, mergedParams),
+                ...authQuery,
+              }
+            : Object.keys(authQuery).length > 0
+              ? authQuery
+              : undefined;
 
-        logger.info(`🚀 [ENGINE:API] Executing ${serviceId}:${action}`);
-        const result = await secureFetch({
-          method: method as any,
-          url: `${baseUrl}/${apiPath}`,
-          headers,
-          data: method !== 'GET' ? payload : undefined,
-          params: requestParams ?? (method === 'GET' ? payload : undefined),
-          kyberion_allow_local_network:
-            Boolean(alt.allow_local_network) ||
-            Boolean(preset.allow_local_network) ||
-            Boolean(serviceConfig.allow_local_network),
-        });
+          logger.info(`🚀 [ENGINE:API] Executing ${serviceId}:${action}`);
+          return await secureFetch({
+            method: method as any,
+            url: `${baseUrl}/${apiPath}`,
+            headers,
+            data: method !== 'GET' ? payload : undefined,
+            params: requestParams ?? (method === 'GET' ? payload : undefined),
+            kyberion_allow_local_network:
+              Boolean(alt.allow_local_network) ||
+              Boolean(preset.allow_local_network) ||
+              Boolean(serviceConfig.allow_local_network),
+          });
+        }, buildRetryOptions(serviceConfig, preset, alt));
         return normalizePresetResult(result, alt.output_mapping);
       }
     } catch (err: any) {

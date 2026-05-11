@@ -1,5 +1,6 @@
 {
   "_comment": "Backlog課題作成 — service-actuator の preset ルートを使う例。プロジェクトID・課題種別IDはget_issue_typesで事前確認すること。",
+  "_resilience": "manifest.json と preset の recovery_policy により、ネットワーク/429/timeout 系は指数バックオフで再試行される。",
   "pipeline": [
     {
       "id": "create_issue",
@@ -10,6 +11,13 @@
         "auth": "secret-guard",
         "params": {
           "space": "YOUR_SPACE_NAME",
+          "retry": {
+            "maxRetries": 3,
+            "initialDelayMs": 250,
+            "maxDelayMs": 5000,
+            "factor": 2,
+            "jitter": true
+          },
           "body": {
             "projectId": 12345,
             "summary": "課題タイトル",

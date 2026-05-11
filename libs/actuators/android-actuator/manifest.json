@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "ADB-driven Android Device Actuator",
   "contract_schema": "schemas/mobile-device-pipeline.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "adb_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["resource_unavailable", "timeout", "network"]
+  },
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/mobile-device-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]

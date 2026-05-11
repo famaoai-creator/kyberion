@@ -8,6 +8,8 @@ export interface ActuatorManifestFile {
   description?: string;
   contract_schema?: string;
   entrypoint?: string;
+  resilience_tier?: string;
+  recovery_policy?: Record<string, unknown>;
   capabilities?: Array<{ op?: string }>;
 }
 

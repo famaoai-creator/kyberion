@@ -8,6 +8,8 @@ import {
   pathResolver,
   renderVideoCompositionBundleAsync,
   safeReadFile,
+  withRetry,
+  classifyError,
   VideoRenderRuntime,
   writeVideoCompositionBundle,
 } from '@agent/core';
@@ -19,6 +21,49 @@ import type { VideoCompositionADF } from '@agent/core';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const videoCompositionActionValidate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/video-composition-action.schema.json'));
+const VIDEO_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/video-composition-actuator/manifest.json');
+const DEFAULT_VIDEO_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 250,
+  maxDelayMs: 2000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(VIDEO_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_VIDEO_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_VIDEO_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+    },
+  };
+}
 
 type VideoCompositionAction =
   | VideoCompositionADF
@@ -271,7 +316,10 @@ async function prepareVideoComposition(params: {
         message: 'assembling deterministic composition bundle',
       });
 
-      const plan = writeVideoCompositionBundle(adf, { bundleDir: params.bundle_dir });
+      const plan = await withRetry(
+        async () => writeVideoCompositionBundle(adf, { bundleDir: params.bundle_dir }),
+        buildRetryOptions(),
+      );
       let artifactRefs = [...plan.artifact_refs];
       let backendOutputPath: string | undefined;
 
@@ -286,9 +334,13 @@ async function prepareVideoComposition(params: {
 
         let backendResult: any;
         try {
-          backendResult = await renderVideoCompositionBundleAsync(plan, policy, {
-            isCancelled: api.isCancelled,
-          });
+          backendResult = await withRetry(
+            async () =>
+              renderVideoCompositionBundleAsync(plan, policy, {
+                isCancelled: api.isCancelled,
+              }),
+            buildRetryOptions(),
+          );
         } catch (error: any) {
           const backendState = extractBackendTerminationState(error);
           if (backendState) {
@@ -477,8 +529,11 @@ const main = async () => {
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputData = JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string);
-  const result = await handleAction(inputData);
+  const inputData = await withRetry(
+    async () => JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string),
+    buildRetryOptions(),
+  );
+  const result = await withRetry(async () => handleAction(inputData), buildRetryOptions());
   console.log(JSON.stringify(result, null, 2));
 };
 

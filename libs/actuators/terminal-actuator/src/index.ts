@@ -1,4 +1,4 @@
-import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile, emitComputerSurfacePatch, pathResolver } from '@agent/core';
+import { logger, ptyEngine, encodeTerminalInput, createStandardYargs, safeReadFile, emitComputerSurfacePatch, pathResolver, classifyError, withRetry } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,6 +6,17 @@ import { fileURLToPath } from 'node:url';
  * Terminal-Actuator v0.2.0 [PROTOTYPE]
  * Provides virtual terminal sessions via PTY engine with Symbolic Keys and Log Slicing.
  */
+
+const TERMINAL_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/terminal-actuator/manifest.json');
+const DEFAULT_TERMINAL_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 250,
+  maxDelayMs: 2000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 interface TerminalAction {
   action: 'spawn' | 'poll' | 'write' | 'kill' | 'list' | 'resize';
@@ -65,6 +76,48 @@ interface ComputerInteractionAction {
   };
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(TERMINAL_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_TERMINAL_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
+
 export async function handleAction(input: TerminalAction): Promise<TerminalResult> {
   if ((input as any).kind === 'computer_interaction') {
     return await handleComputerInteraction(input as unknown as ComputerInteractionAction);
@@ -83,7 +136,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
 
     case 'poll': {
       if (!params.sessionId) throw new Error('sessionId is required for poll action');
-      const result = ptyEngine.poll(params.sessionId, params.offset, params.limit);
+      const result = await withRetry(async () => ptyEngine.poll(params.sessionId, params.offset, params.limit), buildRetryOptions());
 
       // Also fetch messages for the specific persona if threadId is known
       let messages: any[] = [];
@@ -132,7 +185,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
     }
 
     case 'list': {
-      return { sessions: ptyEngine.list() };
+      return await withRetry(async () => ({ sessions: ptyEngine.list() }), buildRetryOptions());
     }
 
     default:
@@ -219,7 +272,7 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
         return result;
       });
     case 'list_terminal_sessions':
-      return {
+      return await withRetry(async () => ({
         status: 'listed',
         sessions: ptyEngine.list().map((id) => {
           const session = ptyEngine.get(id);
@@ -230,7 +283,7 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
             pid: session?.adapter.pid,
           };
         }),
-      };
+      }), buildRetryOptions());
     case 'shell_command': {
       const shell = action.shell || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
       const args = action.args && action.args.length > 0

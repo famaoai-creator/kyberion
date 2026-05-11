@@ -9,6 +9,8 @@ import {
   pathResolver,
   resolveVars,
   assertValidMobileAppProfile,
+  withRetry,
+  classifyError,
 } from '@agent/core';
 import type { MobileAppProfile } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -18,6 +20,51 @@ import { fileURLToPath } from 'node:url';
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
   'public/orchestration/android-ui-defaults.json'
 );
+const ANDROID_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/android-actuator/manifest.json');
+const DEFAULT_ANDROID_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 250,
+  maxDelayMs: 2000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(ANDROID_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_ANDROID_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_ANDROID_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' ||
+            classification.category === 'timeout' ||
+            classification.category === 'network';
+    },
+  };
+}
 
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -119,20 +166,25 @@ async function opCapture(
   switch (op) {
     case 'read_text_file': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+      const content = await withRetry(
+        async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
+        buildRetryOptions(),
+      );
       return { ...ctx, [params.export_as || 'last_text']: content };
     }
     case 'read_json': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(content);
+      const parsed = await withRetry(async () => {
+        const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+        return JSON.parse(content);
+      }, buildRetryOptions());
       if (params.validate_as === 'mobile-app-profile') {
         assertValidMobileAppProfile(parsed, sourcePath);
       }
       return { ...ctx, [params.export_as || 'last_json']: parsed };
     }
     case 'adb_health_check': {
-      const health = collectAdbHealth(ctx, options);
+      const health = await withRetry(async () => collectAdbHealth(ctx, options), buildRetryOptions());
       return {
         ...ctx,
         [params.export_as || 'adb_health']: health,
@@ -143,7 +195,10 @@ async function opCapture(
     case 'capture_foreground_activity': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      const output = runAdb(['shell', 'dumpsys', 'activity', 'activities'], serial, options);
+      const output = await withRetry(
+        async () => runAdb(['shell', 'dumpsys', 'activity', 'activities'], serial, options),
+        buildRetryOptions(),
+      );
       const resumedLine = output
         .split('\n')
         .find((line) => line.includes('mResumedActivity') || line.includes('topResumedActivity'));
@@ -175,9 +230,11 @@ async function opCapture(
         )
       );
       ensureParentDir(outPath);
-      runAdb(['pull', devicePath, outPath], serial, options);
-      const content = safeReadFile(outPath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(content);
+      await withRetry(async () => runAdb(['pull', devicePath, outPath], serial, options), buildRetryOptions());
+      const parsed = await withRetry(async () => {
+        const content = safeReadFile(outPath, { encoding: 'utf8' }) as string;
+        return JSON.parse(content);
+      }, buildRetryOptions());
       return {
         ...ctx,
         [params.export_as || 'runtime_session_handoff']: parsed,
@@ -193,10 +250,13 @@ async function opCapture(
       ensureParentDir(outPath);
       const remotePath = `/sdcard/kyberion-ui-${Date.now()}.xml`;
       const serial = resolveSerial(ctx, options, params);
-      runAdb(['shell', 'uiautomator', 'dump', remotePath], serial, options);
-      runAdb(['pull', remotePath, outPath], serial, options);
-      safeCleanupRemote(serial, remotePath, options);
-      const xml = safeReadFile(outPath, { encoding: 'utf8' }) as string;
+      await withRetry(async () => runAdb(['shell', 'uiautomator', 'dump', remotePath], serial, options), buildRetryOptions());
+      await withRetry(async () => runAdb(['pull', remotePath, outPath], serial, options), buildRetryOptions());
+      await withRetry(async () => {
+        safeCleanupRemote(serial, remotePath, options);
+        return undefined;
+      }, buildRetryOptions());
+      const xml = await withRetry(async () => safeReadFile(outPath, { encoding: 'utf8' }) as string, buildRetryOptions());
       return {
         ...ctx,
         [params.export_as || 'last_ui_tree']: xml,

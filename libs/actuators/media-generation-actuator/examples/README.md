@@ -4,6 +4,8 @@
 
 - 実運用向けの共通 pipeline は `pipelines/` に置く
 - `media-generation-actuator` 専用の検証・再現・テンプレート入力は `libs/actuators/media-generation-actuator/examples/` に置く
+- ジョブの既定 retry は `manifest.json` の `recovery_policy` と `retry_policy` で制御する
+- `secureFetch` 系の履歴取得は transient failure に対して自動再試行される
 
 実行例:
 

@@ -6,6 +6,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
     ...actual,
+    withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
     safeReadFile: vi.fn().mockReturnValue('{}'),
     safeWriteFile: vi.fn(),
     safeMkdir: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     pathResolver: {
       rootDir: vi.fn().mockReturnValue('/mock/root'),
       resolve: vi.fn((p: string) => `/mock/root/${p}`),
+      rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
     },
   };
 });
@@ -30,8 +32,19 @@ vi.mock('@agent/core/fs-utils', () => ({
 }));
 
 describe('code-actuator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { safeReadFile, safeExistsSync, safeReaddir, safeLstat, safeExec } = await import('@agent/core');
+    vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+      if (String(filePath).includes('manifest.json')) {
+        return JSON.stringify({ recovery_policy: {} });
+      }
+      return 'file content';
+    });
+    vi.mocked(safeExistsSync).mockReturnValue(false);
+    vi.mocked(safeReaddir).mockReturnValue([]);
+    vi.mocked(safeLstat).mockReturnValue({ isDirectory: () => false } as any);
+    vi.mocked(safeExec).mockReturnValue('');
   });
 
   describe('handleAction()', () => {
@@ -94,7 +107,10 @@ describe('code-actuator', () => {
 
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
       const { safeReadFile } = await import('@agent/core');
-      vi.mocked(safeReadFile).mockImplementationOnce(() => {
+      vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('manifest.json')) {
+          return JSON.stringify({ recovery_policy: {} });
+        }
         throw new Error('File not found');
       });
 

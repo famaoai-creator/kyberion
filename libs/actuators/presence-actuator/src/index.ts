@@ -1,8 +1,19 @@
-import { logger, recordInteraction, resolveServiceBinding, safeReadFile, validatePresenceTimeline, pathResolver } from '@agent/core';
+import { logger, recordInteraction, resolveServiceBinding, safeReadFile, validatePresenceTimeline, pathResolver, classifyError, withRetry } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/presence-actuator/manifest.json');
+const DEFAULT_PRESENCE_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 /**
  * Helper to safely access global ptyEngine
@@ -17,6 +28,48 @@ const getPtyEngine = () => {
 };
 
 export type MessagingMode = 'emitter' | 'listener' | 'conversational';
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(PRESENCE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_PRESENCE_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
 
 interface PresenceAction {
   action: 'dispatch' | 'status' | 'receive_event' | 'dispatch_timeline' | 'record_interaction';
@@ -93,11 +146,11 @@ export async function handleAction(input: PresenceAction) {
       }
 
       try {
-        const result = await slack.chat.postMessage({
+        const result = await withRetry(async () => slack.chat.postMessage({
           channel: params.channel,
           text: params.payload.text || '',
           thread_ts: params.payload.threadId
-        });
+        }), buildRetryOptions());
 
         logger.info(`✅ [PRESENCE_SLACK] Message sent to ${params.channel}. TS: ${result.ts}`);
         
@@ -120,11 +173,11 @@ export async function handleAction(input: PresenceAction) {
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
       const bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031';
-      const response = await fetch(`${bridgeUrl}/api/timeline/dispatch`, {
+      const response = await withRetry(async () => fetch(`${bridgeUrl}/api/timeline/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(timeline),
-      });
+      }), buildRetryOptions());
       if (!response.ok) {
         throw new Error(`Presence timeline dispatch failed: HTTP ${response.status}`);
       }
