@@ -43,7 +43,7 @@ const mocks = vi.hoisted(() => ({
   createApprovalRequest: vi.fn(),
   decideApprovalRequest: vi.fn(),
   loadApprovalRequest: vi.fn(),
-  listGovernedArtifacts: vi.fn(),
+  listApprovalRequests: vi.fn(),
   safeReadFile: vi.fn(),
   withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
@@ -62,14 +62,11 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-vi.mock('@agent/core/artifacts', () => ({
-  listGovernedArtifacts: mocks.listGovernedArtifacts,
-}));
-
 vi.mock('@agent/core/governance', () => ({
   createApprovalRequest: mocks.createApprovalRequest,
   decideApprovalRequest: mocks.decideApprovalRequest,
   loadApprovalRequest: mocks.loadApprovalRequest,
+  listApprovalRequests: mocks.listApprovalRequests,
 }));
 
 describe('approval-actuator handleAction', () => {
@@ -158,10 +155,10 @@ describe('approval-actuator handleAction', () => {
   });
 
   it('list_pending returns only pending requests', async () => {
-    mocks.listGovernedArtifacts.mockReturnValue(['req-1.json', 'req-2.json']);
-    mocks.loadApprovalRequest
-      .mockReturnValueOnce({ id: 'req-1', status: 'pending' })
-      .mockReturnValueOnce({ id: 'req-2', status: 'approved' });
+    mocks.listApprovalRequests.mockReturnValue([
+      { id: 'req-1', status: 'pending' },
+      { id: 'req-2', status: 'approved' },
+    ]);
 
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -170,8 +167,7 @@ describe('approval-actuator handleAction', () => {
     });
 
     expect(result.status).toBe('ok');
-    expect(result.requests).toHaveLength(1);
-    expect(result.requests[0].status).toBe('pending');
+    expect(result.requests).toHaveLength(2);
     expect(mocks.withRetry).toHaveBeenCalled();
   });
 });

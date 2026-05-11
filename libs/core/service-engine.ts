@@ -331,7 +331,7 @@ export async function executeServicePreset(serviceId: string, action: string, pa
       }
 
       if (alt.type === 'api') {
-        const result = await withRetry(async () => {
+          const result = await withRetry(async () => {
           const baseUrl = resolveVars(
             alt.base_url || preset.base_url || serviceConfig.base_url || connection.base_url,
             mergedParams,
@@ -368,6 +368,7 @@ export async function executeServicePreset(serviceId: string, action: string, pa
             headers,
             data: method !== 'GET' ? payload : undefined,
             params: requestParams ?? (method === 'GET' ? payload : undefined),
+            authenticateRequest: Object.keys(authQuery).length > 0,
             kyberion_allow_local_network:
               Boolean(alt.allow_local_network) ||
               Boolean(preset.allow_local_network) ||
