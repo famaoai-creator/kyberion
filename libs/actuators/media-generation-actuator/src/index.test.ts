@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   compileImageGenerationADF: vi.fn(),
   compileVideoGenerationADF: vi.fn(),
   secureFetch: vi.fn(),
+  withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
   safeCopyFileSync: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('@agent/core', async () => {
     compileImageGenerationADF: mocks.compileImageGenerationADF,
     compileVideoGenerationADF: mocks.compileVideoGenerationADF,
     secureFetch: mocks.secureFetch,
+    withRetry: mocks.withRetry,
     safeCopyFileSync: mocks.safeCopyFileSync,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
@@ -40,6 +42,80 @@ describe('media-generation-actuator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+  });
+
+  it('uses the manifest recovery policy when polling generation history', async () => {
+    mocks.executeServicePreset.mockResolvedValue({ prompt_id: 'img-123' });
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('media-generation-actuator/manifest.json')) {
+        return JSON.stringify({
+          recovery_policy: {
+            retry: {
+              maxRetries: 4,
+              initialDelayMs: 250,
+              maxDelayMs: 2000,
+              factor: 3,
+              jitter: false,
+            },
+            retryable_categories: ['network', 'timeout'],
+          },
+        });
+      }
+      return JSON.stringify({
+        'img-123': {
+          status: { completed: true },
+          outputs: {
+            '201': {
+              images: [
+                {
+                  filename: 'country-cover_00001_.png',
+                  type: 'output',
+                },
+              ],
+            },
+          },
+        },
+      });
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.secureFetch.mockResolvedValue({
+      'img-123': {
+        status: { completed: true },
+        outputs: {
+          '201': {
+            images: [
+              {
+                filename: 'country-cover_00001_.png',
+                type: 'output',
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const { handleAction } = await import('./index.js');
+    await handleAction({
+      action: 'generate_image',
+      params: {
+        workflow: { '201': { class_type: 'SaveImage' } },
+        await_completion: true,
+        target_path: 'active/shared/exports/country-cover.png',
+        poll_interval_ms: 1,
+      },
+    });
+
+    expect(mocks.withRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        maxRetries: 4,
+        initialDelayMs: 250,
+        maxDelayMs: 2000,
+        factor: 3,
+        jitter: false,
+        shouldRetry: expect.any(Function),
+      }),
+    );
   });
 
   it('delegates actions to the media-generation service preset', async () => {

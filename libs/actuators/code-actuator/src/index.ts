@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver, loadCapabilityRegistry, scanProviderCapabilities } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver, loadCapabilityRegistry, scanProviderCapabilities, withRetry, classifyError } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -6,6 +6,50 @@ import { fileURLToPath } from 'node:url';
 import * as vm from 'node:vm';
 import * as util from 'node:util';
 import { execSync } from 'node:child_process';
+
+const CODE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/code-actuator/manifest.json');
+const DEFAULT_CODE_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 150,
+  maxDelayMs: 1200,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(CODE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_CODE_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_CODE_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+    },
+  };
+}
 
 /**
  * Code-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -65,7 +109,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   let ctx = { ...initialCtx, root: rootDir };
   
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    const saved = await withRetry(
+      async () => JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string),
+      buildRetryOptions(),
+    );
     ctx = { ...ctx, ...saved };
   }
 
@@ -98,7 +145,13 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   }
 
   if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    await withRetry(
+      async () => {
+        safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+        return undefined;
+      },
+      buildRetryOptions(),
+    );
   }
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
@@ -140,18 +193,42 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_file':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: await withRetry(
+          async () => safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+          buildRetryOptions(),
+        ),
+      };
     case 'glob_files':
-      return { ...ctx, [params.export_as || 'file_list']: getAllFiles(path.resolve(rootDir, resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(rootDir, f)) };
+      return {
+        ...ctx,
+        [params.export_as || 'file_list']: await withRetry(
+          async () =>
+            getAllFiles(path.resolve(rootDir, resolve(params.dir)))
+              .filter(f => !params.ext || f.endsWith(params.ext))
+              .map(f => path.relative(rootDir, f)),
+          buildRetryOptions(),
+        ),
+      };
     case 'shell':
       assertUnsafeShellAllowed();
-      return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: await withRetry(
+          async () => execSync(resolve(params.cmd), { encoding: 'utf8' }).trim(),
+          buildRetryOptions(),
+        ),
+      };
     case 'discover_capabilities':
     case 'discover_skills':
       const actuatorsRootDir = path.join(rootDir, 'libs/actuators');
       const capabilities: any[] = [];
       if (safeExistsSync(actuatorsRootDir)) {
-        const actuatorDirs = safeReaddir(actuatorsRootDir).filter(f => safeLstat(path.join(actuatorsRootDir, f)).isDirectory());
+        const actuatorDirs = await withRetry(
+          async () => safeReaddir(actuatorsRootDir).filter(f => safeLstat(path.join(actuatorsRootDir, f)).isDirectory()),
+          buildRetryOptions(),
+        );
         for (const dir of actuatorDirs) {
           capabilities.push({
             name: dir,
@@ -214,7 +291,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const out = path.resolve(rootDir, spec.path);
       const content = typeof spec.content === 'string' ? spec.content : spec.content === undefined ? '' : JSON.stringify(spec.content, null, 2);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, content);
+      await withRetry(
+        async () => {
+          safeWriteFile(out, content);
+          return undefined;
+        },
+        buildRetryOptions(),
+      );
       break;
     case 'log': logger.info(`[CODE_LOG] ${resolve(params.message || 'Action completed')}`); break;
   }
@@ -226,7 +309,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 async function performReconcile(input: CodeAction) {
   const strategyPath = path.resolve(pathResolver.rootDir(), input.strategy_path || 'knowledge/governance/code-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
+  const config = await withRetry(
+    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
+    buildRetryOptions(),
+  );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
@@ -238,7 +324,10 @@ async function performReconcile(input: CodeAction) {
  */
 const main = async () => {
   const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputContent = safeReadFile(path.resolve(pathResolver.rootDir(), argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = await withRetry(
+    async () => safeReadFile(path.resolve(pathResolver.rootDir(), argv.input as string), { encoding: 'utf8' }) as string,
+    buildRetryOptions(),
+  );
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

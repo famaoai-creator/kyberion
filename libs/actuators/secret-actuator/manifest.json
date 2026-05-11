@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "OS Native Secret Manager Bridge",
   "contract_schema": "schemas/secret-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "os_native_keychain",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     {
       "op": "get",

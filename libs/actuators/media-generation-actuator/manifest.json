@@ -3,6 +3,18 @@
   "version": "1.1.0",
   "description": "Generative image, video, music, and screen capture actuator",
   "contract_schema": "schemas/media-generation-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "service_then_cli",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "generate_image", "platforms": ["darwin", "linux", "win32"] },
     { "op": "generate_video", "platforms": ["darwin", "linux", "win32"] },

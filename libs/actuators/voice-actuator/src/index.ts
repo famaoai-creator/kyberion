@@ -2,6 +2,7 @@ import AjvModule from 'ajv';
 import {
   collectVoiceSamples,
   compileSchemaFromPath,
+  classifyError,
   getVoiceSampleIngestionPolicy,
   getVoiceEngineRecord,
   getVoiceProfileRecord,
@@ -20,6 +21,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
+  withRetry,
   validateVoiceProfileRegistration,
   VoiceGenerationRuntime,
   writeVoiceProfileRegistry,
@@ -36,9 +38,61 @@ function resolvePythonBin(): string {
   return 'python3';
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(VOICE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_VOICE_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
+
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const voiceActionValidate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/voice-action.schema.json'));
+const VOICE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/voice-actuator/manifest.json');
+const DEFAULT_VOICE_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 type VoiceAction =
   | { action: 'speak_local'; params: Record<string, unknown> }
@@ -558,25 +612,33 @@ async function performPlayback(
 
   if (engine.engine_id === 'mlx_audio_qwen3') {
     const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
-    await runMlxAudioGenerate(text, tmpPath, options.profile);
-    safeExec('open', [tmpPath]);
+    await withRetry(async () => {
+      await runMlxAudioGenerate(text, tmpPath, options.profile);
+      safeExec('open', [tmpPath]);
+    }, buildRetryOptions());
     return;
   }
 
   if (process.platform === 'darwin') {
-    safeExec('say', ['-v', options.voice, '-r', String(options.rate), text]);
+    await withRetry(async () => {
+      safeExec('say', ['-v', options.voice, '-r', String(options.rate), text]);
+    }, buildRetryOptions());
     return;
   }
   if (process.platform === 'linux') {
-    safeExec('espeak', ['-s', String(options.rate), text]);
+    await withRetry(async () => {
+      safeExec('espeak', ['-s', String(options.rate), text]);
+    }, buildRetryOptions());
     return;
   }
   if (process.platform === 'win32') {
     const escaped = text.replace(/'/g, "''");
-    safeExec('powershell', [
-      '-Command',
-      `Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = 0; $s.Speak('${escaped}')`,
-    ]);
+    await withRetry(async () => {
+      safeExec('powershell', [
+        '-Command',
+        `Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = 0; $s.Speak('${escaped}')`,
+      ]);
+    }, buildRetryOptions());
     return;
   }
   throw new Error(`Unsupported voice playback platform: ${process.platform}`);
@@ -656,20 +718,27 @@ function renderNativeArtifact(
   safeMkdir(artifactDir, { recursive: true });
 
   if (options.engineId === 'mlx_audio_qwen3') {
-    return runMlxAudioGenerate(text, artifactPath, options.profile).then(() => artifactPath);
+    return withRetry(async () => {
+      await runMlxAudioGenerate(text, artifactPath, options.profile);
+      return artifactPath;
+    }, buildRetryOptions());
   }
 
   if (process.platform === 'darwin') {
-    safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
-    return artifactPath;
+    return withRetry(async () => {
+      safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
+      return artifactPath;
+    }, buildRetryOptions());
   }
 
   if (process.platform === 'linux') {
     if (options.format !== 'wav') {
       throw new Error(`linux native artifact rendering supports only wav, received ${options.format}`);
     }
-    safeExec('espeak', ['-s', String(options.rate), '-w', artifactPath, text]);
-    return artifactPath;
+    return withRetry(async () => {
+      safeExec('espeak', ['-s', String(options.rate), '-w', artifactPath, text]);
+      return artifactPath;
+    }, buildRetryOptions());
   }
 
   throw new Error(`native artifact rendering is unsupported on ${process.platform}`);

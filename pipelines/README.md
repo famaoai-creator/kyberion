@@ -98,6 +98,7 @@ Service presets keep auth and endpoint details inside the preset catalog. Use `s
 ```
 
 Backlog uses `auth_strategy: "api_key_query"` with `BACKLOG_API_KEY` stored via `secret:set`.
+Pipeline-level `retry` overrides are merged with the actuator manifest and the preset `recovery_policy`.
 
 ## Path Security
 

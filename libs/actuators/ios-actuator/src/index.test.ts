@@ -19,6 +19,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
     ...actual,
+    withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
     safeExec: vi.fn().mockReturnValue(''),
     safeExistsSync: vi.fn().mockReturnValue(false),
     safeMkdir: vi.fn(),
@@ -78,6 +79,7 @@ describe('ios-actuator', () => {
 
         expect(result.status).toBe('succeeded');
         expect(result.context.ios_available).toBe(true);
+        expect((await import('@agent/core')).withRetry).toHaveBeenCalled();
       });
 
       it('エラーケース: simctl利用不可な場合に ios_available: false を返す', async () => {

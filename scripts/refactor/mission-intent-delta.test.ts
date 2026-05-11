@@ -33,15 +33,40 @@ describe('mission-intent-delta hooks', () => {
       missionId: 'MSN-T1',
       stage: 'execution',
       text: 'please execute',
-      source: 'mission_state',
+      source: 'user_prompt',
     });
 
     expect(emitIntentSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
         missionId: 'MSN-T1',
         stage: 'execution',
-        source: 'mission_state',
+        source: 'user_prompt',
         intent: { goal: 'parsed goal' },
+      }),
+    );
+  });
+
+  it('uses a deterministic local summary for mission_state text', async () => {
+    const extract = vi.fn(async () => ({ goal: 'parsed goal' }));
+    vi.mocked(getIntentExtractor).mockReturnValue({
+      name: 'fake',
+      extract,
+    } as any);
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: 'MSN-T3',
+      stage: 'execution',
+      text: '**goal**: Extended adaptive retry rollout',
+      source: 'mission_state',
+    });
+
+    expect(extract).not.toHaveBeenCalled();
+    expect(emitIntentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'MSN-T3',
+        stage: 'execution',
+        source: 'mission_state',
+        intent: { goal: '**goal**: Extended adaptive retry rollout' },
       }),
     );
   });

@@ -1,6 +1,17 @@
 {
   "service_id": "media-generation",
   "name": "Kyberion Generative Media and Capture Unified Presets",
+  "recovery_policy": {
+    "fallback_strategy": "service_then_cli",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
   "operations": {
     "generate_image": {
       "type": "auto",

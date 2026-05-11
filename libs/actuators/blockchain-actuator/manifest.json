@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Immutable Ledger Anchoring System",
   "contract_schema": "schemas/blockchain-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "local_append_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["resource_unavailable", "timeout"]
+  },
   "capabilities": [
     {
       "op": "anchor_mission",
