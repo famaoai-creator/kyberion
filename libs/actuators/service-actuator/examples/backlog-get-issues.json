@@ -1,0 +1,41 @@
+{
+  "_comment": "Backlog課題一覧取得 — service-actuator の preset ルートを使う最小パターン。curlの代替として使用できる。",
+  "_setup": "事前に `secret:set` で BACKLOG_API_KEY をOSキーチェーンに登録すること。一度登録すれば以降不要。",
+  "pipeline": [
+    {
+      "id": "register_secret",
+      "_note": "初回のみ実行。以降はこのステップを削除してよい。",
+      "op": "secret:set",
+      "params": {
+        "key": "BACKLOG_API_KEY",
+        "value": "YOUR_API_KEY_HERE"
+      }
+    },
+    {
+      "id": "fetch_issues",
+      "op": "service:preset",
+      "params": {
+        "service_id": "backlog",
+        "operation": "get_issues",
+        "auth": "secret-guard",
+        "params": {
+          "space": "YOUR_SPACE_NAME",
+          "query": {
+            "projectId[]": [12345],
+            "statusId[]": [1, 2],
+            "count": 50,
+            "order": "desc"
+          }
+        },
+        "export_as": "issues"
+      }
+    },
+    {
+      "id": "log_result",
+      "op": "system:log",
+      "params": {
+        "message": "取得件数: {{issues.length}}"
+      }
+    }
+  ]
+}
