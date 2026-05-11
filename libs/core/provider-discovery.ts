@@ -1,12 +1,21 @@
 import { logger } from './core.js';
 import { spawnSync } from 'node:child_process';
-import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 /**
  * Provider Discovery v1.0
  *
  * Detects which LLM agent providers are installed and available.
  * Results are cached to avoid repeated shell calls.
+ *
+ * Cache strategy:
+ *   1. In-memory (per-process, reset on restart)
+ *   2. Disk cache at ~/.kyberion/provider-cache.json (survives process restarts)
+ *
+ * Note: uses native node:fs intentionally — this is system-level infrastructure,
+ * not a mission artifact. secure-io / tier-guard do not govern ~/.kyberion/.
  */
 
 export interface ProviderInfo {
@@ -23,6 +32,25 @@ export interface ProviderInfo {
 let cachedProviders: ProviderInfo[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 300000; // 5 min
+
+const DISK_CACHE_PATH = path.join(os.homedir(), '.kyberion', 'provider-cache.json');
+
+function readDiskCache(): ProviderInfo[] | null {
+  try {
+    const raw = fs.readFileSync(DISK_CACHE_PATH, 'utf8');
+    const parsed = JSON.parse(raw) as { ts: number; providers: ProviderInfo[] };
+    if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
+  } catch { /* cache miss — non-fatal */ }
+  return null;
+}
+
+function writeDiskCache(providers: ProviderInfo[]): void {
+  try {
+    const dir = path.dirname(DISK_CACHE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), 'utf8');
+  } catch { /* non-fatal */ }
+}
 
 function run(cmd: string, args: string[], timeoutMs = 10000): { ok: boolean; stdout: string } {
   try {
@@ -89,18 +117,8 @@ function checkClaude(): ProviderInfo {
   const which = run('which', ['claude']);
   if (!which.ok) return { provider: 'claude', installed: false, version: null, protocol: 'print-json', models: [], healthy: false };
 
-  const probe = probeShellClaudeCliAvailability();
-  if (!probe.available) {
-    return {
-      provider: 'claude',
-      installed: true,
-      version: null,
-      protocol: 'print-json',
-      models: [],
-      healthy: false,
-    };
-  }
-
+  // Use --version only — probeShellClaudeCliAvailability() makes a live LLM call
+  // which is too expensive for discovery. Credential validity is checked at use-time.
   const ver = run('claude', ['--version']);
   return {
     provider: 'claude',
@@ -194,10 +212,23 @@ function checkCodex(): ProviderInfo {
  * Discover all available providers. Cached for 5 minutes.
  */
 export function discoverProviders(forceRefresh = false): ProviderInfo[] {
+  // 1. In-memory cache
   if (!forceRefresh && cachedProviders && (Date.now() - cacheTimestamp) < CACHE_TTL) {
     return cachedProviders;
   }
 
+  // 2. Disk cache (survives process restarts — avoids re-probing on every pipeline run)
+  if (!forceRefresh) {
+    const disk = readDiskCache();
+    if (disk) {
+      cachedProviders = disk;
+      cacheTimestamp = Date.now();
+      logger.info(`[PROVIDER_DISCOVERY] Loaded from cache: ${disk.filter(p => p.installed).map(p => p.provider).join(', ')}`);
+      return disk;
+    }
+  }
+
+  // 3. Full discovery
   logger.info('[PROVIDER_DISCOVERY] Scanning available providers...');
   const providers = [
     checkGemini(),
@@ -211,6 +242,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
 
   cachedProviders = providers;
   cacheTimestamp = Date.now();
+  writeDiskCache(providers);
   return providers;
 }
 
@@ -221,6 +253,7 @@ export function refreshProviderDiscoveryCache(): ProviderInfo[] {
 export function clearProviderDiscoveryCache(): void {
   cachedProviders = null;
   cacheTimestamp = 0;
+  try { fs.unlinkSync(DISK_CACHE_PATH); } catch { /* non-fatal */ }
 }
 
 /**

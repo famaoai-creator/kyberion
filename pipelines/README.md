@@ -53,3 +53,54 @@ Canonical runtime pipelines use the JSON ADF shape:
 ```
 
 Legacy `.yml` skill-chaining files may still exist as historical artifacts, but they are not the primary runtime contract.
+
+## Op Syntax Reference
+
+Every step `op` in a top-level pipeline must use the **`domain:action`** format. The `domain` is the actuator name minus the `-actuator` suffix.
+
+```json
+{ "op": "media:pptx_render" }     // → media-actuator, op=pptx_render
+{ "op": "wisdom:knowledge_search" } // → wisdom-actuator, op=knowledge_search
+{ "op": "system:shell" }           // → built-in runner
+{ "op": "core:if" }                // → built-in control flow
+```
+
+Bare names (no `:`) are normalized to `system:<op>`. This means `{ "op": "log" }` silently routes to the system actuator — not the actuator you likely intended.
+
+### media-actuator: two invocation contexts
+
+`media-actuator` is unique: it exposes a sub-pipeline interpreter with its own op set (`set`, `merge_content`, `apply_theme`, `pptx_render`, etc.). These ops use **bare names inside the media-actuator's own step loop**, but require the `media:` prefix when called from a top-level pipeline.
+
+| Where written | Required syntax | Why |
+|---------------|----------------|-----|
+| Top-level pipeline JSON | `"op": "media:set"` | Runner does `domain:action` split to load the actuator |
+| `examples/` inside `media-actuator/` | `"op": "set"` | Consumed directly by `executePipeline`, no domain resolution needed |
+
+When in doubt, use `media:` — the runner wraps your step into a single-step sub-pipeline and passes it to `media-actuator` transparently.
+
+### service-actuator: preset calls
+
+Service presets keep auth and endpoint details inside the preset catalog. Use `service:preset` at the top level, then pass the service call inside `params`.
+
+```json
+{
+  "op": "service:preset",
+  "params": {
+    "service_id": "backlog",
+    "operation": "get_issues",
+    "auth": "secret-guard",
+    "params": {
+      "space": "your-space",
+      "query": { "projectId[]": [12345], "count": 50 }
+    }
+  }
+}
+```
+
+Backlog uses `auth_strategy: "api_key_query"` with `BACKLOG_API_KEY` stored via `secret:set`.
+
+## Path Security
+
+Output paths must be within the project root. Use `active/shared/tmp/` or `active/shared/exports/` as staging areas; copy files externally with a `system:shell` step after rendering.
+
+`[ROLE_VIOLATION]` errors mean the active persona/role does not have access to the requested path. Check the policy at `knowledge/public/governance/security-policy.json`.

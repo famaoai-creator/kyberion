@@ -1,0 +1,14 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "backlog": {
+      "base_url": "https://{{space}}.backlog.com/api/v2",
+      "preset_path": "knowledge/public/orchestration/service-presets/backlog.json",
+      "credential_suffixes": {
+        "accessToken": [
+          "API_KEY"
+        ]
+      }
+    }
+  }
+}
