@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Human Presence and Messaging Bridge",
   "contract_schema": "schemas/presence-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "slack_then_log",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable", "rate_limit"]
+  },
   "capabilities": [
     { "op": "dispatch", "platforms": ["darwin", "linux", "win32"] },
     { "op": "receive_event", "platforms": ["darwin", "linux", "win32"] },

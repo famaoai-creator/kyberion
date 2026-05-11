@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
   "contract_schema": "schemas/calendar-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "jxa_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "list_calendars", "description": "Lists all available calendars on the system", "platforms": ["darwin"] },
     { "op": "list_events", "description": "Lists events for specific calendars within a date range", "platforms": ["darwin"] },

@@ -67,6 +67,17 @@ const mocks = vi.hoisted(() => {
   const tracingStart = vi.fn(async () => undefined);
   const tracingStop = vi.fn(async () => undefined);
   const close = vi.fn(async () => undefined);
+  const fileStore = new Map<string, string>();
+  const safeExistsSync = vi.fn((filePath: string) => fileStore.has(filePath));
+  const safeMkdir = vi.fn();
+  const safeReadFile = vi.fn((filePath: string) => fileStore.get(filePath) || '');
+  const safeWriteFile = vi.fn((filePath: string, content: string) => {
+    fileStore.set(filePath, content);
+  });
+  const safeRmSync = vi.fn((filePath: string) => {
+    fileStore.delete(filePath);
+  });
+  const withRetry = vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn());
 
   const context = {
     pages: vi.fn(() => [page]),
@@ -127,6 +138,26 @@ const mocks = vi.hoisted(() => {
     tracingStart,
     tracingStop,
     pageHandlers,
+    safeExistsSync,
+    safeMkdir,
+    safeReadFile,
+    safeWriteFile,
+    safeRmSync,
+    withRetry,
+    fileStore,
+  };
+});
+
+vi.mock('@agent/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core')>();
+  return {
+    ...actual,
+    safeExistsSync: mocks.safeExistsSync,
+    safeMkdir: mocks.safeMkdir,
+    safeReadFile: mocks.safeReadFile,
+    safeWriteFile: mocks.safeWriteFile,
+    safeRmSync: mocks.safeRmSync,
+    withRetry: mocks.withRetry,
   };
 });
 
@@ -146,6 +177,32 @@ describe('browser-actuator v3 contract', () => {
     vi.clearAllMocks();
     const { resetBrowserRuntimeLeasesForTest } = await import('./index');
     await resetBrowserRuntimeLeasesForTest();
+  });
+
+  it('uses the manifest recovery policy for ref interactions', async () => {
+    const { handleAction } = await import('./index');
+
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
+        { type: 'apply', op: 'click_ref', params: { ref: '@e1', retry: { maxRetries: 4, initialDelayMs: 250 } } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(mocks.withRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        maxRetries: 4,
+        initialDelayMs: 250,
+        maxDelayMs: 5000,
+        factor: 2,
+        jitter: true,
+        shouldRetry: expect.any(Function),
+      }),
+    );
   });
 
   it('captures a snapshot and reuses ref selectors for ref-based actions', async () => {

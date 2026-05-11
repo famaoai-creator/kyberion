@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, persistTrace, pathResolver, resolveVars, evaluateCondition, getPathValue } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, persistTrace, pathResolver, resolveVars, evaluateCondition, getPathValue, withRetry, classifyError } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -212,6 +212,65 @@ const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
 const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge('public/orchestration/browser-passkey-providers.json');
+const BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/browser-actuator/manifest.json');
+const DEFAULT_BROWSER_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  factor: 2,
+  jitter: true,
+};
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(stepParams: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
+  const resolved = {
+    ...DEFAULT_BROWSER_RETRY,
+    ...manifestRetry,
+    ...explicitRetry,
+    maxRetries: Number(stepParams.max_retries ?? explicitRetry.maxRetries ?? manifestRetry.maxRetries ?? DEFAULT_BROWSER_RETRY.maxRetries),
+    initialDelayMs: Number(stepParams.retry_delay_ms ?? explicitRetry.initialDelayMs ?? manifestRetry.initialDelayMs ?? DEFAULT_BROWSER_RETRY.initialDelayMs),
+  };
+
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      const message = error.message?.toLowerCase?.() || '';
+      return classification.category === 'timeout'
+        || classification.category === 'network'
+        || classification.category === 'resource_unavailable'
+        || message.includes('selector')
+        || message.includes('not visible')
+        || message.includes('strict mode violation')
+        || message.includes('detached');
+    },
+  };
+}
 
 /**
  * Main Entry Point
@@ -924,6 +983,18 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         url: targetUrl,
       });
     }
+    case 'title':
+      return recordBrowserAction({ ...ctx, [params.export_as || 'page_title']: await page.title() }, {
+        kind: 'capture',
+        op: 'title',
+        tab_id: runtime.activeTabId,
+      });
+    case 'url':
+      return recordBrowserAction({ ...ctx, [params.export_as || 'current_url']: page.url() }, {
+        kind: 'capture',
+        op: 'url',
+        tab_id: runtime.activeTabId,
+      });
     default: 
       throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
@@ -973,20 +1044,40 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
   const page = getActivePage(runtime);
   switch (op) {
+    case 'goto': {
+      const url = resolve(params.url);
+      await withRetry(async () => {
+        await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
+      }, buildRetryOptions(params));
+      return recordBrowserAction({ ...ctx, last_url: page.url() }, {
+        kind: 'apply',
+        op: 'goto',
+        tab_id: runtime.activeTabId,
+        url,
+      });
+    }
     case 'click':
-      await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
+      await withRetry(async () => {
+        await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, { kind: 'apply', op: 'click', tab_id: runtime.activeTabId, selector: resolve(params.selector) });
     case 'fill':
-      await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 });
+      await withRetry(async () => {
+        await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, { kind: 'apply', op: 'fill', tab_id: runtime.activeTabId, selector: resolve(params.selector), text: resolve(params.text) });
     case 'press':
-      await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 });
+      await withRetry(async () => {
+        await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, { kind: 'apply', op: 'press', tab_id: runtime.activeTabId, selector: resolve(params.selector), key: resolve(params.key) });
     case 'click_ref': {
       const ref = resolve(params.ref);
       const selector = resolveRefSelector(ctx, ref);
       const element = findSnapshotElement(ctx, ref);
-      await page.click(selector, { timeout: params.timeout || 5000 });
+      await withRetry(async () => {
+        await page.click(selector, { timeout: params.timeout || 5000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, {
         kind: 'apply',
         op: 'click_ref',
@@ -1002,7 +1093,9 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       const text = resolve(params.text);
       const selector = resolveRefSelector(ctx, ref);
       const element = findSnapshotElement(ctx, ref);
-      await page.fill(selector, text, { timeout: params.timeout || 5000 });
+      await withRetry(async () => {
+        await page.fill(selector, text, { timeout: params.timeout || 5000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, {
         kind: 'apply',
         op: 'fill_ref',
@@ -1019,7 +1112,9 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       const key = resolve(params.key);
       const selector = resolveRefSelector(ctx, ref);
       const element = findSnapshotElement(ctx, ref);
-      await page.press(selector, key, { timeout: params.timeout || 5000 });
+      await withRetry(async () => {
+        await page.press(selector, key, { timeout: params.timeout || 5000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, {
         kind: 'apply',
         op: 'press_ref',
@@ -1032,13 +1127,20 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       });
     }
     case 'wait':
-      if (params.selector) { await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 }); } 
-      else { await page.waitForTimeout(params.duration || 1000); }
+      if (params.selector) {
+        await withRetry(async () => {
+          await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 });
+        }, buildRetryOptions(params));
+      } else {
+        await page.waitForTimeout(params.duration || 1000);
+      }
       return recordBrowserAction(ctx, { kind: 'apply', op: 'wait', tab_id: runtime.activeTabId, selector: params.selector ? resolve(params.selector) : undefined });
     case 'wait_ref': {
       const ref = resolve(params.ref);
       const selector = resolveRefSelector(ctx, ref);
-      await page.waitForSelector(selector, { state: params.state || 'visible', timeout: params.timeout || 10000 });
+      await withRetry(async () => {
+        await page.waitForSelector(selector, { state: params.state || 'visible', timeout: params.timeout || 10000 });
+      }, buildRetryOptions(params));
       return recordBrowserAction(ctx, { kind: 'apply', op: 'wait_ref', tab_id: runtime.activeTabId, ref, selector });
     }
     case 'log':

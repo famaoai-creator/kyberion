@@ -3,6 +3,18 @@
   "version": "1.3.0",
   "description": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
   "contract_schema": "schemas/vision-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "media_generation_fallback",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "inspect_image", "platforms": ["darwin", "linux", "win32"] },
     { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] }

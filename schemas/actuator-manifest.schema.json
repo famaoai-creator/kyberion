@@ -8,6 +8,31 @@
     "version": { "type": "string" },
     "description": { "type": "string" },
     "contract_schema": { "type": "string" },
+    "resilience_tier": {
+      "type": "string",
+      "description": "High-level resilience posture for the actuator, e.g. adaptive_retry."
+    },
+    "recovery_policy": {
+      "type": "object",
+      "description": "Retry and fallback contract used when the actuator encounters transient failure.",
+      "properties": {
+        "fallback_strategy": { "type": "string" },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "maxRetries": { "type": "number" },
+            "initialDelayMs": { "type": "number" },
+            "maxDelayMs": { "type": "number" },
+            "factor": { "type": "number" },
+            "jitter": { "type": "boolean" }
+          }
+        },
+        "retryable_categories": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "capabilities": {
       "type": "array",
       "items": {

@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Architectural Analysis and ADF Transformation Engine",
   "contract_schema": "schemas/modeling-pipeline.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "modeling_io_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 150,
+      "maxDelayMs": 1200,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["resource_unavailable", "timeout"]
+  },
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/modeling-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
