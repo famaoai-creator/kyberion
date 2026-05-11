@@ -41,6 +41,13 @@ describe('executeServicePreset', () => {
       services: {
         'test-service': { preset_path: 'mock/path.json', base_url: 'https://api.test.com' },
         slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
+        backlog: {
+          preset_path: 'knowledge/public/orchestration/service-presets/backlog.json',
+          base_url: 'https://{{space}}.backlog.com/api/v2',
+          credential_suffixes: {
+            accessToken: ['API_KEY'],
+          },
+        },
         'media-generation': {
           preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
           base_url: 'http://127.0.0.1:8188',
@@ -293,6 +300,60 @@ describe('executeServicePreset', () => {
           Authorization: 'Bearer test-token',
         }),
       })
+    );
+  });
+
+  it('supports api_key_query presets with envelope vars and query params', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.resolveServiceBinding.mockReturnValue({
+      serviceId: 'backlog',
+      accessToken: 'backlog-secret',
+    });
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('backlog.json')) {
+        return JSON.stringify({
+          service_id: 'backlog',
+          auth_strategy: 'api_key_query',
+          auth_params: {
+            key: 'apiKey',
+            value: '{{accessToken}}',
+          },
+          operations: {
+            get_issues: {
+              type: 'api',
+              path: 'issues',
+              method: 'GET',
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ issues: [{ id: 1 }] });
+
+    await executeServicePreset(
+      'backlog',
+      'get_issues',
+      {
+        space: 'acme',
+        query: {
+          'projectId[]': [12345],
+          count: 50,
+        },
+      },
+      'secret-guard',
+    );
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://acme.backlog.com/api/v2/issues',
+        params: expect.objectContaining({
+          'projectId[]': [12345],
+          count: 50,
+          apiKey: 'backlog-secret',
+        }),
+        data: undefined,
+      }),
     );
   });
 

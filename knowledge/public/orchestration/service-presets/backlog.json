@@ -1,0 +1,131 @@
+{
+  "service_id": "backlog",
+  "name": "Backlog REST API v2 Presets",
+  "base_url": "https://{{space}}.backlog.com/api/v2",
+  "auth_strategy": "api_key_query",
+  "auth_params": {
+    "key": "apiKey",
+    "value": "{{accessToken}}"
+  },
+  "operations": {
+    "get_projects": {
+      "path": "projects",
+      "method": "GET",
+      "description": "プロジェクト一覧を取得する",
+      "parameters": {
+        "archived": { "required": false, "type": "boolean", "description": "アーカイブ済みを含むか" },
+        "all": { "required": false, "type": "boolean", "description": "全プロジェクトを取得（管理者のみ）" }
+      }
+    },
+    "get_project": {
+      "path": "projects/{{project_id_or_key}}",
+      "method": "GET",
+      "description": "プロジェクトを取得する"
+    },
+    "get_issues": {
+      "path": "issues",
+      "method": "GET",
+      "description": "課題一覧を取得する",
+      "parameters": {
+        "projectId[]": { "required": false, "type": "array", "description": "プロジェクトIDの配列" },
+        "statusId[]": { "required": false, "type": "array", "description": "状態IDの配列" },
+        "assigneeId[]": { "required": false, "type": "array", "description": "担当者IDの配列" },
+        "keyword": { "required": false, "type": "string", "description": "検索キーワード" },
+        "count": { "required": false, "type": "number", "default": 20, "description": "取得件数（最大100）" },
+        "offset": { "required": false, "type": "number", "default": 0 },
+        "sort": { "required": false, "type": "string", "default": "updated" },
+        "order": { "required": false, "type": "string", "default": "desc" }
+      }
+    },
+    "get_issue": {
+      "path": "issues/{{issue_key}}",
+      "method": "GET",
+      "description": "課題を取得する（例: PROJECT-123）"
+    },
+    "create_issue": {
+      "path": "issues",
+      "method": "POST",
+      "description": "課題を作成する",
+      "parameters": {
+        "projectId": { "required": true, "type": "number" },
+        "summary": { "required": true, "type": "string" },
+        "issueTypeId": { "required": true, "type": "number" },
+        "priorityId": { "required": true, "type": "number", "default": 3, "description": "2=高, 3=中, 4=低" },
+        "description": { "required": false, "type": "string" },
+        "assigneeId": { "required": false, "type": "number" },
+        "dueDate": { "required": false, "type": "string", "description": "YYYY-MM-DD" }
+      }
+    },
+    "update_issue": {
+      "path": "issues/{{issue_key}}",
+      "method": "PATCH",
+      "description": "課題を更新する",
+      "parameters": {
+        "summary": { "required": false, "type": "string" },
+        "description": { "required": false, "type": "string" },
+        "statusId": { "required": false, "type": "number", "description": "1=未対応, 2=処理中, 3=処理済み, 4=完了" },
+        "assigneeId": { "required": false, "type": "number" },
+        "comment": { "required": false, "type": "string", "description": "更新時のコメント" }
+      }
+    },
+    "add_comment": {
+      "path": "issues/{{issue_key}}/comments",
+      "method": "POST",
+      "description": "課題にコメントを追加する",
+      "parameters": {
+        "content": { "required": true, "type": "string" }
+      }
+    },
+    "get_comments": {
+      "path": "issues/{{issue_key}}/comments",
+      "method": "GET",
+      "description": "課題のコメント一覧を取得する",
+      "parameters": {
+        "count": { "required": false, "type": "number", "default": 20 },
+        "order": { "required": false, "type": "string", "default": "asc" }
+      }
+    },
+    "get_issue_types": {
+      "path": "projects/{{project_id_or_key}}/issueTypes",
+      "method": "GET",
+      "description": "プロジェクトの課題種別一覧を取得する"
+    },
+    "get_categories": {
+      "path": "projects/{{project_id_or_key}}/categories",
+      "method": "GET",
+      "description": "プロジェクトのカテゴリ一覧を取得する"
+    },
+    "get_versions": {
+      "path": "projects/{{project_id_or_key}}/versions",
+      "method": "GET",
+      "description": "プロジェクトのマイルストーン／バージョン一覧を取得する"
+    },
+    "get_users": {
+      "path": "projects/{{project_id_or_key}}/users",
+      "method": "GET",
+      "description": "プロジェクトのメンバー一覧を取得する"
+    },
+    "get_myself": {
+      "path": "users/myself",
+      "method": "GET",
+      "description": "認証中のユーザー情報を取得する"
+    },
+    "get_notifications": {
+      "path": "notifications",
+      "method": "GET",
+      "description": "お知らせ一覧を取得する",
+      "parameters": {
+        "count": { "required": false, "type": "number", "default": 20 }
+      }
+    },
+    "get_recent_updates": {
+      "path": "projects/{{project_id_or_key}}/activities",
+      "method": "GET",
+      "description": "プロジェクトの最近の更新を取得する",
+      "parameters": {
+        "count": { "required": false, "type": "number", "default": 20 },
+        "activityTypeId[]": { "required": false, "type": "array" }
+      }
+    }
+  }
+}

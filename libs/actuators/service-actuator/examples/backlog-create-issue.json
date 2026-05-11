@@ -1,0 +1,33 @@
+{
+  "_comment": "Backlog課題作成 — service-actuator の preset ルートを使う例。プロジェクトID・課題種別IDはget_issue_typesで事前確認すること。",
+  "pipeline": [
+    {
+      "id": "create_issue",
+      "op": "service:preset",
+      "params": {
+        "service_id": "backlog",
+        "operation": "create_issue",
+        "auth": "secret-guard",
+        "params": {
+          "space": "YOUR_SPACE_NAME",
+          "body": {
+            "projectId": 12345,
+            "summary": "課題タイトル",
+            "issueTypeId": 1,
+            "priorityId": 3,
+            "description": "詳細説明",
+            "assigneeId": 67890
+          }
+        },
+        "export_as": "created_issue"
+      }
+    },
+    {
+      "id": "log_key",
+      "op": "system:log",
+      "params": {
+        "message": "作成した課題: {{created_issue.issueKey}}"
+      }
+    }
+  ]
+}

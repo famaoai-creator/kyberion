@@ -78,6 +78,60 @@ function normalizePresetResult(output: any, outputMapping?: Record<string, strin
   return transform(output, { type: 'json_map', mapping: outputMapping });
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveRequestEnvelope(params: any): {
+  templateVars: Record<string, any>;
+  query?: Record<string, any>;
+  body?: any;
+  hasBody: boolean;
+} {
+  const templateVars: Record<string, any> = isPlainObject(params) ? { ...params } : {};
+  let query: Record<string, any> | undefined;
+  let body: any;
+  let hasBody = false;
+
+  if (isPlainObject(templateVars.vars)) {
+    Object.assign(templateVars, templateVars.vars);
+  }
+  if (isPlainObject(templateVars.query)) {
+    query = { ...templateVars.query };
+  }
+  if (Object.prototype.hasOwnProperty.call(templateVars, 'body')) {
+    body = templateVars.body;
+    hasBody = true;
+  }
+
+  return { templateVars, query, body, hasBody };
+}
+
+function buildApiKeyQueryAuth(
+  authStrategy: string | undefined,
+  authParams: Record<string, any> | undefined,
+  binding: ReturnType<typeof resolveServiceBinding>,
+  templateVars: Record<string, any>,
+): Record<string, string> {
+  if (!authStrategy || authStrategy.toLowerCase() !== 'api_key_query') return {};
+
+  const key = String(authParams?.key || 'apiKey').trim();
+  if (!key) {
+    throw new Error(`api_key_query auth requires a query key for service "${binding.serviceId}"`);
+  }
+
+  const resolvedValue = resolveTemplateValue(authParams?.value ?? '{{accessToken}}', {
+    ...templateVars,
+    ...binding,
+  });
+  const value = typeof resolvedValue === 'string' ? resolvedValue : String(resolvedValue ?? '');
+  if (!value) {
+    throw new Error(`api_key_query auth requires an access token for service "${binding.serviceId}"`);
+  }
+
+  return { [key]: value };
+}
+
 function buildAuthHeaders(
   authStrategy: string | undefined,
   binding: ReturnType<typeof resolveServiceBinding>,
@@ -175,6 +229,7 @@ export async function executeServicePreset(serviceId: string, action: string, pa
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
 
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
+  const envelope = resolveRequestEnvelope(params);
   const connection = loadConnectionWithFallback(serviceId);
   const mergedParams = {
     ...mergeParamsWithConnection(
@@ -182,9 +237,10 @@ export async function executeServicePreset(serviceId: string, action: string, pa
         ...(serviceConfig && typeof serviceConfig === 'object' ? serviceConfig : {}),
         ...(connection && typeof connection === 'object' ? connection : {}),
       },
-      params && typeof params === 'object' ? params : {},
+      isPlainObject(params) ? params : {},
     ),
     [`${serviceId}_connection`]: connection,
+    ...envelope.templateVars,
   };
   
   // Auth resolution
@@ -217,13 +273,25 @@ export async function executeServicePreset(serviceId: string, action: string, pa
         }
         const apiPath = resolveVars(alt.path, mergedParams);
         const method = alt.method || 'GET';
-        const rawPayload = alt.payload_template ? resolveTemplateValue(alt.payload_template, mergedParams) : params;
+        const authQuery = buildApiKeyQueryAuth(alt.auth_strategy || preset.auth_strategy, alt.auth_params || preset.auth_params, binding, mergedParams);
+        const rawQuery = envelope.query ?? (method === 'GET' ? params : undefined);
+        const rawPayload = alt.payload_template
+          ? resolveTemplateValue(alt.payload_template, mergedParams)
+          : (envelope.hasBody ? envelope.body : params);
         const headers = {
           ...preset.headers,
           ...alt.headers,
           ...buildAuthHeaders(alt.auth_strategy || preset.auth_strategy, binding),
         };
         const payload = prepareRequestBody(rawPayload, headers);
+        const requestParams = isPlainObject(rawQuery)
+          ? {
+              ...resolveTemplateValue(rawQuery, mergedParams),
+              ...authQuery,
+            }
+          : Object.keys(authQuery).length > 0
+            ? authQuery
+            : undefined;
 
         logger.info(`🚀 [ENGINE:API] Executing ${serviceId}:${action}`);
         const result = await secureFetch({
@@ -231,7 +299,7 @@ export async function executeServicePreset(serviceId: string, action: string, pa
           url: `${baseUrl}/${apiPath}`,
           headers,
           data: method !== 'GET' ? payload : undefined,
-          params: method === 'GET' ? payload : undefined,
+          params: requestParams ?? (method === 'GET' ? payload : undefined),
           kyberion_allow_local_network:
             Boolean(alt.allow_local_network) ||
             Boolean(preset.allow_local_network) ||
