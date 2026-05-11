@@ -1,5 +1,6 @@
 {
   "_comment": "Backlog課題一覧取得 — service-actuator の preset ルートを使う最小パターン。curlの代替として使用できる。",
+  "_resilience": "manifest.json と preset の recovery_policy により、ネットワーク/429/timeout 系は指数バックオフで再試行される。",
   "_setup": "事前に `secret:set` で BACKLOG_API_KEY をOSキーチェーンに登録すること。一度登録すれば以降不要。",
   "pipeline": [
     {
@@ -20,6 +21,13 @@
         "auth": "secret-guard",
         "params": {
           "space": "YOUR_SPACE_NAME",
+          "retry": {
+            "maxRetries": 3,
+            "initialDelayMs": 250,
+            "maxDelayMs": 5000,
+            "factor": 2,
+            "jitter": true
+          },
           "query": {
             "projectId[]": [12345],
             "statusId[]": [1, 2],

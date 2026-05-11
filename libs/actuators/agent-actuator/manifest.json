@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Meta-Actuator for Agent Lifecycle and A2A",
   "contract_schema": "schemas/agent-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "daemon_then_local",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
     { "op": "ask", "platforms": ["darwin", "linux", "win32"] },

@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver, resolveVars, evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, derivePipelineStatus, pathResolver, resolveVars, evaluateCondition, getPathValue, resolveWriteArtifactSpec, withRetry, classifyError } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -8,6 +8,50 @@ import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
+
+const MODEL_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/modeling-actuator/manifest.json');
+const DEFAULT_MODEL_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 150,
+  maxDelayMs: 1200,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(MODEL_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_MODEL_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_MODEL_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+    },
+  };
+}
 
 /**
  * Modeling-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -59,7 +103,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    const saved = await withRetry(
+      async () => JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string),
+      buildRetryOptions(),
+    );
     ctx = { ...ctx, ...saved };
   }
 
@@ -92,7 +139,13 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   }
 
   if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    await withRetry(
+      async () => {
+        safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+        return undefined;
+      },
+      buildRetryOptions(),
+    );
   }
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
@@ -134,13 +187,37 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
-      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture_data']: await withRetry(
+          async () => JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string),
+          buildRetryOptions(),
+        ),
+      };
     case 'read_file':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: await withRetry(
+          async () => safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+          buildRetryOptions(),
+        ),
+      };
     case 'glob_files':
-      return { ...ctx, [params.export_as || 'file_list']: getAllFiles(path.resolve(rootDir, resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(rootDir, f)) };
+      return {
+        ...ctx,
+        [params.export_as || 'file_list']: await withRetry(
+          async () => getAllFiles(path.resolve(rootDir, resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(rootDir, f)),
+          buildRetryOptions(),
+        ),
+      };
     case 'shell':
-      return { ...ctx, [params.export_as || 'last_capture']: execSync(resolve(params.cmd), { encoding: 'utf8' }).trim() };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: await withRetry(
+          async () => execSync(resolve(params.cmd), { encoding: 'utf8' }).trim(),
+          buildRetryOptions(),
+        ),
+      };
     default: return ctx;
   }
 }
@@ -286,7 +363,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       if (!profile || typeof profile !== 'object') {
         throw new Error('test_inventory_to_browser_pipeline requires a web app profile object');
       }
-      const presetCatalog = loadBrowserExecutionPresetCatalog();
+      const presetCatalog = await loadBrowserExecutionPresetCatalog();
       const presetName = String(profile.execution_preset || params.preset || presetCatalog.default_preset || 'standard-web-auth');
       const executionPreset = presetCatalog.presets?.[presetName] || {};
 
@@ -451,10 +528,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
   }
 }
 
-function loadBrowserExecutionPresetCatalog(): { default_preset?: string; presets: Record<string, any> } {
+async function loadBrowserExecutionPresetCatalog(): Promise<{ default_preset?: string; presets: Record<string, any> }> {
   if (safeExistsSync(BROWSER_EXECUTION_PRESETS_PATH)) {
     try {
-      const parsed = JSON.parse(safeReadFile(BROWSER_EXECUTION_PRESETS_PATH, { encoding: 'utf8' }) as string);
+      const parsed = await withRetry(
+        async () => JSON.parse(safeReadFile(BROWSER_EXECUTION_PRESETS_PATH, { encoding: 'utf8' }) as string),
+        buildRetryOptions(),
+      );
       if (parsed && typeof parsed === 'object' && parsed.presets) return parsed;
     } catch (_) {}
   }
@@ -483,7 +563,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const outPath = path.resolve(rootDir, spec.path);
       const content = spec.content;
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
-      safeWriteFile(outPath, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
+      await withRetry(
+        async () => {
+          safeWriteFile(outPath, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
+          return undefined;
+        },
+        buildRetryOptions(),
+      );
       break;
     case 'log':
       logger.info(`[MODELING_LOG] ${resolve(params.message || 'Action completed')}`);
@@ -497,7 +583,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 async function performReconcile(input: ModelingAction) {
   const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/modeling-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
+  const config = await withRetry(
+    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
+    buildRetryOptions(),
+  );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
@@ -511,7 +600,10 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
+  const inputContent = await withRetry(
+    async () => safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string,
+    buildRetryOptions(),
+  );
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };

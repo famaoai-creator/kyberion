@@ -12,6 +12,7 @@ import {
   getPathValue,
   resolveWriteArtifactSpec,
   withRetry,
+  classifyError,
   derivePipelineStatus
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -20,6 +21,52 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as yaml from 'js-yaml';
 import { dispatchDecisionOp } from './decision-ops.js';
+
+const WISDOM_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json');
+const DEFAULT_WISDOM_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 250,
+  maxDelayMs: 2000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(WISDOM_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_WISDOM_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_WISDOM_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' ||
+            classification.category === 'timeout' ||
+            classification.category === 'network';
+    },
+  };
+}
 
 /**
  * Wisdom-Actuator v2.2.0 [DYNAMIC KNOWLEDGE ENABLED]
@@ -64,7 +111,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   let ctx = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
   
   if (initialCtx.context_path && safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(pathResolver.rootResolve(initialCtx.context_path), { encoding: 'utf8' }) as string);
+    const saved = await withRetry(
+      async () => JSON.parse(safeReadFile(pathResolver.rootResolve(initialCtx.context_path), { encoding: 'utf8' }) as string),
+      buildRetryOptions(),
+    );
     ctx = { ...ctx, ...saved };
   }
 
@@ -95,7 +145,13 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   }
 
   if (initialCtx.context_path) {
-    safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    await withRetry(
+      async () => {
+        safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
+        return undefined;
+      },
+      buildRetryOptions(),
+    );
   }
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
@@ -137,7 +193,13 @@ async function opCapture(op: string, params: any, ctx: any) {
   switch (op) {
     case 'shell':
       const cmd = resolveVars(params.cmd, ctx);
-      return { ...ctx, [params.export_as || 'last_capture']: safeExec(cmd).trim() };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: await withRetry(
+          async () => safeExec(cmd).trim(),
+          buildRetryOptions(),
+        ),
+      };
     case 'read_file':
       return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(pathResolver.rootResolve(resolveVars(params.path, ctx)), { encoding: 'utf8' }) };
     case 'read_json':
@@ -240,75 +302,81 @@ async function opApply(op: string, params: any, ctx: any) {
       }
       break;
     case 'knowledge_inject':
-      const kPath = resolveVars(params.knowledge_path, ctx);
-      const missionId = resolveVars(params.mission_id, ctx);
-      const missionPath = (pathResolver as any).findMissionPath(missionId);
-      if (!missionPath) throw new Error(`Mission ${missionId} not found.`);
-      
-      const sourcePath = pathResolver.knowledge(kPath);
-      const fileName = path.basename(sourcePath);
-      const targetPath = path.join(missionPath, `evidence/injected_${fileName}`);
-      
-      if (safeExistsSync(sourcePath)) {
-        const data = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
-        safeWriteFile(targetPath, data);
-        logger.success(`💉 [Wisdom] Injected knowledge ${kPath} into mission ${missionId}`);
-      } else {
-        throw new Error(`Knowledge source not found: ${sourcePath}`);
-      }
+      await withRetry(async () => {
+        const kPath = resolveVars(params.knowledge_path, ctx);
+        const missionId = resolveVars(params.mission_id, ctx);
+        const missionPath = (pathResolver as any).findMissionPath(missionId);
+        if (!missionPath) throw new Error(`Mission ${missionId} not found.`);
+        
+        const sourcePath = pathResolver.knowledge(kPath);
+        const fileName = path.basename(sourcePath);
+        const targetPath = path.join(missionPath, `evidence/injected_${fileName}`);
+        
+        if (safeExistsSync(sourcePath)) {
+          const data = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
+          safeWriteFile(targetPath, data);
+          logger.success(`💉 [Wisdom] Injected knowledge ${kPath} into mission ${missionId}`);
+        } else {
+          throw new Error(`Knowledge source not found: ${sourcePath}`);
+        }
+      }, buildRetryOptions());
       break;
     case 'log': logger.info(`[WISDOM_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
     case 'knowledge_export':
-      const sourceFile = pathResolver.knowledge(resolveVars(params.path, ctx));
-      if (!safeExistsSync(sourceFile)) throw new Error(`Knowledge source not found: ${sourceFile}`);
-      
-      const agentId = JSON.parse(safeReadFile(pathResolver.knowledge('personal/agent-identity.json'), { encoding: 'utf8' }) as string).agent_id;
-      const rawData = safeReadFile(sourceFile, { encoding: 'utf8' }) as string;
-      const { createHash } = await import('node:crypto');
-      const hash = createHash('sha256').update(rawData).digest('hex');
+      await withRetry(async () => {
+        const sourceFile = pathResolver.knowledge(resolveVars(params.path, ctx));
+        if (!safeExistsSync(sourceFile)) throw new Error(`Knowledge source not found: ${sourceFile}`);
+        
+        const agentId = JSON.parse(safeReadFile(pathResolver.knowledge('personal/agent-identity.json'), { encoding: 'utf8' }) as string).agent_id;
+        const rawData = safeReadFile(sourceFile, { encoding: 'utf8' }) as string;
+        const { createHash } = await import('node:crypto');
+        const hash = createHash('sha256').update(rawData).digest('hex');
 
-      const kkp = {
-        metadata: {
-          package_id: `KKP-${Date.now()}`,
-          origin_agent_id: agentId,
-          timestamp: new Date().toISOString(),
-          domain: params.domain || 'general',
-          hash: hash,
-          visibility: params.visibility || 'public'
-        },
-        content: {
-          path: resolveVars(params.path, ctx),
-          raw_data: rawData
-        }
-      };
+        const kkp = {
+          metadata: {
+            package_id: `KKP-${Date.now()}`,
+            origin_agent_id: agentId,
+            timestamp: new Date().toISOString(),
+            domain: params.domain || 'general',
+            hash: hash,
+            visibility: params.visibility || 'public'
+          },
+          content: {
+            path: resolveVars(params.path, ctx),
+            raw_data: rawData
+          }
+        };
 
-      const outPath = pathResolver.rootResolve(
-        resolveVars(params.output_path || pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`), ctx)
-      );
-      safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
-      logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
+        const outPath = pathResolver.rootResolve(
+          resolveVars(params.output_path || pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`), ctx)
+        );
+        safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
+        logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
+      }, buildRetryOptions());
       break;
 
     case 'knowledge_import':
-      const pkgPath = pathResolver.rootResolve(resolveVars(params.package_path, ctx));
-      if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
-      
-      const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
-      const { createHash: vHash } = await import('node:crypto');
-      const actualHash = vHash('sha256').update(pkg.content.raw_data).digest('hex');
+      await withRetry(async () => {
+        const pkgPath = pathResolver.rootResolve(resolveVars(params.package_path, ctx));
+        if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
+        
+        const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+        const { createHash: vHash } = await import('node:crypto');
+        const actualHash = vHash('sha256').update(pkg.content.raw_data).digest('hex');
 
-      if (actualHash !== pkg.metadata.hash) {
-        throw new Error(`CRITICAL: Knowledge Package integrity check failed. Expected: ${pkg.metadata.hash}, Got: ${actualHash}`);
-      }
+        if (actualHash !== pkg.metadata.hash) {
+          throw new Error(`CRITICAL: Knowledge Package integrity check failed. Expected: ${pkg.metadata.hash}, Got: ${actualHash}`);
+        }
 
-      const targetTier = params.tier || 'confidential';
-      const importDir = pathResolver.knowledge(`${targetTier}/external/${pkg.metadata.origin_agent_id}`);
-      if (!safeExistsSync(importDir)) safeMkdir(importDir, { recursive: true });
+        const targetTier = params.tier || 'confidential';
+        const importDir = pathResolver.knowledge(`${targetTier}/external/${pkg.metadata.origin_agent_id}`);
+        if (!safeExistsSync(importDir)) safeMkdir(importDir, { recursive: true });
 
-      const targetFile = path.join(importDir, path.basename(pkg.content.path));
-      safeWriteFile(targetFile, pkg.content.raw_data);
-      
-      logger.success(`📥 [Wisdom] Imported knowledge from ${pkg.metadata.origin_agent_id} to ${targetFile}`);
+        const targetFile = path.join(importDir, path.basename(pkg.content.path));
+        safeWriteFile(targetFile, pkg.content.raw_data);
+        
+        logger.success(`📥 [Wisdom] Imported knowledge from ${pkg.metadata.origin_agent_id} to ${targetFile}`);
+      }, buildRetryOptions());
       break;
 
     default: {
@@ -327,7 +395,10 @@ async function opApply(op: string, params: any, ctx: any) {
 async function performReconcile(input: WisdomAction) {
   const strategyPath = pathResolver.knowledge(input.strategy_path || 'governance/wisdom-reconcile-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
+  const config = await withRetry(
+    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
+    buildRetryOptions(),
+  );
   for (const strategy of config.strategies) {
     if (strategy.for_each) {
       const listCtx = await opCapture(strategy.for_each.op, strategy.for_each.params, {});

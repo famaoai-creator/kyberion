@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Unified External SaaS/API Reachability Layer",
   "contract_schema": "schemas/service-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "api", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },

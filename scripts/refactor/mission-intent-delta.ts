@@ -18,6 +18,15 @@ function fallbackGoalForStage(missionId: string, stage: string): string {
   return `Mission ${missionId} progressing through ${mapStageToLoopPhase(stage)}`;
 }
 
+function summarizeIntentText(text: string): string {
+  const firstLine = text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)[0] ?? '';
+  if (!firstLine) return '';
+  return firstLine.length <= 200 ? firstLine : `${firstLine.slice(0, 197)}...`;
+}
+
 export async function emitMissionLifecycleIntentSnapshot(input: {
   missionId: string;
   stage: string;
@@ -29,7 +38,16 @@ export async function emitMissionLifecycleIntentSnapshot(input: {
   try {
     const trimmed = String(input.text || '').trim();
     if (trimmed) {
-      const intent = await getIntentExtractor().extract({ text: trimmed });
+      const intent =
+        source === 'user_prompt'
+          ? await getIntentExtractor()
+              .extract({ text: trimmed })
+              .catch(() => ({
+                goal: summarizeIntentText(trimmed) || fallbackGoalForStage(input.missionId, input.stage),
+              }))
+          : {
+              goal: summarizeIntentText(trimmed) || fallbackGoalForStage(input.missionId, input.stage),
+            };
       emitIntentSnapshot({
         missionId: input.missionId,
         stage: input.stage,

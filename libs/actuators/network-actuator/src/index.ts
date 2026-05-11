@@ -12,7 +12,8 @@ import {
   getPathValue,
   resolveWriteArtifactSpec,
   withRetry,
-  derivePipelineStatus
+  derivePipelineStatus,
+  classifyError
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -24,11 +25,66 @@ import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
  * Pure ADF-driven engine for all network and A2A interactions.
  */
 const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
+const NETWORK_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/network-actuator/manifest.json');
+const DEFAULT_RETRY_POLICY = {
+  maxRetries: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
     throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
   }
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(NETWORK_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(stepParams: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
+  const resolved = {
+    ...DEFAULT_RETRY_POLICY,
+    ...manifestRetry,
+    ...explicitRetry,
+    maxRetries: Number(stepParams.max_retries ?? explicitRetry.maxRetries ?? manifestRetry.maxRetries ?? DEFAULT_RETRY_POLICY.maxRetries),
+    initialDelayMs: Number(stepParams.retry_delay_ms ?? explicitRetry.initialDelayMs ?? manifestRetry.initialDelayMs ?? DEFAULT_RETRY_POLICY.initialDelayMs),
+  };
+
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
 }
 
 interface PipelineStep {
@@ -140,14 +196,16 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
 async function opCapture(op: string, params: any, ctx: any) {
   switch (op) {
     case 'fetch':
-      const response = await secureFetch({
-        method: params.method || 'GET',
-        url: resolveVars(params.url, ctx),
-        headers: params.headers,
-        data: params.data,
-        params: params.query,
-        timeout: params.timeout || 20000
-      });
+      const response = await withRetry(async () => {
+        return await secureFetch({
+          method: params.method || 'GET',
+          url: resolveVars(params.url, ctx),
+          headers: params.headers,
+          data: params.data,
+          params: params.query,
+          timeout: params.timeout || 20000
+        });
+      }, buildRetryOptions(params));
       return { ...ctx, [params.export_as || 'last_capture']: response };
 
     case 'shell':

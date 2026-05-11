@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeMkdir, safeWriteFile } from '../secure-io.js';
+import { safeMkdir, safeWriteFile, safeReadFile } from '../secure-io.js';
+import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
+import { pathResolver } from '../path-resolver.js';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from '../schema-loader.js';
+
+const AjvCtor = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('../core.js', () => ({
   logger: {
@@ -131,6 +139,33 @@ describe('actuator-capability', () => {
         'browser-actuator',
         'voice-actuator',
       ]);
+    });
+  });
+
+  describe('resilience declarations', () => {
+    it('all actuator manifests declare resilience_tier and recovery_policy', () => {
+      const catalog = loadActuatorManifestCatalog();
+      expect(catalog.length).toBeGreaterThan(0);
+
+      for (const entry of catalog) {
+        const manifest = JSON.parse(
+          safeReadFile(pathResolver.rootResolve(entry.manifest_path), { encoding: 'utf8' }) as string,
+        ) as Record<string, unknown>;
+        expect(manifest.resilience_tier, entry.actuatorId).toBeDefined();
+        expect(manifest.recovery_policy, entry.actuatorId).toBeDefined();
+        expect(typeof manifest.resilience_tier, entry.actuatorId).toBe('string');
+        expect(manifest.recovery_policy, entry.actuatorId).toEqual(expect.any(Object));
+      }
+    });
+
+    it('actuator manifest schema accepts resilience declarations', () => {
+      const ajv = new AjvCtor({ allErrors: true });
+      addFormats(ajv);
+      const validate = compileSchemaFromPath(ajv, path.join(process.cwd(), 'schemas/actuator-manifest.schema.json'));
+      const manifest = JSON.parse(
+        safeReadFile(path.join(process.cwd(), 'libs/actuators/file-actuator/manifest.json'), { encoding: 'utf8' }) as string,
+      );
+      expect(validate(manifest), JSON.stringify(validate.errors || [])).toBe(true);
     });
   });
 });

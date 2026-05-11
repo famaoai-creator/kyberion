@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Managed process lifecycle actuator backed by the runtime supervisor",
   "contract_schema": "schemas/process-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "process_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
     { "op": "stop", "platforms": ["darwin", "linux", "win32"] },

@@ -3,6 +3,18 @@
   "version": "1.2.0",
   "description": "Governed local voice generation actuator with native playback and artifact fallback",
   "contract_schema": "schemas/voice-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "native_then_artifact",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "speak_local", "platforms": ["darwin", "linux"] },
     { "op": "list_voices", "platforms": ["darwin", "linux"] },

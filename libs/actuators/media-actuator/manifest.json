@@ -3,6 +3,18 @@
   "version": "1.1.0",
   "description": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
   "contract_schema": "schemas/media-pipeline.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "native_then_cli",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/media-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ],

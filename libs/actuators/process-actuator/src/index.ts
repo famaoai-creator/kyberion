@@ -8,10 +8,23 @@ import {
   stopManagedProcess,
   loadSurfaceManifest,
   loadSurfaceState,
+  classifyError,
+  withRetry,
 } from '@agent/core';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const PROCESS_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/process-actuator/manifest.json');
+const DEFAULT_PROCESS_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 250,
+  maxDelayMs: 2000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 interface ProcessAction {
   action: 'spawn' | 'stop' | 'list' | 'status' | 'list-surfaces' | 'pipeline';
@@ -28,6 +41,48 @@ interface ProcessAction {
     env?: Record<string, string>;
     shutdownPolicy?: RuntimeShutdownPolicy;
     export_as?: string;
+  };
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(PROCESS_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_PROCESS_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
   };
 }
 
@@ -48,61 +103,67 @@ export async function handleAction(input: ProcessAction) {
       if (!params.resourceId || !params.command || !params.kind || !params.ownerId || !params.ownerType) {
         throw new Error('resourceId, command, kind, ownerId, and ownerType are required for spawn');
       }
-      const managed = spawnManagedProcess({
-        resourceId: params.resourceId,
-        kind: params.kind,
-        ownerId: params.ownerId,
-        ownerType: params.ownerType,
-        command: params.command,
-        args: params.args || [],
-        shutdownPolicy: params.shutdownPolicy || 'manual',
-        spawnOptions: {
-          cwd: params.cwd ? pathResolver.rootResolve(params.cwd) : pathResolver.rootDir(),
-          env: { ...process.env, ...(params.env || {}) },
-          stdio: ['pipe', 'pipe', 'pipe'],
-        },
-      });
-      return {
-        status: 'spawned',
-        resourceId: managed.resourceId,
-        pid: managed.child.pid,
-      };
+      return await withRetry(async () => {
+        const managed = spawnManagedProcess({
+          resourceId: params.resourceId,
+          kind: params.kind,
+          ownerId: params.ownerId,
+          ownerType: params.ownerType,
+          command: params.command,
+          args: params.args || [],
+          shutdownPolicy: params.shutdownPolicy || 'manual',
+          spawnOptions: {
+            cwd: params.cwd ? pathResolver.rootResolve(params.cwd) : pathResolver.rootDir(),
+            env: { ...process.env, ...(params.env || {}) },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          },
+        });
+        return {
+          status: 'spawned',
+          resourceId: managed.resourceId,
+          pid: managed.child.pid,
+        };
+      }, buildRetryOptions());
     }
 
     case 'stop': {
       if (!params.resourceId) throw new Error('resourceId is required for stop');
-      const record = runtimeSupervisor.get(params.resourceId);
-      stopManagedProcess(params.resourceId, null);
-      return { status: 'stopped', resourceId: params.resourceId, pid: record?.pid };
+      return await withRetry(async () => {
+        const record = runtimeSupervisor.get(params.resourceId);
+        stopManagedProcess(params.resourceId, null);
+        return { status: 'stopped', resourceId: params.resourceId, pid: record?.pid };
+      }, buildRetryOptions());
     }
 
     case 'status': {
       if (!params.resourceId) throw new Error('resourceId is required for status');
-      return { status: 'ok', resource: runtimeSupervisor.get(params.resourceId) || null };
+      return await withRetry(async () => ({ status: 'ok', resource: runtimeSupervisor.get(params.resourceId) || null }), buildRetryOptions());
     }
 
     case 'list':
-      return { status: 'ok', resources: runtimeSupervisor.snapshot() };
+      return await withRetry(async () => ({ status: 'ok', resources: runtimeSupervisor.snapshot() }), buildRetryOptions());
 
     case 'list-surfaces': {
-      const manifest = loadSurfaceManifest();
-      const state = loadSurfaceState();
+      return await withRetry(async () => {
+        const manifest = loadSurfaceManifest();
+        const state = loadSurfaceState();
 
-      const results = manifest.surfaces.map((s) => {
-        const record = state.surfaces[s.id];
-        const running = record && isProcessRunning(record.pid);
-        return {
-          id: s.id,
-          kind: s.kind,
-          enabled: s.enabled !== false,
-          running: !!running,
-          port: s.port,
-          url: s.port ? `http://localhost:${s.port}${s.healthPath || '/'}` : null,
-          home_url: s.port ? `http://localhost:${s.port}/` : null,
-        };
-      });
-      const data = { status: 'ok', surfaces: results };
-      return params.export_as ? { ...data, context: { ...context, [params.export_as]: results } } : data;
+        const results = manifest.surfaces.map((s) => {
+          const record = state.surfaces[s.id];
+          const running = record && isProcessRunning(record.pid);
+          return {
+            id: s.id,
+            kind: s.kind,
+            enabled: s.enabled !== false,
+            running: !!running,
+            port: s.port,
+            url: s.port ? `http://localhost:${s.port}${s.healthPath || '/'}` : null,
+            home_url: s.port ? `http://localhost:${s.port}/` : null,
+          };
+        });
+        const data = { status: 'ok', surfaces: results };
+        return params.export_as ? { ...data, context: { ...context, [params.export_as]: results } } : data;
+      }, buildRetryOptions());
     }
 
 

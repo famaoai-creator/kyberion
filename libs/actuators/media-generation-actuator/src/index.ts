@@ -7,10 +7,12 @@ import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
   secureFetch,
+  withRetry,
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
   pathResolver,
+  classifyError,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -26,6 +28,16 @@ const DEFAULT_COMFY_OUTPUT_DIR = process.env.KYBERION_COMFY_OUTPUT_DIR || '/User
 const PROMPT_BASED_ACTIONS = new Set(['generate_image', 'generate_video', 'generate_music', 'run_workflow']);
 const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'canceled']);
+const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-generation-actuator/manifest.json');
+const DEFAULT_MEDIA_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 type GeneratedArtifact = {
   kind: string;
@@ -48,6 +60,47 @@ function sleep(ms: number): Promise<void> {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(MEDIA_GENERATION_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const manifestRetry = isPlainObject(loadRecoveryPolicy().retry) ? loadRecoveryPolicy().retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(loadRecoveryPolicy().retryable_categories) ? loadRecoveryPolicy().retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_MEDIA_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
 }
 
 function ensureGenerationJobDir(): void {
@@ -107,10 +160,12 @@ function extractArtifacts(history: any): GeneratedArtifact[] {
 async function waitForPromptCompletion(promptId: string, timeoutMs: number, pollIntervalMs: number): Promise<any> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    const history = await secureFetch({
-      method: 'GET',
-      url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
-    });
+    const history = await withRetry(async () => {
+      return await secureFetch({
+        method: 'GET',
+        url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
+      });
+    }, buildRetryOptions());
     if (history && Object.keys(history).length > 0) {
       const promptHistory = history[promptId];
       if (promptHistory?.status?.completed || promptHistory?.outputs) {
@@ -284,8 +339,8 @@ async function submitGenerationJob(params: any) {
       compiled_generation_request: compiled?.resolved,
     },
     retry_policy: params.retry_policy || {
-      max_attempts: 1,
-      backoff_seconds: 0,
+      max_attempts: Number(loadRecoveryPolicy().retry?.maxRetries || 1),
+      backoff_seconds: Number((loadRecoveryPolicy().retry?.initialDelayMs || 0) / 1000),
     },
     attempts: Number(params.next_attempt || 1),
     created_at: params.created_at || nowIso(),

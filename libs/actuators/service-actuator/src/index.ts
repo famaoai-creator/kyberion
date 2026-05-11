@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog, classifyError } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -27,6 +27,24 @@ interface ServiceAction {
   params: any;
   auth?: 'none' | 'secret-guard' | 'session';
 }
+
+type RetryPolicy = {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  factor?: number;
+  jitter?: boolean;
+};
+
+const SERVICE_ACTUATOR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/service-actuator/manifest.json');
+const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+let cachedPipelineRetryPolicy: RetryPolicy | null = null;
 
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
@@ -64,6 +82,35 @@ function emitRecoveryStimulus(serviceId: string) {
     control: { status: 'pending', feedback: 'auto', evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-actuator' }] }
   };
   safeAppendFile(STIMULI_PATH, JSON.stringify(stimulus) + "\n");
+}
+
+function loadPipelineRetryPolicy(): RetryPolicy {
+  if (cachedPipelineRetryPolicy) return cachedPipelineRetryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(SERVICE_ACTUATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const policy = manifest?.recovery_policy?.retry || manifest?.recovery_policy?.default_retry || {};
+    cachedPipelineRetryPolicy = policy;
+    return policy;
+  } catch (_) {
+    cachedPipelineRetryPolicy = {};
+    return {};
+  }
+}
+
+function buildPipelineRetryPolicy(stepRetry: RetryPolicy | undefined): Required<RetryPolicy> {
+  return {
+    ...DEFAULT_PIPELINE_RETRY,
+    ...loadPipelineRetryPolicy(),
+    ...(stepRetry || {}),
+  };
+}
+
+function shouldRetryServiceAction(error: Error): boolean {
+  const classification = classifyError(error);
+  return classification.category === 'network'
+    || classification.category === 'rate_limit'
+    || classification.category === 'timeout'
+    || classification.category === 'resource_unavailable';
 }
 
 function resolveServiceBaseUrl(serviceId: string): string {
@@ -168,7 +215,10 @@ async function handleAction(input: any, onEvent?: (data: any) => void) {
           auth: step.params.auth,
           method: step.params.method
         });
-      }, step.params.retry || { maxRetries: 2 });
+      }, {
+        ...buildPipelineRetryPolicy(step.params.retry),
+        shouldRetry: shouldRetryServiceAction,
+      });
       
       const exportKey = step.params.export_as || 'last_service_result';
       ctx[exportKey] = stepResult;
@@ -264,12 +314,17 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       const token: string | null = binding.accessToken || null;
       const baseUrl = resolveServiceBaseUrl(input.service_id);
       const httpMethod = input.method || (input.params ? 'POST' : 'GET');
-      return await secureFetch({
-        method: httpMethod,
-        url: `${baseUrl}/${input.action}`,
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        data: httpMethod !== 'GET' ? input.params : undefined,
-        params: httpMethod === 'GET' ? input.params : undefined
+      return await withRetry(async () => {
+        return await secureFetch({
+          method: httpMethod,
+          url: `${baseUrl}/${input.action}`,
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          data: httpMethod !== 'GET' ? input.params : undefined,
+          params: httpMethod === 'GET' ? input.params : undefined
+        });
+      }, {
+        ...buildPipelineRetryPolicy(input.params?.retry),
+        shouldRetry: shouldRetryServiceAction,
       });
 
     case 'CLI':

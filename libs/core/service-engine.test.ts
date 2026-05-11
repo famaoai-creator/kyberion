@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   secureFetch: vi.fn(),
   resolveOverlay: vi.fn(() => null),
   loadServiceEndpointsCatalog: vi.fn(),
+  withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
 }));
 
 vi.mock('./index.js', async () => {
@@ -19,6 +20,7 @@ vi.mock('./index.js', async () => {
     resolveServiceBinding: mocks.resolveServiceBinding,
     secureFetch: mocks.secureFetch,
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
+    withRetry: mocks.withRetry,
     platform: {
       ...actual.platform,
       checkBinary: mocks.checkBinary,
@@ -353,6 +355,65 @@ describe('executeServicePreset', () => {
           apiKey: 'backlog-secret',
         }),
         data: undefined,
+      }),
+    );
+  });
+
+  it('applies preset recovery policy to transient failures before falling back', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('backlog.json')) {
+        return JSON.stringify({
+          service_id: 'backlog',
+          auth_strategy: 'api_key_query',
+          auth_params: {
+            key: 'apiKey',
+            value: '{{accessToken}}',
+          },
+          recovery_policy: {
+            retry: {
+              maxRetries: 5,
+              initialDelayMs: 100,
+              maxDelayMs: 5000,
+              factor: 2,
+              jitter: false,
+            },
+            retryable_categories: ['network', 'timeout'],
+          },
+          operations: {
+            get_issues: {
+              type: 'api',
+              path: 'issues',
+              method: 'GET',
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ issues: [{ id: 1 }] });
+
+    await executeServicePreset(
+      'backlog',
+      'get_issues',
+      {
+        space: 'acme',
+        query: {
+          count: 10,
+        },
+      },
+      'secret-guard',
+    );
+
+    expect(mocks.withRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        maxRetries: 5,
+        initialDelayMs: 100,
+        maxDelayMs: 5000,
+        factor: 2,
+        jitter: false,
+        shouldRetry: expect.any(Function),
       }),
     );
   });

@@ -18,6 +18,8 @@ import {
   resolveRef,
   resolveVars,
   handleStepError,
+  classifyError,
+  withRetry,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
@@ -45,6 +47,17 @@ import { PDFParse } from 'pdf-parse';
  * Uses standard safeWriteFile for all physical outputs.
  */
 
+const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
+const DEFAULT_MEDIA_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
@@ -63,6 +76,48 @@ interface MediaAction {
 
 function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(MEDIA_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_MEDIA_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
 }
 
 function mergePptxShape(base: any, overrides: any): any {
@@ -707,7 +762,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (params.height) args.push('-H', String(resolve(params.height)));
       if (params.background_color) args.push('-b', String(resolve(params.background_color)));
 
-      safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+      await withRetry(async () => safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }), buildRetryOptions());
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Mermaid rendered at: ${outPath} (${stats.size} bytes).`);
@@ -730,7 +785,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (params.sketch) args.push('--sketch');
       if (params.pad) args.push('--pad', String(resolve(params.pad)));
 
-      safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+      await withRetry(async () => safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }), buildRetryOptions());
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] D2 rendered at: ${outPath} (${stats.size} bytes).`);
@@ -756,7 +811,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
 
-      await generateNativePptx(protocol, outPath);
+      await withRetry(async () => generateNativePptx(protocol, outPath), buildRetryOptions());
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
@@ -805,7 +860,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const xlsxProtocol = normalizeXlsxDesignProtocol(ctx[params.design_from || 'last_xlsx_design']);
       const xlsxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
-      await generateNativeXlsx(xlsxProtocol, xlsxOutPath);
+      await withRetry(async () => generateNativeXlsx(xlsxProtocol, xlsxOutPath), buildRetryOptions());
       const xlsxStats = safeStat(xlsxOutPath);
       logger.info(`✅ [MEDIA] XLSX rendered at: ${xlsxOutPath} (${xlsxStats.size} bytes).`);
       break;
@@ -814,7 +869,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
       const docxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
-      await generateNativeDocx(docxProtocol, docxOutPath);
+      await withRetry(async () => generateNativeDocx(docxProtocol, docxOutPath), buildRetryOptions());
       const docxStats = safeStat(docxOutPath);
       logger.info(`✅ [MEDIA] DOCX rendered at: ${docxOutPath} (${docxStats.size} bytes).`);
       break;
@@ -823,7 +878,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
       const pdfOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       if (!safeExistsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
-      await generateNativePdf(pdfProtocol, pdfOutPath, params.options);
+      await withRetry(async () => generateNativePdf(pdfProtocol, pdfOutPath, params.options), buildRetryOptions());
       const pdfStats = safeStat(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
       break;
@@ -1465,10 +1520,10 @@ async function renderCompiledProtocol(compiled: {
 }, outPath: string, options?: any): Promise<void> {
   ensureParentDir(outPath);
   const renderers: Record<ProtocolKind, () => Promise<void>> = {
-    pptx: async () => generateNativePptx(compiled.protocol, outPath),
-    xlsx: async () => generateNativeXlsx(normalizeXlsxDesignProtocol(compiled.protocol), outPath),
-    docx: async () => generateNativeDocx(compiled.protocol, outPath),
-    pdf: async () => generateNativePdf(compiled.protocol, outPath, options),
+    pptx: async () => withRetry(async () => generateNativePptx(compiled.protocol, outPath), buildRetryOptions()),
+    xlsx: async () => withRetry(async () => generateNativeXlsx(normalizeXlsxDesignProtocol(compiled.protocol), outPath), buildRetryOptions()),
+    docx: async () => withRetry(async () => generateNativeDocx(compiled.protocol, outPath), buildRetryOptions()),
+    pdf: async () => withRetry(async () => generateNativePdf(compiled.protocol, outPath, options), buildRetryOptions()),
   };
   const renderer = renderers[compiled.protocolKind];
   if (!renderer) {
@@ -1489,7 +1544,7 @@ async function renderDiagramDocumentBrief(rootDir: string, brief: any, outPath: 
         iconMap,
         iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
       });
-      safeWriteFile(outPath, document);
+      await withRetry(async () => safeWriteFile(outPath, document), buildRetryOptions());
     },
     mmd: async () => {
       const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
@@ -1505,7 +1560,7 @@ async function renderDiagramDocumentBrief(rootDir: string, brief: any, outPath: 
       if (params.width) args.push('-w', String(resolve(params.width)));
       if (params.height) args.push('-H', String(resolve(params.height)));
       if (params.background_color) args.push('-b', String(resolve(params.background_color)));
-      safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+      await withRetry(async () => safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }), buildRetryOptions());
     },
     d2: async () => {
       const tempDir = pathResolver.sharedTmp(`actuators/media-actuator/diagram_${Date.now()}`);
@@ -1517,7 +1572,7 @@ async function renderDiagramDocumentBrief(rootDir: string, brief: any, outPath: 
       if (params.theme_id) args.push('--theme', String(resolve(params.theme_id)));
       if (params.sketch) args.push('--sketch');
       if (params.pad) args.push('--pad', String(resolve(params.pad)));
-      safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 });
+      await withRetry(async () => safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }), buildRetryOptions());
     },
   };
   const renderer = renderers[String(brief.render_target || '').trim()];

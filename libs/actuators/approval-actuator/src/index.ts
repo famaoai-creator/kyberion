@@ -2,6 +2,8 @@ import {
   createStandardYargs,
   logger,
   safeReadFile,
+  withRetry,
+  classifyError,
 } from '@agent/core';
 import { listGovernedArtifacts } from '@agent/core/artifacts';
 import {
@@ -21,6 +23,50 @@ import type {
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathResolver } from '@agent/core';
+
+const APPROVAL_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/approval-actuator/manifest.json');
+const DEFAULT_APPROVAL_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 200,
+  maxDelayMs: 1500,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(APPROVAL_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_APPROVAL_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_APPROVAL_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+    },
+  };
+}
 
 interface ApprovalAction {
   action: 'create' | 'load' | 'decide' | 'list_pending';
@@ -79,7 +125,10 @@ export async function handleAction(input: ApprovalAction) {
       if (!input.params.requestId) throw new Error('requestId is required');
       return {
         status: 'ok',
-        request: loadApprovalRequest(input.params.channel, input.params.requestId),
+        request: await withRetry(
+          async () => loadApprovalRequest(input.params.channel, input.params.requestId),
+          buildRetryOptions(),
+        ),
       };
     case 'decide':
       if (!input.params.requestId || !input.params.decision || !input.params.decidedBy) {
@@ -101,10 +150,18 @@ export async function handleAction(input: ApprovalAction) {
     case 'list_pending': {
       const storageChannel = input.params.storageChannel || input.params.channel;
       const entries = listGovernedArtifacts(`active/shared/coordination/channels/${storageChannel}/approvals/requests`);
-      const requests = entries
-        .filter((entry) => entry.endsWith('.json'))
-        .map((entry) => loadApprovalRequest(storageChannel, entry.replace(/\.json$/, '')))
-        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+      const requests = (
+        await Promise.all(
+          entries
+            .filter((entry) => entry.endsWith('.json'))
+            .map((entry) =>
+              withRetry(
+                async () => loadApprovalRequest(storageChannel, entry.replace(/\.json$/, '')),
+                buildRetryOptions(),
+              ),
+            ),
+        )
+      ).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
         .filter((entry) => entry.status === 'pending');
       return { status: 'ok', requests };
     }

@@ -6,6 +6,7 @@ import {
   pathResolver,
   TraceContext,
   persistTrace,
+  withRetry,
   classifyError,
   formatClassification,
   compileSchemaFromPath,
@@ -43,8 +44,17 @@ interface CalendarSummary {
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/calendar-actuator/manifest.json');
+const DEFAULT_CALENDAR_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  factor: 2,
+  jitter: true,
+};
 
 let cachedValidator: ValidateFunction | null = null;
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 function getValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
   const ajv = new AjvCtor({ allErrors: true });
@@ -77,6 +87,48 @@ function parseISODate(value: string | undefined, label: string): Date | null {
   return d;
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_CALENDAR_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
+
 /**
  * Run a JXA script that reads its parameters from a JSON literal embedded in
  * the script body. The double-JSON.stringify pattern prevents any user-supplied
@@ -87,7 +139,7 @@ function parseISODate(value: string | undefined, label: string): Date | null {
  * allow a user with quotes in an event title to break out of the string
  * literal and execute arbitrary JXA.
  */
-function runJxa<T>(scriptBody: string, params: Record<string, unknown>): T {
+async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): Promise<T> {
   const paramsLiteral = JSON.stringify(JSON.stringify(params));
   const script = `
     (function() {
@@ -95,7 +147,7 @@ function runJxa<T>(scriptBody: string, params: Record<string, unknown>): T {
       ${scriptBody}
     })();
   `;
-  const output = safeExec('osascript', ['-l', 'JavaScript', '-e', script]);
+  const output = await withRetry(async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]), buildRetryOptions());
   const trimmed = String(output).trim();
   if (!trimmed) return undefined as unknown as T;
   try {
@@ -107,7 +159,7 @@ function runJxa<T>(scriptBody: string, params: Record<string, unknown>): T {
   }
 }
 
-export function listCalendars(): CalendarSummary[] {
+export async function listCalendars(): Promise<CalendarSummary[]> {
   return runJxa<CalendarSummary[]>(
     `
       const app = Application("Calendar");
@@ -117,7 +169,7 @@ export function listCalendars(): CalendarSummary[] {
   );
 }
 
-export function listEvents(params: CalendarParams): CalendarEvent[] {
+export async function listEvents(params: CalendarParams): Promise<CalendarEvent[]> {
   const startInput = parseISODate(params.start_date, 'start_date');
   const endInput = parseISODate(params.end_date, 'end_date');
 
@@ -172,7 +224,7 @@ export function listEvents(params: CalendarParams): CalendarEvent[] {
   );
 }
 
-export function createEvent(params: CalendarParams): { status: string; title: string } {
+export async function createEvent(params: CalendarParams): Promise<{ status: string; title: string }> {
   if (!params.title || !params.start_date || !params.calendar_names?.[0]) {
     throw new Error(
       'calendar-actuator: create_event requires title, start_date, and calendar_names[0]',
@@ -226,13 +278,13 @@ export async function handleAction(action: CalendarAction): Promise<unknown> {
   try {
     switch (valid.op) {
       case 'list_calendars':
-        result = listCalendars();
+        result = await listCalendars();
         break;
       case 'list_events':
-        result = listEvents(valid.params || {});
+        result = await listEvents(valid.params || {});
         break;
       case 'create_event':
-        result = createEvent(valid.params || {});
+        result = await createEvent(valid.params || {});
         break;
       default: {
         const _exhaustive: never = valid.op;

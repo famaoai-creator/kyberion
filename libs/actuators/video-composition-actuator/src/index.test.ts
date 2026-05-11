@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     validator.errors = [];
     return validator;
   }),
+  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   getVideoCompositionTemplateRegistry: vi.fn(() => ({
     version: 'test',
     default_template_id: 'basic-title-card',
@@ -54,6 +55,7 @@ vi.mock('@agent/core', async () => {
   return {
     ...actual,
     compileSchemaFromPath: mocks.compileSchemaFromPath,
+    withRetry: mocks.withRetry,
     getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
     getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
     compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
@@ -64,8 +66,15 @@ vi.mock('@agent/core', async () => {
 });
 
 describe('video-composition-actuator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { safeReadFile } = await import('@agent/core');
+    vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+      if (String(filePath).includes('manifest.json')) {
+        return JSON.stringify({ recovery_policy: {} });
+      }
+      return '{}';
+    });
   });
 
   it('lists governed templates', async () => {
