@@ -24,12 +24,25 @@ import {
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
   pathResolver,
+  classifyError,
+  withRetry,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeReadFile } from '@agent/core';
+
+const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
+const DEFAULT_AGENT_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 /**
  * Agent-Actuator v1.0.0
@@ -74,6 +87,48 @@ interface AgentPipelineDispatch {
   context?: Record<string, unknown>;
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(AGENT_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_AGENT_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
+
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
   const { action } = input;
   const ctx = (input as AgentPipelineDispatch).context || {};
@@ -106,11 +161,11 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         requestedBy: 'agent_actuator',
       };
       try {
-        const snapshot = await ensureAgentRuntimeViaDaemon(spawnPayload);
+        const snapshot = await withRetry(async () => ensureAgentRuntimeViaDaemon(spawnPayload), buildRetryOptions());
         logger.info(`[AGENT_ACTUATOR] Spawned via daemon: ${snapshot.agent_id} (${snapshot.provider}/${snapshot.model_id})`);
         return { status: 'spawned', agent: snapshot };
       } catch (_) {
-        const handle = await ensureAgentRuntime(spawnPayload);
+        const handle = await withRetry(async () => ensureAgentRuntime(spawnPayload), buildRetryOptions());
         const record = handle.getRecord();
         logger.info(`[AGENT_ACTUATOR] Spawned: ${record?.agentId} (${record?.provider}/${record?.modelId})`);
         return { status: 'spawned', agent: record };
@@ -133,14 +188,14 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       try {
         let response: string;
         try {
-          const result = await askAgentRuntimeViaDaemon({
+          const result = await withRetry(async () => askAgentRuntimeViaDaemon({
             agentId: params.agentId,
             prompt: params.query,
             requestedBy: 'agent_actuator',
-          });
+          }), buildRetryOptions());
           response = result.text;
         } catch (_) {
-          response = await askAgentRuntime(params.agentId, params.query, 'agent_actuator');
+          response = await withRetry(async () => askAgentRuntime(params.agentId, params.query, 'agent_actuator'), buildRetryOptions());
         }
         agentRegistry.updateStatus(params.agentId, 'ready');
         return { status: 'ok', agentId: params.agentId, response };
@@ -153,9 +208,9 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'shutdown': {
       if (!params.agentId) throw new Error('agentId is required for shutdown');
       try {
-        await shutdownAgentRuntimeViaDaemon(params.agentId, 'agent_actuator');
+        await withRetry(async () => shutdownAgentRuntimeViaDaemon(params.agentId, 'agent_actuator'), buildRetryOptions());
       } catch (_) {
-        await stopAgentRuntime(params.agentId, 'agent_actuator');
+        await withRetry(async () => stopAgentRuntime(params.agentId, 'agent_actuator'), buildRetryOptions());
       }
       return { status: 'shutdown', agentId: params.agentId };
     }
@@ -180,7 +235,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'list_runtimes': {
       let runtimes;
       try {
-        runtimes = await listAgentRuntimesViaDaemon();
+        runtimes = await withRetry(async () => listAgentRuntimesViaDaemon(), buildRetryOptions());
       } catch (_) {
         runtimes = listAgentRuntimeSnapshots();
       }
@@ -235,7 +290,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'snapshot': {
       if (!params.agentId) throw new Error('agentId is required for snapshot');
       try {
-        const snapshot = await getAgentRuntimeStatusViaDaemon(params.agentId);
+        const snapshot = await withRetry(async () => getAgentRuntimeStatusViaDaemon(params.agentId), buildRetryOptions());
         if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
         return { status: 'ok', snapshot };
       } catch (_) {
@@ -248,10 +303,10 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'refresh': {
       if (!params.agentId) throw new Error('agentId is required for refresh');
       try {
-        const result = await refreshAgentRuntimeViaDaemon(params.agentId, 'agent_actuator');
+        const result = await withRetry(async () => refreshAgentRuntimeViaDaemon(params.agentId, 'agent_actuator'), buildRetryOptions());
         return { status: 'ok', agentId: params.agentId, ...result };
       } catch (_) {
-        const result = await refreshAgentRuntime(params.agentId, 'agent_actuator');
+        const result = await withRetry(async () => refreshAgentRuntime(params.agentId, 'agent_actuator'), buildRetryOptions());
         return { status: 'ok', agentId: params.agentId, ...result };
       }
     }
@@ -259,24 +314,24 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'restart': {
       if (!params.agentId) throw new Error('agentId is required for restart');
       try {
-        const snapshot = await restartAgentRuntimeViaDaemon({
+        const snapshot = await withRetry(async () => restartAgentRuntimeViaDaemon({
           agentId: params.agentId,
           provider: params.provider || 'gemini',
           modelId: params.modelId,
           systemPrompt: params.systemPrompt,
           capabilities: params.capabilities,
           requestedBy: 'agent_actuator',
-        });
+        }), buildRetryOptions());
         return { status: 'ok', agentId: params.agentId, snapshot };
       } catch (_) {
-        const handle = await restartAgentRuntime(params.agentId, 'agent_actuator');
+        const handle = await withRetry(async () => restartAgentRuntime(params.agentId, 'agent_actuator'), buildRetryOptions());
         return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(params.agentId) };
       }
     }
 
     case 'a2a': {
       if (!params.envelope) throw new Error('envelope is required for a2a');
-      const response = await a2aBridge.route(params.envelope);
+      const response = await withRetry(async () => a2aBridge.route(params.envelope), buildRetryOptions());
       return { status: 'ok', response };
     }
 

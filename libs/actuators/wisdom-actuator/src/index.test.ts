@@ -106,6 +106,26 @@ describe('wisdom-actuator', () => {
     });
 
     describe('capture ops', () => {
+      it('shell でコマンドを実行する', async () => {
+        const { safeExec } = await import('@agent/core');
+        vi.mocked(safeExec).mockReturnValueOnce('shell output');
+
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'shell',
+              params: { cmd: 'echo hello', export_as: 'shell_output' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.context.shell_output).toBe('shell output');
+        expect(vi.mocked((await import('@agent/core')).withRetry)).toHaveBeenCalled();
+      });
+
       it('read_file でファイルを読み込む', async () => {
         const { safeReadFile } = await import('@agent/core');
         vi.mocked(safeReadFile).mockReturnValueOnce('file content here');

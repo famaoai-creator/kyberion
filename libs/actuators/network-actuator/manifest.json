@@ -3,6 +3,18 @@
   "version": "2.2.0",
   "description": "ADF-driven secure fetch and A2A transport pipeline engine",
   "contract_schema": "schemas/network-pipeline.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "network_then_cache",
+    "retry": {
+      "maxRetries": 3,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/network-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]

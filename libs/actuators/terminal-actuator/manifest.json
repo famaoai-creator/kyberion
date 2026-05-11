@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "PTY-driven Terminal Actuator",
   "contract_schema": "schemas/terminal-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "session_read_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
     { "op": "poll", "platforms": ["darwin", "linux", "win32"] },
