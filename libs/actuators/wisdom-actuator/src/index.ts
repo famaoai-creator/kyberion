@@ -23,6 +23,8 @@ import * as yaml from 'js-yaml';
 import { dispatchDecisionOp } from './decision-ops.js';
 
 const WISDOM_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json');
+const KNOWLEDGE_PACKAGE_AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+const KNOWLEDGE_TIER_PATTERN = /^(personal|confidential|public)$/;
 const DEFAULT_WISDOM_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -66,6 +68,22 @@ function buildRetryOptions() {
             classification.category === 'network';
     },
   };
+}
+
+function normalizeKnowledgeTier(value: unknown): 'personal' | 'confidential' | 'public' {
+  const tier = String(value || 'confidential').trim().toLowerCase();
+  if (!KNOWLEDGE_TIER_PATTERN.test(tier)) {
+    throw new Error(`Invalid knowledge import tier: ${value}`);
+  }
+  return tier as 'personal' | 'confidential' | 'public';
+}
+
+function normalizeKnowledgePackageAgentId(value: unknown): string {
+  const agentId = String(value || '').trim();
+  if (!KNOWLEDGE_PACKAGE_AGENT_ID_PATTERN.test(agentId)) {
+    throw new Error(`Invalid knowledge package origin_agent_id: ${value}`);
+  }
+  return agentId;
 }
 
 /**
@@ -368,14 +386,15 @@ async function opApply(op: string, params: any, ctx: any) {
           throw new Error(`CRITICAL: Knowledge Package integrity check failed. Expected: ${pkg.metadata.hash}, Got: ${actualHash}`);
         }
 
-        const targetTier = params.tier || 'confidential';
-        const importDir = pathResolver.knowledge(`${targetTier}/external/${pkg.metadata.origin_agent_id}`);
+        const targetTier = normalizeKnowledgeTier(params.tier);
+        const originAgentId = normalizeKnowledgePackageAgentId(pkg?.metadata?.origin_agent_id);
+        const importDir = pathResolver.knowledge(`${targetTier}/external/${originAgentId}`);
         if (!safeExistsSync(importDir)) safeMkdir(importDir, { recursive: true });
 
         const targetFile = path.join(importDir, path.basename(pkg.content.path));
         safeWriteFile(targetFile, pkg.content.raw_data);
         
-        logger.success(`📥 [Wisdom] Imported knowledge from ${pkg.metadata.origin_agent_id} to ${targetFile}`);
+        logger.success(`📥 [Wisdom] Imported knowledge from ${originAgentId} to ${targetFile}`);
       }, buildRetryOptions());
       break;
 

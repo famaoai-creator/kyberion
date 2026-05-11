@@ -12,6 +12,14 @@
         "knowledge_import"
       ]
     },
-    "params": { "type": "object" }
+    "params": {
+      "type": "object",
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        }
+      }
+    }
   }
 }

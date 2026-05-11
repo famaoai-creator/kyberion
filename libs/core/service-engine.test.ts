@@ -355,6 +355,7 @@ describe('executeServicePreset', () => {
           apiKey: 'backlog-secret',
         }),
         data: undefined,
+        authenticateRequest: true,
       }),
     );
   });
