@@ -34,6 +34,12 @@ function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
   return { maxRequestSizeKb: 2048 };
 }
 
+function isWhitelistedHostname(hostname: string, domain: string): boolean {
+  const normalizedHostname = hostname.toLowerCase();
+  const normalizedDomain = domain.toLowerCase().trim().replace(/^\.+/, '');
+  return normalizedHostname === normalizedDomain || normalizedHostname.endsWith(`.${normalizedDomain}`);
+}
+
 function scrubData(data: any, url: string): any {
   if (!data) return data;
   let str = typeof data === 'string' ? data : JSON.stringify(data);
@@ -66,17 +72,20 @@ function enforcePayloadSize(options: AxiosRequestConfig) {
 }
 
 export async function secureFetch<T = any>(options: SecureFetchOptions): Promise<T> {
-  const { kyberion_allow_local_network, ...axiosOptions } = options;
+  const { kyberion_allow_local_network, authenticateRequest, ...axiosOptions } = options as SecureFetchOptions & { authenticateRequest?: boolean };
   const url = options.url || '';
   validateUrl(url, { allowLocalNetwork: kyberion_allow_local_network === true });
   const hostname = new URL(url).hostname;
 
   // 1. Verify Endpoint Integrity
-  const hasAuth = options.headers && (options.headers['Authorization'] || options.headers['X-API-KEY']);
+  const hasAuth = Boolean(
+    authenticateRequest ||
+    (options.headers && (options.headers['Authorization'] || options.headers['X-API-KEY']))
+  );
   
   if (hasAuth) {
     const allowedDomains = loadAllowedDomains();
-    const isWhitelisted = allowedDomains.some(domain => hostname.endsWith(domain));
+    const isWhitelisted = allowedDomains.some((domain) => isWhitelistedHostname(hostname, domain));
     
     if (!isWhitelisted) {
       throw new Error(`[NETWORK_POLICY_VIOLATION] Authenticated request to non-whitelisted domain: ${hostname}`);
@@ -104,4 +113,5 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
 }
 export interface SecureFetchOptions extends AxiosRequestConfig {
   kyberion_allow_local_network?: boolean;
+  authenticateRequest?: boolean;
 }

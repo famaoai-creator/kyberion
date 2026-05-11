@@ -291,14 +291,17 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   const results = [];
   for (const step of steps) {
     state.stepCount++;
+    // Normalize op: strip 'media:' prefix if present to allow consistent domain:action syntax
+    const op = (step.op || '').startsWith('media:') ? step.op.slice(6) : step.op;
+
     try {
-      logger.info(`  [MEDIA_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      logger.info(`  [MEDIA_PIPELINE] [Step ${state.stepCount}] ${step.type}:${op}...`);
       switch (step.type) {
-        case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
-        case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-        case 'apply': ctx = await opApply(step.op, step.params, ctx, resolve); break;
+        case 'capture': ctx = await opCapture(op, step.params, ctx, resolve); break;
+        case 'transform': ctx = await opTransform(op, step.params, ctx, resolve); break;
+        case 'apply': ctx = await opApply(op, step.params, ctx, resolve); break;
         case 'control': {
-          if (step.op === 'ref') {
+          if (op === 'ref') {
             const refPath = resolve(step.params.path);
             const bindResolved: Record<string, any> = {};
             if (step.params.bind) {
@@ -314,7 +317,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
           break;
         }
       }
-      results.push({ op: step.op, status: 'success' });
+      results.push({ op, status: 'success' });
     } catch (err: any) {
       const stepOnError = (step as any).on_error;
       if (stepOnError) {

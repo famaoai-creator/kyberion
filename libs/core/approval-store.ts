@@ -10,6 +10,25 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir } from './secure-io.js';
 import { buildOrganizationWorkLoopSummary, type OrganizationWorkLoopSummary } from './work-design.js';
 
+const APPROVAL_CHANNEL_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
+const APPROVAL_REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeApprovalChannel(channel: string, label = 'channel'): string {
+  const normalized = String(channel || '').trim().toLowerCase();
+  if (!normalized || !APPROVAL_CHANNEL_PATTERN.test(normalized)) {
+    throw new Error(`[POLICY_VIOLATION] Invalid approval ${label}: ${channel}`);
+  }
+  return normalized;
+}
+
+function normalizeApprovalRequestId(id: string): string {
+  const normalized = String(id || '').trim();
+  if (!normalized || !APPROVAL_REQUEST_ID_PATTERN.test(normalized)) {
+    throw new Error(`[POLICY_VIOLATION] Invalid approval request id: ${id}`);
+  }
+  return normalized.toLowerCase();
+}
+
 export interface ApprovalRequestDraft {
   title: string;
   summary: string;
@@ -110,11 +129,11 @@ export interface ApprovalDecisionPayload {
 }
 
 export function approvalRequestLogicalPath(storageChannel: string, id: string): string {
-  return `active/shared/coordination/channels/${storageChannel}/approvals/requests/${id}.json`;
+  return `active/shared/coordination/channels/${normalizeApprovalChannel(storageChannel)}/approvals/requests/${normalizeApprovalRequestId(id)}.json`;
 }
 
 export function approvalEventLogicalPath(storageChannel: string): string {
-  return `active/shared/observability/channels/${storageChannel}/approvals.jsonl`;
+  return `active/shared/observability/channels/${normalizeApprovalChannel(storageChannel)}/approvals.jsonl`;
 }
 
 export function createApprovalRequest(
@@ -139,7 +158,7 @@ export function createApprovalRequest(
     workLoop?: OrganizationWorkLoopSummary;
   },
 ): ApprovalRequestRecord {
-  const storageChannel = params.storageChannel || params.channel;
+  const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   ensureGovernedArtifactDir(role, `active/shared/coordination/channels/${storageChannel}/approvals/requests`);
 
   const record: ApprovalRequestRecord = {
@@ -205,9 +224,9 @@ export function listApprovalRequests(params?: {
     ? new Set(Array.isArray(params.kind) ? params.kind : [params.kind])
     : null;
   const storageChannels = params?.storageChannels?.length
-    ? params.storageChannels
+    ? params.storageChannels.map((channel) => normalizeApprovalChannel(channel, 'storage channel'))
     : safeReaddir(channelsRoot)
-        .filter((entry) => safeExistsSync(pathResolver.shared(`coordination/channels/${entry}/approvals/requests`)));
+        .filter((entry) => safeExistsSync(pathResolver.shared(`coordination/channels/${normalizeApprovalChannel(entry, 'storage channel')}/approvals/requests`)));
 
   const records: ApprovalRequestRecord[] = [];
   for (const storageChannel of storageChannels) {
@@ -239,7 +258,7 @@ export function decideApprovalRequest(
   },
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
-  const record = loadApprovalRequest(storageChannel, params.requestId);
+  const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
 
   const decidedAt = new Date().toISOString();

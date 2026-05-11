@@ -5,11 +5,11 @@ import {
   withRetry,
   classifyError,
 } from '@agent/core';
-import { listGovernedArtifacts } from '@agent/core/artifacts';
 import {
   createApprovalRequest,
   decideApprovalRequest,
   loadApprovalRequest,
+  listApprovalRequests,
   type ApprovalJustification,
   type ApprovalRequesterContext,
   type ApprovalRequestDraft,
@@ -149,20 +149,10 @@ export async function handleAction(input: ApprovalAction) {
       };
     case 'list_pending': {
       const storageChannel = input.params.storageChannel || input.params.channel;
-      const entries = listGovernedArtifacts(`active/shared/coordination/channels/${storageChannel}/approvals/requests`);
-      const requests = (
-        await Promise.all(
-          entries
-            .filter((entry) => entry.endsWith('.json'))
-            .map((entry) =>
-              withRetry(
-                async () => loadApprovalRequest(storageChannel, entry.replace(/\.json$/, '')),
-                buildRetryOptions(),
-              ),
-            ),
-        )
-      ).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-        .filter((entry) => entry.status === 'pending');
+      const requests = await withRetry(
+        async () => listApprovalRequests({ storageChannels: [storageChannel], status: 'pending' }),
+        buildRetryOptions(),
+      );
       return { status: 'ok', requests };
     }
     default:
