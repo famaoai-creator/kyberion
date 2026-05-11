@@ -7,6 +7,73 @@ This guide is generated from `libs/actuators/*/manifest.json`. It is the human-r
 
 Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.
 
+## Op Invocation Syntax
+
+Actuator ops follow a **`domain:action`** convention in pipeline JSON files, where `domain` is the actuator name without the `-actuator` suffix:
+
+```json
+{ "op": "media:pptx_render", "type": "apply", "params": { ... } }
+{ "op": "wisdom:knowledge_search", "type": "capture", "params": { ... } }
+{ "op": "system:log", "params": { "message": "..." } }
+```
+
+Bare op names (without `:`) are normalized to `system:<op>` by the pipeline runner. The only exception is **`media-actuator`**, which exposes a self-contained sub-pipeline interpreter — its internal ops (`set`, `merge_content`, `pptx_render`, etc.) use bare names **only inside a nested pipeline passed to `media:pipeline`**. When called from a top-level pipeline file, always use the `media:` prefix.
+
+| Context | Syntax | Example |
+|---------|--------|---------|
+| Top-level pipeline JSON | `"op": "<domain>:<action>"` | `"media:pptx_render"` |
+| `media-actuator` internal steps | `"op": "<action>"` (bare) | `"pptx_render"` |
+| Built-in pipeline runner ops | `"op": "core:<action>"` | `"core:if"`, `"core:foreach"` |
+
+See `scripts/run_pipeline.ts → normalizePipelineOp()` for the full normalization rules.
+
+## Connecting to External Services (service-actuator)
+
+**Key principle**: The first time you connect to an external service you spend tokens finding the right pattern. After that, the same pattern becomes a deterministic ADF step — zero exploration cost on every subsequent run.
+
+The workflow is:
+
+1. **Register the secret once** (stored in OS keychain via secret-actuator):
+   ```json
+   { "op": "secret:set", "params": { "key": "backlog_api_key", "value": "<your-api-key>" } }
+   ```
+
+2. **Call `service:preset` in any pipeline** — no auth boilerplate, no curl, no token spent re-discovering the API:
+   ```json
+   {
+     "op": "service:preset",
+     "params": {
+       "service_id": "backlog",
+       "operation": "get_issues",
+       "auth": "secret-guard",
+       "params": {
+         "space": "your-space",
+         "query": { "projectId[]": [12345], "count": 50 }
+       }
+     }
+   }
+   ```
+
+Available preset catalog: `knowledge/public/orchestration/service-presets/`
+
+| Preset | Auth strategy | Template vars |
+|--------|--------------|---------------|
+| `backlog` | `api_key_query` (`apiKey=`) | `space`, `BACKLOG_API_KEY` |
+
+See `libs/actuators/service-actuator/examples/` for copy-paste pipeline snippets.
+
+**Why not curl?** curl works once but encodes credentials inline, is not replayable as an ADF contract, and can't participate in the mission audit trail. `service:preset` is idempotent, secrets stay in keychain, and the same JSON step replays identically across agents and pipeline runs.
+
+## Path Security
+
+All file I/O is governed by `libs/core/secure-io.ts`. Allowed paths depend on the active persona and authority role. If you see a `[ROLE_VIOLATION]` error, consult the policy definition at:
+
+```
+knowledge/public/governance/security-policy.json
+```
+
+Output paths must be **inside the project root**. To deliver a file externally, write to `active/shared/tmp/` or `active/shared/exports/` first, then copy it outside with a shell step.
+
 | Actuator | Description | Version | Ops | Contract Schema | Path |
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | `agent-actuator` | Meta-Actuator for Agent Lifecycle and A2A | 1.0.0 | 6 | `schemas/agent-action.schema.json` | `libs/actuators/agent-actuator` |
@@ -43,4 +110,3 @@ See also:
 - Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
 - [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
 - [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/public/architecture/component-lifecycle-inventory.md)
-

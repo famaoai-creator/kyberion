@@ -6,8 +6,41 @@
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/media-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ],
+  "invocation_contexts": {
+    "note": "This actuator has two op namespaces. Choose based on where the step is written.",
+    "from_top_level_pipeline": {
+      "syntax": "\"op\": \"media:<op>\"",
+      "example": "{ \"op\": \"media:pptx_render\", \"type\": \"apply\", \"params\": { \"path\": \"...\" } }",
+      "note": "The runner splits domain:action, loads media-actuator, and wraps the step in a single-step sub-pipeline."
+    },
+    "from_media_actuator_examples_or_nested_steps": {
+      "syntax": "\"op\": \"<op>\" (bare name)",
+      "example": "{ \"op\": \"pptx_render\", \"type\": \"apply\", \"params\": { \"path\": \"...\" } }",
+      "note": "Used inside media-actuator/examples/ or steps passed directly to executePipeline. No domain prefix needed."
+    }
+  },
   "pipeline_ops": {
-    "capture": ["pptx_slide_text"],
-    "apply": ["pptx_filter_slides"]
+    "capture": [
+      { "op": "pptx_slide_text", "note": "Extract slide text from a PPTX file into context." },
+      { "op": "pptx_extract", "note": "Extract full PPTX design protocol (slides + master theme) into context." },
+      { "op": "json_read", "note": "Read a JSON file into context." }
+    ],
+    "transform": [
+      { "op": "set", "note": "Set a key in the pipeline context. Use to inject theme, content arrays, or config before merge_content." },
+      { "op": "apply_theme", "note": "Load a named theme from knowledge/public/design-patterns/media-templates/themes.json into active_theme." },
+      { "op": "apply_pattern", "note": "Load a design pattern JSON into active_pattern." },
+      { "op": "merge_content", "note": "Combine active_theme + active_pattern + content_data into last_pptx_design (or last_xlsx_design, etc.)." },
+      { "op": "theme_from_pptx_design", "note": "Derive a reusable theme from an extracted PPTX design (for master-theme reuse across decks)." },
+      { "op": "proposal_storyline_from_brief", "note": "Generate a narrative outline from a proposal brief." },
+      { "op": "proposal_content_from_storyline", "note": "Expand a storyline into per-slide content_data ready for merge_content." }
+    ],
+    "apply": [
+      { "op": "pptx_render", "note": "Render last_pptx_design to a .pptx file. Supports text, shape, image (imagePath or imageData), table, line, and smartart elements." },
+      { "op": "pptx_filter_slides", "note": "Write a subset of slides from an existing PPTX by index." },
+      { "op": "pptx_patch", "note": "Text-replacement patch on an existing PPTX (simple find-replace)." },
+      { "op": "xlsx_render", "note": "Render last_xlsx_design to a .xlsx file." },
+      { "op": "docx_render", "note": "Render last_docx_design to a .docx file." },
+      { "op": "write_file", "note": "Write a context value to a file path." }
+    ]
   }
 }

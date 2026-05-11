@@ -534,7 +534,7 @@ export function safeReaddir(dirPath: string): string[] {
   const resolved = pathResolver.resolve(dirPath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''}`);
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''} See knowledge/public/governance/security-policy.json for allowed paths.`);
   }
   return fs.readdirSync(resolved);
 }
@@ -546,7 +546,7 @@ export function safeStat(filePath: string): fs.Stats {
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''}`);
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''} See knowledge/public/governance/security-policy.json for allowed paths.`);
   }
   return fs.statSync(resolved);
 }
@@ -558,7 +558,7 @@ export function safeLstat(filePath: string): fs.Stats {
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''}`);
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''} See knowledge/public/governance/security-policy.json for allowed paths.`);
   }
   return fs.lstatSync(resolved);
 }
@@ -570,7 +570,7 @@ export function safeReadlink(filePath: string): string {
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to readlink path '${filePath}'. ${check.reason || ''}`);
+    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to readlink path '${filePath}'. ${check.reason || ''} See knowledge/public/governance/security-policy.json for allowed paths.`);
   }
   return fs.readlinkSync(resolved);
 }
