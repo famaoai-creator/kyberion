@@ -9,7 +9,10 @@
       "required": ["package_id", "origin_agent_id", "timestamp", "hash"],
       "properties": {
         "package_id": { "type": "string" },
-        "origin_agent_id": { "type": "string" },
+        "origin_agent_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
         "timestamp": { "type": "string", "format": "date-time" },
         "domain": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } },
