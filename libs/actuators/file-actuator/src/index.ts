@@ -11,6 +11,8 @@ import {
   safeCopyFileSync,
   safeMoveSync,
   safeRmSync,
+  withRetry,
+  classifyError,
   derivePipelineStatus,
   pathResolver,
   resolveVars,
@@ -20,6 +22,50 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const FILE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/file-actuator/manifest.json');
+const DEFAULT_FILE_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 150,
+  maxDelayMs: 1200,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(FILE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  } catch {
+    cachedRecoveryPolicy = {};
+  }
+  return cachedRecoveryPolicy;
+}
+
+function buildRetryOptions() {
+  const policy = loadRecoveryPolicy();
+  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_FILE_RETRY;
+  const retryableCategories = new Set<string>(
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+  );
+  return {
+    ...DEFAULT_FILE_RETRY,
+    ...retry,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      return retryableCategories.size > 0
+        ? retryableCategories.has(classification.category)
+        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+    },
+  };
+}
 
 /**
  * File-Actuator v2.1.1 [RESILIENT PIPELINE]
@@ -65,7 +111,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   let ctx = { ...initialCtx, root: rootDir };
   
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    const saved = await withRetry(
+      async () => JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string),
+      buildRetryOptions(),
+    );
     ctx = { ...ctx, ...saved };
   }
 
@@ -98,7 +147,13 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   }
 
   if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    await withRetry(
+      async () => {
+        safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+        return undefined;
+      },
+      buildRetryOptions(),
+    );
   }
 
   return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
@@ -140,26 +195,53 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: await withRetry(
+          async () => safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+          buildRetryOptions(),
+        ),
+      };
     case 'list':
-      return { ...ctx, [params.export_as || 'file_list']: safeReaddir(path.resolve(rootDir, resolve(params.path))) };
+      return {
+        ...ctx,
+        [params.export_as || 'file_list']: await withRetry(
+          async () => safeReaddir(path.resolve(rootDir, resolve(params.path))),
+          buildRetryOptions(),
+        ),
+      };
     case 'stat':
-      const s = safeStat(path.resolve(rootDir, resolve(params.path)));
+      const s = await withRetry(
+        async () => safeStat(path.resolve(rootDir, resolve(params.path))),
+        buildRetryOptions(),
+      );
       return { ...ctx, [params.export_as || 'last_stat']: { size: s.size, mtime: s.mtime, isFile: s.isFile(), isDirectory: s.isDirectory() } };
     case 'exists':
-      return { ...ctx, [params.export_as || 'exists']: safeExistsSync(path.resolve(rootDir, resolve(params.path))) };
+      return {
+        ...ctx,
+        [params.export_as || 'exists']: await withRetry(
+          async () => safeExistsSync(path.resolve(rootDir, resolve(params.path))),
+          buildRetryOptions(),
+        ),
+      };
     case 'search': {
       const pattern = resolve(params.pattern);
       const targetPath = path.resolve(rootDir, resolve(params.path));
-      const rgOutput = safeExec('rg', ['--json', String(pattern), targetPath], { encoding: 'utf8' });
+      const rgOutput = await withRetry(
+        async () => safeExec('rg', ['--json', String(pattern), targetPath], { encoding: 'utf8' }),
+        buildRetryOptions(),
+      );
       return { ...ctx, [params.export_as || 'search_results']: JSON.parse(rgOutput) };
     }
     case 'tail': {
       const tailPath = path.resolve(rootDir, resolve(params.path));
-      const stats = safeStat(tailPath);
+      const stats = await withRetry(async () => safeStat(tailPath), buildRetryOptions());
       const posKey = params.pos_key || 'last_pos';
       const lastPos = ctx[posKey] || 0;
-      const fullText = safeReadFile(tailPath, { encoding: 'utf8' }) as string;
+      const fullText = await withRetry(
+        async () => safeReadFile(tailPath, { encoding: 'utf8' }) as string,
+        buildRetryOptions(),
+      );
       const newText = fullText.substring(lastPos);
       return { ...ctx, [params.export_as || 'last_capture']: newText, [posKey]: stats.size };
     }
@@ -191,7 +273,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'write': {
       const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || resolve(params.content);
-      safeWriteFile(out, content);
+      await withRetry(async () => {
+        safeWriteFile(out, content);
+        return undefined;
+      }, buildRetryOptions());
       break;
     }
     case 'write_file':
@@ -200,34 +285,54 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const out = path.resolve(rootDir, spec.path);
       const content = typeof spec.content === 'string' ? spec.content : spec.content === undefined ? '' : JSON.stringify(spec.content, null, 2);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, content);
+      await withRetry(async () => {
+        safeWriteFile(out, content);
+        return undefined;
+      }, buildRetryOptions());
       break;
     }
     case 'append': {
       const out = path.resolve(rootDir, resolve(params.path));
       const content = ctx[params.from || 'last_transform'] || ctx[params.from || 'last_capture'] || resolve(params.content);
       const payload = content + (params.newline !== false ? '\n' : '');
-      safeAppendFileSync(out, payload);
+      await withRetry(async () => {
+        safeAppendFileSync(out, payload);
+        return undefined;
+      }, buildRetryOptions());
       break;
     }
     case 'delete': {
       const target = path.resolve(rootDir, resolve(params.path));
-      safeRmSync(target, { recursive: true, force: true });
+      await withRetry(async () => {
+        safeRmSync(target, { recursive: true, force: true });
+        return undefined;
+      }, buildRetryOptions());
       break;
     }
-    case 'mkdir': safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true }); break;
+    case 'mkdir':
+      await withRetry(async () => {
+        safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true });
+        return undefined;
+      }, buildRetryOptions());
+      break;
     case 'copy': {
       const src = path.resolve(rootDir, resolve(params.from));
       const dest = path.resolve(rootDir, resolve(params.to));
-      if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
-      safeCopyFileSync(src, dest);
+      await withRetry(async () => {
+        if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
+        safeCopyFileSync(src, dest);
+        return undefined;
+      }, buildRetryOptions());
       break;
     }
     case 'move': {
       const src = path.resolve(rootDir, resolve(params.from));
       const dest = path.resolve(rootDir, resolve(params.to));
-      if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
-      safeMoveSync(src, dest);
+      await withRetry(async () => {
+        if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
+        safeMoveSync(src, dest);
+        return undefined;
+      }, buildRetryOptions());
       break;
     }
   }

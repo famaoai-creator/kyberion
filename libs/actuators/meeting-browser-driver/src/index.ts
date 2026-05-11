@@ -26,6 +26,8 @@
 import {
   registerMeetingJoinDriver,
   logger,
+  classifyError,
+  withRetry,
   type AudioBus,
   type AudioChunk,
   validateMeetingTarget,
@@ -42,6 +44,7 @@ import {
   type MeetingPreJoinSelectors,
 } from './selectors.js';
 import { readCookies, writeCookies } from './cookie-store.js';
+import { safeReadFile, pathResolver } from '@agent/core';
 
 /* Playwright type stand-ins so this file compiles without playwright
  * installed. The real types are loaded via `import('playwright')` at
@@ -62,6 +65,17 @@ type PlaywrightPage = {
   isVisible: (selector: string) => Promise<boolean>;
 };
 
+const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/meeting-browser-driver/manifest.json');
+const DEFAULT_MEETING_BROWSER_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 10000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
 export interface BrowserDriverOptions {
   /** When true, run a visible Chromium (debugging). Default: false (headed=false). */
   headed?: boolean;
@@ -74,6 +88,48 @@ export interface BrowserDriverOptions {
 }
 
 const DEFAULT_TIMEOUT = 20_000;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(MEETING_BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_MEETING_BROWSER_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
+  };
+}
 
 async function loadPlaywright(): Promise<any> {
   // Keep playwright optional: a literal dynamic import would make
@@ -91,7 +147,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     try {
       // Optional dependency — we don't `require`/`import` it
       // statically so non-bot deployments aren't forced to install.
-      await loadPlaywright();
+      await withRetry(async () => loadPlaywright(), buildRetryOptions());
       return { available: true };
     } catch (err: any) {
       return {
@@ -113,7 +169,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const stepTimeout = this.opts.step_timeout_ms ?? DEFAULT_TIMEOUT;
     const headed = this.opts.headed ?? false;
 
-    const browser = (await chromium.launch({
+    const browser = (await withRetry(async () => chromium.launch({
       headless: !headed,
       args: [
         // Auto-allow microphone + camera permissions so the pre-join
@@ -122,18 +178,18 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
         // Required for headless WebRTC on some platforms.
         '--disable-blink-features=AutomationControlled',
       ],
-    })) as unknown as PlaywrightBrowser;
+    }), buildRetryOptions())) as unknown as PlaywrightBrowser;
 
-    const context = (await (browser as any).newContext({
+    const context = (await withRetry(async () => (browser as any).newContext({
       permissions: ['microphone', 'camera'],
       viewport: { width: 1280, height: 800 },
-    })) as PlaywrightContext;
+    }), buildRetryOptions())) as PlaywrightContext;
 
     // Restore cookies if we have any persisted for this account slug.
     const persisted = readCookies(accountSlug);
     if (persisted.length) await context.addCookies(persisted as any[]);
 
-    const page = await context.newPage();
+    const page = await withRetry(async () => context.newPage(), buildRetryOptions());
     const state: MeetingSessionState = {
       session_id: `browser-${Date.now()}`,
       platform,
@@ -141,7 +197,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     };
 
     try {
-      await page.goto(validatedTarget.url, { waitUntil: 'domcontentloaded', timeout: stepTimeout });
+      await withRetry(async () => page.goto(validatedTarget.url, { waitUntil: 'domcontentloaded', timeout: stepTimeout }), buildRetryOptions());
       // Best-effort fill display name (guest path — Meet only).
       if (validatedTarget.display_name) {
         await trySelectors(page, selectors.name_input, async (sel) => {
@@ -175,9 +231,9 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     } catch (err: any) {
       state.status = 'error';
       state.error = err?.message ?? String(err);
-      await browser.close().catch(() => undefined);
-      throw err;
-    }
+        await withRetry(async () => browser.close().catch(() => undefined), buildRetryOptions());
+        throw err;
+      }
 
     let leaveSignaled = false;
     return {
@@ -196,13 +252,13 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
       },
       async leave(): Promise<void> {
         leaveSignaled = true;
-        await trySelectors(page, selectors.leave_button, async (sel) => {
+        await withRetry(async () => trySelectors(page, selectors.leave_button, async (sel) => {
           await page.click(sel, { timeout: 5_000 });
-        });
+        }), buildRetryOptions());
         state.status = 'ended';
         state.left_at = new Date().toISOString();
-        await browser.close().catch(() => undefined);
-        await bus.close();
+        await withRetry(async () => browser.close().catch(() => undefined), buildRetryOptions());
+        await withRetry(async () => bus.close(), buildRetryOptions());
       },
     };
   }

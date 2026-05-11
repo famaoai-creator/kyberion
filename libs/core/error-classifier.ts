@@ -148,7 +148,10 @@ const RULES: ClassifierRule[] = [
     label: 'Connection refused',
     remediation:
       'Nothing is listening on that port/host. Start the service, or check the URL.',
-    test: (m, code) => /ECONNREFUSED|connection[\s_-]?refused/i.test(m) || code === 'ECONNREFUSED',
+    test: (m, code) =>
+      /ECONNREFUSED|ECONNRESET|connection[\s_-]?refused|socket hang up/i.test(m) ||
+      code === 'ECONNREFUSED' ||
+      code === 'ECONNRESET',
   },
   {
     id: 'rate.limit',

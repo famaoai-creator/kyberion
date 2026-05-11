@@ -6,6 +6,7 @@ import { compileSchemaFromPath, pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
+  withRetry: vi.fn(async (fn: () => Promise<any>) => fn()),
   ledgerRecord: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
@@ -17,6 +18,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   return {
     ...(actual as any),
     safeExec: mocks.safeExec,
+    withRetry: mocks.withRetry,
     logger: mocks.logger,
     ledger: { record: mocks.ledgerRecord },
   };
@@ -58,6 +60,7 @@ describe('secret-actuator: governed mutation', () => {
 
     expect(result.status).toBe('success');
     expect(result.mission_id).toBeDefined(); // Should return the auto-generated ephemeral mission ID
+    expect(mocks.withRetry).toHaveBeenCalled();
 
     // Verify that the mission controller was called to create and finish the mission
     expect(mocks.safeExec).toHaveBeenCalledWith(
@@ -108,6 +111,7 @@ describe('secret-actuator: governed mutation', () => {
     const result = await handleAction(input);
 
     expect(result.status).toBe('success');
+    expect(mocks.withRetry).toHaveBeenCalled();
 
     // Mission controller should NOT be called
     expect(mocks.safeExec).not.toHaveBeenCalledWith(
@@ -195,6 +199,7 @@ describe('secret-actuator: governed mutation', () => {
     });
 
     expect(result.status).toBe('success');
+    expect(mocks.withRetry).toHaveBeenCalled();
   });
 
   it('throws for unsupported action', async () => {

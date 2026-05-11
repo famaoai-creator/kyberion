@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Pipeline-driven Playwright browser execution and session artifact actuator",
   "contract_schema": "schemas/browser-pipeline.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "selector_self_heal",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 5000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["timeout", "network", "resource_unavailable"]
+  },
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/browser-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] }

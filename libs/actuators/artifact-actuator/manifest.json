@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Governed Artifact and Delivery Pack Manager",
   "contract_schema": "schemas/artifact-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "artifact_io_retry",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 250,
+      "maxDelayMs": 2000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["resource_unavailable", "timeout"]
+  },
   "capabilities": [
     { "op": "write_json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },

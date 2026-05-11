@@ -6,6 +6,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
     ...actual,
+    withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
     safeReadFile: vi.fn().mockReturnValue('file content'),
     safeWriteFile: vi.fn(),
     safeMkdir: vi.fn(),
@@ -41,8 +42,19 @@ vi.mock('@agent/core', async (importOriginal) => {
 });
 
 describe('file-actuator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { safeReadFile, safeExistsSync, safeReaddir, safeStat, safeExec } = await import('@agent/core');
+    vi.mocked(safeReadFile).mockReturnValue('file content');
+    vi.mocked(safeExistsSync).mockReturnValue(false);
+    vi.mocked(safeReaddir).mockReturnValue([]);
+    vi.mocked(safeStat).mockReturnValue({
+      size: 100,
+      mtime: new Date(),
+      isFile: () => true,
+      isDirectory: () => false,
+    } as any);
+    vi.mocked(safeExec).mockReturnValue('');
   });
 
   describe('handleAction()', () => {
@@ -60,7 +72,10 @@ describe('file-actuator', () => {
 
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
       const { safeReadFile } = await import('@agent/core');
-      vi.mocked(safeReadFile).mockImplementationOnce(() => {
+      vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('manifest.json')) {
+          return JSON.stringify({ recovery_policy: {} });
+        }
         throw new Error('File not found');
       });
 
@@ -90,7 +105,7 @@ describe('file-actuator', () => {
     });
 
     describe('capture ops', () => {
-      it('read でファイルを読み込む', async () => {
+    it('read でファイルを読み込む', async () => {
         const { safeReadFile } = await import('@agent/core');
         vi.mocked(safeReadFile).mockReturnValueOnce('file content here');
 
@@ -107,6 +122,7 @@ describe('file-actuator', () => {
 
         expect(result.status).toBe('succeeded');
         expect(result.context.file_content).toBe('file content here');
+        expect((await import('@agent/core')).withRetry).toHaveBeenCalled();
       });
 
       it('list でディレクトリ一覧を取得する', async () => {

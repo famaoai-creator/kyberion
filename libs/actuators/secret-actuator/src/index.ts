@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeExec, createStandardYargs, pathResolver, ledger } from '@agent/core';
+import { logger, safeReadFile, safeExec, createStandardYargs, pathResolver, ledger, classifyError, withRetry } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,6 +7,17 @@ import { fileURLToPath } from 'node:url';
  * Integrates with OS Native Secret Managers (macOS Keychain, etc.)
  */
 
+const SECRET_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/secret-actuator/manifest.json');
+const DEFAULT_SECRET_RETRY = {
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  factor: 2,
+  jitter: true,
+};
+
+let cachedRecoveryPolicy: Record<string, any> | null = null;
+
 interface SecretAction {
   action: 'get' | 'set' | 'delete' | 'list';
   params: {
@@ -14,6 +25,48 @@ interface SecretAction {
     service: string;
     value?: string;
     export_as?: string;
+  };
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function loadRecoveryPolicy(): Record<string, any> {
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(SECRET_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    return cachedRecoveryPolicy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
+}
+
+function buildRetryOptions(override?: Record<string, any>) {
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set<string>(
+    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+  );
+  const resolved = {
+    ...DEFAULT_SECRET_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error: Error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return classification.category === 'network'
+        || classification.category === 'rate_limit'
+        || classification.category === 'timeout'
+        || classification.category === 'resource_unavailable';
+    },
   };
 }
 
@@ -37,31 +90,33 @@ async function withGovernedMutation(
     }
   }
 
-  // Execute actual secret logic
-  const result = await logic();
-
-  if (result.status === 'success') {
-    // Record to ledger
-    ledger.record('CONFIG_CHANGE', {
-      mission_id: missionId,
-      role: process.env.MISSION_ROLE || 'secret_guard',
-      service_id: params.service,
-      config_target: 'os-keychain',
-      action: actionType,
-      changed_keys: [params.account]
-    });
-    result.mission_id = missionId;
-  }
-
-  if (isEphemeral) {
-    try {
-      safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'finish', missionId]);
-    } catch (err) {
-      logger.warn(`Failed to finish ephemeral mission: ${err}`);
+  let result;
+  try {
+    result = await logic();
+    if (result.status === 'success') {
+      // Record to ledger
+      ledger.record('CONFIG_CHANGE', {
+        mission_id: missionId,
+        role: process.env.MISSION_ROLE || 'secret_guard',
+        service_id: params.service,
+        config_target: 'os-keychain',
+        action: actionType,
+        changed_keys: [params.account]
+      });
+      result.mission_id = missionId;
+    }
+    return result;
+  } catch (err: any) {
+    return { status: 'failed', error: err?.message ?? String(err) };
+  } finally {
+    if (isEphemeral) {
+      try {
+        safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'finish', missionId]);
+      } catch (err) {
+        logger.warn(`Failed to finish ephemeral mission: ${err}`);
+      }
     }
   }
-
-  return result;
 }
 
 async function handleAction(input: SecretAction) {
@@ -81,7 +136,7 @@ async function getSecret(params: any, platform: string) {
   if (platform === 'darwin') {
     try {
       // macOS Keychain: security find-generic-password -a <account> -s <service> -w
-      const result = safeExec('security', ['find-generic-password', '-a', params.account, '-s', params.service, '-w']).trim();
+      const result = await withRetry(async () => safeExec('security', ['find-generic-password', '-a', params.account, '-s', params.service, '-w']).trim(), buildRetryOptions());
       return { status: 'success', [params.export_as || 'secret_value']: result };
     } catch (err: any) {
       return { status: 'failed', error: 'Secret not found or access denied.' };
@@ -96,10 +151,12 @@ async function setSecret(params: any, platform: string) {
   if (platform === 'darwin') {
     try {
       // First try to delete existing to avoid duplicates/errors
-      try { safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]); } catch(_) {}
+      try {
+        await withRetry(async () => safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]), buildRetryOptions());
+      } catch(_) {}
       
       // macOS Keychain: security add-generic-password -a <account> -s <service> -w <value>
-      safeExec('security', ['add-generic-password', '-a', params.account, '-s', params.service, '-w', params.value]);
+      await withRetry(async () => safeExec('security', ['add-generic-password', '-a', params.account, '-s', params.service, '-w', params.value]), buildRetryOptions());
       return { status: 'success', message: 'Secret stored in macOS Keychain.' };
     } catch (err: any) {
       return { status: 'failed', error: err.message };
@@ -111,7 +168,7 @@ async function setSecret(params: any, platform: string) {
 async function deleteSecret(params: any, platform: string) {
   if (platform === 'darwin') {
     try {
-      safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]);
+      await withRetry(async () => safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]), buildRetryOptions());
       return { status: 'success', message: 'Secret deleted from macOS Keychain.' };
     } catch (err: any) {
       return { status: 'failed', error: err.message };
