@@ -76,6 +76,31 @@ describe('Computer interaction contract schema', () => {
     expect(valid, ajv.errorsText(validate.errors)).toBe(true);
   });
 
+  it('accepts a voice input toggle proposal', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schema = loadJson('schemas/computer-interaction.schema.json');
+    const validate = ajv.compile(schema);
+
+    const payload = {
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'system-session-voice',
+      action: {
+        type: 'voice_input_toggle',
+        dictation_keycode: 176
+      },
+      risk: {
+        level: 'medium',
+        reason: 'toggles a system-wide dictation shortcut',
+        requires_approval: false,
+        approval_scope: 'none'
+      }
+    };
+
+    const valid = validate(payload);
+    expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+  });
+
   it('rejects payloads without action', () => {
     const ajv = new Ajv({ allErrors: true });
     const schema = loadJson('schemas/computer-interaction.schema.json');

@@ -8,6 +8,10 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import {
+  SYSTEM_ACTUATOR_APPLY_OPS,
+  SYSTEM_ACTUATOR_CAPTURE_OPS,
+} from '../libs/actuators/system-actuator/src/index.js';
 import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {
@@ -136,6 +140,22 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('| :--- | :--- | :--- | :---: | :--- | :--- |');
   for (const actuator of current) {
     lines.push(`| \`${actuator.n}\` | ${actuator.d} | ${actuator.version} | ${actuator.capability_count} | \`${actuator.contract_schema || '-'}\` | \`${actuator.path}\` |`);
+  }
+  lines.push('');
+  lines.push('### Capture ops (type: capture)');
+  lines.push('');
+  lines.push('| Op | Notes |');
+  lines.push('| :--- | :--- |');
+  for (const op of SYSTEM_ACTUATOR_CAPTURE_OPS) {
+    lines.push(`| \`${op}\` | system-actuator capture op |`);
+  }
+  lines.push('');
+  lines.push('### Apply ops (type: apply)');
+  lines.push('');
+  lines.push('| Op | Notes |');
+  lines.push('| :--- | :--- |');
+  for (const op of SYSTEM_ACTUATOR_APPLY_OPS) {
+    lines.push(`| \`${op}\` | system-actuator apply op |`);
   }
   lines.push('');
   lines.push('See also:');

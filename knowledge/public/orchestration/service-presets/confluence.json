@@ -1,0 +1,93 @@
+{
+  "service_id": "confluence",
+  "name": "Confluence Cloud REST API v2 Presets",
+  "base_url": "https://{{domain}}.atlassian.net/wiki/api/v2",
+  "auth_strategy": "basic",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
+  "operations": {
+    "get_pages": {
+      "path": "pages",
+      "method": "GET",
+      "description": "Get all pages in the instance.",
+      "parameters": {
+        "limit": { "type": "number", "default": 25 },
+        "cursor": { "type": "string" }
+      }
+    },
+    "get_page": {
+      "path": "pages/{{page_id}}",
+      "method": "GET",
+      "description": "Get a specific page by ID.",
+      "parameters": {
+        "body_format": { "type": "string", "default": "storage", "description": "Format of the body: storage, atlas_doc_format, view" }
+      }
+    },
+    "create_page": {
+      "path": "pages",
+      "method": "POST",
+      "description": "Create a new page.",
+      "parameters": {
+        "space_id": { "required": true, "type": "string" },
+        "status": { "type": "string", "default": "current" },
+        "title": { "required": true, "type": "string" },
+        "parentId": { "type": "string" },
+        "body": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "spaceId": "{{space_id}}",
+        "status": "{{status}}",
+        "title": "{{title}}",
+        "parentId": "{{parentId}}",
+        "body": {
+          "representation": "storage",
+          "value": "{{body}}"
+        }
+      }
+    },
+    "update_page": {
+      "path": "pages/{{page_id}}",
+      "method": "PUT",
+      "description": "Update an existing page.",
+      "parameters": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "version": { "required": true, "type": "number", "description": "The new version number (current + 1)" }
+      },
+      "payload_template": {
+        "id": "{{page_id}}",
+        "status": "current",
+        "title": "{{title}}",
+        "body": {
+          "representation": "storage",
+          "value": "{{body}}"
+        },
+        "version": { "number": "{{version}}" }
+      }
+    },
+    "get_space_pages": {
+      "path": "spaces/{{space_id}}/pages",
+      "method": "GET",
+      "description": "Get all pages in a specific space."
+    },
+    "get_spaces": {
+      "path": "spaces",
+      "method": "GET",
+      "description": "Get all spaces."
+    },
+    "get_space": {
+      "path": "spaces/{{space_id}}",
+      "method": "GET",
+      "description": "Get space details."
+    }
+  }
+}

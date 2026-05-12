@@ -11,7 +11,36 @@
         "required": ["required_roles", "optional_roles"],
         "properties": {
           "required_roles": { "type": "array", "items": { "type": "string" } },
-          "optional_roles": { "type": "array", "items": { "type": "string" } }
+          "optional_roles": { "type": "array", "items": { "type": "string" } },
+          "lifecycle": {
+            "type": "object",
+            "required": [
+              "max_parallel_members",
+              "max_members",
+              "max_messages_per_run",
+              "max_wall_clock_minutes",
+              "max_member_turns",
+              "shutdown_policy",
+              "resume_policy",
+              "cooldown_minutes"
+            ],
+            "properties": {
+              "max_parallel_members": { "type": "integer", "minimum": 1 },
+              "max_members": { "type": "integer", "minimum": 1 },
+              "max_messages_per_run": { "type": "integer", "minimum": 1 },
+              "max_wall_clock_minutes": { "type": "integer", "minimum": 1 },
+              "max_member_turns": { "type": "integer", "minimum": 1 },
+              "shutdown_policy": {
+                "type": "string",
+                "enum": ["graceful_handoff", "manual", "auto_shutdown"]
+              },
+              "resume_policy": {
+                "type": "string",
+                "enum": ["checkpoint_resume", "manual_resume"]
+              },
+              "cooldown_minutes": { "type": "integer", "minimum": 0 }
+            }
+          }
         }
       }
     }

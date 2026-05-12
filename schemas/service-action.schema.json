@@ -8,7 +8,7 @@
       "required": ["service_id", "mode", "action", "params"],
       "properties": {
         "service_id": { "type": "string" },
-        "mode": { "enum": ["API", "CLI", "RECONCILE", "PRESET", "OAUTH"] },
+        "mode": { "enum": ["API", "CLI", "RECONCILE", "PRESET", "OAUTH", "MCP"] },
         "action": { "type": "string" },
         "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
         "params": { "type": "object" },
@@ -27,7 +27,7 @@
             "type": "object",
             "required": ["op", "params"],
             "properties": {
-              "op": { "enum": ["api", "cli", "reconcile", "preset", "oauth"] },
+              "op": { "enum": ["api", "cli", "reconcile", "preset", "oauth", "mcp"] },
               "params": {
                 "type": "object",
                 "required": ["service_id", "action", "params"],

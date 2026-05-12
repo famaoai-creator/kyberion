@@ -1,6 +1,10 @@
 {
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
+    "aws-ce": {
+      "base_url": "https://ce.us-east-1.amazonaws.com",
+      "preset_path": "knowledge/public/orchestration/service-presets/aws-ce.json"
+    },
     "backlog": {
       "base_url": "https://{{space}}.backlog.com/api/v2",
       "preset_path": "knowledge/public/orchestration/service-presets/backlog.json",
@@ -10,9 +14,8 @@
         ]
       }
     },
-    "aws-ce": {
-      "base_url": "https://ce.us-east-1.amazonaws.com",
-      "preset_path": "knowledge/public/orchestration/service-presets/aws-ce.json"
+    "brave-search": {
+      "preset_path": "knowledge/public/orchestration/service-presets/brave-search.json"
     },
     "canva": {
       "base_url": "https://api.canva.com/rest/v1",
@@ -21,9 +24,23 @@
     "comfyui": {
       "preset_path": "knowledge/public/orchestration/service-presets/comfyui.json"
     },
+    "confluence": {
+      "base_url": "https://{{domain}}.atlassian.net/wiki/api/v2",
+      "preset_path": "knowledge/public/orchestration/service-presets/confluence.json"
+    },
     "github": {
       "base_url": "https://api.github.com",
       "preset_path": "knowledge/public/orchestration/service-presets/github.json"
+    },
+    "github-mcp": {
+      "preset_path": "knowledge/public/orchestration/service-presets/github-mcp.json"
+    },
+    "gitlab": {
+      "base_url": "https://{{host}}.com/api/v4",
+      "preset_path": "knowledge/public/orchestration/service-presets/gitlab.json"
+    },
+    "google-maps": {
+      "preset_path": "knowledge/public/orchestration/service-presets/google-maps.json"
     },
     "google-workspace": {
       "preset_path": "knowledge/public/orchestration/service-presets/google-workspace.json",
@@ -64,6 +81,9 @@
       "base_url": "https://postman-echo.com",
       "preset_path": "knowledge/public/orchestration/service-presets/smoke-test.json"
     },
+    "sqlite": {
+      "preset_path": "knowledge/public/orchestration/service-presets/sqlite.json"
+    },
     "vision": {
       "preset_path": "knowledge/public/orchestration/service-presets/media-generation.json"
     },
@@ -75,6 +95,10 @@
     },
     "youtube": {
       "preset_path": "knowledge/public/orchestration/service-presets/youtube.json"
+    },
+    "zendesk": {
+      "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
+      "preset_path": "knowledge/public/orchestration/service-presets/zendesk.json"
     }
   }
 }

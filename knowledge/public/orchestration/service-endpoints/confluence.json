@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "confluence": {
+      "base_url": "https://{{domain}}.atlassian.net/wiki/api/v2",
+      "preset_path": "knowledge/public/orchestration/service-presets/confluence.json"
+    }
+  }
+}

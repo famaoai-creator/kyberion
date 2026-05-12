@@ -67,9 +67,9 @@
       "required": ["type"],
       "additionalProperties": false,
       "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
+            "type": {
+              "type": "string",
+              "enum": [
             "snapshot",
             "screenshot",
             "open_tab",
@@ -99,6 +99,7 @@
             "scroll",
             "type",
             "key",
+            "voice_input_toggle",
             "wait",
             "click_ref",
             "fill_ref",
@@ -139,6 +140,7 @@
         },
         "text": { "type": "string" },
         "key": { "type": "string" },
+        "dictation_keycode": { "type": "integer", "minimum": 1 },
         "ref": { "type": "string" },
         "url": { "type": "string" },
         "path": { "type": "string" },

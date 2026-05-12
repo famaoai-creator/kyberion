@@ -24,6 +24,18 @@ Kyberion separates two kinds of roles:
 5. Emit a `team-composition.json` artifact into the mission directory
 6. When writing from CLI, execute with mission authority context. `scripts/compose_mission_team.ts --write` resolves the mission's assigned persona and applies it for governed writes.
 
+## Lifecycle Guardrails
+
+The composed team plan now carries a `team_governance` block with two concerns:
+
+- `lifecycle`
+  - per-template caps for parallel members, total members, message budget, wall-clock budget, and per-member turn budget
+  - shutdown and resume policy used by mission control when a team is paused, handed off, or resumed
+- `composition`
+  - the required, optional, assigned, and unfilled roles for the current mission
+
+This metadata is copied into `team-blueprint.json` so the runtime binding and audit trail keep the same lifecycle contract as the plan artifact.
+
 ## Indexes
 
 - `knowledge/public/governance/authority-roles/` canonical directory, with `knowledge/public/governance/authority-role-index.json` as the compatibility snapshot
@@ -49,6 +61,7 @@ To keep planning and execution explicit, mission team data is split into three a
 
 - `team-blueprint.json`
   - logical role design and delegation boundaries
+  - lifecycle guardrails derived from `team_governance`
   - independent from who currently performs each role
 - `staffing-assignments.json`
   - current role-to-actor mapping (`team_role -> actor_id`)

@@ -1,7 +1,7 @@
 {
   "actuator_id": "service-actuator",
-  "version": "1.0.0",
-  "description": "Unified External SaaS/API Reachability Layer",
+  "version": "1.1.0",
+  "description": "Unified External SaaS/API/MCP Reachability Layer",
   "contract_schema": "schemas/service-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -20,6 +20,7 @@
     { "op": "api", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "cli", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "preset", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "mcp", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "reconcile", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "oauth", "schema_ref": "schemas/service-action.schema.json", "platforms": ["darwin", "linux", "win32"] }
   ]

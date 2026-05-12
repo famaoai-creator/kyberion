@@ -18,11 +18,11 @@
             "enum": [
               "shell", "exec", "cli_health_check", "read_file", "read_json", "glob_files", "vision_consult", "pulse_status",
               "regex_extract", "json_query", "sre_analyze",
-              "keyboard", "mouse_click", "voice", "native_tts_speak", "check_native_tts", "open_url",
+              "keyboard", "mouse_click", "voice_input_toggle", "voice", "native_tts_speak", "check_native_tts", "open_url",
               "notify", "write_file", "mkdir", "log", "if",
               "system:shell", "system:exec", "system:cli_health_check", "system:read_file", "system:read_json", "system:glob_files", "system:vision_consult", "system:pulse_status",
               "system:regex_extract", "system:json_query", "system:sre_analyze",
-              "system:keyboard", "system:mouse_click", "system:voice", "system:native_tts_speak", "system:check_native_tts", "system:open_url",
+              "system:keyboard", "system:mouse_click", "system:voice_input_toggle", "system:voice", "system:native_tts_speak", "system:check_native_tts", "system:open_url",
               "system:notify", "system:write_file", "system:mkdir", "system:log",
               "core:if"
             ]
@@ -31,6 +31,7 @@
             "type": "object",
             "properties": {
               "text": { "type": "string", "description": "Text for keyboard or voice output" },
+              "dictation_keycode": { "type": "integer", "minimum": 1, "description": "macOS dictation key code for voice input toggle" },
               "x": { "type": "number", "description": "X coordinate for mouse" },
               "y": { "type": "number", "description": "Y coordinate for mouse" },
               "cmd": { "type": "string", "description": "Shell command to execute" },

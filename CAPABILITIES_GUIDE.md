@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 27
-Last updated: 2026-05-09
+Last updated: 2026-05-11
 
 This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/public/orchestration/global_actuator_index.json`.
 
@@ -103,13 +103,69 @@ Output paths must be **inside the project root**. To deliver a file externally, 
 | `presence-actuator` | Human Presence and Messaging Bridge with adaptive retry | 1.0.0 | 3 | `schemas/presence-action.schema.json` | `libs/actuators/presence-actuator` |
 | `process-actuator` | Managed process lifecycle actuator backed by the runtime supervisor with adaptive retry | 1.0.0 | 4 | `schemas/process-action.schema.json` | `libs/actuators/process-actuator` |
 | `secret-actuator` | OS Native Secret Manager Bridge with adaptive retry | 1.0.0 | 3 | `schemas/secret-action.schema.json` | `libs/actuators/secret-actuator` |
-| `service-actuator` | Unified External SaaS/API Reachability Layer with adaptive retry and auth-aware recovery policies | 1.0.0 | 6 | `schemas/service-action.schema.json` | `libs/actuators/service-actuator` |
+| `service-actuator` | Unified External SaaS/API/MCP Reachability Layer with adaptive retry and auth-aware recovery policies | 1.1.0 | 7 | `schemas/service-action.schema.json` | `libs/actuators/service-actuator` |
 | `system-actuator` | OS-level control, diagnostics, and short-lived local execution with adaptive retry | 1.1.0 | 3 | `schemas/system-pipeline.schema.json` | `libs/actuators/system-actuator` |
 | `terminal-actuator` | PTY-driven Terminal Actuator with adaptive retry for read operations | 1.0.0 | 5 | `schemas/terminal-action.schema.json` | `libs/actuators/terminal-actuator` |
 | `video-composition-actuator` | Governed deterministic composed-video bundle preparation actuator with adaptive retry on bundle and render boundaries | 1.0.0 | 6 | `-` | `libs/actuators/video-composition-actuator` |
 | `vision-actuator` | Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator with adaptive retry | 1.3.0 | 2 | `schemas/vision-action.schema.json` | `libs/actuators/vision-actuator` |
 | `voice-actuator` | Governed local voice generation actuator with native playback, artifact fallback, and adaptive retry | 1.2.0 | 7 | `schemas/voice-action.schema.json` | `libs/actuators/voice-actuator` |
 | `wisdom-actuator` | Knowledge-tier search, injection, import/export, and decision-support operations with boundary retry on external command and knowledge package operations | 1.1.0 | 32 | `schemas/wisdom-action.schema.json` | `libs/actuators/wisdom-actuator` |
+
+### Capture ops (type: capture)
+
+| Op | Notes |
+| :--- | :--- |
+| `screenshot` | screen capture |
+| `clipboard_read` | clipboard read |
+| `get_focused_input` | focus inspection |
+| `get_screen_size` | display bounds |
+| `window_list` | application windows |
+| `chrome_tab_list` | browser tabs |
+| `read_file` | file read |
+| `read_json` | json read |
+| `probe` | environment probe |
+| `glob_files` | filesystem glob |
+| `scan_directory` | directory scan |
+| `exec` | governed shell capture |
+| `shell` | governed shell capture |
+| `cli_health_check` | cli health check |
+| `list_missions` | mission list |
+| `list_projects` | project list |
+| `list_capabilities` | capability list |
+| `list_knowledge` | knowledge list |
+| `list_running_apps` | running apps |
+| `collect_artifacts` | artifact discovery |
+| `sample_traces` | trace sampling |
+| `vision_consult` | vision consult |
+
+### Apply ops (type: apply)
+
+| Op | Notes |
+| :--- | :--- |
+| `scroll` | mouse wheel |
+| `drag` | mouse drag |
+| `clipboard_write` | clipboard write |
+| `system_notify` | system notification |
+| `open_file` | open file |
+| `app_quit` | quit app |
+| `process_kill` | kill process |
+| `run_applescript` | applescript execution |
+| `keyboard` | keyboard input |
+| `paste_text` | paste text |
+| `press_key` | key press |
+| `voice_input_toggle` | toggle dictation/input |
+| `mouse_click` | mouse click |
+| `mouse_move` | mouse move |
+| `activate_application` | activate app |
+| `open_url` | open url |
+| `write_file` | file write |
+| `write_artifact` | artifact write |
+| `write_json` | json write |
+| `mkdir` | directory create |
+| `log` | log event |
+| `voice` | voice output |
+| `native_tts_speak` | native tts |
+| `wait` | delay |
 
 See also:
 

@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog, classifyError } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, executeMcp, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog, classifyError } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -21,7 +21,7 @@ function assertUnsafeCliAllowed() {
 
 interface ServiceAction {
   service_id: string; 
-  mode: 'API' | 'CLI' | 'SDK' | 'STREAM' | 'RECONCILE' | 'PRESET' | 'OAUTH';
+  mode: 'API' | 'CLI' | 'SDK' | 'STREAM' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP';
   action: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
@@ -238,6 +238,16 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
   switch (input.mode) {
     case 'PRESET':
       return await executeServicePreset(input.service_id, input.action, input.params, input.auth === 'secret-guard' ? 'secret-guard' : 'none');
+
+    case 'MCP':
+      assertUnsafeCliAllowed();
+      const mcpCmd = String(input.params.command || 'npx');
+      const mcpArgs = Array.isArray(input.params.args) ? input.params.args.map(String) : [];
+      return await executeMcp(mcpCmd, mcpArgs, {
+        action: input.params.mcp_action || 'call_tool',
+        name: input.action,
+        arguments: input.params.arguments || input.params
+      });
 
     case 'OAUTH':
       if (input.action === 'begin') {

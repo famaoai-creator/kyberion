@@ -27,6 +27,7 @@ import {
   keystrokeText,
   pasteText,
   pressKey,
+  toggleDictation,
   clickAt,
   rightClickAt,
   moveMouse,
@@ -182,10 +183,12 @@ interface ComputerInteractionAction {
       | 'empty_trash'
       | 'type'
       | 'key'
+      | 'voice_input_toggle'
       | 'wait';
     coordinate?: { x: number; y: number };
     text?: string;
     key?: string;
+    dictation_keycode?: number;
     path?: string;
     url?: string;
     application?: string;
@@ -234,6 +237,7 @@ export const SYSTEM_ACTUATOR_APPLY_OPS = [
   'keyboard',
   'paste_text',
   'press_key',
+  'voice_input_toggle',
   'mouse_click',
   'mouse_move',
   'activate_application',
@@ -830,6 +834,13 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       break;
     case 'key':
       steps.push({ type: 'apply', op: 'keyboard', params: { text: interaction.key || '' } });
+      break;
+    case 'voice_input_toggle':
+      steps.push({
+        type: 'apply',
+        op: 'voice_input_toggle',
+        params: { dictation_keycode: interaction.dictation_keycode ?? 176 },
+      });
       break;
     case 'left_click':
       steps.push({
@@ -1509,6 +1520,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'press_key': {
       const key = String(resolve(params.key || '')).trim().toLowerCase();
       pressKey(key);
+      break;
+    }
+    case 'voice_input_toggle': {
+      if (process.platform !== 'darwin') {
+        throw new Error('voice_input_toggle is only supported on macOS');
+      }
+      const dictationKeycode = Number(resolve(params.dictation_keycode ?? 176));
+      toggleDictation(dictationKeycode);
       break;
     }
     case 'activate_application': {

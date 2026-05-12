@@ -22,7 +22,37 @@ export interface MissionTeamPlan {
   assigned_persona?: string;
   mission_classification?: MissionClassification;
   generated_at: string;
+  team_governance?: MissionTeamGovernance;
   assignments: MissionTeamAssignment[];
+}
+
+export interface MissionTeamLifecyclePolicy {
+  max_parallel_members: number;
+  max_members: number;
+  max_messages_per_run: number;
+  max_wall_clock_minutes: number;
+  max_member_turns: number;
+  shutdown_policy: 'graceful_handoff' | 'manual' | 'auto_shutdown';
+  resume_policy: 'checkpoint_resume' | 'manual_resume';
+  cooldown_minutes: number;
+}
+
+export interface MissionTeamCompositionSummary {
+  required_roles: string[];
+  optional_roles: string[];
+  assigned_roles: string[];
+  unfilled_required_roles: string[];
+}
+
+export interface MissionTeamGovernance {
+  lifecycle: MissionTeamLifecyclePolicy;
+  composition: MissionTeamCompositionSummary;
+}
+
+interface MissionTeamTemplateRecord {
+  required_roles: string[];
+  optional_roles: string[];
+  lifecycle?: MissionTeamLifecyclePolicy;
 }
 
 export interface ResolveMissionTeamOptions {
@@ -40,6 +70,32 @@ export interface ResolveMissionTeamOptions {
 
 function loadJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+}
+
+function buildTeamGovernance(template: MissionTeamTemplateRecord, assignments: MissionTeamAssignment[]): MissionTeamGovernance {
+  const lifecycle = template.lifecycle || {
+    max_parallel_members: template.required_roles.length,
+    max_members: template.required_roles.length + template.optional_roles.length,
+    max_messages_per_run: 40,
+    max_wall_clock_minutes: 120,
+    max_member_turns: 8,
+    shutdown_policy: 'graceful_handoff',
+    resume_policy: 'checkpoint_resume',
+    cooldown_minutes: 5,
+  };
+  const assignedRoles = assignments.filter((entry) => entry.status === 'assigned').map((entry) => entry.team_role);
+  const unfilledRequiredRoles = assignments
+    .filter((entry) => entry.required && entry.status !== 'assigned')
+    .map((entry) => entry.team_role);
+  return {
+    lifecycle,
+    composition: {
+      required_roles: [...template.required_roles],
+      optional_roles: [...template.optional_roles],
+      assigned_roles: assignedRoles,
+      unfilled_required_roles: unfilledRequiredRoles,
+    },
+  };
 }
 
 export function composeMissionTeamPlan(input: {
@@ -68,7 +124,7 @@ export function composeMissionTeamPlan(input: {
   const teamRoles = loadTeamRoleIndex();
   const authorityRoles = loadAuthorityRoleIndex();
   const agents = loadAgentProfileIndex();
-  const template = templates[missionType] || templates.default;
+  const template = (templates[missionType] || templates.default) as MissionTeamTemplateRecord;
   const assignments: MissionTeamAssignment[] = [];
 
   for (const role of template.required_roles) {
@@ -107,6 +163,7 @@ export function composeMissionTeamPlan(input: {
     assigned_persona: input.assignedPersona,
     mission_classification: missionClassification,
     generated_at: new Date().toISOString(),
+    team_governance: buildTeamGovernance(template, assignments),
     assignments,
   };
 }
