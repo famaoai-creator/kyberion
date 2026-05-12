@@ -136,6 +136,8 @@ describe('Mission team composition contract', () => {
     });
 
     expect(plan.template).toBe('development');
+    expect(plan.team_governance?.lifecycle.max_parallel_members).toBeGreaterThan(0);
+    expect(plan.team_governance?.composition.required_roles).toContain('owner');
     expect(plan.assignments.find((entry) => entry.team_role === 'owner')?.agent_id).toBe('nerve-agent');
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe('implementation-architect');
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(/^(gemini|codex)$/);
@@ -164,6 +166,7 @@ describe('Mission team composition contract', () => {
 
     const valid = validate(plan);
     expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+    expect(plan.team_governance?.composition.assigned_roles.length).toBeGreaterThan(0);
   });
 
   it('predefines a product development team shape', () => {

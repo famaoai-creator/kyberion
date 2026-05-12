@@ -91,7 +91,7 @@ const DOMAIN_REGISTRY: Record<string, DomainOpRegistry> = {
   },
   system: {
     capture: ['shell', 'list', 'pulse_status'],
-    apply: ['log', 'notify', 'voice'],
+    apply: ['log', 'notify', 'voice', 'voice_input_toggle'],
   },
   service: {
     capture: ['read', 'list'],

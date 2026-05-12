@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   safeReadFile: vi.fn(),
   executeServicePreset: vi.fn(),
+  executeMcp: vi.fn(),
   withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -20,6 +21,7 @@ vi.mock('@agent/core', async () => {
     safeExec: mocks.safeExec,
     safeReadFile: mocks.safeReadFile,
     executeServicePreset: mocks.executeServicePreset,
+    executeMcp: mocks.executeMcp,
     withRetry: mocks.withRetry,
   };
 });
@@ -127,6 +129,26 @@ describe('service-actuator handleAction', () => {
     expect(result).toEqual({ output: 'cli-output' });
   });
 
+  it('executes MCP mode when unsafe CLI is enabled', async () => {
+    process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
+    mocks.executeMcp.mockResolvedValue({ tools: [] });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      service_id: 'github-mcp',
+      mode: 'MCP',
+      action: 'search_repositories',
+      params: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'] },
+    });
+
+    expect(mocks.executeMcp).toHaveBeenCalledWith(
+      'npx',
+      ['-y', '@modelcontextprotocol/server-github'],
+      expect.objectContaining({ action: 'call_tool', name: 'search_repositories' }),
+    );
+    expect(result).toEqual({ tools: [] });
+  });
+
   it('emits service actions that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
@@ -143,6 +165,15 @@ describe('service-actuator handleAction', () => {
         title: 'Schema check',
       },
       auth: 'secret-guard',
+    };
+    const mcpRequest = {
+      service_id: 'github-mcp',
+      mode: 'MCP',
+      action: 'search_repositories',
+      params: {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-github'],
+      },
     };
     const pipelineRequest = {
       action: 'pipeline',
@@ -167,6 +198,7 @@ describe('service-actuator handleAction', () => {
     };
 
     expect(validate(directRequest), JSON.stringify(validate.errors || [])).toBe(true);
+    expect(validate(mcpRequest), JSON.stringify(validate.errors || [])).toBe(true);
     expect(validate(pipelineRequest), JSON.stringify(validate.errors || [])).toBe(true);
   });
 });

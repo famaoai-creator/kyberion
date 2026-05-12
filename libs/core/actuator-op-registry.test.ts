@@ -13,6 +13,7 @@ describe('actuator-op-registry', () => {
     expect(determineActuatorStepType('browser', 'goto')).toBe('capture');
     expect(determineActuatorStepType('browser', 'click')).toBe('apply');
     expect(determineActuatorStepType('system', 'log')).toBe('apply');
+    expect(determineActuatorStepType('system', 'voice_input_toggle')).toBe('apply');
   });
 
   it('prefers apply semantics when provider ops overlap', () => {

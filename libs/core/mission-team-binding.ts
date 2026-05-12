@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import type { MissionTeamPlan } from './mission-team-plan-composer.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import type { MissionTeamGovernance } from './mission-team-plan-composer.js';
 
 export interface TeamBlueprintRole {
   team_role: string;
@@ -18,6 +19,7 @@ export interface MissionTeamBlueprint {
   mission_type: string;
   generated_at: string;
   source_artifact: string;
+  team_governance?: MissionTeamGovernance;
   roles: TeamBlueprintRole[];
 }
 
@@ -97,6 +99,7 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
     mission_type: plan.mission_type,
     generated_at: new Date().toISOString(),
     source_artifact: 'team-composition.json',
+    team_governance: plan.team_governance,
     roles: plan.assignments.map((assignment) => ({
       team_role: assignment.team_role,
       required: assignment.required,

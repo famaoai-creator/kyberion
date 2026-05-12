@@ -49,4 +49,16 @@ describe('apple-event-bridge', () => {
 
     restorePlatform();
   });
+
+  it('toggles dictation using the macOS key code helper', async () => {
+    mockDarwinPlatform();
+    const secureIo = await import('./secure-io.js');
+    const bridge = await import('./apple-event-bridge.js');
+
+    bridge.toggleDictation(176);
+
+    expect(secureIo.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 176']);
+
+    restorePlatform();
+  });
 });

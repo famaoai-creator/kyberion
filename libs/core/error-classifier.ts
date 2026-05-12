@@ -83,8 +83,24 @@ const RULES: ClassifierRule[] = [
     label: 'Tier guard refused access',
     remediation:
       'Higher tier required. Set `KYBERION_PERSONA` or `MISSION_ROLE` to a role authorized for this tier.',
-    test: (m) => /tier[\s_-]?guard|TIER_VIOLATION|tier policy|returned no data/i.test(m),
+    test: (m) => /tier[\s_-]?guard|TIER_VIOLATION|tier policy/i.test(m),
     repairAction: 'Consult organization-profile.md for required roles. Suggest adding `KYBERION_PERSONA=ecosystem_architect` or `MISSION_ROLE=knowledge_steward` to the environment configuration to authorize access.'
+  },
+  {
+    id: 'runtime.property-access',
+    category: 'unknown',
+    label: 'Internal runtime error',
+    remediation: 'Check the actuator implementation for null/undefined property access.',
+    test: (m) => /Cannot read properties of undefined|is not a function/i.test(m),
+    repairAction: 'Investigate the actuator code and the provided parameters. If the error is due to a missing parameter, fix the pipeline ADF.'
+  },
+  {
+    id: 'kyberion.capture-empty',
+    category: 'invalid_input',
+    label: 'Capture operation returned no data',
+    remediation: 'Check the search query, topic, or path. The target resource might not exist.',
+    test: (m) => /returned no data/i.test(m),
+    repairAction: 'Analyze the step parameters and the expected input for this actuator. Fix any mismatched key names or invalid paths in the pipeline ADF.'
   },
   {
     id: 'kyberion.path-scope',

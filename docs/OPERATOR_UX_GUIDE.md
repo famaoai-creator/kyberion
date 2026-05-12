@@ -39,6 +39,16 @@ Internally, Kyberion may use:
 
 Those are execution details behind the contract above.
 
+For mission-backed work, the team composition artifact also carries a small governance block:
+
+- `team_governance.lifecycle`
+  - bounds on team size, turn budget, message budget, and wall-clock budget
+  - shutdown and resume policy for handoff-safe operation
+- `team_governance.composition`
+  - which roles are required, optional, assigned, or still unfilled
+
+This is what makes mission staffing explainable before delegation begins.
+
 When Kyberion explains a complex capability, it should surface the
 governed capability bundle summary before expanding into the underlying
 actuator or pipeline details.
@@ -88,6 +98,8 @@ Use when you want:
 - browser assistance
 - live task detail and artifact access
 - immediate project bootstrap context
+
+For hands-free dictation on macOS, use `system:voice_input_toggle` as the fallback when browser-based capture is unavailable or the focused app expects the OS dictation shortcut. That keeps the shortcut in the OS-control layer instead of mixing it into `voice-actuator`.
 
 ### Background Bridges
 
@@ -217,6 +229,7 @@ Examples:
 - multi-step delivery
 - cross-agent work
 - auditable workflows
+- team assembly with lifecycle guardrails
 
 For distillation and other structured reasoning tasks, see:
 
