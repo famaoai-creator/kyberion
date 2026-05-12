@@ -14,6 +14,7 @@ describe('mission-team-brief-composer request briefing', () => {
     expect(brief.workflow_design.workflow_id).toBeTruthy();
     expect(brief.review_design.review_mode).toBeTruthy();
     expect(brief.team_plan.assignments.length).toBeGreaterThan(0);
+    expect(brief.team_governance?.lifecycle.max_members).toBeGreaterThan(0);
     expect(brief.recommended_optional_roles).toContain('experience_designer');
     expect(brief.recommended_optional_roles).not.toContain('operator');
     expect(brief.recommended_optional_roles).not.toContain('surface_liaison');

@@ -1,0 +1,34 @@
+{
+  "service_id": "brave-search",
+  "name": "Brave Search MCP Server",
+  "description": "MCP-based web search via Brave Search API",
+  "recovery_policy": {
+    "retry": { "maxRetries": 2 }
+  },
+  "operations": {
+    "brave_web_search": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "tool_name": "brave_web_search",
+      "parameters": {
+        "query": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "query": "{{query}}"
+      }
+    },
+    "brave_local_search": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "tool_name": "brave_local_search",
+      "parameters": {
+        "query": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "query": "{{query}}"
+      }
+    }
+  }
+}

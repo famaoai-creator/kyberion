@@ -18,6 +18,15 @@
         "tier": {
           "type": "string",
           "enum": ["personal", "confidential", "public"]
+        },
+        "query": {
+          "type": "string"
+        },
+        "export_as": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
         }
       }
     }

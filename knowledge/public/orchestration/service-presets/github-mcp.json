@@ -1,0 +1,39 @@
+{
+  "service_id": "github-mcp",
+  "name": "GitHub MCP Server",
+  "description": "MCP-based GitHub interactions (search, create issues, etc.)",
+  "operations": {
+    "search_repositories": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "tool_name": "search_repositories",
+      "parameters": {
+        "query": { "required": true, "type": "string" }
+      }
+    },
+    "get_file_contents": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "tool_name": "get_file_contents",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "path": { "required": true, "type": "string" }
+      }
+    },
+    "create_issue": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "tool_name": "create_issue",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" },
+        "body": { "type": "string" }
+      }
+    }
+  }
+}

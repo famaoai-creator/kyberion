@@ -229,9 +229,12 @@ async function opCapture(op: string, params: any, ctx: any) {
       const query = resolveVars(params.query, ctx).toLowerCase();
       const manifestPath = pathResolver.knowledge('_manifest.json');
       const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
-      const matched = manifest.documents?.filter((doc: any) =>
-        doc.title.toLowerCase().includes(query) || doc.tags?.some((t: string) => t.toLowerCase().includes(query))
-      ) || [];
+      const items = manifest.files || manifest.documents || [];
+      const matched = items.filter((doc: any) => {
+        const title = (doc.title || doc.path || '').toLowerCase();
+        const tags = (doc.tags || []).some((t: string) => t.toLowerCase().includes(query));
+        return title.includes(query) || tags;
+      });
       return { ...ctx, [params.export_as || 'found_knowledge']: matched };
     case 'query': {
       const { buildKnowledgeIndex, queryKnowledge } = await import('@agent/core');

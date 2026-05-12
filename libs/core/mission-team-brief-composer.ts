@@ -30,6 +30,7 @@ export interface MissionTeamCompositionBrief {
   workflow_design: MissionWorkflowDesign;
   review_design: MissionReviewDesign;
   team_plan: MissionTeamPlan;
+  team_governance: MissionTeamPlan['team_governance'];
   recommended_optional_roles: string[];
   missing_inputs: string[];
   rationale: string[];
@@ -90,6 +91,7 @@ export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput)
     workflow_design: workflowDesign,
     review_design: reviewDesign,
     team_plan: teamPlan,
+    team_governance: teamPlan.team_governance,
     recommended_optional_roles: recommendedOptionalRoles,
     missing_inputs: missingInputs,
     rationale: [

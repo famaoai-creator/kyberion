@@ -1,0 +1,25 @@
+{
+  "service_id": "sqlite",
+  "name": "SQLite MCP Server",
+  "description": "MCP-based SQLite database interactions",
+  "operations": {
+    "query": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sqlite", "{{db_path}}"],
+      "tool_name": "query",
+      "parameters": {
+        "sql": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "sql": "{{sql}}"
+      }
+    },
+    "list_tables": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sqlite", "{{db_path}}"],
+      "tool_name": "list_tables"
+    }
+  }
+}
