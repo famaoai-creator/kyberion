@@ -1,0 +1,56 @@
+{
+  "service_id": "gitlab",
+  "name": "GitLab REST API v4 Presets",
+  "base_url": "https://{{host}}.com/api/v4",
+  "auth_strategy": "bearer",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
+  "operations": {
+    "get_projects": {
+      "path": "projects",
+      "method": "GET",
+      "description": "List projects.",
+      "parameters": {
+        "owned": { "type": "boolean", "default": true },
+        "membership": { "type": "boolean", "default": true }
+      }
+    },
+    "get_project": {
+      "path": "projects/{{project_id}}",
+      "method": "GET",
+      "description": "Get project details."
+    },
+    "get_issues": {
+      "path": "projects/{{project_id}}/issues",
+      "method": "GET",
+      "description": "List project issues."
+    },
+    "create_issue": {
+      "path": "projects/{{project_id}}/issues",
+      "method": "POST",
+      "description": "Create a new issue.",
+      "parameters": {
+        "title": { "required": true, "type": "string" },
+        "description": { "type": "string" }
+      },
+      "payload_template": {
+        "title": "{{title}}",
+        "description": "{{description}}"
+      }
+    },
+    "get_merge_requests": {
+      "path": "projects/{{project_id}}/merge_requests",
+      "method": "GET",
+      "description": "List project merge requests."
+    }
+  }
+}

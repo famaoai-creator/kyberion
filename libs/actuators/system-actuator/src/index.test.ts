@@ -59,6 +59,10 @@ const pressKey = vi.fn((key: string) => {
     `tell application "System Events" to keystroke "${normalizedKey}"`,
   ]);
 });
+const pressKeyCode = vi.fn((keyCode: number) =>
+  safeExec('osascript', ['-e', `tell application "System Events" to key code ${keyCode}`])
+);
+const toggleDictation = vi.fn((keyCode = 176) => pressKeyCode(keyCode));
 const clickAt = vi.fn((x: number, y: number, clickCount = 1) => {
   for (let index = 0; index < clickCount; index += 1) {
     safeExec('osascript', ['-e', `tell application "System Events" to click at {${x}, ${y}}`]);
@@ -163,6 +167,8 @@ vi.mock('@agent/core', () => ({
   keystrokeText,
   pasteText,
   pressKey,
+  pressKeyCode,
+  toggleDictation,
   clickAt,
   rightClickAt,
   moveMouse,
@@ -187,6 +193,8 @@ vi.mock('@agent/core/os-automation', () => ({
   keystrokeText,
   pasteText,
   pressKey,
+  pressKeyCode,
+  toggleDictation,
   clickAt,
   rightClickAt,
   moveMouse,
@@ -586,6 +594,25 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
+  });
+
+  it('maps voice input toggle into the system pipeline', async () => {
+    mockDarwinPlatform();
+    const { handleAction } = await import('./index');
+    const core = await import('@agent/core');
+
+    const result = await handleAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'voice_input_toggle',
+        dictation_keycode: 176,
+      },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 176']);
+    restorePlatform();
   });
 
   it('maps left_click into mouse_click execution', async () => {
@@ -1163,6 +1190,25 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       expect(result.status).toBe('succeeded');
       expect(core.safeExec).toHaveBeenCalledWith('open', [expect.stringContaining('report.html')], expect.any(Object));
+      restorePlatform();
+    });
+
+    it('voice_input_toggle: sends the macOS dictation key code', async () => {
+      mockDarwinPlatform();
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{
+          type: 'apply',
+          op: 'voice_input_toggle',
+          params: { dictation_keycode: 176 },
+        }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 176']);
       restorePlatform();
     });
   });

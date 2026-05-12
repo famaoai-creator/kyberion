@@ -418,33 +418,36 @@ async function attemptAutonomousRepair(step: PipelineAdfStep, failure: any, ctx:
   try {
     const { getReasoningBackend } = await import('@agent/core');
     const backend = getReasoningBackend();
+
+    const repairHint = failure.repairAction || 'Investigate the error and the pipeline ADF structure to identify a potential fix.';
+
     const instruction = `
-The following pipeline step failed in Kyberion due to a security tier violation (Tier Guard refused access):
+The following pipeline step failed in Kyberion:
 Step Operation: ${step.op}
 Step Params: ${JSON.stringify(step.params)}
 Error Category: ${failure.category}
 Error Detail: ${failure.detail}
 
-Repair Action Goal:
-1. IDENTIFY the required Persona or Role needed to access the target path (likely in knowledge/confidential/).
-2. CONSULT 'knowledge/confidential/organization-profile.md' (or similar governance docs) to find the correct Identity mapping.
-3. INJECT the necessary environment variables (e.g., 'KYBERION_PERSONA=ecosystem_architect' or 'MISSION_ROLE=knowledge_steward') into the pipeline context or a local .env file.
-4. UPDATE the pipeline ADF at ${pipelinePath} to include these identity vars in the 'context' or as environment hints.
-5. DO NOT copy confidential files to public areas unless absolutely necessary and authorized.
+Repair Hint: ${repairHint}
 
-Assume the persona of a "Sovereign Identity & Governance Agent".
-Once finished, provide a brief summary of the Identity changes you applied to authorize the mission.
+Repair Action Goal:
+1. ANALYZE the error and parameters.
+2. If it is a structural/parameter error, FIX the pipeline ADF at ${pipelinePath}.
+3. If it is an environment/permission error, suggest or apply changes to .env or authority roles if appropriate.
+4. Ensure the resulting ADF follows the required schema.
+
+Assume the persona of a "Sovereign System Recovery Agent".
+Once finished, provide a brief summary of the changes you applied to fix the pipeline.
 `.trim();
 
     const report = await backend.delegateTask(instruction, `Self-Healing Mission for ${step.op}`);
     logger.info(`  [SYS_PIPELINE:REPAIR] Sub-agent report: ${report}`);
-    return true; 
+    return true;
   } catch (err: any) {
     logger.error(`  [SYS_PIPELINE:REPAIR] Failed to perform repair: ${err.message}`);
     return false;
   }
 }
-
 export async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })

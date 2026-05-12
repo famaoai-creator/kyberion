@@ -5,9 +5,30 @@ import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 
 /**
- * Shared Service Execution Engine v1.0
- * Allows any Actuator to leverage Adaptive Presets (API/CLI).
+ * Shared Service Execution Engine v1.2.0
+ * Allows any Actuator to leverage Adaptive Presets (API/CLI/MCP).
  */
+
+export async function executeMcp(command: string, args: string[], actionRequest: { action: string; name?: string; arguments?: any }) {
+  // Dynamic import to avoid heavy SDK load during normal boots
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+
+  const transport = new StdioClientTransport({ command, args, stderr: "inherit" });
+  const client = new Client({ name: "Kyberion-Service-Engine", version: "1.0.0" }, { capabilities: {} });
+
+  try {
+    await client.connect(transport);
+    if (actionRequest.action === 'list_tools') return await client.listTools();
+    if (actionRequest.action === 'call_tool') {
+      if (!actionRequest.name) throw new Error("Tool name is required for MCP call_tool");
+      return await client.callTool({ name: actionRequest.name, arguments: actionRequest.arguments || {} });
+    }
+    throw new Error(`Unsupported MCP action: ${actionRequest.action}`);
+  } finally {
+    try { await transport.close(); } catch (_) {}
+  }
+}
 
 function loadConnectionWithFallback(serviceId: string): Record<string, any> {
   const connectionPath = customerResolver.resolveOverlay(`connections/${serviceId}.json`);
@@ -328,6 +349,27 @@ export async function executeServicePreset(serviceId: string, action: string, pa
         let parsed = rawOutput;
         try { parsed = JSON.parse(rawOutput); } catch (_) {}
         return normalizePresetResult(parsed, alt.output_mapping);
+      }
+
+      if (alt.type === 'mcp') {
+        const bin = resolveVars(alt.command, mergedParams);
+        const args = (alt.args || []).map((a: any) => resolveVars(String(a), mergedParams));
+        if (!(await platform.checkBinary(bin))) continue;
+        if (!isCliAllowedForOperation(serviceConfig, preset, alt)) {
+          throw new Error('CLI execution disabled.');
+        }
+        
+        const mcpResult = await withRetry(async () => {
+          logger.info(`🚀 [ENGINE:MCP] Executing ${bin} for ${action}`);
+          return await executeMcp(bin, args, {
+            action: alt.mcp_action || 'call_tool',
+            name: resolveVars(alt.tool_name || action, mergedParams),
+            arguments: alt.payload_template 
+              ? resolveTemplateValue(alt.payload_template, mergedParams)
+              : params
+          });
+        }, buildRetryOptions(serviceConfig, preset, alt));
+        return normalizePresetResult(mcpResult, alt.output_mapping);
       }
 
       if (alt.type === 'api') {

@@ -3,11 +3,31 @@
   "templates": {
     "default": {
       "required_roles": ["owner", "planner", "implementer", "reviewer"],
-      "optional_roles": ["tester"]
+      "optional_roles": ["tester"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 5,
+        "max_messages_per_run": 40,
+        "max_wall_clock_minutes": 120,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 5
+      }
     },
     "development": {
       "required_roles": ["owner", "planner", "implementer", "reviewer", "tester"],
-      "optional_roles": ["operator", "surface_liaison"]
+      "optional_roles": ["operator", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 7,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 10,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
     },
     "product_development": {
       "required_roles": [
@@ -18,27 +38,87 @@
         "reviewer",
         "tester"
       ],
-      "optional_roles": ["experience_designer", "operator", "surface_liaison"]
+      "optional_roles": ["experience_designer", "operator", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 6,
+        "max_members": 9,
+        "max_messages_per_run": 80,
+        "max_wall_clock_minutes": 240,
+        "max_member_turns": 12,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
     },
     "operations": {
       "required_roles": ["owner", "planner", "operator", "reviewer"],
-      "optional_roles": ["tester", "surface_liaison"]
+      "optional_roles": ["tester", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 6,
+        "max_messages_per_run": 50,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 15
+      }
     },
     "surface_concierge": {
       "required_roles": ["owner", "planner", "operator", "reviewer"],
-      "optional_roles": ["tester", "surface_liaison", "experience_designer"]
+      "optional_roles": ["tester", "surface_liaison", "experience_designer"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 7,
+        "max_messages_per_run": 30,
+        "max_wall_clock_minutes": 120,
+        "max_member_turns": 6,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
     },
     "meeting_operations": {
       "required_roles": ["owner", "planner", "facilitator", "scribe", "tracker", "reviewer"],
-      "optional_roles": ["executor", "decision_maker", "surface_liaison"]
+      "optional_roles": ["executor", "decision_maker", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 6,
+        "max_members": 9,
+        "max_messages_per_run": 100,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 4,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 5
+      }
     },
     "system_query": {
       "required_roles": ["owner", "planner", "operator"],
-      "optional_roles": ["reviewer", "surface_liaison"]
+      "optional_roles": ["reviewer", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 3,
+        "max_members": 5,
+        "max_messages_per_run": 20,
+        "max_wall_clock_minutes": 60,
+        "max_member_turns": 4,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "manual_resume",
+        "cooldown_minutes": 5
+      }
     },
     "incident": {
       "required_roles": ["owner", "operator", "reviewer", "surface_liaison"],
-      "optional_roles": ["planner", "tester"]
+      "optional_roles": ["planner", "tester"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 7,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 120,
+        "max_member_turns": 6,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 0
+      }
     }
   }
 }

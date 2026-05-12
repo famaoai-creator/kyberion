@@ -106,6 +106,24 @@ export function pressKey(key: string) {
   safeExec('osascript', ['-e', `tell application "System Events" to keystroke "${toAppleScriptString(normalizedKey)}"`]);
 }
 
+export function pressKeyCode(keyCode: number) {
+  if (!isDarwin()) {
+    return;
+  }
+  const normalizedKeyCode = Number(keyCode);
+  if (!Number.isInteger(normalizedKeyCode) || normalizedKeyCode <= 0) {
+    throw new Error(`Invalid key code for pressKeyCode: ${keyCode}`);
+  }
+  safeExec('osascript', ['-e', `tell application "System Events" to key code ${normalizedKeyCode}`]);
+}
+
+export function toggleDictation(keyCode = 176) {
+  if (!isDarwin()) {
+    return;
+  }
+  pressKeyCode(keyCode);
+}
+
 export function clickAt(x: number, y: number, clickCount = 1) {
   if (!isDarwin()) {
     return;

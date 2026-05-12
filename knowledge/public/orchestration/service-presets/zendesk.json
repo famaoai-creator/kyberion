@@ -1,0 +1,54 @@
+{
+  "service_id": "zendesk",
+  "name": "Zendesk Support REST API v2 Presets",
+  "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
+  "auth_strategy": "basic",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
+  "operations": {
+    "get_tickets": {
+      "path": "tickets.json",
+      "method": "GET",
+      "description": "List tickets."
+    },
+    "get_ticket": {
+      "path": "tickets/{{ticket_id}}.json",
+      "method": "GET",
+      "description": "Get ticket details."
+    },
+    "create_ticket": {
+      "path": "tickets.json",
+      "method": "POST",
+      "description": "Create a new ticket.",
+      "parameters": {
+        "subject": { "required": true, "type": "string" },
+        "comment": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "ticket": {
+          "subject": "{{subject}}",
+          "comment": { "body": "{{comment}}" }
+        }
+      }
+    },
+    "get_users": {
+      "path": "users.json",
+      "method": "GET",
+      "description": "List users."
+    },
+    "get_myself": {
+      "path": "users/me.json",
+      "method": "GET",
+      "description": "Get current user profile."
+    }
+  }
+}

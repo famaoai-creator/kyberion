@@ -1,36 +1,133 @@
 {
   "service_id": "jira",
-  "name": "Jira Cloud REST API Presets",
+  "name": "Jira Cloud REST API v3 Presets",
   "base_url": "https://{{domain}}.atlassian.net/rest/api/3",
-  "auth_strategy": "Basic",
+  "auth_strategy": "basic",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry": {
+      "maxRetries": 3,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
   "operations": {
+    "get_myself": {
+      "path": "myself",
+      "method": "GET",
+      "description": "Get current user profile."
+    },
+    "get_projects": {
+      "path": "project",
+      "method": "GET",
+      "description": "Get all visible projects."
+    },
+    "get_project": {
+      "path": "project/{{project_key}}",
+      "method": "GET",
+      "description": "Get project details by key."
+    },
+    "search_issues": {
+      "path": "search",
+      "method": "GET",
+      "description": "Search issues using JQL.",
+      "parameters": {
+        "jql": { "required": true, "type": "string" },
+        "startAt": { "type": "number", "default": 0 },
+        "maxResults": { "type": "number", "default": 50 },
+        "fields": { "type": "array", "default": ["summary", "status", "assignee"] }
+      }
+    },
+    "get_issue": {
+      "path": "issue/{{issue_key}}",
+      "method": "GET",
+      "description": "Get issue details."
+    },
     "create_issue": {
       "path": "issue",
       "method": "POST",
-      "description": "Creates a Jira issue.",
+      "description": "Create a new issue.",
       "parameters": {
         "project_key": { "required": true, "type": "string" },
         "summary": { "required": true, "type": "string" },
-        "description": { "required": false, "type": "string" },
+        "description": { "type": "string" },
         "issue_type": { "default": "Task" }
       },
       "payload_template": {
         "fields": {
           "project": { "key": "{{project_key}}" },
           "summary": "{{summary}}",
+          "issuetype": { "name": "{{issue_type}}" },
           "description": {
             "type": "doc",
             "version": 1,
-            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "{{description}}" }] }]
-          },
-          "issuetype": { "name": "{{issue_type}}" }
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "{{description}}" }]
+              }
+            ]
+          }
         }
       }
     },
-    "get_issue": {
+    "update_issue": {
       "path": "issue/{{issue_key}}",
-      "method": "GET",
-      "description": "Retrieves an issue by key."
+      "method": "PUT",
+      "description": "Update an issue.",
+      "parameters": {
+        "summary": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "payload_template": {
+        "fields": {
+          "summary": "{{summary}}",
+          "description": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "{{description}}" }]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "add_comment": {
+      "path": "issue/{{issue_key}}/comment",
+      "method": "POST",
+      "description": "Add a comment to an issue.",
+      "parameters": {
+        "body": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "body": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "{{body}}" }]
+            }
+          ]
+        }
+      }
+    },
+    "transition_issue": {
+      "path": "issue/{{issue_key}}/transitions",
+      "method": "POST",
+      "description": "Transition an issue status.",
+      "parameters": {
+        "transition_id": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "transition": { "id": "{{transition_id}}" }
+      }
     }
   }
 }
