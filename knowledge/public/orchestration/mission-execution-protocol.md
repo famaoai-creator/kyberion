@@ -45,6 +45,20 @@ last_updated: 2026-03-10
 ### 3.2 チェックポイント (Checkpoint)
 主要なタスクの完了ごとに `checkpoint` コマンドを実行し、ミッション固有の歴史に刻む。失敗時には、メインシステムに影響を与えることなく、ミッション内部の状態のみを過去のチェックポイントへロールバック可能。
 
+### 3.3 チーム・ライフサイクル (Mission Team Governance)
+
+`team-composition.json` と `team-blueprint.json` は、単なる人員表ではなくミッションの運用契約でもある。
+
+- `team_governance.lifecycle`
+  - 並列メンバー数、総メンバー数、メッセージ予算、壁時計時間、各メンバーの turn 数を制限する
+  - `shutdown_policy` と `resume_policy` は、ミッションを停止・引き渡し・再開するときの既定挙動を示す
+  - `cooldown_minutes` は再開直後の連続再起動や再委任を抑制する
+- `team_governance.composition`
+  - 必須 / 任意 / 割当済み / 未充足の役割を表す
+  - 役割不足がある場合は、実行前に owner が補充またはスコープ縮小を決める
+
+KSMC はこの契約を参照して、スタッフ起動、handoff、resume の説明を一貫させる。
+
 ## 4. 証跡とエビデンス (Hybrid Ledger)
 
 - **Evidence Vault**: 実行結果、ログ、中間生成物はすべて `[MISSION_ID]/evidence/` に集約される。

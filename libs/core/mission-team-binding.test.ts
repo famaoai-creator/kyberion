@@ -18,6 +18,24 @@ const SAMPLE_PLAN: MissionTeamPlan = {
   tier: 'public',
   template: 'development',
   generated_at: '2026-04-19T00:00:00.000Z',
+  team_governance: {
+    lifecycle: {
+      max_parallel_members: 5,
+      max_members: 7,
+      max_messages_per_run: 60,
+      max_wall_clock_minutes: 180,
+      max_member_turns: 10,
+      shutdown_policy: 'graceful_handoff',
+      resume_policy: 'checkpoint_resume',
+      cooldown_minutes: 10,
+    },
+    composition: {
+      required_roles: ['owner', 'planner'],
+      optional_roles: ['tester'],
+      assigned_roles: ['owner'],
+      unfilled_required_roles: ['planner'],
+    },
+  },
   assignments: [
     {
       team_role: 'owner',
@@ -68,6 +86,7 @@ describe('mission-team-binding', () => {
 
     expect(blueprint.roles.length).toBe(2);
     expect(blueprint.roles[0]?.team_role).toBe('owner');
+    expect(blueprint.team_governance?.lifecycle.max_members).toBe(7);
     expect(staffing.assignments.length).toBe(1);
     expect(staffing.assignments[0]?.actor_id).toBe('nerve-agent');
     expect(staffing.assignments[0]?.status).toBe('active');
