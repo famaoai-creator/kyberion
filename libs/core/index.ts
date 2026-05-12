@@ -205,7 +205,7 @@ export * as transformer from './transformer.js';
 export { transform, getValueByPath } from './transformer.js';
 
 export * as serviceEngine from './service-engine.js';
-export { executeServicePreset } from './service-engine.js';
+export { executeServicePreset, executeMcp } from './service-engine.js';
 export {
   getServiceEndpointRecord,
   loadServiceEndpointsCatalog,

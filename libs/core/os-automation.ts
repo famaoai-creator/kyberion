@@ -4,6 +4,8 @@ export {
   keystrokeText,
   pasteText,
   pressKey,
+  pressKeyCode,
+  toggleDictation,
   clickAt,
   rightClickAt,
   moveMouse,

@@ -1,0 +1,25 @@
+{
+  "service_id": "google-maps",
+  "name": "Google Maps MCP Server",
+  "description": "MCP-based Google Maps interactions",
+  "operations": {
+    "maps_search": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "tool_name": "maps_search",
+      "parameters": {
+        "query": { "required": true, "type": "string" }
+      }
+    },
+    "maps_geocode": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "tool_name": "maps_geocode",
+      "parameters": {
+        "address": { "required": true, "type": "string" }
+      }
+    }
+  }
+}

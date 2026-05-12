@@ -1,0 +1,8 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "google-maps": {
+      "preset_path": "knowledge/public/orchestration/service-presets/google-maps.json"
+    }
+  }
+}

@@ -56,6 +56,7 @@ Tier 0 is the first-win path. This document is about wiring tier 0.
 - [x] `pipelines/voice-hello.json` — the tier-0 first-win ADF.
 - [x] `system:native_tts_speak` — system actuator wiring from the voice pipeline to `libs/core/native-tts.ts`.
 - [x] `system:check_native_tts` — preflight probe that calls `probeNativeTts()` and exports its status.
+- [x] `system:voice_input_toggle` — macOS fallback for dictation-based input when browser Web Speech is unavailable or the focused field needs OS-level dictation; this is an OS control op, not a voice-actuator op.
 - [x] README / Quickstart now point at the first-win smoke commands.
 
 ## What's NOT implemented yet
@@ -87,6 +88,10 @@ see Phase A-5.8 in the roadmap.
 ## Why tier 0 matters
 
 OSS first impression is decided in the first 60 seconds. Forcing API keys / install / login at the door is the highest-leverage way to lose users we never hear from. Tier 0 means the demo works for anyone who clones the repo — and they can decide to pay later.
+
+## Dictation fallback
+
+The primary tier-0 path still uses browser Web Speech for input. If that path is unavailable on macOS, or if the focused application expects the system dictation shortcut, use `system:voice_input_toggle` as the fallback before the capture step. The default key code is `176`, but the op accepts an override when the keyboard layout or system dictation shortcut differs.
 
 ## Related
 

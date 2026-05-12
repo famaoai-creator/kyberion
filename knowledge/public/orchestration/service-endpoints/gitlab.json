@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "gitlab": {
+      "base_url": "https://{{host}}.com/api/v4",
+      "preset_path": "knowledge/public/orchestration/service-presets/gitlab.json"
+    }
+  }
+}
