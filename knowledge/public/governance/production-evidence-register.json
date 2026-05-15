@@ -1,0 +1,117 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-05-15",
+  "release_decision": "pending_external_evidence",
+  "items": [
+    {
+      "id": "EV-30DAY-OPS",
+      "gate": "Roadmap D2 / Phase B acceptance",
+      "required_evidence": "30 日連続稼働の run log。主要シナリオの成功率、human intervention 件数、unknown error 率を含む。",
+      "status": "pending_external_evidence",
+      "owner": "operator",
+      "template_ref": "docs/operator/templates/production-evidence-30day-ops.md",
+      "acceptance_criteria": [
+        "operation_window_days >= 30",
+        "primary_scenario_success_rate >= 95%",
+        "human_interventions_per_week <= 1",
+        "unknown_error_rate <= 10%"
+      ],
+      "verification_artifact": "docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md runbook result, active/shared/logs/traces/, incident summary",
+      "reviewed_at": null,
+      "reviewer": null,
+      "ref_requirements": [
+        {
+          "id": "run_summary",
+          "description": "30-day run summary or completed EV-30DAY-OPS template",
+          "accepted_ref_patterns": ["docs/operator/", "https://"]
+        },
+        {
+          "id": "trace_bundle",
+          "description": "Trace files or trace bundle covering the operation window",
+          "accepted_ref_patterns": ["active/shared/logs/traces/", "active/shared/tmp/", "https://"]
+        },
+        {
+          "id": "incident_summary",
+          "description": "Incident summary or explicit no-incident statement",
+          "accepted_ref_patterns": ["docs/operator/", "https://"]
+        }
+      ],
+      "evidence_refs": []
+    },
+    {
+      "id": "EV-EXT-CONTRIB",
+      "gate": "Roadmap D5 / Phase C' acceptance",
+      "required_evidence": "外部 contributor が good-first-issue を 1 週間以内に merge した PR。issue、PR、review、merge date を含む。",
+      "status": "pending_external_evidence",
+      "owner": "maintainer",
+      "template_ref": "docs/operator/templates/production-evidence-external-contribution.md",
+      "acceptance_criteria": [
+        "contributor is external to maintainer team",
+        "issue follows .github/ISSUE_TEMPLATE/good-first-issue-guide.md",
+        "merge completed within 7 days of contributor start",
+        "issue URL, PR URL, and review or merge record are present"
+      ],
+      "verification_artifact": "docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md, GitHub issue / PR URL, docs/developer/GOOD_FIRST_ISSUES.md slice",
+      "reviewed_at": null,
+      "reviewer": null,
+      "ref_requirements": [
+        {
+          "id": "issue_url",
+          "description": "GitHub issue URL for the good-first-issue",
+          "accepted_ref_patterns": ["/issues/"]
+        },
+        {
+          "id": "pr_url",
+          "description": "GitHub pull request URL for the merged external contribution",
+          "accepted_ref_patterns": ["/pull/"]
+        },
+        {
+          "id": "review_record",
+          "description": "Review, merge, or completed contribution evidence template",
+          "accepted_ref_patterns": ["docs/operator/templates/production-evidence-external-contribution.md", "https://github.com/"]
+        }
+      ],
+      "evidence_refs": []
+    },
+    {
+      "id": "EV-FDE-DEPLOY",
+      "gate": "Roadmap Phase D' acceptance",
+      "required_evidence": "外部 FDE / SI が fork なしで 1 件の顧客導入を完了した evidence。customer overlay、migration note、deployment runbook、postmortem を含む。",
+      "status": "pending_external_evidence",
+      "owner": "operator + maintainer",
+      "template_ref": "docs/operator/templates/production-evidence-fde-deployment.md",
+      "acceptance_criteria": [
+        "external FDE or SI completed one customer deployment",
+        "deployment required no Kyberion fork",
+        "customer overlay evidence excludes secrets and customer PII",
+        "mission, pipeline, trace, or screenshot artifact proves the deployment scenario ran"
+      ],
+      "verification_artifact": "docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md, migration/, customer overlay evidence",
+      "reviewed_at": null,
+      "reviewer": null,
+      "ref_requirements": [
+        {
+          "id": "deployment_summary",
+          "description": "Deployment summary, postmortem, or completed EV-FDE-DEPLOY template",
+          "accepted_ref_patterns": ["docs/operator/", "https://"]
+        },
+        {
+          "id": "customer_overlay",
+          "description": "Customer overlay evidence with secrets excluded",
+          "accepted_ref_patterns": ["customer/", "docs/operator/", "https://"]
+        },
+        {
+          "id": "runtime_artifact",
+          "description": "Mission, pipeline, trace, or screenshot artifact proving the scenario ran",
+          "accepted_ref_patterns": ["active/shared/logs/traces/", "active/shared/tmp/", "https://"]
+        },
+        {
+          "id": "no_fork_statement",
+          "description": "Statement that no fork was required or rejected status explaining the blocker",
+          "accepted_ref_patterns": ["docs/operator/", "migration/", "https://"]
+        }
+      ],
+      "evidence_refs": []
+    }
+  ]
+}

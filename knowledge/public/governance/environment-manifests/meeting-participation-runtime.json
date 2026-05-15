@@ -9,7 +9,7 @@
       "kind": "npm-package",
       "description": "Playwright + a Chromium binary so the browser-driver can drive Meet/Zoom/Teams pre-join UIs.",
       "required_for": ["browser-meeting-join-driver"],
-      "probe": { "kind": "module", "specifier": "playwright" },
+      "probe": { "kind": "module", "specifier": "@playwright/test" },
       "install": {
         "operator_confirmed": true,
         "command": "pnpm",

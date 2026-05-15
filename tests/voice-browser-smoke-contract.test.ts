@@ -33,6 +33,8 @@ describe('voice and browser smoke contract', () => {
   it('keeps the browser and voice smoke pipelines pointed at the current health checks', () => {
     const browserCatalog = read('libs/actuators/browser-actuator/examples/catalog.json');
     const voiceHealth = read('pipelines/voice-health-check.json');
+    const packageJson = read('package.json');
+    const smokePipeline = read('pipelines/ui-voice-browser-smoke.json');
 
     expect(browserCatalog).toContain('test-session-recording');
     expect(browserCatalog).toContain('Playwright trace and video recording');
@@ -41,5 +43,15 @@ describe('voice and browser smoke contract', () => {
     expect(voiceHealth).toContain('mlx_audio_tts_bridge.py');
     expect(voiceHealth).toContain('system:system_notify');
     expect(voiceHealth).toContain('Voice Health Check');
+
+    expect(packageJson).toContain('test:ui-voice-browser-smoke');
+    expect(packageJson).toContain('tests/voice-browser-smoke-contract.test.ts');
+    expect(packageJson).toContain('libs/actuators/meeting-actuator/src/index.test.ts');
+
+    expect(smokePipeline).toContain('presence/displays/presence-studio/server.ts');
+    expect(smokePipeline).toContain('pipelines/voice-hello.json');
+    expect(smokePipeline).toContain('pipelines/verify-session.json');
+    expect(smokePipeline).toContain('libs/actuators/meeting-actuator/src/index.ts');
+    expect(smokePipeline).toContain('meeting consent gate');
   });
 });

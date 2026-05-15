@@ -1,31 +1,56 @@
 {
   "pipeline_id": "verify-session",
   "version": "1.0.0",
-  "description": "Re-open the persisted enterprise-sync profile (from enterprise-login.json) and confirm that authenticated session state survives. Captures a screenshot under active/shared/tmp/ as evidence.",
+  "description": "Clean first-win browser smoke: open a local data URL and capture a screenshot artifact under active/shared/tmp/ without requiring an existing login session.",
   "action": "pipeline",
+  "labels": ["first-win", "browser", "screenshot", "clean-env"],
+  "inputs": {
+    "TARGET_URL": {
+      "required": false,
+      "default": "data:text/html,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Ctitle%3EKyberion%20First%20Win%3C%2Ftitle%3E%3C%2Fhead%3E%3Cbody%20style%3D%22font-family%3Asystem-ui%3Bpadding%3A48px%22%3E%3Ch1%3EKyberion%20First%20Win%3C%2Fh1%3E%3Cp%3EThe%20browser%20runtime%20opened%20a%20page%20and%20captured%20this%20artifact.%3C%2Fp%3E%3C%2Fbody%3E%3C%2Fhtml%3E"
+    }
+  },
+  "context": {
+    "TARGET_URL": "data:text/html,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Ctitle%3EKyberion%20First%20Win%3C%2Ftitle%3E%3C%2Fhead%3E%3Cbody%20style%3D%22font-family%3Asystem-ui%3Bpadding%3A48px%22%3E%3Ch1%3EKyberion%20First%20Win%3C%2Fh1%3E%3Cp%3EThe%20browser%20runtime%20opened%20a%20page%20and%20captured%20this%20artifact.%3C%2Fp%3E%3C%2Fbody%3E%3C%2Fhtml%3E"
+  },
+  "expected_outcome": "Within 5 minutes of setup, Kyberion writes active/shared/tmp/first-win-session.png as a visible browser artifact.",
   "options": {
-    "headless": false,
-    "browser_channel": "chrome",
+    "headless": true,
     "keep_alive": true,
-    "user_data_dir": "active/browser-session/enterprise-sync"
+    "user_data_dir": "active/shared/tmp/first-win-browser-profile"
   },
   "steps": [
     {
+      "id": "open-first-win-page",
+      "type": "apply",
+      "op": "browser:goto",
+      "params": {
+        "url": "{{TARGET_URL}}"
+      }
+    },
+    {
       "id": "check-state",
       "type": "capture",
-      "op": "evaluate",
+      "op": "browser:evaluate",
       "params": {
-        "expression": "({ title: document.title, url: location.href, cookiesPresent: document.cookie.length > 0 })",
+        "script": "({ title: document.title, url: location.href, bodyText: document.body.innerText.slice(0, 80) })",
         "export_as": "session_state"
       }
     },
     {
       "id": "screenshot-verify",
       "type": "capture",
-      "op": "screenshot",
+      "op": "browser:screenshot",
       "params": {
-        "path": "active/shared/tmp/enterprise-login-success.png"
+        "path": "active/shared/tmp/first-win-session.png",
+        "export_as": "first_win_screenshot"
       }
+    },
+    {
+      "id": "close-first-win-session",
+      "type": "control",
+      "op": "browser:close_session",
+      "params": {}
     }
   ]
 }

@@ -1,0 +1,62 @@
+{
+  "pipeline_id": "ui-voice-browser-smoke",
+  "version": "1.0.0",
+  "description": "Static smoke contract for UI health endpoints, voice runtime entrypoints, browser first-win flow, and meeting consent gate wiring.",
+  "action": "pipeline",
+  "labels": ["smoke", "ui", "voice", "browser", "consent"],
+  "steps": [
+    {
+      "id": "presence-studio-health-surface",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "presence/displays/presence-studio/server.ts",
+        "export_as": "presence_studio_server"
+      }
+    },
+    {
+      "id": "presence-studio-voice-ui",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "presence/displays/presence-studio/static/index.html",
+        "export_as": "presence_studio_ui"
+      }
+    },
+    {
+      "id": "voice-runtime-first-line",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "pipelines/voice-hello.json",
+        "export_as": "voice_hello_pipeline"
+      }
+    },
+    {
+      "id": "browser-first-win-pipeline",
+      "type": "capture",
+      "op": "system:read_json",
+      "params": {
+        "path": "pipelines/verify-session.json",
+        "export_as": "browser_first_win_pipeline"
+      }
+    },
+    {
+      "id": "meeting-consent-gate",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "libs/actuators/meeting-actuator/src/index.ts",
+        "export_as": "meeting_consent_gate"
+      }
+    },
+    {
+      "id": "smoke-summary",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "[ui-voice-browser-smoke] checked presence health surface, voice runtime pipeline, browser first-win pipeline, and meeting consent gate"
+      }
+    }
+  ]
+}

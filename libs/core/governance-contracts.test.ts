@@ -9,6 +9,11 @@ import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
+const GOLDEN_SCENARIO_CATALOG_ALLOWLIST = [
+  'mission-orchestration-scenario-pack.json',
+  'mission-workflow-catalog.json',
+];
+
 type GovernanceSchemaCase = {
   name: string;
   schemaPath: string;
@@ -315,6 +320,44 @@ describe('governance contracts', () => {
       expect(validate(testCase.invalidPayload)).toBe(false);
     });
   }
+
+  it('keeps deterministic golden scenarios in the canonical schema-managed catalogs', () => {
+    const governanceDir = path.resolve(process.cwd(), 'knowledge/public/governance');
+    const unmanagedCatalogs = safeReaddir(governanceDir)
+      .filter((entry) => entry.endsWith('.json'))
+      .filter((entry) => {
+        const isGoldenScenarioCatalog =
+          entry.includes('deterministic') ||
+          entry.includes('golden-scenario') ||
+          entry.includes('scenario-catalog') ||
+          entry.includes('workflow-catalog');
+        return isGoldenScenarioCatalog && !GOLDEN_SCENARIO_CATALOG_ALLOWLIST.includes(entry);
+      });
+
+    expect(unmanagedCatalogs).toEqual([]);
+
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json'),
+    );
+    expect(
+      validate({
+        version: '1.0.0',
+        scenarios: [
+          {
+            scenario_id: 'failure-schema-mismatched-golden-scenario',
+            scenario_class: 'golden',
+            mission_class: 'operations_and_release',
+            delivery_shape: 'single_artifact',
+            workflow_pattern: 'stage_gated_delivery',
+            prompt: 'schema-mismatched catalog fixture',
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
 
   it('keeps the canonical voice profile and surface provider directories aligned with their snapshots', () => {
     const ajv = new AjvCtor({ allErrors: true });

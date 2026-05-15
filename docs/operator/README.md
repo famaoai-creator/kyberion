@@ -7,6 +7,8 @@ For people **deploying / running** Kyberion in service. If you're using it, see 
 | Doc | When to read |
 |---|---|
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Deploy on macOS / Linux / Docker. |
+| [PRODUCTION_EVIDENCE_COLLECTION.md](./PRODUCTION_EVIDENCE_COLLECTION.md) | Collect and review non-local production evidence before release promotion. |
+| [templates/](./templates/) | Evidence templates for 30-day operations, external contribution, and FDE deployment proof. |
 | [INITIALIZATION.md](../INITIALIZATION.md) | First-time setup walkthrough. |
 | [OPERATOR_UX_GUIDE.md](../OPERATOR_UX_GUIDE.md) | Daily operations: Slack, Chronos, terminal, directories. |
 | [PRIVACY.md](../PRIVACY.md) / [PRIVACY.ja.md](../PRIVACY.ja.md) | Data flow + telemetry policy you should explain to your users. |
@@ -19,6 +21,7 @@ Operational documentation: install, deploy, monitor, upgrade, decommission. Phas
 Current state:
 
 - ✅ `docs/operator/DEPLOYMENT.md` (this directory)
+- ✅ `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`
 - ✅ `docs/INITIALIZATION.md`
 - ✅ `docs/OPERATOR_UX_GUIDE.md`
 - ✅ `docs/PRIVACY.md`

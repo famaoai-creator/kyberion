@@ -182,6 +182,11 @@ kyberion/
 │   ├── onboarding_wizard.ts         # first-run setup
 │   ├── voice_upgrade.ts             # tier switch
 │   ├── check_*.ts                   # CI checks (esm, contracts, semver, etc.)
+│   ├── run_doctor.ts                # runtime readiness diagnostics
+│   ├── meeting_participate.ts       # live meeting participation CLI
+│   ├── voice_consent.ts             # mission-scoped speak / recording consent
+│   ├── generate_changelog.ts        # release changelog generation
+│   ├── run_migrations.ts            # one-shot upgrade migrations
 │   ├── license_audit.ts             # third-party licenses
 │   └── refactor/
 │       ├── mission-*.ts             # mission lifecycle internals
@@ -203,9 +208,12 @@ kyberion/
 │   ├── telegram-bridge/
 │   └── macos-camera/
 │
-├── pipelines/              # 75 ADF pipelines (committed)
+├── pipelines/              # ADF pipelines (committed)
 │   ├── baseline-check.json          # session-start health
-│   ├── voice-hello.json             # tier-0 first win
+│   ├── verify-session.json          # first-win browser artifact smoke
+│   ├── voice-hello.json             # optional tier-0 voice smoke
+│   ├── action-item-execute-self.json # meeting follow-up for Kyberion-owned items
+│   ├── action-item-tracking.json    # meeting follow-up reminders for team-owned items
 │   ├── chaos-*.json                 # failure-injection drills
 │   └── fragments/                   # reusable sub-pipelines
 │
@@ -261,6 +269,14 @@ For governance / decision rules: [`GOVERNANCE.md`](../../GOVERNANCE.md). For who
 | Run a release | [`RELEASE_OPERATIONS.md`](./RELEASE_OPERATIONS.md) |
 | Triage incoming issues | [`ISSUE_TRIAGE.md`](./ISSUE_TRIAGE.md) |
 | Understand stable vs internal surfaces | [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) |
+
+Meeting-specific orientation:
+
+- Public op boundary: `libs/actuators/meeting-actuator/` and the `meeting:participate` CLI.
+- Internal browser join helper: `libs/actuators/meeting-browser-driver/`.
+- Runtime loop: `libs/core/meeting-participation-coordinator.ts`.
+- Consent boundary: `voice-consent.json` is checked before meeting recording/capture and again before TTS speech.
+- Cross-OS dry-run: `pnpm run test:meeting-dry-run`.
 
 ## 8. What to avoid
 

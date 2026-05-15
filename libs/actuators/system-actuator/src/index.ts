@@ -212,12 +212,14 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'probe',
   'glob_files',
   'scan_directory',
+  'pulse_status',
   'exec',
   'shell',
   'cli_health_check',
   'list_missions',
   'list_projects',
   'list_capabilities',
+  'list_incidents',
   'list_knowledge',
   'list_running_apps',
   'collect_artifacts',
@@ -249,7 +251,16 @@ export const SYSTEM_ACTUATOR_APPLY_OPS = [
   'log',
   'voice',
   'native_tts_speak',
+  'check_native_tts',
+  'notify',
   'wait',
+] as const;
+
+export const SYSTEM_ACTUATOR_TRANSFORM_OPS = [
+  'regex_extract',
+  'json_query',
+  'sre_analyze',
+  'run_js',
 ] as const;
 
 export const SYSTEM_ACTUATOR_CONTROL_OPS = [

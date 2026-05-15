@@ -233,29 +233,48 @@ export async function runSteps(
   const shellBin = 'bash';
   const rootDir = pathResolver.rootDir();
 for (const step of steps) {
-  opts.trace?.startSpan(step.op, {
+  const stepStartedAtMs = Date.now();
+  const stepTraceBase = {
     step_index: results.length,
+    step_id: step.id || step.op,
+    op: step.op,
     ...(step.type ? { step_type: step.type } : {}),
+  };
+  opts.trace?.startSpan(step.op, {
+    ...stepTraceBase,
   });
-  opts.trace?.addEvent('step.started');
+  opts.trace?.addEvent('step.started', stepTraceBase);
 
   let attempt = 0;
   let stepSucceeded = false;
   let lastError: any = null;
   let currentNormalizedOp = step.op;
+  const finishStepTrace = (
+    eventName: string,
+    status: 'success' | 'failed' | 'skipped',
+    attributes: Record<string, string | number | boolean> = {},
+  ): void => {
+    opts.trace?.addEvent(eventName, {
+      ...stepTraceBase,
+      op: currentNormalizedOp,
+      status,
+      duration_ms: Date.now() - stepStartedAtMs,
+      ...attributes,
+    });
+  };
 
   // ── before hooks ──────────────────────────────────────────────
   if (step.hooks?.before?.length) {
     const beforeDecision = await runStepHooks(step.hooks.before, ctx, 'before', loadActuatorDispatch);
     if (beforeDecision === 'abort') {
       results.push({ op: step.op, status: 'failed', error: 'aborted by before hook' });
-      opts.trace?.addEvent('step.aborted');
+      finishStepTrace('step.aborted', 'failed');
       opts.trace?.endSpan('error', 'before hook abort');
       return { status: 'failed', results, context: ctx };
     }
     if (beforeDecision === 'skip') {
       results.push({ op: step.op, status: 'success' });
-      opts.trace?.addEvent('step.skipped');
+      finishStepTrace('step.skipped', 'skipped');
       opts.trace?.endSpan('ok');
       continue;
     }
@@ -437,19 +456,19 @@ for (const step of steps) {
         const afterDecision = await runStepHooks(step.hooks.after, ctx, 'after', loadActuatorDispatch);
         if (afterDecision === 'abort') {
           results.push({ op: currentNormalizedOp, status: 'failed', error: 'aborted by after hook' });
-          opts.trace?.addEvent('step.aborted');
+          finishStepTrace('step.aborted', 'failed');
           opts.trace?.endSpan('error', 'after hook abort');
           return { status: 'failed', results, context: ctx };
         }
       }
       results.push({ op: currentNormalizedOp, status: 'success' });
-      opts.trace?.addEvent('step.completed');
+      finishStepTrace('step.completed', 'success');
       opts.trace?.endSpan('ok');
     } else {
       const message = lastError?.message ?? String(lastError);
       const failureFormatted = formatPipelineFailure(lastError);
       results.push({ op: currentNormalizedOp, status: 'failed', error: message });
-      opts.trace?.addEvent('step.failed', {
+      finishStepTrace('step.failed', 'failed', {
         error: message,
         error_category: failureFormatted.classification.category,
         error_rule_id: failureFormatted.classification.ruleId,

@@ -170,10 +170,28 @@ function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
   const file = pathResolver.knowledge(`confidential/tenant-groups/${groupId}.json`);
   try {
     if (!rawExistsSync(file)) return null;
-    return JSON.parse(rawReadTextFile(file)) as TenantGroupProfile;
+    const profile = JSON.parse(rawReadTextFile(file)) as TenantGroupProfile;
+    if (!isValidTenantGroupProfile(groupId, profile)) return null;
+    return profile;
   } catch (_) {
     return null;
   }
+}
+
+function isValidTenantGroupProfile(groupId: string, profile: TenantGroupProfile): boolean {
+  return (
+    profile &&
+    profile.tenant_group_id === groupId &&
+    (profile.status === 'active' || profile.status === 'suspended' || profile.status === 'archived') &&
+    Array.isArray(profile.member_tenants) &&
+    profile.member_tenants.length > 0 &&
+    profile.member_tenants.every((tenant) => /^[a-z][a-z0-9-]{1,30}$/.test(String(tenant))) &&
+    Array.isArray(profile.shared_prefixes) &&
+    profile.shared_prefixes.length > 0 &&
+    profile.shared_prefixes.every((prefix) =>
+      new RegExp(`^knowledge/confidential/shared/${groupId}/`).test(String(prefix))
+    )
+  );
 }
 
 function checkTenantGroupScope(

@@ -218,6 +218,51 @@ describe('action-item-store', () => {
     expect(othersPending.map((i) => i.item_id)).toEqual(['AI-T-1']);
   });
 
+  it('pending helpers do not reprocess in-progress or blocked items', () => {
+    recordActionItem({
+      item_id: 'AI-SELF-PENDING',
+      mission_id: FIX_MISSION,
+      title: 'self pending item should still be dispatched',
+      assignee: { kind: 'operator_self', label: 'Operator' },
+    });
+    recordActionItem({
+      item_id: 'AI-SELF-BLOCK',
+      mission_id: FIX_MISSION,
+      title: 'self blocked item must not be dispatched again',
+      assignee: { kind: 'operator_self', label: 'Operator' },
+    });
+    updateActionItemStatus({
+      mission_id: FIX_MISSION,
+      item_id: 'AI-SELF-BLOCK',
+      status: 'blocked',
+      blocked_reason: 'waiting on external authority',
+    });
+    recordActionItem({
+      item_id: 'AI-TEAM-PENDING',
+      mission_id: FIX_MISSION,
+      title: 'team pending item should still receive reminders',
+      assignee: { kind: 'team_member', label: 'Alice' },
+    });
+    recordActionItem({
+      item_id: 'AI-TEAM-RUN',
+      mission_id: FIX_MISSION,
+      title: 'team item already being handled elsewhere',
+      assignee: { kind: 'team_member', label: 'Bob' },
+    });
+    updateActionItemStatus({
+      mission_id: FIX_MISSION,
+      item_id: 'AI-TEAM-RUN',
+      status: 'in_progress',
+    });
+
+    expect(listOperatorSelfPending(FIX_MISSION).map((i) => i.item_id)).toEqual([
+      'AI-SELF-PENDING',
+    ]);
+    expect(listOthersPending(FIX_MISSION).map((i) => i.item_id)).toEqual([
+      'AI-TEAM-PENDING',
+    ]);
+  });
+
   it('generates a deterministic next id from existing count', () => {
     const first = nextActionItemId(FIX_MISSION, 'budget');
     expect(first).toMatch(/^AI-/);

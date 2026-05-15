@@ -63,7 +63,7 @@ last_updated: 2026-05-09
 | P2-1 | README の first-win 導線強化 | 試す理由と手順を明確にする | `README.md`, `docs/WHY.md`, `docs/QUICKSTART.md` | 30 秒で価値、5 分で実行、15 分で構造が分かる |
 | P2-2 | Developer tour の実コード追従 | contributor の迷子を減らす | `docs/developer/TOUR.md`, `docs/developer/EXTENSION_POINTS.md` | actuator / pipeline / skill / tenant の入口が現在の構造と一致する |
 | P2-3 | Meeting use-case の operator doc 化 | デモ価値を外部に伝える | `docs/user/`, `knowledge/public/architecture/meeting-facilitator-use-case.md` | consent、安全境界、dry-run、real meeting の違いが明記される |
-| P2-4 | Good-first-issue 分解 | 外部 contributor を受け入れる | `.github/ISSUE_TEMPLATE`, `CONTRIBUTING.md` | P1/P2 の一部が 1-2h タスクとして切り出せる |
+| P2-4 | Good-first-issue 分解 | 外部 contributor を受け入れる | `.github/ISSUE_TEMPLATE`, `CONTRIBUTING.md` | P1/P2 の一部が file cluster、validation command、out-of-scope 付きの 1-2h タスクとして切り出せる |
 
 ### P3: Level-up backlog
 
@@ -263,6 +263,27 @@ Kyberion の docs/developer/PRODUCTION_READINESS_PLAN.ja.md を読み、P0-<id> 
 
 ## 6. 今回の patch で特に注意する点
 
+- P0-1 は `pnpm doctor` を baseline / reasoning の既定確認にし、meeting / voice / browser / audio の runtime 不足は `pnpm doctor:meeting --mission <MISSION_ID>` または `pnpm doctor -- --runtime meeting --mission <MISSION_ID>` で must / should / nice と domain label 付きで分類する。不足解消は同じ manifest を `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` に渡す。
+- P0-6 は `mission-orchestration-scenario-pack.json` と `mission-workflow-catalog.json` を canonical catalog とし、`check:contract-schemas` と governance contract test で schema mismatch / 未管理 deterministic catalog を拒否する。
+- P0-5 は `check:pipeline-shell-independence` で process substitution / direct shell interpreter / implicit host temp path を拒否し、temp / trace / artifact は `active/shared/tmp/` または mission-local storage に寄せる。
+- P0-2 の pipeline step trace は step id / normalized op / status / duration_ms / error classification を `step.completed` または `step.failed` event に残し、bootstrap capability failure は `env_bootstrap.capability_unsatisfied` audit に残す。
+- P0-3 は tenant member / non-member shared group access、malformed group registry の fail-closed、public promotion への confidential evidence 混入拒否を targeted regression で固定する。
+- P0-4 は `voice-consent.json` を mission / operator / tenant / expiration 付きの consent record として検証し、missing / malformed / expired / wrong tenant を `meeting.speak_denied` audit + trace に固定する。`join` / `listen` / `leave` は speak consent に依存せず、最小権限の bridge action として audit / trace を残す。
+- P0-7 は `pipelines/verify-session.json` を clean environment でも動く browser first-win smoke とし、local data URL を開いて `active/shared/tmp/first-win-session.png` を生成する。`check:first-win-smoke` は README / Quickstart の導線だけでなく、pipeline が headless・repo-managed temp profile・`browser:goto` / `browser:evaluate` / `browser:screenshot` を満たすことも固定する。
+- P1-1 は `libs/core/error-classifier.ts` で provider timeout、capability missing、generic policy violation、raw AJV/Zod schema error を unknown に落とさず分類する。Pipeline / actuator の失敗 trace はこの分類を使うため、unknown 削減は targeted classifier test で固定する。
+- P1-2 は runtime capability receipt の expiry、manifest fingerprint、host fingerprint、required / optional missing capability の扱いを `libs/core/environment-capability.test.ts` で固定する。Receipt が古い・別 host・manifest drift・必須 capability 欠落の場合は fail-closed、optional 欠落は readiness を block しない。
+- P1-3 は action item の pending view を `status === pending` に限定し、blocked / in_progress の再実行・再 reminder を防ぐ。`action-item-store` は duplicate reminder、status transition、blocked reason、owner kind summary を固定し、`wisdom:execute_self_action_items` / `wisdom:track_pending_action_items` の pipeline-facing op でも allowed completion、restricted block、team-member reminder 対象、duplicate suppression を regression として残す。
+- P1-4 は browser driver の URL redaction / platform allowlist に加え、`MeetingParticipationCoordinator` が mission-scoped `voice-consent.json` を recording 開始前と TTS speech 前に fail-closed で再検証する。`meeting:participate` は coordinator に `mission_id` を渡し、missing / revoked consent では audio capture または speech に進まない。
+- P1-5 は `.github/workflows/cross-os.yml` の Ubuntu / macOS matrix に schema、core test、pipeline preview、shell independence に加えて `pnpm run test:meeting-dry-run` を入れる。Dry-run は stub coordinator と browser-driver contract tests を実行し、実 meeting / OS audio device に依存せず consent gate・domain allowlist・URL redaction を固定する。
+- P1-6 は release prep の完了条件を `CHANGELOG.md` の `Migration required` 明記、必要な `migration/<id>.ts` と dry-run、actuator surface 変更時の `scripts/contract-baseline.json` rebaseline にする。`tests/release-operations-contract.test.ts` は release runbook / migration README / changelog section がこの契約を維持することを固定する。
+- P2-1 は README / Quickstart / WHY の first-win ladder を 30秒 value boundary (`pnpm doctor`)、5分 browser artifact (`pipelines/verify-session.json`)、15分 structure map (`pipelines/verify-session.json` / `CAPABILITIES_GUIDE.md` / `docs/developer/EXTENSION_POINTS.md`) に揃える。`tests/first-win-docs-contract.test.ts` で古い voice-first / enterprise-login 導線へ戻らないよう固定する。
+- P2-2 は `docs/developer/TOUR.md` と `docs/developer/EXTENSION_POINTS.md` を現在の meeting participation / consent / release-migration / first-win pipeline 境界へ追従させる。`tests/developer-tour-contract.test.ts` は actuator、pipeline、skill/plugin、tenant overlay、meeting runtime dry-run、release helper の入口が drift しないことを固定する。
+- P2-3 は `docs/user/meeting-facilitator.md` と `knowledge/public/architecture/meeting-facilitator-use-case.md` に dry-run / real meeting の違い、mission-scoped consent、recording/capture と TTS speech の fail-closed gate、doctor/bootstrap、URL redaction を明記する。`tests/user-meeting-use-case-contract.test.ts` で operator-facing safety boundary を固定する。
+- P3-1 は `provider-discovery` の disk cache を `~/.kyberion` 直書きから `active/shared/runtime/provider-cache.json` へ移し、`safeReadFile` / `safeWriteFile` / `safeMkdir` / `safeUnlinkSync` 経由にする。`libs/core/security-boundary.contract.test.ts` は production TS の raw `node:fs` import を `secure-io` / `fs-primitives` などレビュー済み low-level boundary に限定する。
+- P3-2 は `system-actuator` の public op catalog を capture / transform / apply / control に分け、`CAPABILITIES_GUIDE.md`、`schemas/system-pipeline.schema.json`、`scripts/sync_component_inventory.ts`、`op-catalog.test.ts` が同じ exported op arrays を参照する状態にする。説明だけ存在する op と実装だけ存在する op の両方を contract test で検出する。
+- P3-3 は `agent_runtime_manager` の spawn 失敗を `classifyError` で分類し、`agent.manual_spawn` の failed audit を残してから rethrow する。`scripts/agent_runtime_manager.test.ts`、`scripts/vital_check.test.ts`、`scripts/onboarding_apply.test.ts`、`libs/core/voice-bridge.test.ts` で runtime bridge の入出力・失敗時挙動・権限エラーの代表経路を固定する。
+- P3-4 は `pipelines/ui-voice-browser-smoke.json` と `pnpm run test:ui-voice-browser-smoke` を追加し、presence-studio の health / voice UI、`voice-hello`、`verify-session`、meeting consent gate を 1 つの smoke slice として固定する。
+- P3-5 は `tests/reference-drift-contract.test.ts` を `check:reference-drift` として `pnpm run validate` に組み込み、削除済み script / op / path 名が workflow、docs、runbook に戻った場合に CI-style gate で検出する。
 - `vault/update.patch` 由来の差分は広い。実装担当は unrelated file を整形しない。
 - `knowledge/public/governance/*-deterministic.json` のような schema 外 catalog は、そのまま増やさず canonical catalog に統合する。
 - meeting / voice / browser runtime は機能の魅力が強い分、consent と audit が弱いと OSS 公開時の信用を落とす。P0-4 は demo より優先する。

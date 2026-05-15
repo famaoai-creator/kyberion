@@ -21,9 +21,9 @@ You ask `今週の進捗レポートを作って` or `この PDF をパワポに
 
 Kyberion's first visible result comes in three short paths:
 
-- 30 seconds: run `pnpm doctor` and see what is missing
-- 5 minutes: run the voice smoke and hear Kyberion reply
-- 15 minutes: run the browser session smoke and get a screenshot artifact
+- 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
+- 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
+- 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
@@ -37,13 +37,14 @@ pnpm doctor
 Then pick a smoke path:
 
 ```bash
+# Clean browser smoke: opens a local first-win page and writes active/shared/tmp/first-win-session.png
+pnpm pipeline --input pipelines/verify-session.json
+
 # Voice smoke: browser speech in, OS-native speech out
 pnpm pipeline --input pipelines/voice-hello.json
-
-# Session smoke: persist a browser session, then verify it with a screenshot artifact
-pnpm pipeline --input pipelines/enterprise-login.json
-pnpm pipeline --input pipelines/verify-session.json
 ```
+
+To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) sections 4-10, then inspect [`pipelines/verify-session.json`](./pipelines/verify-session.json), [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md), and [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md).
 
 For the full setup, see [`docs/QUICKSTART.md`](./docs/QUICKSTART.md). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
