@@ -13,18 +13,28 @@
         "required": ["type", "op"],
         "properties": {
           "id": { "type": "string" },
-          "type": { "enum": ["capture", "transform", "apply"] },
+          "type": { "enum": ["capture", "transform", "apply", "control"] },
           "op": {
             "enum": [
-              "shell", "exec", "cli_health_check", "read_file", "read_json", "glob_files", "vision_consult", "pulse_status",
-              "regex_extract", "json_query", "sre_analyze",
-              "keyboard", "mouse_click", "voice_input_toggle", "voice", "native_tts_speak", "check_native_tts", "open_url",
-              "notify", "write_file", "mkdir", "log", "if",
-              "system:shell", "system:exec", "system:cli_health_check", "system:read_file", "system:read_json", "system:glob_files", "system:vision_consult", "system:pulse_status",
-              "system:regex_extract", "system:json_query", "system:sre_analyze",
-              "system:keyboard", "system:mouse_click", "system:voice_input_toggle", "system:voice", "system:native_tts_speak", "system:check_native_tts", "system:open_url",
-              "system:notify", "system:write_file", "system:mkdir", "system:log",
-              "core:if"
+              "screenshot", "clipboard_read", "get_focused_input", "get_screen_size", "window_list", "chrome_tab_list",
+              "read_file", "read_json", "probe", "glob_files", "scan_directory", "pulse_status",
+              "exec", "shell", "cli_health_check", "list_missions", "list_projects", "list_capabilities",
+              "list_incidents", "list_knowledge", "list_running_apps", "collect_artifacts", "sample_traces", "vision_consult",
+              "regex_extract", "json_query", "sre_analyze", "run_js",
+              "scroll", "drag", "clipboard_write", "system_notify", "open_file", "app_quit", "process_kill", "run_applescript",
+              "keyboard", "paste_text", "press_key", "voice_input_toggle", "mouse_click", "mouse_move", "activate_application",
+              "open_url", "write_file", "write_artifact", "write_json", "mkdir", "log", "voice", "native_tts_speak",
+              "check_native_tts", "notify", "wait", "if", "while",
+              "system:screenshot", "system:clipboard_read", "system:get_focused_input", "system:get_screen_size", "system:window_list", "system:chrome_tab_list",
+              "system:read_file", "system:read_json", "system:probe", "system:glob_files", "system:scan_directory", "system:pulse_status",
+              "system:exec", "system:shell", "system:cli_health_check", "system:list_missions", "system:list_projects", "system:list_capabilities",
+              "system:list_incidents", "system:list_knowledge", "system:list_running_apps", "system:collect_artifacts", "system:sample_traces", "system:vision_consult",
+              "system:regex_extract", "system:json_query", "system:sre_analyze", "system:run_js",
+              "system:scroll", "system:drag", "system:clipboard_write", "system:system_notify", "system:open_file", "system:app_quit", "system:process_kill", "system:run_applescript",
+              "system:keyboard", "system:paste_text", "system:press_key", "system:voice_input_toggle", "system:mouse_click", "system:mouse_move", "system:activate_application",
+              "system:open_url", "system:write_file", "system:write_artifact", "system:write_json", "system:mkdir", "system:log", "system:voice", "system:native_tts_speak",
+              "system:check_native_tts", "system:notify", "system:wait", "system:if", "system:while",
+              "core:if", "core:while"
             ]
           },
           "params": {

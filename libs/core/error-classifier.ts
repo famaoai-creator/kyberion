@@ -121,6 +121,14 @@ const RULES: ClassifierRule[] = [
     test: (m) => /approval[\s_-]?required|enforceApprovalGate|approval gate/i.test(m),
   },
   {
+    id: 'kyberion.policy-violation',
+    category: 'governance_block',
+    label: 'Governance policy denied action',
+    remediation:
+      'Review the policy denial and either change the requested action or obtain the required approval before retrying.',
+    test: (m) => /POLICY_VIOLATION|policy (violation|denied|refused)|not allowed by policy|governance policy/i.test(m),
+  },
+  {
     id: 'pipeline.hook-abort',
     category: 'governance_block',
     label: 'Step blocked by hook',
@@ -149,6 +157,14 @@ const RULES: ClassifierRule[] = [
     test: (m) => /secret[\s_-]?(not[\s_-]?found|missing)|keychain.*not[\s_-]?found/i.test(m),
   },
   // --- Network ---
+  {
+    id: 'provider.timeout',
+    category: 'timeout',
+    label: 'Provider timed out',
+    remediation:
+      'The provider did not return before its timeout. Retry with a larger provider timeout or switch to another configured backend.',
+    test: (m) => /\b(provider|anthropic|openai|claude|gemini|codex|shell-claude-cli|gemini-cli|codex-cli)\b.*\b(timed out|timeout|deadline exceeded)\b/i.test(m),
+  },
   {
     id: 'network.timeout',
     category: 'timeout',
@@ -207,6 +223,14 @@ const RULES: ClassifierRule[] = [
     test: (m, code) =>
       /Cannot find module|MODULE_NOT_FOUND/i.test(m) || code === 'MODULE_NOT_FOUND',
   },
+  {
+    id: 'kyberion.capability-missing',
+    category: 'missing_dependency',
+    label: 'Kyberion capability missing',
+    remediation:
+      'Run `pnpm capabilities` or `pnpm doctor` to confirm the missing capability, then install or enable the referenced actuator/runtime.',
+    test: (m) => /(capability|actuator|runtime).*(missing|not found|unavailable|not registered)|no capability registered/i.test(m),
+  },
   // --- Resources ---
   {
     id: 'resource.eaddrinuse',
@@ -238,7 +262,7 @@ const RULES: ClassifierRule[] = [
     label: 'Schema validation failed',
     remediation:
       'The input does not match the required schema. Fix the highlighted fields and retry.',
-    test: (m) => /schema validation|ajv|invalid (input|payload|adf)|preflight failed/i.test(m),
+    test: (m) => /schema validation|ajv|zod|invalid (input|payload|adf)|preflight failed|schema violation|must have required property|additional propert(y|ies)|must match schema|should match/i.test(m),
   },
   {
     id: 'input.unsupported-op',

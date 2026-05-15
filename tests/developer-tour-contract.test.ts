@@ -18,6 +18,12 @@ describe('Developer tour contract', () => {
     expect(tour).toContain('libs/actuators/browser-actuator/src/index.ts');
     expect(tour).toContain('meeting-actuator/');
     expect(tour).toContain('meeting-browser-driver/');
+    expect(tour).toContain('meeting_participate.ts');
+    expect(tour).toContain('voice_consent.ts');
+    expect(tour).toContain('run_migrations.ts');
+    expect(tour).toContain('verify-session.json');
+    expect(tour).toContain('pnpm run test:meeting-dry-run');
+    expect(tour).toContain('voice-consent.json');
     expect(tour).toContain('telegram-bridge');
     expect(tour).toContain('customer/{slug}/` becomes the preferred overlay root');
     expect(tour).toContain('Legacy personal fallback');
@@ -29,7 +35,12 @@ describe('Developer tour contract', () => {
     const ext = read('docs/developer/EXTENSION_POINTS.md');
     const readme = read('docs/developer/README.md');
     expect(ext).toContain('release:notes');
+    expect(ext).toContain('migration:run');
+    expect(ext).toContain('doctor:meeting');
+    expect(ext).toContain('test:meeting-dry-run');
     expect(ext).toContain('libs/actuators/meeting-browser-driver/');
+    expect(ext).toContain('meeting-actuator');
+    expect(ext).toContain('voice-consent.json');
     expect(ext).toContain('PLUGIN_AUTHORING.md');
     expect(ext).toContain('Resolution order: customer overlay → legacy personal fallback.');
     expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset');
@@ -37,5 +48,6 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');
     expect(readme).toContain('PLUGIN_AUTHORING.md');
+    expect(readme).toContain('Meeting participation runtime');
   });
 });

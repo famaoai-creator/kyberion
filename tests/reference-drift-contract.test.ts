@@ -41,4 +41,10 @@ describe('reference drift contract', () => {
     expect(contents).toContain('onboard:apply');
     expect(contents).toContain('check:doc-examples');
   });
+
+  it('runs as part of the validation chain', () => {
+    const pkg = read('package.json');
+    expect(pkg).toContain('"check:reference-drift": "vitest run tests/reference-drift-contract.test.ts"');
+    expect(pkg).toContain('pnpm run check:reference-drift');
+  });
 });

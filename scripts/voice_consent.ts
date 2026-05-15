@@ -17,7 +17,7 @@
  *   - `revoke` is idempotent.
  */
 
-import { logger, MissionEvidenceDoc } from '@agent/core';
+import { logger, MissionEvidenceDoc, resolveIdentityContext } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 interface VoiceConsentRecord {
@@ -26,8 +26,10 @@ interface VoiceConsentRecord {
   operator_handle: string;
   scope?: string;
   note?: string;
+  tenant_slug?: string;
   granted_at?: string;
   revoked_at?: string;
+  expires_at?: string;
   audit_event_id?: string;
 }
 
@@ -37,7 +39,9 @@ function isVoiceConsentRecord(doc: unknown): doc is VoiceConsentRecord {
   return (
     (r.consent === 'granted' || r.consent === 'revoked') &&
     typeof r.mission_id === 'string' &&
-    typeof r.operator_handle === 'string'
+    typeof r.operator_handle === 'string' &&
+    (r.tenant_slug === undefined || typeof r.tenant_slug === 'string') &&
+    (r.expires_at === undefined || typeof r.expires_at === 'string')
   );
 }
 
@@ -56,6 +60,7 @@ function grant(
   scope?: string,
   note?: string,
   force?: boolean,
+  expiresAt?: string,
 ): void {
   const doc = consentDoc(missionId);
   const existing = doc.read();
@@ -64,11 +69,17 @@ function grant(
       `voice-consent.json already declares consent=granted for mission ${missionId}. Use --force to overwrite.`,
     );
   }
+  if (expiresAt && !Number.isFinite(Date.parse(expiresAt))) {
+    throw new Error(`expires_at must be an ISO-compatible datetime (got '${expiresAt}')`);
+  }
+  const tenantSlug = resolveIdentityContext().tenantSlug;
   const record: VoiceConsentRecord = {
     consent: 'granted',
     mission_id: missionId,
     operator_handle: operator,
     granted_at: new Date().toISOString(),
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(expiresAt ? { expires_at: expiresAt } : {}),
     ...(scope ? { scope } : {}),
     ...(note ? { note } : {}),
   };
@@ -128,6 +139,7 @@ async function main(): Promise<void> {
     .option('scope', { type: 'string' })
     .option('note', { type: 'string' })
     .option('force', { type: 'boolean', default: false })
+    .option('expires-at', { type: 'string', describe: 'ISO datetime when the grant expires' })
     .demandCommand(1)
     .parseSync();
 
@@ -142,6 +154,7 @@ async function main(): Promise<void> {
         argv.scope ? String(argv.scope) : undefined,
         argv.note ? String(argv.note) : undefined,
         Boolean(argv.force),
+        argv.expiresAt ? String(argv.expiresAt) : undefined,
       );
       break;
     case 'revoke':

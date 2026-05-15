@@ -2,28 +2,32 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   spawnSync: vi.fn(),
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
-  homedir: vi.fn(() => '/tmp/provider-discovery-test'),
+  safeReadFile: vi.fn(),
+  safeWriteFile: vi.fn(),
+  safeExistsSync: vi.fn(),
+  safeMkdir: vi.fn(),
+  safeUnlinkSync: vi.fn(),
+  rootResolve: vi.fn((relPath: string) => `/repo/${relPath}`),
+  shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
 }));
 
 vi.mock('node:child_process', () => ({
   spawnSync: mocks.spawnSync,
 }));
 
-vi.mock('node:fs', () => ({
-  readFileSync: mocks.readFileSync,
-  writeFileSync: mocks.writeFileSync,
-  existsSync: mocks.existsSync,
-  mkdirSync: mocks.mkdirSync,
-  unlinkSync: mocks.unlinkSync,
+vi.mock('./secure-io.js', () => ({
+  safeReadFile: mocks.safeReadFile,
+  safeWriteFile: mocks.safeWriteFile,
+  safeExistsSync: mocks.safeExistsSync,
+  safeMkdir: mocks.safeMkdir,
+  safeUnlinkSync: mocks.safeUnlinkSync,
 }));
 
-vi.mock('node:os', () => ({
-  homedir: mocks.homedir,
+vi.mock('./path-resolver.js', () => ({
+  pathResolver: {
+    rootResolve: mocks.rootResolve,
+    shared: mocks.shared,
+  },
 }));
 
 describe('provider-discovery', () => {
@@ -37,11 +41,11 @@ describe('provider-discovery', () => {
       }
       return { status: 1, stdout: '', stderr: '' };
     });
-    mocks.existsSync.mockReturnValue(false);
-    mocks.mkdirSync.mockReturnValue(undefined);
-    mocks.writeFileSync.mockReturnValue(undefined);
-    mocks.unlinkSync.mockReturnValue(undefined);
-    mocks.readFileSync.mockImplementation(() => {
+    mocks.safeExistsSync.mockReturnValue(false);
+    mocks.safeMkdir.mockReturnValue(undefined);
+    mocks.safeWriteFile.mockReturnValue(undefined);
+    mocks.safeUnlinkSync.mockReturnValue(undefined);
+    mocks.safeReadFile.mockImplementation(() => {
       throw new Error('ENOENT');
     });
 
@@ -61,6 +65,12 @@ describe('provider-discovery', () => {
       expect.objectContaining({
         timeout: 15000,
       }),
+    );
+    expect(mocks.rootResolve).toHaveBeenCalledWith('active/shared/runtime/provider-cache.json');
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      '/repo/active/shared/runtime/provider-cache.json',
+      expect.any(String),
+      { encoding: 'utf8' },
     );
   });
 });

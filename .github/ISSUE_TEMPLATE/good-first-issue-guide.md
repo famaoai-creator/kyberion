@@ -16,8 +16,10 @@ contributors to take on. The pattern below makes them low-friction to pick up.
 
 ## Why this is a good first issue
 
-- Estimated time: ~ X hours
-- Touches: <!-- e.g., libs/core/error-classifier.ts only -->
+- Estimated time: 1-2 hours
+- Files expected: <!-- e.g., libs/core/error-classifier.ts and libs/core/error-classifier.test.ts only -->
+- Validation command: <!-- e.g., pnpm exec vitest run libs/core/error-classifier.test.ts -->
+- Out of scope: <!-- e.g., classifier taxonomy changes, unrelated CLI logging -->
 - No deep system knowledge required.
 - Existing tests cover the surrounding code.
 
@@ -39,6 +41,7 @@ See [`docs/developer/GOOD_FIRST_ISSUES.md`](../../docs/developer/GOOD_FIRST_ISSU
 
 ## Acceptance
 
+- [ ] Good first issue checklist is still true: one area, one small file cluster, one validation command, 1-2 hours.
 - [ ] Test added that fails before the change.
 - [ ] Test passes after the change.
 - [ ] No regression in existing tests.
