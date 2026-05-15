@@ -22,6 +22,18 @@ vi.mock('@agent/core', async () => {
 
 vi.mock('tesseract.js', () => ({
   recognize: mocks.recognize,
+  createWorker: vi.fn(async () => ({
+    load: vi.fn(),
+    loadLanguage: vi.fn(),
+    initialize: vi.fn(),
+    recognize: vi.fn(async () => ({
+      data: {
+        text: 'hello world',
+        confidence: 93,
+      },
+    })),
+    terminate: vi.fn(),
+  })),
 }));
 
 describe('vision-actuator legacy facade', () => {

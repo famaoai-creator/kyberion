@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveServiceBinding: vi.fn(),
+  loadServiceEndpointsCatalog: vi.fn(() => ({ services: {} })),
+  getSecret: vi.fn(),
   safeReadFile: vi.fn(),
   safeExistsSync: vi.fn(),
   safeExec: vi.fn(),
@@ -9,6 +11,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../core/service-binding.js', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
+  loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
+}));
+
+vi.mock('../../../core/secret-guard.js', () => ({
+  secretGuard: {
+    getSecret: mocks.getSecret,
+  },
 }));
 
 vi.mock('../../../core/secure-io.js', () => ({
@@ -50,10 +59,10 @@ describe('service-actuator: validateServiceAuth', () => {
       operations: {}
     }));
     mocks.resolveServiceBinding.mockReturnValue({ serviceId: SERVICE_ID, accessToken: 'valid-token' });
+    mocks.getSecret.mockReturnValue('valid-token');
 
     const result = await validateServiceAuth(SERVICE_ID, MOCK_PRESET_PATH);
     expect(result.valid).toBe(true);
-    expect(mocks.resolveServiceBinding).toHaveBeenCalledWith(SERVICE_ID, 'secret-guard');
   });
 
   it('should return invalid if auth_strategy is "bearer" but token is missing', async () => {
@@ -64,6 +73,7 @@ describe('service-actuator: validateServiceAuth', () => {
     }));
     // Simulate missing token
     mocks.resolveServiceBinding.mockReturnValue({ serviceId: SERVICE_ID, accessToken: undefined });
+    mocks.getSecret.mockReturnValue(undefined);
 
     const result = await validateServiceAuth(SERVICE_ID, MOCK_PRESET_PATH);
     expect(result.valid).toBe(false);

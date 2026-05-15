@@ -140,7 +140,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
   return {
+    ...actual,
     compileSchemaFromPath: mocks.compileSchemaFromPath,
     getVoiceProfileRecord: mocks.getVoiceProfileRecord,
     getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
