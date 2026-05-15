@@ -77,9 +77,17 @@ describe('openai-compatible-backend', () => {
       timeoutMs: 1_000,
     });
 
-    const result = await backend.prompt('Read the file');
+    const result = await backend.prompt('Read the file', {
+      token: 'top-secret-token',
+      nested: {
+        apiKey: 'sk-test-1234567890abcdef',
+      },
+    });
 
     expect(result).toBe('done');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(firstBody.messages[1].content).not.toContain('top-secret-token');
+    expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
   });
 });

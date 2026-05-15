@@ -1,4 +1,5 @@
 import { logger, safeReadFile, platform, transform, secureFetch, safeExec, withRetry, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog, classifyError } from './index.js';
+import { tryRepairJson } from './json-repair.js';
 import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -346,8 +347,11 @@ export async function executeServicePreset(serviceId: string, action: string, pa
           logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
           return safeExec(bin, args);
         }, buildRetryOptions(serviceConfig, preset, alt));
-        let parsed = rawOutput;
-        try { parsed = JSON.parse(rawOutput); } catch (_) {}
+        let parsed: unknown = rawOutput;
+        try { parsed = JSON.parse(rawOutput); } catch (_) {
+          const repaired = tryRepairJson(rawOutput);
+          if (repaired !== null) parsed = repaired;
+        }
         return normalizePresetResult(parsed, alt.output_mapping);
       }
 

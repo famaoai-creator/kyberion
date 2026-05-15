@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+import { llmSemaphore } from './semaphore.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -319,6 +320,22 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
   }
 
+  /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
+  private callParse(
+    params: Parameters<typeof this.client.messages.parse>[0],
+  ): ReturnType<typeof this.client.messages.parse> {
+    return llmSemaphore.run(() => this.client.messages.parse(params));
+  }
+
+  /** Semaphore-guarded wrapper around messages.create (non-streaming). */
+  private callCreate(
+    params: Parameters<typeof this.client.messages.create>[0] & { stream?: false },
+  ): Promise<Anthropic.Message> {
+    return llmSemaphore.run(
+      () => this.client.messages.create(params) as Promise<Anthropic.Message>,
+    );
+  }
+
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
     const minPer = Math.max(1, input.minPerPersona ?? 2);
     const userPrompt = [
@@ -338,7 +355,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -370,7 +387,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       `status must be "survived" or "rejected" and match the survived boolean.`,
     ].join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -402,7 +419,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       `- recent_history_summary = last 3 entries of node.history, most recent last`,
     ].join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -430,7 +447,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       `Return { "branches": ForkedBranch[] }. Do not fork rejected hypotheses.`,
     ].join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -458,7 +475,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       `Return SimulationResult.`,
     ].join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -505,7 +522,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -547,7 +564,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -581,7 +598,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -621,7 +638,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.client.messages.parse({
+    const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
@@ -634,7 +651,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
-    const response = await this.client.messages.create({
+    const response = await this.callCreate({
       model: this.model,
       max_tokens: this.maxTokens,
       thinking: { type: 'adaptive' },
@@ -660,7 +677,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
     }));
 
-    const response = await this.client.messages.create({
+    const response = await this.callCreate({
       model: this.model,
       max_tokens: this.maxTokens,
       messages: [{ role: 'user', content: prompt }],

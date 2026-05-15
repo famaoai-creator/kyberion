@@ -92,7 +92,8 @@ const RULES: ClassifierRule[] = [
     label: 'Internal runtime error',
     remediation: 'Check the actuator implementation for null/undefined property access.',
     test: (m) => /Cannot read properties of undefined|is not a function/i.test(m),
-    repairAction: 'Investigate the actuator code and the provided parameters. If the error is due to a missing parameter, fix the pipeline ADF.'
+    // No repairAction — actuator runtime crashes cannot be fixed by rewriting the ADF.
+    // Allowing repair here causes the 5-minute repair agent to run unnecessarily.
   },
   {
     id: 'kyberion.capture-empty',
@@ -118,6 +119,14 @@ const RULES: ClassifierRule[] = [
     remediation:
       'This action requires explicit approval per `approval-policy.json`. Run `pnpm cli approval` or follow the prompt to grant approval.',
     test: (m) => /approval[\s_-]?required|enforceApprovalGate|approval gate/i.test(m),
+  },
+  {
+    id: 'pipeline.hook-abort',
+    category: 'governance_block',
+    label: 'Step blocked by hook',
+    remediation:
+      'A before/after hook returned abort. Check the hook definition on this step in the pipeline ADF. For command hooks, the script exited with code 2 or threw. For http hooks, the endpoint returned a non-2xx status or { "decision": "abort" }. For approval gates, ensure the required flag or approval is in place before re-running.',
+    test: (m) => /aborted by (before|after) hook/i.test(m),
   },
   // --- Auth / secrets ---
   {

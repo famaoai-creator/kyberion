@@ -821,6 +821,7 @@ export * from './src/pfc/SovereignSentinel.js';
 
 // Observability (Unified Trace Model)
 export { TraceContext, persistTrace, finalizeAndPersist, traceLogDir } from './src/trace.js';
+export { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
 export type { Trace, TraceSpan, TraceEvent, TraceArtifact } from './src/trace.js';
 
 // Feedback Loop (Closed-Loop Automation)
@@ -831,3 +832,13 @@ export {
   recordPipelineResult,
   runFeedbackLoop,
 } from './src/feedback-loop.js';
+
+// JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
+export { tryRepairJson, repairJsonString } from './json-repair.js';
+
+// Semaphore (Paper2Any pattern — LLM concurrency guard, prevents 429 rate-limit errors)
+export { Semaphore, llmSemaphore } from './semaphore.js';
+
+// Prompt constraints (Paper2Any pattern — reusable output constraint fragments)
+export { JSON_OUTPUT_CONSTRAINTS, JSON_OBJECT_CONSTRAINTS, JSON_ARRAY_CONSTRAINTS, jsonOutputConstraints, VALIDATOR_CHAIN_PATTERN } from './prompt-constraints.js';
+export type { ValidatorName } from './prompt-constraints.js';

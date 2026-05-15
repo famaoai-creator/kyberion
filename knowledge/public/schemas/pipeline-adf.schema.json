@@ -36,22 +36,56 @@
         "type": "object",
         "required": ["op"],
         "properties": {
-          "id": {
-            "type": "string"
-          },
+          "id": { "type": "string" },
           "type": {
             "type": "string",
             "enum": ["capture", "transform", "apply", "control"]
           },
-          "op": {
-            "type": "string",
-            "minLength": 1
-          },
-          "params": {
-            "type": "object"
+          "op": { "type": "string", "minLength": 1 },
+          "params": { "type": "object" },
+          "hooks": {
+            "type": "object",
+            "properties": {
+              "before": { "$ref": "#/definitions/hookList" },
+              "after":  { "$ref": "#/definitions/hookList" }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": true
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "required": ["cron"],
+      "properties": {
+        "id":       { "type": "string" },
+        "cron":     { "type": "string", "minLength": 9 },
+        "timezone": { "type": "string" },
+        "enabled":  { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "hookList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type":      { "type": "string", "enum": ["actuator_op", "http", "command"] },
+          "label":     { "type": "string" },
+          "on_reject": { "type": "string", "enum": ["abort", "skip", "warn"] },
+          "op":        { "type": "string" },
+          "params":    { "type": "object" },
+          "url":       { "type": "string" },
+          "method":    { "type": "string", "enum": ["GET", "POST"] },
+          "body":      { "type": "object" },
+          "headers":   { "type": "object" },
+          "cmd":       { "type": "string" }
+        },
+        "additionalProperties": false
       }
     }
   },

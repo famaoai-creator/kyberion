@@ -189,15 +189,14 @@ function checkCopilot(): ProviderInfo {
 
 function checkCodex(): ProviderInfo {
   const which = run('which', ['codex']);
-  const npx = !which.ok ? run('npx', ['codex', '--version'], 15000) : { ok: true, stdout: '' };
-  const installed = which.ok || npx.ok;
+  const installed = which.ok;
   const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
   const protocol: ProviderInfo['protocol'] = (mode === 'exec' || mode === 'legacy') ? 'exec' : 'json-rpc';
 
   return {
     provider: 'codex',
     installed,
-    version: which.ok ? null : (npx.stdout || null),
+    version: null,
     protocol,
     models: ['codex'],
     capabilities: ['code', 'implementation', 'refactoring', 'patch', 'terminal', 'debugging', 'structured_json'],
