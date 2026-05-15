@@ -1,11 +1,16 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 27
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/public/orchestration/global_actuator_index.json`.
 
 Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.
+
+**Recent additions (2026-05-14):**
+- [Pipeline Scheduling](#pipeline-scheduling-schedule-field) — `schedule` field on ADF files; run any pipeline on a cron without extra scripts
+- [Step Hooks](#step-hooks-hooks-field-on-steps) — `hooks.before` / `hooks.after` on any step; approval gates, notifications, health checks
+- `pipelines/examples/` — three runnable sample pipelines demonstrating both features
 
 ## Op Invocation Syntax
 
@@ -70,6 +75,158 @@ Resilience notes:
 See `libs/actuators/service-actuator/examples/` for copy-paste pipeline snippets.
 
 **Why not curl?** curl works once but encodes credentials inline, is not replayable as an ADF contract, and can't participate in the mission audit trail. `service:preset` is idempotent, secrets stay in keychain, and the same JSON step replays identically across agents and pipeline runs.
+
+## Pipeline Scheduling (`schedule` field)
+
+Add a `schedule` field to any pipeline ADF to make it run automatically. The chronos daemon (`pnpm chronos`) picks it up — no registration step needed.
+
+**When to use:**
+- Recurring reports, digests, health checks (use `cron`)
+- Routine syncs that run every N minutes (use `interval`)
+- Replacing "run this manually each morning" instructions with ADF
+
+**Minimal example:**
+
+```json
+{
+  "name": "daily-knowledge-digest",
+  "schedule": { "cron": "0 9 * * 1-5", "timezone": "Asia/Tokyo" },
+  "steps": [
+    { "op": "wisdom:knowledge_search", "type": "capture",
+      "params": { "query": "本日対応", "knowledge_tier": "confidential", "export_as": "hits" } },
+    { "op": "presence:dispatch", "type": "apply",
+      "params": { "channel": "slack", "payload": "📋 Daily digest: {{hits}}" } }
+  ]
+}
+```
+
+**`schedule` field reference:**
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `cron` | yes | — | 5-field cron expression (minute hour day month weekday) |
+| `timezone` | no | local | IANA timezone string, e.g. `"Asia/Tokyo"` |
+| `enabled` | no | `true` | Set `false` to pause without removing the field |
+| `id` | no | filename (without `.json`) | Override the registry key |
+
+**Cron quick reference:**
+
+| Pattern | Meaning |
+|---------|---------|
+| `0 9 * * 1-5` | Weekdays at 09:00 |
+| `*/15 * * * *` | Every 15 minutes |
+| `0 8 * * 1` | Every Monday at 08:00 |
+| `30 17 * * 5` | Every Friday at 17:30 |
+| `0 0 1 * *` | First day of month at midnight |
+
+**LLM note:** The chronos daemon re-scans `pipelines/` on every tick, so editing the `schedule` field takes effect within 60 seconds without restarting the daemon. `lastRun` and `lastStatus` are persisted to `active/shared/runtime/pipeline-schedules.json`.
+
+See `pipelines/examples/scheduled-daily-digest.json` for a complete runnable example.
+
+---
+
+## Step Hooks (`hooks` field on steps)
+
+Any pipeline step can declare `before` and/or `after` hook lists. Hooks run synchronously around the step; a hook returning `abort` stops the entire pipeline.
+
+**When to use:**
+- Gate a destructive step behind human approval (`before` + `actuator_op: approval:create`)
+- Send a Slack notification when a specific step completes (`after` + `actuator_op: presence:dispatch`)
+- Verify external service availability before an expensive API call (`before` + `http` or `command`)
+- Post an audit webhook whenever a sensitive file is written (`after` + `http`)
+
+**Structure:**
+
+```json
+{
+  "op": "artifact:write_json",
+  "params": { "logicalPath": "public/reports/out.json", "value": "{{report}}" },
+  "hooks": {
+    "before": [
+      {
+        "type": "actuator_op",
+        "label": "approval-gate",
+        "op": "approval:create",
+        "params": { "channel": "slack", "draft": "Publish report to public?", "requestedBy": "pipeline" },
+        "on_reject": "abort"
+      }
+    ],
+    "after": [
+      {
+        "type": "actuator_op",
+        "label": "notify-published",
+        "op": "presence:dispatch",
+        "params": { "channel": "slack", "payload": "✅ Published: public/reports/out.json" },
+        "on_reject": "warn"
+      }
+    ]
+  }
+}
+```
+
+**Hook types:**
+
+| `type` | Required fields | Abort trigger |
+|--------|----------------|---------------|
+| `actuator_op` | `op` (domain:action), `params` | Actuator throws, or result context has `decision:"rejected"` / `approved:false` |
+| `http` | `url` | Non-2xx response, or response body `{ "decision": "abort" }` |
+| `command` | `cmd` (bash) | Exit code `2` (explicit abort); other non-zero triggers `on_reject` |
+
+**`on_reject` values:**
+
+| Value | Behaviour when hook signals rejection |
+|-------|--------------------------------------|
+| `abort` (default) | Stop the pipeline immediately, record step as failed |
+| `skip` | Skip the current step, continue to next |
+| `warn` | Log a warning, execute the step anyway |
+
+**`before` hook decision flow:**
+
+```
+before hooks run in order
+  → 'abort'  ──→ pipeline.status = 'failed', return immediately
+  → 'skip'   ──→ skip this step, continue to next step
+  → 'continue'→ execute step normally
+```
+
+**`after` hook decision flow:**
+
+```
+step executes successfully
+after hooks run in order
+  → 'abort'  ──→ pipeline.status = 'failed', return immediately
+  → 'skip'   ──→ (treated as continue — skipping after effects is unusual)
+  → 'continue'→ proceed to next step
+```
+
+**`{{ctx}}` variables in hook params:**
+
+Hook params support the same `{{variable}}` interpolation as step params. This means you can reference the step's output in an `after` hook:
+
+```json
+{
+  "op": "wisdom:knowledge_export",
+  "type": "capture",
+  "params": { "query": "monthly report", "export_as": "report_path" },
+  "hooks": {
+    "after": [{
+      "type": "http",
+      "url": "https://hooks.slack.com/services/...",
+      "body": { "text": "Report written to: {{report_path}}" },
+      "on_reject": "warn"
+    }]
+  }
+}
+```
+
+**LLM note:** Hooks do not appear in the pipeline `results` array — they are transparent to the pipeline runner's success/failure accounting. Only the step itself appears in results. If you need hook execution to be auditable, use `approval:create` (which writes to the approval store) or `presence:dispatch` (which writes to the Slack thread).
+
+See `pipelines/examples/` for runnable patterns:
+- `approval-gated-publish.json` — human approval before a sensitive write
+- `health-check-before-sync.json` — external API health gate
+- `scheduled-daily-digest.json` — scheduling + after-hook notification together
+
+---
 
 ## Path Security
 

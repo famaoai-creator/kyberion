@@ -97,55 +97,56 @@ function buildRetryOptions(override?: Record<string, any>) {
 }
 
 export async function handleAction(input: ArtifactAction) {
-  const role = input.params.role || 'mission_controller';
+  const params = input.params || ({} as any);
+  const role = params.role || 'mission_controller';
   switch (input.action) {
     case 'write_json':
-      if (!input.params.logicalPath) throw new Error('logicalPath is required');
+      if (!params.logicalPath) throw new Error('logicalPath is required');
       return await withRetry(async () => ({
         status: 'written',
-        path: writeGovernedArtifactJson(role, input.params.logicalPath, input.params.value ?? {}),
+        path: writeGovernedArtifactJson(role, params.logicalPath, params.value ?? {}),
       }), buildRetryOptions());
     case 'append_event':
-      if (!input.params.logicalPath) throw new Error('logicalPath is required');
+      if (!params.logicalPath) throw new Error('logicalPath is required');
       return await withRetry(async () => ({
         status: 'appended',
-        path: appendGovernedArtifactJsonl(role, input.params.logicalPath, input.params.value ?? {}),
+        path: appendGovernedArtifactJsonl(role, params.logicalPath, params.value ?? {}),
       }), buildRetryOptions());
     case 'read_json':
-      if (!input.params.logicalPath) throw new Error('logicalPath is required');
+      if (!params.logicalPath) throw new Error('logicalPath is required');
       return await withRetry(async () => ({
         status: 'ok',
-        path: resolveGovernedArtifactPath(input.params.logicalPath),
-        value: readGovernedArtifactJson(input.params.logicalPath),
+        path: resolveGovernedArtifactPath(params.logicalPath),
+        value: readGovernedArtifactJson(params.logicalPath),
       }), buildRetryOptions());
     case 'list':
-      if (!input.params.logicalDir) throw new Error('logicalDir is required');
+      if (!params.logicalDir) throw new Error('logicalDir is required');
       return await withRetry(async () => ({
         status: 'ok',
-        entries: listGovernedArtifacts(input.params.logicalDir),
+        entries: listGovernedArtifacts(params.logicalDir),
       }), buildRetryOptions());
     case 'ensure_dir':
-      if (!input.params.logicalDir) throw new Error('logicalDir is required');
+      if (!params.logicalDir) throw new Error('logicalDir is required');
       return await withRetry(async () => ({
         status: 'ensured',
-        path: ensureGovernedArtifactDir(role, input.params.logicalDir),
+        path: ensureGovernedArtifactDir(role, params.logicalDir),
       }), buildRetryOptions());
     case 'write_delivery_pack': {
-      if (!input.params.logicalDir) throw new Error('logicalDir is required');
+      if (!params.logicalDir) throw new Error('logicalDir is required');
       return await withRetry(async () => {
-        const dir = ensureGovernedArtifactDir(role, input.params.logicalDir);
-        const packId = input.params.packId || `delivery-pack-${Date.now()}`;
-        const logicalPath = path.join(input.params.logicalDir, `${packId}.json`);
+        const dir = ensureGovernedArtifactDir(role, params.logicalDir);
+        const packId = params.packId || `delivery-pack-${Date.now()}`;
+        const logicalPath = path.join(params.logicalDir, `${packId}.json`);
         const payload = {
           kind: 'delivery-pack',
           pack_id: packId,
-          summary: input.params.summary || 'Governed delivery pack',
-          main_artifact_id: input.params.mainArtifactId || '',
-          request_text: input.params.requestText || '',
-          conversation_summary: input.params.conversationSummary || '',
-          recommended_next_action: input.params.recommendedNextAction || '',
-          artifacts_by_role: input.params.artifactsByRole || {},
-          artifacts: Array.isArray(input.params.artifacts) ? input.params.artifacts : [],
+          summary: params.summary || 'Governed delivery pack',
+          main_artifact_id: params.mainArtifactId || '',
+          request_text: params.requestText || '',
+          conversation_summary: params.conversationSummary || '',
+          recommended_next_action: params.recommendedNextAction || '',
+          artifacts_by_role: params.artifactsByRole || {},
+          artifacts: Array.isArray(params.artifacts) ? params.artifacts : [],
         };
         return {
           status: 'written',

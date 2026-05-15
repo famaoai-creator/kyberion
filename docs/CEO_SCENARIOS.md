@@ -1,5 +1,7 @@
 # CEO 業務シナリオ評価
 
+> Executive / decision-support view. Canonical breadth lives in [`USE_CASES.md`](./USE_CASES.md); this doc keeps the CEO-focused matrix and examples compact.
+
 CEO の実業務を 10 パターンに分類し、Kyberion での実行可能性をシミュレートした結果。
 
 ## 評価サマリー

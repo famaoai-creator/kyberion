@@ -5,18 +5,7 @@
   "auth_strategy": "api_key_query",
   "auth_params": {
     "key": "apiKey",
-    "value": "{{accessToken}}"
-  },
-  "recovery_policy": {
-    "fallback_strategy": "sequential_alternatives",
-    "retry": {
-      "maxRetries": 3,
-      "initialDelayMs": 500,
-      "maxDelayMs": 10000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+    "value": "{{backlog_api_key}}"
   },
   "operations": {
     "get_projects": {

@@ -20,6 +20,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { redactSensitiveObject } from './network.js';
 import type { AuditEntry } from './audit-chain.js';
 
 export interface AuditForwarder {
@@ -115,7 +116,7 @@ export class ShellAuditForwarder implements AuditForwarder {
   constructor(private readonly options: ShellAuditForwarderOptions) {}
 
   publish(entry: AuditEntry): void {
-    const json = JSON.stringify(entry);
+    const json = JSON.stringify(redactSensitiveObject(entry));
     const cmd = this.options.command.replace(/\{\{entry\}\}/gu, shellEscape(json));
     const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
     try {
@@ -155,13 +156,14 @@ export class HttpAuditForwarder implements AuditForwarder {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? 5_000);
     try {
+      const redactedEntry = redactSensitiveObject(entry);
       const response = await fetch(this.options.url, {
         method: this.options.method ?? 'POST',
         headers: {
           'content-type': 'application/json',
           ...(this.options.headers ?? {}),
         },
-        body: JSON.stringify(entry),
+        body: JSON.stringify(redactedEntry),
         signal: controller.signal,
       });
       if (!response.ok) {

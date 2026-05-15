@@ -114,6 +114,7 @@ export interface BuildSurfaceConversationInputOptions {
   agentId: string;
   senderAgentId: string;
   cwd?: string;
+  threadContext?: string;
   forcedReceiver?: string;
   missionId?: string;
   teamRole?: string;
@@ -481,6 +482,7 @@ export function buildSurfaceConversationInputFromMessage(
     senderAgentId: options.senderAgentId,
     surface: message.surface,
     surfaceText: message.text,
+    threadContext: options.threadContext,
     surfaceMetadata: message.surface === 'slack'
       ? {
         surface: 'slack',
@@ -544,13 +546,14 @@ export function buildSurfaceConversationInput(input: SurfaceConversationMessageI
   const message = createSurfaceMessageFromConversationInput(input);
   const manifest = getSurfaceProviderManifest(input.surface);
   return buildSurfaceConversationInputFromMessage(message, {
-    agentId: input.agentId || manifest.agentId,
-    senderAgentId: input.senderAgentId,
-    cwd: input.cwd,
-    forcedReceiver: input.forcedReceiver,
-    missionId: input.missionId,
-    teamRole: input.teamRole,
-    delegationSummaryInstruction: input.delegationSummaryInstruction,
+      agentId: input.agentId || manifest.agentId,
+      senderAgentId: input.senderAgentId,
+      cwd: input.cwd,
+      threadContext: input.threadContext,
+      forcedReceiver: input.forcedReceiver,
+      missionId: input.missionId,
+      teamRole: input.teamRole,
+      delegationSummaryInstruction: input.delegationSummaryInstruction,
     slack: input.surface === 'slack'
       ? {
         user: input.metadata?.user || input.actorId,

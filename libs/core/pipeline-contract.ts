@@ -8,6 +8,22 @@ export interface PipelineStepResult {
   error?: string;
 }
 
+export interface StepHook {
+  type: 'actuator_op' | 'http' | 'command';
+  label?: string;
+  on_reject?: 'abort' | 'skip' | 'warn';
+  // actuator_op
+  op?: string;
+  params?: Record<string, unknown>;
+  // http
+  url?: string;
+  method?: 'GET' | 'POST';
+  body?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  // command
+  cmd?: string;
+}
+
 export interface PipelineAdfStep {
   op: string;
   params: Record<string, unknown>;
@@ -19,6 +35,17 @@ export interface PipelineAdfStep {
     ref?: string;
     bind?: Record<string, unknown>;
   };
+  hooks?: {
+    before?: StepHook[];
+    after?: StepHook[];
+  };
+}
+
+export interface PipelineSchedule {
+  cron: string;
+  timezone?: string;
+  enabled?: boolean;
+  id?: string;
 }
 
 export interface PipelineAdf {
@@ -31,6 +58,7 @@ export interface PipelineAdf {
     timeout_ms?: number;
   };
   steps: PipelineAdfStep[];
+  schedule?: PipelineSchedule;
 }
 
 let validatePipelineFn: ValidateFunction | null = null;

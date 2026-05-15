@@ -61,9 +61,9 @@ These remain at `docs/` root (not moved this pass) because they are heavily link
 |---|---|
 | `WHY.md` / `WHY.ja.md` | Positioning, thesis. Entry point for new visitors. |
 | `QUICKSTART.md` | 5-minute getting-started. Linked from `README.md`. |
-| `USE_CASES.md` | Catalog of automation scenarios (Japanese, ~1100 lines). |
-| `SCENARIOS.md` | Persona-mapped scenarios linking actuators to playbooks. |
-| `CEO_SCENARIOS.md` | CEO-task evaluation matrix. Audience overlap with `USE_CASES.md`; consolidate-or-archive candidate. |
+| `USE_CASES.md` | Canonical catalog of automation scenarios (Japanese, ~1100 lines). |
+| `SCENARIOS.md` | Persona-mapped scenario view linking actuators to playbooks. |
+| `CEO_SCENARIOS.md` | Executive / decision-support scenario view. |
 | `HOWTO.md` | Operational how-to for the Intent Gateway. Audience bridge between user and operator. |
 
 ### Operator-facing (deploy / run / daily ops)
@@ -139,7 +139,7 @@ Files with names suggesting "snapshot at a point in time" or one-off evaluation:
 (Out of scope for this Phase C'-1 deliverable; recorded for future work.)
 
 - **Move root-level `docs/*.md` to user/operator/developer/ when reference churn is acceptable.** Move plan: `INITIALIZATION.md` → `operator/`, `USE_CASES.md` → `user/`, `OPERATOR_UX_GUIDE.md` → `operator/`, `COMPONENT_MAP.md` → `developer/`, `GLOSSARY.md` → `developer/`, `INTENT_LOOP_CONCEPT.md` → `developer/`, `PACKAGING_CONTRACT.md` → `developer/`, `USER_EXPERIENCE_CONTRACT.md` → `developer/`, `DOCUMENTATION_LOCALIZATION_POLICY.md` → `developer/`, `ROADMAP_ENGINE_REFINEMENT.md` → `developer/`. Each move requires updating cross-refs.
-- **Consolidate `CEO_SCENARIOS.md` into `USE_CASES.md`** or archive — overlap is significant.
+- **Keep `USE_CASES.md` canonical and trim the other two scenario docs to audience-specific views.** The new `SCENARIO_CATALOG.md` should be the navigation entry point.
 - **Cut date for `knowledge/public/architecture/`** — pick a date (e.g. 2026-01-01) and archive snapshot-style docs older than that.
 - **Test-emitter discipline** — mirror the value-threshold pattern from `promoted-memory.ts` to any other generator that writes into committed `knowledge/public/`.
 
@@ -158,7 +158,7 @@ Files with names suggesting "snapshot at a point in time" or one-off evaluation:
 
 The following inconsistencies were noticed but **not** changed in this pass (recorded so they can be addressed later):
 
-- `CEO_SCENARIOS.md`, `SCENARIOS.md`, `USE_CASES.md` are three scenario docs with overlapping but not identical content. Pick one canonical and consolidate.
+- `CEO_SCENARIOS.md`, `SCENARIOS.md`, `USE_CASES.md` are three scenario docs with overlapping but not identical content. `USE_CASES.md` is the canonical catalog; the others should remain audience-specific views.
 - The `ROADMAP_ENGINE_REFINEMENT.md` and `PRODUCTIZATION_ROADMAP.md` coexist intentionally (engine internals vs. external surface), but cross-linking between them could be tighter.
 - `docs/PACKAGING_CONTRACT.md` and `docs/developer/EXTENSION_POINTS.md` overlap on stable surfaces; merge candidates after the next minor.
 - Several `knowledge/public/` subdirs are nearly empty (`browser-scenarios`, `classifiers`, `terraform`, `test-runners`, `project-health`) — likely placeholders that never got content.

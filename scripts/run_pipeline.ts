@@ -14,12 +14,14 @@ import {
   missionEvidenceDir,
   pathResolver,
 } from '@agent/core';
+import { tryRepairJson } from '@agent/core/json-repair';
 import * as nodePath from 'node:path';
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
+import { runStepHooks } from './refactor/step-hooks.js';
 
 type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
@@ -31,6 +33,18 @@ interface RunStepsOptions {
   _includeStack?: ReadonlySet<string>;
   pipelinePath?: string;
   _retryCount?: number;
+}
+
+function resolveParamsRecursive(params: any, ctx: any): any {
+  if (Array.isArray(params)) {
+    return params.map(item => resolveParamsRecursive(item, ctx));
+  }
+  if (params && typeof params === 'object') {
+    return Object.fromEntries(
+      Object.entries(params).map(([key, value]) => [key, resolveParamsRecursive(value, ctx)])
+    );
+  }
+  return resolveVars(params, ctx);
 }
 
 async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
@@ -106,7 +120,12 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             context: ctx,
             options: ctx.__pipeline_options
           });
-          result = { handled: true, ctx: actionResult };
+          result = {
+            handled: true,
+            ctx: actionResult && typeof actionResult === 'object'
+              ? { ...ctx, ...(actionResult as Record<string, unknown>) }
+              : { ...ctx, [params.export_as || 'last_action_result']: actionResult },
+          };
         } catch (err: any) {
           // If the error is an actual execution failure (like SECURITY, File not found, etc.),
           // throw it immediately to trigger autonomous repair.
@@ -115,13 +134,14 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             throw err;
           }
           try {
+            const resolvedParams = resolveParamsRecursive(params, ctx);
             const directResult = await mod.handleAction({ 
               action: op, 
-              params: { ...params, context: ctx }
+              params: { ...resolvedParams, context: ctx }
             });
             result = { handled: true, ctx: { ...ctx, [params.export_as || 'last_action_result']: directResult } };
-          } catch (err2) {
-            logger.info(`  [SYS_PIPELINE] Actuator fallback failed for domain: ${domain}, op: ${op}`);
+          } catch (err2: any) {
+            logger.info(`  [SYS_PIPELINE] Actuator fallback failed for domain: ${domain}, op: ${op}. Error: ${err2.message}`);
             throw err; // Critical: Re-throw to trigger autonomous repair
           }
         }
@@ -224,6 +244,23 @@ for (const step of steps) {
   let lastError: any = null;
   let currentNormalizedOp = step.op;
 
+  // ── before hooks ──────────────────────────────────────────────
+  if (step.hooks?.before?.length) {
+    const beforeDecision = await runStepHooks(step.hooks.before, ctx, 'before', loadActuatorDispatch);
+    if (beforeDecision === 'abort') {
+      results.push({ op: step.op, status: 'failed', error: 'aborted by before hook' });
+      opts.trace?.addEvent('step.aborted');
+      opts.trace?.endSpan('error', 'before hook abort');
+      return { status: 'failed', results, context: ctx };
+    }
+    if (beforeDecision === 'skip') {
+      results.push({ op: step.op, status: 'success' });
+      opts.trace?.addEvent('step.skipped');
+      opts.trace?.endSpan('ok');
+      continue;
+    }
+  }
+
   while (attempt < 2 && !stepSucceeded) {
     // CRITICAL: Resolve normalizedOp, domain, action, and params INSIDE the attempt loop
     // so that repaired step definitions are actually used during the retry.
@@ -282,7 +319,16 @@ for (const step of steps) {
           if (includeStack.has(fragmentPath)) {
             throw new Error(`core:include: circular reference detected — ${fragmentRef} is already in the include chain`);
           }
-          const fragmentJson = JSON.parse(String(safeReadFile(fragmentPath, { encoding: 'utf8' })));
+          const fragmentRaw = String(safeReadFile(fragmentPath, { encoding: 'utf8' }));
+          const fragmentJson = (() => {
+            try { return JSON.parse(fragmentRaw); } catch { /* fall through */ }
+            const repaired = tryRepairJson(fragmentRaw);
+            if (repaired !== null) {
+              logger.warn(`[pipeline] Auto-repaired malformed JSON in fragment: ${fragmentRef}`);
+              return repaired;
+            }
+            throw new Error(`core:include: fragment at ${fragmentRef} contains invalid JSON that could not be repaired`);
+          })();
           const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({ ...s, params: s.params || {} }));
           const inlineCtx: Record<string, unknown> = params.context && typeof params.context === 'object'
             ? Object.fromEntries(
@@ -371,14 +417,6 @@ for (const step of steps) {
                 step.op = refreshedStep.op;
                 step.params = refreshedStep.params;
                 
-                // CRITICAL SECURITY BYPASS: If the repair moved the file to PUBLIC, 
-                // we must ensure the actuator doesn't hit a cached tier violation.
-                if (typeof step.params.path === 'string' && step.params.path.includes('knowledge/public/')) {
-                   logger.info(`  [SYS_PIPELINE] Repair detected Public path. Ensuring security context alignment...`);
-                   // In some actuators, we might need to inject a bypass flag or resolve to absolute path
-                   step.params.__repaired_public_path = true; 
-                }
-                
                 logger.info(`  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${step.params.path}`);
                 
                 attempt++;
@@ -394,6 +432,16 @@ for (const step of steps) {
     }
 
     if (stepSucceeded) {
+      // ── after hooks ─────────────────────────────────────────────
+      if (step.hooks?.after?.length) {
+        const afterDecision = await runStepHooks(step.hooks.after, ctx, 'after', loadActuatorDispatch);
+        if (afterDecision === 'abort') {
+          results.push({ op: currentNormalizedOp, status: 'failed', error: 'aborted by after hook' });
+          opts.trace?.addEvent('step.aborted');
+          opts.trace?.endSpan('error', 'after hook abort');
+          return { status: 'failed', results, context: ctx };
+        }
+      }
       results.push({ op: currentNormalizedOp, status: 'success' });
       opts.trace?.addEvent('step.completed');
       opts.trace?.endSpan('ok');
@@ -442,6 +490,14 @@ Once finished, provide a brief summary of the changes you applied to fix the pip
 
     const report = await backend.delegateTask(instruction, `Self-Healing Mission for ${step.op}`);
     logger.info(`  [SYS_PIPELINE:REPAIR] Sub-agent report: ${report}`);
+
+    // Confirm the ADF is actually valid after the repair attempt before signalling success.
+    try {
+      readValidatedPipelineAdf(pipelinePath);
+    } catch (validationErr: any) {
+      logger.warn(`  [SYS_PIPELINE:REPAIR] Sub-agent finished but ADF is still invalid: ${validationErr.message}`);
+      return false;
+    }
     return true;
   } catch (err: any) {
     logger.error(`  [SYS_PIPELINE:REPAIR] Failed to perform repair: ${err.message}`);

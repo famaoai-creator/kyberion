@@ -1,6 +1,7 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExec, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { redactSensitiveObject } from './network.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -219,7 +220,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       headers,
       body: JSON.stringify({
         model: this.model,
-        messages,
+        messages: redactSensitiveObject(messages),
         tools: createToolDefinitions(),
         tool_choice: 'auto',
       } satisfies ChatCompletionRequest),
@@ -240,7 +241,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   private async handleToolCall(name: string, rawArguments: string): Promise<string> {
     const args = (safeJsonParse(rawArguments) as Record<string, unknown>) || {};
-    logger.info(`[LOCAL_LLM] Tool Call: ${name}(${JSON.stringify(args)})`);
+    logger.info(`[LOCAL_LLM] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
     try {
       switch (name) {
@@ -262,6 +263,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   }
 
   async prompt(prompt: string, context?: unknown): Promise<string> {
+    const redactedContext = context === undefined ? undefined : redactSensitiveObject(context);
     const messages: ChatMessage[] = [
       {
         role: 'system',
@@ -271,7 +273,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       },
       {
         role: 'user',
-        content: [prompt, context ? `Context:\n${typeof context === 'string' ? context : JSON.stringify(context, null, 2)}` : '']
+        content: [prompt, redactedContext ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}` : '']
           .filter(Boolean)
           .join('\n\n'),
       },

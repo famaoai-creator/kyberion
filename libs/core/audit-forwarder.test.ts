@@ -1,14 +1,24 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ChainAuditForwarder,
+  HttpAuditForwarder,
   TenantFilteringAuditForwarder,
   getAuditForwarder,
   registerAuditForwarder,
   resetAuditForwarder,
   stubAuditForwarder,
+  ShellAuditForwarder,
   type AuditForwarder,
 } from './audit-forwarder.js';
 import type { AuditEntry } from './audit-chain.js';
+
+const childProcessMocks = vi.hoisted(() => ({
+  execFileSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  execFileSync: childProcessMocks.execFileSync,
+}));
 
 const sample: AuditEntry = {
   id: 'AUD-SAMPLE-1',
@@ -22,6 +32,14 @@ const sample: AuditEntry = {
 };
 
 describe('audit-forwarder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '',
+    } as any));
+  });
+
   afterEach(() => resetAuditForwarder());
 
   it('defaults to the stub (no-op) forwarder', () => {
@@ -64,6 +82,42 @@ describe('audit-forwarder', () => {
     await chain.publish(sample);
     expect(calls).toEqual(['ok']);
     expect(chain.name).toContain('flaky→ok');
+  });
+
+  it('ShellAuditForwarder redacts sensitive fields before publishing', () => {
+    const forwarder = new ShellAuditForwarder({ command: 'cat {{entry}}' });
+    forwarder.publish({
+      ...sample,
+      metadata: {
+        apiKey: 'sk-test-1234567890abcdef',
+        profilePath: '/Users/alice/private.json',
+      },
+      reason: 'Bearer token top-secret-token',
+    });
+
+    expect(childProcessMocks.execFileSync).toHaveBeenCalledTimes(1);
+    const [[, args, options]] = childProcessMocks.execFileSync.mock.calls;
+    expect(args).toEqual(['-c', expect.stringContaining('[REDACTED_SECRET]')]);
+    expect(options.input).toContain('[REDACTED_SECRET]');
+    expect(options.input).toContain('[REDACTED_PATH]/private.json');
+  });
+
+  it('HttpAuditForwarder redacts sensitive fields before posting', async () => {
+    const forwarder = new HttpAuditForwarder({ url: 'https://example.com/audit' });
+    await forwarder.publish({
+      ...sample,
+      metadata: {
+        apiKey: 'sk-test-1234567890abcdef',
+        profilePath: '/Users/alice/private.json',
+      },
+      reason: 'Bearer token top-secret-token',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe('https://example.com/audit');
+    expect(String(init?.body)).toContain('[REDACTED_SECRET]');
+    expect(String(init?.body)).toContain('[REDACTED_PATH]/private.json');
   });
 
   describe('TenantFilteringAuditForwarder (IP-2)', () => {
