@@ -49,6 +49,9 @@ jobs:
       - name: Unit tests (core)
         run: pnpm run test:core
 
+      - name: Meeting participation dry-run
+        run: pnpm run test:meeting-dry-run
+
       - name: Pipeline preview (baseline)
         run: pnpm run cli:preview -- pipelines/baseline-check.json
 

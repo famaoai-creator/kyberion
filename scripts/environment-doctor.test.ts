@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EnvironmentManifest } from '@agent/core';
-import { classifyDoctorSeverity, formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
+import { classifyDoctorDomains, classifyDoctorSeverity, formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
 describe('environment-doctor', () => {
   it('classifies critical meeting/bootstrap capabilities as must and optional runtime knobs as nice', () => {
@@ -72,7 +72,39 @@ describe('environment-doctor', () => {
     expect(summary.counts.nice).toBe(1);
     const lines = formatDoctorSummary(summary);
     expect(lines.join('\n')).toContain('must=1 should=0 nice=1');
+    expect(lines.join('\n')).toContain('[browser,meeting]');
+    expect(lines.join('\n')).toContain('[voice]');
     expect(lines.join('\n')).toContain('playwright-chromium');
     expect(lines.join('\n')).toContain('stt-command');
+  });
+
+  it('classifies meeting runtime gaps by meeting, voice, browser, and audio domains', () => {
+    expect(
+      classifyDoctorDomains({
+        capability_id: 'playwright-chromium',
+        kind: 'npm-package',
+        description: 'browser automation',
+        required_for: ['browser-meeting-join-driver'],
+        probe: { kind: 'module', specifier: 'playwright' },
+      }),
+    ).toEqual(['browser', 'meeting']);
+    expect(
+      classifyDoctorDomains({
+        capability_id: 'voice-consent',
+        kind: 'mission-evidence',
+        description: 'voice consent',
+        required_for: ['meeting-actuator.speak'],
+        probe: { kind: 'mission-evidence', filename: 'voice-consent.json' },
+      }),
+    ).toEqual(['meeting', 'voice']);
+    expect(
+      classifyDoctorDomains({
+        capability_id: 'ffmpeg',
+        kind: 'binary',
+        description: 'audio bridge dependency',
+        required_for: ['blackhole-audio-bus'],
+        probe: { kind: 'command', command: 'ffmpeg' },
+      }),
+    ).toEqual(['audio']);
   });
 });

@@ -227,6 +227,28 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/tenant\.group_scope_violation/);
   });
+
+  it('denies shared group access when the group registry entry is malformed', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'unit-shared.json'),
+      JSON.stringify({
+        tenant_group_id: 'unit-shared',
+        display_name: 'Unit Shared',
+        status: 'active',
+        member_tenants: ['acme-corp'],
+        shared_prefixes: ['knowledge/public/shared/unit-shared/'],
+      }),
+    );
+
+    const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
+    const result = validateReadPermission(target);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/tenant\.group_unknown/);
+  });
 });
 
 describe('tier-guard brokered missions (C8)', () => {

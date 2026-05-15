@@ -12,14 +12,17 @@ describe('voice_consent CLI helpers', () => {
   let savedMission: string | undefined;
   let savedPersona: string | undefined;
   let savedRole: string | undefined;
+  let savedTenant: string | undefined;
 
   beforeEach(() => {
     savedMission = process.env.MISSION_ID;
     savedPersona = process.env.KYBERION_PERSONA;
     savedRole = process.env.MISSION_ROLE;
+    savedTenant = process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_TENANT = 'alpha-team';
     fs.mkdirSync(path.join(MISSION_DIR, 'evidence'), { recursive: true });
     fs.writeFileSync(
       path.join(MISSION_DIR, 'mission-state.json'),
@@ -27,6 +30,7 @@ describe('voice_consent CLI helpers', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
+        tenant_slug: 'alpha-team',
       }),
     );
   });
@@ -38,6 +42,8 @@ describe('voice_consent CLI helpers', () => {
     else process.env.KYBERION_PERSONA = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = savedRole;
+    if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = savedTenant;
     fs.rmSync(MISSION_DIR, { recursive: true, force: true });
   });
 
@@ -55,6 +61,7 @@ describe('voice_consent CLI helpers', () => {
       fs.readFileSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'), 'utf8'),
     );
     expect(granted.consent).toBe('granted');
+    expect(granted.tenant_slug).toBe('alpha-team');
     expect(granted.audit_event_id).toBeTruthy();
 
     revokeVoiceConsent(FIX_MISSION, 'test revoke');
@@ -69,5 +76,12 @@ describe('voice_consent CLI helpers', () => {
     expect(after.length).toBeGreaterThan(before.length);
     expect(after).toContain('voice_consent.grant');
     expect(after).toContain('voice_consent.revoke');
+  });
+
+  it('rejects invalid expiration timestamps before writing consent', () => {
+    expect(() => {
+      grantVoiceConsent(FIX_MISSION, 'operator', 'meeting speak', 'test grant', false, 'not-a-date');
+    }).toThrow(/expires_at/);
+    expect(fs.existsSync(path.join(MISSION_DIR, 'evidence/voice-consent.json'))).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EnergyVad,
   MeetingParticipationCoordinator,
@@ -18,6 +18,8 @@ import {
 } from './index.js';
 
 const ROOT = pathResolver.rootDir();
+const CONSENT_MISSION = 'MSN-MTG-CONSENT-TEST';
+const CONSENT_MISSION_DIR = path.join(ROOT, 'active/missions/confidential', CONSENT_MISSION);
 const FORMAT: AudioFormat = {
   encoding: 'pcm_s16le',
   sample_rate_hz: 16000,
@@ -32,7 +34,26 @@ function makeChunk(byteLength = 320): { format: AudioFormat; payload: Uint8Array
   };
 }
 
+function writeVoiceConsent(record: Record<string, unknown>): void {
+  const evidenceDir = path.join(CONSENT_MISSION_DIR, 'evidence');
+  fs.mkdirSync(evidenceDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(CONSENT_MISSION_DIR, 'mission-state.json'),
+    JSON.stringify({
+      mission_id: CONSENT_MISSION,
+      tier: 'confidential',
+      assigned_persona: 'ecosystem_architect',
+    }),
+  );
+  fs.writeFileSync(path.join(evidenceDir, 'voice-consent.json'), JSON.stringify(record));
+}
+
 describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(CONSENT_MISSION_DIR, { recursive: true, force: true });
+  });
+
   it('joins, hears 3 stub utterances, replies once each, leaves cleanly', async () => {
     const traceDir = fs.mkdtempSync(path.join(ROOT, 'active/shared/tmp/kyberion-meeting-trace-'));
     const bus = new StubAudioBus();
@@ -126,6 +147,145 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(report.utterances_received).toBeGreaterThanOrEqual(1);
     const summary = trace.summary();
     expect(summary.spans).toBeGreaterThanOrEqual(2);
+  });
+
+  it('refuses recording before opening the audio bus when mission consent is missing', async () => {
+    fs.mkdirSync(path.join(CONSENT_MISSION_DIR, 'evidence'), { recursive: true });
+    fs.writeFileSync(
+      path.join(CONSENT_MISSION_DIR, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: CONSENT_MISSION,
+        tier: 'confidential',
+        assigned_persona: 'ecosystem_architect',
+      }),
+    );
+    const bus = new StubAudioBus();
+    const openSpy = vi.spyOn(bus, 'open');
+    const agent: ConversationAgent = {
+      async onUtterance() {
+        return { speech: 'should not run' };
+      },
+    };
+    const trace = new TraceContext('meeting_participation:consent-missing', {
+      missionId: CONSENT_MISSION,
+    });
+
+    await expect(
+      new MeetingParticipationCoordinator({
+        driver: new StubMeetingJoinDriver(),
+        bus,
+        stt: new StubStreamingSpeechToTextBridge(1),
+        tts: new StubStreamingTextToSpeechBridge(),
+        vad: new EnergyVad(),
+        agent,
+        trace,
+      }).run(
+        {
+          url: 'https://meet.google.com/test-test-test',
+          platform: 'meet',
+        },
+        {
+          mission_id: CONSENT_MISSION,
+          max_minutes: 1,
+          voice_profile_id: 'operator-default-v1',
+          audio_format: FORMAT,
+        },
+      ),
+    ).rejects.toThrow(/voice-consent\.json missing/);
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(JSON.stringify(trace.finalize())).toContain('meeting_participation.recording_denied');
+  });
+
+  it('re-checks voice consent before TTS speech', async () => {
+    writeVoiceConsent({
+      consent: 'revoked',
+      mission_id: CONSENT_MISSION,
+      operator_handle: 'operator',
+    });
+    const bus = new StubAudioBus();
+    const tts = new StubStreamingTextToSpeechBridge();
+    const ttsSpy = vi.spyOn(tts, 'synthesizeStream');
+    const agent: ConversationAgent = {
+      async onUtterance() {
+        return { speech: 'blocked speech' };
+      },
+    };
+    const trace = new TraceContext('meeting_participation:voice-denied', {
+      missionId: CONSENT_MISSION,
+    });
+    bus.injectInbound(makeChunk());
+
+    await expect(
+      new MeetingParticipationCoordinator({
+        driver: new StubMeetingJoinDriver(),
+        bus,
+        stt: new StubStreamingSpeechToTextBridge(1),
+        tts,
+        vad: new EnergyVad(),
+        agent,
+        trace,
+      }).run(
+        {
+          url: 'https://meet.google.com/test-test-test',
+          platform: 'meet',
+        },
+        {
+          mission_id: CONSENT_MISSION,
+          require_recording_consent: false,
+          require_voice_consent: true,
+          max_minutes: 1,
+          voice_profile_id: 'operator-default-v1',
+          audio_format: FORMAT,
+        },
+      ),
+    ).rejects.toThrow(/consent != 'granted'/);
+
+    expect(ttsSpy).not.toHaveBeenCalled();
+    expect(JSON.stringify(trace.finalize())).toContain('meeting_participation.speak_denied');
+  });
+
+  it('allows capture and speech when mission consent is granted', async () => {
+    writeVoiceConsent({
+      consent: 'granted',
+      mission_id: CONSENT_MISSION,
+      operator_handle: 'operator',
+      expires_at: '2999-01-01T00:00:00.000Z',
+    });
+    const bus = new StubAudioBus();
+    let heard = 0;
+    const agent: ConversationAgent = {
+      async onUtterance() {
+        heard += 1;
+        return heard === 1 ? { speech: 'approved reply' } : { leave: true };
+      },
+    };
+    bus.injectInbound(makeChunk());
+
+    const report = await new MeetingParticipationCoordinator({
+      driver: new StubMeetingJoinDriver(),
+      bus,
+      stt: new StubStreamingSpeechToTextBridge(1),
+      tts: new StubStreamingTextToSpeechBridge(),
+      vad: new EnergyVad(),
+      agent,
+      trace: new TraceContext('meeting_participation:consent-granted', {
+        missionId: CONSENT_MISSION,
+      }),
+    }).run(
+      {
+        url: 'https://meet.google.com/test-test-test',
+        platform: 'meet',
+      },
+      {
+        mission_id: CONSENT_MISSION,
+        max_minutes: 1,
+        voice_profile_id: 'operator-default-v1',
+        audio_format: FORMAT,
+      },
+    );
+
+    expect(report.utterances_spoken).toBe(1);
   });
 });
 

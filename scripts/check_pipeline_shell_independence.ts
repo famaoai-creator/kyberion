@@ -4,7 +4,8 @@
  *
  * Flags pipeline shell commands that depend on host-specific substitutions or
  * process-substitution tricks (`$(pwd)`, `$(uname -s)`, `$(date)`, `<(...)`,
- * `>(...)`, `/dev/fd`, `mktemp`).
+ * `>(...)`, `/dev/fd`, `mktemp`, direct shell interpreter escapes, implicit
+ * host temp paths).
  *
  * The goal is not to ban shell entirely; it is to keep pipelines portable by
  * forcing runtime context to come from pipeline inputs or helper scripts.
@@ -33,6 +34,8 @@ const FORBIDDEN_PATTERNS: Array<{ pattern: string; regex: RegExp }> = [
   { pattern: 'process-substitution', regex: /[<>]\(\s*[^)]+\)/ },
   { pattern: 'dev-fd', regex: /\/dev\/fd\//i },
   { pattern: 'mktemp', regex: /\bmktemp\b/i },
+  { pattern: 'shell-interpreter', regex: /\b(?:bash|zsh|sh)\s+-c\b/i },
+  { pattern: 'implicit-host-temp-path', regex: /(?:^|[\s"'=:])(?:\/tmp|\/var\/tmp|\$TMPDIR|\$\{TMPDIR\})(?:\/|\b)/i },
 ];
 
 function listPipelineFiles(roots: string[] = PIPELINE_ROOTS): string[] {

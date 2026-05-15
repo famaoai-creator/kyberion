@@ -99,14 +99,17 @@ describe('meeting-actuator voice-consent gate', () => {
   let savedMission: string | undefined;
   let savedSudo: string | undefined;
   let savedPersona: string | undefined;
+  let savedTenant: string | undefined;
 
   beforeEach(() => {
     savedMission = process.env.MISSION_ID;
     savedSudo = process.env.KYBERION_SUDO;
     savedPersona = process.env.KYBERION_PERSONA;
+    savedTenant = process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     delete process.env.KYBERION_SUDO;
+    delete process.env.KYBERION_TENANT;
     fs.mkdirSync(path2.join(MISSION_DIR, 'evidence'), { recursive: true });
     fs.writeFileSync(
       path2.join(MISSION_DIR, 'mission-state.json'),
@@ -125,6 +128,8 @@ describe('meeting-actuator voice-consent gate', () => {
     else process.env.KYBERION_SUDO = savedSudo;
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = savedPersona;
+    if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = savedTenant;
     try {
       fs.rmSync(MISSION_DIR, { recursive: true, force: true });
     } catch {
@@ -140,6 +145,9 @@ describe('meeting-actuator voice-consent gate', () => {
     });
     expect(result.status).toBe('denied');
     expect(result.message).toMatch(/voice-consent.json missing/);
+    expect(result.audit_event_id).toBeTruthy();
+    expect((result as any).trace_persisted_path).toBeTruthy();
+    expect((result as any).trace_summary?.errors).toBeGreaterThan(0);
   });
 
   it('denies speak() when consent != "granted"', async () => {
@@ -156,11 +164,80 @@ describe('meeting-actuator voice-consent gate', () => {
     expect(result.message).toMatch(/consent != 'granted'/);
   });
 
-  it('does not gate non-speak verbs', async () => {
+  it('denies speak() when consent is malformed', async () => {
+    fs.writeFileSync(
+      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+      JSON.stringify({ consent: 'granted' }),
+    );
     const { handleAction } = await import('./index.js');
-    const result = await handleAction({ action: 'status', params: { platform: 'auto' } });
-    // Either bridge succeeds or fails on platform issue, but not via consent denial.
-    expect(result.status).not.toBe('denied');
+    const result = await handleAction({
+      action: 'speak',
+      params: { platform: 'auto', text: 'hello' },
+    });
+    expect(result.status).toBe('denied');
+    expect(result.message).toMatch(/malformed/);
+  });
+
+  it('denies speak() when consent is expired', async () => {
+    fs.writeFileSync(
+      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+      JSON.stringify({
+        consent: 'granted',
+        mission_id: FIX_MISSION,
+        operator_handle: 'operator',
+        expires_at: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'speak',
+      params: { platform: 'auto', text: 'hello' },
+    });
+    expect(result.status).toBe('denied');
+    expect(result.message).toMatch(/expired/);
+  });
+
+  it('denies speak() when consent belongs to another tenant', async () => {
+    fs.writeFileSync(
+      path2.join(MISSION_DIR, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: FIX_MISSION,
+        tier: 'confidential',
+        assigned_persona: 'ecosystem_architect',
+        tenant_slug: 'alpha-team',
+      }),
+    );
+    fs.writeFileSync(
+      path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
+      JSON.stringify({
+        consent: 'granted',
+        mission_id: FIX_MISSION,
+        operator_handle: 'operator',
+        tenant_slug: 'beta-team',
+      }),
+    );
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'speak',
+      params: { platform: 'auto', text: 'hello' },
+    });
+    expect(result.status).toBe('denied');
+    expect(result.message).toMatch(/tenant_slug/);
+  });
+
+  it('does not gate join/listen/leave behind voice consent', async () => {
+    const { handleAction } = await import('./index.js');
+    const actions = [
+      { action: 'join', params: { platform: 'auto', url: 'https://example.invalid/meeting' } },
+      { action: 'listen', params: { platform: 'auto', duration_sec: 0 } },
+      { action: 'leave', params: { platform: 'auto' } },
+    ] as const;
+    for (const action of actions) {
+      const result = await handleAction(action);
+      expect(result.status).not.toBe('denied');
+      expect(result.audit_event_id).toBeTruthy();
+      expect((result as any).trace_persisted_path).toBeTruthy();
+    }
   });
 
   it('allows speak() after consent is granted and emits a meeting audit entry', async () => {

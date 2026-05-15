@@ -19,8 +19,11 @@
  * silence, etc.); intelligence lives in the agent callback.
  */
 
+import * as path from 'node:path';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
+import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
 import type { AudioBus } from './audio-bus.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
@@ -48,6 +51,8 @@ export interface ConversationAgent {
 }
 
 export interface MeetingParticipationOptions {
+  /** Mission whose evidence directory carries live-meeting consent. */
+  mission_id?: string;
   /** Max wall-clock minutes the AI will stay. Hard ceiling. */
   max_minutes: number;
   /** Max consecutive seconds of total silence before the AI leaves. */
@@ -58,6 +63,10 @@ export interface MeetingParticipationOptions {
   audio_format: AudioFormat;
   /** Tenant slug for audit emission, when set. */
   tenant_slug?: string;
+  /** Fail closed before opening the audio bus unless consent exists. Defaults to true when mission_id is set. */
+  require_recording_consent?: boolean;
+  /** Fail closed before TTS speech unless consent exists. Defaults to true when mission_id is set. */
+  require_voice_consent?: boolean;
 }
 
 export interface MeetingParticipationReport {
@@ -69,6 +78,91 @@ export interface MeetingParticipationReport {
   /** Whether `max_minutes` triggered the leave (vs. agent / error). */
   ended_by_timeout: boolean;
   error?: string;
+}
+
+interface MeetingParticipationConsentRecord {
+  consent?: unknown;
+  mission_id?: unknown;
+  operator_handle?: unknown;
+  tenant_slug?: unknown;
+  expires_at?: unknown;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function checkMeetingParticipationConsent(input: {
+  mission_id?: string;
+  tenant_slug?: string;
+  purpose: 'recording' | 'voice';
+}): { allowed: boolean; reason?: string } {
+  if (process.env.KYBERION_SUDO === 'true') return { allowed: true };
+  const missionId = normalizeOptionalString(input.mission_id);
+  if (!missionId) {
+    return {
+      allowed: false,
+      reason: `${input.purpose} requires mission_id + voice-consent.json in the mission evidence dir`,
+    };
+  }
+  const evidenceDir = pathResolver.missionEvidenceDir(missionId);
+  if (!evidenceDir) {
+    return { allowed: false, reason: `mission evidence dir not found for ${missionId}` };
+  }
+  const consentPath = path.join(evidenceDir, 'voice-consent.json');
+  if (!safeExistsSync(consentPath)) {
+    return {
+      allowed: false,
+      reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
+    };
+  }
+  let raw: MeetingParticipationConsentRecord;
+  try {
+    const parsed = JSON.parse(safeReadFile(consentPath, { encoding: 'utf8' }) as string);
+    if (!isPlainObject(parsed)) {
+      return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
+    }
+    raw = parsed;
+  } catch (err: any) {
+    return { allowed: false, reason: `failed to parse voice-consent.json: ${err?.message ?? err}` };
+  }
+  if (raw.consent !== 'granted') {
+    return {
+      allowed: false,
+      reason: `voice-consent.json present but consent != 'granted' (got '${String(raw.consent)}')`,
+    };
+  }
+  if (normalizeOptionalString(raw.mission_id) !== missionId) {
+    return {
+      allowed: false,
+      reason: `voice-consent.json mission_id '${String(raw.mission_id)}' does not match active mission '${missionId}'`,
+    };
+  }
+  if (!normalizeOptionalString(raw.operator_handle)) {
+    return { allowed: false, reason: 'voice-consent.json is malformed: operator_handle is required' };
+  }
+  const expiresAt = normalizeOptionalString(raw.expires_at);
+  if (expiresAt) {
+    const expiry = Date.parse(expiresAt);
+    if (!Number.isFinite(expiry)) {
+      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
+    }
+    if (expiry <= Date.now()) {
+      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
+    }
+  }
+  const activeTenant = normalizeOptionalString(input.tenant_slug);
+  if (activeTenant && normalizeOptionalString(raw.tenant_slug) !== activeTenant) {
+    return {
+      allowed: false,
+      reason: `voice-consent.json tenant_slug '${normalizeOptionalString(raw.tenant_slug) ?? 'missing'}' does not match active tenant '${activeTenant}'`,
+    };
+  }
+  return { allowed: true };
 }
 
 export class MeetingParticipationCoordinator {
@@ -109,6 +203,27 @@ export class MeetingParticipationCoordinator {
       this.deps.trace.addEvent('meeting_participation.start', {
         platform: target.platform,
         driver: this.deps.driver.driver_id,
+      });
+    }
+
+    const requireRecordingConsent =
+      options.require_recording_consent ?? Boolean(options.mission_id);
+    if (requireRecordingConsent) {
+      const consent = checkMeetingParticipationConsent({
+        mission_id: options.mission_id,
+        tenant_slug: options.tenant_slug,
+        purpose: 'recording',
+      });
+      if (!consent.allowed) {
+        this.deps.trace?.addEvent('meeting_participation.recording_denied', {
+          reason: consent.reason,
+        });
+        closeTrace('error', consent.reason);
+        this.recordAudit('meeting_participation.recording_denied', target, 'denied', consent.reason);
+        throw new Error(`[meeting-participation] ${consent.reason}`);
+      }
+      this.deps.trace?.addEvent('meeting_participation.recording_consent_granted', {
+        mission_id: options.mission_id,
       });
     }
 
@@ -178,7 +293,7 @@ export class MeetingParticipationCoordinator {
           this.deps.trace?.addEvent('meeting_participation.speak_requested', {
             chars: decision.speech.length,
           });
-          await this.speak(session, decision.speech, options.voice_profile_id);
+          await this.speak(session, decision.speech, options.voice_profile_id, target, options);
           utterancesSpoken += 1;
           this.deps.trace?.addEvent('meeting_participation.spoke', {
             utterance_index: utterancesReceived,
@@ -233,7 +348,24 @@ export class MeetingParticipationCoordinator {
     session: MeetingSession,
     text: string,
     voiceProfileId: string,
+    target: MeetingTarget,
+    options: MeetingParticipationOptions,
   ): Promise<void> {
+    const requireVoiceConsent = options.require_voice_consent ?? Boolean(options.mission_id);
+    if (requireVoiceConsent) {
+      const consent = checkMeetingParticipationConsent({
+        mission_id: options.mission_id,
+        tenant_slug: options.tenant_slug,
+        purpose: 'voice',
+      });
+      if (!consent.allowed) {
+        this.deps.trace?.addEvent('meeting_participation.speak_denied', {
+          reason: consent.reason,
+        });
+        this.recordAudit('meeting_participation.speak_denied', target, 'denied', consent.reason);
+        throw new Error(`[meeting-participation] ${consent.reason}`);
+      }
+    }
     this.deps.trace?.startSpan('meeting_participation.tts', {
       chars: text.length,
       voice_profile_id: voiceProfileId,

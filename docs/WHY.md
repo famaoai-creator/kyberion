@@ -88,4 +88,4 @@ Kyberion is **OSS, in active development**. The current focus (`docs/PRODUCTIZAT
 
 If any of this resonates, the [Quickstart](./QUICKSTART.md) is the next step. If you'd rather understand the architecture first, start with [`knowledge/public/architecture/organization-work-loop.md`](../knowledge/public/architecture/organization-work-loop.md).
 
-The Quickstart is organized around a first-win ladder: 30 seconds for `pnpm doctor`, 5 minutes for `pipelines/voice-hello.json`, and 15 minutes for the browser-session smoke.
+The Quickstart is organized around a first-win ladder: 30 seconds for `pnpm doctor`, 5 minutes for `pipelines/verify-session.json` to produce `active/shared/tmp/first-win-session.png`, and 15 minutes to understand the structure through `pipelines/verify-session.json`, `CAPABILITIES_GUIDE.md`, and `docs/developer/EXTENSION_POINTS.md`.
