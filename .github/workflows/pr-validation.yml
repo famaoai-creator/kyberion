@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check PR title
-        run: pnpm run check:pr-title
+        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
 
       - name: Build project
         run: pnpm run build
