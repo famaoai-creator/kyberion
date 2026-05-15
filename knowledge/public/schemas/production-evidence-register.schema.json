@@ -1,0 +1,398 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "production-evidence-register.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "release_decision": {
+      "$ref": "#/$defs/status"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/evidenceItem"
+      }
+    }
+  },
+  "required": ["version", "last_updated", "release_decision", "items"],
+  "allOf": [
+    {
+      "properties": {
+        "items": {
+          "type": "array",
+          "contains": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "const": "EV-30DAY-OPS" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "items": {
+          "type": "array",
+          "contains": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "const": "EV-EXT-CONTRIB" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "items": {
+          "type": "array",
+          "contains": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "const": "EV-FDE-DEPLOY" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "if": {
+              "type": "object",
+              "properties": {
+                "id": { "const": "EV-30DAY-OPS" }
+              },
+              "required": ["id"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "template_ref": { "const": "docs/operator/templates/production-evidence-30day-ops.md" },
+                "ref_requirements": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "enum": ["run_summary", "trace_bundle", "incident_summary"] }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "run_summary" },
+                          "accepted_ref_patterns": { "const": ["docs/operator/", "https://"] }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "trace_bundle" },
+                          "accepted_ref_patterns": {
+                            "const": ["active/shared/logs/traces/", "active/shared/tmp/", "https://"]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "incident_summary" },
+                          "accepted_ref_patterns": { "const": ["docs/operator/", "https://"] }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "if": {
+              "type": "object",
+              "properties": {
+                "id": { "const": "EV-EXT-CONTRIB" }
+              },
+              "required": ["id"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "template_ref": { "const": "docs/operator/templates/production-evidence-external-contribution.md" },
+                "ref_requirements": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "enum": ["issue_url", "pr_url", "review_record"] }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "issue_url" },
+                          "accepted_ref_patterns": { "const": ["/issues/"] }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "pr_url" },
+                          "accepted_ref_patterns": { "const": ["/pull/"] }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "review_record" },
+                          "accepted_ref_patterns": {
+                            "const": [
+                              "docs/operator/templates/production-evidence-external-contribution.md",
+                              "https://github.com/"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "if": {
+              "type": "object",
+              "properties": {
+                "id": { "const": "EV-FDE-DEPLOY" }
+              },
+              "required": ["id"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "template_ref": { "const": "docs/operator/templates/production-evidence-fde-deployment.md" },
+                "ref_requirements": {
+                  "type": "array",
+                  "minItems": 4,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "enum": ["deployment_summary", "customer_overlay", "runtime_artifact", "no_fork_statement"]
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "deployment_summary" },
+                          "accepted_ref_patterns": { "const": ["docs/operator/", "https://"] }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "customer_overlay" },
+                          "accepted_ref_patterns": { "const": ["customer/", "docs/operator/", "https://"] }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "runtime_artifact" },
+                          "accepted_ref_patterns": {
+                            "const": ["active/shared/logs/traces/", "active/shared/tmp/", "https://"]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "contains": {
+                        "type": "object",
+                        "required": ["id"],
+                        "properties": {
+                          "id": { "const": "no_fork_statement" },
+                          "accepted_ref_patterns": { "const": ["docs/operator/", "migration/", "https://"] }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": ["pending_external_evidence", "verified"]
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["EV-30DAY-OPS", "EV-EXT-CONTRIB", "EV-FDE-DEPLOY"]
+        },
+        "gate": {
+          "type": "string",
+          "pattern": "^.*\\S.*$"
+        },
+        "required_evidence": {
+          "type": "string",
+          "pattern": "^.*\\S.*$"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^.*\\S.*$"
+        },
+        "template_ref": {
+          "type": "string",
+          "pattern": "^docs/operator/templates/production-evidence-[a-z0-9-]+\\.md$"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^.*\\S.*$"
+          }
+        },
+        "verification_artifact": {
+          "type": "string",
+          "pattern": "^.*\\S.*$"
+        },
+        "reviewed_at": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "reviewer": {
+          "type": ["string", "null"],
+          "pattern": "^.*\\S.*$"
+        },
+        "ref_requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/refRequirement"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "id",
+        "gate",
+        "required_evidence",
+        "status",
+        "owner",
+        "template_ref",
+        "acceptance_criteria",
+        "verification_artifact",
+        "reviewed_at",
+        "reviewer",
+        "ref_requirements",
+        "evidence_refs"
+      ]
+    },
+    "refRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string",
+          "pattern": "^.*\\S.*$"
+        },
+        "accepted_ref_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^.*\\S.*$"
+          }
+        }
+      },
+      "required": ["id", "description", "accepted_ref_patterns"]
+    }
+  }
+}

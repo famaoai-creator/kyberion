@@ -16,6 +16,7 @@ const RULES: SmokeRule[] = [
       'pnpm doctor',
       'pnpm pipeline --input pipelines/voice-hello.json',
       'pnpm pipeline --input pipelines/verify-session.json',
+      'active/shared/tmp/first-win-session.png',
     ],
   },
   {
@@ -24,6 +25,7 @@ const RULES: SmokeRule[] = [
       'pnpm doctor',
       'pnpm pipeline --input pipelines/voice-hello.json',
       'pnpm pipeline --input pipelines/verify-session.json',
+      'active/shared/tmp/first-win-session.png',
     ],
   },
   {
@@ -52,10 +54,62 @@ const RULES: SmokeRule[] = [
     file: 'pipelines/verify-session.json',
     required: [
       '"pipeline_id": "verify-session"',
-      'enterprise-login-success.png',
+      '"first-win"',
+      'active/shared/tmp/first-win-session.png',
     ],
   },
 ];
+
+function readJson(file: string): any | null {
+  const abs = pathResolver.rootResolve(file);
+  try {
+    return JSON.parse(String(safeReadFile(abs, { encoding: 'utf8' }) || ''));
+  } catch {
+    return null;
+  }
+}
+
+export function validateVerifySessionPipeline(pipeline: any): string[] {
+  const violations: string[] = [];
+  const steps = Array.isArray(pipeline?.steps) ? pipeline.steps : [];
+  const stepOps = new Set(steps.map((step: any) => String(step?.op || '')));
+  if (pipeline?.options?.headless !== true) {
+    violations.push('pipelines/verify-session.json: options.headless must be true for clean first-win smoke');
+  }
+  const userDataDir = String(pipeline?.options?.user_data_dir || '');
+  if (!userDataDir.startsWith('active/shared/tmp/')) {
+    violations.push('pipelines/verify-session.json: user_data_dir must stay under active/shared/tmp/');
+  }
+  if (!stepOps.has('browser:goto')) {
+    violations.push('pipelines/verify-session.json: missing browser:goto first-win navigation');
+  }
+  if (!stepOps.has('browser:evaluate')) {
+    violations.push('pipelines/verify-session.json: missing browser:evaluate state capture');
+  }
+  if (!stepOps.has('browser:screenshot')) {
+    violations.push('pipelines/verify-session.json: missing browser:screenshot artifact capture');
+  }
+  if (!stepOps.has('browser:close_session')) {
+    violations.push('pipelines/verify-session.json: missing browser:close_session cleanup step');
+  }
+  const gotoStep = steps.find((step: any) => step?.op === 'browser:goto');
+  const rawGotoUrl = String(gotoStep?.params?.url || '');
+  const defaultTargetUrl = String(pipeline?.context?.TARGET_URL || pipeline?.inputs?.TARGET_URL?.default || '');
+  const gotoUrl = rawGotoUrl.includes('{{TARGET_URL}}')
+    ? defaultTargetUrl
+    : rawGotoUrl || defaultTargetUrl;
+  if (!gotoUrl.includes('data:text/html')) {
+    violations.push('pipelines/verify-session.json: first-win navigation must use a local data URL');
+  }
+  if (!String(pipeline?.context?.TARGET_URL || '').includes('data:text/html')) {
+    violations.push('pipelines/verify-session.json: context.TARGET_URL must provide the local data URL default');
+  }
+  const screenshotStep = steps.find((step: any) => step?.op === 'browser:screenshot');
+  if (screenshotStep?.params?.path !== 'active/shared/tmp/first-win-session.png') {
+    violations.push('pipelines/verify-session.json: screenshot path must be active/shared/tmp/first-win-session.png');
+  }
+  return violations;
+}
 
 export function checkFirstWinSmoke(): string[] {
   const violations: string[] = [];
@@ -71,6 +125,12 @@ export function checkFirstWinSmoke(): string[] {
         violations.push(`${rule.file}: missing "${needle}"`);
       }
     }
+  }
+  const verifySession = readJson('pipelines/verify-session.json');
+  if (!verifySession) {
+    violations.push('pipelines/verify-session.json: invalid JSON');
+  } else {
+    violations.push(...validateVerifySessionPipeline(verifySession));
   }
   return violations;
 }

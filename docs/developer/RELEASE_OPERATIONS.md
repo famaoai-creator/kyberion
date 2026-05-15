@@ -71,7 +71,9 @@ pnpm tsx scripts/generate_changelog.ts --prepend
 # 4. Edit CHANGELOG.md:
 #    - Move the [Unreleased] additions to a new ## [<version>] - <YYYY-MM-DD> section.
 #    - Add a fresh empty [Unreleased] section at the top.
-#    - Review wording, add migration notes if any.
+#    - Review wording.
+#    - Keep a "Migration required" subsection explicit:
+#      write "None" when no migration applies, or list each migration/<id>.ts script.
 
 # 5. Bump version in package.json + workspaces.
 node -e "
@@ -84,6 +86,7 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2)+'\n');
 # 6. If any actuator surfaces changed and require a version bump,
 #    update their manifest.json versions and run:
 pnpm run check:contract-semver -- --rebaseline
+#    Review and stage scripts/contract-baseline.json with the release prep.
 
 # 7. Commit the release prep.
 git add CHANGELOG.md package.json scripts/contract-baseline.json migration/
@@ -109,6 +112,12 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ## Migration scripts
 
 If the release introduces a schema or path change, add a migration script under `migration/` (see [`migration/README.md`](../../migration/README.md)). Reference it in the changelog under "Migration required".
+
+Release prep is not complete until the migration state is explicit:
+
+- If no migration is required, the release changelog section must say `Migration required: None`.
+- If a migration is required, add `migration/<sequence>-<slug>.ts`, document operator impact and rollback expectations in the changelog, and run `pnpm migration:run -- --dry-run` before tagging.
+- If actuator contract surfaces changed, update manifest versions and commit the refreshed `scripts/contract-baseline.json` produced by `pnpm run check:contract-semver -- --rebaseline`.
 
 ## Hotfix branch policy
 

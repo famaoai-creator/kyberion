@@ -35,6 +35,7 @@ Before opening a PR:
 - Browse the [GitHub issue tracker](https://github.com/famaoai-creator/kyberion/issues), especially `good-first-issue` and `help-wanted`.
 - Look at `docs/PRODUCTIZATION_ROADMAP.md` — pick a Phase task that's marked `not done`.
 - Read `docs/developer/GOOD_FIRST_ISSUES.md` for starter slices that fit a 1-2 hour contribution.
+- A starter slice should stay in one area, name one small file cluster, and include one validation command. If it needs broader coordination, file a normal roadmap issue instead of using `good-first-issue`.
 - File an issue first if you're proposing a non-trivial change. We don't want you to spend a weekend on something we're about to redesign.
 
 ## Areas and CODEOWNERS

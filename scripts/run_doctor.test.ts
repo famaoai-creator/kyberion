@@ -28,15 +28,11 @@ describe('run_doctor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createStandardYargs.mockReturnValue({
-      option: () => ({
-        option: () => ({
-          option: () => ({
-            parseSync: () => ({}),
-          }),
-        }),
-      }),
-    });
+    const yargsStub = {
+      option: vi.fn(() => yargsStub),
+      parseSync: vi.fn(() => ({})),
+    };
+    mocks.createStandardYargs.mockReturnValue(yargsStub);
     mocks.loadEnvironmentManifest.mockImplementation((id: string) => {
       if (id === 'reasoning-backend') {
         return {
@@ -84,5 +80,14 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('reasoning-backend');
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reasoning-backend'));
+  });
+
+  it('expands the meeting runtime preset to the meeting participation manifest', async () => {
+    const { collectDoctorReport } = await import('./run_doctor.js');
+
+    await collectDoctorReport({ runtime: 'meeting', mission: 'MSN-DOCTOR-RUNTIME' });
+
+    expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
+    expect(mocks.loadEnvironmentManifest).not.toHaveBeenCalledWith('kyberion-runtime-baseline');
   });
 });

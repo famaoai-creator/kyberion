@@ -113,6 +113,15 @@ The use case implies authority that the operator must explicitly delegate:
   whose `consent: 'granted'` is unambiguous. Without that file, the
   agent can `join`, `listen`, `chat`, and `leave`, but cannot speak in
   the operator's voice. This is the load-bearing check; never bypass.
+- **Participation consent (`meeting:participate`)** — the live
+  participation coordinator checks the same `voice-consent.json` before
+  recording/capture starts and re-checks before TTS speech. Missing,
+  revoked, expired, malformed, wrong-mission, or wrong-tenant consent
+  fails closed before audio capture or speech proceeds.
+- **Dry-run before real meeting** — use
+  `pnpm cli preview pipelines/meeting-proxy-workflow.json` and
+  `pnpm run test:meeting-dry-run` to validate workflow structure,
+  consent gates, host allowlist, and redaction without opening a call.
 - **Voice profile registration** — the synthesized voice itself must be
   a `voice-profile-registry.json` entry whose source samples were
   recorded by the operator (see `pipelines/voice-recording-session.json`).
@@ -138,6 +147,8 @@ The use case implies authority that the operator must explicitly delegate:
 | LLM extracts zero action items      | `action_item_count = 0` in pipeline ctx; orchestrator summary shows total=0 | Re-run with longer `listen_duration_sec`; verify the transcript file is non-empty |
 | `delegateTask` fails on a self item | Item transitions to `blocked` with the error in `result_summary`            | Operator unblocks manually or re-runs `pipelines/action-item-execute-self.json`   |
 | Reminder dispatch sends duplicates  | `appendReminder` is idempotent on `(sent_at, channel)`                      | No remediation needed                                                             |
+| Live consent missing before capture | `meeting_participation.recording_denied` trace/audit event                  | Grant mission-scoped consent or use dry-run only                                  |
+| Consent revoked before TTS speech   | `meeting_participation.speak_denied` trace/audit event                      | Re-grant consent intentionally or remain silent                                   |
 
 ## 5. Cron / scheduling
 

@@ -95,34 +95,57 @@ describe('probeManifest', () => {
 
 describe('bootstrapManifest dry-run', () => {
   it('does not install when apply=false; receipts list everything as unsatisfied', async () => {
+    const savedPersona = process.env.KYBERION_PERSONA;
+    const savedRole = process.env.MISSION_ROLE;
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    process.env.MISSION_ROLE = 'mission_controller';
     delete process.env.PROBE_BOOTSTRAP_DRY;
-    const manifest: EnvironmentManifest = {
-      manifest_id: 'unit-test-manifest-c',
-      version: 'test',
-      capabilities: [
-        {
-          capability_id: 'cap.dry-run',
-          kind: 'env-var',
-          description: 'env that will not be set',
-          required_for: ['demo'],
-          probe: { kind: 'env', name: 'PROBE_BOOTSTRAP_DRY' },
-          install: {
-            operator_confirmed: false,
-            instruction: 'set the env var',
+    try {
+      const auditPath = path.join(
+        ROOT,
+        'active/audit',
+        `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+      );
+      const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
+      const manifest: EnvironmentManifest = {
+        manifest_id: 'unit-test-manifest-c',
+        version: 'test',
+        capabilities: [
+          {
+            capability_id: 'cap.dry-run',
+            kind: 'env-var',
+            description: 'env that will not be set',
+            required_for: ['demo'],
+            probe: { kind: 'env', name: 'PROBE_BOOTSTRAP_DRY' },
+            install: {
+              operator_confirmed: false,
+              instruction: 'set the env var',
+            },
           },
-        },
-      ],
-    };
-    const receipt = await bootstrapManifest(manifest, { apply: false });
-    expect(receipt.satisfied).toHaveLength(0);
-    expect(receipt.unsatisfied[0].reason).toContain('dry run');
-    expect(receipt.installs_performed).toHaveLength(0);
+        ],
+      };
+      const receipt = await bootstrapManifest(manifest, { apply: false });
+      expect(receipt.satisfied).toHaveLength(0);
+      expect(receipt.unsatisfied[0].reason).toContain('dry run');
+      expect(receipt.installs_performed).toHaveLength(0);
+      const after = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
+      expect(after.slice(before.length)).toContain('env_bootstrap.capability_unsatisfied');
+      expect(after.slice(before.length)).toContain('cap.dry-run');
+      expect(after.slice(before.length)).toContain('"result":"failed"');
+    } finally {
+      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = savedPersona;
+      if (savedRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = savedRole;
+    }
   });
 });
 
 describe('verifyReady', () => {
   const FIX_MISSION = 'MSN-ENV-CAP-FIXTURE-001';
   const MISSION_DIR = path.join(ROOT, 'active/missions/confidential', FIX_MISSION);
+  const receiptPath = (manifestId: string) =>
+    path.join(MISSION_DIR, 'evidence', `env-setup-receipt.${manifestId}.json`);
 
   beforeEach(() => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
@@ -217,6 +240,152 @@ describe('verifyReady', () => {
     expect(report.ready).toBe(false);
     expect(report.missing.some((m) => m.capability_id === '__manifest_fingerprint__')).toBe(true);
     delete process.env.PROBE_VERIFY_READY;
+  });
+
+  it('invalidates an expired receipt', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-g',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.env-ok',
+          kind: 'env-var',
+          description: 'env present',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+    receipt.expires_at = '2026-01-01T00:00:00.000Z';
+    fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(receipt, null, 2));
+
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing.some((m) => m.capability_id === '__receipt_age__')).toBe(true);
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
+  it('invalidates a receipt generated on another host fingerprint', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-h',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.env-ok',
+          kind: 'env-var',
+          description: 'env present',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+    receipt.host_fingerprint = '0'.repeat(64);
+    fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(receipt, null, 2));
+
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing.some((m) => m.capability_id === '__host_fingerprint__')).toBe(true);
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
+  it('invalidates a receipt with malformed generated_at or expires_at timestamps', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-i2',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.env-ok',
+          kind: 'env-var',
+          description: 'env present',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+    receipt.generated_at = 'not-a-date';
+    receipt.expires_at = 'also-not-a-date';
+    fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(receipt, null, 2));
+
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing.map((m) => m.capability_id)).toEqual(
+      expect.arrayContaining(['__receipt_generated_at__', '__receipt_expires_at__', '__receipt_age__']),
+    );
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
+  it('invalidates a receipt with malformed array fields', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-i3',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.env-ok',
+          kind: 'env-var',
+          description: 'env present',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+    receipt.satisfied = null;
+    receipt.unsatisfied = {};
+    receipt.installs_performed = 'nope';
+    fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(receipt, null, 2));
+
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing.map((m) => m.capability_id)).toEqual(
+      expect.arrayContaining([
+        '__receipt_satisfied__',
+        '__receipt_unsatisfied__',
+        '__receipt_installs_performed__',
+      ]),
+    );
+    delete process.env.PROBE_VERIFY_READY;
+  });
+
+  it('blocks on required unsatisfied capabilities but not optional ones', async () => {
+    delete process.env.PROBE_VERIFY_REQUIRED_MISSING;
+    delete process.env.PROBE_VERIFY_OPTIONAL_MISSING;
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-i',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.required-missing',
+          kind: 'env-var',
+          description: 'required env absent',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_REQUIRED_MISSING' },
+        },
+        {
+          capability_id: 'cap.optional-missing',
+          kind: 'env-var',
+          description: 'optional env absent',
+          required_for: ['demo'],
+          optional: true,
+          probe: { kind: 'env', name: 'PROBE_VERIFY_OPTIONAL_MISSING' },
+        },
+      ],
+    };
+    await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+    const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+    expect(report.ready).toBe(false);
+    expect(report.missing.map((m) => m.capability_id)).toContain('cap.required-missing');
+    expect(report.missing.map((m) => m.capability_id)).not.toContain('cap.optional-missing');
   });
 });
 

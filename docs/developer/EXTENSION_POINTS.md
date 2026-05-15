@@ -133,6 +133,8 @@ The set of `pnpm <command>` scripts in `package.json`.
 **Stable**:
 
 - Existing top-level scripts: `build`, `test`, `lint`, `typecheck`, `validate`, `doctor`, `mission`, `pipeline`, `cli`, `onboard`, `surfaces:*`, `dashboard`, `control`, `release:notes`.
+- Release and migration helpers: `release:notes`, `migration:run`, `migration:rollback`.
+- Meeting runtime checks: `doctor:meeting` and `test:meeting-dry-run`.
 - Their flags and exit codes.
 
 **Internal**:
@@ -169,6 +171,15 @@ Each actuator carries its own semver in `manifest.json`. The repo as a whole car
 When intentional, run `pnpm check:contract-semver -- --rebaseline` to update the baseline. This is reviewed in the PR.
 
 ## 5. Customer Authoring Guidelines
+
+### 5.1 Meeting Runtime Boundary
+
+The stable extension point for meeting participation is the actuator / CLI contract, not the browser automation internals:
+
+- Use `meeting-actuator` ops and `pnpm meeting:participate` for integration.
+- Treat `libs/actuators/meeting-browser-driver/` as internal; wrap it only through the meeting actuator or the participation CLI.
+- Keep `voice-consent.json` mission-scoped. The coordinator checks it before recording/capture and re-checks before TTS speech.
+- Use `pnpm doctor:meeting --mission <MISSION_ID>` and `pnpm run test:meeting-dry-run` before claiming meeting runtime readiness.
 
 For FDE / customer engagements:
 

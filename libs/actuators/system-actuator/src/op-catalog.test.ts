@@ -3,6 +3,8 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import {
   SYSTEM_ACTUATOR_APPLY_OPS,
   SYSTEM_ACTUATOR_CAPTURE_OPS,
+  SYSTEM_ACTUATOR_CONTROL_OPS,
+  SYSTEM_ACTUATOR_TRANSFORM_OPS,
 } from './index.js';
 
 function extractOps(sectionHeading: string): string[] {
@@ -28,8 +30,34 @@ describe('system-actuator op catalog', () => {
     expect(extractOps('### Capture ops (type: capture)')).toEqual([...SYSTEM_ACTUATOR_CAPTURE_OPS]);
   });
 
+  it('keeps transform ops aligned with the published guide', () => {
+    expect(extractOps('### Transform ops (type: transform)')).toEqual([...SYSTEM_ACTUATOR_TRANSFORM_OPS]);
+  });
+
   it('keeps apply ops aligned with the published guide', () => {
     expect(extractOps('### Apply ops (type: apply)')).toEqual([...SYSTEM_ACTUATOR_APPLY_OPS]);
   });
 
+  it('keeps control ops aligned with the published guide', () => {
+    expect(extractOps('### Control ops (type: control)')).toEqual([...SYSTEM_ACTUATOR_CONTROL_OPS]);
+  });
+
+  it('keeps the contract schema aligned with routed public ops', () => {
+    const schema = JSON.parse(String(safeReadFile(pathResolver.rootResolve('schemas/system-pipeline.schema.json'), { encoding: 'utf8' }) || '{}'));
+    const enumValues = new Set<string>(schema?.properties?.steps?.items?.properties?.op?.enum || []);
+    const bareOps = [
+      ...SYSTEM_ACTUATOR_CAPTURE_OPS,
+      ...SYSTEM_ACTUATOR_TRANSFORM_OPS,
+      ...SYSTEM_ACTUATOR_APPLY_OPS,
+      ...SYSTEM_ACTUATOR_CONTROL_OPS,
+    ];
+
+    for (const op of bareOps) {
+      expect(enumValues.has(op), `schema missing ${op}`).toBe(true);
+      expect(enumValues.has(`system:${op}`), `schema missing system:${op}`).toBe(true);
+    }
+    expect(enumValues.has('core:if')).toBe(true);
+    expect(enumValues.has('core:while')).toBe(true);
+    expect(schema?.properties?.steps?.items?.properties?.type?.enum).toContain('control');
+  });
 });

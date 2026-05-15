@@ -11,25 +11,28 @@ function read(relPath: string): string {
 describe('First-win documentation contract', () => {
   it('keeps README on the 30s / 5m / 15m first-win ladder', () => {
     const readme = read('README.md');
-    expect(readme).toContain('30 seconds: run `pnpm doctor`');
-    expect(readme).toContain('5 minutes: run the voice smoke');
-    expect(readme).toContain('15 minutes: run the browser session smoke');
+    expect(readme).toContain("30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary");
+    expect(readme).toContain('5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`');
+    expect(readme).toContain('15 minutes: read the Quickstart structure map');
     expect(readme).toContain('pnpm pipeline --input pipelines/voice-hello.json');
     expect(readme).toContain('pnpm pipeline --input pipelines/verify-session.json');
+    expect(readme).toContain('docs/developer/EXTENSION_POINTS.md');
   });
 
   it('keeps the quickstart aligned with the same ladder and commands', () => {
     const quickstart = read('docs/QUICKSTART.md');
-    expect(quickstart).toContain('30 seconds: `pnpm doctor`');
-    expect(quickstart).toContain('5 minutes: `pnpm pipeline --input pipelines/voice-hello.json`');
-    expect(quickstart).toContain('15 minutes: `pnpm pipeline --input pipelines/enterprise-login.json` then `pnpm pipeline --input pipelines/verify-session.json`');
+    expect(quickstart).toContain('30 seconds: `pnpm doctor` shows whether the local runtime is ready');
+    expect(quickstart).toContain('5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`');
+    expect(quickstart).toContain('15 minutes: skim sections 4-10');
+    expect(quickstart).toContain('CAPABILITIES_GUIDE.md');
+    expect(quickstart).toContain('docs/developer/EXTENSION_POINTS.md');
   });
 
   it('points WHY readers to the same first-win path', () => {
     const why = read('docs/WHY.md');
     expect(why).toContain('first-win ladder');
     expect(why).toContain('30 seconds for `pnpm doctor`');
-    expect(why).toContain('5 minutes for `pipelines/voice-hello.json`');
-    expect(why).toContain('15 minutes for the browser-session smoke');
+    expect(why).toContain('5 minutes for `pipelines/verify-session.json`');
+    expect(why).toContain('15 minutes to understand the structure');
   });
 });

@@ -99,6 +99,10 @@ function extractFirstJson(text: string): any {
   }
 }
 
+export function prepareMeetingTarget(target: MeetingTarget): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' } {
+  return validateMeetingTarget(target);
+}
+
 async function loadDriver(driverId: string): Promise<MeetingJoinDriver> {
   if (driverId === 'browser-playwright') {
     try {
@@ -235,7 +239,7 @@ async function main(): Promise<void> {
       platform: (argv.platform as MeetingTarget['platform']) ?? 'auto',
       display_name: String(argv['display-name']),
     };
-    const validatedTarget = validateMeetingTarget(target);
+    const validatedTarget = prepareMeetingTarget(target);
 
     const driver = await loadDriver(String(argv.driver));
     const bus = resolveAudioBus((argv['audio-bus'] as any) || undefined);
@@ -262,6 +266,7 @@ async function main(): Promise<void> {
     );
 
     const report = await coordinator.run(validatedTarget, {
+      mission_id: missionId,
       max_minutes: Number(argv['max-minutes']),
       voice_profile_id: String(argv['voice-profile-id']),
       audio_format: FORMAT,

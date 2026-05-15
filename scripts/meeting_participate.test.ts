@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TraceContext } from '@agent/core';
-import { evaluateMeetingBootstrapGate } from './meeting_participate.js';
+import { evaluateMeetingBootstrapGate, prepareMeetingTarget } from './meeting_participate.js';
 
 describe('meeting_participate bootstrap gate', () => {
   it('records a failed gate in trace and returns not ready', async () => {
@@ -65,5 +65,14 @@ describe('meeting_participate bootstrap gate', () => {
     expect(gateSpan.status).toBe('error');
     expect(gateSpan.events.map((event) => event.name)).toContain('meeting_participate.bootstrap_gate_error');
     expect(traceDoc.rootSpan.status).toBe('error');
+  });
+
+  it('rejects unsupported meeting hosts before coordinator execution', () => {
+    expect(() =>
+      prepareMeetingTarget({
+        url: 'https://example.com/meeting',
+        platform: 'auto',
+      } as any),
+    ).toThrow(/unsupported meeting URL/i);
   });
 });

@@ -26,6 +26,10 @@ const mocks = vi.hoisted(() => ({
     selection_hints: { preferred_provider: 'claude', preferred_modelId: 'claude-3.5-sonnet' },
   })),
   record: vi.fn(),
+  classifyError: vi.fn(() => ({
+    category: 'policy_violation',
+    remediation: 'Check runtime permissions.',
+  })),
   logger: {
     info: vi.fn(),
     success: vi.fn(),
@@ -42,6 +46,7 @@ vi.mock('@agent/core', () => ({
   logger: mocks.logger,
   pathResolver: { rootDir: vi.fn(() => '/tmp/kyberion') },
   auditChain: { record: mocks.record },
+  classifyError: mocks.classifyError,
 }));
 
 import { inspectAgent, listManifests, listRunningAgents, spawnAgent } from './agent_runtime_manager.js';
@@ -78,6 +83,25 @@ describe('agent_runtime_manager', () => {
       }),
     );
     expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.manual_spawn' }));
+    spy.mockRestore();
+  });
+
+  it('audits classified spawn failures before rethrowing', async () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.spawn.mockRejectedValueOnce(new Error('permission denied by runtime policy'));
+
+    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' })).rejects.toThrow('permission denied');
+
+    expect(mocks.classifyError).toHaveBeenCalledWith(expect.any(Error));
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'agent.manual_spawn',
+      operation: 'manifest-a',
+      result: 'failed',
+      metadata: expect.objectContaining({
+        classification: expect.objectContaining({ category: 'policy_violation' }),
+      }),
+    }));
+    expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('policy_violation'));
     spy.mockRestore();
   });
 
