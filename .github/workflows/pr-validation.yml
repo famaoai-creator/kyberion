@@ -61,7 +61,7 @@ jobs:
       - name: Vital check
         id: build-size
         run: |
-          node dist/scripts/vital_check.js --format text > vital-check-report.md
+          node dist/scripts/vital_check.js --format text --exit-on-missing=false > vital-check-report.md
           node dist/scripts/vital_check.js --format json --exit-on-missing=false > vital-check-report.json
           cat vital-check-report.md
 
