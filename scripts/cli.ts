@@ -156,6 +156,10 @@ function stripLocaleArg(args: string[]): string[] {
   return nextArgs;
 }
 
+export function stripNpmSeparatorArg(args: string[]): string[] {
+  return args.filter(arg => arg !== '--');
+}
+
 function loadVocabularyCatalog(): VocabularyCatalog | null {
   if (!safeExistsSync(vocabularyPath)) {
     return null;
@@ -947,7 +951,7 @@ export async function main(args = process.argv.slice(2)) {
   printMissionContextBanner(missionId);
 
   const actuators = loadActuators();
-  const normalizedArgs = stripLocaleArg(args);
+  const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
   if (command === 'help' || command === '--help' || command === '-h') {

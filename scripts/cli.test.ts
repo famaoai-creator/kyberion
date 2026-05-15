@@ -8,6 +8,7 @@ import {
   main,
   normalizeActuators,
   searchActuators,
+  stripNpmSeparatorArg,
 } from './cli.js';
 
 describe('Kyberion CLI helpers', () => {
@@ -45,6 +46,13 @@ describe('Kyberion CLI helpers', () => {
       branchId: 'ceo-mode',
       args: ['--', '--help'],
     });
+  });
+
+  it('drops npm separator tokens before dispatching commands', () => {
+    expect(stripNpmSeparatorArg(['preview', '--', 'pipelines/baseline-check.json'])).toEqual([
+      'preview',
+      'pipelines/baseline-check.json',
+    ]);
   });
 
   afterEach(() => {
