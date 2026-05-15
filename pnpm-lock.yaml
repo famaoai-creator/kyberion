@@ -147,8 +147,8 @@ importers:
         specifier: ^8.19.0
         version: 8.19.0
       xlsx:
-        specifier: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
-        version: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
+        specifier: ^0.18.5
+        version: 0.18.5
       yargs:
         specifier: ^18.0.0
         version: 18.0.0
@@ -352,7 +352,7 @@ importers:
         specifier: ^1.7.0
         version: 1.11.0
       marked:
-        specifier: ^12.0.0
+        specifier: ^12.0.2
         version: 12.0.2
       pdf-parse:
         specifier: ^2.4.5
@@ -567,7 +567,7 @@ importers:
         specifier: ^4.1.1
         version: 4.1.1
       marked:
-        specifier: ^12.0.0
+        specifier: ^12.0.2
         version: 12.0.2
       openai:
         specifier: ^6.35.0
@@ -8715,12 +8715,6 @@ packages:
 
   xlsx@0.18.5:
     resolution: {integrity: sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==}
-    engines: {node: '>=0.8'}
-    hasBin: true
-
-  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz:
-    resolution: {tarball: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz}
-    version: 0.20.2
     engines: {node: '>=0.8'}
     hasBin: true
 
@@ -18380,8 +18374,6 @@ snapshots:
       ssf: 0.11.2
       wmf: 1.0.2
       word: 0.3.0
-
-  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz: {}
 
   xml-name-validator@5.0.0: {}
 

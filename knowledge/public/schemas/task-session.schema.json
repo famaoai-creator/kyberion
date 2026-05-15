@@ -18,7 +18,7 @@
     "session_id": { "type": "string", "minLength": 1 },
     "surface": {
       "type": "string",
-      "enum": ["presence", "slack", "terminal", "chronos", "web"]
+      "enum": ["presence", "slack", "terminal", "chronos", "web", "imessage", "discord", "telegram"]
     },
     "task_type": {
       "type": "string",

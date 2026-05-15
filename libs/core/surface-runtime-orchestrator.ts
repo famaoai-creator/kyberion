@@ -131,7 +131,11 @@ function formatExecutionReceipt(params: {
 }
 
 function structuredSurfaceQueryText(context: SurfaceRuntimeRouteContext): string {
-  return (context.input.surfaceText || context.input.query || context.structuredQuery || '').trim();
+  const baseText = context.input.surfaceText || context.input.query || context.structuredQuery || '';
+  const contextualText = context.input.threadContext
+    ? `${context.input.threadContext}\n\nCurrent user message:\n${baseText}`
+    : baseText;
+  return contextualText.trim();
 }
 
 function resolvedSurfaceIntent(context: SurfaceRuntimeRouteContext): ReturnType<typeof resolveSurfaceIntent> {
@@ -1259,15 +1263,18 @@ export async function runSurfaceConversation(
   const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
+  const routingText = input.threadContext
+    ? `${input.threadContext}\n\nCurrent user message:\n${routedSurfaceInput.text}`
+    : routedSurfaceInput.text;
   const ruleBasedReceiver =
-    forcedReceiver || deriveSurfaceDelegationReceiver(routedSurfaceInput.text, surface);
+    forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);
   const compiledFlow: UserIntentFlow | null = shouldCompileSurfaceIntent(
     input,
-    routedSurfaceInput.text,
+    routingText,
     ruleBasedReceiver
   )
     ? await compileUserIntentFlow({
-        text: routedSurfaceInput.text,
+        text: routingText,
         channel: surface || 'surface',
       }).catch((error: any) => {
         logger.warn(
@@ -1321,7 +1328,7 @@ export async function runSurfaceConversation(
   const routeContext: SurfaceRuntimeRouteContext = {
     input,
     compiledFlow,
-    resolvedIntent: resolveSurfaceIntent(routedSurfaceInput.text),
+    resolvedIntent: resolveSurfaceIntent(routingText),
     computedReceiver,
     structuredQuery,
     parsedSlackPrompt,

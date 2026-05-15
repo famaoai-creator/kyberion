@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { redactSensitiveObject } from './network.js';
 
 /**
  * Kyberion A2UI (Agent-to-User Interface) Protocol v0.2.0
@@ -169,10 +170,11 @@ function createBridgeTransport(bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL 
     .filter(Boolean);
   return (message: A2UIMessage) => {
     for (const target of targets) {
+      const payload = redactSensitiveObject(message);
       fetch(`${target}/a2ui/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(message),
+        body: JSON.stringify(payload),
       }).catch((err) => {
         logger.warn(`[A2UI_BRIDGE] Failed to relay to bridge ${target}: ${err.message}`);
       });

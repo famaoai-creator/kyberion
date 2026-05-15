@@ -94,7 +94,7 @@ The strategic positioning is **OSS-first, with paid implementation support / FDE
 | Understand why this exists | [`docs/WHY.md`](./docs/WHY.md) / [`.ja.md`](./docs/WHY.ja.md) |
 | Try it in 5 minutes | [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) |
 | Deploy it for a customer | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md) |
-| Browse what it can automate | [`docs/USE_CASES.md`](./docs/USE_CASES.md) |
+| Browse what it can automate | [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md) |
 | Understand the architecture | [`knowledge/public/architecture/organization-work-loop.md`](./knowledge/public/architecture/organization-work-loop.md) |
 | Author a new actuator / pipeline | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) |
 | Customize for a customer | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |

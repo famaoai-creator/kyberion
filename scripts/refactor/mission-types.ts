@@ -104,6 +104,14 @@ export interface MissionState {
     blockers?: string[];
     associated_projects?: string[];
     routing_decision_summary?: string;
+    mission_finish_trace_summary?: {
+      traceId: string;
+      spans: number;
+      events: number;
+      artifacts: number;
+      errors: number;
+    };
+    mission_finish_trace_persisted_path?: string;
     intent_delta_summary?: {
       checked_at: string;
       passed: boolean;

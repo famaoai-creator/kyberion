@@ -129,12 +129,12 @@ When `KYBERION_CUSTOMER` is set, `persistTrace` automatically routes to `custome
 
 - [x] `browser-actuator` — migrated (reference implementation)
 - [x] `mission_controller` checkpoint — migrated (Phase B-1.5: spans for git.stage, git.commit, state.save, project_ledger.sync, intent_delta.emit)
-- [ ] `media-actuator` — TODO (Phase B-1.4)
-- [ ] `media-generation-actuator` — TODO
-- [ ] `meeting-actuator` — TODO
-- [ ] `mission_controller` evidence/finish — TODO (Phase B-1.5 continued)
-- [ ] `voice-actuator` — TODO
-- [ ] `code-actuator` — TODO
+- [x] `media-actuator` — migrated
+- [x] `media-generation-actuator` — migrated
+- [x] `meeting-actuator` — migrated
+- [x] `mission_controller` evidence/finish — migrated
+- [x] `voice-actuator` — migrated
+- [x] `code-actuator` — migrated
 - [ ] (others) — TODO
 
 When migrating, update the box above in the same PR.

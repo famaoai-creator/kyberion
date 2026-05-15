@@ -1,5 +1,7 @@
 # Usage Scenarios / Kyberion 活用シナリオ集
 
+> Persona-mapped view. Canonical breadth lives in [`USE_CASES.md`](./USE_CASES.md); this document keeps the persona and playbook mapping tight.
+
 Each scenario demonstrates how multiple actuators and capability flows chain together to automate complex workflows. These scenarios map to specific personas and can be packaged as [Mission Playbooks](knowledge/public/orchestration/mission-playbooks).
 
 本リポジトリに実装されたアクチュエータ群と capability flow を組み合わせることで、ソフトウェア開発ライフサイクルの各フェーズを高度に自動化できます。

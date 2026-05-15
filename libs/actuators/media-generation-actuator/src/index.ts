@@ -13,6 +13,9 @@ import {
   safeMkdir,
   pathResolver,
   classifyError,
+  derivePipelineStatus,
+  createActuatorTrace,
+  finalizeActuatorTrace,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -262,6 +265,19 @@ async function resumeRetriedGenerationJob(job: GenerationJob): Promise<Generatio
     next_attempt: (job.attempts || 1) + 1,
     created_at: job.created_at,
   });
+  if (retried.status === 'failed' || !('job_id' in retried)) {
+    return writeJob({
+      ...job,
+      status: 'failed',
+      result: {
+        ...job.result,
+        error: (retried as any).message || 'retry submission failed',
+      },
+      next_retry_at: undefined,
+      updated_at: nowIso(),
+      completed_at: nowIso(),
+    });
+  }
   return writeJob({
     ...retried,
     result: {
@@ -273,97 +289,155 @@ async function resumeRetriedGenerationJob(job: GenerationJob): Promise<Generatio
 }
 
 async function handlePromptBasedGeneration(action: string, params: any) {
-  const { compiled, workflow } = preparePromptBasedGeneration(action, params);
-
-  const result = await executeServicePreset('media-generation', action, {
-    ...params,
-    workflow,
+  const traceCtx = createActuatorTrace('media-generation-actuator', action, {
+    pipelineId: String(params?.request_id || params?.job_id || ''),
   });
+  traceCtx.startSpan(`media-generation:${action}`, {
+    await_completion: Boolean(
+      params.await_completion ??
+      params.music_adf?.output?.await_completion ??
+      params.image_adf?.output?.await_completion ??
+      params.video_adf?.output?.await_completion,
+    ),
+  });
+  let result: any = null;
+  try {
+    const { compiled, workflow } = preparePromptBasedGeneration(action, params);
+    result = await executeServicePreset('media-generation', action, {
+      ...params,
+      workflow,
+    });
 
-  const promptId = result?.prompt_id;
-  if (!promptId) return result;
+    const promptId = result?.prompt_id;
+    if (!promptId) {
+      traceCtx.endSpan('ok');
+      return { ...result, ...finalizeActuatorTrace(traceCtx) };
+    }
 
-  const awaitCompletion =
-    params.await_completion ??
-    params.music_adf?.output?.await_completion ??
-    Boolean(params.music_adf);
+    const awaitCompletion =
+      params.await_completion ??
+      params.music_adf?.output?.await_completion ??
+      Boolean(params.music_adf);
 
-  if (awaitCompletion && !workflow) {
-    throw new Error(`${action} requires params.workflow when await_completion is enabled`);
-  }
+    if (awaitCompletion && !workflow) {
+      throw new Error(`${action} requires params.workflow when await_completion is enabled`);
+    }
 
-  if (!awaitCompletion) {
-    if (!compiled) return result;
+    if (!awaitCompletion) {
+      if (!compiled) {
+        traceCtx.endSpan('ok');
+        return { ...result, ...finalizeActuatorTrace(traceCtx) };
+      }
+      const next = {
+        ...result,
+        status: 'submitted',
+        compiled_generation_request: compiled?.resolved,
+      };
+      traceCtx.endSpan('ok');
+      return { ...next, ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    const collected = await collectGenerationResult(action, params, promptId, compiled);
+    traceCtx.endSpan('ok');
+    return { ...collected, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
     return {
-      ...result,
-      status: 'submitted',
-      compiled_generation_request: compiled?.resolved,
+      status: 'failed',
+      message: err?.message ?? String(err),
+      ...(result || {}),
+      ...finalizeActuatorTrace(traceCtx),
     };
   }
-
-  return collectGenerationResult(action, params, promptId, compiled);
 }
 
 async function submitGenerationJob(params: any) {
-  const action = String(params.action || '');
-  if (!PROMPT_BASED_ACTIONS.has(action)) {
-    throw new Error(`submit_generation requires a prompt-based action. Received: ${action}`);
+  const traceCtx = createActuatorTrace('media-generation-actuator', 'submit_generation', {
+    pipelineId: String(params?.existing_job_id || params?.job_id || ''),
+  });
+  traceCtx.startSpan('media-generation:submit_generation');
+  try {
+    const action = String(params.action || '');
+    if (!PROMPT_BASED_ACTIONS.has(action)) {
+      throw new Error(`submit_generation requires a prompt-based action. Received: ${action}`);
+    }
+
+    const { compiled, workflow } = preparePromptBasedGeneration(action, params.params || {});
+    const requestParams = { ...(params.params || {}), workflow };
+    const result = await executeServicePreset('media-generation', action, requestParams);
+    if (!result?.prompt_id) {
+      throw new Error(`submit_generation failed to receive prompt_id for ${action}`);
+    }
+
+    const job: GenerationJob = {
+      kind: 'generation-job',
+      job_id: params.existing_job_id || createGenerationJobId(action),
+      action: action as any,
+      status: 'submitted',
+      provider: {
+        engine: 'comfyui',
+        prompt_id: String(result.prompt_id),
+      },
+      request: {
+        ...requestParams,
+        target_path: params.params?.target_path || params.params?.music_adf?.output?.target_path,
+        music_adf: params.params?.music_adf,
+        image_adf: params.params?.image_adf,
+        video_adf: params.params?.video_adf,
+        workflow_path: params.params?.workflow_path,
+      },
+      result: {
+        compiled_music_adf: compiled?.resolved,
+        compiled_generation_request: compiled?.resolved,
+      },
+      retry_policy: params.retry_policy || {
+        max_attempts: Number(loadRecoveryPolicy().retry?.maxRetries || 1),
+        backoff_seconds: Number((loadRecoveryPolicy().retry?.initialDelayMs || 0) / 1000),
+      },
+      attempts: Number(params.next_attempt || 1),
+      created_at: params.created_at || nowIso(),
+      updated_at: nowIso(),
+    };
+
+    writeJob(job);
+    traceCtx.endSpan('ok');
+    return { ...job, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
+      status: 'failed',
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
+    };
   }
-
-  const { compiled, workflow } = preparePromptBasedGeneration(action, params.params || {});
-  const requestParams = { ...(params.params || {}), workflow };
-  const result = await executeServicePreset('media-generation', action, requestParams);
-  if (!result?.prompt_id) {
-    throw new Error(`submit_generation failed to receive prompt_id for ${action}`);
-  }
-
-  const job: GenerationJob = {
-    kind: 'generation-job',
-    job_id: params.existing_job_id || createGenerationJobId(action),
-    action: action as any,
-    status: 'submitted',
-    provider: {
-      engine: 'comfyui',
-      prompt_id: String(result.prompt_id),
-    },
-    request: {
-      ...requestParams,
-      target_path: params.params?.target_path || params.params?.music_adf?.output?.target_path,
-      music_adf: params.params?.music_adf,
-      image_adf: params.params?.image_adf,
-      video_adf: params.params?.video_adf,
-      workflow_path: params.params?.workflow_path,
-    },
-    result: {
-      compiled_music_adf: compiled?.resolved,
-      compiled_generation_request: compiled?.resolved,
-    },
-    retry_policy: params.retry_policy || {
-      max_attempts: Number(loadRecoveryPolicy().retry?.maxRetries || 1),
-      backoff_seconds: Number((loadRecoveryPolicy().retry?.initialDelayMs || 0) / 1000),
-    },
-    attempts: Number(params.next_attempt || 1),
-    created_at: params.created_at || nowIso(),
-    updated_at: nowIso(),
-  };
-
-  writeJob(job);
-  return job;
 }
 
 async function getGenerationJob(params: any) {
-  const jobId = String(params.job_id || '');
-  if (!jobId) throw new Error('get_generation_job requires job_id');
-  const job = readJob(jobId);
-  if (job.status === 'retrying') {
-    return resumeRetriedGenerationJob(job);
-  }
-  if (isTerminalStatus(job.status)) return job;
-
-  const promptId = String(job.provider?.prompt_id || '');
-  if (!promptId) return job;
-
+  const traceCtx = createActuatorTrace('media-generation-actuator', 'get_generation_job', {
+    pipelineId: String(params?.job_id || ''),
+  });
+  traceCtx.startSpan('media-generation:get_generation_job');
+  let job: GenerationJob | undefined;
   try {
+    const jobId = String(params.job_id || '');
+    if (!jobId) throw new Error('get_generation_job requires job_id');
+    job = readJob(jobId);
+    if (job.status === 'retrying') {
+      const resumed = await resumeRetriedGenerationJob(job);
+      traceCtx.endSpan('ok');
+      return { ...resumed, ...finalizeActuatorTrace(traceCtx) };
+    }
+    if (isTerminalStatus(job.status)) {
+      traceCtx.endSpan('ok');
+      return { ...job, ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    const promptId = String(job.provider?.prompt_id || '');
+    if (!promptId) {
+      traceCtx.endSpan('ok');
+      return { ...job, ...finalizeActuatorTrace(traceCtx) };
+    }
+
     const history = await secureFetch({
       method: 'GET',
       url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
@@ -375,9 +449,11 @@ async function getGenerationJob(params: any) {
           status: 'running',
           updated_at: nowIso(),
         } as GenerationJob;
-        return writeJob(runningJob);
+        traceCtx.endSpan('ok');
+        return { ...writeJob(runningJob), ...finalizeActuatorTrace(traceCtx) };
       }
-      return job;
+      traceCtx.endSpan('ok');
+      return { ...job, ...finalizeActuatorTrace(traceCtx) };
     }
 
     const result = await collectGenerationResult(job.action, job.request || {}, promptId, { resolved: job.result?.compiled_generation_request });
@@ -394,69 +470,111 @@ async function getGenerationJob(params: any) {
       updated_at: nowIso(),
       completed_at: nowIso(),
     };
-    return writeJob(succeededJob);
-  } catch (error: any) {
-    const failedJob: GenerationJob = {
-      ...job,
+    traceCtx.endSpan('ok');
+    return { ...writeJob(succeededJob), ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    if (job) {
+      const failedJob: GenerationJob = {
+        ...job,
+        status: 'failed',
+        result: {
+          ...job.result,
+          error: err?.message ?? String(err),
+        },
+        updated_at: nowIso(),
+        completed_at: nowIso(),
+      };
+      writeJob(failedJob);
+      const retried = await retryGenerationJob(failedJob);
+      traceCtx.endSpan('error', err?.message ?? String(err));
+      return { ...retried, ...finalizeActuatorTrace(traceCtx) };
+    }
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
       status: 'failed',
-      result: {
-        ...job.result,
-        error: error.message,
-      },
-      updated_at: nowIso(),
-      completed_at: nowIso(),
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
     };
-    writeJob(failedJob);
-    return retryGenerationJob(failedJob);
   }
 }
 
 async function waitGenerationJob(params: any) {
-  const jobId = String(params.job_id || '');
-  if (!jobId) throw new Error('wait_generation_job requires job_id');
-  const timeoutMs = Number(params.timeout_ms || 15 * 60 * 1000);
-  const pollIntervalMs = Number(params.poll_interval_ms || 5_000);
-  const startedAt = Date.now();
+  const traceCtx = createActuatorTrace('media-generation-actuator', 'wait_generation_job', {
+    pipelineId: String(params?.job_id || ''),
+  });
+  traceCtx.startSpan('media-generation:wait_generation_job');
+  try {
+    const jobId = String(params.job_id || '');
+    if (!jobId) throw new Error('wait_generation_job requires job_id');
+    const timeoutMs = Number(params.timeout_ms || 15 * 60 * 1000);
+    const pollIntervalMs = Number(params.poll_interval_ms || 5_000);
+    const startedAt = Date.now();
 
-  while (Date.now() - startedAt < timeoutMs) {
-    const job = await getGenerationJob({ job_id: jobId });
-    if (isTerminalStatus(job.status)) return job;
-    await sleep(pollIntervalMs);
+    while (Date.now() - startedAt < timeoutMs) {
+      const job = await getGenerationJob({ job_id: jobId });
+      if (isTerminalStatus(job.status)) {
+        traceCtx.endSpan('ok');
+        return { ...job, ...finalizeActuatorTrace(traceCtx) };
+      }
+      await sleep(pollIntervalMs);
+    }
+
+    const timedOut = {
+      ...readJob(jobId),
+      status: 'timed_out',
+      updated_at: nowIso(),
+      completed_at: nowIso(),
+      next_retry_at: undefined,
+    } as GenerationJob;
+    traceCtx.endSpan('error', 'timed_out');
+    return { ...writeJob(timedOut), ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
+      status: 'failed',
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
+    };
   }
-
-  const timedOut = {
-    ...readJob(jobId),
-    status: 'timed_out',
-    updated_at: nowIso(),
-    completed_at: nowIso(),
-    next_retry_at: undefined,
-  } as GenerationJob;
-  return writeJob(timedOut);
 }
 
 async function collectGenerationArtifact(params: any) {
-  const jobId = String(params.job_id || '');
-  if (!jobId) throw new Error('collect_generation_artifact requires job_id');
-  const job = readJob(jobId);
-  if (job.status !== 'succeeded') {
-    throw new Error(`collect_generation_artifact requires succeeded job. Current status: ${job.status}`);
+  const traceCtx = createActuatorTrace('media-generation-actuator', 'collect_generation_artifact', {
+    pipelineId: String(params?.job_id || ''),
+  });
+  traceCtx.startSpan('media-generation:collect_generation_artifact');
+  try {
+    const jobId = String(params.job_id || '');
+    if (!jobId) throw new Error('collect_generation_artifact requires job_id');
+    const job = readJob(jobId);
+    if (job.status !== 'succeeded') {
+      throw new Error(`collect_generation_artifact requires succeeded job. Current status: ${job.status}`);
+    }
+    const artifact = job.result?.artifact as GeneratedArtifact | undefined;
+    if (!artifact?.path) {
+      throw new Error(`collect_generation_artifact found no artifact path for job ${jobId}`);
+    }
+    const targetPath = String(params.target_path || job.request?.target_path || '');
+    const copiedTo = maybeCopyArtifact(artifact.path, targetPath || undefined);
+    const updatedJob: GenerationJob = {
+      ...job,
+      result: {
+        ...job.result,
+        copied_to: copiedTo || job.result?.copied_to,
+      },
+      updated_at: nowIso(),
+    };
+    writeJob(updatedJob);
+    traceCtx.endSpan('ok');
+    return { ...updatedJob, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
+      status: 'failed',
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
+    };
   }
-  const artifact = job.result?.artifact as GeneratedArtifact | undefined;
-  if (!artifact?.path) {
-    throw new Error(`collect_generation_artifact found no artifact path for job ${jobId}`);
-  }
-  const targetPath = String(params.target_path || job.request?.target_path || '');
-  const copiedTo = maybeCopyArtifact(artifact.path, targetPath || undefined);
-  const updatedJob: GenerationJob = {
-    ...job,
-    result: {
-      ...job.result,
-      copied_to: copiedTo || job.result?.copied_to,
-    },
-    updated_at: nowIso(),
-  };
-  writeJob(updatedJob);
-  return updatedJob;
 }
 
 async function handleSingleAction(input: any) {
@@ -485,14 +603,50 @@ async function handleSingleAction(input: any) {
 }
 
 export async function handleAction(input: any) {
+  const traceCtx = createActuatorTrace('media-generation-actuator', String(input?.action || 'unknown'));
+  traceCtx.startSpan(`media-generation:${String(input?.action || 'unknown')}`);
   if (input.action === 'pipeline') {
-    const results = [];
-    for (const step of input.steps) {
-      results.push(await handleSingleAction(step));
+    try {
+      const results = [];
+      for (const step of input.steps) {
+        traceCtx.startSpan(`media-generation:${String(step?.action || 'step')}`);
+        try {
+          const stepResult = await handleSingleAction(step);
+          results.push(stepResult);
+          if (stepResult?.status === 'failed' || stepResult?.status === 'error') {
+            traceCtx.endSpan('error', stepResult?.message ?? `step failed: ${String(step?.action || 'step')}`);
+          } else {
+            traceCtx.endSpan('ok');
+          }
+        } catch (err: any) {
+          traceCtx.endSpan('error', err?.message ?? String(err));
+          throw err;
+        }
+      }
+      traceCtx.endSpan('ok');
+      return {
+        status: derivePipelineStatus(
+          results.map((result: any) => ({
+            op: String(result?.action || result?.job_id || result?.prompt_id || 'step'),
+            status: result?.status === 'failed' || result?.status === 'error' ? 'failed' : 'success',
+          })),
+        ),
+        results,
+        ...finalizeActuatorTrace(traceCtx),
+      };
+    } catch (err: any) {
+      traceCtx.endSpan('error', err?.message ?? String(err));
+      return { status: 'failed', message: err?.message ?? String(err), ...finalizeActuatorTrace(traceCtx) };
     }
-    return { status: 'succeeded', results };
   }
-  return await handleSingleAction(input);
+  try {
+    const result = await handleSingleAction(input);
+    traceCtx.endSpan('ok');
+    return { ...result, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return { status: 'failed', message: err?.message ?? String(err), ...finalizeActuatorTrace(traceCtx) };
+  }
 }
 
 const main = async () => {

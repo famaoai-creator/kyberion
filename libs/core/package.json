@@ -147,6 +147,10 @@
       "types": "./dist/pipeline-contract.d.ts",
       "default": "./dist/pipeline-contract.js"
     },
+    "./pipeline-scheduler": {
+      "types": "./dist/src/pipeline-scheduler.d.ts",
+      "default": "./dist/src/pipeline-scheduler.js"
+    },
     "./pty-engine": {
       "types": "./dist/pty-engine.d.ts",
       "default": "./dist/pty-engine.js"
@@ -226,6 +230,18 @@
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
+    },
+    "./json-repair": {
+      "types": "./dist/json-repair.d.ts",
+      "default": "./dist/json-repair.js"
+    },
+    "./prompt-constraints": {
+      "types": "./dist/prompt-constraints.d.ts",
+      "default": "./dist/prompt-constraints.js"
+    },
+    "./semaphore": {
+      "types": "./dist/semaphore.d.ts",
+      "default": "./dist/semaphore.js"
     },
     "./validate": {
       "types": "./dist/validate.d.ts",

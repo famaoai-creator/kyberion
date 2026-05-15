@@ -85,6 +85,27 @@ describe('task-session', () => {
     expect(getActiveTaskSession('presence')?.session_id).toBeTruthy();
   });
 
+  it('persists iMessage-backed task sessions', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-IMESSAGE',
+      surface: 'imessage',
+      taskType: 'analysis',
+      intentId: 'incident-informed-review',
+      status: 'planning',
+      goal: {
+        summary: 'iMessage のやり取りを分析する',
+        success_condition: 'session が検証付きで保存される',
+      },
+      payload: {
+        note: 'surface should now be accepted',
+      },
+    });
+
+    expect(() => saveTaskSession(session)).not.toThrow();
+    const loaded = loadTaskSession('TSK-TEST-IMESSAGE');
+    expect(loaded?.surface).toBe('imessage');
+  });
+
   it('derives approval-required control state from classified service operations', () => {
     const classified = classifyTaskSessionIntent('voice-hub を再起動して');
     expect(classified?.payload?.approval_required).toBe(true);

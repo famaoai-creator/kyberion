@@ -310,6 +310,28 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
   });
 
+  it('threads iMessage context into intent compilation', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'schedule-coordination',
+      shape: 'task_session',
+      routeFamily: 'direct_reply',
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    await runSurfaceConversation({
+      agentId: 'imessage-surface-agent',
+      surface: 'imessage',
+      query: 'では夕方にー！',
+      surfaceText: 'では夕方にー！',
+      threadContext: 'User: 今夜のお店は予定表に入れています。',
+      senderAgentId: 'kyberion:imessage-bridge',
+    } as any);
+    expect(mocks.compileUserIntentFlow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Current user message:'),
+      }),
+    );
+  });
+
   it('creates a task session for schedule coordination requests', async () => {
     mocks.classifyTaskSessionIntent.mockReturnValue({
       intentId: 'schedule-coordination',
