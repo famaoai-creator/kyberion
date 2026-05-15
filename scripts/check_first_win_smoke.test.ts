@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
-import { checkFirstWinSmoke } from './check_first_win_smoke.js';
+import { checkFirstWinSmoke, validateVerifySessionPipeline } from './check_first_win_smoke.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -33,5 +33,24 @@ describe('check_first_win_smoke', () => {
     safeWriteFile(readmePath, '# Kyberion\n', { encoding: 'utf8' });
     const violations = checkFirstWinSmoke();
     expect(violations.some((line) => line.startsWith('README.md: missing'))).toBe(true);
+  });
+
+  it('requires verify-session to be a clean local screenshot smoke', () => {
+    const violations = validateVerifySessionPipeline({
+      options: { headless: false, user_data_dir: 'active/browser-session/enterprise-sync' },
+      inputs: { TARGET_URL: { default: 'https://example.com' } },
+      steps: [
+        { op: 'browser:evaluate', params: { script: 'document.title', export_as: 'session_state' } },
+        { op: 'browser:screenshot', params: { path: 'active/shared/tmp/enterprise-login-success.png' } },
+      ],
+    });
+
+    expect(violations).toEqual(expect.arrayContaining([
+      expect.stringContaining('headless must be true'),
+      expect.stringContaining('user_data_dir must stay under active/shared/tmp/'),
+      expect.stringContaining('missing browser:goto'),
+      expect.stringContaining('local data URL'),
+      expect.stringContaining('first-win-session.png'),
+    ]));
   });
 });

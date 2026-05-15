@@ -1,11 +1,13 @@
 import type { CapabilityStatus, EnvironmentCapability, EnvironmentManifest } from '@agent/core';
 
 export type DoctorSeverity = 'must' | 'should' | 'nice';
+export type DoctorDomain = 'core' | 'meeting' | 'voice' | 'browser' | 'audio' | 'reasoning';
 
 export interface DoctorFinding {
   manifest_id: string;
   capability_id: string;
   severity: DoctorSeverity;
+  domains: DoctorDomain[];
   reason?: string;
   docs_url?: string;
   instruction?: string;
@@ -40,6 +42,23 @@ export function classifyDoctorSeverity(cap: EnvironmentCapability): DoctorSeveri
   return 'should';
 }
 
+export function classifyDoctorDomains(cap: EnvironmentCapability): DoctorDomain[] {
+  const haystack = [
+    cap.capability_id,
+    cap.kind,
+    cap.description,
+    ...(cap.required_for || []),
+  ].join(' ').toLowerCase();
+  const domains = new Set<DoctorDomain>();
+  if (/(meeting|participation|join|speak)/.test(haystack)) domains.add('meeting');
+  if (/(voice|stt|tts|speech|speak)/.test(haystack)) domains.add('voice');
+  if (/(browser|playwright|chromium)/.test(haystack)) domains.add('browser');
+  if (/(audio|ffmpeg|blackhole|pulse|pcm)/.test(haystack)) domains.add('audio');
+  if (/(reasoning|wisdom|claude|gemini|codex|anthropic)/.test(haystack)) domains.add('reasoning');
+  if (domains.size === 0) domains.add('core');
+  return [...domains].sort();
+}
+
 export function summarizeManifestDoctor(
   manifest: EnvironmentManifest,
   probeStatuses: CapabilityStatus[],
@@ -57,6 +76,7 @@ export function summarizeManifestDoctor(
       manifest_id: manifest.manifest_id,
       capability_id: cap.capability_id,
       severity,
+      domains: classifyDoctorDomains(cap),
       reason: status.reason,
       docs_url: cap.install?.docs_url,
       instruction: cap.install?.instruction,
@@ -83,6 +103,7 @@ export function formatDoctorSummary(summary: DoctorSummary): string[] {
     lines.push(`   ${severity.toUpperCase()}:`);
     for (const finding of entries) {
       const details = [
+        finding.domains.length ? `[${finding.domains.join(',')}]` : '',
         finding.reason ? finding.reason : '',
         finding.docs_url ? `docs=${finding.docs_url}` : '',
       ]

@@ -1,8 +1,8 @@
 import { logger } from './core.js';
 import { spawnSync } from 'node:child_process';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 /**
  * Provider Discovery v1.0
@@ -12,10 +12,7 @@ import * as path from 'node:path';
  *
  * Cache strategy:
  *   1. In-memory (per-process, reset on restart)
- *   2. Disk cache at ~/.kyberion/provider-cache.json (survives process restarts)
- *
- * Note: uses native node:fs intentionally — this is system-level infrastructure,
- * not a mission artifact. secure-io / tier-guard do not govern ~/.kyberion/.
+ *   2. Disk cache under active/shared/runtime/ (survives process restarts)
  */
 
 export interface ProviderInfo {
@@ -33,11 +30,12 @@ let cachedProviders: ProviderInfo[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 300000; // 5 min
 
-const DISK_CACHE_PATH = path.join(os.homedir(), '.kyberion', 'provider-cache.json');
+const DISK_CACHE_PATH = pathResolver.rootResolve('active/shared/runtime/provider-cache.json');
 
 function readDiskCache(): ProviderInfo[] | null {
   try {
-    const raw = fs.readFileSync(DISK_CACHE_PATH, 'utf8');
+    if (!safeExistsSync(DISK_CACHE_PATH)) return null;
+    const raw = safeReadFile(DISK_CACHE_PATH, { encoding: 'utf8' }) as string;
     const parsed = JSON.parse(raw) as { ts: number; providers: ProviderInfo[] };
     if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
   } catch { /* cache miss — non-fatal */ }
@@ -47,8 +45,8 @@ function readDiskCache(): ProviderInfo[] | null {
 function writeDiskCache(providers: ProviderInfo[]): void {
   try {
     const dir = path.dirname(DISK_CACHE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), 'utf8');
+    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    safeWriteFile(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), { encoding: 'utf8' });
   } catch { /* non-fatal */ }
 }
 
@@ -189,14 +187,15 @@ function checkCopilot(): ProviderInfo {
 
 function checkCodex(): ProviderInfo {
   const which = run('which', ['codex']);
-  const installed = which.ok;
+  const npx = !which.ok ? run('npx', ['codex', '--version'], 15000) : { ok: true, stdout: '' };
+  const installed = which.ok || npx.ok;
   const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
   const protocol: ProviderInfo['protocol'] = (mode === 'exec' || mode === 'legacy') ? 'exec' : 'json-rpc';
 
   return {
     provider: 'codex',
     installed,
-    version: null,
+    version: which.ok ? null : (npx.stdout || null),
     protocol,
     models: ['codex'],
     capabilities: ['code', 'implementation', 'refactoring', 'patch', 'terminal', 'debugging', 'structured_json'],
@@ -252,7 +251,7 @@ export function refreshProviderDiscoveryCache(): ProviderInfo[] {
 export function clearProviderDiscoveryCache(): void {
   cachedProviders = null;
   cacheTimestamp = 0;
-  try { fs.unlinkSync(DISK_CACHE_PATH); } catch { /* non-fatal */ }
+  try { safeUnlinkSync(DISK_CACHE_PATH); } catch { /* non-fatal */ }
 }
 
 /**

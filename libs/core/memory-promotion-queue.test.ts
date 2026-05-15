@@ -83,6 +83,18 @@ describe('memory-promotion-queue', () => {
     expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(/public-tier/i);
   });
 
+  it('rejects public-tier candidates that reference confidential mission artifacts', () => {
+    const candidate = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-CONFIDENTIAL-REF',
+      proposedMemoryKind: 'sop',
+      summary: 'Public promotion must not leak confidential mission evidence.',
+      evidenceRefs: ['active/missions/confidential/MSN-TEST-CONFIDENTIAL-REF/evidence/trace.jsonl'],
+      sensitivityTier: 'public',
+    });
+    expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(/public-tier/i);
+  });
+
   it('queues a mission candidate and supports status updates', () => {
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: 'MSN-TEST-STATUS',

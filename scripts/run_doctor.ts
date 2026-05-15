@@ -5,6 +5,12 @@ import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doct
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
 const MISSION_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend', 'meeting-participation-runtime'];
+const RUNTIME_PRESETS: Record<string, string[]> = {
+  meeting: ['meeting-participation-runtime'],
+  voice: ['meeting-participation-runtime'],
+  browser: ['meeting-participation-runtime'],
+  baseline: DEFAULT_MANIFESTS,
+};
 
 export interface DoctorRunReport {
   totalMissing: number;
@@ -17,6 +23,7 @@ export interface DoctorRunReport {
 
 export async function collectDoctorReport(argv: {
   manifest?: string;
+  runtime?: string;
   all?: boolean;
   mission?: string;
 }): Promise<DoctorRunReport> {
@@ -27,7 +34,9 @@ export async function collectDoctorReport(argv: {
     ? listEnvironmentManifestIds()
     : argv.manifest
       ? [String(argv.manifest)]
-      : missionId ? MISSION_MANIFESTS : DEFAULT_MANIFESTS;
+      : argv.runtime
+        ? (RUNTIME_PRESETS[String(argv.runtime)] ?? [String(argv.runtime)])
+        : missionId ? MISSION_MANIFESTS : DEFAULT_MANIFESTS;
 
   const summaries: DoctorRunReport['summaries'] = [];
   let totalMissing = 0;
@@ -49,6 +58,10 @@ export async function collectDoctorReport(argv: {
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('manifest', { type: 'string' })
+    .option('runtime', {
+      type: 'string',
+      describe: 'Runtime preset to inspect: meeting, voice, browser, or baseline',
+    })
     .option('all', { type: 'boolean', default: false })
     .option('mission', { type: 'string' })
     .parseSync();
@@ -68,10 +81,10 @@ async function main(): Promise<void> {
   }
 
   const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
-  if (!missionId && !argv.manifest && !argv.all) {
-    console.log('Tip: pass `--mission <id>` to include mission-scoped meeting checks such as voice consent.');
+  if (!missionId && !argv.manifest && !argv.runtime && !argv.all) {
+    console.log('Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.');
   }
-  console.log('Next step: run `pnpm env:bootstrap --manifest <id> --apply` for missing must/should items.');
+  console.log('Next step: run `pnpm env:bootstrap --manifest <id> --apply` for missing must/should items, or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps.');
   process.exit(1);
 }
 

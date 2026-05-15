@@ -11,6 +11,8 @@ import { withExecutionContext } from '@agent/core/governance';
 import {
   SYSTEM_ACTUATOR_APPLY_OPS,
   SYSTEM_ACTUATOR_CAPTURE_OPS,
+  SYSTEM_ACTUATOR_CONTROL_OPS,
+  SYSTEM_ACTUATOR_TRANSFORM_OPS,
 } from '../libs/actuators/system-actuator/src/index.js';
 import { readJsonFile } from './refactor/cli-input.js';
 
@@ -150,12 +152,28 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     lines.push(`| \`${op}\` | system-actuator capture op |`);
   }
   lines.push('');
+  lines.push('### Transform ops (type: transform)');
+  lines.push('');
+  lines.push('| Op | Notes |');
+  lines.push('| :--- | :--- |');
+  for (const op of SYSTEM_ACTUATOR_TRANSFORM_OPS) {
+    lines.push(`| \`${op}\` | system-actuator transform op |`);
+  }
+  lines.push('');
   lines.push('### Apply ops (type: apply)');
   lines.push('');
   lines.push('| Op | Notes |');
   lines.push('| :--- | :--- |');
   for (const op of SYSTEM_ACTUATOR_APPLY_OPS) {
     lines.push(`| \`${op}\` | system-actuator apply op |`);
+  }
+  lines.push('');
+  lines.push('### Control ops (type: control)');
+  lines.push('');
+  lines.push('| Op | Notes |');
+  lines.push('| :--- | :--- |');
+  for (const op of SYSTEM_ACTUATOR_CONTROL_OPS) {
+    lines.push(`| \`${op}\` | system-actuator control op |`);
   }
   lines.push('');
   lines.push('See also:');
