@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver, loadCapabilityRegistry, scanProviderCapabilities, withRetry, classifyError } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver, loadCapabilityRegistry, scanProviderCapabilities, withRetry, classifyError, createActuatorTrace, finalizeActuatorTrace } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -95,13 +95,28 @@ async function handleAction(input: CodeAction) {
   if (input.action === 'reconcile') {
     return await performReconcile(input);
   }
-  return await executePipeline(input.steps || [], input.context || {}, input.options);
+  const traceCtx = createActuatorTrace('code-actuator', 'pipeline');
+  traceCtx.startSpan('code:pipeline', {
+    stepCount: Array.isArray(input.steps) ? input.steps.length : 0,
+  });
+  try {
+    const result = await executePipeline(input.steps || [], input.context || {}, input.options, { stepCount: 0, startTime: Date.now() }, traceCtx);
+    traceCtx.endSpan('ok');
+    return { ...result, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
+      status: 'error',
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
+    };
+  }
 }
 
 /**
  * Universal Pipeline Engine with Control Flow & Safety Guards
  */
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }, traceCtx?: any) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
@@ -125,10 +140,11 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
 
     try {
+      traceCtx?.startSpan?.(`code:${step.type}:${step.op}`, { stepCount: state.stepCount });
       logger.info(`  [CODE_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
       
       if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
+        ctx = await opControl(step.op, step.params, ctx, options, state, resolve, traceCtx);
       } else {
         switch (step.type) {
           case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
@@ -136,8 +152,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
           case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
         }
       }
+      traceCtx?.endSpan?.('ok');
       results.push({ op: step.op, status: 'success' });
     } catch (err: any) {
+      traceCtx?.endSpan?.('error', err.message);
       logger.error(`  [CODE_PIPELINE] Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
       break; 
@@ -160,14 +178,14 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 /**
  * CONTROL Operators
  */
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any) {
+async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any, traceCtx?: any) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
+        const res = await executePipeline(params.then, ctx, options, state, traceCtx);
         return res.context;
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
+        const res = await executePipeline(params.else, ctx, options, state, traceCtx);
         return res.context;
       }
       return ctx;
@@ -176,7 +194,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state);
+        const res = await executePipeline(params.pipeline, ctx, options, state, traceCtx);
         ctx = res.context;
         iterations++;
       }

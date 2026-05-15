@@ -130,7 +130,12 @@ describe('media-generation-actuator', () => {
     expect(mocks.executeServicePreset).toHaveBeenCalledWith('media-generation', 'generate_image', {
       workflow_path: 'active/shared/tmp/image-workflow.json',
     });
-    expect(result).toEqual({ prompt_id: 'abc123' });
+    expect(result).toEqual(expect.objectContaining({
+      prompt_id: 'abc123',
+      trace_summary: expect.objectContaining({
+        spans: expect.any(Number),
+      }),
+    }));
   });
 
   it('can await image generation completion and return the generated artifact', async () => {
@@ -202,11 +207,14 @@ describe('media-generation-actuator', () => {
     });
 
     expect(mocks.compileImageGenerationADF).toHaveBeenCalled();
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       prompt_id: 'img-234',
       status: 'submitted',
       compiled_generation_request: { filename_prefix: 'cover' },
-    });
+      trace_summary: expect.objectContaining({
+        spans: expect.any(Number),
+      }),
+    }));
   });
 
   it('compiles music ADFs, waits for completion, and returns the generated artifact', async () => {

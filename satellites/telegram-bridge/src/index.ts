@@ -1,10 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
   createStandardYargs,
   logger,
   pathResolver,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
   runSurfaceMessageConversation,
   safeReadFile,
 } from '@agent/core';
@@ -76,6 +80,17 @@ export interface TelegramWebhookReceipt {
 }
 
 const TELEGRAM_SURFACE_AGENT_ID = 'telegram-surface-agent';
+const TELEGRAM_THREAD_HISTORY_ROOT = 'active/shared/runtime/telegram-bridge/thread-history';
+
+export interface TelegramThreadHistoryEntry {
+  role: 'user' | 'assistant';
+  authorLabel: string;
+  text: string;
+  messageId: string;
+  threadTs: string;
+  chatId: string;
+  receivedAt: string;
+}
 
 function resolveUpdate(raw: TelegramBridgeInput | TelegramUpdate): TelegramUpdate {
   if (typeof raw === 'object' && raw && ('message' in raw || 'edited_message' in raw)) {
@@ -90,6 +105,73 @@ function pickMessage(update: TelegramUpdate): TelegramMessage | undefined {
 
 function pickText(message: TelegramMessage): string {
   return (message.text || message.caption || '').trim();
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function resolveTelegramThreadTs(message: TelegramMessage): string {
+  const chatId = String(message.chat.id);
+  const threadId = message.message_thread_id;
+  return typeof threadId === 'number' ? `${chatId}:${threadId}` : chatId;
+}
+
+function resolveTelegramThreadHistoryPath(threadTs: string): string {
+  const safeThreadTs = sanitizePathSegment(threadTs);
+  return pathResolver.resolve(`${TELEGRAM_THREAD_HISTORY_ROOT}/${safeThreadTs}.jsonl`);
+}
+
+function readTelegramThreadHistory(threadTs: string): TelegramThreadHistoryEntry[] {
+  const resolved = resolveTelegramThreadHistoryPath(threadTs);
+  if (!safeExistsSync(resolved)) return [];
+  const raw = String(safeReadFile(resolved, { encoding: 'utf8' }) || '').trim();
+  if (!raw) return [];
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line) as TelegramThreadHistoryEntry;
+      } catch {
+        return null;
+      }
+    })
+    .filter((entry): entry is TelegramThreadHistoryEntry => Boolean(entry));
+}
+
+function appendTelegramThreadHistory(entry: TelegramThreadHistoryEntry): void {
+  try {
+    const resolved = resolveTelegramThreadHistoryPath(entry.threadTs);
+    safeMkdir(path.dirname(resolved), { recursive: true });
+    safeAppendFileSync(resolved, `${JSON.stringify(entry)}\n`);
+  } catch (error: any) {
+    logger.warn(`⚠️ [TelegramBridge] Failed to persist thread history: ${error?.message || error}`);
+  }
+}
+
+export function buildTelegramThreadContextFromEntries(
+  entries: TelegramThreadHistoryEntry[],
+): string | undefined {
+  const recent = entries
+    .filter((entry) => entry.text.trim().length > 0)
+    .slice(-6);
+
+  if (!recent.length) return undefined;
+
+  return [
+    'Recent Telegram thread context:',
+    ...recent.map((entry) => (
+      entry.role === 'assistant'
+        ? `Assistant: ${entry.text}`
+        : `User (${entry.authorLabel}): ${entry.text}`
+    )),
+  ].join('\n');
+}
+
+function buildTelegramThreadContext(threadTs: string): string | undefined {
+  return buildTelegramThreadContextFromEntries(readTelegramThreadHistory(threadTs));
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
@@ -173,12 +255,23 @@ export async function handleTelegramUpdate(
   }
 
   const chatId = String(message.chat.id);
-  const threadTs = String(message.message_thread_id || message.message_id);
+  const threadTs = resolveTelegramThreadTs(message);
   const receivedAt = typeof message.date === 'number'
     ? new Date(message.date * 1000).toISOString()
     : new Date().toISOString();
+  const authorLabel = String(message.from?.username || message.from?.id || chatId);
 
   logger.info(`📥 [TelegramBridge] Message from ${message.from?.username || message.from?.id || chatId}: ${text}`);
+  const threadContext = buildTelegramThreadContext(threadTs);
+  appendTelegramThreadHistory({
+    role: 'user',
+    authorLabel,
+    text,
+    messageId: String(message.message_id),
+    threadTs,
+    chatId,
+    receivedAt,
+  });
 
   const conversation = await runSurfaceMessageConversation({
     surface: 'telegram',
@@ -190,6 +283,7 @@ export async function handleTelegramUpdate(
     actorId: String(message.from?.id || chatId),
     senderAgentId: 'kyberion:telegram-bridge',
     agentId: TELEGRAM_SURFACE_AGENT_ID,
+    threadContext: threadContext || undefined,
     delegationSummaryInstruction: 'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
   } as any);
 
@@ -200,6 +294,15 @@ export async function handleTelegramUpdate(
       { chatId, text: conversation.text, parseMode: options.parseMode },
       options,
     );
+    appendTelegramThreadHistory({
+      role: 'assistant',
+      authorLabel: TELEGRAM_SURFACE_AGENT_ID,
+      text: conversation.text,
+      messageId: `reply-${message.message_id}`,
+      threadTs,
+      chatId,
+      receivedAt: new Date().toISOString(),
+    });
   }
 
   return {
@@ -305,7 +408,7 @@ async function main(): Promise<void> {
 }
 
 const directEntry = process.argv[1] ? pathToFileURL(process.argv[1]).href === import.meta.url : false;
-if (directEntry) {
+if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

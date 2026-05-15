@@ -220,6 +220,7 @@ interface SurfaceConversationInputBase {
   query: string;
   senderAgentId: string;
   surfaceText?: string;
+  threadContext?: string;
   cwd?: string;
   delegationSummaryInstruction?: string;
   forcedReceiver?: string;
@@ -239,6 +240,7 @@ interface SurfaceConversationMessageInputBase {
   receivedAt?: string;
   senderAgentId: string;
   agentId?: string;
+  threadContext?: string;
   cwd?: string;
   delegationSummaryInstruction?: string;
   forcedReceiver?: string;
