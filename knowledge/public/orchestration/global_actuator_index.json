@@ -185,10 +185,10 @@
     {
       "n": "service-actuator",
       "path": "libs/actuators/service-actuator",
-      "d": "Unified External SaaS/API Reachability Layer",
+      "d": "Unified External SaaS/API/MCP Reachability Layer",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 6,
+      "version": "1.1.0",
+      "capability_count": 7,
       "contract_schema": "schemas/service-action.schema.json"
     },
     {
@@ -196,7 +196,7 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control, diagnostics, and short-lived local execution",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 3,
       "contract_schema": "schemas/system-pipeline.schema.json"
     },
@@ -240,7 +240,7 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 32,
       "contract_schema": "schemas/wisdom-action.schema.json"
     }

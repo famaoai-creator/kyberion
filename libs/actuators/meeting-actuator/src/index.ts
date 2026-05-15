@@ -29,6 +29,8 @@ import {
   auditChain,
   classifyError,
   withRetry,
+  createActuatorTrace,
+  finalizeActuatorTrace,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -53,6 +55,9 @@ export interface MeetingActionResult {
   method?: string;
   message?: string;
   audit_event_id?: string;
+  trace?: unknown;
+  trace_summary?: unknown;
+  trace_persisted_path?: string;
   /**
    * Set true on `listen` when the bridge could not deliver a complete
    * transcript (timeout, partial connection, dropped audio chunks).
@@ -222,6 +227,13 @@ function recordMeetingEvent(
 }
 
 export async function handleAction(input: MeetingAction): Promise<MeetingActionResult> {
+  const traceCtx = createActuatorTrace('meeting-actuator', input.action, {
+    pipelineId: input.params.meeting_id,
+  });
+  traceCtx.startSpan(`meeting:${input.action}`, {
+    platform: input.params.platform,
+  });
+
   // Voice consent gate (only speak() is gated).
   if (input.action === 'speak') {
     const consent = checkSpeakConsent();
@@ -232,7 +244,8 @@ export async function handleAction(input: MeetingAction): Promise<MeetingActionR
         message: consent.reason,
       };
       denied.audit_event_id = recordMeetingEvent(input, denied);
-      return denied;
+      traceCtx.endSpan('error', consent.reason);
+      return { ...denied, ...finalizeActuatorTrace(traceCtx) };
     }
   }
 
@@ -260,8 +273,9 @@ export async function handleAction(input: MeetingAction): Promise<MeetingActionR
     };
   }
 
+  traceCtx.endSpan(parsed.status === 'error' ? 'error' : 'ok', parsed.message);
   parsed.audit_event_id = recordMeetingEvent(input, parsed);
-  return parsed;
+  return { ...parsed, ...finalizeActuatorTrace(traceCtx) };
 }
 
 const main = async () => {

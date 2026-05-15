@@ -8,6 +8,8 @@ import {
   findMissionPath,
   grantAccess,
   grantAccessGuarded,
+  createActuatorTrace,
+  finalizeActuatorTrace,
   ledger,
   logger,
   pathResolver,
@@ -247,29 +249,51 @@ export async function finishMission(
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
   const evidenceRefs = collectMissionEvidenceRefs(missionDir);
+  const traceCtx = createActuatorTrace('mission-controller', 'finish', {
+    pipelineId: upperId,
+    missionId: upperId,
+  });
+  traceCtx.startSpan('mission:finish', {
+    evidence_count: evidenceRefs.length,
+    tier: state.tier,
+  });
 
   logger.info(`🏁 Finishing Mission: ${upperId}...`);
 
   try {
+    traceCtx.startSpan('mission:commit');
     safeExec('git', ['add', '.'], { cwd: missionDir });
     safeExec('git', ['commit', '-m', `feat: complete mission ${upperId}`], { cwd: missionDir });
     state.git.latest_commit = args.getGitHash(missionDir);
+    traceCtx.endSpan('ok');
   } catch (_) {
     logger.info('No changes to commit in mission repo.');
+    traceCtx.endSpan('ok');
   }
 
   if (state.status !== 'completed') {
+    traceCtx.startSpan('mission:complete-state');
     state.status = args.transitionStatus(state.status, 'completed');
     state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
+    traceCtx.endSpan('ok');
   }
+  traceCtx.startSpan('mission:evidence');
+  for (const ref of evidenceRefs) {
+    traceCtx.addArtifact('file', ref, 'mission evidence ref');
+  }
+  traceCtx.endSpan('ok');
   await saveState(upperId, state);
   await args.syncProjectLedgerIfLinked(upperId);
+  traceCtx.addEvent('ledger.synced', { evidence_count: evidenceRefs.length });
 
   if (seal || (state.tier === 'personal' && process.env.AUTO_SEAL === 'true')) {
+    traceCtx.startSpan('mission:seal');
     await args.sealMission(upperId);
+    traceCtx.endSpan('ok');
   }
 
   try {
+    traceCtx.startSpan('mission:memory-promotion');
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: upperId,
       missionType: state.mission_type,
@@ -278,16 +302,25 @@ export async function finishMission(
       evidenceRefs,
     });
     logger.info(`🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`);
+    traceCtx.endSpan('ok');
   } catch (err: any) {
     logger.warn(`⚠️ [MEMORY_PROMOTION] queue skipped for ${upperId}: ${err?.message || err}`);
+    traceCtx.endSpan('error', err?.message || String(err));
   }
 
+  if (!ledger.verifyIntegrity()) {
+    logger.warn(`⚠️ [LEDGER_INTEGRITY] Global ledger integrity check failed for mission ${upperId}. The ledger may be corrupted — review ${upperId} audit trail before relying on it.`);
+    traceCtx.addEvent('ledger.integrity_failed');
+  }
+
+  traceCtx.startSpan('mission:ledger-record');
   ledger.record('MISSION_FINISH', {
     mission_id: upperId,
     status: 'completed',
     sealed: seal,
     archive_path: args.archiveDir,
   });
+  traceCtx.endSpan('ok');
 
   recordAgentRuntimeEvent(args.agentRuntimeEventPath, {
     event: 'MISSION_FINISH_REFRESH_RECOMMENDED',
@@ -298,18 +331,30 @@ export async function finishMission(
 
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
   if (safeExistsSync(missionTmpDir)) {
+    traceCtx.startSpan('mission:purge-temp');
     logger.info('🧹 Purging mission runtime temp...');
     safeRmSync(missionTmpDir, { recursive: true, force: true });
+    traceCtx.endSpan('ok');
   }
 
   if (!safeExistsSync(args.archiveDir)) safeMkdir(args.archiveDir, { recursive: true });
   const archivePath = path.join(args.archiveDir, upperId);
+  traceCtx.startSpan('mission:archive');
   if (safeExistsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
   safeExec('cp', ['-r', missionDir, archivePath]);
   safeExec('rm', ['-rf', missionDir]);
+  traceCtx.endSpan('ok');
 
   state.status = args.transitionStatus(state.status, 'archived');
   state.history.push({ ts: new Date().toISOString(), event: 'ARCHIVE', note: `Mission archived to ${archivePath}.` });
+  await saveState(upperId, state);
+  traceCtx.endSpan('ok');
+  const traceResult = finalizeActuatorTrace(traceCtx);
+  state.context = {
+    ...(state.context || {}),
+    mission_finish_trace_summary: traceResult.trace_summary,
+    mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
+  };
   await saveState(upperId, state);
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }

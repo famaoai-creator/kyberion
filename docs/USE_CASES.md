@@ -1,5 +1,7 @@
 # ユースケース集 — Kyberion で業務を自動化する
 
+> Canonical workflow catalog. If you only read one scenario document, read this one first. `SCENARIOS.md` and `CEO_SCENARIOS.md` are audience-specific views layered on top.
+
 Kyberion は「人間が一度やったブラウザ操作を記録し、次から自動で実行する」仕組みを持っています。
 このドキュメントでは、すぐに業務で活用できる具体的なシナリオを紹介します。
 

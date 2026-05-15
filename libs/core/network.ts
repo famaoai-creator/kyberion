@@ -40,25 +40,58 @@ function isWhitelistedHostname(hostname: string, domain: string): boolean {
   return normalizedHostname === normalizedDomain || normalizedHostname.endsWith(`.${normalizedDomain}`);
 }
 
-function scrubData(data: any, url: string): any {
-  if (!data) return data;
-  let str = typeof data === 'string' ? data : JSON.stringify(data);
+const SENSITIVE_KEY_PATTERN = /(authorization|proxy-authorization|api[_-]?key|access[_-]?token|auth[_-]?token|bearer|password|secret|session|cookie|credential|private[_-]?key|token)/i;
+const LOCAL_PATH_PATTERN = /\/Users\/[a-zA-Z0-9._-]+\//g;
+const GENERIC_SECRET_PATTERNS: RegExp[] = [
+  /\bsk-[A-Za-z0-9]{16,}\b/g,
+  /\bAIza[0-9A-Za-z_-]{20,}\b/g,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}\b/g,
+  /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/g,
+  /\beyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\b/g,
+];
 
-  // Layer 2 Shield: Scrub active secrets tracked by secret-guard
-  const secrets = secretGuard.getActiveSecrets();
-  for (const secret of secrets) {
+export function redactSensitiveString(value: string): string {
+  let redacted = value;
+  for (const secret of secretGuard.getActiveSecrets()) {
     if (secret && secret.length > 5) {
-      // Endpoint Check: If the URL is whitelisted for a service, we might allow the secret 
-      // (This is handled primarily in headers, but we scrub body just in case)
       const escaped = secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      str = str.replace(new RegExp(escaped, 'g'), '[REDACTED_SECRET]');
+      redacted = redacted.replace(new RegExp(escaped, 'g'), '[REDACTED_SECRET]');
     }
   }
+  for (const pattern of GENERIC_SECRET_PATTERNS) {
+    redacted = redacted.replace(pattern, '[REDACTED_SECRET]');
+  }
+  redacted = redacted.replace(LOCAL_PATH_PATTERN, '[REDACTED_PATH]/');
+  return redacted;
+}
 
-  // Scrub absolute local paths
-  str = str.replace(/\/Users\/[a-zA-Z0-9._-]+\//g, '[REDACTED_PATH]/');
+export function redactSensitiveValue(value: any, keyPath: string[] = []): any {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') {
+    return SENSITIVE_KEY_PATTERN.test(keyPath[keyPath.length - 1] || '') ? '[REDACTED_SECRET]' : redactSensitiveString(value);
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => redactSensitiveValue(entry, [...keyPath, String(index)]));
+  }
+  if (typeof value === 'object') {
+    const output: Record<string, any> = {};
+    for (const [key, nested] of Object.entries(value)) {
+      if (SENSITIVE_KEY_PATTERN.test(key)) {
+        output[key] = typeof nested === 'string' ? '[REDACTED_SECRET]' : redactSensitiveValue(nested, [...keyPath, key]);
+        continue;
+      }
+      output[key] = redactSensitiveValue(nested, [...keyPath, key]);
+    }
+    return output;
+  }
+  return value;
+}
 
-  return typeof data === 'string' ? str : JSON.parse(str);
+export function redactSensitiveObject(data: any): any {
+  return redactSensitiveValue(data);
 }
 
 function enforcePayloadSize(options: AxiosRequestConfig) {
@@ -93,9 +126,13 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   }
 
   // 2. Automatically scrub outbound payload
-  if (options.data) options.data = scrubData(options.data, url);
-  if (options.params) options.params = scrubData(options.params, url);
-  enforcePayloadSize(options);
+  const requestOptions: AxiosRequestConfig = {
+    ...axiosOptions,
+    data: redactSensitiveObject(axiosOptions.data),
+    params: redactSensitiveObject(axiosOptions.params),
+    headers: redactSensitiveObject(axiosOptions.headers),
+  };
+  enforcePayloadSize(requestOptions);
 
   try {
     const response = await axios({
@@ -103,7 +140,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
       headers: {
         'User-Agent': 'Kyberion-Sovereign-Agent/2.1.0 (Physical-Integrity-Enforced)',
       },
-      ...axiosOptions,
+      ...requestOptions,
     });
     return response.data;
   } catch (err: any) {

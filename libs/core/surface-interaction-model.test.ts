@@ -206,9 +206,11 @@ describe('surface-interaction-model', () => {
     const imessageInput = buildSurfaceConversationInputFromMessage(imessageMessage, {
       agentId: 'imessage-surface-agent',
       senderAgentId: 'kyberion:imessage-bridge',
+      threadContext: 'Previous context line',
     });
     expect(imessageInput.surface).toBe('imessage');
     expect(imessageInput.query).toBe('iMessageで会話して');
+    expect(imessageInput.threadContext).toBe('Previous context line');
     expect(imessageInput.surfaceMetadata?.surface).toBe('imessage');
 
     const unifiedIMessageInput = buildSurfaceConversationInput({
@@ -224,6 +226,7 @@ describe('surface-interaction-model', () => {
     expect(unifiedIMessageInput.agentId).toBe('imessage-surface-agent');
     expect(unifiedIMessageInput.surface).toBe('imessage');
     expect(unifiedIMessageInput.surfaceText).toBe('iMessageで会話して');
+    expect(unifiedIMessageInput.threadContext).toBeUndefined();
 
     const unifiedSlackInput = buildSurfaceConversationInput({
       surface: 'slack',
