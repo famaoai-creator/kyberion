@@ -1,5 +1,8 @@
 name: PR Validation
 
+env:
+  PUPPETEER_SKIP_DOWNLOAD: 'true'
+
 on:
   pull_request:
     branches: [main, develop]
