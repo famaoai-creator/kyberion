@@ -7,6 +7,7 @@ import {
   describeIMessageBridgeHealth, 
   sendIMessage, 
   getRecentIMessages,
+  getIMessageHistory,
   runSurfaceMessageConversation,
   type IMessageSendRequest 
 } from '@agent/core';
@@ -34,6 +35,22 @@ async function handleSend(request: IMessageSendRequest) {
   return sendIMessage(request);
 }
 
+function buildThreadContext(message: { id: string; chatId: string; sender: string; text: string }): string {
+  const currentId = Number(message.id);
+  if (!Number.isFinite(currentId)) return '';
+  const history = getIMessageHistory(message.chatId, 8)
+    .filter((entry) => Number(entry.id) < currentId)
+    .slice(-6);
+  if (history.length === 0) return '';
+
+  return [
+    'Recent iMessage thread context:',
+    ...history.map((entry) => `${entry.isFromMe ? 'Assistant' : `User (${entry.sender})`}: ${entry.text}`),
+    '',
+    `Current user message: ${message.text}`,
+  ].join('\n');
+}
+
 async function pollIMessages() {
   try {
     const newMessages = getRecentIMessages(lastSeenRowId);
@@ -46,6 +63,7 @@ async function pollIMessages() {
       if (msg.isFromMe) continue;
 
       logger.info(`📥 [iMessageBridge] Message from ${msg.sender}: ${msg.text}`);
+      const threadContext = buildThreadContext(msg);
 
       const conversation = await runSurfaceMessageConversation({
         surface: 'imessage',
@@ -57,6 +75,7 @@ async function pollIMessages() {
         actorId: msg.sender,
         senderAgentId: 'kyberion:imessage-bridge',
         agentId: IMESSAGE_SURFACE_AGENT_ID,
+        threadContext: threadContext || undefined,
         delegationSummaryInstruction: 
           'Produce a concise iMessage reply in the user language. Do not use A2A blocks.'
       } as any);

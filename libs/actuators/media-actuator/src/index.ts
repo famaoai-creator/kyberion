@@ -20,6 +20,8 @@ import {
   handleStepError,
   classifyError,
   withRetry,
+  createActuatorTrace,
+  finalizeActuatorTrace,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
@@ -280,10 +282,25 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
 
 async function handleAction(input: MediaAction) {
   if (input.action !== 'pipeline') throw new Error('Unsupported action');
-  return await executePipeline(input.steps || [], input.context || {}, input.options);
+  const traceCtx = createActuatorTrace('media-actuator', 'pipeline');
+  traceCtx.startSpan('media:pipeline', {
+    stepCount: Array.isArray(input.steps) ? input.steps.length : 0,
+  });
+  try {
+    const result = await executePipeline(input.steps || [], input.context || {}, input.options, { stepCount: 0, startTime: Date.now() }, traceCtx);
+    traceCtx.endSpan('ok');
+    return { ...result, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
+      status: 'failed',
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
+    };
+  }
 }
 
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }, traceCtx?: any) {
   const rootDir = pathResolver.rootDir();
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
   const resolve = (val: any) => resolveVars(val, ctx);
@@ -295,6 +312,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     const op = (step.op || '').startsWith('media:') ? step.op.slice(6) : step.op;
 
     try {
+      traceCtx?.startSpan?.(`media:${step.type}:${op}`, { stepCount: state.stepCount });
       logger.info(`  [MEDIA_PIPELINE] [Step ${state.stepCount}] ${step.type}:${op}...`);
       switch (step.type) {
         case 'capture': ctx = await opCapture(op, step.params, ctx, resolve); break;
@@ -310,23 +328,25 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
               }
             }
             const refResult = await resolveRef(refPath, bindResolved, ctx, resolve);
-            const subResult = await executePipeline(refResult.steps, { ...ctx, ...refResult.mergedCtx }, options, state);
+            const subResult = await executePipeline(refResult.steps, { ...ctx, ...refResult.mergedCtx }, options, state, traceCtx);
             const { _refDepth, ...subCtxClean } = subResult.context || {};
             ctx = { ...ctx, ...subCtxClean };
           }
           break;
         }
       }
+      traceCtx?.endSpan?.('ok');
       results.push({ op, status: 'success' });
     } catch (err: any) {
+      traceCtx?.endSpan?.('error', err.message);
       const stepOnError = (step as any).on_error;
       if (stepOnError) {
         try {
           const recovery = await handleStepError(err, step, stepOnError, ctx,
             async (fallbackSteps: any[], errCtx: any) => {
-              const res = await executePipeline(fallbackSteps, errCtx, options, state);
-              return res.context;
-            }, resolve);
+                const res = await executePipeline(fallbackSteps, errCtx, options, state, traceCtx);
+                return res.context;
+              }, resolve);
           if (recovery.recovered) {
             ctx = recovery.ctx;
             results.push({ op: step.op, status: 'recovered' as any });

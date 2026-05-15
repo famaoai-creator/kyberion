@@ -96,59 +96,60 @@ interface ApprovalAction {
 }
 
 export async function handleAction(input: ApprovalAction) {
-  const role = input.params.role || 'mission_controller';
+  const params = input.params || ({} as any);
+  const role = params.role || 'mission_controller';
   switch (input.action) {
     case 'create':
-      if (!input.params.threadTs || !input.params.correlationId || !input.params.requestedBy || !input.params.draft) {
+      if (!params.threadTs || !params.correlationId || !params.requestedBy || !params.draft) {
         throw new Error('threadTs, correlationId, requestedBy, and draft are required');
       }
       return {
         status: 'created',
         request: createApprovalRequest(role, {
-          channel: input.params.channel,
-          storageChannel: input.params.storageChannel,
-          threadTs: input.params.threadTs,
-          correlationId: input.params.correlationId,
-          requestedBy: input.params.requestedBy,
-          draft: input.params.draft,
-          sourceText: input.params.sourceText,
-          kind: input.params.requestKind,
-          expiresAt: input.params.expiresAt,
-          requestedByContext: input.params.requestedByContext,
-          target: input.params.target,
-          justification: input.params.justification,
-          risk: input.params.risk,
-          workflow: input.params.workflow,
+          channel: params.channel,
+          storageChannel: params.storageChannel,
+          threadTs: params.threadTs,
+          correlationId: params.correlationId,
+          requestedBy: params.requestedBy,
+          draft: params.draft,
+          sourceText: params.sourceText,
+          kind: params.requestKind,
+          expiresAt: params.expiresAt,
+          requestedByContext: params.requestedByContext,
+          target: params.target,
+          justification: params.justification,
+          risk: params.risk,
+          workflow: params.workflow,
         }),
       };
     case 'load':
-      if (!input.params.requestId) throw new Error('requestId is required');
+      if (!params.requestId) throw new Error('requestId is required');
       return {
         status: 'ok',
         request: await withRetry(
-          async () => loadApprovalRequest(input.params.channel, input.params.requestId),
+          async () => loadApprovalRequest(params.channel, params.requestId),
           buildRetryOptions(),
         ),
       };
     case 'decide':
-      if (!input.params.requestId || !input.params.decision || !input.params.decidedBy) {
+      if (!params.requestId || !params.decision || !params.decidedBy) {
         throw new Error('requestId, decision, and decidedBy are required');
       }
       return {
         status: 'ok',
         request: decideApprovalRequest(role, {
-          channel: input.params.channel,
-          storageChannel: input.params.storageChannel,
-          requestId: input.params.requestId,
-          decision: input.params.decision,
-          decidedBy: input.params.decidedBy,
-          decidedByRole: input.params.decidedByRole,
-          authMethod: input.params.authMethod,
-          note: input.params.note,
+          channel: params.channel,
+          storageChannel: params.storageChannel,
+          requestId: params.requestId,
+          decision: params.decision,
+          decidedBy: params.decidedBy,
+          decidedByRole: params.decidedByRole,
+          authMethod: params.authMethod,
+          note: params.note,
         }),
       };
     case 'list_pending': {
-      const storageChannel = input.params.storageChannel || input.params.channel;
+      const storageChannel = params.storageChannel || params.channel;
       const requests = await withRetry(
         async () => listApprovalRequests({ storageChannels: [storageChannel], status: 'pending' }),
         buildRetryOptions(),

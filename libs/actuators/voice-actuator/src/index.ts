@@ -26,6 +26,8 @@ import {
   VoiceGenerationRuntime,
   writeVoiceProfileRegistry,
   splitVoiceTextIntoChunks,
+  createActuatorTrace,
+  finalizeActuatorTrace,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { randomUUID } from 'node:crypto';
@@ -252,14 +254,51 @@ async function collectAndRegisterVoiceProfile(input: {
 export async function handleAction(input: VoiceAction) {
   validateVoiceAction(input);
   if ((input as any).action === 'pipeline') {
+    const traceCtx = createActuatorTrace('voice-actuator', 'pipeline', {
+      pipelineId: String((input as any).request_id || ''),
+    });
+    traceCtx.startSpan('voice:pipeline', {
+      stepCount: Array.isArray((input as any).steps) ? (input as any).steps.length : 0,
+    });
     const results = [];
-    for (const step of (input as any).steps) {
-      validateVoiceAction(step);
-      results.push(await handleSingleAction(step));
+    try {
+      for (const step of (input as any).steps) {
+        validateVoiceAction(step);
+        traceCtx.startSpan(`voice:${String(step.action || 'step')}`);
+        try {
+          results.push(await handleSingleAction(step));
+          traceCtx.endSpan('ok');
+        } catch (err: any) {
+          traceCtx.endSpan('error', err?.message ?? String(err));
+          throw err;
+        }
+      }
+      traceCtx.endSpan('ok');
+      return { status: 'succeeded', results, ...finalizeActuatorTrace(traceCtx) };
+    } catch (err: any) {
+      traceCtx.endSpan('error', err?.message ?? String(err));
+      return {
+        status: 'error',
+        message: err?.message ?? String(err),
+        results,
+        ...finalizeActuatorTrace(traceCtx),
+      };
     }
-    return { status: 'succeeded', results };
   }
-  return handleSingleAction(input);
+  const traceCtx = createActuatorTrace('voice-actuator', String((input as any).action || 'unknown'));
+  traceCtx.startSpan(`voice:${String((input as any).action || 'unknown')}`);
+  try {
+    const result = await handleSingleAction(input);
+    traceCtx.endSpan('ok');
+    return { ...result, ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: any) {
+    traceCtx.endSpan('error', err?.message ?? String(err));
+    return {
+      status: 'error',
+      message: err?.message ?? String(err),
+      ...finalizeActuatorTrace(traceCtx),
+    };
+  }
 }
 
 function validateVoiceAction(input: unknown): void {
