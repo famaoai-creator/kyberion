@@ -18,7 +18,10 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 | [REGISTRY_SPLIT_PLAN.md](./REGISTRY_SPLIT_PLAN.md) | Taskized backlog for moving global catalogs to per-item canonical files. |
 | [RELEASE_OPERATIONS.md](./RELEASE_OPERATIONS.md) | How releases get cut. |
 | [GOOD_FIRST_ISSUES.md](./GOOD_FIRST_ISSUES.md) | Starter slices for first-time contributors. |
+| [PRODUCTION_GOAL_INSTRUCTIONS.ja.md](./PRODUCTION_GOAL_INSTRUCTIONS.ja.md) | `/goal` handoff instructions for raising Kyberion to production level. |
 | [PRODUCTION_READINESS_PLAN.ja.md](./PRODUCTION_READINESS_PLAN.ja.md) | Implementation backlog and verification scenarios before production-grade OSS release. |
+| [PRODUCTION_RELEASE_GATE_AUDIT.ja.md](./PRODUCTION_RELEASE_GATE_AUDIT.ja.md) | Current evidence for G1-G7 release gates and remaining non-local proof. |
+| [PRODUCTION_EVIDENCE_REGISTER.ja.md](./PRODUCTION_EVIDENCE_REGISTER.ja.md) | Tracks operational proof that cannot be established by local tests alone. |
 | [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) | The PR contract. (Currently being refreshed in Phase C'-3.) |
 | [`../../GOVERNANCE.md`](../../GOVERNANCE.md) | How decisions get made. |
 | [`../../MAINTAINERS.md`](../../MAINTAINERS.md) | Who reviews what. |
@@ -42,10 +45,11 @@ If you're authoring an actuator or a vertical template:
 
 | Need | Doc |
 |---|---|
-| New actuator / plugin | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md) |
+| New actuator / plugin / skill | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md), [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) |
 | New vertical template | [`templates/verticals/README.md`](../../templates/verticals/README.md) |
 | Adding Trace to an existing actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md) |
 | Customer-specific config | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) |
+| Meeting participation runtime | [`TOUR.md`](./TOUR.md#7-where-to-go-next), [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md#51-meeting-runtime-boundary) |
 
 ## Scope
 

@@ -448,27 +448,26 @@ function isEligibleForExecution(item: ActionItem): boolean {
 }
 
 /**
- * Convenience: items assigned to operator_self that are not yet done
+ * Convenience: items assigned to operator_self that are pending
  * AND eligible (declarative + speaker-acknowledged where required).
  */
 export function listOperatorSelfPending(missionId: string): ActionItem[] {
   return listActionItems(missionId).filter(
     (item) =>
       item.assignee.kind === 'operator_self' &&
-      item.status !== 'completed' &&
-      item.status !== 'cancelled' &&
+      item.status === 'pending' &&
       isEligibleForExecution(item),
   );
 }
 
 /**
- * Convenience: items assigned to team_member that are not yet done,
+ * Convenience: items assigned to team_member that are pending,
  * eligible, AND below the per-item reminder cap (default 5).
  */
 export function listOthersPending(missionId: string): ActionItem[] {
   return listActionItems(missionId).filter((item) => {
     if (item.assignee.kind !== 'team_member') return false;
-    if (item.status === 'completed' || item.status === 'cancelled') return false;
+    if (item.status !== 'pending') return false;
     if (!isEligibleForExecution(item)) return false;
     const cap = item.max_reminders ?? 5;
     const sent = item.reminders?.length ?? 0;

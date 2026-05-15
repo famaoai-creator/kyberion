@@ -21,6 +21,18 @@ describe('User meeting use-case contract', () => {
     expect(guide).toContain('meeting:consent grant');
     expect(guide).toContain('meeting:participate');
     expect(guide).toContain('pnpm cli preview pipelines/meeting-proxy-workflow.json');
+    expect(guide).toContain('pnpm run test:meeting-dry-run');
+    expect(guide).toContain('pnpm doctor:meeting --mission MSN-...');
+    expect(guide).toContain('before recording/capture starts and again before TTS speech');
+    expect(guide).toContain('Meeting URLs are logged as redacted host-only values');
     expect(guide).toContain('Dry run vs real meeting');
+  });
+
+  it('keeps the architecture use-case aligned with live participation guardrails', () => {
+    const architecture = read('knowledge/public/architecture/meeting-facilitator-use-case.md');
+    expect(architecture).toContain('Participation consent (`meeting:participate`)');
+    expect(architecture).toContain('meeting_participation.recording_denied');
+    expect(architecture).toContain('meeting_participation.speak_denied');
+    expect(architecture).toContain('pnpm run test:meeting-dry-run');
   });
 });

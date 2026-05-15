@@ -51,6 +51,12 @@ describe('error-classifier', () => {
       const c = classifyError(new Error('approval required to proceed'));
       expect(c.category).toBe('governance_block');
     });
+
+    it('classifies generic policy violations that are not path-scope denials', () => {
+      const c = classifyError('POLICY_VIOLATION: network fetch is not allowed by policy for this role');
+      expect(c.category).toBe('governance_block');
+      expect(c.ruleId).toBe('kyberion.policy-violation');
+    });
   });
 
   describe('auth / secret rules', () => {
@@ -90,6 +96,12 @@ describe('error-classifier', () => {
     it('classifies 429 rate limit', () => {
       expect(classifyError('429 Too Many Requests').category).toBe('rate_limit');
     });
+
+    it('classifies provider-specific timeouts', () => {
+      const c = classifyError('[shell-claude-cli] timed out after 300000ms');
+      expect(c.category).toBe('timeout');
+      expect(c.ruleId).toBe('provider.timeout');
+    });
   });
 
   describe('dependency rules', () => {
@@ -105,6 +117,12 @@ describe('error-classifier', () => {
       const err = new Error('Cannot find module foo') as NodeJS.ErrnoException;
       err.code = 'MODULE_NOT_FOUND';
       expect(classifyError(err).category).toBe('missing_dependency');
+    });
+
+    it('classifies missing Kyberion capabilities', () => {
+      const c = classifyError("capability 'browser-actuator' unavailable for this runtime");
+      expect(c.category).toBe('missing_dependency');
+      expect(c.ruleId).toBe('kyberion.capability-missing');
     });
   });
 
@@ -127,6 +145,12 @@ describe('error-classifier', () => {
   describe('input rules', () => {
     it('classifies schema validation', () => {
       expect(classifyError('schema validation failed at /steps/0').category).toBe('invalid_input');
+    });
+
+    it('classifies raw schema validator messages', () => {
+      const c = classifyError("data/steps/0 must have required property 'op'");
+      expect(c.category).toBe('invalid_input');
+      expect(c.ruleId).toBe('input.schema');
     });
 
     it('classifies unsupported pipeline op', () => {

@@ -187,6 +187,12 @@ function addMinutes(isoTimestamp: string, minutes: number): string {
   return new Date(new Date(isoTimestamp).getTime() + minutes * 60_000).toISOString();
 }
 
+function parseIsoDate(value: unknown): { ok: true; ms: number } | { ok: false } {
+  if (typeof value !== 'string' || value.trim() === '') return { ok: false };
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? { ok: true, ms } : { ok: false };
+}
+
 async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ available: boolean; reason?: string }> {
   switch (probe.kind) {
     case 'command': {
@@ -381,6 +387,19 @@ export async function bootstrapManifest(
     unsatisfied,
     installs_performed: installsPerformed,
   };
+  for (const status of unsatisfied) {
+    safeEmitAudit(
+      'env_bootstrap.capability_unsatisfied',
+      status.capability_id,
+      {
+        manifest_id: manifest.manifest_id,
+        mission_id: opts.mission_id,
+        reason: status.reason,
+      },
+      'failed',
+      status.reason,
+    );
+  }
   // Only persist when something was actually installed (or attempted).
   // A dry-run probe does not produce a receipt — `verifyReady` would
   // otherwise treat a probe-only run as "ready" until next probe.
@@ -407,20 +426,64 @@ export function verifyReady(
       receipt_age_minutes: null,
     };
   }
-  const ageMs = Date.now() - new Date(receipt.generated_at).getTime();
-  const ageMin = ageMs / 60_000;
+  const satisfiedEntries = Array.isArray(receipt.satisfied) ? receipt.satisfied : null;
+  const unsatisfiedEntries = Array.isArray(receipt.unsatisfied) ? receipt.unsatisfied : null;
+  const installsPerformedEntries = Array.isArray(receipt.installs_performed) ? receipt.installs_performed : null;
+  const generatedAt = parseIsoDate(receipt.generated_at);
+  const expiresAt = parseIsoDate(receipt.expires_at);
+  const ageMin = generatedAt.ok ? (Date.now() - generatedAt.ms) / 60_000 : Number.NaN;
   const manifestFingerprint = stableManifestFingerprint(manifest);
   const hostFingerprint = stableHostFingerprint();
-  const receiptExpiresAt = receipt.expires_at || null;
-  const expiresAtMs = receiptExpiresAt ? new Date(receiptExpiresAt).getTime() : Number.POSITIVE_INFINITY;
+  const receiptExpiresAt = typeof receipt.expires_at === 'string' && receipt.expires_at.trim() !== ''
+    ? receipt.expires_at
+    : null;
+  const expiresAtMs = expiresAt.ok ? expiresAt.ms : Number.NaN;
   const stale =
+    !generatedAt.ok ||
+    !expiresAt.ok ||
     (opts.max_age_minutes !== undefined && ageMin > opts.max_age_minutes) ||
-    Date.now() > expiresAtMs;
+    (generatedAt.ok && ageMin < 0) ||
+    (expiresAt.ok && Date.now() > expiresAtMs);
   // Optional capabilities never block readiness.
-  const blocking = receipt.unsatisfied.filter((u) => {
+  const blocking = (unsatisfiedEntries ?? []).filter((u) => {
     const cap = manifest.capabilities.find((c) => c.capability_id === u.capability_id);
     return cap && !cap.optional;
   });
+  if (!satisfiedEntries) {
+    blocking.push({
+      capability_id: '__receipt_satisfied__',
+      satisfied: false,
+      reason: 'receipt satisfied entries are missing or invalid — re-run pnpm env:bootstrap',
+    });
+  }
+  if (!unsatisfiedEntries) {
+    blocking.push({
+      capability_id: '__receipt_unsatisfied__',
+      satisfied: false,
+      reason: 'receipt unsatisfied entries are missing or invalid — re-run pnpm env:bootstrap',
+    });
+  }
+  if (!installsPerformedEntries) {
+    blocking.push({
+      capability_id: '__receipt_installs_performed__',
+      satisfied: false,
+      reason: 'receipt installs_performed entries are missing or invalid — re-run pnpm env:bootstrap',
+    });
+  }
+  if (!generatedAt.ok) {
+    blocking.push({
+      capability_id: '__receipt_generated_at__',
+      satisfied: false,
+      reason: 'receipt generated_at is missing or invalid — re-run pnpm env:bootstrap',
+    });
+  }
+  if (!expiresAt.ok) {
+    blocking.push({
+      capability_id: '__receipt_expires_at__',
+      satisfied: false,
+      reason: 'receipt expires_at is missing or invalid — re-run pnpm env:bootstrap',
+    });
+  }
   if (receipt.manifest_fingerprint !== manifestFingerprint) {
     blocking.push({
       capability_id: '__manifest_fingerprint__',
@@ -440,18 +503,20 @@ export function verifyReady(
       capability_id: '__receipt_age__',
       satisfied: false,
       reason:
-        receiptExpiresAt && Date.now() > expiresAtMs
+        expiresAt.ok && receiptExpiresAt && Date.now() > expiresAtMs
           ? `receipt expired at ${receiptExpiresAt}`
-          : `receipt is ${ageMin.toFixed(1)}m old; max_age_minutes=${opts.max_age_minutes}`,
+          : generatedAt.ok
+            ? `receipt is ${ageMin.toFixed(1)}m old; max_age_minutes=${opts.max_age_minutes}`
+            : 'receipt age could not be computed because generated_at is invalid',
     });
   }
   return {
     ready: blocking.length === 0,
     manifest_id: manifest.manifest_id,
-    generated_at: receipt.generated_at,
+    generated_at: generatedAt.ok ? receipt.generated_at : new Date().toISOString(),
     receipt_expires_at: receiptExpiresAt,
     missing: blocking,
-    receipt_age_minutes: ageMin,
+    receipt_age_minutes: generatedAt.ok ? ageMin : null,
   };
 }
 
@@ -540,13 +605,16 @@ function safeEmitAudit(
   action: string,
   capabilityId: string,
   metadata: Record<string, unknown>,
+  result: 'allowed' | 'denied' | 'error' | 'completed' | 'failed' = 'allowed',
+  reason?: string,
 ): string | null {
   try {
     const entry = auditChain.record({
       agentId: 'env-bootstrap',
       action,
       operation: capabilityId,
-      result: 'allowed',
+      result,
+      ...(reason ? { reason } : {}),
       metadata,
     });
     return entry.id;

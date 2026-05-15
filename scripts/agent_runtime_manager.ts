@@ -8,6 +8,7 @@ import {
   logger,
   pathResolver,
   auditChain,
+  classifyError,
 } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 
@@ -124,15 +125,28 @@ export async function spawnAgent(manifestId: string, overrides: { provider?: any
   if (!manifest) throw new Error(`Agent manifest "${manifestId}" not found.`);
 
   logger.info(`Spawning agent from manifest: ${manifestId}...`);
-  
-  const handle = await agentLifecycle.spawn({
-    agentId: `${manifestId}-${Math.random().toString(36).slice(2, 10)}`,
-    provider: overrides.provider || manifest.selection_hints?.preferred_provider || 'gemini',
-    modelId: overrides.modelId || manifest.selection_hints?.preferred_modelId,
-    systemPrompt: manifest.systemPrompt,
-    capabilities: manifest.capabilities,
-    missionId: overrides.missionId,
-  });
+  let handle;
+  try {
+    handle = await agentLifecycle.spawn({
+      agentId: `${manifestId}-${Math.random().toString(36).slice(2, 10)}`,
+      provider: overrides.provider || manifest.selection_hints?.preferred_provider || 'gemini',
+      modelId: overrides.modelId || manifest.selection_hints?.preferred_modelId,
+      systemPrompt: manifest.systemPrompt,
+      capabilities: manifest.capabilities,
+      missionId: overrides.missionId,
+    });
+  } catch (err: any) {
+    const classification = classifyError(err);
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'operator',
+      action: 'agent.manual_spawn',
+      operation: manifestId,
+      result: 'failed',
+      metadata: { manifestId, overrides, classification }
+    });
+    logger.error(`[AGENT_RUNTIME] spawn failed (${classification.category}): ${err?.message || err}`);
+    throw err;
+  }
 
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'operator',

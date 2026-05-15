@@ -54,7 +54,8 @@ node migration/<script>.js
 pnpm migration:run
 ```
 
-For now (until the runner ships), maintainers should call out each required migration in the release notes and `CHANGELOG.md`.
+Maintainers must call out each required migration in the release notes and `CHANGELOG.md`.
+Use `Migration required: None` when no state migration applies, so operators do not have to infer silence.
 
 ## Rollback
 

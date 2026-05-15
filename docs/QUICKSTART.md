@@ -37,23 +37,29 @@ If you only want the shortest path to a visible result, start here.
 
 The first-win path is intentionally staged:
 
-- 30 seconds: `pnpm doctor`
-- 5 minutes: `pnpm pipeline --input pipelines/voice-hello.json`
-- 15 minutes: `pnpm pipeline --input pipelines/enterprise-login.json` then `pnpm pipeline --input pipelines/verify-session.json`
+- 30 seconds: `pnpm doctor` shows whether the local runtime is ready and what value boundary is currently blocked
+- 5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`
+- optional voice path: `pnpm pipeline --input pipelines/voice-hello.json`
+- 15 minutes: skim sections 4-10, then open `pipelines/verify-session.json`, `CAPABILITIES_GUIDE.md`, and `docs/developer/EXTENSION_POINTS.md` to understand the structure
 
 ```bash
 pnpm doctor
-pnpm pipeline --input pipelines/voice-hello.json
-```
-
-If you want a screenshot artifact from a persisted browser session:
-
-```bash
-pnpm pipeline --input pipelines/enterprise-login.json
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-The browser session smoke writes `active/shared/tmp/enterprise-login-success.png`.
+If you want the voice first-win after the screenshot smoke:
+
+```bash
+pnpm pipeline --input pipelines/voice-hello.json
+```
+
+The browser session smoke writes `active/shared/tmp/first-win-session.png`.
+
+After the screenshot exists, spend the remaining 10 minutes on structure:
+
+- `pipelines/verify-session.json` shows the smallest pipeline contract that produces an artifact.
+- `CAPABILITIES_GUIDE.md` shows which actuators already exist before you write new code.
+- `docs/developer/EXTENSION_POINTS.md` shows how to add or stabilize an actuator, pipeline, or plugin surface.
 
 ## 3. Bring Up The Local Surfaces
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TraceContext } from '@agent/core';
 import { normalizePipelineOp, runSteps, formatPipelineFailure } from './run_pipeline.js';
 
 describe('run_pipeline compatibility', () => {
@@ -70,5 +71,48 @@ describe('run_pipeline compatibility', () => {
     expect(failure.classification.ruleId).toBe('kyberion.path-scope');
     expect(failure.summary).toContain('[permission_denied]');
     expect(failure.summary).toContain('Path scope policy denied write');
+  });
+
+  it('records pipeline step status, duration, and error classification in trace events', async () => {
+    const trace = new TraceContext('pipeline:trace-contract', { pipelineId: 'trace-contract' });
+
+    const result = await runSteps([
+      {
+        id: 'first-step',
+        op: 'log',
+        params: {
+          template: 'hello',
+        },
+      },
+      {
+        id: 'failing-step',
+        op: 'shell',
+        params: {
+          cmd: 'exit 7',
+        },
+      },
+    ], {}, { trace });
+
+    const finalized = trace.finalize();
+    const firstSpan = finalized.rootSpan.children[0];
+    const failingSpan = finalized.rootSpan.children[1];
+    const completed = firstSpan.events.find((event) => event.name === 'step.completed');
+    const failed = failingSpan.events.find((event) => event.name === 'step.failed');
+
+    expect(result.status).toBe('failed');
+    expect(completed?.attributes).toMatchObject({
+      step_id: 'first-step',
+      op: 'system:log',
+      status: 'success',
+    });
+    expect(typeof completed?.attributes?.duration_ms).toBe('number');
+    expect(failed?.attributes).toMatchObject({
+      step_id: 'failing-step',
+      op: 'system:shell',
+      status: 'failed',
+      error_category: expect.any(String),
+      error_rule_id: expect.any(String),
+    });
+    expect(typeof failed?.attributes?.duration_ms).toBe('number');
   });
 });

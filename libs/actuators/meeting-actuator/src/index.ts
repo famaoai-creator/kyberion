@@ -31,6 +31,7 @@ import {
   withRetry,
   createActuatorTrace,
   finalizeActuatorTrace,
+  resolveIdentityContext,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -84,6 +85,75 @@ const DEFAULT_MEETING_RETRY = {
 
 let cachedRecoveryPolicy: Record<string, any> | null = null;
 
+interface VoiceConsentRecord {
+  consent?: unknown;
+  mission_id?: unknown;
+  operator_handle?: unknown;
+  tenant_slug?: unknown;
+  expires_at?: unknown;
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function validateGrantedConsent(
+  consent: VoiceConsentRecord,
+  missionId: string,
+): { allowed: boolean; reason?: string } {
+  if (consent.consent !== 'granted') {
+    return {
+      allowed: false,
+      reason: `voice-consent.json present but consent != 'granted' (got '${String(consent.consent)}')`,
+    };
+  }
+
+  const consentMissionId = normalizeOptionalString(consent.mission_id);
+  const operatorHandle = normalizeOptionalString(consent.operator_handle);
+  if (!consentMissionId || !operatorHandle) {
+    return {
+      allowed: false,
+      reason: 'voice-consent.json is malformed: mission_id and operator_handle are required',
+    };
+  }
+  if (consentMissionId !== missionId) {
+    return {
+      allowed: false,
+      reason: `voice-consent.json mission_id '${consentMissionId}' does not match active mission '${missionId}'`,
+    };
+  }
+
+  const expiresAt = normalizeOptionalString(consent.expires_at);
+  if (expiresAt) {
+    const expiresMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresMs)) {
+      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
+    }
+    if (expiresMs <= Date.now()) {
+      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
+    }
+  }
+
+  const activeTenant = resolveIdentityContext().tenantSlug;
+  if (activeTenant) {
+    const consentTenant = normalizeOptionalString(consent.tenant_slug);
+    if (consentTenant !== activeTenant) {
+      return {
+        allowed: false,
+        reason: `voice-consent.json tenant_slug '${consentTenant ?? 'missing'}' does not match active tenant '${activeTenant}'`,
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
 /**
  * Voice consent gate — only `speak` is gated. The mission evidence
  * directory must contain `voice-consent.json` with `consent: 'granted'`.
@@ -111,13 +181,13 @@ function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   }
   try {
     const consent = JSON.parse(safeReadFile(consentPath, { encoding: 'utf8' }) as string);
-    if (consent.consent !== 'granted') {
+    if (!isPlainObject(consent)) {
       return {
         allowed: false,
-        reason: `voice-consent.json present but consent != 'granted' (got '${consent.consent}')`,
+        reason: 'voice-consent.json is malformed: expected an object',
       };
     }
-    return { allowed: true };
+    return validateGrantedConsent(consent, missionId);
   } catch (err: any) {
     return { allowed: false, reason: `failed to parse voice-consent.json: ${err?.message ?? err}` };
   }
@@ -132,10 +202,6 @@ function redactedTarget(input: MeetingAction): string {
   } catch {
     return `${input.params.platform}:invalid-url`;
   }
-}
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function loadRecoveryPolicy(): Record<string, any> {

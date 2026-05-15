@@ -283,17 +283,28 @@ Output paths must be **inside the project root**. To deliver a file externally, 
 | `probe` | environment probe |
 | `glob_files` | filesystem glob |
 | `scan_directory` | directory scan |
+| `pulse_status` | ledger integrity probe |
 | `exec` | governed shell capture |
 | `shell` | governed shell capture |
 | `cli_health_check` | cli health check |
 | `list_missions` | mission list |
 | `list_projects` | project list |
 | `list_capabilities` | capability list |
+| `list_incidents` | incident list |
 | `list_knowledge` | knowledge list |
 | `list_running_apps` | running apps |
 | `collect_artifacts` | artifact discovery |
 | `sample_traces` | trace sampling |
 | `vision_consult` | vision consult |
+
+### Transform ops (type: transform)
+
+| Op | Notes |
+| :--- | :--- |
+| `regex_extract` | regex extraction |
+| `json_query` | JSON path lookup |
+| `sre_analyze` | root-cause analysis |
+| `run_js` | guarded JavaScript transform |
 
 ### Apply ops (type: apply)
 
@@ -322,7 +333,16 @@ Output paths must be **inside the project root**. To deliver a file externally, 
 | `log` | log event |
 | `voice` | voice output |
 | `native_tts_speak` | native tts |
+| `check_native_tts` | native tts probe |
+| `notify` | log notification |
 | `wait` | delay |
+
+### Control ops (type: control)
+
+| Op | Notes |
+| :--- | :--- |
+| `if` | conditional branch |
+| `while` | bounded loop |
 
 See also:
 

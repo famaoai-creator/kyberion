@@ -31,6 +31,10 @@ describe('Release operations contract', () => {
     expect(releaseOps).toContain('Automated release workflow (`.github/workflows/release.yml`)');
     expect(releaseOps).toContain('Migration runner (`scripts/run_migrations.ts`)');
     expect(releaseOps).toContain('PR titles that do not match the pattern');
+    expect(releaseOps).toContain('pnpm run check:contract-semver -- --rebaseline');
+    expect(releaseOps).toContain('scripts/contract-baseline.json');
+    expect(releaseOps).toContain('Migration required: None');
+    expect(releaseOps).toContain('pnpm migration:run -- --dry-run');
   });
 
   it('extracts a tagged changelog section with the built helper contract', async () => {
@@ -41,5 +45,14 @@ describe('Release operations contract', () => {
     const section = extractReleaseSection(changelog, 'Unreleased');
     expect(section).toContain('## [Unreleased]');
     expect(section).toContain('Productization roadmap');
+    expect(section).toContain('### Migration required');
+    expect(section).toContain('None for the current unreleased changes');
+  });
+
+  it('keeps migration docs aligned with the shipped migration runner', () => {
+    const migrationReadme = read('migration/README.md');
+    expect(migrationReadme).toContain('pnpm migration:run');
+    expect(migrationReadme).toContain('Migration required: None');
+    expect(migrationReadme).not.toContain('until the runner ships');
   });
 });

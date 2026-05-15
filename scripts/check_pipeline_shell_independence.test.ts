@@ -49,4 +49,59 @@ describe('check_pipeline_shell_independence', () => {
     expect(violations.some((v) => v.pattern === 'pwd-substitution')).toBe(true);
     expect(violations.some((v) => v.pattern === 'uname-substitution')).toBe(true);
   });
+
+  it('flags implicit host temp paths and direct shell interpreter escapes', () => {
+    safeWriteFile(
+      PROBE,
+      JSON.stringify(
+        {
+          context: {
+            output_path: '/tmp/kyberion-report.json',
+          },
+          steps: [
+            {
+              op: 'system:shell',
+              params: {
+                cmd: 'bash -c "echo unsafe"',
+              },
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+
+    const violations = scanPipelineShellIndependence([PROBE]);
+
+    expect(violations.some((v) => v.pattern === 'implicit-host-temp-path')).toBe(true);
+    expect(violations.some((v) => v.pattern === 'shell-interpreter')).toBe(true);
+  });
+
+  it('allows repo-managed shared temp artifacts', () => {
+    safeWriteFile(
+      PROBE,
+      JSON.stringify(
+        {
+          context: {
+            output_path: 'active/shared/tmp/kyberion-report.json',
+          },
+          steps: [
+            {
+              op: 'system:shell',
+              params: {
+                cmd: 'node dist/scripts/run_pipeline.js --input pipelines/verify-session.json',
+              },
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+
+    const violations = scanPipelineShellIndependence([PROBE]);
+
+    expect(violations).toEqual([]);
+  });
 });

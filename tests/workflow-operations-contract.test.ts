@@ -58,6 +58,7 @@ describe('Workflow operations contract', () => {
     const crossOs = read('.github/workflows/cross-os.yml');
     expect(crossOs).toContain('pnpm run check:contract-schemas');
     expect(crossOs).toContain('pnpm run test:core');
+    expect(crossOs).toContain('pnpm run test:meeting-dry-run');
     expect(crossOs).toContain('pnpm run cli:preview -- pipelines/baseline-check.json');
     expect(crossOs).toContain('pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json');
     expect(crossOs).toContain('pnpm run check:pipeline-shell-independence');
