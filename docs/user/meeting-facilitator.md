@@ -80,6 +80,22 @@ Real meeting mode can open a browser, capture meeting audio, run STT/TTS, and
 write trace/audit evidence. Do not use it as a connectivity test; use the dry
 run commands above until the target meeting and consent are real.
 
+## Dictation fallback for notes
+
+If STT is not configured, you can still use the browser surface as a dictation
+front-end:
+
+- open `presence-studio`,
+- switch the voice capture mode to `Notes Capture`,
+- dictate into the browser mic, and
+- click `Create Minutes` to save a markdown minutes artifact.
+
+This path keeps the captured text local until you decide to generate minutes.
+If the browser's speech recognition is unavailable, fall back to the OS dictation
+shortcut or paste the text manually before creating the minutes. Browser Web
+Speech support still depends on the browser implementation, so offline behavior
+is not guaranteed there.
+
 ## What happens after the meeting
 
 Kyberion can turn the transcript into action items, mark the operator's

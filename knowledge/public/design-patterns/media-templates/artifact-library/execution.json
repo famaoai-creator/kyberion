@@ -17,9 +17,12 @@
       "document_type": "record",
       "sections": [
         { "section_id": "title", "title": "Meeting Minutes: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "participants", "title": "Attendees & Agenda", "layout_key": "doc-summary" },
         { "section_id": "decisions", "title": "Key Decisions", "layout_key": "doc-sections" },
-        { "section_id": "actions", "title": "Action Items", "layout_key": "doc-sections" }
+        { "section_id": "discussion", "title": "Discussion Highlights", "layout_key": "doc-sections" },
+        { "section_id": "actions", "title": "Action Items", "layout_key": "doc-sections" },
+        { "section_id": "open-issues", "title": "Open Issues", "layout_key": "risk-controls" }
       ]
     },
     "mission-ledger": {
