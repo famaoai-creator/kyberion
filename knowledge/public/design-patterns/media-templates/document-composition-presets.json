@@ -46,8 +46,10 @@
       "recommended_layout_template_id": "report-standard",
       "sections": [
         { "section_id": "title", "title": "{{title}}", "media_kind": "title-page", "layout_key": "doc-title" },
-        { "section_id": "summary", "title": "Summary", "media_kind": "summary", "layout_key": "doc-summary" },
-        { "section_id": "body", "title": "Analysis", "media_kind": "section-flow", "layout_key": "doc-sections" },
+        { "section_id": "contents", "title": "Contents", "media_kind": "contents", "layout_key": "doc-contents" },
+        { "section_id": "summary", "title": "Executive Summary", "media_kind": "summary", "layout_key": "doc-summary" },
+        { "section_id": "findings", "title": "Findings and Observations", "media_kind": "section-flow", "layout_key": "doc-sections" },
+        { "section_id": "recommendations", "title": "Recommendations", "media_kind": "section-flow", "layout_key": "doc-sections" },
         { "section_id": "appendix", "title": "Appendix", "media_kind": "appendix", "layout_key": "doc-appendix" }
       ]
     },
@@ -95,10 +97,12 @@
       "sections": [
         { "section_id": "title", "title": "Requirements Definition: {{title}}", "media_kind": "title-page", "layout_key": "doc-title" },
         { "section_id": "scope", "title": "Scope and Objectives", "media_kind": "summary", "layout_key": "doc-summary" },
+        { "section_id": "contents", "title": "Contents", "media_kind": "contents", "layout_key": "doc-contents" },
         { "section_id": "functional", "title": "Functional Requirements", "media_kind": "section-flow", "layout_key": "doc-sections" },
         { "section_id": "non-functional", "title": "Non-Functional Requirements (SLO/SLI)", "media_kind": "control", "layout_key": "risk-controls" },
         { "section_id": "data-assets", "title": "Information Assets", "media_kind": "architecture", "layout_key": "three-point-architecture" },
-        { "section_id": "traceability", "title": "Traceability Matrix", "media_kind": "execution", "layout_key": "sheet-main-table" }
+        { "section_id": "traceability", "title": "Traceability Matrix", "media_kind": "execution", "layout_key": "sheet-main-table" },
+        { "section_id": "appendix", "title": "Appendix", "media_kind": "appendix", "layout_key": "doc-appendix" }
       ]
     },
     "test-plan": {
@@ -108,11 +112,14 @@
       "recommended_theme": "kyberion-standard",
       "sections": [
         { "section_id": "title", "title": "Test Plan: {{title}}", "media_kind": "title-page", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "media_kind": "contents", "layout_key": "doc-contents" },
         { "section_id": "strategy", "title": "Testing Strategy", "media_kind": "vision", "layout_key": "immersive-vision" },
         { "section_id": "scope", "title": "Test Scope", "media_kind": "journey", "layout_key": "two-column-story" },
+        { "section_id": "acceptance", "title": "Acceptance Criteria", "media_kind": "evidence", "layout_key": "evidence-callout" },
         { "section_id": "environment", "title": "Environment and Tools", "media_kind": "model", "layout_key": "operating-model" },
         { "section_id": "schedule", "title": "Schedule and Milestones", "media_kind": "timeline", "layout_key": "timeline-roadmap" },
-        { "section_id": "risks", "title": "RAID (Risks and Assumptions)", "media_kind": "control", "layout_key": "risk-controls" }
+        { "section_id": "risks", "title": "RAID (Risks and Assumptions)", "media_kind": "control", "layout_key": "risk-controls" },
+        { "section_id": "exit", "title": "Exit Criteria and Sign-off", "media_kind": "decision", "layout_key": "decision-cta" }
       ]
     }
   }

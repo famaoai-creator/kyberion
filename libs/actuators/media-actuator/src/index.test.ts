@@ -440,6 +440,84 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(safeExistsSync(outputPath)).toBe(true);
   });
 
+  it('infers a meeting minutes profile when document_profile is omitted', async () => {
+    const outputPath = 'active/shared/tmp/media/unified-inferred-meeting-minutes.docx';
+    if (safeExistsSync(outputPath)) {
+      safeRmSync(outputPath, { force: true });
+    }
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            render_target: 'docx',
+            output_path: outputPath,
+            data: {
+              title: 'Weekly Product Meeting Minutes',
+              summary: 'Decision log for the weekly product sync.',
+              sections: [
+                {
+                  heading: 'Attendees and Agenda',
+                  body: ['Product, design, and engineering joined the sync.'],
+                },
+                {
+                  heading: 'Action Items',
+                  body: ['Finalize the rollout checklist.'],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(safeExistsSync(outputPath)).toBe(true);
+  });
+
+  it('injects a table of contents section into report outlines', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        last_json: {
+          kind: 'document-brief',
+          artifact_family: 'document',
+          document_type: 'report',
+          document_profile: 'summary-report',
+          render_target: 'docx',
+          title: 'Outline Coverage Report',
+          summary: 'This report should expose a navigable front matter.',
+          payload: {
+            sections: [
+              {
+                heading: 'Findings',
+                body: ['The document needs a visible contents section.'],
+              },
+              {
+                heading: 'Recommendations',
+                body: ['Add a front matter outline to every longer document.'],
+              },
+            ],
+          },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'document_outline_from_brief',
+          params: { from: 'last_json', export_as: 'document_outline' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.document_outline.toc.map((entry: any) => entry.section_id)).toContain('contents');
+    expect(result.context.document_outline.toc.find((entry: any) => entry.section_id === 'contents')?.body?.[0]).toContain('Findings');
+  });
+
   it('generates a tracker binary directly from a unified document request', async () => {
     const outputPath = 'active/shared/tmp/media/unified-generate-tracker.xlsx';
     if (safeExistsSync(outputPath)) {

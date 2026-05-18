@@ -6,11 +6,13 @@
       "document_type": "plan",
       "sections": [
         { "section_id": "title", "title": "Test Plan: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "strategy", "title": "Testing Strategy", "layout_key": "immersive-vision" },
         { "section_id": "scope", "title": "Test Scope", "layout_key": "two-column-story" },
         { "section_id": "acceptance", "title": "Acceptance Criteria", "layout_key": "evidence-callout" },
         { "section_id": "environment", "title": "Test Environment", "layout_key": "operating-model" },
-        { "section_id": "schedule", "title": "Test Schedule", "layout_key": "timeline-roadmap" }
+        { "section_id": "schedule", "title": "Test Schedule", "layout_key": "timeline-roadmap" },
+        { "section_id": "risks", "title": "Risks and Mitigations", "layout_key": "risk-controls" }
       ]
     },
     "test-case-specification": {

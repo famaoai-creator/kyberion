@@ -40,8 +40,10 @@
       "recommended_layout_template_id": "report-standard",
       "sections": [
         { "section_id": "title", "title": "{{title}}", "media_kind": "title-page", "layout_key": "doc-title" },
-        { "section_id": "summary", "title": "Summary", "media_kind": "summary", "layout_key": "doc-summary" },
-        { "section_id": "body", "title": "Analysis", "media_kind": "section-flow", "layout_key": "doc-sections" },
+        { "section_id": "contents", "title": "Contents", "media_kind": "contents", "layout_key": "doc-contents" },
+        { "section_id": "summary", "title": "Executive Summary", "media_kind": "summary", "layout_key": "doc-summary" },
+        { "section_id": "findings", "title": "Findings and Observations", "media_kind": "section-flow", "layout_key": "doc-sections" },
+        { "section_id": "recommendations", "title": "Recommendations", "media_kind": "section-flow", "layout_key": "doc-sections" },
         { "section_id": "appendix", "title": "Appendix", "media_kind": "appendix", "layout_key": "doc-appendix" }
       ]
     },

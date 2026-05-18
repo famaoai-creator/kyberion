@@ -6,10 +6,12 @@
       "document_type": "specification",
       "sections": [
         { "section_id": "title", "title": "Basic Design: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "concept", "title": "Design Concept & Principles", "layout_key": "immersive-vision" },
         { "section_id": "architecture", "title": "System Architecture Overview", "layout_key": "three-point-architecture" },
         { "section_id": "subsystems", "title": "Subsystem Breakdown", "layout_key": "three-pillars" },
-        { "section_id": "security", "title": "Security Design", "layout_key": "risk-controls" }
+        { "section_id": "security", "title": "Security Design", "layout_key": "risk-controls" },
+        { "section_id": "operations", "title": "Operations and Monitoring", "layout_key": "timeline-roadmap" }
       ]
     },
     "architecture-design": {
@@ -25,9 +27,13 @@
       "document_type": "specification",
       "sections": [
         { "section_id": "title", "title": "API Specification", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
+        { "section_id": "overview", "title": "Overview and Constraints", "layout_key": "doc-summary" },
         { "section_id": "endpoints", "title": "Endpoints & Methods", "layout_key": "doc-sections" },
         { "section_id": "data-models", "title": "Request/Response Models", "layout_key": "three-point-architecture" },
-        { "section_id": "auth", "title": "Authentication & Authorization", "layout_key": "risk-controls" }
+        { "section_id": "auth", "title": "Authentication & Authorization", "layout_key": "risk-controls" },
+        { "section_id": "errors", "title": "Error Handling & Status Codes", "layout_key": "doc-sections" },
+        { "section_id": "versioning", "title": "Versioning & Change Notes", "layout_key": "doc-appendix" }
       ]
     },
     "database-design": {
@@ -35,9 +41,11 @@
       "document_type": "specification",
       "sections": [
         { "section_id": "title", "title": "Database Design", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "erd", "title": "Entity Relationship Diagram (ERD)", "layout_key": "three-point-architecture" },
         { "section_id": "schema", "title": "Table Schema Details", "layout_key": "doc-sections" },
-        { "section_id": "indexing", "title": "Indexing & Performance Tuning", "layout_key": "doc-sections" }
+        { "section_id": "indexing", "title": "Indexing & Performance Tuning", "layout_key": "doc-sections" },
+        { "section_id": "operations", "title": "Backup, Recovery & Operations", "layout_key": "risk-controls" }
       ]
     },
     "detailed-design": {
@@ -45,9 +53,12 @@
       "document_type": "specification",
       "sections": [
         { "section_id": "title", "title": "Detailed Design: {{title}}", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "module-logic", "title": "Module Logic & Algorithms", "layout_key": "doc-sections" },
         { "section_id": "internal-interfaces", "title": "Internal Interfaces", "layout_key": "doc-sections" },
-        { "section_id": "error-handling", "title": "Error Handling & Logging", "layout_key": "risk-controls" }
+        { "section_id": "data-flow", "title": "Data Flow & State Changes", "layout_key": "three-point-architecture" },
+        { "section_id": "error-handling", "title": "Error Handling & Logging", "layout_key": "risk-controls" },
+        { "section_id": "appendix", "title": "Appendix", "layout_key": "doc-appendix" }
       ]
     },
     "interface-control-document": {
@@ -55,8 +66,10 @@
       "document_type": "specification",
       "sections": [
         { "section_id": "title", "title": "Interface Control Document (ICD)", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "external-systems", "title": "External System Interfaces", "layout_key": "three-pillars" },
-        { "section_id": "protocols", "title": "Communication Protocols", "layout_key": "doc-sections" }
+        { "section_id": "protocols", "title": "Communication Protocols", "layout_key": "doc-sections" },
+        { "section_id": "versioning", "title": "Interface Versioning", "layout_key": "doc-appendix" }
       ]
     }
   }

@@ -100,6 +100,7 @@ export * from './mobile-profile-validators.js';
 export * from './schema-loader.js';
 export * from './operator-learning.js';
 export * from './guided-coordination-brief.js';
+export * from './email-workflow.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
