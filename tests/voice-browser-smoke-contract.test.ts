@@ -17,10 +17,35 @@ describe('voice and browser smoke contract', () => {
     expect(server).toContain("/api/voice/stt-backends");
     expect(server).toContain("/api/voice/speech-state");
     expect(server).toContain("/api/voice/stop-speaking");
+    expect(server).toContain("/api/voice/minutes");
+    expect(server).toContain("/api/email-triage");
+    expect(server).toContain("/api/email-draft");
+    expect(server).toContain("/api/email-auth-status");
+    expect(server).toContain("/api/email-deliver");
 
     expect(page).toContain('Hold To Talk');
     expect(page).toContain('Start Native Mic');
     expect(page).toContain('Start Browser Mic');
+    expect(page).toContain('Notes Capture');
+    expect(page).toContain('Create Minutes');
+    expect(page).toContain('Email Triage');
+    expect(page).toContain('Refresh Triage');
+    expect(page).toContain('Copy Draft');
+    expect(page).toContain('Email Reply Draft');
+    expect(page).toContain('Gmail auth status');
+    expect(page).toContain('Create Reply Draft');
+    expect(page).toContain('Create Gmail Draft');
+    expect(page).toContain('Send Approved Email');
+    expect(page).toContain('Confirm email send');
+    expect(page).toContain('Send Email');
+    expect(page).toContain('This send will be recorded in Gmail and the local Presence Studio event flow.');
+    expect(page).toContain('click outside the dialog to cancel.');
+    expect(page).toContain('Refresh Auth');
+    expect(page).toContain('Reload Draft');
+    expect(page).toContain('Copy Reply');
+    expect(page).toContain('I approve sending this email');
+    expect(page).toContain('Kyberion Design System');
+    expect(page).toContain('design-system.css');
     expect(page).toContain('Voice state: idle');
     expect(page).toContain('voice-hub');
 

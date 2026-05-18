@@ -533,6 +533,11 @@ describe('executeServicePreset', () => {
               command: 'gws',
               args: ['drive', 'files', 'list', '--params', '{{params}}', '--page-all'],
             },
+            gmail_send: {
+              type: 'cli',
+              command: 'gws',
+              args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}'],
+            },
           },
         });
       }
@@ -554,6 +559,52 @@ describe('executeServicePreset', () => {
       '--params',
       JSON.stringify({ pageSize: 5 }),
       '--page-all',
+    ]);
+  });
+
+  it('executes gmail send helper commands through gws', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('google-workspace.json')) {
+        return JSON.stringify({
+          auth_strategy: 'session',
+          allow_unsafe_cli: true,
+          operations: {
+            gmail_send: {
+              type: 'cli',
+              command: 'gws',
+              args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}'],
+            },
+            gmail_send_draft: {
+              type: 'cli',
+              command: 'gws',
+              args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}', '--draft'],
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeExec.mockReturnValue(JSON.stringify({ status: 'sent' }));
+
+    await expect(
+      executeServicePreset('google-workspace', 'gmail_send', {
+        to: 'person@example.com',
+        subject: 'Hello',
+        body: 'Thanks for the update.',
+      })
+    ).resolves.toEqual({ status: 'sent' });
+
+    expect(mocks.safeExec).toHaveBeenCalledWith('gws', [
+      'gmail',
+      '+send',
+      '--to',
+      'person@example.com',
+      '--subject',
+      'Hello',
+      '--body',
+      'Thanks for the update.',
     ]);
   });
 });

@@ -103,6 +103,17 @@ describe('Kyberion CLI helpers', () => {
     expect(output).toContain('Path: knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
   });
 
+  it('includes the email workflow command in help output', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['help']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('email <status|draft|latest-draft|deliver>');
+    expect(output).toContain('npm run cli -- email status');
+    expect(output).toContain('npm run cli -- email draft');
+  });
+
   it('allows only approved packet commands', () => {
     expect(() => assertApprovedNextActionCommand('node dist/scripts/mission_controller.js status MSN-1')).not.toThrow();
     expect(() => assertApprovedNextActionCommand('bash -lc "echo hacked"')).toThrow('Only node-based packet commands are allowed');

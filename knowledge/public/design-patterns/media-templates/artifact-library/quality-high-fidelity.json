@@ -7,6 +7,7 @@
       "description": "Comprehensive test orchestration aligned with ISTQB and ISO 29119.",
       "sections": [
         { "section_id": "1-introduction", "title": "1. Introduction", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "1-1-purpose", "title": "1.1 Purpose and Scope", "layout_key": "doc-sections" },
         { "section_id": "2-test-items", "title": "2. Test Items (Builds & Environment)", "layout_key": "doc-sections" },
         { "section_id": "3-features-to-test", "title": "3. Features to be Tested", "layout_key": "three-pillars" },
@@ -20,7 +21,8 @@
         { "section_id": "8-environmental-needs", "title": "8. Environmental Needs", "layout_key": "operating-model" },
         { "section_id": "9-responsibilities", "title": "9. Responsibilities (RACI Matrix)", "layout_key": "doc-sections" },
         { "section_id": "10-schedule", "title": "10. Schedule and Milestones", "layout_key": "timeline-roadmap" },
-        { "section_id": "11-risks", "title": "11. Risks and Contingencies", "layout_key": "risk-controls" }
+        { "section_id": "11-risks", "title": "11. Risks and Contingencies", "layout_key": "risk-controls" },
+        { "section_id": "12-exit", "title": "12. Exit Criteria and Approval", "layout_key": "decision-cta" }
       ]
     },
     "security-audit-report": {
@@ -30,6 +32,7 @@
       "sections": [
         { "section_id": "1-executive-summary", "title": "1. Executive Summary", "layout_key": "doc-summary" },
         { "section_id": "2-introduction", "title": "2. Introduction and Scope", "layout_key": "doc-title" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "2-1-objectives", "title": "2.1 Audit Objectives and Criteria", "layout_key": "doc-sections" },
         { "section_id": "3-findings-domain", "title": "3. Audit Findings by Domain", "layout_key": "doc-title" },
         { "section_id": "3-1-organization", "title": "3.1 Context and Leadership", "layout_key": "doc-sections" },
@@ -47,6 +50,7 @@
       "description": "Strategic QA roadmap including Shift-Left and Shift-Right philosophies.",
       "sections": [
         { "section_id": "1-vision", "title": "1. QA Vision and Mission", "layout_key": "immersive-vision" },
+        { "section_id": "contents", "title": "Contents", "layout_key": "doc-contents" },
         { "section_id": "2-methodology", "title": "2. QA Methodology (SDLC Integration)", "layout_key": "operating-model" },
         { "section_id": "3-shift-left", "title": "3. Shift-Left Strategy", "layout_key": "three-pillars" },
         { "section_id": "4-automation", "title": "4. Test Automation Strategy", "layout_key": "doc-sections" },

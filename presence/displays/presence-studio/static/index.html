@@ -505,6 +505,124 @@
         font: inherit;
         min-width: 240px;
       }
+      .text-input {
+        border: 1px solid rgba(125, 211, 252, 0.2);
+        background: rgba(9, 16, 24, 0.8);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+        min-width: 240px;
+      }
+      .notes-area {
+        width: 100%;
+        min-height: 180px;
+        resize: vertical;
+        border: 1px solid rgba(125, 211, 252, 0.2);
+        background: rgba(9, 16, 24, 0.82);
+        color: var(--text);
+        border-radius: 16px;
+        padding: 14px 16px;
+        font: inherit;
+        line-height: 1.55;
+      }
+      .artifact-view {
+        width: 100%;
+        min-height: 180px;
+        white-space: pre-wrap;
+        overflow: auto;
+        border: 1px solid rgba(125, 211, 252, 0.2);
+        background: rgba(9, 16, 24, 0.82);
+        color: var(--text);
+        border-radius: 16px;
+        padding: 14px 16px;
+        font: inherit;
+        line-height: 1.55;
+      }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(2, 8, 20, 0.72);
+        backdrop-filter: blur(10px);
+        z-index: 40;
+        padding: 24px;
+      }
+      .modal-backdrop.open {
+        display: flex;
+      }
+      .modal {
+        width: min(560px, 100%);
+        border: 1px solid rgba(125, 211, 252, 0.28);
+        background: rgba(10, 18, 28, 0.96);
+        border-radius: 24px;
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+        padding: 22px;
+      }
+      .modal-title {
+        font-size: 1.12rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .modal-body {
+        color: var(--muted);
+        line-height: 1.55;
+        font-size: 0.95rem;
+        max-height: min(48vh, 420px);
+        overflow: auto;
+        padding-right: 6px;
+      }
+      .modal-summary {
+        display: grid;
+        gap: 12px;
+      }
+      .modal-summary-grid {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: 1fr;
+      }
+      .modal-summary-row {
+        display: grid;
+        gap: 4px;
+      }
+      .modal-summary-label {
+        color: var(--muted-2);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .modal-summary-value {
+        color: var(--text);
+        word-break: break-word;
+      }
+      .modal-summary-preview {
+        white-space: pre-wrap;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(125, 211, 252, 0.14);
+        border-radius: 16px;
+        padding: 14px;
+      }
+      .modal-note {
+        margin-top: 6px;
+        color: var(--muted-2);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+      .modal-shortcuts {
+        margin-top: 4px;
+        color: var(--muted-2);
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
       @keyframes float {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-12px); }
@@ -514,12 +632,13 @@
         .avatar { min-height: 320px; }
       }
     </style>
+    <link rel="stylesheet" href="./design-system.css" />
   </head>
   <body>
     <div class="shell">
       <div class="header">
         <div>
-          <div class="eyebrow">Expressive Surface</div>
+          <div class="eyebrow">Kyberion Design System</div>
           <h1 id="title">Presence Studio</h1>
         </div>
         <div class="header-meta">
@@ -530,7 +649,7 @@
           </div>
         </div>
       </div>
-      <div class="sub">A governed realtime surface for subtitles, expression state, transcript, and voice-channel stimuli.</div>
+      <div class="sub">A Digital Agency-inspired capture surface for subtitles, notes, minutes, and governed voice-channel stimuli.</div>
       <div id="first-run-banner" class="first-run-banner hidden">
         <div class="first-run-icon">✨</div>
         <div class="first-run-body">
@@ -566,6 +685,10 @@
               <option value="operator">Operator</option>
               <option value="private">Private</option>
             </select>
+            <select class="select" id="capture-mode">
+              <option value="conversation">Conversation Capture</option>
+              <option value="notes">Notes Capture</option>
+            </select>
             <select class="select" id="native-device"></select>
             <select class="select" id="stt-backend"></select>
             <div class="hint" id="stt-availability-hint"></div>
@@ -574,6 +697,80 @@
           <div class="footer" id="voice-presence-state">Voice state: idle</div>
           <div class="footer">Talk in natural language. Kyberion will interpret the intent, choose a plan, and return a result.</div>
         </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Dictation Notes</div>
+          <textarea id="dictation-notes" class="notes-area" spellcheck="false" placeholder="Use Notes Capture with the browser mic, or paste text here before generating minutes."></textarea>
+          <div class="controls" style="margin-top: 12px;">
+            <input class="text-input" id="minutes-title" type="text" placeholder="Meeting title" />
+            <button class="button" id="minutes-save" type="button">Create Minutes</button>
+            <button class="button button-ghost" id="minutes-copy" type="button">Copy Notes</button>
+            <button class="button button-ghost" id="minutes-restore" type="button">Restore Draft</button>
+            <button class="button button-ghost" id="minutes-clear" type="button">Clear Notes</button>
+          </div>
+          <div class="hint" id="minutes-hint">Notes capture keeps the dictated text local until you choose to generate minutes.</div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Email Triage</div>
+          <div id="email-triage-content" class="artifact-view" aria-live="polite">Email triage has not been loaded yet.</div>
+          <div class="controls" style="margin-top: 12px;">
+            <button class="button" id="email-triage-refresh" type="button">Refresh Triage</button>
+            <button class="button button-ghost" id="email-triage-copy" type="button">Copy Draft</button>
+          </div>
+          <div class="hint" id="email-triage-hint">Run the email triage pipeline to populate the latest inbox summary and reply draft.</div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
+        <section class="panel">
+          <div class="label">Email Reply Draft</div>
+          <div class="hint" id="email-auth-status">Checking Gmail auth status...</div>
+          <div class="controls" style="margin-top: 0;">
+            <input class="text-input" id="email-draft-to" type="text" placeholder="Recipient" />
+            <input class="text-input" id="email-draft-subject" type="text" placeholder="Subject" />
+            <select class="select" id="email-draft-tone">
+              <option value="clear and concise">Clear and concise</option>
+              <option value="warm and helpful">Warm and helpful</option>
+              <option value="firm and direct">Firm and direct</option>
+            </select>
+          </div>
+          <div class="controls" style="margin-top: 10px;">
+            <input class="text-input" id="email-draft-message-id" type="text" placeholder="Reply Message ID (optional)" />
+            <select class="select" id="email-draft-mode">
+              <option value="new">New Email</option>
+              <option value="reply">Reply</option>
+              <option value="reply-all">Reply All</option>
+            </select>
+            <label class="hint" style="display: inline-flex; align-items: center; gap: 8px; margin: 0;">
+              <input id="email-send-approval" type="checkbox" />
+              I approve sending this email
+            </label>
+          </div>
+          <div id="email-draft-content" class="artifact-view" aria-live="polite">No email reply draft has been created yet.</div>
+          <div class="controls" style="margin-top: 12px;">
+            <button class="button" id="email-draft-create" type="button">Create Reply Draft</button>
+            <button class="button button-ghost" id="email-draft-create-gmail" type="button">Create Gmail Draft</button>
+            <button class="button button-ghost" id="email-draft-send" type="button">Send Approved Email</button>
+            <button class="button button-ghost" id="email-auth-refresh" type="button">Refresh Auth</button>
+            <button class="button button-ghost" id="email-draft-refresh" type="button">Reload Draft</button>
+            <button class="button button-ghost" id="email-draft-copy" type="button">Copy Reply</button>
+          </div>
+          <div class="hint" id="email-draft-hint">Generate a local reply draft from the latest inbox triage, then copy it into Gmail.</div>
+        </section>
+      </div>
+      <div id="email-send-confirm-modal" class="modal-backdrop" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="email-send-confirm-title" aria-describedby="email-send-confirm-body">
+          <div id="email-send-confirm-title" class="modal-title">Confirm email send</div>
+          <div id="email-send-confirm-body" class="modal-body"></div>
+          <div class="modal-note">This send will be recorded in Gmail and the local Presence Studio event flow.</div>
+          <div class="modal-shortcuts">Press <kbd>Esc</kbd> or click outside the dialog to cancel.</div>
+          <div class="modal-actions">
+            <button class="button button-ghost" id="email-send-confirm-cancel" type="button">Cancel</button>
+            <button class="button" id="email-send-confirm-submit" type="button">Send Email</button>
+          </div>
+        </div>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel">
@@ -906,11 +1103,45 @@
       const micToggleEl = document.getElementById("mic-toggle");
       const handsFreeToggleEl = document.getElementById("hands-free-toggle");
       const conversationModeEl = document.getElementById("conversation-mode");
+      const captureModeEl = document.getElementById("capture-mode");
       const nativeDeviceEl = document.getElementById("native-device");
       const sttBackendEl = document.getElementById("stt-backend");
       const micHintEl = document.getElementById("mic-hint");
       const voicePresenceStateEl = document.getElementById("voice-presence-state");
+      const dictationNotesEl = document.getElementById("dictation-notes");
+      const minutesTitleEl = document.getElementById("minutes-title");
+      const minutesSaveEl = document.getElementById("minutes-save");
+      const minutesCopyEl = document.getElementById("minutes-copy");
+      const minutesRestoreEl = document.getElementById("minutes-restore");
+      const minutesClearEl = document.getElementById("minutes-clear");
+      const minutesHintEl = document.getElementById("minutes-hint");
+      const emailTriageContentEl = document.getElementById("email-triage-content");
+      const emailTriageRefreshEl = document.getElementById("email-triage-refresh");
+      const emailTriageCopyEl = document.getElementById("email-triage-copy");
+      const emailTriageHintEl = document.getElementById("email-triage-hint");
+      const emailDraftToEl = document.getElementById("email-draft-to");
+      const emailDraftSubjectEl = document.getElementById("email-draft-subject");
+      const emailDraftToneEl = document.getElementById("email-draft-tone");
+      const emailDraftMessageIdEl = document.getElementById("email-draft-message-id");
+      const emailDraftModeEl = document.getElementById("email-draft-mode");
+      const emailSendApprovalEl = document.getElementById("email-send-approval");
+      const emailDraftContentEl = document.getElementById("email-draft-content");
+      const emailDraftCreateEl = document.getElementById("email-draft-create");
+      const emailDraftCreateGmailEl = document.getElementById("email-draft-create-gmail");
+      const emailDraftSendEl = document.getElementById("email-draft-send");
+      const emailAuthRefreshEl = document.getElementById("email-auth-refresh");
+      const emailAuthStatusEl = document.getElementById("email-auth-status");
+      const emailSendConfirmModalEl = document.getElementById("email-send-confirm-modal");
+      const emailSendConfirmBodyEl = document.getElementById("email-send-confirm-body");
+      const emailSendConfirmCancelEl = document.getElementById("email-send-confirm-cancel");
+      const emailSendConfirmSubmitEl = document.getElementById("email-send-confirm-submit");
+      const emailDraftRefreshEl = document.getElementById("email-draft-refresh");
+      const emailDraftCopyEl = document.getElementById("email-draft-copy");
+      const emailDraftHintEl = document.getElementById("email-draft-hint");
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const MINUTES_DRAFT_KEY = "presence-studio.minutes-draft.v1";
+      const EMAIL_DRAFT_KEY = "presence-studio.email-draft.v1";
+      const EMAIL_AUTH_STATUS_KEY = "presence-studio.email-auth-status.v1";
       let recognition = null;
       let isListening = false;
       let isNativeListening = false;
@@ -945,6 +1176,12 @@
       let latestSpeechState = { status: "idle" };
       let previousSpeechStatus = "idle";
       let triggerHandsFreeRecognition = async () => {};
+      let lastSavedMinutesMarkdown = "";
+      let emailTriageMarkdown = "";
+      let emailDraftMarkdown = "";
+      let emailDraftBodyMarkdown = "";
+      let emailAuthStatus = null;
+      let pendingEmailSendResolver = null;
 
       function makeRequestId() {
         if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -974,6 +1211,431 @@
 
       function selectedConversationMode() {
         return conversationModeEl.value || "conversation";
+      }
+
+      function selectedCaptureMode() {
+        return captureModeEl.value || "conversation";
+      }
+
+      function currentMissionId() {
+        const activeTaskMission = taskSessionState?.active?.mission_id;
+        if (typeof activeTaskMission === "string" && activeTaskMission.trim()) return activeTaskMission.trim();
+        const activeBrowserMission = browserConversationState?.active?.mission_id;
+        if (typeof activeBrowserMission === "string" && activeBrowserMission.trim()) return activeBrowserMission.trim();
+        const surfaceMission = latestState?.surfaces?.["presence-studio"]?.data?.mission_id;
+        if (typeof surfaceMission === "string" && surfaceMission.trim()) return surfaceMission.trim();
+        return null;
+      }
+
+      function defaultMinutesTitle() {
+        return taskSessionState?.active?.goal?.summary
+          || browserConversationState?.active?.goal?.summary
+          || latestState?.surfaces?.["presence-studio"]?.data?.title
+          || "Voice Notes Minutes";
+      }
+
+      function persistMinutesDraft() {
+        try {
+          localStorage.setItem(MINUTES_DRAFT_KEY, JSON.stringify({
+            title: minutesTitleEl.value || "",
+            notes: dictationNotesEl.value || "",
+            capture_mode: selectedCaptureMode(),
+            updated_at: new Date().toISOString(),
+          }));
+        } catch (_) {
+          // Best effort only.
+        }
+      }
+
+      function restoreMinutesDraft() {
+        try {
+          const raw = localStorage.getItem(MINUTES_DRAFT_KEY);
+          if (!raw) return false;
+          const draft = JSON.parse(raw);
+          if (!draft || typeof draft !== "object") return false;
+          if (typeof draft.title === "string" && draft.title.trim()) {
+            minutesTitleEl.value = draft.title.trim();
+          }
+          if (typeof draft.notes === "string" && draft.notes) {
+            dictationNotesEl.value = draft.notes;
+          }
+          if (typeof draft.capture_mode === "string" && ["conversation", "notes"].includes(draft.capture_mode)) {
+            captureModeEl.value = draft.capture_mode;
+            renderVoicePresenceState();
+          }
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      async function copyMinutesText() {
+        const text = dictationNotesEl.value.trim() || lastSavedMinutesMarkdown.trim();
+        if (!text) {
+          minutesHintEl.textContent = "Nothing to copy yet.";
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          minutesHintEl.textContent = "Minutes copied to clipboard.";
+        } catch (_) {
+          minutesHintEl.textContent = "Clipboard unavailable; select the text manually.";
+        }
+      }
+
+      async function loadEmailTriage() {
+        if (!emailTriageContentEl || !emailTriageHintEl) return;
+        emailTriageHintEl.textContent = "Loading email triage...";
+        try {
+          const response = await fetch("/api/email-triage");
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          emailTriageMarkdown = body.content || "";
+          emailTriageContentEl.textContent = emailTriageMarkdown || "No triage draft found yet.";
+          emailTriageHintEl.textContent = body.exists
+            ? "Latest triage draft loaded from local storage."
+            : "No triage draft found yet.";
+        } catch (error) {
+          emailTriageContentEl.textContent = "Unable to load email triage right now.";
+          emailTriageHintEl.textContent = `Email triage load failed: ${error.message || error}`;
+        }
+      }
+
+      async function copyEmailTriageDraft() {
+        const text = emailTriageMarkdown.trim();
+        if (!text) {
+          emailTriageHintEl.textContent = "No email draft available to copy.";
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          emailTriageHintEl.textContent = "Email triage draft copied to clipboard.";
+        } catch (_) {
+          emailTriageHintEl.textContent = "Clipboard unavailable; select the draft text manually.";
+        }
+      }
+
+      function persistEmailDraftForm() {
+        try {
+          localStorage.setItem(EMAIL_DRAFT_KEY, JSON.stringify({
+            to: emailDraftToEl.value || "",
+            subject: emailDraftSubjectEl.value || "",
+            tone: emailDraftToneEl.value || "clear and concise",
+            message_id: emailDraftMessageIdEl.value || "",
+            reply_mode: emailDraftModeEl.value || "new",
+            approved: Boolean(emailSendApprovalEl.checked),
+            updated_at: new Date().toISOString(),
+          }));
+        } catch (_) {
+          // Best effort only.
+        }
+      }
+
+      function restoreEmailDraftForm() {
+        try {
+          const raw = localStorage.getItem(EMAIL_DRAFT_KEY);
+          if (!raw) return false;
+          const draft = JSON.parse(raw);
+          if (!draft || typeof draft !== "object") return false;
+          if (typeof draft.to === "string") emailDraftToEl.value = draft.to;
+          if (typeof draft.subject === "string") emailDraftSubjectEl.value = draft.subject;
+          if (typeof draft.tone === "string" && draft.tone) emailDraftToneEl.value = draft.tone;
+          if (typeof draft.message_id === "string") emailDraftMessageIdEl.value = draft.message_id;
+          if (typeof draft.reply_mode === "string" && ["new", "reply", "reply-all"].includes(draft.reply_mode)) {
+            emailDraftModeEl.value = draft.reply_mode;
+          }
+          if (typeof draft.approved === "boolean") {
+            emailSendApprovalEl.checked = draft.approved;
+          }
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function defaultEmailDraftSubject() {
+        const triageText = emailTriageMarkdown.trim() || emailTriageContentEl?.textContent?.trim() || "";
+        if (!triageText) return "Re: Inbox update";
+        const line = triageText.split(/\n+/).map((item) => item.trim()).find(Boolean) || "Inbox update";
+        return `Re: ${line.replace(/^[-*#\s]+/, '').slice(0, 80)}`;
+      }
+
+      function setEmailDeliveryAvailability(ready) {
+        emailDraftCreateGmailEl.disabled = !ready;
+        emailDraftSendEl.disabled = !ready;
+      }
+
+      function buildEmailSendPreview() {
+        const subject = emailDraftSubjectEl.value.trim() || "(not set)";
+        const to = emailDraftToEl.value.trim() || "(not set)";
+        const mode = emailDraftModeEl.value || "new";
+        const source = (emailDraftBodyMarkdown.trim() || emailDraftMarkdown.trim()).split(/\r?\n/).slice(0, 10).join("\n");
+        return {
+          to,
+          subject,
+          mode,
+          preview: source ? source : "(empty body)",
+        };
+      }
+
+      function renderEmailSendConfirmSummary(summary) {
+        if (!emailSendConfirmBodyEl) return;
+        emailSendConfirmBodyEl.textContent = "";
+        const root = document.createElement("div");
+        root.className = "modal-summary";
+
+        const rows = document.createElement("div");
+        rows.className = "modal-summary-grid";
+        for (const [label, value] of [
+          ["To", summary.to],
+          ["Subject", summary.subject],
+          ["Mode", summary.mode],
+        ]) {
+          const row = document.createElement("div");
+          row.className = "modal-summary-row";
+          const labelEl = document.createElement("div");
+          labelEl.className = "modal-summary-label";
+          labelEl.textContent = label;
+          const valueEl = document.createElement("div");
+          valueEl.className = "modal-summary-value";
+          valueEl.textContent = value;
+          row.append(labelEl, valueEl);
+          rows.append(row);
+        }
+
+        const previewLabel = document.createElement("div");
+        previewLabel.className = "modal-summary-label";
+        previewLabel.textContent = "Preview";
+        const preview = document.createElement("div");
+        preview.className = "modal-summary-preview";
+        preview.textContent = summary.preview;
+
+        root.append(rows, previewLabel, preview);
+        emailSendConfirmBodyEl.append(root);
+      }
+
+      function closeEmailSendConfirm(result) {
+        if (emailSendConfirmModalEl) {
+          emailSendConfirmModalEl.classList.remove("open");
+          emailSendConfirmModalEl.setAttribute("aria-hidden", "true");
+        }
+        if (pendingEmailSendResolver) {
+          const resolve = pendingEmailSendResolver;
+          pendingEmailSendResolver = null;
+          resolve(result);
+        }
+      }
+
+      function openEmailSendConfirm(summary) {
+        if (!emailSendConfirmModalEl || !emailSendConfirmBodyEl) {
+          return Promise.resolve(false);
+        }
+        renderEmailSendConfirmSummary(summary);
+        emailSendConfirmModalEl.classList.add("open");
+        emailSendConfirmModalEl.setAttribute("aria-hidden", "false");
+        return new Promise((resolve) => {
+          pendingEmailSendResolver = resolve;
+        });
+      }
+
+      function syncEmailReplyModeUI() {
+        const mode = emailDraftModeEl.value || "new";
+        const requiresMessageId = mode !== "new";
+        emailDraftMessageIdEl.placeholder = requiresMessageId
+          ? "Reply Message ID (required for reply modes)"
+          : "Reply Message ID (optional)";
+        emailDraftMessageIdEl.toggleAttribute("required", requiresMessageId);
+      }
+
+      function describeEmailAuthStatus(status) {
+        if (!status) return "Checking Gmail auth status...";
+        if (!status.ok) {
+          return `Gmail auth status unavailable: ${status.error || "unknown error"}`;
+        }
+        if (status.auth_method && status.auth_method !== "none") {
+          const source = status.credential_source ? ` via ${status.credential_source}` : "";
+          return `Gmail auth ready (${status.auth_method}${source}).`;
+        }
+        const clientConfig = status.client_config_exists ? "client secret present" : "client secret missing";
+        const credentials = status.token_cache_exists || status.encrypted_credentials_exists || status.plain_credentials_exists
+          ? "credentials present"
+          : "no credentials yet";
+        return `Gmail auth not ready (${clientConfig}, ${credentials}).`;
+      }
+
+      function restoreEmailAuthStatus() {
+        try {
+          const raw = localStorage.getItem(EMAIL_AUTH_STATUS_KEY);
+          if (!raw) return false;
+          const cached = JSON.parse(raw);
+          if (!cached || typeof cached !== "object") return false;
+          emailAuthStatus = cached;
+          if (emailAuthStatusEl) {
+            emailAuthStatusEl.textContent = `Last known: ${describeEmailAuthStatus(cached)}`;
+          }
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      async function loadEmailAuthStatus() {
+        if (!emailAuthStatusEl) return;
+        emailAuthStatusEl.textContent = "Checking Gmail auth status...";
+        setEmailDeliveryAvailability(false);
+        try {
+          const response = await fetch("/api/email-auth-status");
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          emailAuthStatus = body;
+          emailAuthStatusEl.textContent = describeEmailAuthStatus(body);
+          const ready = Boolean(body.ok && body.auth_method && body.auth_method !== "none");
+          setEmailDeliveryAvailability(ready);
+          try {
+            localStorage.setItem(EMAIL_AUTH_STATUS_KEY, JSON.stringify(body));
+          } catch (_) {
+            // Best effort only.
+          }
+        } catch (error) {
+          emailAuthStatus = null;
+          emailAuthStatusEl.textContent = `Gmail auth status unavailable: ${error.message || error}`;
+          setEmailDeliveryAvailability(false);
+        }
+      }
+
+      async function loadEmailDraft() {
+        if (!emailDraftContentEl || !emailDraftHintEl) return;
+        emailDraftHintEl.textContent = "Loading email reply draft...";
+        try {
+          const response = await fetch("/api/email-draft");
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          emailDraftMarkdown = body.draft_markdown || "";
+          emailDraftBodyMarkdown = body.body_markdown || "";
+          emailDraftContentEl.textContent = emailDraftMarkdown || "No email reply draft has been created yet.";
+          if (!emailDraftToEl.value.trim() && body.to) emailDraftToEl.value = body.to;
+          if (!emailDraftSubjectEl.value.trim() && body.subject) emailDraftSubjectEl.value = body.subject;
+          if (!emailDraftToneEl.value && body.tone) emailDraftToneEl.value = body.tone;
+          emailDraftHintEl.textContent = body.exists
+            ? "Latest draft loaded."
+            : "No email reply draft has been created yet.";
+        } catch (error) {
+          emailDraftContentEl.textContent = "Unable to load email draft right now.";
+          emailDraftHintEl.textContent = `Email draft load failed: ${error.message || error}`;
+        }
+      }
+
+      async function copyEmailDraft() {
+        const text = emailDraftMarkdown.trim();
+        if (!text) {
+          emailDraftHintEl.textContent = "No email draft available to copy.";
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          emailDraftHintEl.textContent = "Email reply draft copied to clipboard.";
+        } catch (_) {
+          emailDraftHintEl.textContent = "Clipboard unavailable; select the draft text manually.";
+        }
+      }
+
+      async function createEmailDraft() {
+        if (!emailDraftContentEl || !emailDraftHintEl) return;
+        emailDraftCreateEl.disabled = true;
+        emailDraftHintEl.textContent = "Creating email reply draft...";
+        try {
+          const response = await fetch("/api/email-draft", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              request_id: makeRequestId(),
+              to: emailDraftToEl.value.trim(),
+              subject: emailDraftSubjectEl.value.trim(),
+              tone: emailDraftToneEl.value || "clear and concise",
+              triage_text: emailTriageMarkdown.trim() || emailTriageContentEl.textContent.trim(),
+            }),
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          emailDraftMarkdown = body.draft_markdown || "";
+          emailDraftBodyMarkdown = body.body_markdown || "";
+          emailDraftContentEl.textContent = emailDraftMarkdown || "No email reply draft has been created yet.";
+          if (body.to) emailDraftToEl.value = body.to;
+          if (body.subject) emailDraftSubjectEl.value = body.subject;
+          if (body.tone) emailDraftToneEl.value = body.tone;
+          emailDraftHintEl.textContent = `Draft created: ${body.draft_path}`;
+          persistEmailDraftForm();
+        } catch (error) {
+          emailDraftHintEl.textContent = `Email draft creation failed: ${error.message || error}`;
+        } finally {
+          emailDraftCreateEl.disabled = false;
+        }
+      }
+
+      async function deliverEmailDraft(draftMode) {
+        if (!emailDraftContentEl || !emailDraftHintEl) return;
+        if (!draftMode && !emailSendApprovalEl.checked) {
+          emailDraftHintEl.textContent = "Check approval before sending.";
+          return;
+        }
+        const bodyMarkdown = emailDraftBodyMarkdown.trim() || emailDraftMarkdown.trim();
+        if (!bodyMarkdown) {
+          emailDraftHintEl.textContent = "Create a reply draft first.";
+          return;
+        }
+        const mode = emailDraftModeEl.value || "new";
+        const messageId = emailDraftMessageIdEl.value.trim();
+        if (mode !== "new" && !messageId) {
+          emailDraftHintEl.textContent = "Reply mode requires a message ID.";
+          emailDraftMessageIdEl.focus();
+          return;
+        }
+        if (!draftMode) {
+          const confirmed = await openEmailSendConfirm(buildEmailSendPreview());
+          if (!confirmed) {
+            emailDraftHintEl.textContent = "Email send cancelled.";
+            return;
+          }
+        }
+        const approved = draftMode ? true : Boolean(emailSendApprovalEl.checked);
+        const button = draftMode ? emailDraftCreateGmailEl : emailDraftSendEl;
+        button.disabled = true;
+        emailDraftHintEl.textContent = draftMode ? "Creating Gmail draft..." : "Sending approved email...";
+        try {
+          const response = await fetch("/api/email-deliver", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              approved,
+              draft_mode: draftMode,
+              reply_mode: mode,
+              to: emailDraftToEl.value.trim(),
+              subject: emailDraftSubjectEl.value.trim(),
+              message_id: messageId,
+              body_markdown: bodyMarkdown,
+            }),
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || `HTTP ${response.status}`);
+          }
+          emailDraftHintEl.textContent = draftMode
+            ? "Gmail draft created."
+            : "Email sent through Gmail.";
+          persistEmailDraftForm();
+        } catch (error) {
+          emailDraftHintEl.textContent = `Email delivery failed: ${error.message || error}`;
+        } finally {
+          button.disabled = false;
+        }
       }
 
       function setHandsFreeState(nextActive, hint) {
@@ -1050,9 +1712,10 @@
 
       function renderVoicePresenceState() {
         const mode = selectedConversationMode();
+        const captureMode = selectedCaptureMode();
         const status = latestSpeechState?.status || "idle";
         const handsFreeLabel = isHandsFreeActive ? "hands-free on" : "hands-free off";
-        voicePresenceStateEl.textContent = `Voice state: ${status} · mode: ${mode} · ${handsFreeLabel}`;
+        voicePresenceStateEl.textContent = `Voice state: ${status} · mode: ${mode} · capture: ${captureMode} · ${handsFreeLabel}`;
       }
 
       function selectedNativeDeviceLabel() {
@@ -1080,6 +1743,25 @@
         await loadAsyncState();
         if (latestState) render(latestState);
         return body;
+      }
+
+      async function postVoiceMinutes(text) {
+        const response = await fetch("/api/voice/minutes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            request_id: makeRequestId(),
+            mission_id: currentMissionId() || undefined,
+            title: minutesTitleEl.value.trim() || defaultMinutesTitle(),
+            language: navigator.language || "ja-JP",
+            attendees: [],
+            text,
+          })
+        });
+        if (!response.ok) {
+          throw new Error(`voice minutes failed: HTTP ${response.status}`);
+        }
+        return response.json();
       }
 
       async function startNativeStt() {
@@ -2052,6 +2734,21 @@
               }
               return;
             }
+            if (selectedCaptureMode() === "notes") {
+              const nextText = [dictationNotesEl.value.trim(), transcript].filter(Boolean).join("\n");
+              dictationNotesEl.value = nextText;
+              minutesTitleEl.value = minutesTitleEl.value.trim() || defaultMinutesTitle();
+              persistMinutesDraft();
+              if (isPushToTalkActive) {
+                setPushToTalkState(false, `Captured note: ${transcript}`);
+              } else {
+                micHintEl.textContent = `Captured note: ${transcript}`;
+              }
+              if (isHandsFreeActive) {
+                scheduleHandsFreeRestart(500);
+              }
+              return;
+            }
             if (isPushToTalkActive) {
               setPushToTalkState(false, `Sending: ${transcript}`);
             } else {
@@ -2102,6 +2799,12 @@
               browserFinalTranscript = `${browserFinalTranscript} ${finals}`.trim();
               browserInterimTranscript = interim.trim();
               const preview = `${browserFinalTranscript} ${browserInterimTranscript}`.trim();
+              if (selectedCaptureMode() === "notes") {
+                minutesHintEl.textContent = preview
+                  ? `Capturing notes: ${preview}`
+                  : "Notes capture is listening.";
+                return;
+              }
               if (isPushToTalkActive) {
                 setPushToTalkState(true, preview ? `Listening... ${preview}` : "Listening...");
               } else if (isHandsFreeActive) {
@@ -2121,8 +2824,15 @@
                 return;
               }
               if (isHandsFreeActive) {
+                if (selectedCaptureMode() === "notes") {
+                  minutesHintEl.textContent = `Notes capture error: ${event.error || "unknown"}`;
+                }
                 micHintEl.textContent = `Hands-free error: ${event.error || "unknown"}`;
                 scheduleHandsFreeRestart(1200);
+                return;
+              }
+              if (selectedCaptureMode() === "notes") {
+                minutesHintEl.textContent = `Notes capture error: ${event.error || "unknown"}`;
                 return;
               }
               setMicState(false, `Speech recognition error: ${event.error || "unknown"}`);
@@ -2212,6 +2922,16 @@
             await startHandsFreeRecognition();
           });
 
+          captureModeEl.addEventListener("change", () => {
+            const captureMode = selectedCaptureMode();
+            if (captureMode === "notes") {
+              minutesHintEl.textContent = "Notes capture keeps dictated text local until you create minutes.";
+            } else {
+              minutesHintEl.textContent = "Conversation capture sends recognized text through voice-hub.";
+            }
+            renderVoicePresenceState();
+          });
+
           conversationModeEl.addEventListener("change", () => {
             const mode = selectedConversationMode();
             if (isHandsFreeActive) {
@@ -2296,6 +3016,96 @@
       syncBrowserLocationContext();
       setInterval(syncBrowserLocationContext, 10 * 60 * 1000);
       setupMic();
+      restoreMinutesDraft();
+      minutesTitleEl.value = minutesTitleEl.value.trim() || defaultMinutesTitle();
+      persistMinutesDraft();
+      loadEmailTriage();
+      restoreEmailDraftForm();
+      if (!emailDraftSubjectEl.value.trim()) {
+        emailDraftSubjectEl.value = defaultEmailDraftSubject();
+      }
+      if (!emailDraftModeEl.value) {
+        emailDraftModeEl.value = "new";
+      }
+      syncEmailReplyModeUI();
+      restoreEmailAuthStatus();
+      persistEmailDraftForm();
+      loadEmailAuthStatus();
+      loadEmailDraft();
+      minutesTitleEl.addEventListener("input", persistMinutesDraft);
+      dictationNotesEl.addEventListener("input", persistMinutesDraft);
+      captureModeEl.addEventListener("change", persistMinutesDraft);
+      window.addEventListener("beforeunload", persistMinutesDraft);
+      emailDraftToEl.addEventListener("input", persistEmailDraftForm);
+      emailDraftSubjectEl.addEventListener("input", persistEmailDraftForm);
+      emailDraftToneEl.addEventListener("change", persistEmailDraftForm);
+      emailDraftMessageIdEl.addEventListener("input", persistEmailDraftForm);
+      emailDraftModeEl.addEventListener("change", () => {
+        syncEmailReplyModeUI();
+        persistEmailDraftForm();
+      });
+      emailSendApprovalEl.addEventListener("change", persistEmailDraftForm);
+      minutesClearEl.addEventListener("click", () => {
+        dictationNotesEl.value = "";
+        minutesHintEl.textContent = "Notes cleared.";
+        persistMinutesDraft();
+      });
+      minutesRestoreEl.addEventListener("click", () => {
+        if (restoreMinutesDraft()) {
+          minutesHintEl.textContent = "Draft restored.";
+          if (!minutesTitleEl.value.trim()) {
+            minutesTitleEl.value = defaultMinutesTitle();
+          }
+        } else {
+          minutesHintEl.textContent = "No saved draft found.";
+        }
+      });
+      minutesCopyEl.addEventListener("click", copyMinutesText);
+      emailTriageRefreshEl.addEventListener("click", loadEmailTriage);
+      emailTriageCopyEl.addEventListener("click", copyEmailTriageDraft);
+      emailDraftCreateEl.addEventListener("click", createEmailDraft);
+      emailDraftCreateGmailEl.addEventListener("click", () => deliverEmailDraft(true));
+      emailDraftSendEl.addEventListener("click", () => deliverEmailDraft(false));
+      emailAuthRefreshEl.addEventListener("click", loadEmailAuthStatus);
+      emailDraftRefreshEl.addEventListener("click", loadEmailDraft);
+      emailDraftCopyEl.addEventListener("click", copyEmailDraft);
+      emailSendConfirmCancelEl.addEventListener("click", () => closeEmailSendConfirm(false));
+      emailSendConfirmSubmitEl.addEventListener("click", () => closeEmailSendConfirm(true));
+      emailSendConfirmModalEl.addEventListener("click", (event) => {
+        if (event.target === emailSendConfirmModalEl) {
+          closeEmailSendConfirm(false);
+        }
+      });
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && emailSendConfirmModalEl.classList.contains("open")) {
+          closeEmailSendConfirm(false);
+        }
+      });
+      minutesSaveEl.addEventListener("click", async () => {
+        const text = dictationNotesEl.value.trim();
+        if (!text) {
+          minutesHintEl.textContent = "Add or dictate notes first.";
+          return;
+        }
+        minutesSaveEl.disabled = true;
+        minutesHintEl.textContent = "Creating minutes...";
+        try {
+          const body = await postVoiceMinutes(text);
+          minutesHintEl.textContent = `Minutes saved: ${body.minutes_path}`;
+          if (body.minutes_markdown) {
+            dictationNotesEl.value = body.minutes_markdown;
+            lastSavedMinutesMarkdown = body.minutes_markdown;
+          }
+          if (!minutesTitleEl.value.trim() && body.title) {
+            minutesTitleEl.value = body.title;
+          }
+          persistMinutesDraft();
+        } catch (error) {
+          minutesHintEl.textContent = `Minutes failed: ${error.message || error}`;
+        } finally {
+          minutesSaveEl.disabled = false;
+        }
+      });
       browserSessionBootstrapEl.addEventListener("click", async () => {
         const browserSessionId = browserSessionSelectEl.value;
         if (!browserSessionId) return;
