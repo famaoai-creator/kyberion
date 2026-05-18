@@ -131,6 +131,25 @@ Typical service presets include:
 
 Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
 
+For Google Workspace email work:
+
+- `pnpm email:workflow status`
+  - check the shared Gmail auth status from CLI
+- `pnpm email:workflow draft --triage-file active/shared/tmp/email-inbox-triage.md`
+  - generate a reply draft from CLI using the same shared core as Web
+- `pnpm email:workflow deliver --draft-mode --body-file <path>`
+  - create a Gmail draft from CLI without sending
+- `gws auth login --services gmail --readonly`
+  - use for inbox triage and read-only inspection
+- `gws auth login --services gmail`
+  - use for reply draft creation and send actions
+- If `gws auth login` reports `No OAuth client configured`, provide one of:
+  - `/Users/famao/.config/gws/client_secret.json`
+  - `GOOGLE_WORKSPACE_CLI_CLIENT_ID` and `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET`
+  - `gws auth setup --project <gcp-project-id> --login` when `gcloud` is available
+- `gws auth status`
+  - confirm the credential state before sending mail
+
 The lifecycle details live in [`knowledge/public/architecture/runtime-surface-lifecycle-model.md`](../knowledge/public/architecture/runtime-surface-lifecycle-model.md).
 
 ### CEO UX

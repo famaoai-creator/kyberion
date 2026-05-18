@@ -5,11 +5,14 @@ categories:
     - 議事録
     - 参加者
     - 決定事項
+    - 懸案
     - Next Action
     - Agenda
   specification:
     - 仕様書
     - 設計
+    - API仕様
+    - 詳細設計
     - Architecture
     - Sequence
     - API Definition
@@ -17,6 +20,7 @@ categories:
     - 報告書
     - 月次
     - 週報
+    - 四半期
     - Report
     - Summary
   contract:
@@ -24,4 +28,23 @@ categories:
     - 甲
     - 乙
     - 条
+    - 覚書
     - Agreement
+  record:
+    - 議事録
+    - 会議メモ
+    - Meeting Minutes
+    - Minutes
+    - ログ
+  proposal:
+    - 提案書
+    - 企画書
+    - 稟議
+    - Proposal
+    - Pitch
+  plan:
+    - 計画
+    - 計画書
+    - Roadmap
+    - Test Plan
+    - Runbook

@@ -8,6 +8,7 @@ import {
   main,
   normalizeActuators,
   searchActuators,
+  stripNpmSeparatorArg,
 } from './cli.js';
 
 describe('Kyberion CLI helpers', () => {
@@ -45,6 +46,13 @@ describe('Kyberion CLI helpers', () => {
       branchId: 'ceo-mode',
       args: ['--', '--help'],
     });
+  });
+
+  it('drops npm separator tokens before dispatching commands', () => {
+    expect(stripNpmSeparatorArg(['preview', '--', 'pipelines/baseline-check.json'])).toEqual([
+      'preview',
+      'pipelines/baseline-check.json',
+    ]);
   });
 
   afterEach(() => {
@@ -93,6 +101,17 @@ describe('Kyberion CLI helpers', () => {
     expect(output).toContain('example-web-login-guarded (browser)');
     expect(output).toContain('Example Web Login + Guarded Routes');
     expect(output).toContain('Path: knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
+  });
+
+  it('includes the email workflow command in help output', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['help']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('email <status|draft|latest-draft|deliver>');
+    expect(output).toContain('npm run cli -- email status');
+    expect(output).toContain('npm run cli -- email draft');
   });
 
   it('allows only approved packet commands', () => {

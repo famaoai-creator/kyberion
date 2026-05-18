@@ -9,6 +9,13 @@ import {
   safeStat,
   loadActuatorManifestCatalog,
 } from '@agent/core';
+import {
+  executeGmailDelivery,
+  generateEmailReplyDraft,
+  readEmailDraftArtifact,
+  readGwsAuthStatus,
+  resolveEmailTriagePath,
+} from '@agent/core/email-workflow';
 import { assertValidMobileAppProfileIndex, assertValidWebAppProfileIndex } from '@agent/core/app-profiles';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
@@ -156,6 +163,10 @@ function stripLocaleArg(args: string[]): string[] {
   return nextArgs;
 }
 
+export function stripNpmSeparatorArg(args: string[]): string[] {
+  return args.filter(arg => arg !== '--');
+}
+
 function loadVocabularyCatalog(): VocabularyCatalog | null {
   if (!safeExistsSync(vocabularyPath)) {
     return null;
@@ -281,6 +292,7 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  approvals [channel]  List pending approval requests, including secret mutations');
   console.log('  approve <id> [channel]  Approve a pending request as the current sovereign');
   console.log('  reject <id> [channel]   Reject a pending request as the current sovereign');
+  console.log('  email <status|draft|latest-draft|deliver>  Manage Gmail triage and replies');
   console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
   console.log('  preview <file>       Preview a pipeline JSON and validate its steps');
   console.log('  schedule list        List all scheduled pipelines');
@@ -301,6 +313,8 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  npm run cli -- accept-next-action active/shared/tmp/orchestrator/status-operator-interaction-packet.json review-target-mission-artifacts');
   console.log('  npm run cli -- approvals');
   console.log('  npm run cli -- approve <request-id>');
+  console.log('  npm run cli -- email status');
+  console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
   console.log('  npm run cli -- run file-actuator -- --help');
   console.log('');
   console.log('Useful first-run commands:');
@@ -309,6 +323,113 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  pnpm mission:journal Inspect mission history');
   console.log('');
   console.log(`Indexed actuators: ${actuators.length}`);
+}
+
+function printEmailHelp(): void {
+  printHeader();
+  console.log('Usage: npm run cli -- email <status|draft|latest-draft|deliver> [options]');
+  console.log('');
+  console.log('Commands:');
+  console.log('  status        Check Gmail auth readiness');
+  console.log('  draft         Generate a reply draft from inbox triage');
+  console.log('  latest-draft  Show the latest stored draft artifact');
+  console.log('  deliver       Create a Gmail draft or send an approved email');
+  console.log('');
+  console.log('Examples:');
+  console.log('  npm run cli -- email status');
+  console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
+  console.log('  npm run cli -- email latest-draft');
+  console.log('  npm run cli -- email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md');
+  console.log('  npm run cli -- email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md');
+}
+
+function parseEmailWorkflowOptions(args: string[]): Record<string, string | boolean> {
+  const parsed: Record<string, string | boolean> = {};
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (!current.startsWith('--')) continue;
+    const next = args[index + 1];
+    if (!next || next.startsWith('--')) {
+      parsed[current] = true;
+      continue;
+    }
+    parsed[current] = next;
+    index += 1;
+  }
+  return parsed;
+}
+
+async function handleEmailWorkflowCommand(subcommand: string | undefined, args: string[]): Promise<void> {
+  if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
+    printEmailHelp();
+    return;
+  }
+  const options = parseEmailWorkflowOptions(args);
+
+  if (subcommand === 'status') {
+    printHeader();
+    console.log(JSON.stringify(readGwsAuthStatus(), null, 2));
+    return;
+  }
+
+  if (subcommand === 'latest-draft') {
+    printHeader();
+    console.log(JSON.stringify(readEmailDraftArtifact(), null, 2));
+    return;
+  }
+
+  if (subcommand === 'draft') {
+    const triageFile = typeof options['--triage-file'] === 'string' ? options['--triage-file'] : resolveEmailTriagePath();
+    const triageText = String(safeReadFile(pathResolver.rootResolve(triageFile), { encoding: 'utf8' }) || '').trim();
+    if (!triageText) {
+      throw new Error(`triage text not found at ${triageFile}`);
+    }
+    const backend = (await import('@agent/core')).getReasoningBackend();
+    const result = await generateEmailReplyDraft({
+      requestId: typeof options['--request-id'] === 'string' ? options['--request-id'] : undefined,
+      recipient: typeof options['--to'] === 'string' ? options['--to'] : undefined,
+      subjectInput: typeof options['--subject'] === 'string' ? options['--subject'] : undefined,
+      tone: typeof options['--tone'] === 'string' ? options['--tone'] : undefined,
+      triageText,
+      delegateTask: backend.delegateTask.bind(backend),
+      backendName: (backend as any)?.name || 'unknown',
+    });
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (subcommand === 'deliver') {
+    const bodyFile = typeof options['--body-file'] === 'string' ? options['--body-file'] : '';
+    const bodyMarkdown = typeof options['--body-markdown'] === 'string'
+      ? options['--body-markdown']
+      : bodyFile
+        ? String(safeReadFile(pathResolver.rootResolve(bodyFile), { encoding: 'utf8' }) || '')
+        : '';
+    if (!bodyMarkdown.trim()) {
+      throw new Error('body_markdown is required; provide --body-markdown or --body-file');
+    }
+    const draftMode = options['--draft-mode'] === true || options['--draft-mode'] === 'true';
+    const approved = options['--approved'] === true || options['--approved'] === 'true';
+    if (!draftMode && !approved) {
+      throw new Error('approval is required before sending an email; add --approved or use --draft-mode');
+    }
+    const replyModeValue = typeof options['--reply-mode'] === 'string' ? options['--reply-mode'] : 'new';
+    const result = await executeGmailDelivery({
+      approved,
+      draft_mode: draftMode,
+      reply_mode: replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
+      body_markdown: bodyMarkdown,
+      subject: typeof options['--subject'] === 'string' ? options['--subject'] : undefined,
+      to: typeof options['--to'] === 'string' ? options['--to'] : undefined,
+      message_id: typeof options['--message-id'] === 'string' ? options['--message-id'] : undefined,
+    });
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  throw new Error(`Unknown email subcommand: ${subcommand}`);
 }
 
 function printActuatorList(actuators: ActuatorRecord[]) {
@@ -947,7 +1068,7 @@ export async function main(args = process.argv.slice(2)) {
   printMissionContextBanner(missionId);
 
   const actuators = loadActuators();
-  const normalizedArgs = stripLocaleArg(args);
+  const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
   if (command === 'help' || command === '--help' || command === '-h') {
@@ -1076,6 +1197,11 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'approve' || command === 'reject') {
     applyApprovalDecision(command, firstArg, restArgs[0]);
+    return;
+  }
+
+  if (command === 'email') {
+    await handleEmailWorkflowCommand(firstArg, restArgs);
     return;
   }
 

@@ -1361,6 +1361,27 @@ function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protoc
     design_system_id: outline.design_system_id,
     branding: outline.branding || {},
   }));
+  if (!contentData.some((entry: any) => String(entry.id || '').toLowerCase() === 'contents')) {
+    const contentsEntry = Array.isArray(outline.toc)
+      ? outline.toc.find((entry: any) => String(entry.section_id || '') === 'contents')
+      : null;
+    if (contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0) {
+      const contentsSlide = {
+        title: contentsEntry.title || 'Contents',
+        body: contentsEntry.body,
+        subtitle: contentsEntry.objective || 'Document navigation',
+        visual: 'outline navigation',
+        media_kind: 'contents',
+        layout_key: 'doc-contents',
+        semantic_type: 'summary',
+        design_system_id: outline.design_system_id,
+        branding: outline.branding || {},
+        id: 'contents',
+      };
+      const insertAt = contentData.length > 0 && String(contentData[0]?.layout_key || '').includes('cover') ? 1 : 0;
+      contentData.splice(insertAt, 0, contentsSlide);
+    }
+  }
   const protocol = {
     version: '3.0.0',
     generatedAt: new Date().toISOString(),
@@ -1886,6 +1907,7 @@ function classifyRenderSemantic(layoutKey?: string, mediaKind?: string): string 
   const media = String(mediaKind || '').trim();
 
   if (['cover-statement', 'doc-title'].includes(layout) || ['hero', 'title-page'].includes(media)) return 'hero';
+  if (['contents', 'doc-contents'].includes(layout) || ['contents'].includes(media)) return 'summary';
   if (['title-body', 'doc-summary', 'sheet-overview'].includes(layout) || ['summary', 'dashboard'].includes(media)) return 'summary';
   if (['evidence-callout'].includes(layout) || ['evidence'].includes(media)) return 'evidence';
   if (['risk-controls'].includes(layout) || ['controls'].includes(media)) return 'control';
@@ -1896,6 +1918,46 @@ function classifyRenderSemantic(layoutKey?: string, mediaKind?: string): string 
   if (['sheet-main-table'].includes(layout) || ['table'].includes(media)) return 'execution';
   if (['three-point-architecture', 'diagram-context', 'operating-model'].includes(layout) || ['architecture', 'diagram', 'model'].includes(media)) return 'architecture';
   return 'content';
+}
+
+function resolveDocumentContentsLabel(locale?: string): string {
+  return String(locale || '').toLowerCase().startsWith('ja') ? '目次' : 'Contents';
+}
+
+function buildDocumentContentsSection(entries: any[], locale?: string): any | null {
+  const navigable = Array.isArray(entries)
+    ? entries.filter((entry) => {
+        const sectionId = String(entry?.section_id || '').trim();
+        return sectionId && !['contents'].includes(sectionId);
+      })
+    : [];
+  if (navigable.length < 2) return null;
+  const body = navigable.map((entry, index) => {
+    const title = String(entry?.title || entry?.section_id || `Section ${index + 1}`).trim();
+    const objective = String(entry?.objective || '').trim();
+    return `${index + 1}. ${title}${objective ? ` — ${objective}` : ''}`;
+  });
+  return {
+    section_id: 'contents',
+    title: resolveDocumentContentsLabel(locale),
+    objective: 'Document navigation',
+    body,
+    media_kind: 'contents',
+    layout_key: 'doc-contents',
+    semantic_type: 'summary',
+  };
+}
+
+function insertDocumentContentsSection(entries: any[], locale?: string): any[] {
+  if (Array.isArray(entries) && entries.some((entry) => String(entry?.section_id || '').trim() === 'contents')) {
+    return entries;
+  }
+  const contentsSection = buildDocumentContentsSection(entries, locale);
+  if (!contentsSection) return Array.isArray(entries) ? entries : [];
+  const next = Array.isArray(entries) ? [...entries] : [];
+  const insertAt = next.length > 0 && ['cover', 'title'].includes(String(next[0]?.section_id || '')) ? 1 : 0;
+  next.splice(insertAt, 0, contentsSection);
+  return next;
 }
 
 function rankSignalTone(tone?: string): number {
@@ -1931,7 +1993,7 @@ function buildProposalNarrativeOutline(rootDir: string, brief: any): any {
   const tokens = buildCompositionTokenMap(brief);
   const sections = Array.isArray(preset.sections) ? preset.sections : [];
   const requestedSections = Array.isArray(brief.required_sections) ? new Set(brief.required_sections.map((value: any) => String(value))) : null;
-  const toc = sections
+  const toc = insertDocumentContentsSection(sections
     .filter((section: any) => !requestedSections || requestedSections.size === 0 || requestedSections.has(section.section_id) || ['cover', 'decision'].includes(section.section_id))
     .map((section: any, index: number) => {
       const supporting = chooseProposalSectionEvidence(section.section_id, brief) || {};
@@ -1950,7 +2012,7 @@ function buildProposalNarrativeOutline(rootDir: string, brief: any): any {
         layout_key: section.layout_key || 'title-body',
         semantic_type: classifyRenderSemantic(section.layout_key, section.media_kind),
       };
-    });
+    }), brief.locale);
 
   return {
     kind: 'document-outline-adf',
@@ -2013,6 +2075,7 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
           layout_key: String(section.layout_key || 'doc-sections'),
         };
       });
+  const toc = insertDocumentContentsSection(sections, brief.locale);
   return {
     kind: 'document-outline-adf',
     artifact_family: brief.artifact_family,
@@ -2051,7 +2114,7 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
         layout_key: 'doc-summary',
         semantic_type: classifyRenderSemantic('doc-summary', 'summary'),
       }] : []),
-      ...sections.map((section: any) => ({
+      ...toc.map((section: any) => ({
         section_id: String(section.section_id || 'section'),
         title: String(section.title || 'Section'),
         objective: String(section.objective || ''),
@@ -2236,6 +2299,93 @@ function normalizeProposalBrief(input: any): any {
   throw new Error(`Unsupported proposal brief kind: ${String(input.kind || 'unknown')}`);
 }
 
+function gatherDocumentClueText(source: any, data: any): string {
+  const pieces: string[] = [];
+  const pushValue = (value: any) => {
+    if (value === undefined || value === null) return;
+    const text = String(value).trim();
+    if (text) pieces.push(text);
+  };
+  [source?.title, source?.summary, source?.objective, source?.document_type, source?.document_profile, data?.title, data?.summary, data?.objective, data?.document_type, data?.document_profile].forEach(pushValue);
+  for (const item of [source?.payload, data?.payload, source, data]) {
+    if (!item || typeof item !== 'object') continue;
+    if (Array.isArray(item.sections)) {
+      for (const section of item.sections) {
+        pushValue(section?.heading);
+        pushValue(section?.title);
+        pushValue(section?.objective);
+        if (Array.isArray(section?.body)) section.body.forEach(pushValue);
+        if (Array.isArray(section?.bullets)) section.bullets.forEach(pushValue);
+      }
+    }
+    if (Array.isArray(item.story?.chapters)) item.story.chapters.forEach(pushValue);
+    if (Array.isArray(item.items)) {
+      for (const entry of item.items) {
+        pushValue(entry?.title);
+        pushValue(entry?.summary);
+        pushValue(entry?.description);
+      }
+    }
+  }
+  return pieces.join(' ').toLowerCase();
+}
+
+function inferDocumentTypeFromClues(source: any, data: any): string {
+  const clueText = gatherDocumentClueText(source, data);
+  const orderedRules: Array<[string, string[]]> = [
+    ['meeting-notes', ['minutes', 'meeting', 'agenda', 'attendees', 'action items', 'decision']],
+    ['proposal', ['proposal', 'pitch', 'vision', 'charter', 'commitment']],
+    ['specification', ['specification', 'requirements', 'brd', 'api', 'architecture', 'design', 'icd', 'data dictionary', 'use case']],
+    ['report', ['report', 'summary', 'weekly', 'milestone', 'closure', 'audit', 'security', 'postmortem']],
+    ['plan', ['plan', 'test', 'qa', 'strategy', 'roadmap', 'runbook', 'release', 'governance']],
+    ['contract', ['contract', 'agreement', 'msa', 'dpa', 'licensing', 'terms', 'service agreement']],
+    ['record', ['log', 'register', 'issue', 'lessons learned', 'stakeholder']],
+  ];
+  for (const [type, keywords] of orderedRules) {
+    if (keywords.some((keyword) => clueText.includes(keyword))) return type;
+  }
+  return '';
+}
+
+function inferDocumentProfileId(rootDir: string, artifactFamily: string, documentType: string, source: any, data: any): string | null {
+  const clueText = gatherDocumentClueText(source, data);
+  const docType = String(documentType || '').trim();
+  const family = String(artifactFamily || '').trim();
+  const profileOrder: Record<string, string[]> = {
+    proposal: ['executive-proposal', 'vision-proposal', 'project-charter'],
+    report: ['summary-report', 'weekly-status-report', 'milestone-report', 'project-closure-report', 'security-audit-report', 'test-validation-report'],
+    plan: ['test-plan', 'quality-assurance-strategy', 'master-test-plan', 'project-management-plan', 'risk-management-plan', 'quality-management-plan'],
+    specification: ['requirements-definition', 'business-requirements-document', 'api-specification', 'detailed-design', 'basic-design', 'interface-control-document', 'database-design', 'use-case-specification', 'data-dictionary'],
+    'meeting-notes': ['meeting-minutes', 'mission-ledger', 'stakeholder-register', 'issue-log', 'change-log', 'lessons-learned-register'],
+    record: ['meeting-minutes', 'mission-ledger', 'stakeholder-register', 'issue-log', 'change-log', 'lessons-learned-register'],
+    contract: ['master-services-agreement', 'data-processing-agreement-dpa', 'ip-licensing-agreement', 'internal-control-policy'],
+  };
+  const keywordMap: Record<string, string[]> = {
+    proposal: ['proposal', 'pitch', 'vision', 'charter', 'decision', 'next step', 'commitment'],
+    report: ['report', 'summary', 'weekly', 'milestone', 'closure', 'audit', 'security', 'postmortem'],
+    plan: ['plan', 'test', 'qa', 'strategy', 'roadmap', 'runbook', 'release', 'governance'],
+    specification: ['spec', 'specification', 'requirements', 'brd', 'api', 'architecture', 'design', 'icd', 'data dictionary', 'use case'],
+    'meeting-notes': ['minutes', 'meeting', 'agenda', 'attendees', 'action items', 'decision', 'issues', 'register', 'log'],
+    record: ['minutes', 'meeting', 'agenda', 'attendees', 'action items', 'decision', 'issues', 'register', 'log'],
+    contract: ['contract', 'agreement', 'msa', 'dpa', 'licensing', 'terms', 'service agreement'],
+  };
+  const candidates = profileOrder[docType] || profileOrder[family] || [];
+  const keywords = keywordMap[docType] || keywordMap[family] || [];
+  for (const profileId of candidates) {
+    if (keywords.length === 0) return profileId;
+    if (keywords.some((keyword) => clueText.includes(keyword))) return profileId;
+  }
+  if (family && docType) {
+    const catalog = loadDocumentCompositionCatalog(rootDir);
+    for (const [profileId, profile] of Object.entries(catalog.profiles || {})) {
+      if (String((profile as any).artifact_family || '') !== family) continue;
+      if (String((profile as any).document_type || '') !== docType) continue;
+      return profileId;
+    }
+  }
+  return null;
+}
+
 function buildUnifiedDocumentBrief(rootDir: string, input: {
   profileId?: string;
   renderTarget?: string;
@@ -2245,7 +2395,19 @@ function buildUnifiedDocumentBrief(rootDir: string, input: {
   const source = (input.source && typeof input.source === 'object') ? input.source : {};
   const data = (input.data && typeof input.data === 'object') ? input.data : {};
   const renderTarget = String(input.renderTarget || source.render_target || data.render_target || '').trim();
-  const profileId = String(input.profileId || source.document_profile || data.document_profile || '').trim();
+  const inferredDocumentType = String(
+    source.document_type ||
+    data.document_type ||
+    inferDocumentTypeFromClues(source, data) ||
+    '',
+  ).trim();
+  const profileId = String(
+    input.profileId ||
+    source.document_profile ||
+    data.document_profile ||
+    inferDocumentProfileId(rootDir, source.artifact_family || data.artifact_family || '', inferredDocumentType, source, data) ||
+    '',
+  ).trim();
   const catalog = loadDocumentCompositionCatalog(rootDir);
   const profilePreset = profileId ? catalog.profiles?.[profileId] || null : null;
   const artifactFamily = String(
@@ -2257,6 +2419,7 @@ function buildUnifiedDocumentBrief(rootDir: string, input: {
   const documentType = String(
     source.document_type ||
     data.document_type ||
+    inferredDocumentType ||
     profilePreset?.document_type ||
     (artifactFamily === 'presentation' ? 'proposal' : artifactFamily === 'spreadsheet' ? 'tracker' : 'report'),
   ).trim();
@@ -2265,7 +2428,7 @@ function buildUnifiedDocumentBrief(rootDir: string, input: {
     throw new Error('generate_document requires render_target');
   }
   if (!profileId) {
-    throw new Error('generate_document requires profile_id or document_profile');
+    throw new Error('generate_document requires profile_id, document_profile, or inferable content');
   }
 
   if (artifactFamily === 'presentation') {
@@ -2449,6 +2612,9 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
   const evidenceCalloutTitleRule = resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_title');
   const evidenceCalloutBodyRule = resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_body');
   const tableCaptionRule = resolveSemanticComponentRule(rootDir, 'content', 'docx', 'table_caption');
+  const contentsEntry = Array.isArray(outline.toc)
+    ? outline.toc.find((entry: any) => String(entry.section_id) === 'contents')
+    : null;
   const bodyBlocks: any[] = [
     {
       type: 'paragraph',
@@ -2465,6 +2631,25 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
       paragraph: {
         content: [{ type: 'run', run: { content: [{ type: 'text', text: brief.payload.summary }] } }],
       },
+    });
+  }
+
+  if (contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0) {
+    bodyBlocks.push({
+      type: 'paragraph',
+      paragraph: {
+        pPr: { pStyle: 'Heading2' },
+        content: [{ type: 'run', run: { content: [{ type: 'text', text: contentsEntry.title || 'Contents' }] } }],
+      },
+    });
+    contentsEntry.body.forEach((line: string) => {
+      bodyBlocks.push({
+        type: 'paragraph',
+        paragraph: {
+          pPr: { numPr: { ilvl: 0, numId: 1 } },
+          content: [{ type: 'run', run: { content: [{ type: 'text', text: String(line) }] } }],
+        },
+      });
     });
   }
 
@@ -4476,9 +4661,15 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
   const themeAccent = String(activeTheme?.colors?.accent || template?.colors?.accent || '#2563eb');
   const themeBackground = String(activeTheme?.colors?.background || '#ffffff');
   const vectors: any[] = [];
+  const contentsEntry = Array.isArray(outline.toc)
+    ? outline.toc.find((entry: any) => String(entry.section_id) === 'contents')
+    : null;
   const bodySections = [
     brief.payload.title || 'Report',
     brief.payload.summary || '',
+    ...(contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0
+      ? [contentsEntry.title || 'Contents', ...contentsEntry.body]
+      : []),
     ...brief.payload.sections.flatMap((section: any) => [
       section.heading || 'Section',
       ...(Array.isArray(section.body) ? section.body : []),
@@ -4506,6 +4697,29 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
       fontSize: pdfLayout.summary_font_size || 11,
     });
     cursorY += pdfLayout.summary_gap || 30;
+  }
+
+  if (contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0) {
+    elements.push({
+      type: 'text',
+      x: pdfLayout.margin_left || 48,
+      y: cursorY,
+      text: contentsEntry.title || 'Contents',
+      fontSize: pdfLayout.section_font_size || 14,
+      color: hexToPdfRgb(themePrimary, [0.12, 0.16, 0.22]),
+    });
+    cursorY += 22;
+    for (const line of contentsEntry.body) {
+      elements.push({
+        type: 'text',
+        x: pdfLayout.content_x || 56,
+        y: cursorY,
+        text: String(line),
+        fontSize: pdfLayout.body_font_size || 10,
+      });
+      cursorY += pdfLayout.line_height || 16;
+    }
+    cursorY += pdfLayout.section_gap || 10;
   }
 
   for (const section of brief.payload.sections) {

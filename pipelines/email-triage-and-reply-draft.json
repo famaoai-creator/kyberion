@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "name": "email-triage-and-reply-draft",
+  "description": "Summarizes unread Gmail items, writes a paste-ready reply draft, and keeps the inbox response loop in one local artifact.",
+  "context": {
+    "reply_tone": "clear and concise",
+    "output_path": "active/shared/tmp/email-inbox-triage.md"
+  },
+  "steps": [
+    {
+      "id": "triage_inbox",
+      "type": "capture",
+      "op": "service:preset",
+      "params": {
+        "service_id": "google-workspace",
+        "action": "gmail_triage",
+        "export_as": "gmail_triage"
+      }
+    },
+    {
+      "id": "write_reply_draft",
+      "type": "apply",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "# Gmail Inbox Triage\n\nGenerated: {{run_utc_now}}\nTone: {{reply_tone}}\n\n## Triage Output\n\n{{gmail_triage}}\n\n## Suggested Reply Draft\n\nUse the triage above to write a short reply with these parts:\n- Acknowledge receipt\n- Confirm the requested action or next step\n- Mention any blocker or missing detail\n- Close with the next date or action owner\n\n### Paste-Ready Template\n\nHi,\n\nThanks for the update. I reviewed the items below:\n\n{{gmail_triage}}\n\nMy current response is:\n- \n\nNext step:\n- \n\nBest,\nKyberion\n"
+      }
+    },
+    {
+      "id": "log_result",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "📧 Email triage draft written to {{output_path}}"
+      }
+    }
+  ]
+}

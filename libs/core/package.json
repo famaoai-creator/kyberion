@@ -99,6 +99,10 @@
       "types": "./dist/entropy-gate.d.ts",
       "default": "./dist/entropy-gate.js"
     },
+    "./email-workflow": {
+      "types": "./dist/email-workflow.d.ts",
+      "default": "./dist/email-workflow.js"
+    },
     "./fs-utils": {
       "types": "./dist/fs-utils.d.ts",
       "default": "./dist/fs-utils.js"

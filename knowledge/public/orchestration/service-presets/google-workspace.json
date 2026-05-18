@@ -36,6 +36,42 @@
       "args": ["gmail", "+triage"],
       "description": "Summarize unread Gmail inbox items."
     },
+    "gmail_send": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+send", "--to", "{{to}}", "--subject", "{{subject}}", "--body", "{{body}}"],
+      "description": "Send a Gmail message."
+    },
+    "gmail_send_draft": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+send", "--to", "{{to}}", "--subject", "{{subject}}", "--body", "{{body}}", "--draft"],
+      "description": "Create a Gmail draft instead of sending."
+    },
+    "gmail_reply": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+reply", "--message-id", "{{message_id}}", "--body", "{{body}}"],
+      "description": "Reply to a Gmail message."
+    },
+    "gmail_reply_draft": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+reply", "--message-id", "{{message_id}}", "--body", "{{body}}", "--draft"],
+      "description": "Create a Gmail reply draft."
+    },
+    "gmail_reply_all": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+reply-all", "--message-id", "{{message_id}}", "--body", "{{body}}"],
+      "description": "Reply-all to a Gmail message."
+    },
+    "gmail_reply_all_draft": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "+reply-all", "--message-id", "{{message_id}}", "--body", "{{body}}", "--draft"],
+      "description": "Create a Gmail reply-all draft."
+    },
     "calendar_agenda": {
       "type": "cli",
       "command": "gws",

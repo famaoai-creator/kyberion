@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveServiceBinding: vi.fn(),
+  loadServiceEndpointsCatalog: vi.fn(() => ({ services: {} })),
   safeReadFile: vi.fn(),
   safeExistsSync: vi.fn(),
   safeExec: vi.fn(),
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../core/service-binding.js', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
+  loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
 vi.mock('../../../core/secure-io.js', () => ({

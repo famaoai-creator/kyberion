@@ -8,6 +8,8 @@ import {
   createBrowserConversationSession,
   createPresenceVoiceStimulus,
   decideApprovalRequest,
+  executeServicePreset,
+  getReasoningBackend,
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getPresenceAvatarProfile,
@@ -31,14 +33,25 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeExec,
   safeReadFile,
   safeReaddir,
+  safeStat,
+  safeWriteFile,
   saveBrowserConversationSession,
   type A2UIMessage,
   type PresenceTimelineAdf,
   validatePresenceTimeline,
   withExecutionContext,
 } from '@agent/core';
+import {
+  executeGmailDelivery,
+  extractFirstJsonBlock,
+  generateEmailReplyDraft,
+  readEmailDraftArtifact as readSharedEmailDraftArtifact,
+  readGwsAuthStatus,
+  resolveEmailTriagePath,
+} from '@agent/core/email-workflow';
 
 type Client = express.Response;
 
@@ -163,6 +176,22 @@ interface StandardIntentCatalog {
   }>;
 }
 
+interface VoiceMinutesArtifact {
+  title: string;
+  summary: string;
+  decisions: string[];
+  action_items: string[];
+  open_questions: string[];
+  minutes_markdown: string;
+}
+
+interface EmailTriageArtifact {
+  exists: boolean;
+  path: string;
+  updated_at: string | null;
+  content: string;
+}
+
 const app = express();
 const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/presence-studio/static');
@@ -232,6 +261,82 @@ function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
 function ensureStimuliDir(): void {
   const dir = path.dirname(STIMULI_PATH);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+}
+
+function toLineItems(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/\n+/)
+      .map((item) => item.replace(/^[\s*-]+/, '').trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function buildFallbackMinutesMarkdown(input: {
+  title: string;
+  summary: string;
+  decisions: string[];
+  actionItems: string[];
+  openQuestions: string[];
+  sourceText: string;
+}): string {
+  const topSummary = input.summary.trim() || input.sourceText.split(/\n+/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join(' ');
+  const sourcePreview = input.sourceText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .join('\n');
+  return [
+    `# ${input.title}`,
+    '',
+    '## Summary',
+    topSummary || 'No summary available.',
+    '',
+    '## Decisions',
+    ...(input.decisions.length ? input.decisions.map((item) => `- ${item}`) : ['- None captured.']),
+    '',
+    '## Action Items',
+    ...(input.actionItems.length ? input.actionItems.map((item) => `- ${item}`) : ['- None captured.']),
+    '',
+    '## Open Questions',
+    ...(input.openQuestions.length ? input.openQuestions.map((item) => `- ${item}`) : ['- None captured.']),
+    '',
+    '## Source Notes',
+    sourcePreview || input.sourceText,
+    '',
+  ].join('\n');
+}
+
+function resolveVoiceMinutesDir(missionId?: string): string {
+  if (missionId) {
+    const missionDir = pathResolver.missionEvidenceDir(missionId);
+    if (missionDir) return missionDir;
+  }
+  return pathResolver.shared('runtime/presence-studio/voice-notes');
+}
+
+function readEmailTriageArtifact(): EmailTriageArtifact {
+  const path = resolveEmailTriagePath();
+  if (!safeExistsSync(path)) {
+    return {
+      exists: false,
+      path,
+      updated_at: null,
+      content: '',
+    };
+  }
+  const content = String(safeReadFile(path, { encoding: 'utf8' }) || '');
+  return {
+    exists: true,
+    path,
+    updated_at: new Date().toISOString(),
+    content,
+  };
 }
 
 function rememberStimulus(stimulus: Record<string, unknown>): void {
@@ -563,6 +668,18 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/state', (_req, res) => {
   res.json(state);
+});
+
+app.get('/api/email-triage', (_req, res) => {
+  res.json(readEmailTriageArtifact());
+});
+
+app.get('/api/email-draft', (_req, res) => {
+  res.json(readSharedEmailDraftArtifact());
+});
+
+app.get('/api/email-auth-status', (_req, res) => {
+  res.json(readGwsAuthStatus());
 });
 
 app.get('/api/surface-agents', (_req, res) => {
@@ -935,6 +1052,198 @@ app.post('/api/voice/ingest', async (req, res) => {
 
   const payload = await response.text();
   res.status(response.status).type('application/json').send(payload);
+});
+
+app.post('/api/voice/minutes', async (req, res) => {
+  const sourceText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  if (!sourceText) {
+    return res.status(400).json({ error: 'text is required' });
+  }
+
+  const requestId = typeof req.body?.request_id === 'string' && req.body.request_id.trim()
+    ? req.body.request_id.trim()
+    : randomUUID();
+  const missionId = typeof req.body?.mission_id === 'string' && req.body.mission_id.trim()
+    ? req.body.mission_id.trim()
+    : undefined;
+  const title = typeof req.body?.title === 'string' && req.body.title.trim()
+    ? req.body.title.trim()
+    : 'Voice Notes Minutes';
+  const language = typeof req.body?.language === 'string' && req.body.language.trim()
+    ? req.body.language.trim()
+    : 'ja';
+  const attendees = toLineItems(req.body?.attendees);
+  const outputDir = resolveVoiceMinutesDir(missionId);
+  safeMkdir(outputDir, { recursive: true });
+
+  const sourcePath = path.join(outputDir, `voice-notes-${requestId}.txt`);
+  safeWriteFile(sourcePath, `${sourceText}\n`, { encoding: 'utf8' });
+
+  const backend = getReasoningBackend();
+  const prompt = [
+    `You are converting dictated notes into meeting minutes in ${language}.`,
+    'Output ONLY a JSON object with keys: title, summary, decisions, action_items, open_questions, minutes_markdown.',
+    'Keep the content concise, factual, and useful for follow-up.',
+    'Do not invent facts that are not in the source notes.',
+    `Title: ${title}`,
+    attendees.length ? `Attendees: ${attendees.join(', ')}` : 'Attendees: not provided',
+    'Source notes:',
+    sourceText,
+  ].join('\n');
+
+  let backendName = 'unknown';
+  let artifact: VoiceMinutesArtifact | null = null;
+  try {
+    const raw = await backend.delegateTask(prompt, `voice-minutes:${requestId}`);
+    backendName = (backend as any)?.name || backendName;
+    const parsed = extractFirstJsonBlock(raw);
+    if (parsed) {
+      artifact = {
+        title: typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : title,
+        summary: typeof parsed.summary === 'string' ? parsed.summary.trim() : '',
+        decisions: toLineItems(parsed.decisions),
+        action_items: toLineItems(parsed.action_items),
+        open_questions: toLineItems(parsed.open_questions),
+        minutes_markdown: typeof parsed.minutes_markdown === 'string' ? parsed.minutes_markdown.trim() : '',
+      };
+    }
+  } catch (error: any) {
+    logger.warn(`[presence-studio] voice minutes generation failed: ${error?.message || String(error)}`);
+  }
+
+  const minutes = artifact || {
+    title,
+    summary: sourceText.split(/\n+/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join(' '),
+    decisions: [],
+    action_items: [],
+    open_questions: [],
+    minutes_markdown: '',
+  };
+  const markdown = minutes.minutes_markdown.trim() || buildFallbackMinutesMarkdown({
+    title: minutes.title,
+    summary: minutes.summary,
+    decisions: minutes.decisions,
+    actionItems: minutes.action_items,
+    openQuestions: minutes.open_questions,
+    sourceText,
+  });
+
+  const minutesPath = path.join(outputDir, `voice-minutes-${requestId}.md`);
+  const jsonPath = path.join(outputDir, `voice-minutes-${requestId}.json`);
+  safeWriteFile(minutesPath, markdown, { encoding: 'utf8' });
+  safeWriteFile(
+    jsonPath,
+    JSON.stringify(
+      {
+        request_id: requestId,
+        mission_id: missionId,
+        backend: backendName,
+        title: minutes.title,
+        summary: minutes.summary,
+        decisions: minutes.decisions,
+        action_items: minutes.action_items,
+        open_questions: minutes.open_questions,
+        source_path: sourcePath,
+        minutes_path: minutesPath,
+        generated_at: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+    { encoding: 'utf8' },
+  );
+
+  return res.status(201).json({
+    ok: true,
+    request_id: requestId,
+    backend: backendName,
+    title: minutes.title,
+    summary: minutes.summary,
+    source_path: sourcePath,
+    minutes_path: minutesPath,
+    json_path: jsonPath,
+    minutes_markdown: markdown,
+  });
+});
+
+app.post('/api/email-draft', async (req, res) => {
+  const requestId = typeof req.body?.request_id === 'string' && req.body.request_id.trim()
+    ? req.body.request_id.trim()
+    : randomUUID();
+  const recipient = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+  const subjectInput = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
+  const tone = typeof req.body?.tone === 'string' && req.body.tone.trim()
+    ? req.body.tone.trim()
+    : 'clear and concise';
+  const triageInput = typeof req.body?.triage_text === 'string' ? req.body.triage_text.trim() : '';
+  const triageText = triageInput || readEmailTriageArtifact().content.trim();
+  if (!triageText) {
+    return res.status(400).json({ error: 'triage_text is required when no email triage file exists' });
+  }
+  try {
+    const draft = await generateEmailReplyDraft({
+      requestId,
+      recipient,
+      subjectInput,
+      tone,
+      triageText,
+    });
+    return res.status(201).json({
+      ok: true,
+      request_id: draft.request_id,
+      backend: draft.backend,
+      to: draft.to,
+      subject: draft.subject,
+      tone: draft.tone,
+      body_markdown: draft.body_markdown,
+      draft_markdown: draft.draft_markdown,
+      draft_path: draft.draft_path,
+      json_path: draft.json_path,
+      triage_path: draft.triage_path,
+    });
+  } catch (error: any) {
+    logger.warn(`[presence-studio] email draft generation failed: ${error?.message || String(error)}`);
+    return res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/email-deliver', async (req, res) => {
+  const approved = req.body?.approved === true || req.body?.approved === 'true';
+  const body_markdown = typeof req.body?.body_markdown === 'string' ? req.body.body_markdown.trim() : '';
+  const reply_mode = req.body?.reply_mode === 'reply' || req.body?.reply_mode === 'reply-all'
+    ? req.body.reply_mode
+    : 'new';
+  const draft_mode = req.body?.draft_mode === true || req.body?.draft_mode === 'true';
+  const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
+  const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+  const message_id = typeof req.body?.message_id === 'string' ? req.body.message_id.trim() : '';
+  if (!body_markdown) {
+    return res.status(400).json({ error: 'body_markdown is required' });
+  }
+  if (!draft_mode && !approved) {
+    return res.status(400).json({ error: 'approval is required before sending an email' });
+  }
+
+  try {
+    const result = await executeGmailDelivery({
+      approved,
+      draft_mode,
+      reply_mode,
+      body_markdown,
+      subject,
+      to,
+      message_id: message_id || undefined,
+    });
+    return res.status(201).json({
+      ok: true,
+      mode: draft_mode ? 'draft' : 'send',
+      reply_mode,
+      result,
+    });
+  } catch (error: any) {
+    logger.warn(`[presence-studio] gmail delivery failed: ${error?.message || String(error)}`);
+    return res.status(500).json({ error: error?.message || String(error) });
+  }
 });
 
 app.post('/api/voice/native-listen', async (req, res) => {
