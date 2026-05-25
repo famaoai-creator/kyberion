@@ -327,7 +327,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     } as any);
     expect(mocks.compileUserIntentFlow).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.stringContaining('Current user message:'),
+        text: expect.stringContaining('Current incoming message:'),
       }),
     );
   });

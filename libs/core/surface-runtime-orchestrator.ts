@@ -133,7 +133,7 @@ function formatExecutionReceipt(params: {
 function structuredSurfaceQueryText(context: SurfaceRuntimeRouteContext): string {
   const baseText = context.input.surfaceText || context.input.query || context.structuredQuery || '';
   const contextualText = context.input.threadContext
-    ? `${context.input.threadContext}\n\nCurrent user message:\n${baseText}`
+    ? `${context.input.threadContext}\n\nCurrent incoming message:\n${baseText}`
     : baseText;
   return contextualText.trim();
 }
@@ -1264,7 +1264,7 @@ export async function runSurfaceConversation(
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
   const routingText = input.threadContext
-    ? `${input.threadContext}\n\nCurrent user message:\n${routedSurfaceInput.text}`
+    ? `${input.threadContext}\n\nCurrent incoming message:\n${routedSurfaceInput.text}`
     : routedSurfaceInput.text;
   const ruleBasedReceiver =
     forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);

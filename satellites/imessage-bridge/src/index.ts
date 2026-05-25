@@ -47,7 +47,7 @@ function buildThreadContext(message: { id: string; chatId: string; sender: strin
     'Recent iMessage thread context:',
     ...history.map((entry) => `${entry.isFromMe ? 'Assistant' : `User (${entry.sender})`}: ${entry.text}`),
     '',
-    `Current user message: ${message.text}`,
+    `Current incoming message: ${message.text}`,
   ].join('\n');
 }
 
