@@ -3,6 +3,7 @@ import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   listSurfaceOutboxMessages,
+  discoverProviders,
   loadSurfaceManifest,
   logger,
   pathResolver,
@@ -19,11 +20,13 @@ import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
-type DashboardFocus = 'all' | 'onboarding';
+type DashboardFocus = 'all' | 'onboarding' | 'capabilities' | 'skills';
 
 function getDashboardFocus(): DashboardFocus {
   const focusIndex = process.argv.indexOf('--focus');
   const focusValue = focusIndex >= 0 ? String(process.argv[focusIndex + 1] || '').trim().toLowerCase() : '';
+  if (focusValue === 'capabilities') return 'capabilities';
+  if (focusValue === 'skills') return 'skills';
   return focusValue === 'onboarding' ? 'onboarding' : 'all';
 }
 
@@ -38,19 +41,45 @@ function drawHeader() {
 }
 
 function readJsonIfExists<T>(logicalPath: string): T | null {
-  if (!safeExistsSync(logicalPath)) return null;
   try {
+    if (!safeExistsSync(logicalPath)) return null;
     return readJsonFile<T>(logicalPath);
   } catch {
     return null;
   }
 }
 
+type ProviderCapabilitySnapshot = {
+  generated_at: string;
+  registered_capabilities: number;
+  available_capabilities: number;
+  available_providers: string[];
+  missing_providers: string[];
+  providers: Array<{
+    provider: string;
+    installed: boolean;
+    version: string | null;
+    protocol: string;
+    healthy: boolean;
+  }>;
+  capabilities: Array<{
+    capability_id: string;
+    provider: string;
+    status: string;
+    discovery_status: string;
+    evidence?: string;
+  }>;
+};
+
 function listJsonFiles(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => path.join(dir, entry));
+  try {
+    if (!safeExistsSync(dir)) return [];
+    return safeReaddir(dir)
+      .filter((entry) => entry.endsWith('.json'))
+      .map((entry) => path.join(dir, entry));
+  } catch {
+    return [];
+  }
 }
 
 function readConnectionReview() {
@@ -201,6 +230,83 @@ function drawStarterMissionSuggestion() {
   console.log(`  ${chalk.gray('•')} Why: ${chalk.dim(suggestion.why)}`);
   console.log(`  ${chalk.gray('•')} Ready services: ${readyServices.length > 0 ? chalk.green(readyServices.join(', ')) : chalk.dim('none')}`);
   console.log(`  ${chalk.gray('•')} Next action: ${chalk.white(`create a mission from ${suggestion.intentId} in the current tenant context`)}`);
+  console.log('');
+}
+
+function drawCapabilityLandscape() {
+  console.log(chalk.bold.cyan(' 🧰 PROVIDER CAPABILITY LANDSCAPE'));
+
+  const snapshotPath = pathResolver.rootResolve('active/shared/runtime/provider-capabilities.json');
+  const snapshot = readJsonIfExists<ProviderCapabilitySnapshot>(snapshotPath);
+  const discovery = discoverProviders();
+
+  if (!snapshot) {
+    console.log(chalk.dim('  (No capability snapshot yet)'));
+    console.log(chalk.dim('  Run `pnpm provider-capabilities:scan` to capture one.'));
+    console.log('');
+    return;
+  }
+
+  const installedProviders = discovery.filter((provider) => provider.installed);
+  const activeProviders = snapshot.providers.filter((provider) => provider.installed && provider.healthy);
+  const missingProviders = snapshot.missing_providers;
+  const previewCapabilities = snapshot.capabilities.slice(0, 5);
+
+  console.log(`  ${chalk.gray('•')} Generated: ${chalk.white(snapshot.generated_at)}`);
+  console.log(`  ${chalk.gray('•')} Registered: ${chalk.cyan(snapshot.registered_capabilities)} capabilities`);
+  console.log(`  ${chalk.gray('•')} Available: ${chalk.green(snapshot.available_capabilities)} capabilities`);
+  console.log(`  ${chalk.gray('•')} Providers: ${activeProviders.length > 0 ? chalk.green(activeProviders.length) : chalk.dim(0)} healthy / ${installedProviders.length} installed`);
+  console.log(`  ${chalk.gray('•')} Available providers: ${snapshot.available_providers.length > 0 ? chalk.green(snapshot.available_providers.join(', ')) : chalk.dim('none')}`);
+  console.log(`  ${chalk.gray('•')} Missing providers: ${missingProviders.length > 0 ? chalk.yellow(missingProviders.join(', ')) : chalk.dim('none')}`);
+
+  if (previewCapabilities.length > 0) {
+    console.log(chalk.dim('  Top capabilities:'));
+    for (const capability of previewCapabilities) {
+      const status = capability.discovery_status === 'available' ? chalk.green('available') : chalk.yellow('missing');
+      console.log(`    ${chalk.gray('•')} ${capability.capability_id.padEnd(38)} ${chalk.dim(capability.provider)} ${status}`);
+    }
+  }
+  console.log('');
+}
+
+function drawSkillLandscape() {
+  console.log(chalk.bold.green(' 🧠 GOVERNED SKILL LANDSCAPE'));
+
+  const skillIndex = readJsonIfExists<{
+    v?: string;
+    t?: number;
+    u?: string;
+    s?: Array<{
+      n: string;
+      path: string;
+      d: string;
+      s: string;
+      version?: string;
+      capability_count?: number;
+    }>;
+  }>(pathResolver.knowledge('public/orchestration/global_skill_index.json'));
+
+  if (!skillIndex || !Array.isArray(skillIndex.s) || skillIndex.s.length === 0) {
+    console.log(chalk.dim('  (No governed skill catalog found)'));
+    console.log(chalk.dim('  Run `pnpm run sync:component-inventory` to refresh the index.'));
+    console.log('');
+    return;
+  }
+
+  const implemented = skillIndex.s.filter((entry) => entry.s === 'implemented');
+  const preview = skillIndex.s.slice(0, 5);
+
+  console.log(`  ${chalk.gray('•')} Version: ${chalk.white(skillIndex.v || 'unknown')}`);
+  console.log(`  ${chalk.gray('•')} Last updated: ${chalk.white(skillIndex.u || 'unknown')}`);
+  console.log(`  ${chalk.gray('•')} Skills: ${implemented.length > 0 ? chalk.green(implemented.length) : chalk.dim(0)} implemented / ${skillIndex.s.length}`);
+  console.log(`  ${chalk.gray('•')} Catalog: ${chalk.cyan(pathResolver.knowledge('public/orchestration/global_skill_index.json'))}`);
+
+  if (preview.length > 0) {
+    console.log(chalk.dim('  Top skills:'));
+    for (const skill of preview) {
+      console.log(`    ${chalk.gray('•')} ${skill.n.padEnd(28)} ${chalk.dim(skill.version || 'unknown')} ${chalk.white(skill.d.slice(0, 56))}`);
+    }
+  }
   console.log('');
 }
 
@@ -541,6 +647,18 @@ function render() {
   drawTenantContext();
   drawConnectionReview();
   drawStarterMissionSuggestion();
+  if (focus === 'capabilities') {
+    drawCapabilityLandscape();
+    console.log(chalk.dim(' Focused view: provider capability snapshot and provider health.'));
+    console.log(chalk.dim(' Press Ctrl+C to exit.'));
+    return;
+  }
+  if (focus === 'skills') {
+    drawSkillLandscape();
+    console.log(chalk.dim(' Focused view: governed skill catalog.'));
+    console.log(chalk.dim(' Press Ctrl+C to exit.'));
+    return;
+  }
   if (focus === 'onboarding') {
     console.log(chalk.dim(' Focused view: onboarding setup, connection review, tenant context, starter mission.'));
     console.log(chalk.dim(' Press Ctrl+C to exit.'));
@@ -551,6 +669,8 @@ function render() {
   drawOwnerSummaries();
   drawRuntimeLeaseDoctor();
   drawRuntimeSurfaces();
+  drawCapabilityLandscape();
+  drawSkillLandscape();
   drawSlackOutbox();
   drawA2ATraffic();
   drawTrustBoard();

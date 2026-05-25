@@ -270,6 +270,7 @@ export type { ReflexTerminalOptions } from './reflex-terminal.js';
 export * from './sensor-engine.js';
 export * from './sensory-memory.js';
 export * from './provider-capability-scanner.js';
+export * from './provider-capability-overview.js';
 export * from './provider-bridge.js';
 export * from './claude-task-runner.js';
 export * from './claude-task-session-executor.js';
