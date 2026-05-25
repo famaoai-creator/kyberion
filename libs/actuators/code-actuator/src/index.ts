@@ -88,6 +88,22 @@ interface CodeAction {
   };
 }
 
+interface GlobalSkillIndexEntry {
+  n: string;
+  path: string;
+  d: string;
+  s: string;
+  version?: string;
+  capability_count?: number;
+}
+
+interface GlobalSkillIndex {
+  v?: string;
+  t?: number;
+  u?: string;
+  s?: GlobalSkillIndexEntry[];
+}
+
 /**
  * Main Entry Point
  */
@@ -239,7 +255,6 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ),
       };
     case 'discover_capabilities':
-    case 'discover_skills':
       const actuatorsRootDir = path.join(rootDir, 'libs/actuators');
       const capabilities: any[] = [];
       if (safeExistsSync(actuatorsRootDir)) {
@@ -257,6 +272,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }
       capabilities.push(...discoverProviderCliCapabilities());
       return { ...ctx, [params.export_as || 'capabilities_list']: capabilities };
+    case 'discover_skills':
+      return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
     default: return ctx;
   }
 }
@@ -274,6 +291,32 @@ function discoverProviderCliCapabilities(): any[] {
     evidence: capability.evidence || capability.provider_probe.evidence,
     discovery_status: capability.discovery_status,
   }));
+}
+
+function discoverGovernedSkills(): any[] {
+  const skillIndexPath = pathResolver.knowledge('public/orchestration/global_skill_index.json');
+  if (!safeExistsSync(skillIndexPath)) {
+    return [];
+  }
+
+  try {
+    const raw = safeReadFile(skillIndexPath, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw) as GlobalSkillIndex;
+    const entries = Array.isArray(parsed.s) ? parsed.s : [];
+    return entries.map((entry) => ({
+      name: entry.n,
+      path: entry.path,
+      category: 'skill',
+      description: entry.d,
+      status: entry.s,
+      version: entry.version || 'unknown',
+      capability_count: entry.capability_count ?? 0,
+      catalog: 'global_skill_index',
+    }));
+  } catch (err: any) {
+    logger.warn(`[CODE_DISCOVERY] Failed to read global_skill_index.json: ${err?.message || err}`);
+    return [];
+  }
 }
 
 /**
