@@ -76,6 +76,9 @@ Use when you want:
 Slack is a governed ingress and delivery surface.
 It is not the durable mission owner.
 
+Slack threads should be read as incoming conversation turns, not as the operator's request by default.
+If the speaker is someone other than the operator, Kyberion should preserve that speaker identity and keep the reply authority separate from the mission owner.
+
 ### Chronos Mirror
 
 Use when you want:
@@ -149,6 +152,31 @@ For Google Workspace email work:
   - `gws auth setup --project <gcp-project-id> --login` when `gcloud` is available
 - `gws auth status`
   - confirm the credential state before sending mail
+
+### Email Triage Quick Start
+
+Use this when you want the shortest path from inbox triage to a sent reply.
+
+#### Web
+
+1. Open Presence Studio.
+2. Check `Gmail auth status`.
+3. Use `Create Reply Draft` to generate the reply text.
+4. Review it in `Send Approved Email` and send only after confirmation.
+
+#### CLI
+
+1. Run `pnpm cli -- email status`.
+2. Run `pnpm cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md`.
+3. Inspect the latest output with `pnpm cli -- email latest-draft`.
+4. Create a Gmail draft with `pnpm cli -- email deliver --draft-mode --body-file <path>`.
+5. Add `--approved` only when you really want to send it.
+
+#### Notes
+
+- Shared logic lives in `libs/core/email-workflow.ts`.
+- Web and CLI both use the same email workflow core.
+- Sending should always happen after a visible confirmation step.
 
 The lifecycle details live in [`knowledge/public/architecture/runtime-surface-lifecycle-model.md`](../knowledge/public/architecture/runtime-surface-lifecycle-model.md).
 
