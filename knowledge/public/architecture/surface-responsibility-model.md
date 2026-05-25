@@ -90,6 +90,29 @@ The CEO UX should feel like a strategic dashboard and approval inbox.
 
 It should not expose low-level execution machinery by default.
 
+### 3.4 Thread-First Messaging
+
+Messaging surfaces should treat the current turn as incoming thread context, not as a user-owned request by default.
+
+The speaker and the reply authority are separate:
+
+- `speaker`
+  - who sent the current message
+- `reply authority`
+  - which Kyberion surface or agent is allowed to answer on this channel
+- `mission owner`
+  - the durable owner of work, only when the thread escalates
+
+Slack may branch into approval or mission proposal flows.
+Discord, Telegram, and iMessage should default to thread reply semantics.
+
+For internal labels, prefer:
+
+- `Current incoming message`
+- `Current thread message`
+
+Avoid `Current user message` when the message may have come from someone other than the operator.
+
 ## 4. Responsibility Table
 
 | Responsibility | Presence Studio | Chronos | CEO UX |
