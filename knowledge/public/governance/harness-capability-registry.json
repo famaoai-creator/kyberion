@@ -272,6 +272,114 @@
       "notes": "Prefer for bounded sidecar execution with explicit task contracts. Delegation traces should remain auditable."
     },
     {
+      "capability_id": "provider.runtime.claude_cowork_desktop",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "claude-desktop",
+        "name": "cowork",
+        "version": "2026.04"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["knowledge-work", "parallel-tasks", "scheduled-ops"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "experimental",
+      "notes": "Claude Cowork is the desktop knowledge-work surface with tasks, skills, plugins, connectors, analytics, telemetry, and RBAC controls."
+    },
+    {
+      "capability_id": "provider.runtime.gemini_spark_desktop",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "gemini-app",
+        "name": "spark",
+        "version": "2026.05"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["desktop-voice", "local-files", "desktop-workflow"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "experimental",
+      "notes": "Gemini Spark is the proactive desktop agent surface for local files, voice, and desktop automation."
+    },
+    {
+      "capability_id": "provider.runtime.hermes_kanban_board",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "kanban",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["multi-agent-kanban", "task-handoff"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "Hermes Kanban is the durable multi-agent board pattern: named workers, persistent rows, and shared handoffs."
+    },
+    {
+      "capability_id": "provider.runtime.openhands_control_plane",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "openhands",
+        "name": "control-plane",
+        "version": "2026.05"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["policy-routing", "budget-governance", "fleet-observability"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "management-control-plane"
+      },
+      "status": "experimental",
+      "notes": "OpenHands-style control plane surfaces are governance-heavy and should be modeled as policy and observability adapters, not as raw execution surfaces."
+    },
+    {
       "capability_id": "cli.native.gemini_headless_prompt",
       "source": {
         "type": "cli_native",
