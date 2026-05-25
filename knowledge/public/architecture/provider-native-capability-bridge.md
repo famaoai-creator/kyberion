@@ -18,6 +18,9 @@ This bridge is especially relevant for:
 - provider CLI feature discovery
 - browser-interactive host surfaces
 - future Gemini-side equivalents
+- multimodal desktop front doors such as Claude Cowork and Gemini Spark
+- durable multi-agent collaboration surfaces such as Hermes Kanban
+- enterprise control-plane surfaces such as OpenHands Enterprise
 
 ## Design Principle
 
@@ -35,6 +38,34 @@ Instead, split the integration into three layers:
    - records what actually happened, including the capability and adapter used
 
 This keeps Kyberion neutral at the core while still allowing strong host-native leverage.
+
+## 2026-05 Landscape Signal
+
+The current ecosystem is converging on the same shape from different directions:
+
+- OpenClaw is tightening a local, messaging-first surface with skills, media, voice, and explicit runtime-context scoping.
+- Hermes is treating skills as shared documents and Kanban as a durable work board for named agents.
+- OpenHands is separating harness, orchestrator, and control plane so policy and observability stay distinct from execution.
+- Claude Cowork is bringing scheduled tasks, plugins, connectors, analytics, and role-based control into a desktop collaboration surface.
+- Gemini Spark is bringing proactive voice and local-file workflow automation into the desktop front door.
+- Codex is turning into a command center for multiple agents, worktrees, images, and shared skills.
+- browser-use is making CDP-first browser attach and session persistence easy for any agent loop.
+
+The detailed comparison lives in
+[`../external-wisdom/harness-landscape-scan-2026-05.md`](../external-wisdom/harness-landscape-scan-2026-05.md).
+
+## Kyberion Absorption Plan
+
+The implementation plan is tracked in
+[`harness-adoption-plan-2026-05.md`](./harness-adoption-plan-2026-05.md).
+
+The short version is:
+
+1. keep multimodal entry surfaces easy to reach
+2. make skills and plugins shareable
+3. introduce durable kanban-style collaboration where transient delegation is not enough
+4. keep control-plane policy separate from harness execution
+5. route provider-native browser and desktop surfaces through registry-backed adapters only
 
 ## Why This Is Needed
 
