@@ -160,6 +160,15 @@
         margin-left: 6px;
         color: rgba(237, 246, 255, 0.6);
       }
+      .first-run-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .first-run-actions .button {
+        min-width: 0;
+      }
       .first-run-steps {
         margin: 6px 0 0;
         padding-left: 18px;
@@ -292,6 +301,19 @@
         display: grid;
         grid-template-columns: 1.4fr 1fr;
         gap: 18px;
+      }
+      .quick-actions {
+        display: grid;
+        gap: 12px;
+      }
+      .quick-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .quick-actions-grid .button {
+        width: 100%;
+        min-width: 0;
       }
       .panel {
         background: var(--panel);
@@ -630,6 +652,19 @@
       @media (max-width: 860px) {
         .grid { grid-template-columns: 1fr; }
         .avatar { min-height: 320px; }
+        .quick-actions-grid { grid-template-columns: 1fr 1fr 1fr; }
+        .controls { align-items: stretch; }
+        .controls .button,
+        .controls .select,
+        .controls .text-input {
+          width: 100%;
+          min-width: 0;
+        }
+      }
+      @media (max-width: 560px) {
+        .quick-actions-grid { grid-template-columns: 1fr; }
+        .panel { padding: 16px; }
+        .controls { gap: 10px; }
       }
     </style>
     <link rel="stylesheet" href="./design-system.css" />
@@ -655,19 +690,25 @@
         <div class="first-run-body">
           <div class="first-run-eyebrow">First Run</div>
           <div class="first-run-title">
-            <span id="first-run-greeting">Welcome.</span>
-            <span class="first-run-sub">No live surface activity yet — try one of these to wake the studio.</span>
+            <span class="first-run-sub">No live surface activity yet. Try voice or browser.</span>
           </div>
-          <ol class="first-run-steps">
-            <li><strong>Hold To Talk</strong> or press <strong>Start Native Mic</strong> to send your first stimulus through voice-hub.</li>
-            <li>Open the <strong>Developer</strong> panel below and post a sample <code>/a2ui/dispatch</code> message.</li>
-            <li>Promote the simulated tutorial in <code>knowledge/personal/onboarding/tutorial-plan.md</code> to a real mission.</li>
-          </ol>
+          <div class="first-run-actions">
+            <button class="button" id="first-run-voice" type="button">Try Voice</button>
+            <button class="button button-ghost" id="first-run-browser" type="button">Prepare Browser</button>
+          </div>
         </div>
         <button id="first-run-close" class="first-run-close" aria-label="Dismiss first run banner">×</button>
       </div>
+      <div class="panel quick-actions" style="margin-top: 18px;">
+        <div class="label">Shortcuts</div>
+        <div class="quick-actions-grid">
+          <button class="button" id="quick-action-minutes" type="button">Minutes</button>
+          <button class="button" id="quick-action-email" type="button">Draft</button>
+          <button class="button" id="quick-action-browser" type="button">Browser</button>
+        </div>
+      </div>
       <div class="grid" style="margin-top: 22px;">
-        <section class="panel avatar">
+        <section class="panel avatar" id="voice-panel">
           <img class="avatar-media hidden" id="avatar-image" alt="Kyberion avatar" />
           <div class="orb"></div>
           <div class="expression" id="expression">neutral</div>
@@ -699,7 +740,7 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="minutes-panel">
           <div class="label">Dictation Notes</div>
           <textarea id="dictation-notes" class="notes-area" spellcheck="false" placeholder="Use Notes Capture with the browser mic, or paste text here before generating minutes."></textarea>
           <div class="controls" style="margin-top: 12px;">
@@ -713,7 +754,7 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="email-triage-panel">
           <div class="label">Email Triage</div>
           <div id="email-triage-content" class="artifact-view" aria-live="polite">Email triage has not been loaded yet.</div>
           <div class="controls" style="margin-top: 12px;">
@@ -724,7 +765,7 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="email-panel">
           <div class="label">Email Reply Draft</div>
           <div class="hint" id="email-auth-status">Checking Gmail auth status...</div>
           <div class="controls" style="margin-top: 0;">
@@ -773,71 +814,71 @@
         </div>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="current-agent-panel">
           <div class="label">Current Assistant</div>
           <div class="capability-card" id="current-agent"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="agent-catalog-panel">
           <div class="label">Common Requests</div>
           <div class="list" id="agent-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="project-panel">
           <div class="label">Projects</div>
           <div class="list" id="project-catalog"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="track-panel">
           <div class="label">Tracks</div>
           <div class="list" id="track-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="binding-panel">
           <div class="label">Service Bindings</div>
           <div class="list" id="binding-catalog"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="mission-seed-panel">
           <div class="label">Mission Seeds</div>
           <div class="list" id="mission-seed-catalog"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="conversation-panel">
           <div class="label">Conversation</div>
           <div class="list" id="transcript"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="stimuli-panel">
           <div class="label">Recent Inputs</div>
           <div class="list" id="stimuli"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="async-panel">
           <div class="label">In Progress</div>
           <div class="list" id="async-requests"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="notifications-panel">
           <div class="label">Updates</div>
           <div class="list" id="notifications"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="approval-panel">
           <div class="label">Approval Inbox</div>
           <div class="list" id="approval-inbox"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="outcome-panel">
           <div class="label">Latest Outcomes</div>
           <div class="list" id="outcome-inbox"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="requested-work-panel">
           <div class="label">Requested Work</div>
           <div class="list" id="task-session-active"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="browser-panel">
           <div class="label">Browser Task</div>
           <div class="controls" style="margin-top: 0; margin-bottom: 14px;">
             <select class="select" id="browser-session"></select>
@@ -847,17 +888,17 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="browser-actions-panel">
           <div class="label">Available Browser Actions</div>
           <div class="list" id="browser-conversation-candidates"></div>
         </section>
-        <section class="panel">
+        <section class="panel" id="work-detail-panel">
           <div class="label">Work Detail</div>
           <div class="list" id="task-session-detail"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel">
+        <section class="panel" id="memory-panel">
           <div class="label">Memory Detail</div>
           <div class="list" id="memory-detail"></div>
         </section>
@@ -977,10 +1018,6 @@
           const stimuliCount = (state && Array.isArray(state.recentStimuli) ? state.recentStimuli.length : 0)
             || (health && typeof health.recentStimuli === "number" ? health.recentStimuli : 0);
           if (stimuliCount > 0) return;
-          const greeting = document.getElementById("first-run-greeting");
-          if (greeting && identityPayload.sovereign && identityPayload.sovereign.name) {
-            greeting.textContent = "Welcome, " + identityPayload.sovereign.name + ".";
-          }
           banner.classList.remove("hidden");
         });
       }
@@ -1138,10 +1175,20 @@
       const emailDraftRefreshEl = document.getElementById("email-draft-refresh");
       const emailDraftCopyEl = document.getElementById("email-draft-copy");
       const emailDraftHintEl = document.getElementById("email-draft-hint");
+      const quickActionMinutesEl = document.getElementById("quick-action-minutes");
+      const quickActionEmailEl = document.getElementById("quick-action-email");
+      const quickActionBrowserEl = document.getElementById("quick-action-browser");
+      const voicePanelEl = document.getElementById("voice-panel");
+      const minutesPanelEl = document.getElementById("minutes-panel");
+      const emailPanelEl = document.getElementById("email-panel");
+      const browserPanelEl = document.getElementById("browser-panel");
+      const devPanelEl = document.getElementById("dev-panel");
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const MINUTES_DRAFT_KEY = "presence-studio.minutes-draft.v1";
       const EMAIL_DRAFT_KEY = "presence-studio.email-draft.v1";
       const EMAIL_AUTH_STATUS_KEY = "presence-studio.email-auth-status.v1";
+      const firstRunVoiceBtn = document.getElementById("first-run-voice");
+      const firstRunBrowserBtn = document.getElementById("first-run-browser");
       let recognition = null;
       let isListening = false;
       let isNativeListening = false;
@@ -1182,6 +1229,7 @@
       let emailDraftBodyMarkdown = "";
       let emailAuthStatus = null;
       let pendingEmailSendResolver = null;
+      let emailSendConfirmReturnFocus = null;
 
       function makeRequestId() {
         if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
@@ -1426,6 +1474,10 @@
           pendingEmailSendResolver = null;
           resolve(result);
         }
+        if (emailSendConfirmReturnFocus && typeof emailSendConfirmReturnFocus.focus === "function") {
+          emailSendConfirmReturnFocus.focus();
+        }
+        emailSendConfirmReturnFocus = null;
       }
 
       function openEmailSendConfirm(summary) {
@@ -1433,10 +1485,21 @@
           return Promise.resolve(false);
         }
         renderEmailSendConfirmSummary(summary);
+        emailSendConfirmReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         emailSendConfirmModalEl.classList.add("open");
         emailSendConfirmModalEl.setAttribute("aria-hidden", "false");
         return new Promise((resolve) => {
           pendingEmailSendResolver = resolve;
+          window.requestAnimationFrame(() => {
+            emailSendConfirmSubmitEl?.focus();
+          });
+        });
+      }
+
+      function focusSection(panelEl, focusEl) {
+        panelEl?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+        window.requestAnimationFrame(() => {
+          focusEl?.focus?.();
         });
       }
 
@@ -3076,11 +3139,31 @@
           closeEmailSendConfirm(false);
         }
       });
+      emailSendConfirmModalEl.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab" || !emailSendConfirmModalEl.classList.contains("open")) return;
+        const focusables = [emailSendConfirmCancelEl, emailSendConfirmSubmitEl].filter((el) => el && !el.disabled);
+        if (!focusables.length) return;
+        const activeIndex = focusables.indexOf(document.activeElement);
+        if (event.shiftKey) {
+          if (activeIndex <= 0) {
+            event.preventDefault();
+            focusables[focusables.length - 1].focus();
+          }
+        } else if (activeIndex === focusables.length - 1) {
+          event.preventDefault();
+          focusables[0].focus();
+        }
+      });
       window.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && emailSendConfirmModalEl.classList.contains("open")) {
           closeEmailSendConfirm(false);
         }
       });
+      quickActionMinutesEl?.addEventListener("click", () => focusSection(minutesPanelEl, minutesTitleEl));
+      quickActionEmailEl?.addEventListener("click", () => focusSection(emailPanelEl, emailDraftToEl));
+      quickActionBrowserEl?.addEventListener("click", () => focusSection(browserPanelEl, browserSessionSelectEl));
+      firstRunVoiceBtn?.addEventListener("click", () => focusSection(voicePanelEl, pttToggleEl));
+      firstRunBrowserBtn?.addEventListener("click", () => focusSection(browserPanelEl, browserSessionSelectEl));
       minutesSaveEl.addEventListener("click", async () => {
         const text = dictationNotesEl.value.trim();
         if (!text) {
