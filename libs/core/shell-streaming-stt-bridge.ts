@@ -20,6 +20,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from './core.js';
+import { buildSafeExecEnv } from './secure-io.js';
 import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
@@ -34,6 +35,20 @@ export interface ShellStreamingSttOptions {
   env?: Record<string, string>;
 }
 
+function validateShellCommand(command: string): string {
+  const normalized = String(command || '').trim();
+  if (!normalized) {
+    throw new Error('KYBERION_STT_COMMAND must not be empty');
+  }
+  if (/\s/.test(normalized)) {
+    throw new Error('KYBERION_STT_COMMAND must not contain whitespace');
+  }
+  if (/\0/.test(normalized)) {
+    throw new Error('KYBERION_STT_COMMAND contains an invalid null byte');
+  }
+  return normalized;
+}
+
 export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBridge {
   readonly bridge_id: string;
   constructor(private readonly opts: ShellStreamingSttOptions) {
@@ -41,12 +56,13 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
   }
 
   async *transcribeStream(audio: AsyncIterable<AudioChunk>): AsyncIterable<TranscriptChunk> {
+    const command = validateShellCommand(this.opts.command);
     const proc: ChildProcessWithoutNullStreams = spawn(
-      this.opts.command,
+      command,
       [...(this.opts.args ?? [])],
       {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, ...(this.opts.env ?? {}) },
+        env: buildSafeExecEnv(this.opts.env),
       },
     );
     let stderrTail = '';
@@ -88,7 +104,7 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
     });
     proc.on('exit', (code) => {
       if (code !== 0) {
-        logger.warn(`[shell-stt] command "${this.opts.command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`);
+        logger.warn(`[shell-stt] command "${command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`);
       }
       drained = true;
       while (resolvers.length) resolvers.shift()!(null);
