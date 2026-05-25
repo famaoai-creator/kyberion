@@ -23,6 +23,7 @@ vi.mock('@agent/core', async (importOriginal) => {
       rootDir: vi.fn().mockReturnValue('/mock/root'),
       resolve: vi.fn((p: string) => `/mock/root/${p}`),
       rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
+      knowledge: vi.fn((p: string) => `/mock/root/knowledge/${p}`),
     },
   };
 });
@@ -93,16 +94,16 @@ describe('code-actuator', () => {
       expect(result.results[0].error).toContain('[SECURITY]');
     });
 
-    it('max_steps超過時に[SAFETY_LIMIT]エラーをスロー', async () => {
+    it('max_steps超過時に[SAFETY_LIMIT]エラーを返す', async () => {
       const steps = Array.from({ length: 3 }, (_, i) => ({
         type: 'apply' as const,
         op: 'log',
         params: { message: `step ${i}` },
       }));
 
-      await expect(
-        handleAction({ action: 'pipeline', steps, options: { max_steps: 2 } })
-      ).rejects.toThrow('[SAFETY_LIMIT]');
+      const result = await handleAction({ action: 'pipeline', steps, options: { max_steps: 2 } });
+      expect(result.status).toBe('error');
+      expect(result.message).toContain('[SAFETY_LIMIT]');
     });
 
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
@@ -168,6 +169,52 @@ describe('code-actuator', () => {
         expect(result.status).toBe('succeeded');
         expect(result.context.ts_files).toBeDefined();
         expect(Array.isArray(result.context.ts_files)).toBe(true);
+      });
+
+      it('discover_skills で governed skill index を読み込む', async () => {
+        const { safeExistsSync, safeReadFile } = await import('@agent/core');
+        vi.mocked(safeExistsSync).mockImplementation((filePath: string) =>
+          String(filePath).includes('global_skill_index.json'),
+        );
+        vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+          if (String(filePath).includes('global_skill_index.json')) {
+            return JSON.stringify({
+              v: '3.0.0',
+              s: [
+                {
+                  n: 'sample-skill',
+                  path: 'skills/sample-skill',
+                  d: 'Sample governed skill',
+                  s: 'implemented',
+                  version: '1.0.0',
+                  capability_count: 2,
+                },
+              ],
+            });
+          }
+          return '{}';
+        });
+
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'discover_skills',
+              params: { export_as: 'skills_list' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.context.skills_list).toHaveLength(1);
+        expect(result.context.skills_list[0]).toMatchObject({
+          name: 'sample-skill',
+          category: 'skill',
+          status: 'implemented',
+          capability_count: 2,
+          catalog: 'global_skill_index',
+        });
       });
     });
 
@@ -297,7 +344,7 @@ describe('code-actuator', () => {
 
     // Feature: project-quality-improvement, Property 2: SAFETY_LIMITエラーの一貫性
     describe('Property 2: SAFETY_LIMITエラーの一貫性', () => {
-      it('max_steps超過時は常に[SAFETY_LIMIT]プレフィックスのエラー', async () => {
+      it('max_steps超過時は常に[SAFETY_LIMIT]プレフィックスのエラーを返す', async () => {
         /**
          * Validates: Requirements 1.6
          */
@@ -309,9 +356,9 @@ describe('code-actuator', () => {
               params: { message: `step ${i}` },
             }));
 
-            await expect(
-              handleAction({ action: 'pipeline', steps, options: { max_steps: maxSteps } })
-            ).rejects.toThrow('[SAFETY_LIMIT]');
+            const result = await handleAction({ action: 'pipeline', steps, options: { max_steps: maxSteps } });
+            expect(result.status).toBe('error');
+            expect(result.message).toContain('[SAFETY_LIMIT]');
           }),
           { numRuns: 100 }
         );

@@ -156,6 +156,46 @@
           }
         }
       ]
+    },
+    {
+      "provider": "claude-desktop",
+      "primary_probe": {
+        "command": "claude",
+        "args": ["--version"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "claude --version (desktop surface)"
+      }
+    },
+    {
+      "provider": "gemini-app",
+      "primary_probe": {
+        "command": "gemini",
+        "args": ["--help"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "gemini --help (app surface)"
+      }
+    },
+    {
+      "provider": "hermes-agent",
+      "primary_probe": {
+        "command": "which",
+        "args": ["hermes"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "which hermes"
+      }
+    },
+    {
+      "provider": "openhands",
+      "primary_probe": {
+        "command": "which",
+        "args": ["openhands"],
+        "timeout_ms": 10000,
+        "max_output_mb": 1,
+        "evidence": "which openhands"
+      }
     }
   ]
 }
