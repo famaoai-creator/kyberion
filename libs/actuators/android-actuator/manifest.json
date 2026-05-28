@@ -1,7 +1,7 @@
 {
   "actuator_id": "android-actuator",
-  "version": "1.0.0",
-  "description": "ADB-driven Android Device Actuator",
+  "version": "1.1.0",
+  "description": "Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search)",
   "contract_schema": "schemas/mobile-device-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {

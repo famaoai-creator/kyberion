@@ -253,7 +253,7 @@ describe('meeting-actuator voice-consent gate', () => {
 
     const auditPath = path2.join(
       ROOT,
-      'active/audit',
+      'active/shared/logs/audit',
       `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
     );
     const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
