@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
   "t": 27,
-  "u": "2026-05-09T14:32:46.623Z",
+  "u": "2026-05-28T15:33:15.058Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -15,9 +15,9 @@
     {
       "n": "android-actuator",
       "path": "libs/actuators/android-actuator",
-      "d": "ADB-driven Android Device Actuator",
+      "d": "Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search)",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 1,
       "contract_schema": "schemas/mobile-device-pipeline.schema.json"
     },
@@ -89,7 +89,7 @@
       "path": "libs/actuators/ios-actuator",
       "d": "simctl-driven iOS Simulator Actuator",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 1,
       "contract_schema": "schemas/mobile-device-pipeline.schema.json"
     },
@@ -178,8 +178,8 @@
       "path": "libs/actuators/secret-actuator",
       "d": "OS Native Secret Manager Bridge",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 3,
+      "version": "1.1.0",
+      "capability_count": 4,
       "contract_schema": "schemas/secret-action.schema.json"
     },
     {

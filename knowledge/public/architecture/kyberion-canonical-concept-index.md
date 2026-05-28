@@ -61,6 +61,10 @@ Use each document for a distinct purpose:
 | `docs/INTENT_LOOP_CONCEPT.md` | non-replaceable intent-loop closure model |
 | `knowledge/public/orchestration/guided-coordination-protocol.md` | shared repeated-work coordination flow |
 | `knowledge/public/schemas/guided-coordination-brief.schema.json` | shared intake brief for repeated coordination |
+| `knowledge/public/architecture/sdlc-gating-model.md` | gate-driven lifecycle governance model |
+| `knowledge/public/architecture/ai-agent-track-patterns.md` | AI agent業務のTrack/Gateパターンカタログ（8プロファイル・3パターン） |
+| `knowledge/public/architecture/actuator-external-dependency-pattern.md` | 外部依存 Actuator の Provision→Verify→Bind→Run パターン（Service/Voice/Meeting 共通） |
+| `knowledge/public/voice/meeting-voice-proxy-setup.md` | Google Meet クローン音声代理プロキシのセットアップ手順 |
 
 ## 6. Reading Order
 

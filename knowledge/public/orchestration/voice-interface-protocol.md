@@ -21,9 +21,12 @@ last_updated: 2026-03-06
 
 | 機能            | 採用技術                 | 特徴                                            |
 | :-------------- | :----------------------- | :---------------------------------------------- |
-| **Ear (STT)**   | OpenAI Whisper (Local)   | オフラインで動作。高精度な日本語認識。          |
-| **Brain (LLM)** | Gemma 2 (Ollama)         | ローカル実行。高速かつ日本語に強い。            |
-| **Mouth (TTS)** | macOS `say` / ElevenLabs | `say` は即時性、ElevenLabs は感情表現に優れる。 |
+| **Ear (STT)**   | mlx-audio Whisper (Local) | Apple Silicon 最適化。オフライン高精度日本語認識。 |
+| **Brain (LLM)** | Kyberion Reasoning Backend | `KYBERION_REASONING_BACKEND` で切替（claude-cli / gemini-cli / anthropic）。 |
+| **Mouth (TTS)** | CosyVoice 2 / Fish Speech / Qwen3-TTS (mlx-audio) + macOS `say` fallback | ゼロショットクローン対応。Apache 2.0 ライセンス。Apple Silicon Metal 動作。 |
+| **AudioBus**    | BlackHole 2ch + SwitchAudioSource | TTS 出力 → 仮想マイク入力 → ブラウザ → 会議のルーティング。 |
+
+詳細セットアップ: `knowledge/public/voice/meeting-voice-proxy-setup.md`
 
 ## 3. 音声コマンドの拡張
 

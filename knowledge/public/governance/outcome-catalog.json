@@ -651,6 +651,69 @@
       "deliverable_kind": "report",
       "downloadable": true,
       "previewable": true
+    },
+    "hypothesis_tree_result": {
+      "label": "hypothesis tree result",
+      "description": "A divergent hypothesis tree with branches, critiques, and convergence notes.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "task_plan": {
+      "label": "task plan",
+      "description": "A stepwise task plan with dependencies, checkpoints, and execution order.",
+      "deliverable_kind": "plan",
+      "downloadable": false,
+      "previewable": true
+    },
+    "execution_result": {
+      "label": "execution result",
+      "description": "A governed execution result with progress tracking and completion evidence.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "prior_knowledge_summary": {
+      "label": "prior knowledge summary",
+      "description": "A concise summary of relevant prior knowledge and its application to the current request.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "consensus_result": {
+      "label": "consensus result",
+      "description": "A multi-agent consensus result with agreed outcome and recorded dissent.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "gate_verdict": {
+      "label": "gate verdict",
+      "description": "A counterfactual gate verdict with convergence score and go or no-go recommendation.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "adaptive_analysis": {
+      "label": "adaptive analysis",
+      "description": "An adaptive reasoning analysis produced from persona or prompt switching.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "tool_use_result": {
+      "label": "tool use result",
+      "description": "A tool-use execution result with selected tools and emitted artifacts.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "review_id": {
+      "label": "review id",
+      "description": "A review request outcome that records the identifier of the human review item.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
     }
   }
 }

@@ -1,6 +1,9 @@
 {
   "concept": "sdlc-gate-catalog",
   "version": "1.0.0",
+  "deprecated": true,
+  "superseded_by": "knowledge/public/governance/gate-profiles/sdlc.json",
+  "note": "This file is preserved for backward compatibility. New tooling should use gate-profiles/sdlc.json via gate-profile-registry.json.",
   "gates": [
     {
       "gate_id": "gate-initiation-approval",

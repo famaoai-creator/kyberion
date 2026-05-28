@@ -38,6 +38,10 @@
               "redirectUri": {
                 "type": "array",
                 "items": { "type": "string" }
+              },
+              "baseUrl": {
+                "type": "array",
+                "items": { "type": "string" }
               }
             },
             "additionalProperties": false

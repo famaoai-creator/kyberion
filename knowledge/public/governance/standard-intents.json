@@ -2987,6 +2987,455 @@
           }
         }
       ]
+    },
+    {
+      "id": "diverge-hypotheses",
+      "category": "conversation_orchestration",
+      "legacy_category": "surface",
+      "description": "複数ペルソナが独立した仮説を発散させ、相互批判を経て収束させる（Tree of Thoughts / A2A Fanout パターン）。意思決定の選択肢が複数ある場合や、単一視点では偏りが生じる課題に最適。",
+      "surface_examples": [
+        "複数の視点で仮説を立てて",
+        "この課題を違う角度から考えてみて",
+        "3人の専門家に意見を出させて批判させて",
+        "仮説を発散・収束させて",
+        "ToT で考えて",
+        "ブレストして相互批判して",
+        "複数案を出してぶつけ合って"
+      ],
+      "plan_outline": [
+        "複数ペルソナが独立して仮説を発散（a2a_fanout）",
+        "ペルソナ間で相互批判（cross_critique）",
+        "脱落した仮説の根拠を dissent log に記録"
+      ],
+      "intake_requirements": ["objective", "persona_spec"],
+      "outcome_ids": ["hypothesis_tree_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "仮説", "発散", "批判", "複数視点", "ブレスト",
+        "hypothesis", "fanout", "diverge", "tree of thoughts", "ToT",
+        "a2a", "cross critique", "多角的"
+      ],
+      "resolution": { "shape": "pipeline", "result_shape": "hypothesis_tree_result" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "hypothesis_tree",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/hypothesis-tree.json",
+            "export_as": "hypothesis_tree_result"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chain-of-thought-planning",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "要件定義 → 設計仕様 → テスト計画 → タスク分解を段階的に実行する（Chain of Thought パターン）。各ステップで品質ゲートが通過を判定し、不完全な段階には戻る。",
+      "surface_examples": [
+        "要件からタスクまで順番に分解して",
+        "要件定義→設計→テスト→タスクの流れで進めて",
+        "考えながら段階的に計画を立てて",
+        "ステップバイステップで計画を作って",
+        "Chain of Thought で計画して",
+        "順を追って要件からタスクを作って"
+      ],
+      "plan_outline": [
+        "要件を抽出・構造化（completeness gate 付き）",
+        "設計仕様を抽出（architecture-ready gate 付き）",
+        "テスト計画を生成（qa-ready gate 付き）",
+        "タスクに分解（task-plan-ready gate 付き）"
+      ],
+      "intake_requirements": ["source_path", "mission_id"],
+      "outcome_ids": ["task_plan"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "要件", "設計", "テスト", "タスク分解", "段階的", "ステップ",
+        "chain of thought", "CoT", "requirements", "decompose",
+        "順番に", "ステップバイステップ", "step by step"
+      ],
+      "resolution": { "shape": "task_session", "task_kind": "planning", "result_shape": "task_plan" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "task_plan",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "wisdom:extract_requirements",
+          "params": { "export_as": "requirements_draft" }
+        },
+        {
+          "op": "wisdom:extract_design_spec",
+          "params": { "export_as": "design_spec" }
+        },
+        {
+          "op": "wisdom:extract_test_plan",
+          "params": { "export_as": "test_plan" }
+        },
+        {
+          "op": "wisdom:decompose_into_tasks",
+          "params": { "export_as": "task_plan" }
+        }
+      ]
+    },
+    {
+      "id": "plan-and-execute",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "タスクを分解し、依存関係を考慮しながら段階的に実行する（Plan-and-Execute パターン）。完了後に進捗追跡まで行う。",
+      "surface_examples": [
+        "計画を立てて実行して",
+        "タスクに分解して順番に実行して",
+        "plan して execute して",
+        "自動でタスクを進めて",
+        "依存関係を考慮して実行計画を作って進めて"
+      ],
+      "plan_outline": [
+        "タスクに分解して依存関係を定義",
+        "アクションアイテムとして登録",
+        "順番に実行（self-action-items）",
+        "進捗を追跡（track-pending）"
+      ],
+      "intake_requirements": ["source_path", "mission_id"],
+      "outcome_ids": ["execution_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "実行", "進めて", "タスク実行", "plan", "execute", "自動実行",
+        "plan and execute", "plan-and-execute", "アクションアイテム",
+        "依存関係", "順番に実行"
+      ],
+      "resolution": { "shape": "task_session", "task_kind": "execution", "result_shape": "execution_result" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "task_plan",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "approval_required",
+      "pipeline": [
+        {
+          "op": "wisdom:decompose_into_tasks",
+          "params": { "export_as": "task_plan" }
+        },
+        {
+          "op": "wisdom:execute_self_action_items",
+          "params": { "export_as": "execution_result" }
+        },
+        {
+          "op": "wisdom:track_pending_action_items",
+          "params": { "export_as": "tracking_result" }
+        }
+      ]
+    },
+    {
+      "id": "recall-prior-knowledge",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "description": "過去の実行トレース・インシデント・ミッションから蓄積された distilled knowledge を検索し、現在のコンテキストに注入する（Knowledge Distillation / Reflexion パターン）。",
+      "surface_examples": [
+        "過去の経験を踏まえて",
+        "以前の失敗から学んだことを使って",
+        "蓄積した知識を参照して",
+        "past incidents を考慮して",
+        "過去のナレッジを注入して",
+        "先例を踏まえて判断して"
+      ],
+      "plan_outline": [
+        "関連する distilled knowledge を検索（タグ・タイトル類似度スコアリング）",
+        "上位 N 件をコンテキストに注入",
+        "注入済み knowledge サマリをログに出力"
+      ],
+      "intake_requirements": ["topic", "tags"],
+      "outcome_ids": ["prior_knowledge_summary"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": [
+        "過去", "先例", "以前", "失敗", "経験", "学習",
+        "prior knowledge", "distilled", "recall", "past incidents",
+        "蓄積", "知識注入", "ナレッジ活用"
+      ],
+      "resolution": { "shape": "direct_reply", "result_shape": "prior_knowledge_summary" },
+      "exposed_to_surface": true,
+      "target": "knowledge",
+      "action": "query",
+      "object": "distilled_knowledge",
+      "execution_shape": "pipeline",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "wisdom:inject_prior_knowledge",
+          "params": {
+            "topic": "{{topic}}",
+            "tags": "{{tags}}",
+            "limit": 5,
+            "min_score": 0.3,
+            "export_as": "prior_knowledge_summary"
+          }
+        },
+        {
+          "op": "system:log",
+          "params": {
+            "message": "Prior knowledge injected: {{prior_knowledge_count}} entries found. {{prior_knowledge_summary}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "multi-agent-consensus",
+      "category": "conversation_orchestration",
+      "legacy_category": "surface",
+      "description": "複数エージェント（ペルソナ）が協調して合意形成を行う（Multi-Agent Debate パターン）。ステークホルダー全員の立場を考慮した上で Go/No-Go を判定する。",
+      "surface_examples": [
+        "ステークホルダー全員の合意を取って",
+        "関係者の意見をまとめてgo/no-goを判定して",
+        "多エージェントで議論して結論を出して",
+        "コンセンサスを取って",
+        "反対意見も含めて全員の合意を形成して",
+        "multi-agent で議論して"
+      ],
+      "plan_outline": [
+        "ステークホルダーペルソナを合成",
+        "各ペルソナが立場から意見を表明（1-on-1 セッション）",
+        "ACE スコアリングで Go / No-Go / Yellow-Card を判定",
+        "dissent log に反対意見を記録"
+      ],
+      "intake_requirements": ["objective", "stakeholders"],
+      "outcome_ids": ["consensus_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "合意", "コンセンサス", "ステークホルダー", "go/no-go",
+        "multi-agent", "consensus", "全員", "賛否",
+        "反対意見", "debate", "議論", "判定"
+      ],
+      "resolution": { "shape": "pipeline", "result_shape": "consensus_result" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "compose",
+      "object": "consensus_decision",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "approval_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/stakeholder-consensus-orchestrator.json",
+            "export_as": "consensus_result"
+          }
+        }
+      ]
+    },
+    {
+      "id": "counterfactual-simulation",
+      "category": "conversation_orchestration",
+      "legacy_category": "surface",
+      "description": "仮説を分岐させ N 回アンサンブルシミュレーションを実行し、収束スコアを Gate 判定に繋ぐ（Counterfactual Simulation + Uncertainty Quantification パターン）。",
+      "surface_examples": [
+        "このシナリオで反事実分析をして",
+        "複数回シミュレーションして不確かさを評価して",
+        "アンサンブルで収束スコアを出して Gate 判定して",
+        "counterfactual simulation をして",
+        "シミュレーションの信頼度を評価して Go/No-Go を出して"
+      ],
+      "plan_outline": [
+        "仮説ブランチを N 本フォーク（fork_branches）",
+        "アンサンブルで N 回シミュレーション（simulate_all_ensemble）",
+        "収束スコアを Gate 判定に変換（uncertainty_gate）",
+        "収束が低ければ YELLOW-CARD / blocked を返す"
+      ],
+      "intake_requirements": ["goal", "output_dir"],
+      "outcome_ids": ["gate_verdict"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "counterfactual", "反事実", "シミュレーション", "アンサンブル",
+        "不確かさ", "uncertainty", "収束", "convergence",
+        "gate判定", "信頼度", "シナリオ分析"
+      ],
+      "resolution": { "shape": "pipeline", "result_shape": "gate_verdict" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "inspect",
+      "object": "simulation_ensemble",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "wisdom:fork_branches",
+          "params": { "goal": "{{goal}}", "output_dir": "{{output_dir}}", "export_as": "branches" }
+        },
+        {
+          "op": "wisdom:simulate_all_ensemble",
+          "params": {
+            "goal": "{{goal}}",
+            "output_dir": "{{output_dir}}",
+            "runs": 3,
+            "convergence_threshold": 0.7,
+            "export_as": "ensemble_result"
+          }
+        },
+        {
+          "op": "wisdom:uncertainty_gate",
+          "params": {
+            "from": "mean_convergence",
+            "threshold": 0.7,
+            "yellow_threshold": 0.5,
+            "output_path": "{{output_dir}}/gate-verdict.json",
+            "export_as": "gate_verdict"
+          }
+        },
+        {
+          "op": "system:log",
+          "params": { "message": "Gate verdict: {{gate_verdict.verdict}} (convergence={{gate_verdict.mean_convergence}})" }
+        }
+      ]
+    },
+    {
+      "id": "adaptive-reasoning",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "ステップごとに異なるシステムプロンプトを使って推論する（Adaptive Prompting パターン）。エキスパートペルソナ（CFO/法務/技術）の視点を切り替えながら多面的な分析を出力する。",
+      "surface_examples": [
+        "CFO の視点で財務リスクだけを分析して",
+        "法務の専門家として契約書のリスクを洗い出して",
+        "技術アーキテクトとしてシステム設計を評価して",
+        "ペルソナを切り替えながら多面的に分析して",
+        "adaptive prompting で専門家視点を注入して"
+      ],
+      "plan_outline": [
+        "ペルソナ指定のシステムプロンプトを注入",
+        "wisdom:reasoning に system_prompt パラメータで渡す",
+        "各ペルソナの分析結果を export_as で収集"
+      ],
+      "intake_requirements": ["instruction", "system_prompt"],
+      "outcome_ids": ["adaptive_analysis"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "ペルソナ", "視点", "専門家", "CFO", "法務", "技術",
+        "adaptive", "prompting", "システムプロンプト", "役割を変えて",
+        "立場から", "として分析"
+      ],
+      "resolution": { "shape": "direct_reply", "result_shape": "adaptive_analysis" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "inspect",
+      "object": "reasoning_output",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "wisdom:reasoning",
+          "params": {
+            "system_prompt": "{{system_prompt}}",
+            "instruction": "{{instruction}}",
+            "export_as": "adaptive_analysis"
+          }
+        },
+        {
+          "op": "system:log",
+          "params": { "message": "Adaptive analysis complete: {{adaptive_analysis}}" }
+        }
+      ]
+    },
+    {
+      "id": "tool-use-expert",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "複数ツールを LLM に提示し、モデルが最適なツールを選択して実行する（Mixture of Experts / Tool Use パターン）。",
+      "surface_examples": [
+        "ツールを使って問題を解いて",
+        "必要なツールを選んで実行して",
+        "tool use で解いて",
+        "function calling を使って",
+        "複数のツールから最適なものを選んで実行して"
+      ],
+      "plan_outline": [
+        "利用可能ツールを定義して LLM に提示",
+        "LLM が最適ツールを選択し tool_calls を返す",
+        "結果を export_as でコンテキストに保存"
+      ],
+      "intake_requirements": ["prompt", "tools"],
+      "outcome_ids": ["tool_use_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "ツール", "tool use", "function calling", "MoE",
+        "mixture of experts", "ツール選択", "実行", "tool_use"
+      ],
+      "resolution": { "shape": "pipeline", "result_shape": "tool_use_result" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "tool_call",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "approval_required",
+      "pipeline": [
+        {
+          "op": "wisdom:tool_use",
+          "params": {
+            "prompt": "{{prompt}}",
+            "tools": "{{tools}}",
+            "export_as": "tool_use_result"
+          }
+        }
+      ]
+    },
+    {
+      "id": "active-learning-escalate",
+      "category": "governance_control",
+      "legacy_category": "surface",
+      "description": "自動判断が困難な場合に人間レビューをリクエストし、保留キューに記録する（Active Learning パターン）。Slack 等の通知チャネルが設定されていれば非同期 escalation が発火する。",
+      "surface_examples": [
+        "人間のレビューを要請して",
+        "この判断は人間に確認して",
+        "escalate して",
+        "不確かなので上長に確認してから進めて",
+        "自動判断できないのでレビューに回して"
+      ],
+      "plan_outline": [
+        "レビュー記録を pending-reviews キューに書き込む",
+        "review_id と review_path をコンテキストに保存",
+        "通知チャネル設定があれば escalation 発火（別ステップ）"
+      ],
+      "intake_requirements": ["topic", "reason"],
+      "outcome_ids": ["review_id"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "レビュー", "確認", "escalate", "escalation", "人間",
+        "上長", "承認", "pending", "保留", "active learning"
+      ],
+      "resolution": { "shape": "direct_reply", "result_shape": "review_record" },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "review_request",
+      "execution_shape": "pipeline",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required",
+      "pipeline": [
+        {
+          "op": "wisdom:escalate_for_review",
+          "params": {
+            "topic": "{{topic}}",
+            "reason": "{{reason}}",
+            "export_as": "review_record"
+          }
+        },
+        {
+          "op": "system:log",
+          "params": { "message": "Human review queued: review_id={{review_record.review_id}}, path={{review_record.review_path}}" }
+        }
+      ]
     }
   ]
 }

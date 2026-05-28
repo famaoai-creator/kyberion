@@ -4,14 +4,23 @@ category: Architecture
 tags: [sdlc, gating, project-os, governance]
 importance: 8
 author: Kyberion
-last_updated: 2026-03-29
+last_updated: 2026-05-26
 ---
 
 # SDLC Gating Model
 
-Kyberion の SDLC gate は、`文書を増やすこと` ではなく、`次の phase に進める判断を evidence 付きで行うこと` を目的とします。
+Kyberion の gate は、`文書を増やすこと` ではなく、`次の phase に進める判断を evidence 付きで行うこと` を目的とします。
 
-`Project` と `SDLC` は 1:1 とは限りません。  
+このモデルは SDLC 専用ではなく、**マーケティング・提案・インシデント対応**など任意のドメインに適用できます。
+ゲート定義は domain 非依存の Gate Profile として分離されています。
+
+- Gate Profile 一覧: `knowledge/public/governance/gate-profiles/gate-profile-registry.json`
+- Gate Profile スキーマ: `schemas/gate-profile.schema.json`
+- Gate 状態マシン: `libs/core/gate-status.ts`
+- Track 作成基準: `knowledge/public/governance/track-creation-policy.json`
+- AIエージェント業務の Track パターン: `knowledge/public/architecture/ai-agent-track-patterns.md`
+
+`Project` と Gate は 1:1 とは限りません。  
 Kyberion では、gate は通常 `Project` ではなく `Track` にぶら下がります。
 
 - `Project`

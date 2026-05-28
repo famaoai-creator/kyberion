@@ -6,7 +6,7 @@
     "public": "active/missions/public",
     "archive": "active/archive/missions",
     "exports": "hub/exports/missions",
-    "global_ledger": "active/audit/system-ledger.jsonl",
+    "global_ledger": "active/shared/logs/audit/system-ledger.jsonl",
     "global_coordination": "active/shared/coordination",
     "global_channel_coordination": "active/shared/coordination/channels",
     "global_runtime_locks": "active/shared/runtime/locks",
