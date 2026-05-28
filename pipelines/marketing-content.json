@@ -20,20 +20,34 @@
       }
     },
     {
-      "id": "gen-pptx-slides",
+      "id": "apply-theme",
+      "type": "transform",
+      "op": "media:apply_theme",
+      "params": {
+        "theme": "kyberion-sovereign"
+      }
+    },
+    {
+      "id": "apply-pattern",
+      "type": "transform",
+      "op": "media:apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json"
+      }
+    },
+    {
+      "id": "merge-pptx-content",
+      "type": "transform",
+      "op": "media:merge_content",
+      "params": {
+        "output_format": "pptx"
+      }
+    },
+    {
+      "id": "render-pptx",
       "type": "apply",
       "op": "media:pptx_render",
       "params": {
-        "content": {
-          "title": "Kyberion: The Intent-Driven OS for AI",
-          "slides": [
-            { "title": "1. What is Kyberion?", "body": "An Operating System that turns your intent into reality safely." },
-            { "title": "2. Say what you want", "body": "Just type: 'Open the news' or 'Convert this PDF'. Kyberion does the rest." },
-            { "title": "3. Absolute Governance", "body": "Every action is logged and verified. Safe for enterprise and personal use." },
-            { "title": "4. Your AI, Your Rules", "body": "Tiered knowledge storage keeps your private data private." },
-            { "title": "5. Start Today", "body": "Join the Kyberion ecosystem and unleash disciplined autonomy." }
-          ]
-        },
         "output_path": "{{output_pptx}}"
       }
     }

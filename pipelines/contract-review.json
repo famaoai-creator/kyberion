@@ -18,12 +18,20 @@
   "steps": [
     {
       "id": "convert_to_markdown",
-      "type": "transform",
-      "op": "media:protocol_to_markdown",
+      "type": "capture",
+      "op": "media:document_digest",
       "params": {
-        "input": "{{source_document}}",
-        "output": "{{markdown_output}}",
+        "path": "{{source_document}}",
         "export_as": "markdown_ref"
+      }
+    },
+    {
+      "id": "persist_markdown",
+      "type": "apply",
+      "op": "media:write_file",
+      "params": {
+        "path": "{{markdown_output}}",
+        "from": "markdown_ref"
       }
     },
     {

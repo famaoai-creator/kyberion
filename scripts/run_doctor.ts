@@ -84,7 +84,12 @@ async function main(): Promise<void> {
   if (!missionId && !argv.manifest && !argv.runtime && !argv.all) {
     console.log('Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.');
   }
-  console.log('Next step: run `pnpm env:bootstrap --manifest <id> --apply` for missing must/should items, or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps.');
+  const needsMeetingHint = argv.mission
+    || (argv.runtime && ['meeting', 'voice', 'browser'].includes(String(argv.runtime)));
+  const meetingHint = needsMeetingHint
+    ? ' or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps'
+    : '';
+  console.log(`Next step: run \`pnpm env:bootstrap --manifest <id> --apply\` for missing must/should items${meetingHint}.`);
   process.exit(1);
 }
 

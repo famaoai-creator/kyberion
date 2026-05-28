@@ -1,4 +1,4 @@
-import { logger, safeReadFile, platform, transform, secureFetch, safeExec, withRetry, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog, classifyError } from './index.js';
+import { logger, safeReadFile, platform, transform, secureFetch, safeExec, withRetry, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog, classifyError, fetchWithVaultCache } from './index.js';
 import { tryRepairJson } from './json-repair.js';
 import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
@@ -304,7 +304,22 @@ function isCliAllowedForOperation(
   );
 }
 
-export async function executeServicePreset(serviceId: string, action: string, params: any, auth: 'none' | 'secret-guard' = 'none') {
+export interface ServicePresetCacheOptions {
+  /** When set, the result is cached in the Data Vault for this many milliseconds. */
+  cache_ttl_ms?: number;
+  /** Project scope for the vault entry (defaults to _global). */
+  project_id?: string;
+  /** Data tier for vault storage (defaults to confidential). */
+  tier?: 'personal' | 'confidential' | 'public';
+}
+
+export async function executeServicePreset(
+  serviceId: string,
+  action: string,
+  params: any,
+  auth: 'none' | 'secret-guard' = 'none',
+  cacheOpts?: ServicePresetCacheOptions,
+) {
   const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services[serviceId];
   if (!serviceConfig || !serviceConfig.preset_path) {
@@ -428,4 +443,32 @@ export async function executeServicePreset(serviceId: string, action: string, pa
     }
   }
   throw new Error(`All service alternatives failed for ${serviceId}:${action}`);
+}
+
+/**
+ * Vault-cached variant of executeServicePreset.
+ * Wraps the call in fetchWithVaultCache so repeated identical requests
+ * are served from active/shared/data-vault/ within the TTL window.
+ */
+export async function executeServicePresetCached(
+  serviceId: string,
+  action: string,
+  params: any,
+  auth: 'none' | 'secret-guard' = 'none',
+  cacheOpts: Required<Pick<ServicePresetCacheOptions, 'cache_ttl_ms'>> & ServicePresetCacheOptions,
+): Promise<{ result: any; fromCache: boolean }> {
+  const { createHash } = await import('node:crypto');
+  const cacheKey = `${action}:${createHash('sha256').update(JSON.stringify(params ?? {})).digest('hex').slice(0, 16)}`;
+  const { data: result, fromCache } = await fetchWithVaultCache(
+    serviceId,
+    cacheKey,
+    () => executeServicePreset(serviceId, action, params, auth),
+    {
+      ttlMs: cacheOpts.cache_ttl_ms,
+      projectId: cacheOpts.project_id,
+      tier: cacheOpts.tier ?? 'confidential',
+    },
+  );
+  if (fromCache) logger.info(`[ENGINE:VAULT] cache hit for ${serviceId}:${action}`);
+  return { result, fromCache };
 }

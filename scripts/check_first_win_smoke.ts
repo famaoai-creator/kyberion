@@ -36,6 +36,14 @@ const RULES: SmokeRule[] = [
     ],
   },
   {
+    file: 'docs/user/TROUBLESHOOTING.md',
+    required: [
+      'pnpm setup:report --persona first-time-user',
+      'pnpm surfaces:repair',
+      'pnpm doctor',
+    ],
+  },
+  {
     file: 'docs/developer/VOICE_FIRST_WIN.md',
     required: [
       'pipelines/voice-hello.json',
@@ -56,6 +64,15 @@ const RULES: SmokeRule[] = [
       '"pipeline_id": "verify-session"',
       '"first-win"',
       'active/shared/tmp/first-win-session.png',
+      'verify-session-fallback.json',
+    ],
+  },
+  {
+    file: 'pipelines/verify-session-fallback.json',
+    required: [
+      '"pipeline_id": "verify-session-fallback"',
+      'first-win-fallback.txt',
+      'non-browser artifact',
     ],
   },
 ];
@@ -107,6 +124,9 @@ export function validateVerifySessionPipeline(pipeline: any): string[] {
   const screenshotStep = steps.find((step: any) => step?.op === 'browser:screenshot');
   if (screenshotStep?.params?.path !== 'active/shared/tmp/first-win-session.png') {
     violations.push('pipelines/verify-session.json: screenshot path must be active/shared/tmp/first-win-session.png');
+  }
+  if (pipeline?.fallback_pipeline !== 'pipelines/verify-session-fallback.json') {
+    violations.push('pipelines/verify-session.json: fallback_pipeline must point to pipelines/verify-session-fallback.json');
   }
   return violations;
 }

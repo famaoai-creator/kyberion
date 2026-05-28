@@ -266,8 +266,14 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     wisdom = buildFallbackWisdom(upperId, state);
   }
 
-  let outputDir = 'knowledge/public/evolution';
-  outputDir = wisdomPolicy.tier_mapping?.[state.tier] || outputDir;
+  const defaultOutputDir = 'knowledge/public/evolution';
+  const mappedOutputDir = wisdomPolicy.tier_mapping?.[state.tier] || defaultOutputDir;
+  const outputDir = /(^|\/)incidents(\/|$)/.test(mappedOutputDir)
+    ? defaultOutputDir
+    : mappedOutputDir;
+  if (outputDir !== mappedOutputDir) {
+    logger.warn(`⚠️ wisdom-policy output_dir "${mappedOutputDir}" was normalized to "${outputDir}" for writable public distillation output.`);
+  }
 
   const dateSlug = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
   const wisdomFileName = `distill_${upperId.toLowerCase()}_${dateSlug}.md`;
