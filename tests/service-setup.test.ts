@@ -103,10 +103,12 @@ describe('services_setup', () => {
       auth: 'missing',
       connection: 'customer',
     });
+    expect(result.rows[0].nextAction?.suggested_command).toBe('pnpm services:setup');
     expect(result.rows[1]).toMatchObject({
       service: 'github',
       auth: 'ready',
       connection: 'missing',
     });
+    expect(result.rows[1].nextAction?.suggested_command).toBe('pnpm services:setup');
   });
 });

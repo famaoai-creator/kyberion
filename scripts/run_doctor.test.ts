@@ -28,6 +28,7 @@ describe('run_doctor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    exitSpy.mockImplementation(((code?: number) => undefined as never) as any);
     const yargsStub = {
       option: vi.fn(() => yargsStub),
       parseSync: vi.fn(() => ({})),
@@ -97,5 +98,36 @@ describe('run_doctor', () => {
     await collectDoctorReport({ runtime: 'browser' });
 
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
+  });
+
+  it('prints a runnable next action when required doctor capabilities are missing', async () => {
+    const yargsStub = {
+      option: vi.fn(() => yargsStub),
+      parseSync: vi.fn(() => ({ runtime: 'meeting' })),
+    };
+    mocks.createStandardYargs.mockReturnValue(yargsStub);
+    mocks.loadEnvironmentManifest.mockReturnValue({
+      manifest_id: 'meeting-participation-runtime',
+      version: '2026-04-29',
+      capabilities: [
+        {
+          capability_id: 'browser-meeting-join-driver',
+          optional: false,
+          required_for: ['browser-meeting-join-driver'],
+          install: { instruction: 'Install Playwright' },
+        },
+      ],
+    });
+    mocks.probeManifest.mockResolvedValue([
+      { capability_id: 'browser-meeting-join-driver', satisfied: false, reason: 'missing' },
+    ]);
+
+    const { runDoctor } = await import('./run_doctor.js');
+
+    await runDoctor();
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Next Action: Bootstrap meeting-participation-runtime'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply'));
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

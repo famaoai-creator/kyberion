@@ -25,6 +25,8 @@ import {
   surfaceResourceId,
   surfaceStatePath,
   auditChain,
+  buildNextAction,
+  formatNextAction,
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 
@@ -145,6 +147,27 @@ function buildSurfaceRepairHint(
       : 'no health probe configured: inspect logs or add a health path';
   }
   return `unhealthy (${health.detail}): run pnpm surfaces:repair -- --surface <surface-id>`;
+}
+
+function buildSurfaceNextAction(
+  surfaceId: string,
+  stateHealth: 'healthy' | 'degraded' | 'stale' | 'untracked',
+  repairHint: string,
+): ReturnType<typeof buildNextAction> {
+  if (stateHealth === 'healthy') {
+    return buildNextAction({
+      title: `Inspect surface ${surfaceId}`,
+      reason: repairHint,
+      next_action_type: 'inspect_artifact',
+      suggested_command: `pnpm surfaces:status -- --surface ${surfaceId}`,
+    });
+  }
+  return buildNextAction({
+    title: `Repair surface ${surfaceId}`,
+    reason: repairHint,
+    next_action_type: 'repair_surface',
+    suggested_command: `pnpm surfaces:repair -- --surface ${surfaceId}`,
+  });
 }
 
 export async function startSurfaceById(surfaceId: string, manifestPath: string) {
@@ -368,13 +391,24 @@ async function statusSurfaces() {
           ? surfaceHealth.status === 'healthy'
             ? 'healthy'
             : 'degraded'
+            : record
+              ? 'stale'
+              : 'untracked',
+      repairHint: buildSurfaceRepairHint(definition, record, surfaceHealth),
+      nextAction: buildSurfaceNextAction(
+        definition.id,
+        record && isRunning(record.pid)
+          ? surfaceHealth.status === 'healthy'
+            ? 'healthy'
+            : 'degraded'
           : record
             ? 'stale'
             : 'untracked',
-      repairHint: buildSurfaceRepairHint(definition, record, surfaceHealth),
+        buildSurfaceRepairHint(definition, record, surfaceHealth),
+      ),
       lastKnownState: record
         ? {
-            pid: record.pid,
+          pid: record.pid,
             startedAt: record.startedAt,
             logPath: record.logPath,
             startupMode: record.metadata?.startupMode || definition.startupMode,
@@ -415,6 +449,26 @@ async function listUnits() {
       auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
       port: d.port || '-',
       hint: auth?.setupHint || '',
+      nextAction: auth && !auth.valid
+        ? buildNextAction({
+            title: `Fix surface auth for ${d.id}`,
+            reason: auth.setupHint,
+            next_action_type: 'bootstrap_environment',
+            suggested_command: 'pnpm surfaces:setup',
+          })
+        : health.status !== 'healthy'
+          ? buildNextAction({
+              title: `Repair surface ${d.id}`,
+              reason: health.detail,
+              next_action_type: 'repair_surface',
+              suggested_command: `pnpm surfaces:repair -- --surface ${d.id}`,
+            })
+          : buildNextAction({
+              title: `Inspect surface ${d.id}`,
+              reason: 'Surface is healthy.',
+              next_action_type: 'inspect_artifact',
+              suggested_command: `pnpm surfaces:status -- --surface ${d.id}`,
+            }),
       pid: record?.pid || '-'
     };
   }));
@@ -431,6 +485,11 @@ async function listUnits() {
     console.log(
       `${r.unit.padEnd(25)} ${r.kind.padEnd(10)} ${enabledColor} ${r.enabled.padEnd(8)} ${statusColor} ${r.status.padEnd(8)} ${authColor} ${r.auth.padEnd(8)} ${r.health.padEnd(10)} ${String(r.port).padEnd(6)} ${r.pid}`
     );
+    if (r.nextAction && (r.auth === 'missing' || r.health !== 'healthy' || r.enabled !== 'enabled')) {
+      for (const line of formatNextAction(r.nextAction)) {
+        console.log(`  ${line}`);
+      }
+    }
   }
   console.log('');
 }
