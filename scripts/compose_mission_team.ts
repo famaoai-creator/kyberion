@@ -3,6 +3,7 @@ import {
   createStandardYargs,
   composeMissionTeamPlan,
   composeMissionTeamBrief,
+  writeMissionTeamBrief,
   findMissionPath,
   initializeMissionTeamBindings,
   missionDir,
@@ -113,6 +114,7 @@ async function main() {
     withMissionWriteContext(assignedPersona, () => {
       writeMissionTeamPlan(targetDir, plan);
       initializeMissionTeamBindings(targetDir, plan);
+      if (brief) writeMissionTeamBrief(targetDir, brief);
     });
   }
 

@@ -3,5 +3,56 @@
     "id": "baseline-check",
     "pipeline": "pipelines/baseline-check.json",
     "note": "Session-start health check. The shape of its output is stable: any change is either intentional or a regression."
+  },
+  {
+    "id": "vital-check",
+    "pipeline": "pipelines/vital-check.json",
+    "note": "System vitals probe. Verifies that the dependency resolver, doctor script, and layer checks produce a consistent status shape."
+  },
+  {
+    "id": "voice-hello",
+    "pipeline": "pipelines/voice-hello.json",
+    "note": "Voice first-win pipeline (tier-0, zero external deps). Regression in this pipeline blocks the D1 first-win KPI.",
+    "ignore_paths": ["audio_path", "tts_output"]
+  },
+  {
+    "id": "agent-provider-check",
+    "pipeline": "pipelines/agent-provider-check.json",
+    "note": "Provider discovery probe. The set of discovered providers and their health shape must stay stable across releases."
+  },
+  {
+    "id": "analysis-job",
+    "pipeline": "pipelines/analysis-job.json",
+    "note": "Representative analysis pipeline. Verifies that the analysis brief output structure does not regress.",
+    "ignore_paths": ["started_at", "finished_at", "elapsed_ms"]
+  },
+  {
+    "id": "audit-example",
+    "pipeline": "pipelines/audit-example.json",
+    "note": "Governance audit pipeline. Changes to the audit output schema are breaking for compliance tooling."
+  },
+  {
+    "id": "artifact-collector",
+    "pipeline": "pipelines/artifact-collector.json",
+    "note": "Artifact collection pipeline. The artifact manifest shape is a public contract.",
+    "ignore_paths": ["collected_at", "artifact_path"]
+  },
+  {
+    "id": "meeting-facilitation-workflow",
+    "pipeline": "pipelines/meeting-facilitation-workflow.json",
+    "note": "Meeting facilitation pipeline. Key output: facilitation_plan, action_items shape.",
+    "ignore_paths": ["meeting_id", "started_at"]
+  },
+  {
+    "id": "voice-learning-setup",
+    "pipeline": "pipelines/voice-learning-setup.json",
+    "note": "Voice profile setup pipeline. Verifies that the learning brief output is structurally stable.",
+    "ignore_paths": ["profile_id", "sample_paths"]
+  },
+  {
+    "id": "build-web-concept",
+    "pipeline": "pipelines/build-web-concept.json",
+    "note": "Web concept builder pipeline. Represents the project-bootstrap family output shape.",
+    "ignore_paths": ["project_id", "created_at"]
   }
 ]

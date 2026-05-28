@@ -39,16 +39,18 @@ describe('check_first_win_smoke', () => {
     const violations = validateVerifySessionPipeline({
       options: { headless: false, user_data_dir: 'active/browser-session/enterprise-sync' },
       inputs: { TARGET_URL: { default: 'https://example.com' } },
+      fallback_pipeline: 'pipelines/verify-session-fallback.json',
       steps: [
+        { op: 'browser:goto', params: { url: 'https://example.com' } },
         { op: 'browser:evaluate', params: { script: 'document.title', export_as: 'session_state' } },
         { op: 'browser:screenshot', params: { path: 'active/shared/tmp/enterprise-login-success.png' } },
+        { op: 'browser:close_session', params: {} },
       ],
     });
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.stringContaining('headless must be true'),
       expect.stringContaining('user_data_dir must stay under active/shared/tmp/'),
-      expect.stringContaining('missing browser:goto'),
       expect.stringContaining('local data URL'),
       expect.stringContaining('first-win-session.png'),
     ]));

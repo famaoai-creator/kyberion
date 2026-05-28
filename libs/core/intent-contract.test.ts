@@ -8,6 +8,7 @@ import {
   deriveAgentRoutingDecision,
   deriveIntentDeliveryDecision,
   formatClarificationPacket,
+  formatClarificationPacketConcise,
   inferGovernedDeliveryMode,
   resolveIntentCompilerTarget,
 } from './intent-contract.js';
@@ -615,5 +616,55 @@ describe('intent-contract compiler', () => {
         why: 'The request is a governed presentation generation task.',
       })
     ).toBe(false);
+  });
+});
+
+describe('formatClarificationPacketConcise', () => {
+  const packet: any = {
+    kind: 'operator-interaction-packet',
+    interaction_type: 'clarification',
+    headline: 'More context required',
+    summary: 'Join a meeting as proxy',
+    questions: [
+      { id: 'meeting_url', question: 'What is the meeting URL?', reason: 'Needed to join.' },
+      { id: 'meeting_purpose', question: 'What is the meeting purpose?', reason: 'Sets role.' },
+    ],
+    suggested_response_style: 'clarify-first',
+  };
+
+  it('shows only the first question in English', () => {
+    const out = formatClarificationPacketConcise(packet, { locale: 'en' });
+    expect(out).toContain('meeting_url');
+    expect(out).toContain('What is the meeting URL?');
+    expect(out).toContain('(+ 1 more)');
+    expect(out).not.toContain('meeting_purpose');
+  });
+
+  it('shows the first question in Japanese', () => {
+    const out = formatClarificationPacketConcise(packet, { locale: 'ja' });
+    expect(out).toContain('meeting_url');
+    expect(out).toContain('次に必要な情報');
+    expect(out).toContain('（他 1 件）');
+    expect(out).not.toContain('meeting_purpose');
+  });
+
+  it('shows no-more-inputs message when questions list is empty', () => {
+    const emptyPacket = { ...packet, questions: [] };
+    const en = formatClarificationPacketConcise(emptyPacket, { locale: 'en' });
+    const ja = formatClarificationPacketConcise(emptyPacket, { locale: 'ja' });
+    expect(en).toContain('Ready to proceed');
+    expect(ja).toContain('不足している情報はありません');
+  });
+
+  it('shows no "(+ N more)" hint when there is only one question', () => {
+    const singlePacket = { ...packet, questions: [packet.questions[0]] };
+    const out = formatClarificationPacketConcise(singlePacket, { locale: 'en' });
+    expect(out).not.toContain('more');
+    expect(out).toContain('meeting_url');
+  });
+
+  it('includes reason when present', () => {
+    const out = formatClarificationPacketConcise(packet, { locale: 'en' });
+    expect(out).toContain('Needed to join.');
   });
 });

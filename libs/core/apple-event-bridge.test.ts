@@ -61,4 +61,19 @@ describe('apple-event-bridge', () => {
 
     restorePlatform();
   });
+
+  it('builds a system notification AppleScript call', async () => {
+    mockDarwinPlatform();
+    const secureIo = await import('./secure-io.js');
+    vi.mocked(secureIo.safeExec).mockReturnValue('');
+    const bridge = await import('./apple-event-bridge.js');
+
+    bridge.systemNotify('Voice Health Check', 'mlx_audio: false', 'voice-health-check');
+    expect(secureIo.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'display notification "mlx_audio: false" with title "Voice Health Check" subtitle "voice-health-check"',
+    ]);
+
+    restorePlatform();
+  });
 });

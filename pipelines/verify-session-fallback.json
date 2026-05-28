@@ -1,0 +1,36 @@
+{
+  "pipeline_id": "verify-session-fallback",
+  "version": "1.0.0",
+  "description": "Non-browser first-win fallback for environments where Playwright cannot launch. Writes a small local artifact so first-win still succeeds with a useful result.",
+  "action": "pipeline",
+  "labels": ["first-win", "fallback", "clean-env"],
+  "context": {
+    "ARTIFACT_PATH": "active/shared/tmp/first-win-fallback.txt"
+  },
+  "steps": [
+    {
+      "id": "announce-fallback",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "Browser first-win was unavailable. Falling back to a non-browser artifact at {{ARTIFACT_PATH}}."
+      }
+    },
+    {
+      "id": "write-fallback-artifact",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "printf 'Kyberion first-win fallback succeeded on %s\\n' \"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\" > \"{{ARTIFACT_PATH}}\""
+      }
+    },
+    {
+      "id": "confirm-fallback",
+      "type": "apply",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Fallback first-win artifact written to {{ARTIFACT_PATH}}"
+      }
+    }
+  ]
+}

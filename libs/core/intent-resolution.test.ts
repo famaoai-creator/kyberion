@@ -2,7 +2,11 @@ import AjvModule from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import {
+  loadStandardIntentCatalog,
+  normalizeForTriggerMatch,
+  resolveIntentResolutionPacket,
+} from './intent-resolution.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -197,5 +201,31 @@ describe('intent-resolution', () => {
         candidate.reasons.includes('service operation heuristic')
       )
     ).toBe(true);
+  });
+});
+
+describe('normalizeForTriggerMatch', () => {
+  it('converts full-width ASCII to half-width', () => {
+    expect(normalizeForTriggerMatch('ＡＩ')).toBe('ai');
+    expect(normalizeForTriggerMatch('Ｓｌａｃｋ')).toBe('slack');
+  });
+
+  it('converts katakana to hiragana', () => {
+    expect(normalizeForTriggerMatch('スラック')).toBe('すらっく');
+    expect(normalizeForTriggerMatch('テレグラム')).toBe('てれぐらむ');
+  });
+
+  it('applies standard lowercasing and whitespace normalization', () => {
+    expect(normalizeForTriggerMatch('  Slack  ')).toBe('slack');
+    expect(normalizeForTriggerMatch('MEETING URL')).toBe('meeting url');
+  });
+
+  it('handles mixed full-width and regular characters', () => {
+    const result = normalizeForTriggerMatch('スラックSlack');
+    expect(result).toContain('slack');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(normalizeForTriggerMatch('')).toBe('');
   });
 });

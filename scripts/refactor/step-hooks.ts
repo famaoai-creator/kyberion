@@ -59,7 +59,9 @@ async function runOneHook(
     }
     throw new Error(`unsupported hook type: ${(hook as any).type}`);
   } catch (err: any) {
-    logger.warn(`[pipeline:hook] ${label} failed: ${err.message || err}`);
+    const hookTarget = (hook as any).url || (hook as any).cmd || (hook as any).op || '';
+    const targetSuffix = hookTarget ? ` → ${hookTarget}` : '';
+    logger.warn(`[pipeline:hook] ${label} failed (${phase} ${hook.type}${targetSuffix}): ${err.message || err}`);
     return true;
   }
 }

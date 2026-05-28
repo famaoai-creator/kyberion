@@ -50,6 +50,30 @@ export function sharedExports(subPath = '') {
   return path.join(base, subPath);
 }
 
+export function sharedLogsAudit(subPath = '') {
+  const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'audit');
+  if (!rawExistsSync(base)) rawMkdirp(base);
+  return path.join(base, subPath);
+}
+
+export function sharedLogsProcess(subPath = '') {
+  const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'process');
+  if (!rawExistsSync(base)) rawMkdirp(base);
+  return path.join(base, subPath);
+}
+
+export function sharedLogsSurfaces(subPath = '') {
+  const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'surfaces');
+  if (!rawExistsSync(base)) rawMkdirp(base);
+  return path.join(base, subPath);
+}
+
+export function sharedLogsTraces(subPath = '') {
+  const base = path.join(ACTIVE_SHARED_ROOT, 'logs', 'traces');
+  if (!rawExistsSync(base)) rawMkdirp(base);
+  return path.join(base, subPath);
+}
+
 export function isProtected(filePath: string) {
   const resolved = path.resolve(filePath);
   if (resolved.startsWith(KNOWLEDGE_ROOT)) return true;
@@ -98,12 +122,46 @@ export function missionDir(missionId: string, tier: 'personal' | 'confidential' 
 }
 
 /**
+ * Returns the path to the audit directory for a given mission (tier-aware).
+ */
+export function missionAuditDir(missionId: string, tier: 'personal' | 'confidential' | 'public' = 'confidential') {
+  const missionPath = findMissionPath(missionId) ?? path.join(ACTIVE_ROOT, 'missions', tier, missionId);
+  const dir = path.join(missionPath, 'audit');
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
+/**
  * Returns the path to the evidence directory for a given mission.
  */
 export function missionEvidenceDir(missionId: string) {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return null;
   const dir = path.join(missionPath, 'evidence');
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
+/**
+ * Returns the mission directory scoped to a specific tenant.
+ * Path: active/missions/{tier}/{tenantSlug}/{missionId}/
+ * Used when creating tenant-bound missions to make tenant ownership
+ * visible in the filesystem (not just inside mission-state.json).
+ */
+export function tenantMissionDir(
+  missionId: string,
+  tenantSlug: string,
+  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+): string {
+  const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
+  let subPath = 'active/missions';
+  if (rawExistsSync(configPath)) {
+    try {
+      const config = JSON.parse(rawReadTextFile(configPath));
+      subPath = config.directories?.[tier] || subPath;
+    } catch (_) { /* fallback */ }
+  }
+  const dir = path.join(PROJECT_ROOT_DIR, subPath, tenantSlug, missionId);
   if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
@@ -173,11 +231,16 @@ export const pathResolver = {
   shared,
   sharedTmp,
   sharedExports,
+  sharedLogsAudit,
+  sharedLogsProcess,
+  sharedLogsSurfaces,
+  sharedLogsTraces,
   isProtected,
   capabilityEntry,
   capabilityDir,
   skillDir,
   missionDir,
+  missionAuditDir,
   missionEvidenceDir,
   findMissionPath,
   resolve,

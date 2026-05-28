@@ -51,8 +51,11 @@ vi.mock('./network.js', () => ({
 }));
 
 vi.mock('./src/knowledge-index.js', () => ({
+  DEFAULT_SCOPE: { tiers: ['public'] },
   buildKnowledgeIndex: mocks.buildKnowledgeIndex,
+  buildScopedIndex: mocks.buildKnowledgeIndex,
   queryKnowledge: mocks.queryKnowledge,
+  queryKnowledgeHybrid: mocks.queryKnowledge,
 }));
 
 vi.mock('./task-session.js', () => ({

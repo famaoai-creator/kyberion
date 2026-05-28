@@ -40,7 +40,7 @@ function verifiedEvidenceRefsFor(id: string): string[] {
   return [
     'docs/operator/templates/production-evidence-fde-deployment.md',
     'docs/operator/DEPLOYMENT.md',
-    'active/shared/tmp/first-win-session.png',
+    'active/shared/logs/traces/',
     'migration/README.md',
   ];
 }

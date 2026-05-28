@@ -103,7 +103,7 @@ describe('bootstrapManifest dry-run', () => {
     try {
       const auditPath = path.join(
         ROOT,
-        'active/audit',
+        'active/shared/logs/audit',
         `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
       );
       const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';

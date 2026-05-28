@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyError,
+  explainPolicyViolation,
   formatClassification,
   getRuleIds,
 } from './error-classifier.js';
@@ -199,5 +200,52 @@ describe('error-classifier', () => {
       expect(s).toContain('→');
       expect(s).toContain('detail:');
     });
+  });
+});
+
+describe('explainPolicyViolation', () => {
+  it('diagnoses project scope denial', () => {
+    const d = explainPolicyViolation('[POLICY_VIOLATION] Persona \'developer\' is not authorized for project \'sbi-prime\'.');
+    expect(d.violationType).toBe('project_scope_denied');
+    expect(d.requiredRole).toBeTruthy();
+    expect(d.repairSteps.length).toBeGreaterThan(0);
+    expect(d.repairSteps[0]).toContain('KYBERION_PERSONA');
+  });
+
+  it('diagnoses path scope denial', () => {
+    const d = explainPolicyViolation('[POLICY_VIOLATION] Write rejected by path-scope-policy: path is outside project root.');
+    expect(d.violationType).toBe('path_scope_denied');
+    expect(d.repairSteps.some((s) => s.includes('active/missions'))).toBe(true);
+  });
+
+  it('diagnoses approval required', () => {
+    const d = explainPolicyViolation('approval_required: enforceApprovalGate blocked this action');
+    expect(d.violationType).toBe('approval_required');
+    expect(d.repairSteps.some((s) => s.includes('pnpm cli approval'))).toBe(true);
+  });
+
+  it('diagnoses tenant broker expired', () => {
+    const d = explainPolicyViolation('[POLICY_VIOLATION] tenant.broker_expired: broker grant from sbi-main to sbi-prime has expired');
+    expect(d.violationType).toBe('tenant_broker_expired');
+    expect(d.requiredAuthority).toBe('CROSS_TENANT_BROKER');
+  });
+
+  it('diagnoses tenant broker missing', () => {
+    const d = explainPolicyViolation('[POLICY_VIOLATION] cross-tenant broker missing for tenant sbi-sec');
+    expect(d.violationType).toBe('tenant_broker_missing');
+    expect(d.repairSteps.some((s) => s.includes('cross-tenant-broker.json'))).toBe(true);
+  });
+
+  it('diagnoses tier access denial', () => {
+    const d = explainPolicyViolation('[POLICY_VIOLATION] tier guard denied write to knowledge/confidential/project-x/');
+    expect(d.violationType).toBe('tier_access_denied');
+    expect(d.requiredAuthority).toBe('KNOWLEDGE_WRITE');
+  });
+
+  it('falls back gracefully for unrecognized violations', () => {
+    const d = explainPolicyViolation('[POLICY_VIOLATION] some unknown rule was triggered');
+    expect(d.violationType).toBe('unknown_policy_violation');
+    expect(d.repairSteps.length).toBeGreaterThan(0);
+    expect(d.explanation).toBeTruthy();
   });
 });

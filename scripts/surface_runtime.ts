@@ -28,7 +28,7 @@ import {
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 
-type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status' | 'list-units' | 'setup' | 'enable' | 'disable' | 'register' | 'unregister';
+type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status' | 'list-units' | 'setup' | 'repair' | 'enable' | 'disable' | 'register' | 'unregister';
 
 type SurfaceSetupRow = {
   surface: string;
@@ -126,6 +126,25 @@ function stopByPid(pid: number | undefined): void {
   try {
     process.kill(pid, 'SIGTERM');
   } catch (_) {}
+}
+
+function buildSurfaceRepairHint(
+  definition: SurfaceRuntimeDefinition,
+  record: any,
+  health: Awaited<ReturnType<typeof probeSurfaceHealth>>,
+): string {
+  if (record && !isRunning(record.pid)) {
+    return 'stale state record: run pnpm surfaces:repair -- --surface <surface-id>';
+  }
+  if (health.status === 'healthy') {
+    return 'healthy';
+  }
+  if (health.detail === 'no_port_or_health_path') {
+    return definition.enabled === false
+      ? 'disabled surface: enable it before repair'
+      : 'no health probe configured: inspect logs or add a health path';
+  }
+  return `unhealthy (${health.detail}): run pnpm surfaces:repair -- --surface <surface-id>`;
 }
 
 export async function startSurfaceById(surfaceId: string, manifestPath: string) {
@@ -340,9 +359,19 @@ async function statusSurfaces() {
   const health: Record<string, unknown> = {};
   const diagnostics: Record<string, unknown> = {};
   for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
-    health[definition.id] = await probeSurfaceHealth(definition);
     const record = state.surfaces[definition.id];
+    const surfaceHealth = await probeSurfaceHealth(definition);
+    health[definition.id] = surfaceHealth;
     diagnostics[definition.id] = {
+      stateHealth:
+        record && isRunning(record.pid)
+          ? surfaceHealth.status === 'healthy'
+            ? 'healthy'
+            : 'degraded'
+          : record
+            ? 'stale'
+            : 'untracked',
+      repairHint: buildSurfaceRepairHint(definition, record, surfaceHealth),
       lastKnownState: record
         ? {
             pid: record.pid,
@@ -406,7 +435,7 @@ async function listUnits() {
   console.log('');
 }
 
-export async function setupSurfaces() {
+export async function setupSurfaces(options: { quiet?: boolean } = {}) {
   const manifest = loadSurfaceManifest();
   const rows = sortSurfaceSetupRows(await Promise.all(manifest.surfaces.map(async (d) => {
     const auth = (d as any).preset_path ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path) : null;
@@ -431,21 +460,23 @@ export async function setupSurfaces() {
     return acc;
   }, { total: 0, enabled: 0, disabled: 0, ready: 0, missing: 0, hostManaged: 0 });
 
-  console.log('');
-  console.log(`Setup summary: ${summary.missing} missing, ${summary.ready} ready, ${summary.hostManaged} host-managed, ${summary.disabled} disabled, ${summary.total} total`);
-  const header = `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`;
-  console.log(header);
-  console.log('-'.repeat(header.length + 8));
-  for (const row of rows) {
-    const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
-    console.log(
-      `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
-    );
-    if (row.auth === 'missing' || row.auth === 'n/a') {
-      console.log(`  ↳ ${row.hint}`);
+  if (!options.quiet) {
+    console.log('');
+    console.log(`Setup summary: ${summary.missing} missing, ${summary.ready} ready, ${summary.hostManaged} host-managed, ${summary.disabled} disabled, ${summary.total} total`);
+    const header = `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`;
+    console.log(header);
+    console.log('-'.repeat(header.length + 8));
+    for (const row of rows) {
+      const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+      console.log(
+        `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
+      );
+      if (row.auth === 'missing' || row.auth === 'n/a') {
+        console.log(`  ↳ ${row.hint}`);
+      }
     }
+    console.log('');
   }
-  console.log('');
 
   return {
     status: 'ok',
@@ -453,6 +484,81 @@ export async function setupSurfaces() {
     manifestDirectory: surfaceManifestDirectoryPath(),
     rows,
     summary,
+  };
+}
+
+async function repairSurfaceById(surfaceId: string, manifestPath: string) {
+  const manifest = loadSurfaceManifest(manifestPath);
+  const definition = manifest.surfaces.find((entry) => entry.id === surfaceId);
+  if (!definition) {
+    throw new Error(`Surface "${surfaceId}" not found in manifest ${manifestPath}`);
+  }
+
+  const normalized = normalizeSurfaceDefinition(definition);
+  const state = loadSurfaceState();
+  const record = state.surfaces[surfaceId];
+  const health = await probeSurfaceHealth(normalized);
+
+  if (!record || !isRunning(record.pid)) {
+    if (record) {
+      stopSurfaceById(surfaceId);
+    }
+    if (definition.enabled === false) {
+      return {
+        status: 'skipped_disabled',
+        id: surfaceId,
+        repairHint: 'surface is disabled in the manifest',
+        health,
+      };
+    }
+    const started = await startSurfaceById(surfaceId, manifestPath);
+    return {
+      ...started,
+      repairHint: health.status === 'healthy' ? 'already healthy before repair' : `recovered from ${health.detail}`,
+    };
+  }
+
+  if (health.status === 'healthy') {
+    return {
+      status: 'already_healthy',
+      id: surfaceId,
+      repairHint: 'no repair needed',
+      health,
+    };
+  }
+
+  stopSurfaceById(surfaceId);
+  const restarted = await startSurfaceById(surfaceId, manifestPath);
+  return {
+    ...restarted,
+    repairHint: `restarted after ${health.detail}`,
+  };
+}
+
+async function repairSurfaces(manifestPath: string, surfaceId?: string) {
+  if (surfaceId) {
+    return repairSurfaceById(surfaceId, manifestPath);
+  }
+
+  const manifest = loadSurfaceManifest(manifestPath);
+  const state = loadSurfaceState();
+  const results: Array<Record<string, unknown>> = [];
+  for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
+    const record = state.surfaces[definition.id];
+    if (!record) continue;
+    if (!isRunning(record.pid)) {
+      results.push(await repairSurfaceById(definition.id, manifestPath));
+      continue;
+    }
+    const health = await probeSurfaceHealth(definition);
+    if (health.status === 'healthy') continue;
+    results.push(await repairSurfaceById(definition.id, manifestPath));
+  }
+
+  return {
+    status: 'repaired',
+    manifestPath,
+    results,
   };
 }
 
@@ -587,7 +693,7 @@ async function reconcileHealth(manifestPath: string) {
 
 const main = async () => {
   const argv = await createStandardYargs()
-    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status', 'list-units', 'setup', 'enable', 'disable', 'register', 'unregister'] as const, required: true })
+    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status', 'list-units', 'setup', 'repair', 'enable', 'disable', 'register', 'unregister'] as const, required: true })
     .option('surface', { type: 'string' })
     .option('manifest', { type: 'string', default: surfaceManifestPath() })
     .option('cleanup', { type: 'boolean', default: false })
@@ -625,6 +731,9 @@ const main = async () => {
       break;
     case 'setup':
       result = await setupSurfaces();
+      break;
+    case 'repair':
+      result = await repairSurfaces(manifestPath, argv.surface as string | undefined);
       break;
     case 'enable':
       if (!argv.surface) throw new Error('--surface is required for enable');

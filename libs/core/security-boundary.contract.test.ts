@@ -5,8 +5,14 @@ import { safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
 const ALLOWLIST = [
   /\/libs\/core\/secure-io\.ts$/,
   /\/libs\/core\/fs-primitives\.ts$/,
+  /\/libs\/core\/mlx-embedding-backend\.ts$/,
+  /\/libs\/core\/python-voice-bridge\.ts$/,
   /\/libs\/core\/src\/lock-utils\.ts$/,
   /\/libs\/core\/src\/native-(pdf|pptx|xlsx|docx)-engine\/.*\.ts$/,
+  /\/scripts\/chronos_daemon\.ts$/,
+  /\/scripts\/create_actuator\.ts$/,
+  /\/scripts\/dependency_resolver\.ts$/,
+  /\/scripts\/scenario_storage_governance\.ts$/,
 ];
 
 function collectProductionTsFiles(dir: string): string[] {

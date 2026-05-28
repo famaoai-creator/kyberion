@@ -50,7 +50,7 @@ function inspectConnection(serviceId: string): { connection: 'customer' | 'perso
   return { connection: 'missing', connectionPath: candidates.overlay ?? candidates.base };
 }
 
-export async function setupServices() {
+export async function setupServices(options: { quiet?: boolean } = {}) {
   const catalog = loadServiceEndpointsCatalog();
   const rows = sortServiceSetupRows(Object.entries(catalog.services).map(([serviceId, record]) => {
     const auth = record.preset_path ? inspectServiceAuth(serviceId, record.preset_path) : null;
@@ -78,30 +78,32 @@ export async function setupServices() {
     return acc;
   }, { total: 0, ready: 0, authMissing: 0, connectionMissing: 0, customerConnections: 0, personalConnections: 0 });
 
-  console.log('');
-  console.log(formatSetupSummaryLine([
-    ['auth missing', summary.authMissing],
-    ['connections missing', summary.connectionMissing],
-    ['auth ready', summary.ready],
-    ['total', summary.total],
-  ]));
-  const header = `${'SERVICE'.padEnd(20)} ${'AUTH'.padEnd(10)} ${'CONNECTION'.padEnd(12)} ${'STRATEGY'.padEnd(12)} ${'SECRETS'.padEnd(36)} CLI`;
-  console.log(header);
-  console.log('-'.repeat(header.length + 8));
-  for (const row of rows) {
-    const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
-    const connectionSymbol = row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
-    console.log(
-      `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
-    );
-    if (row.auth === 'missing' || row.connection === 'missing') {
-      console.log(formatSetupHintLine(row.hint));
-      if (row.connection === 'missing') {
-        console.log(formatSetupHintLine(`Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`));
+  if (!options.quiet) {
+    console.log('');
+    console.log(formatSetupSummaryLine([
+      ['auth missing', summary.authMissing],
+      ['connections missing', summary.connectionMissing],
+      ['auth ready', summary.ready],
+      ['total', summary.total],
+    ]));
+    const header = `${'SERVICE'.padEnd(20)} ${'AUTH'.padEnd(10)} ${'CONNECTION'.padEnd(12)} ${'STRATEGY'.padEnd(12)} ${'SECRETS'.padEnd(36)} CLI`;
+    console.log(header);
+    console.log('-'.repeat(header.length + 8));
+    for (const row of rows) {
+      const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+      const connectionSymbol = row.connection === 'customer' ? '🟢' : row.connection === 'personal' ? '🟡' : '⚠️';
+      console.log(
+        `${row.service.padEnd(20)} ${authSymbol} ${row.auth.padEnd(8)} ${connectionSymbol} ${row.connection.padEnd(10)} ${row.strategy.padEnd(12)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
+      );
+      if (row.auth === 'missing' || row.connection === 'missing') {
+        console.log(formatSetupHintLine(row.hint));
+        if (row.connection === 'missing') {
+          console.log(formatSetupHintLine(`Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`));
+        }
       }
     }
+    console.log('');
   }
-  console.log('');
 
   return {
     status: 'ok',

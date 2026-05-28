@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '@agent/core';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { buildState, buildSummary, validateInput } from './onboarding_apply.js';
 
-const ROOT = process.cwd();
+const ROOT = pathResolver.rootDir();
 
 function read(relPath: string): string {
   return String(safeReadFile(path.join(ROOT, relPath), { encoding: 'utf8' }) || '');

@@ -67,6 +67,10 @@
       "types": "./dist/blackhole-audio-bus.d.ts",
       "default": "./dist/blackhole-audio-bus.js"
     },
+    "./blackhole-routing-guard": {
+      "types": "./dist/blackhole-routing-guard.d.ts",
+      "default": "./dist/blackhole-routing-guard.js"
+    },
     "./environment-capability-probes": {
       "types": "./dist/environment-capability-probes.d.ts",
       "default": "./dist/environment-capability-probes.js"
@@ -147,9 +151,17 @@
       "types": "./dist/src/types/pdf-protocol.d.ts",
       "default": "./dist/src/types/pdf-protocol.js"
     },
+    "./intent-resolution": {
+      "types": "./dist/intent-resolution.d.ts",
+      "default": "./dist/intent-resolution.js"
+    },
     "./pipeline-contract": {
       "types": "./dist/pipeline-contract.d.ts",
       "default": "./dist/pipeline-contract.js"
+    },
+    "./python-voice-bridge": {
+      "types": "./dist/python-voice-bridge.d.ts",
+      "default": "./dist/python-voice-bridge.js"
     },
     "./pipeline-scheduler": {
       "types": "./dist/src/pipeline-scheduler.d.ts",
@@ -254,6 +266,26 @@
     "./validators": {
       "types": "./dist/validators.d.ts",
       "default": "./dist/validators.js"
+    },
+    "./embedding-backend": {
+      "types": "./dist/embedding-backend.d.ts",
+      "default": "./dist/embedding-backend.js"
+    },
+    "./embedding-bootstrap": {
+      "types": "./dist/embedding-bootstrap.d.ts",
+      "default": "./dist/embedding-bootstrap.js"
+    },
+    "./mlx-embedding-backend": {
+      "types": "./dist/mlx-embedding-backend.d.ts",
+      "default": "./dist/mlx-embedding-backend.js"
+    },
+    "./ollama-embedding-backend": {
+      "types": "./dist/ollama-embedding-backend.d.ts",
+      "default": "./dist/ollama-embedding-backend.js"
+    },
+    "./openai-embedding-backend": {
+      "types": "./dist/openai-embedding-backend.d.ts",
+      "default": "./dist/openai-embedding-backend.js"
     }
   },
   "dependencies": {

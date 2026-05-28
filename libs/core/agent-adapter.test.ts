@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AgentFactory, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
+import {
+  AgentFactory,
+  ClaudeAdapter,
+  CodexAdapter,
+  CodexAppServerAdapter,
+  CodexExecutionEnhancer,
+  GeminiJsonModeEnforcer,
+  GeminiPhaseAwareInstructionEnhancer,
+  GeminiWisdomEnhancer,
+} from './agent-adapter.js';
 
 describe('CodexAppServerAdapter', () => {
   afterEach(() => {
@@ -143,4 +152,49 @@ describe('CodexAppServerAdapter', () => {
       expect.any(Number)
     );
   });
+});
+
+describe('AgentEnhancer parity', () => {
+  const ENHANCERS = [
+    new GeminiPhaseAwareInstructionEnhancer(),
+    new GeminiJsonModeEnforcer(),
+    new GeminiWisdomEnhancer(),
+    new CodexExecutionEnhancer(),
+  ];
+
+  for (const enhancer of ENHANCERS) {
+    describe(enhancer.name, () => {
+      it('has a non-empty name', () => {
+        expect(typeof enhancer.name).toBe('string');
+        expect(enhancer.name.length).toBeGreaterThan(0);
+      });
+
+      it('onBeforeAsk always returns { prompt: string } without throwing', async () => {
+        const result = await enhancer.onBeforeAsk!('hello', {});
+        expect(typeof result.prompt).toBe('string');
+      });
+
+      it('onBeforeAsk works with an empty prompt and no options', async () => {
+        const result = await enhancer.onBeforeAsk!('', undefined);
+        expect(typeof result.prompt).toBe('string');
+      });
+
+      it('onBeforeAsk does not drop caller options (additive merge)', async () => {
+        const callerOptions = { cwd: '/test/dir', model: 'test-model' };
+        const result = await enhancer.onBeforeAsk!('test prompt', callerOptions);
+        if (result.options) {
+          expect(result.options.cwd).toBe('/test/dir');
+          expect(result.options.model).toBe('test-model');
+        }
+      });
+
+      if ('onAfterAsk' in enhancer && typeof (enhancer as any).onAfterAsk === 'function') {
+        it('onAfterAsk passes response through without throwing', async () => {
+          const response = { text: 'test', stopReason: 'completed' as const };
+          const result = await (enhancer as any).onAfterAsk(response);
+          expect(typeof result.text).toBe('string');
+        });
+      }
+    });
+  }
 });
