@@ -16,6 +16,8 @@ import {
   installReasoningBackends,
   runFeedbackLoop,
   safeExecResult,
+  buildNextActionFromError,
+  formatNextAction,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -226,6 +228,19 @@ export function formatPipelineFailure(err: unknown): {
     classification,
     summary: formatClassification(classification).replace(/\n+/g, ' | '),
   };
+}
+
+function logNextActionForPipelineFailure(
+  failure: ReturnType<typeof formatPipelineFailure>,
+  pipelinePath: string,
+) {
+  const nextAction = buildNextActionFromError(failure.classification, {
+    source: 'pipeline',
+    pipelinePath,
+  });
+  for (const line of formatNextAction(nextAction)) {
+    logger.error(line);
+  }
 }
 
 export async function runSteps(
@@ -670,6 +685,7 @@ export async function main() {
           if (fallbackResult.stderr.trim()) logger.error(fallbackResult.stderr.trim());
         }
         logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failure.summary}`);
+        logNextActionForPipelineFailure(failure, String(argv.input));
       }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
       process.exit(1);
@@ -706,6 +722,7 @@ export async function main() {
     runFeedbackLoop(pipelineId, 'failed', persisted.trace);
     logger.info(`   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`);
     logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
+    logNextActionForPipelineFailure(failure, String(argv.input));
     process.exit(1);
   }
 }
