@@ -1,2 +1,4 @@
 mlx-audio
 mlx-whisper
+sounddevice
+soundfile

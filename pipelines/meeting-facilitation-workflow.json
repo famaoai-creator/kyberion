@@ -1,101 +1,58 @@
 {
   "action": "pipeline",
   "name": "meeting-facilitation-workflow",
-  "description": "End-to-end AI-led meeting flow: open agenda → join → listen N seconds → leave. The live session emits a transcript artifact for downstream action-item and fairness follow-up pipelines. Persona-parameterized via context.",
+  "description": "AI-led meeting session: join → listen N seconds → leave. Emits a transcript artifact for downstream action-item and fairness follow-up pipelines. Supports Google Meet, Microsoft Teams, and Zoom.",
   "context": {
     "persona_name": "Operator",
     "profile_id": "operator-default-v1",
-    "agent_id": "meeting-proxy",
     "meeting_url": "",
     "platform": "auto",
+    "display_name": "Kyberion Agent",
     "agenda": ["Status check", "Action items"],
-    "listen_duration_sec": 5,
+    "listen_duration_sec": 300,
     "language": "ja",
     "operator_label": "Operator",
     "attendees": [],
-    "join_action_json": "active/shared/tmp/meeting-join.json",
-    "listen_action_json": "active/shared/tmp/meeting-listen.json",
-    "leave_action_json": "active/shared/tmp/meeting-leave.json"
+    "python_bin": ".venv/bin/python3",
+    "screenshot_path": "active/shared/tmp/meeting-facilitation-screenshot.png",
+    "transcript_path": "active/shared/tmp/meeting-transcript.txt"
   },
   "steps": [
     {
       "id": "open_log",
       "op": "system:log",
       "params": {
-        "message": "🎙️ Meeting facilitation start (persona={{persona_name}}, platform={{platform}})."
+        "message": "🎙️ Meeting facilitation start — url={{meeting_url}} persona={{persona_name}} duration={{listen_duration_sec}}s"
       }
     },
     {
-      "id": "write_join_action",
-      "op": "code:write_artifact",
-      "params": {
-        "path": "{{join_action_json}}",
-        "content": "{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}"
-      }
-    },
-    {
-      "id": "join",
-      "type": "apply",
+      "id": "join_session",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{join_action_json}}",
+        "cmd": "node libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs --url '{{meeting_url}}' --name '{{display_name}}' --wait {{listen_duration_sec}} --python '{{python_bin}}' --screenshot '{{screenshot_path}}'",
         "export_as": "join_result"
       }
     },
     {
-      "id": "facilitate_open",
+      "id": "log_session",
       "op": "system:log",
       "params": {
-        "message": "🗒️ Facilitation stub: agenda={{agenda}} persona={{persona_name}} language={{language}} listen={{listen_duration_sec}}s"
-      }
-    },
-    {
-      "id": "write_listen_action",
-      "op": "code:write_artifact",
-      "params": {
-        "path": "{{listen_action_json}}",
-        "content": "{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}"
-      }
-    },
-    {
-      "id": "listen",
-      "type": "apply",
-      "op": "system:shell",
-      "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{listen_action_json}}",
-        "export_as": "listen_result"
+        "message": "📋 Session complete: {{join_result}}"
       }
     },
     {
       "id": "write_transcript_stub",
       "op": "code:write_artifact",
       "params": {
-        "path": "active/shared/tmp/meeting-transcript-{{mission_id}}.txt",
-        "content": "# Meeting Transcript\n\nPersona: {{persona_name}}\nPlatform: {{platform}}\nListen Duration: {{listen_duration_sec}}s\nAgenda:\n- {{agenda[0]}}\n- {{agenda[1]}}\n\nThis transcript was deterministically emitted by the meeting workflow after listen.\n"
-      }
-    },
-    {
-      "id": "write_leave_action",
-      "op": "code:write_artifact",
-      "params": {
-        "path": "{{leave_action_json}}",
-        "content": "{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}"
-      }
-    },
-    {
-      "id": "leave",
-      "type": "apply",
-      "op": "system:shell",
-      "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{leave_action_json}}",
-        "export_as": "leave_result"
+        "path": "{{transcript_path}}",
+        "content": "# Meeting Transcript\n\nPersona: {{persona_name}}\nMeeting URL: {{meeting_url}}\nListen Duration: {{listen_duration_sec}}s\nAgenda:\n- {{agenda[0]}}\n- {{agenda[1]}}\n\nSession result: {{join_result}}\n"
       }
     },
     {
       "id": "wrap",
       "op": "system:log",
       "params": {
-        "message": "🛑 Meeting closed. Transcript: active/shared/tmp/meeting-transcript-{{mission_id}}.txt. Run pipelines/meeting-facilitation-postprocess.json for action-item extraction and fairness audit, then pipelines/action-item-execute-self.json and pipelines/action-item-tracking.json for follow-up."
+        "message": "🛑 Meeting closed. Screenshot: {{screenshot_path}} | Transcript: {{transcript_path}}. Run pipelines/meeting-facilitation-postprocess.json for action-item extraction."
       }
     }
   ]
