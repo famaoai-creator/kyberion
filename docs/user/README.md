@@ -9,6 +9,8 @@ For people **using** Kyberion to get work done. If you're trying to operate / de
 | [WHY.md](../WHY.md) | First. What is this thing and why does it exist. |
 | [QUICKSTART.md](../QUICKSTART.md) | Then. 5 minutes from clone to first working smoke. |
 | [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or environment-dependent in normal use. Pair it with `pnpm setup:report`. |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | First-stop recovery guide for missing auth, stale surfaces, and first-run setup noise. |
+| [USE_CASE_QUICKSTARTS.md](./USE_CASE_QUICKSTARTS.md) | Three task-first entry points: meeting facilitator, report generation, browser research. |
 | [SCENARIO_CATALOG.md](../SCENARIO_CATALOG.md) | Browse the canonical catalog of automated workflows you can ask Kyberion to do. |
 | [customer-overlay-use-cases.md](./customer-overlay-use-cases.md) | Customer overlay story: create, inspect, activate, onboard, and switch engagements. |
 | [meeting-facilitator.md](./meeting-facilitator.md) | How Kyberion joins meetings, keeps consent boundaries, and handles follow-up. |
@@ -25,8 +27,9 @@ The English-first user-facing docs. Phase C'-1 of `docs/PRODUCTIZATION_ROADMAP.m
 - ✅ `docs/user/customer-overlay-use-cases.md` (customer overlay story)
 - ✅ `docs/PRIVACY.md` (en/ja)
 - ✅ `docs/user/meeting-facilitator.md` (meeting use-case and safety boundaries)
+- ✅ `docs/user/USE_CASE_QUICKSTARTS.md` (task-first entry points)
 - ⏳ `docs/HOWTO.md` — to be split into per-task user docs.
-- ⏳ Troubleshooting guide — to be created.
+- ✅ `docs/user/TROUBLESHOOTING.md` (first-stop recovery guide)
 - ⏳ Slack / Chronos / Terminal user-facing guides — to be split out from `OPERATOR_UX_GUIDE.md`.
 
 Until migration completes, this README is a pointer to where the canonical doc lives.

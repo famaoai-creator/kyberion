@@ -325,9 +325,11 @@ adapter wiring for the current environment.
 | Promote candidate into `knowledge/` | `mission_controller memory-promote <ID>` |
 | Post-release retrospective | `post-release-retrospective` pipeline |
 
-Distilled knowledge lands in `knowledge/incidents/` (frozen incidents) or via
-the promotion queue in `knowledge/public/`, `knowledge/confidential/`, or
-`knowledge/personal/` per the source's tier.
+Distilled knowledge lands in `knowledge/public/evolution/` for mission
+distills, with legacy compatibility reads still covering older
+`knowledge/incidents/` files. The promotion queue still targets
+`knowledge/public/`, `knowledge/confidential/`, or `knowledge/personal/`
+per the source's tier.
 
 ## 6. Mission Classes (canonical set)
 
