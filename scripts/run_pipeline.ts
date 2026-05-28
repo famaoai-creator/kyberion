@@ -13,8 +13,13 @@ import {
   findMissionPath,
   missionEvidenceDir,
   pathResolver,
+  installReasoningBackends,
+  runFeedbackLoop,
+  safeExecResult,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
+import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
+import { markRouterActive, markRouterInactive, resetRouterSync } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
 import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -302,6 +307,16 @@ for (const step of steps) {
           if (params.export_as && typeof params.export_as === 'string') {
             ctx = { ...ctx, [params.export_as]: output };
           }
+          // Track BlackHole mic routing state for SIGINT cleanup.
+          if (cmd.includes('blackhole_audio_router.py')) {
+            if (cmd.includes('setup_routing')) {
+              const pythonBin = cmd.split(/\s+/)[0];
+              const defaultMicDevice = String(ctx.default_mic_device || 'MacBook Pro Microphone');
+              markRouterActive(pythonBin, defaultMicDevice, rootDir);
+            } else if (cmd.includes('reset_routing')) {
+              markRouterInactive();
+            }
+          }
         } else if (domain === 'core' && action === 'if') {
           const cond = params.condition;
           const conditionResult = evaluateCondition(cond, ctx);
@@ -404,7 +419,7 @@ for (const step of steps) {
              const data = actualCtx[exportKey];
              if (data === undefined) {
                 logger.warn(`  [SYS_PIPELINE] Capture operation ${step.op} returned no data for key: ${exportKey}.`);
-                throw new Error(`Capture operation ${step.op} returned no data. Possible security or existence error.`);
+                throw new Error(`Capture operation ${step.op} returned no data for key "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`);
              }
           }
 
@@ -524,6 +539,21 @@ Once finished, provide a brief summary of the changes you applied to fix the pip
   }
 }
 export async function main() {
+  // Bootstrap reasoning + voice backends before any actuator dispatch.
+  installReasoningBackends();
+  installPythonVoiceBridgeIfAvailable();
+
+  // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
+  // The pipeline's `||` fallback only fires on non-zero exit codes, not SIGINT.
+  // Without this, a user pressing Ctrl+C during a meeting join pipeline would
+  // leave their system microphone locked to BlackHole.
+  const cleanupAndExit = (code: number) => {
+    resetRouterSync();
+    process.exit(code);
+  };
+  process.once('SIGINT', () => cleanupAndExit(130));
+  process.once('SIGTERM', () => cleanupAndExit(143));
+
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .option('context', { alias: 'c', type: 'string', describe: 'JSON string merged into pipeline.context (overrides)' })
@@ -566,6 +596,20 @@ export async function main() {
   autoContext.node_options = process.env.NODE_OPTIONS || '';
   autoContext.run_utc_now = new Date().toISOString();
   autoContext.__pipeline_options = pipeline.options || {};
+
+  // Propagate pipeline knowledge_scope so wisdom:query uses the right tier/customer index.
+  // Falls back to public-only scope when not declared.
+  if (pipeline.knowledge_scope) {
+    autoContext._knowledge_scope = pipeline.knowledge_scope;
+  } else if (autoContext.mission_tier && autoContext.mission_tier !== 'public') {
+    // Infer scope from mission tier when pipeline doesn't declare one explicitly
+    const inferredScope: Record<string, unknown> = {
+      tiers: ['public', autoContext.mission_tier],
+    };
+    const customer = process.env.KYBERION_CUSTOMER?.trim();
+    if (customer) inferredScope.customerId = customer;
+    autoContext._knowledge_scope = inferredScope;
+  }
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
 
   logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
@@ -591,6 +635,8 @@ export async function main() {
     result.context.trace_summary = persisted.trace.rootSpan.status;
     result.context.trace_persisted_path = nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
+    const pipelineStatus = result.status === 'succeeded' ? 'succeeded' : 'failed';
+    runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
       if (autoContext.__pipeline_options && (autoContext.__pipeline_options as any).keep_alive) {
@@ -602,6 +648,27 @@ export async function main() {
       const failed = result.results.find((entry) => entry.status === 'failed');
       if (failed) {
         const failure = formatPipelineFailure(failed.error || 'unknown error');
+        const fallbackPath = String((pipeline as any).fallback_pipeline || '');
+        if (
+          fallbackPath &&
+          failure.classification.category === 'permission_denied' &&
+          !process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
+        ) {
+          logger.warn(`⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`);
+          const fallbackResult = safeExecResult('node', ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath], {
+            cwd: pathResolver.rootDir(),
+            env: {
+              KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
+            },
+          });
+          if (fallbackResult.status === 0) {
+            logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
+            process.exit(0);
+          }
+          logger.error(`❌ [PIPELINE] Fallback failed: ${fallbackPath}`);
+          if (fallbackResult.stdout.trim()) logger.error(fallbackResult.stdout.trim());
+          if (fallbackResult.stderr.trim()) logger.error(fallbackResult.stderr.trim());
+        }
         logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failure.summary}`);
       }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
@@ -609,12 +676,34 @@ export async function main() {
     }
   } catch (err: any) {
     const failure = formatPipelineFailure(err);
+    const fallbackPath = String((pipeline as any).fallback_pipeline || '');
+    if (
+      fallbackPath &&
+      failure.classification.category === 'permission_denied' &&
+      !process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
+    ) {
+      logger.warn(`⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`);
+      const fallbackResult = safeExecResult('node', ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath], {
+        cwd: pathResolver.rootDir(),
+        env: {
+          KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
+        },
+      });
+      if (fallbackResult.status === 0) {
+        logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
+        process.exit(0);
+      }
+      logger.error(`❌ [PIPELINE] Fallback failed: ${fallbackPath}`);
+      if (fallbackResult.stdout.trim()) logger.error(fallbackResult.stdout.trim());
+      if (fallbackResult.stderr.trim()) logger.error(fallbackResult.stderr.trim());
+    }
     trace.addEvent('pipeline.error', {
       error: err?.message ?? String(err),
       error_category: failure.classification.category,
       error_rule_id: failure.classification.ruleId,
     });
     const persisted = finalizeAndPersist(trace);
+    runFeedbackLoop(pipelineId, 'failed', persisted.trace);
     logger.info(`   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`);
     logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
     process.exit(1);

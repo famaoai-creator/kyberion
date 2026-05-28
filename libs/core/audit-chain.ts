@@ -3,6 +3,7 @@ import { safeReadFile, safeWriteFile, safeAppendFileSync, safeExistsSync, safeMk
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { rootDir } from './path-resolver.js';
 
 /**
  * Hash-Chained Audit Trail v1.0
@@ -42,7 +43,7 @@ class AuditChainImpl {
   private auditDir: string;
 
   constructor() {
-    this.auditDir = path.join(pathResolver.rootDir(), 'active', 'audit');
+    this.auditDir = path.join(pathResolver.rootDir(), 'active', 'shared', 'logs', 'audit');
   }
 
   /**
@@ -207,6 +208,23 @@ class AuditChainImpl {
       safeAppendFileSync(this.getFilePath(), JSON.stringify(entry) + '\n');
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
+    }
+
+    // Per-tenant mirror: copy to customer/{slug}/logs/audit/ when slug is present.
+    if (entry.tenantSlug) {
+      try {
+        const tenantAuditDir = path.join(rootDir(), 'customer', entry.tenantSlug, 'logs', 'audit');
+        if (!safeExistsSync(tenantAuditDir)) {
+          safeMkdir(tenantAuditDir, { recursive: true });
+        }
+        const date = new Date().toISOString().slice(0, 10);
+        safeAppendFileSync(
+          path.join(tenantAuditDir, `audit-${date}.jsonl`),
+          JSON.stringify(entry) + '\n',
+        );
+      } catch (err: any) {
+        logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${entry.tenantSlug}: ${err.message}`);
+      }
     }
   }
 

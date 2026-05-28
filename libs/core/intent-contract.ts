@@ -943,6 +943,54 @@ export function formatClarificationPacket(packet: OperatorInteractionPacket): st
   return lines.join('\n');
 }
 
+export interface ClarificationFormatOptions {
+  /** When true, show only the first blocking question instead of the full list. Default: false */
+  concise?: boolean;
+  /** Output locale. 'ja' produces Japanese-phrased output. Default: 'en' */
+  locale?: 'en' | 'ja';
+}
+
+/**
+ * Concise clarification formatter — surfaces the single next required input
+ * rather than the full question list.  Use for CLI and surface contexts where
+ * brevity is more important than completeness.
+ */
+export function formatClarificationPacketConcise(
+  packet: OperatorInteractionPacket,
+  options: ClarificationFormatOptions = {}
+): string {
+  const locale = options.locale ?? 'en';
+  const questions = packet.questions ?? [];
+  const first = questions[0];
+  const remaining = questions.length - 1;
+
+  if (!first) {
+    return locale === 'ja'
+      ? '不足している情報はありません。実行を進められます。'
+      : 'No missing inputs. Ready to proceed.';
+  }
+
+  if (locale === 'ja') {
+    const moreHint = remaining > 0 ? `（他 ${remaining} 件）` : '';
+    const lines = [
+      `次に必要な情報${moreHint}: **${first.id}**`,
+      first.question,
+    ];
+    if (first.reason) lines.push(`理由: ${first.reason}`);
+    if (first.default_assumption) lines.push(`デフォルト: ${first.default_assumption}`);
+    return lines.join('\n');
+  }
+
+  const moreHint = remaining > 0 ? ` (+ ${remaining} more)` : '';
+  const lines = [
+    `Next required${moreHint}: **${first.id}**`,
+    first.question,
+  ];
+  if (first.reason) lines.push(`Reason: ${first.reason}`);
+  if (first.default_assumption) lines.push(`Default: ${first.default_assumption}`);
+  return lines.join('\n');
+}
+
 export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDeliveryDecision {
   const durableShape =
     contract.resolution.execution_shape === 'project_bootstrap' ||

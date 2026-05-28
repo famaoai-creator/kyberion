@@ -21,6 +21,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
+  safeAppendFileSync,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 
@@ -79,11 +80,19 @@ export class MissionEvidenceDoc<T> {
   /**
    * Write the document and optionally emit one audit-chain entry. The
    * `auditAction` is the load-bearing label (e.g. `voice_consent.grant`).
+   * When `missionAudit` is true, a copy of the audit entry is also written
+   * to the mission-local audit directory (active/missions/{tier}/{id}/audit/).
    * Returns the audit event id when one was recorded, or empty string.
    */
   write(
     record: T,
-    audit?: { action: string; reason?: string; metadata?: Record<string, unknown> },
+    audit?: {
+      action: string;
+      reason?: string;
+      metadata?: Record<string, unknown>;
+      missionAudit?: boolean;
+      tier?: 'personal' | 'confidential' | 'public';
+    },
   ): { audit_event_id: string } {
     safeMkdir(path.dirname(this.filePath), { recursive: true });
     safeWriteFile(this.filePath, JSON.stringify(record, null, 2));
@@ -98,6 +107,22 @@ export class MissionEvidenceDoc<T> {
         ...(audit.reason ? { reason: audit.reason } : {}),
         ...(audit.metadata ? { metadata: audit.metadata } : {}),
       });
+
+      // Mission-local audit copy
+      if (audit.missionAudit) {
+        try {
+          const tier = audit.tier ?? 'confidential';
+          const auditDir = pathResolver.missionAuditDir(this.options.mission_id, tier);
+          const date = new Date().toISOString().slice(0, 10);
+          safeAppendFileSync(
+            path.join(auditDir, `audit-${date}.jsonl`),
+            JSON.stringify(entry) + '\n',
+          );
+        } catch (err: any) {
+          logger.warn(`[mission-evidence-doc] mission audit write failed: ${err?.message ?? err}`);
+        }
+      }
+
       return { audit_event_id: entry.id };
     } catch (err: any) {
       logger.warn(`[mission-evidence-doc] audit emission failed: ${err?.message ?? err}`);

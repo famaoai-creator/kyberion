@@ -45,6 +45,8 @@ export interface Trace {
     pipelineId?: string;
     startedAt: string;
     completedAt?: string;
+    customerId?: string;
+    tenantSlug?: string;
   };
 }
 
@@ -66,11 +68,15 @@ export class TraceContext {
       knowledgeRefs: [],
       children: [],
     };
+    const customer = process.env.KYBERION_CUSTOMER?.trim() || undefined;
+    const tenant = process.env.KYBERION_TENANT?.trim() || undefined;
     this.trace = {
       traceId: randomUUID(),
       rootSpan,
       metadata: {
         startedAt: rootSpan.startTime,
+        ...(customer ? { customerId: customer } : {}),
+        ...(tenant ? { tenantSlug: tenant } : {}),
         ...metadata,
       },
     };

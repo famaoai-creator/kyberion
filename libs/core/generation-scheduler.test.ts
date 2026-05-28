@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { isGenerationScheduleDue } from './generation-scheduler.js';
+import { isGenerationScheduleDue, runGenerationScheduleAction } from './generation-scheduler.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -79,5 +79,16 @@ describe('generation scheduler', () => {
         request: {},
       }),
     ).toBe(false);
+  });
+
+  it('lists generation schedules without requiring the actuator path', async () => {
+    await expect(runGenerationScheduleAction({ action: 'list' })).resolves.toEqual([]);
+  });
+
+  it('ticks generation schedules safely when none are registered', async () => {
+    await expect(runGenerationScheduleAction({ action: 'tick' })).resolves.toEqual({
+      status: 'completed',
+      results: [],
+    });
   });
 });

@@ -8,7 +8,9 @@ import {
   safeReaddir,
   safeStat,
   loadActuatorManifestCatalog,
+  installReasoningBackends,
 } from '@agent/core';
+import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
   executeGmailDelivery,
   generateEmailReplyDraft,
@@ -150,6 +152,9 @@ function resolveLocale(args: string[] = process.argv.slice(2)): string {
   const rawLocale = String(localeArg || envLocale || 'en').trim();
   const normalized = rawLocale.replace(/_/g, '-').toLowerCase();
   if (normalized.startsWith('ja')) return 'ja';
+  if (normalized && !normalized.startsWith('en') && normalized !== 'c' && normalized !== 'posix') {
+    process.stderr.write(`Note: locale "${normalized}" is not available; using "en".\n`);
+  }
   return 'en';
 }
 
@@ -277,48 +282,55 @@ function printHelp(actuators: ActuatorRecord[]) {
   printHeader();
   console.log('Usage: npm run cli -- <command> [arguments]');
   console.log('');
-  console.log('Commands:');
-  console.log('  help                 Show this help');
-  console.log('  list [--check]       List available actuators in the manifest-backed catalog (--check: runtime capability detection)');
+  console.log('── Actuator Management ─────────────────────────────────────────────');
+  console.log('  list [--check]       List actuators in the manifest catalog (--check: runtime detection)');
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
-  console.log('  examples <name>      List actuator-owned examples for a specific actuator');
-  console.log('  mobile-profiles [id] List shared mobile app profiles or inspect one profile');
-  console.log('  web-profiles [id]    List shared web app profiles or inspect one profile');
-  console.log('  artifact <path>      Inspect a generated artifact for review');
-  console.log('  open-artifact <path> Open a generated artifact with the local viewer');
-  console.log('  packet <path>        Render an operator packet, status report, or response preview');
-  console.log('  accept-next-action <packet> <id>  Execute a suggested next action from a packet');
-  console.log('  approvals [channel]  List pending approval requests, including secret mutations');
-  console.log('  approve <id> [channel]  Approve a pending request as the current sovereign');
-  console.log('  reject <id> [channel]   Reject a pending request as the current sovereign');
-  console.log('  email <status|draft|latest-draft|deliver>  Manage Gmail triage and replies');
-  console.log('  run <name> [args]    Execute an actuator, forwarding trailing arguments');
-  console.log('  preview <file>       Preview a pipeline JSON and validate its steps');
-  console.log('  schedule list        List all scheduled pipelines');
+  console.log('  examples [name]      List actuator-owned examples (all, or one actuator)');
+  console.log('  mobile-profiles [id] List shared mobile app profiles or inspect one');
+  console.log('  web-profiles [id]    List shared web app profiles or inspect one');
+  console.log('  run <name> [args]    Execute an actuator (30-min timeout; use --help for actuator flags)');
+  console.log('');
+  console.log('── Pipelines ───────────────────────────────────────────────────────');
+  console.log('  preview <file>       Validate a pipeline JSON and show its step tree');
+  console.log('  schedule list        List scheduled pipelines registered with chronos');
   console.log('  schedule register <id> <pipeline> <actuator> "<cron>"');
   console.log('                       Register a new scheduled pipeline');
-  console.log('  schedule remove <id> Remove a scheduled pipeline');
+  console.log('  schedule remove <id> Remove a scheduled pipeline from chronos');
+  console.log('');
+  console.log('── Artifacts ───────────────────────────────────────────────────────');
+  console.log('  artifact <path>      Inspect a generated artifact (text preview for text types)');
+  console.log('  open-artifact <path> Open a generated artifact with the OS default viewer');
+  console.log('');
+  console.log('── Operator Packets ────────────────────────────────────────────────');
+  console.log('  packet <path>        Render an operator packet, status report, or response preview');
+  console.log('  accept-next-action <packet> <id>  Execute a suggested next action from a packet');
+  console.log('');
+  console.log('── Approvals & Governance ──────────────────────────────────────────');
+  console.log('  approvals [channel]  List pending approval requests (run this first to find IDs)');
+  console.log('  approve <id> [ch]    Approve a pending request as the current sovereign');
+  console.log('  reject  <id> [ch]    Reject a pending request as the current sovereign');
+  console.log('');
+  console.log('── Email Workflow ───────────────────────────────────────────────────');
+  console.log('  email <status|draft|latest-draft|deliver>  Email workflow (run `npm run cli -- email --help` for details)');
+  console.log('  email status         Check Gmail auth readiness');
+  console.log('  email draft          Generate a reply draft from inbox triage');
+  console.log('  email latest-draft   Show the latest stored draft artifact');
+  console.log('  email deliver        Create a Gmail draft or send an approved reply');
   console.log('');
   console.log('Examples:');
   console.log('  npm run cli -- list');
   console.log('  npm run cli -- search browser');
-  console.log('  npm run cli -- info orchestrator-actuator');
-  console.log('  npm run cli -- examples browser-actuator');
-  console.log('  npm run cli -- mobile-profiles');
-  console.log('  npm run cli -- web-profiles');
-  console.log('  npm run cli -- artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx');
-  console.log('  npm run cli -- open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx');
-  console.log('  npm run cli -- packet active/shared/tmp/orchestrator/operator-interaction-packet.json');
-  console.log('  npm run cli -- accept-next-action active/shared/tmp/orchestrator/status-operator-interaction-packet.json review-target-mission-artifacts');
+  console.log('  npm run cli -- run file-actuator -- --help');
+  console.log('  npm run cli -- preview pipelines/verify-session.json');
   console.log('  npm run cli -- approvals');
   console.log('  npm run cli -- approve <request-id>');
   console.log('  npm run cli -- email status');
   console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
-  console.log('  npm run cli -- run file-actuator -- --help');
   console.log('');
   console.log('Useful first-run commands:');
-  console.log('  pnpm onboard         Configure sovereign identity (customer/{slug}/ preferred when KYBERION_CUSTOMER is set)');
+  console.log('  pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
+  console.log('  pnpm doctor          Check environment readiness');
   console.log('  pnpm capabilities    Check which actuator capabilities fit this environment');
   console.log('  pnpm mission:journal Inspect mission history');
   console.log('');
@@ -868,7 +880,7 @@ function acceptNextAction(packetPath: string, actionId: string) {
       executedVia = 'pipeline';
       executedTarget = action.suggested_pipeline_path;
     } else {
-      throw new Error(`Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path.`);
+      throw new Error(`Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path. The packet may be malformed or was generated by an outdated pipeline. Re-run the originating pipeline or ask the orchestrator to regenerate the packet.`);
     }
   } catch (error: any) {
     executionFailed = true;
@@ -957,7 +969,7 @@ function printApprovalRequests(channelArg?: string) {
 
 function applyApprovalDecision(command: 'approve' | 'reject', requestId: string | undefined, channelArg?: string) {
   if (!requestId) {
-    throw new Error(`Usage: npm run cli -- ${command} <request-id> [storage-channel]`);
+    throw new Error(`Usage: npm run cli -- ${command} <request-id> [storage-channel]\nRun \`npm run cli -- approvals\` first to list pending request IDs.`);
   }
 
   const requests = listApprovalRequests({
@@ -1055,7 +1067,11 @@ function runActuator(actuators: ActuatorRecord[], actuatorName: string | undefin
       process.stdout.write(output);
     }
   } catch (err: any) {
-    process.stderr.write(chalk.red(`\n❌ Execution failed: ${err.message}\n`));
+    const isTimeout = /timed?\s*out|timeout|deadline|ETIMEDOUT/i.test(err.message || '');
+    const timeoutHint = isTimeout
+      ? ' (30-minute timeout exceeded — for long-running tasks, run the actuator directly: `node dist/<path>/src/index.js --input <file>`)'
+      : '';
+    process.stderr.write(chalk.red(`\n❌ Execution failed: ${err.message}${timeoutHint}\n`));
     if (err.stdout) {
       process.stdout.write(err.stdout.toString());
     }
@@ -1064,6 +1080,9 @@ function runActuator(actuators: ActuatorRecord[], actuatorName: string | undefin
 }
 
 export async function main(args = process.argv.slice(2)) {
+  installReasoningBackends();
+  installPythonVoiceBridgeIfAvailable();
+
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
 
@@ -1238,6 +1257,85 @@ export async function main(args = process.argv.slice(2)) {
     };
     preview.steps.forEach((s: any) => printStep(s));
     process.exit(preview.valid ? 0 : 1);
+  }
+
+  if (command === 'intent') {
+    // Free-text → intent resolution → optional pipeline execution
+    // Usage: pnpm cli intent "仮説を発散させて" [--run]
+    const flags = normalizedArgs.filter(a => a.startsWith('--'));
+    const words = normalizedArgs.slice(1).filter(a => !a.startsWith('--'));
+    const utterance = words.join(' ').trim();
+    if (!utterance) {
+      console.error('Usage: pnpm cli intent "<utterance>" [--run]');
+      console.error('  --run  Execute the resolved pipeline immediately');
+      process.exit(1);
+    }
+    const doRun = flags.includes('--run');
+
+    const { resolveIntentResolutionPacket, loadStandardIntentCatalog } = await import('@agent/core/intent-resolution');
+    const packet = resolveIntentResolutionPacket(utterance);
+
+    console.log(`\n=== Intent Resolution ===`);
+    console.log(`Utterance  : "${packet.utterance}"`);
+
+    if (!packet.selected_intent_id) {
+      console.log(`Result     : No intent matched (confidence below threshold)`);
+      if (packet.candidates.length > 0) {
+        console.log(`\nTop candidates:`);
+        for (const c of packet.candidates.slice(0, 5)) {
+          console.log(`  ${c.confidence.toFixed(2)}  ${c.intent_id}  — ${c.reasons[0] ?? 'heuristic'}`);
+        }
+      }
+      process.exit(0);
+    }
+
+    const catalog = loadStandardIntentCatalog();
+    const intent = catalog.find(i => i.id === packet.selected_intent_id);
+
+    console.log(`Selected   : ${packet.selected_intent_id} (confidence: ${packet.selected_confidence})`);
+    if (intent?.description) console.log(`Description: ${intent.description}`);
+    if (intent?.risk_profile) console.log(`Risk       : ${intent.risk_profile}`);
+    if (intent?.plan_outline?.length) {
+      console.log(`\nPlan:`);
+      intent.plan_outline.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
+    }
+    if (intent?.pipeline?.length) {
+      console.log(`\nPipeline steps (${intent.pipeline.length}):`);
+      intent.pipeline.forEach((s, i) => console.log(`  ${i + 1}. ${s.op}`));
+    }
+    if (packet.bundle_candidates?.length) {
+      console.log(`\nCapability bundles:`);
+      for (const b of packet.bundle_candidates) {
+        console.log(`  [${b.status}] ${b.bundle_id} — ${b.summary}`);
+      }
+    }
+
+    if (doRun && intent?.pipeline?.length) {
+      const { execFileSync } = await import('node:child_process');
+      const tempPipeline = {
+        action: 'pipeline',
+        name: `Intent dispatch: ${packet.selected_intent_id}`,
+        pipeline_id: `intent-${packet.selected_intent_id}`,
+        steps: intent.pipeline,
+      };
+      const tempPath = pathResolver.rootResolve(
+        `active/shared/tmp/intent-dispatch-${packet.selected_intent_id}-${Date.now()}.json`
+      );
+      safeWriteFile(tempPath, JSON.stringify(tempPipeline, null, 2));
+      console.log(`\nRunning: node dist/scripts/run_pipeline.js --input ${tempPath}`);
+      try {
+        execFileSync('node', ['dist/scripts/run_pipeline.js', '--input', tempPath], {
+          stdio: 'inherit',
+          cwd: pathResolver.rootDir(),
+        });
+      } catch {
+        process.exit(1);
+      }
+    } else if (doRun) {
+      console.log(`\nNote: intent "${packet.selected_intent_id}" has no inline pipeline (execution_shape: ${intent?.execution_shape ?? 'unknown'}). Use a task session instead.`);
+    }
+
+    process.exit(0);
   }
 
   if (command === 'schedule') {

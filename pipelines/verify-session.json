@@ -4,6 +4,7 @@
   "description": "Clean first-win browser smoke: open a local data URL and capture a screenshot artifact under active/shared/tmp/ without requiring an existing login session.",
   "action": "pipeline",
   "labels": ["first-win", "browser", "screenshot", "clean-env"],
+  "fallback_pipeline": "pipelines/verify-session-fallback.json",
   "inputs": {
     "TARGET_URL": {
       "required": false,

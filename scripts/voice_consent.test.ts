@@ -50,7 +50,7 @@ describe('voice_consent CLI helpers', () => {
   it('grants consent, records an audit event, and revokes idempotently', () => {
     const auditPath = path.join(
       ROOT,
-      'active/audit',
+      'active/shared/logs/audit',
       `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
     );
     const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';

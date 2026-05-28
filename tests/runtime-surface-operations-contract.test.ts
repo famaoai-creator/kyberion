@@ -13,6 +13,7 @@ describe('Runtime surface operations contract', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     expect(pkg.scripts['surfaces:reconcile']).toBe('node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['surfaces:status']).toBe('node dist/scripts/surface_runtime.js --action status');
+    expect(pkg.scripts['surfaces:repair']).toBe('node dist/scripts/surface_runtime.js --action repair');
     expect(pkg.scripts.bootstrap).toBe('pnpm build && node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['dashboard:onboarding']).toBe('node dist/scripts/sovereign_dashboard.js --once --focus onboarding');
   });
@@ -46,6 +47,8 @@ describe('Runtime surface operations contract', () => {
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');
     expect(surfaceRuntime).toContain('lastKnownState');
+    expect(surfaceRuntime).toContain('repairHint');
+    expect(surfaceRuntime).toContain("case 'repair'");
     expect(lifecycleModel).toContain('Waited for background terminal');
     expect(lifecycleModel).toContain('active/shared/runtime/surfaces/state.json');
     expect(lifecycleModel).toContain('discord-bridge');

@@ -134,6 +134,8 @@ Typical service presets include:
 
 Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to inspect state, and `pnpm surfaces:start -- --surface <surface-id>` or `pnpm surfaces:stop -- --surface <surface-id>` for a specific managed surface.
 
+Use `pnpm surfaces:repair -- --surface <surface-id>` when a surface is tracked but unhealthy or stale and you want Kyberion to restart it without doing a full reconcile.
+
 For Google Workspace email work:
 
 - `pnpm email:workflow status`

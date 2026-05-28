@@ -84,7 +84,7 @@ the canonical surface(s) involved.
 
 | # | Scenario | Mechanism | Status |
 |---|---|---|---|
-| E1 | Mission distill | `mission_controller distill` → `knowledge/incidents/distill_*.md` | ✅ |
+| E1 | Mission distill | `mission_controller distill` → `knowledge/public/evolution/distill_*.md` | ✅ |
 | E2 | Memory promotion queue | `memory-list` / `memory-approve` / `memory-promote` | ✅ |
 | E3 | Cross-tenant promotion | `memory-promote` + tier-hygiene + `multi-tenant-operations.md §7` | ✅ |
 | E4 | Post-release retrospective | `post-release-retrospective` pipeline | ✅ |

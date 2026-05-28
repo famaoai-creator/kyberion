@@ -12,31 +12,84 @@ Actuator 固有のサンプルや検証用 pipeline はここに置かず、各 
 
 ## Available Pipelines
 
-| Pipeline                   | Description                                                 |
-| -------------------------- | ----------------------------------------------------------- |
-| `auto-audit`               | Quick automated project audit                               |
-| `code-health`              | Code health assessment (mapping → quality → refactoring)    |
-| `code-quality`             | Focused code quality scoring                                |
-| `compliance-audit`         | License + regulatory compliance check                       |
-| `cost-optimization-audit`  | Cloud cost analysis and waste detection                     |
-| `data-flow-audit`          | Data flow and schema validation                             |
-| `devsecops-continuous-compliance` | Advanced security and governance audit integrated into the lifecycle |
-| `doc-analysis`             | Document analysis and extraction                            |
-| `documentation-excellence` | Full documentation quality suite                            |
-| `documentation-sync`       | Detect and fix documentation drift                          |
-| `ecosystem-health-monitor` | Overall ecosystem health monitoring                         |
-| `full-quality-gate`        | Comprehensive quality gate (security + code + tests + docs) |
-| `full-security-audit`      | Deep security audit (scanner + supply chain + red team)     |
-| `intelligent-code-review`  | AI-assisted code review pipeline                            |
-| `knowledge-extraction`     | Extract knowledge from codebases and documents              |
-| `project-kickstart`        | **[NEW]** Autonomous project lifecycle starter (Concept -> Req -> Design -> Tasks -> Repo) |
-| `living-docs`              | Generate and maintain living documentation                  |
-| `mobile-webview-handoff-runner-android` | Android runtime handoff capture -> browser import orchestration |
-| `mobile-webview-handoff-runner-ios` | iOS runtime handoff capture -> browser import orchestration |
-| `web-session-handoff-runner` | Web runtime handoff export -> import orchestration |
-| `release-pipeline`         | Release preparation (changelog + security + PR)             |
-| `security-audit`           | Standard security scan                                      |
-| `team-onboarding`          | Generate onboarding materials for new team members          |
+> Only pipelines with a corresponding `.json` file in this directory are listed. Run `ls pipelines/*.json` to see all files.
+
+### Health & Diagnostics
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `baseline-check` | `pnpm pipeline --input pipelines/baseline-check.json` | Session-start health gate (onboarding / recovery / all-clear) |
+| `vital-check` | `pnpm vital` | Core liveness check |
+| `system-diagnostics` | `pnpm diagnose` | Detailed system-level diagnostic report |
+| `full-health-report` | — | Aggregated health across all surfaces |
+| `system-upgrade-check` | `pnpm system:upgrade:check` | Detect available system + dependency upgrades |
+| `system-upgrade-execute` | `pnpm system:upgrade:execute` | Apply upgrades interactively |
+
+### Knowledge & Governance
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `knowledge-sync` | `pnpm knowledge:sync` | Sync knowledge artifacts to public tier |
+| `orchestration-jobs` | `pnpm orchestration:jobs` | Run scheduled orchestration batch |
+| `analysis-job` | `pnpm analysis:job` | Generic analysis task runner |
+| `judgment-job` | `pnpm judgment:job` | Governance judgment evaluation |
+| `kyberion-autonomous-onboarding` | `pnpm onboard` | Full autonomous onboarding (install → surfaces → alignment) |
+| `kyberion-config-provisioner` | — | Provision operator config from canonical defaults |
+| `intent-audit-api-gdpr` | — | GDPR intent audit over API surface |
+| `intent-audit-api-pci` | — | PCI intent audit over API surface |
+| `intent-audit-report-gdpr` | — | GDPR compliance report |
+| `culture-governance-guardrail` | — | Culture and governance policy gate |
+
+### Voice
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `voice-learning-setup` | `pnpm voice:setup` | One-time voice profile setup (clone + register) |
+| `voice-health-check` | `pnpm voice:health` | Verify voice engine availability |
+| `clone-my-voice` | `pnpm voice:clone` | Generate a voice clone from recordings |
+| `speak-with-my-voice` | `pnpm voice:speak` | TTS playback with cloned voice |
+| `voice-hello` | — | Smoke test for voice output |
+| `voice-instant-clone` | — | Quick single-sample voice clone |
+| `voice-recording-session` | — | Guided recording session for voice training |
+
+### Meeting
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `meeting-facilitation-workflow` | — | Full meeting facilitation (join → transcribe → summarize) |
+| `meeting-facilitation-postprocess` | — | Post-meeting processing (transcript → action items) |
+| `meeting-proxy-workflow` | — | Voice-proxy meeting attendance |
+| `meet-join-with-cloned-voice` | — | Google Meet join with cloned voice |
+| `zoom-join-with-cloned-voice` | — | Zoom join with cloned voice |
+| `teams-join-with-cloned-voice` | — | Microsoft Teams join with cloned voice |
+
+### Delivery & Code
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `project-kickstart` | — | Autonomous project lifecycle starter (Concept → Req → Design → Tasks → Repo) |
+| `code-review-cycle` | — | AI-assisted code review with wisdom ops |
+| `deploy-release` | — | Release preparation (changelog + tag + PR) |
+| `incident-post-mortem` | — | Structured post-mortem report generation |
+| `daily-summary` | — | Daily activity and task summary |
+| `schedule-summary-and-coordination` | — | Weekly schedule synthesis and coordination |
+
+### Mobile & Web Handoff
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `mobile-webview-handoff-runner-android` | — | Android runtime handoff capture → browser import orchestration |
+| `mobile-webview-handoff-runner-ios` | — | iOS runtime handoff capture → browser import orchestration |
+| `web-session-handoff-runner` | — | Web runtime handoff export → import orchestration |
+
+### Chaos & Resilience Tests
+
+| Pipeline | Description |
+|---|---|
+| `chaos-actuator-down` | Simulates actuator failure; validates fallback behaviour |
+| `chaos-network-partition` | Simulates network partition; validates retry/circuit-breaker |
+| `chaos-repair-test` | Validates self-repair after injected fault |
+| `chaos-secret-missing` | Simulates missing secret; validates secret-guard error path |
 
 ## Creating Custom Pipelines
 

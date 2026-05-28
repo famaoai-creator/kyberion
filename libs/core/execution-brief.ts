@@ -4,6 +4,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
 import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
+import { resolveInputBindings, type InputBinding } from './input-binding.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -480,6 +481,7 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
     target_actuators: targetActuators,
     deliverables,
     missing_inputs: missingInputs,
+    input_bindings: resolveInputBindings(missingInputs) as InputBinding[],
     service_binding_refs: inferServiceBindingRefs(seed),
     assumptions: guidedBrief.assumptions,
     clarification_questions: inferClarificationQuestions(seed, missingInputs),
