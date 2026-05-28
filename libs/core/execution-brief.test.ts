@@ -39,4 +39,19 @@ describe('execution-brief', () => {
     ]);
     expect(brief.clarification_questions?.[0]?.id).toBe('meeting_url');
   });
+
+  it('populates input_bindings with typed metadata for missing inputs', () => {
+    const brief = buildFallbackExecutionBrief({
+      requestText: 'Teamsで会議に参加して',
+      intentId: 'meeting-operations',
+    });
+
+    const bindings = (brief as any).input_bindings as Array<{ id: string; type: string; label: string }>;
+    expect(Array.isArray(bindings)).toBe(true);
+    expect(bindings.length).toBe(brief.missing_inputs.length);
+
+    const urlBinding = bindings.find((b) => b.id === 'meeting_url');
+    expect(urlBinding?.type).toBe('url');
+    expect(urlBinding?.label).toBeTruthy();
+  });
 });

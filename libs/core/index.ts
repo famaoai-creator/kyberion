@@ -80,6 +80,7 @@ export {
   capabilityDir,
   skillDir,
   missionDir,
+  tenantMissionDir,
   missionEvidenceDir,
   findMissionPath,
   resolve,
@@ -101,12 +102,18 @@ export * from './schema-loader.js';
 export * from './operator-learning.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
+export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
+export type { InputBinding, InputBindingType } from './input-binding.js';
+export { distillIncident, summarizeIncidents } from './incident-distiller.js';
+export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
+export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
+export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
 export * from './knowledge-provider.js';
-export { buildKnowledgeIndex, queryKnowledge, KnowledgeHintIndex } from './src/knowledge-index.js';
-export type { KnowledgeHint, KnowledgeQueryOptions } from './src/knowledge-index.js';
+export { buildKnowledgeIndex, buildScopedIndex, queryKnowledge, queryKnowledgeHybrid, clearKnowledgeEmbedCache, KnowledgeHintIndex, DEFAULT_SCOPE, computeScopeHash } from './src/knowledge-index.js';
+export type { KnowledgeHint, KnowledgeQueryOptions, KnowledgeScope } from './src/knowledge-index.js';
 
 // Networking
 export { secureFetch } from './network.js';
@@ -229,7 +236,7 @@ export {
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
-export { composeMissionTeamBrief } from './mission-team-brief-composer.js';
+export { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 
 // Domain Engines (Moved to @agent/shared-*)
 // export * as excelUtils from './excel-utils.js';
@@ -280,6 +287,47 @@ export * from './stimuli-journal.js';
 // Mission Status Guard
 export { isValidTransition, transitionStatus } from './mission-status.js';
 export type { MissionStatus } from './mission-status.js';
+
+// Gate Status Guard
+export { isValidGateTransition, transitionGateStatus } from './gate-status.js';
+export type { GateStatus } from './gate-status.js';
+
+// Storage Governance
+export {
+  scanTmp,
+  rotateLogs,
+  scanDataVault,
+  runJanitor,
+  DEFAULT_TMP_TTL_MS,
+  DEFAULT_LOG_RETENTION_DAYS,
+} from './storage-janitor.js';
+export type { JanitorReport, ScanTmpResult, RotateLogsResult, ScanDataVaultResult } from './storage-janitor.js';
+
+// Data Vault (external data source reference cache)
+export {
+  fetchWithVaultCache,
+  getVaultEntry,
+  invalidateVaultEntry,
+  listVaultEntries,
+} from './data-vault.js';
+export type { VaultEntry, FetchWithVaultCacheOptions, FetchWithVaultCacheResult, DataVaultTier, VaultEntryFilter } from './data-vault.js';
+
+// Process Logger (file-backed logger for long-running daemons)
+export { createProcessLogger, resetProcessLoggerRegistry, ProcessLogger } from './process-logger.js';
+export type { ProcessLogEntry, ProcessLogLevel, ProcessLoggerOptions } from './process-logger.js';
+
+// Service Engine (vault-cached variant)
+export type { ServicePresetCacheOptions } from './service-engine.js';
+export { executeServicePresetCached } from './service-engine.js';
+
+// Path helpers (log sub-directories)
+export {
+  sharedLogsAudit,
+  sharedLogsProcess,
+  sharedLogsSurfaces,
+  sharedLogsTraces,
+  missionAuditDir,
+} from './path-resolver.js';
 
 // A2UI Protocol
 export * from './a2ui.js';
@@ -844,3 +892,6 @@ export { Semaphore, llmSemaphore } from './semaphore.js';
 // Prompt constraints (Paper2Any pattern — reusable output constraint fragments)
 export { JSON_OUTPUT_CONSTRAINTS, JSON_OBJECT_CONSTRAINTS, JSON_ARRAY_CONSTRAINTS, jsonOutputConstraints, VALIDATOR_CHAIN_PATTERN } from './prompt-constraints.js';
 export type { ValidatorName } from './prompt-constraints.js';
+
+// BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
+export { markRouterActive, markRouterInactive, isRouterActive, resetRouterSync } from './blackhole-routing-guard.js';

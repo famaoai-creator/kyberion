@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import {
   mapMissionClassToMissionTypeTemplate,
   resolveMissionClassification,
@@ -7,6 +8,7 @@ import { resolveMissionWorkflowDesign, type MissionWorkflowDesign } from './miss
 import { resolveMissionReviewDesign, type MissionReviewDesign } from './mission-review-gates.js';
 import { composeMissionTeamPlan, type MissionTeamPlan } from './mission-team-plan-composer.js';
 import { inferMissingInputs, inferOptionalRoleHints, summarizeRequestText } from './mission-team-brief-utils.js';
+import { safeWriteFile, safeExistsSync, safeMkdir } from './secure-io.js';
 
 export interface MissionTeamCompositionBriefInput {
   missionId?: string;
@@ -34,6 +36,18 @@ export interface MissionTeamCompositionBrief {
   recommended_optional_roles: string[];
   missing_inputs: string[];
   rationale: string[];
+}
+
+/**
+ * Persist a composed brief to the mission's evidence directory.
+ * Returns the path of the written file.
+ */
+export function writeMissionTeamBrief(missionPath: string, brief: MissionTeamCompositionBrief): string {
+  const evidenceDir = path.join(missionPath, 'evidence');
+  if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
+  const targetPath = path.join(evidenceDir, 'team-composition-brief.json');
+  safeWriteFile(targetPath, JSON.stringify(brief, null, 2));
+  return targetPath;
 }
 
 export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput): MissionTeamCompositionBrief {
