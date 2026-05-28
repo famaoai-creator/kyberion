@@ -2,6 +2,7 @@ import {
   pathResolver,
   safeExistsSync,
   safeReadFile,
+  safeReaddir,
 } from "@agent/core/intelligence-primitives";
 
 export interface OrchestrationEventSummary {

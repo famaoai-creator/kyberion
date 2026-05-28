@@ -1,16 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@agent/core", () => ({
+vi.mock("@agent/core/intelligence-primitives", () => ({
   pathResolver: {
     resolve: vi.fn((logicalPath: string) => logicalPath),
-  },
-  ptyEngine: {
-    list: vi.fn(() => ["pty-1"]),
-    get: vi.fn(() => ({
-      status: "running",
-      lastUpdated: Date.UTC(2026, 2, 25, 0, 0, 0),
-      adapter: { pid: 9012 },
-    })),
   },
   safeExistsSync: vi.fn((target: string) =>
     target === "active/shared/runtime/computer/sessions" || target === "active/shared/runtime/browser/sessions",
@@ -47,6 +39,17 @@ vi.mock("@agent/core", () => ({
       action_trail_count: 4,
     });
   }),
+}));
+
+vi.mock("@agent/core/pty-engine", () => ({
+  ptyEngine: {
+    list: vi.fn(() => ["pty-1"]),
+    get: vi.fn(() => ({
+      status: "running",
+      lastUpdated: Date.UTC(2026, 2, 25, 0, 0, 0),
+      adapter: { pid: 9012 },
+    })),
+  },
 }));
 
 describe("Chronos computer sessions", () => {

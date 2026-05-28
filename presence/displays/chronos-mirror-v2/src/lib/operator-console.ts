@@ -62,6 +62,15 @@ export interface OperatorViewLink {
   detail: string;
 }
 
+export interface OperatorScenarioPreset {
+  label: string;
+  targetId: string;
+  detail: string;
+  actionLabel: string;
+  surface: "mission-intelligence" | "focused-operator";
+  nextStep: string;
+}
+
 export const SURFACE_ROLES: SurfaceRole[] = [
   {
     label: "Command Surface",
@@ -134,6 +143,70 @@ export const OPERATOR_VIEW_LINKS: OperatorViewLink[] = [
     label: "Audit Trail",
     targetId: "owner-summaries",
     detail: "Review recent control and ownership history.",
+  },
+  {
+    label: "Trace Viewer",
+    targetId: "trace-viewer",
+    detail: "Inspect pipeline and actuator execution traces. Download OTel-compatible JSON.",
+  },
+];
+
+export const OPERATOR_SCENARIO_PRESETS: OperatorScenarioPreset[] = [
+  {
+    label: "Review blockers",
+    targetId: "needs-attention",
+    detail: "See blockers.",
+    actionLabel: "Open blockers",
+    surface: "mission-intelligence",
+    nextStep: "Open the top blocker, then branch to mission, runtime, or delivery.",
+  },
+  {
+    label: "Start a mission",
+    targetId: "mission-control-plane",
+    detail: "Open mission control.",
+    actionLabel: "Open mission control",
+    surface: "mission-intelligence",
+    nextStep: "Check the queue, then open the mission that needs attention.",
+  },
+  {
+    label: "Check runtime health",
+    targetId: "runtime-lease-doctor",
+    detail: "Check runtimes.",
+    actionLabel: "Review governance",
+    surface: "mission-intelligence",
+    nextStep: "Read the doctor first, then remediate only if needed.",
+  },
+  {
+    label: "Inspect delivery",
+    targetId: "recent-surface-outbox",
+    detail: "Check delivery.",
+    actionLabel: "Open delivery",
+    surface: "mission-intelligence",
+    nextStep: "Inspect the outbox and clear only what is stuck.",
+  },
+  {
+    label: "Investigate traces",
+    targetId: "trace-viewer",
+    detail: "Jump to traces.",
+    actionLabel: "Open trace viewer",
+    surface: "focused-operator",
+    nextStep: "Filter by error, then open raw trace if needed.",
+  },
+  {
+    label: "Review sessions",
+    targetId: "computer-sessions",
+    detail: "Check sessions.",
+    actionLabel: "Open sessions",
+    surface: "focused-operator",
+    nextStep: "Pick the live browser or terminal context before intervening.",
+  },
+  {
+    label: "Handle approvals",
+    targetId: "secret-approval-queue",
+    detail: "Review approvals.",
+    actionLabel: "Open approvals",
+    surface: "mission-intelligence",
+    nextStep: "Confirm the request, then review the pending roles.",
   },
 ];
 
