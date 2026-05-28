@@ -48,6 +48,7 @@ describe('Runtime surface operations contract', () => {
     expect(surfaceRuntime).toContain('diagnostics');
     expect(surfaceRuntime).toContain('lastKnownState');
     expect(surfaceRuntime).toContain('repairHint');
+    expect(surfaceRuntime).toContain('nextAction');
     expect(surfaceRuntime).toContain("case 'repair'");
     expect(lifecycleModel).toContain('Waited for background terminal');
     expect(lifecycleModel).toContain('active/shared/runtime/surfaces/state.json');
