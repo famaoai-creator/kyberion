@@ -108,6 +108,17 @@ export { distillIncident, summarizeIncidents } from './incident-distiller.js';
 export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
 export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
 export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
+export {
+  buildNextAction,
+  buildNextActionFromError,
+  formatNextAction,
+} from './next-action.js';
+export type {
+  BuildNextActionInput,
+  ErrorNextActionContext,
+  NextAction,
+  NextActionType,
+} from './next-action.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
