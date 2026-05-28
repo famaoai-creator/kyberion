@@ -1,57 +1,75 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { logger } from '@agent/core';
+import { buildNextAction, formatNextAction, logger } from '@agent/core';
 import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';
-import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report.js';
+import { formatSetupSummaryLine } from './setup-report.js';
 
 type SetupPersona = 'operator' | 'first-time-user';
 
-export async function runSetupReport(): Promise<{
+type SetupReport = {
   surfaces: Awaited<ReturnType<typeof setupSurfaces>>;
   services: Awaited<ReturnType<typeof setupServices>>;
   reasoning: { must: number; should: number; nice: number };
   doctor: Awaited<ReturnType<typeof collectDoctorReport>>;
-}> {
+  nextActions: ReturnType<typeof buildNextAction>[];
+};
+
+export async function runSetupReport(): Promise<SetupReport> {
   return runSetupReportWithPersona({});
 }
 
 export async function runSetupReportWithPersona(options: {
   persona?: SetupPersona;
-}): Promise<{
-  surfaces: Awaited<ReturnType<typeof setupSurfaces>>;
-  services: Awaited<ReturnType<typeof setupServices>>;
-  reasoning: { must: number; should: number; nice: number };
-  doctor: Awaited<ReturnType<typeof collectDoctorReport>>;
-}> {
+}): Promise<SetupReport> {
   const quiet = options.persona === 'first-time-user';
   const surfaces = await setupSurfaces({ quiet });
   const services = await setupServices({ quiet });
   const reasoning = await runReasoningSetup();
   const doctor = await collectDoctorReport({});
 
-  return { surfaces, services, reasoning, doctor };
+  const nextActions = buildFirstTimeUserNextActions({ surfaces, services, doctor });
+
+  return { surfaces, services, reasoning, doctor, nextActions };
 }
 
-function buildFirstTimeUserHints(report: Awaited<ReturnType<typeof runSetupReportWithPersona>>): string[] {
-  const hints: string[] = [];
-  if (report.surfaces.summary.missing > 0) {
-    hints.push(formatSetupHintLine('Run `pnpm surfaces:setup` to inspect missing surface auth and enablement.'));
-  }
+function buildFirstTimeUserNextActions(report: SetupReport): Array<ReturnType<typeof buildNextAction>> {
+  const actions: Array<ReturnType<typeof buildNextAction>> = [];
   if (report.surfaces.summary.missing > 0 || report.surfaces.summary.disabled > 0) {
-    hints.push(formatSetupHintLine('Run `pnpm surfaces:reconcile` after fixing any surface auth or manifest issues.'));
+    actions.push(buildNextAction({
+      title: 'Reconcile surface readiness',
+      reason: `${report.surfaces.summary.missing} surface auth gaps and ${report.surfaces.summary.disabled} disabled surfaces need attention.`,
+      next_action_type: 'run_command',
+      suggested_command: 'pnpm surfaces:reconcile',
+    }));
   }
   if (report.services.summary.authMissing > 0 || report.services.summary.connectionMissing > 0) {
-    hints.push(formatSetupHintLine('See `docs/user/TROUBLESHOOTING.md` for service auth and connection recovery steps.'));
+    actions.push(buildNextAction({
+      title: 'Repair service setup',
+      reason: `${report.services.summary.authMissing} services are missing auth and ${report.services.summary.connectionMissing} are missing connections.`,
+      next_action_type: 'bootstrap_environment',
+      suggested_command: 'pnpm services:setup',
+    }));
   }
-  if (report.doctor.totalMissing > 0) {
-    hints.push(formatSetupHintLine('Run `pnpm doctor` for the canonical readiness gate.'));
+  const doctorSummary = report.doctor.summaries.find((summary) => summary.counts.must + summary.counts.should > 0);
+  if (doctorSummary) {
+    actions.push(buildNextAction({
+      title: `Bootstrap ${doctorSummary.manifestId}`,
+      reason: `Doctor reports ${doctorSummary.counts.must} must and ${doctorSummary.counts.should} should gaps.`,
+      next_action_type: 'bootstrap_environment',
+      suggested_command: `pnpm env:bootstrap --manifest ${doctorSummary.manifestId} --apply`,
+    }));
   }
-  if (hints.length === 0) {
-    hints.push(formatSetupHintLine('Everything looks ready. Re-run `pnpm setup:report` after you make changes.'));
+  if (actions.length === 0) {
+    actions.push(buildNextAction({
+      title: 'Re-run setup report after changes',
+      reason: 'Everything looks ready right now.',
+      next_action_type: 'inspect_artifact',
+      suggested_command: 'pnpm setup:report',
+    }));
   }
-  return hints.slice(0, 4);
+  return actions.slice(0, 4);
 }
 
 async function main(): Promise<void> {
@@ -77,9 +95,11 @@ async function main(): Promise<void> {
   ]));
 
   if (argv.persona === 'first-time-user') {
-    console.log('First-time user next steps:');
-    for (const hint of buildFirstTimeUserHints(report)) {
-      console.log(hint);
+    console.log('First-time user next actions:');
+    for (const action of report.nextActions) {
+      for (const line of formatNextAction(action)) {
+        console.log(line);
+      }
     }
   } else if (report.doctor.summaries.length > 0) {
     console.log('Doctor detail:');
