@@ -17,7 +17,7 @@ describe('Telegram bridge contract', () => {
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
 
     expect(pkg.scripts['telegram:bridge']).toBe('node dist/satellites/telegram-bridge/src/index.js');
-    expect(pkg.scripts['telegram:demo']).toBe('pnpm exec tsx scripts/demo_telegram_flow.ts');
+    expect(pkg.scripts['telegram:demo']).toBe('pnpm exec tsx scripts/demos/demo_telegram_flow.ts');
     expect(manifests).toContain('"id": "telegram"');
     expect(manifests).toContain('"agentId": "telegram-surface-agent"');
     expect(activeSurfaces).toContain('"id": "telegram-bridge"');
@@ -27,7 +27,7 @@ describe('Telegram bridge contract', () => {
   });
 
   it('simulates telegram conversation through the surface conversation model', () => {
-    const demo = read('scripts/demo_telegram_flow.ts');
+    const demo = read('scripts/demos/demo_telegram_flow.ts');
     expect(demo).toContain("surface: 'telegram'");
     expect(demo).toContain("senderAgentId: 'kyberion:telegram-bridge'");
     expect(demo).toContain("agentId: 'telegram-surface-agent'");

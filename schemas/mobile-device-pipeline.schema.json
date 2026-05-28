@@ -44,6 +44,12 @@
               "wait_for_ui_node",
               "authenticate_with_passkey",
               "emit_session_handoff",
+              "android_cli_health_check",
+              "android_cli_layout",
+              "android_cli_screen_capture",
+              "android_cli_screen_resolve",
+              "android_cli_describe",
+              "android_cli_docs_search",
               "log"
             ]
           },

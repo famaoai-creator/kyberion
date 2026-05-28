@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeExec, createStandardYargs, pathResolver, ledger, classifyError, withRetry } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, createStandardYargs, pathResolver, ledger, classifyError, withRetry, safeExistsSync, safeMkdir } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
  */
 
 const SECRET_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/secret-actuator/manifest.json');
+const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
+
 const DEFAULT_SECRET_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -18,10 +20,53 @@ const DEFAULT_SECRET_RETRY = {
 
 let cachedRecoveryPolicy: Record<string, any> | null = null;
 
+interface RegistryEntry {
+  service: string;
+  account: string;
+  addedAt: string;
+}
+
+interface KeychainRegistry {
+  entries: RegistryEntry[];
+}
+
+function loadRegistry(): KeychainRegistry {
+  if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
+  try {
+    return JSON.parse(safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string) as KeychainRegistry;
+  } catch {
+    return { entries: [] };
+  }
+}
+
+function saveRegistry(registry: KeychainRegistry): void {
+  const dir = path.dirname(KEYCHAIN_REGISTRY_PATH);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(registry, null, 2));
+}
+
+function registryAdd(service: string, account: string): void {
+  const registry = loadRegistry();
+  const existing = registry.entries.findIndex(e => e.service === service && e.account === account);
+  const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
+  if (existing >= 0) {
+    registry.entries[existing] = entry;
+  } else {
+    registry.entries.push(entry);
+  }
+  saveRegistry(registry);
+}
+
+function registryRemove(service: string, account: string): void {
+  const registry = loadRegistry();
+  registry.entries = registry.entries.filter(e => !(e.service === service && e.account === account));
+  saveRegistry(registry);
+}
+
 interface SecretAction {
   action: 'get' | 'set' | 'delete' | 'list';
   params: {
-    account: string;
+    account?: string;
     service: string;
     value?: string;
     export_as?: string;
@@ -124,11 +169,13 @@ async function handleAction(input: SecretAction) {
 
   switch (input.action) {
     case 'get': return await getSecret(input.params, platform);
-    case 'set': 
+    case 'set':
       return await withGovernedMutation('set', input.params, platform, () => setSecret(input.params, platform));
-    case 'delete': 
+    case 'delete':
       return await withGovernedMutation('delete', input.params, platform, () => deleteSecret(input.params, platform));
-    default: throw new Error(`Unsupported secret action: ${input.action}`);
+    case 'list':
+      return listSecrets(input.params);
+    default: throw new Error(`Unsupported secret action: ${(input as any).action}`);
   }
 }
 
@@ -147,16 +194,18 @@ async function getSecret(params: any, platform: string) {
 
 async function setSecret(params: any, platform: string) {
   if (!params.value) throw new Error('Value is required for "set" action.');
-  
+  if (!params.account) throw new Error('Account is required for "set" action.');
+
   if (platform === 'darwin') {
     try {
       // First try to delete existing to avoid duplicates/errors
       try {
         await withRetry(async () => safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]), buildRetryOptions());
       } catch(_) {}
-      
+
       // macOS Keychain: security add-generic-password -a <account> -s <service> -w <value>
       await withRetry(async () => safeExec('security', ['add-generic-password', '-a', params.account, '-s', params.service, '-w', params.value]), buildRetryOptions());
+      registryAdd(params.service, params.account);
       return { status: 'success', message: 'Secret stored in macOS Keychain.' };
     } catch (err: any) {
       return { status: 'failed', error: err.message };
@@ -166,15 +215,26 @@ async function setSecret(params: any, platform: string) {
 }
 
 async function deleteSecret(params: any, platform: string) {
+  if (!params.account) throw new Error('Account is required for "delete" action.');
+
   if (platform === 'darwin') {
     try {
       await withRetry(async () => safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]), buildRetryOptions());
+      registryRemove(params.service, params.account);
       return { status: 'success', message: 'Secret deleted from macOS Keychain.' };
     } catch (err: any) {
       return { status: 'failed', error: err.message };
     }
   }
   throw new Error(`Platform ${platform} not supported for 'delete' secret yet.`);
+}
+
+function listSecrets(params: { service: string }): { status: string; entries: RegistryEntry[] } {
+  const registry = loadRegistry();
+  const entries = params.service
+    ? registry.entries.filter(e => e.service === params.service)
+    : registry.entries;
+  return { status: 'success', entries };
 }
 
 const main = async () => {
