@@ -23,6 +23,7 @@
   ],
   "policy_refs": [
     "knowledge/public/architecture/capability-lifecycle-eligibility-checklist.md",
+    "knowledge/public/governance/capability-admission-policy.json",
     "knowledge/public/governance/provider-capability-scan-policy.json",
     "knowledge/public/governance/surface-provider-manifests.json",
     "knowledge/public/governance/execution-receipt-policy.json"

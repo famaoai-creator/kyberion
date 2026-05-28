@@ -74,6 +74,7 @@ pnpm onboard
 - **補助コマンド**:
   - `pnpm surfaces:reconcile` で setup 結果をもとに background surface を標準起動します。
   - `pnpm surfaces:status` で起動状態を確認できます。
+  - `pnpm surfaces:repair -- --surface <surface-id>` で stale / unhealthy な surface を再起動できます。
   - `pnpm surfaces:start -- --surface <surface-id>` で個別 surface を開始できます。
   - `pnpm surfaces:stop -- --surface <surface-id>` で個別 surface を停止できます。
 

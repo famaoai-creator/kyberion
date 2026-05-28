@@ -1,7 +1,7 @@
 {
   "v": "1.0.0",
-  "t": 2,
-  "u": "2026-05-09T14:32:46.629Z",
+  "t": 1,
+  "u": "2026-05-28T15:33:15.072Z",
   "components": [
     {
       "name": "daemon-actuator",
@@ -9,13 +9,6 @@
       "status": "legacy-review",
       "package_based": false,
       "rationale": "Launchd-era runtime management overlaps with surface-runtime and managed process supervision."
-    },
-    {
-      "name": "physical-bridge",
-      "path": "libs/actuators/physical-bridge",
-      "status": "legacy-review",
-      "package_based": false,
-      "rationale": "Thin wrapper that shells into browser/system actuators and writes temp files instead of expressing the flow directly as ADF."
     }
   ]
 }
