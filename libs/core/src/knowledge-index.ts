@@ -1,13 +1,28 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import * as pathResolver from '../path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+  safeMkdir,
+} from '../secure-io.js';
+import {
+  getEmbeddingBackend,
+  cosineSimilarity,
+  reciprocalRankFusion,
+} from '../embedding-backend.js';
 
 /**
- * Reactive Knowledge Index v1.0
+ * Reactive Knowledge Index v3.0
  *
- * Provides a lightweight in-memory index of knowledge hints that actuators
- * can query at execution time. Built from structured JSON hint files and
- * markdown procedure titles.
+ * v3 changes over v2:
+ * - KnowledgeScope: declare which tiers/domains/tags to index per intent
+ * - buildScopedIndex(): scope-keyed disk cache + multi-tier scanning
+ *   (public / confidential / personal + customer overlay)
+ * - Per-index embedCache (Map on KnowledgeHintIndex) — no module-level sharing
+ * - buildKnowledgeIndex() remains as a backward-compat alias for public-only scope
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -15,121 +30,461 @@ import { safeExistsSync, safeReadFile, safeReaddir } from '../secure-io.js';
 export interface KnowledgeHint {
   topic: string;
   hint: string;
-  source: string;       // file path relative to knowledge/
-  confidence: number;   // 0-1
+  source: string;
+  confidence: number;
   tags?: string[];
+  tier?: 'public' | 'confidential' | 'personal';
+  customerId?: string;
 }
 
 export interface KnowledgeQueryOptions {
-  actuator?: string;    // filter by actuator relevance
-  op?: string;          // filter by operation
-  maxResults?: number;  // default 5
+  actuator?: string;
+  op?: string;
+  maxResults?: number;
 }
 
-// ─── Index Class ─────────────────────────────────────────────────────────────
+/**
+ * Declares the knowledge space a pipeline/intent is allowed to access.
+ *
+ * The scope hash becomes the disk-cache key:
+ *   active/shared/cache/ki-{scopeHash}.json
+ *
+ * Same scope across missions → shared cached vectors.
+ * Different tiers/customer → different file → isolation guaranteed.
+ */
+export interface KnowledgeScope {
+  /** Which tiers to scan. Order is irrelevant; results are merged. */
+  tiers: Array<'public' | 'confidential' | 'personal'>;
+  /**
+   * Restrict 'confidential' scanning to one customer subdirectory.
+   * Also activates customer/ overlay for 'personal' tier.
+   * If omitted with tier='confidential', all subdirs are scanned.
+   */
+  customerId?: string;
+  /**
+   * Limit to these Tier-1 domain subdirectories under each tier root.
+   * Defaults to TIER1_SUBDIRS (all).
+   */
+  domains?: string[];
+  /**
+   * Pre-filter: only index documents whose tags overlap this set.
+   * Reduces embedding corpus for focused intents.
+   */
+  filterTags?: string[];
+  /**
+   * Embedding model name — included in the cache key so that switching
+   * models automatically invalidates cached vectors.
+   */
+  embeddingModel?: string;
+}
+
+export const DEFAULT_SCOPE: KnowledgeScope = { tiers: ['public'] };
+
+// ─── Index class ─────────────────────────────────────────────────────────────
 
 export class KnowledgeHintIndex {
   readonly hints: KnowledgeHint[];
   readonly builtAt: string;
+  readonly scope?: KnowledgeScope;
+  /** Per-instance embedding cache. Isolated per scope — no cross-tier leakage. */
+  readonly embedCache: Map<string, Float32Array>;
 
-  constructor(hints: KnowledgeHint[]) {
+  constructor(hints: KnowledgeHint[], scope?: KnowledgeScope) {
     this.hints = hints;
     this.builtAt = new Date().toISOString();
+    this.scope = scope;
+    this.embedCache = new Map();
   }
 }
 
-// ─── Build Index ─────────────────────────────────────────────────────────────
+// ─── Module-level cache (legacy — kept for clearKnowledgeEmbedCache compat) ──
+const _embedCache = new Map<string, Float32Array>();
+
+export function clearKnowledgeEmbedCache(): void {
+  _embedCache.clear();
+}
+
+// ─── Disk-cache helpers ───────────────────────────────────────────────────────
+
+interface DiskCacheEntry {
+  source: string;
+  textHash: string;
+  vector: number[];
+}
+
+interface DiskCache {
+  scopeHash: string;
+  model: string;
+  builtAt: string;
+  entries: DiskCacheEntry[];
+}
+
+export function computeScopeHash(scope: KnowledgeScope, modelName?: string): string {
+  const key = JSON.stringify({
+    tiers: [...scope.tiers].sort(),
+    customerId: scope.customerId ?? null,
+    domains: scope.domains ? [...scope.domains].sort() : null,
+    filterTags: scope.filterTags ? [...scope.filterTags].sort() : null,
+    model: scope.embeddingModel ?? modelName ?? 'default',
+  });
+  return createHash('sha256').update(key).digest('hex').slice(0, 16);
+}
+
+function computeTextHash(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 12);
+}
+
+function cacheFilePath(scopeHash: string): string {
+  const root = path.dirname(pathResolver.knowledge());
+  return path.join(root, 'active', 'shared', 'cache', `ki-${scopeHash}.json`);
+}
+
+function loadDiskCache(scopeHash: string): Map<string, { textHash: string; vector: Float32Array }> {
+  const result = new Map<string, { textHash: string; vector: Float32Array }>();
+  const filePath = cacheFilePath(scopeHash);
+  if (!safeExistsSync(filePath)) return result;
+  try {
+    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const cache: DiskCache = JSON.parse(raw);
+    for (const entry of cache.entries) {
+      result.set(entry.source, {
+        textHash: entry.textHash,
+        vector: new Float32Array(entry.vector),
+      });
+    }
+  } catch {
+    // Corrupt or unreadable cache — ignore, will rebuild
+  }
+  return result;
+}
+
+function saveDiskCache(scopeHash: string, modelName: string, entries: DiskCacheEntry[]): void {
+  const filePath = cacheFilePath(scopeHash);
+  try {
+    const dir = path.dirname(filePath);
+    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    const cache: DiskCache = {
+      scopeHash,
+      model: modelName,
+      builtAt: new Date().toISOString(),
+      entries,
+    };
+    safeWriteFile(filePath, JSON.stringify(cache));
+  } catch {
+    // Cache write failure is non-fatal
+  }
+}
+
+// ─── Tier-1 subdirectories (public default) ───────────────────────────────────
+
+const TIER1_SUBDIRS = [
+  'procedures',
+  'architecture',
+  'design-patterns',
+  'external-wisdom',
+  'nonfunctional',
+  'organization',
+];
+
+// ─── Scope-aware index builder ────────────────────────────────────────────────
 
 /**
- * Build an in-memory index of knowledge hints from:
- * 1. knowledge/public/procedures/hints/*.json (structured hints)
- * 2. Frontmatter/titles from knowledge/public/procedures/**\/*.md
+ * Build an in-memory knowledge index for the given scope.
+ *
+ * 1. Scans the declared tier directories for hints (fast, always runs).
+ * 2. Loads matching vectors from the scope-keyed disk cache.
+ * 3. If an EmbeddingBackend is available, eagerly embeds uncached hints
+ *    and writes the updated cache back to disk.
+ *
+ * Isolation: each (tiers × customerId × domains × model) combination maps to
+ * a distinct cache file, so confidential vectors never share storage with
+ * public-only indexes.
  */
-export async function buildKnowledgeIndex(rootDir?: string): Promise<KnowledgeHintIndex> {
+export async function buildScopedIndex(
+  scope: KnowledgeScope = DEFAULT_SCOPE,
+  rootDir?: string,
+): Promise<KnowledgeHintIndex> {
   const knowledgeBase = rootDir || pathResolver.knowledge();
   const hints: KnowledgeHint[] = [];
 
-  // 1. Load structured JSON hint files
-  const hintsDir = path.join(knowledgeBase, 'public/procedures/hints');
-  if (safeExistsSync(hintsDir)) {
-    const files = safeReaddir(hintsDir);
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      const filePath = path.join(hintsDir, file);
-      try {
-        const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-        const parsed = JSON.parse(content);
-        const entries: any[] = Array.isArray(parsed) ? parsed : [parsed];
-        const relSource = path.relative(knowledgeBase, filePath);
-        for (const entry of entries) {
-          if (entry.topic && entry.hint) {
-            hints.push({
-              topic: entry.topic,
-              hint: entry.hint,
-              source: relSource,
-              confidence: typeof entry.confidence === 'number' ? entry.confidence : 0.5,
-              tags: Array.isArray(entry.tags) ? entry.tags : undefined,
-            });
-          }
-        }
-      } catch (_) {
-        // Skip malformed files silently
-      }
+  const domains = scope.domains ?? TIER1_SUBDIRS;
+
+  for (const tier of scope.tiers) {
+    switch (tier) {
+      case 'public':
+        _scanPublicTier(knowledgeBase, domains, hints);
+        break;
+      case 'confidential':
+        _scanConfidentialTier(knowledgeBase, domains, scope.customerId, hints);
+        break;
+      case 'personal':
+        _scanPersonalTier(knowledgeBase, domains, scope.customerId, hints);
+        break;
     }
   }
 
-  // 2. Extract titles from markdown procedure files
-  const proceduresDir = path.join(knowledgeBase, 'public/procedures');
-  if (safeExistsSync(proceduresDir)) {
-    scanMarkdownHints(proceduresDir, knowledgeBase, hints);
-  }
+  // Apply tag pre-filter after scanning (cheaper than per-file filter)
+  const filteredHints = scope.filterTags?.length
+    ? hints.filter(h =>
+        h.tags?.some(t => scope.filterTags!.includes(t))
+      )
+    : hints;
 
-  return new KnowledgeHintIndex(hints);
+  const index = new KnowledgeHintIndex(filteredHints, scope);
+
+  await _hydrateEmbedCache(index, scope);
+
+  return index;
 }
 
 /**
- * Recursively scan a directory for .md files and extract title-based hints.
+ * Backward-compat alias — builds a public-only index (v2 behaviour).
+ * Passes rootDir through for test injection.
  */
-function scanMarkdownHints(dir: string, knowledgeBase: string, hints: KnowledgeHint[]): void {
-  let entries: string[];
-  try {
-    entries = safeReaddir(dir);
-  } catch (_) {
-    return;
+export async function buildKnowledgeIndex(rootDir?: string): Promise<KnowledgeHintIndex> {
+  return buildScopedIndex(DEFAULT_SCOPE, rootDir);
+}
+
+// ─── Embedding cache hydration ────────────────────────────────────────────────
+
+async function _hydrateEmbedCache(index: KnowledgeHintIndex, scope: KnowledgeScope): Promise<void> {
+  const backend = getEmbeddingBackend();
+  const modelName = backend?.name ?? 'none';
+  const scopeHash = computeScopeHash(scope, modelName);
+
+  const diskCache = loadDiskCache(scopeHash);
+
+  const toEmbed: KnowledgeHint[] = [];
+  const upToDate: DiskCacheEntry[] = [];
+
+  for (const hint of index.hints) {
+    const text = _corpusText(hint);
+    const textHash = computeTextHash(text);
+    const cached = diskCache.get(hint.source);
+
+    if (cached && cached.textHash === textHash) {
+      index.embedCache.set(hint.source, cached.vector);
+      upToDate.push({ source: hint.source, textHash, vector: Array.from(cached.vector) });
+    } else {
+      toEmbed.push(hint);
+    }
   }
+
+  if (toEmbed.length === 0 || !backend) return;
+
+  try {
+    const vectors = await backend.embedBatch(toEmbed.map(_corpusText));
+    const newEntries: DiskCacheEntry[] = [];
+    toEmbed.forEach((hint, i) => {
+      index.embedCache.set(hint.source, vectors[i]);
+      newEntries.push({
+        source: hint.source,
+        textHash: computeTextHash(_corpusText(hint)),
+        vector: Array.from(vectors[i]),
+      });
+    });
+
+    // Persist merged cache (up-to-date + newly embedded)
+    saveDiskCache(scopeHash, modelName, [...upToDate, ...newEntries]);
+  } catch {
+    // Silent — index still usable for lexical search
+  }
+}
+
+// ─── Tier scanners ────────────────────────────────────────────────────────────
+
+function _scanPublicTier(
+  knowledgeBase: string,
+  domains: string[],
+  hints: KnowledgeHint[],
+): void {
+  // Structured JSON hints
+  const hintsDir = path.join(knowledgeBase, 'public/procedures/hints');
+  if (safeExistsSync(hintsDir)) {
+    _loadJsonHints(hintsDir, knowledgeBase, 'public', undefined, hints);
+  }
+
+  // Markdown hints across Tier-1 domains
+  for (const domain of domains) {
+    const dir = path.join(knowledgeBase, 'public', domain);
+    if (safeExistsSync(dir)) {
+      _scanMarkdownHints(dir, knowledgeBase, 'public', undefined, hints);
+    }
+  }
+}
+
+function _scanConfidentialTier(
+  knowledgeBase: string,
+  domains: string[],
+  customerId: string | undefined,
+  hints: KnowledgeHint[],
+): void {
+  const confidentialRoot = path.join(knowledgeBase, 'confidential');
+  if (!safeExistsSync(confidentialRoot)) return;
+
+  let customerDirs: string[];
+  if (customerId) {
+    customerDirs = [customerId];
+  } else {
+    try {
+      customerDirs = safeReaddir(confidentialRoot).filter(e => !e.startsWith('.'));
+    } catch {
+      return;
+    }
+  }
+
+  for (const cid of customerDirs) {
+    const cidRoot = path.join(confidentialRoot, cid);
+    if (!safeExistsSync(cidRoot)) continue;
+
+    // Confidential dirs have customer-specific structures (design/, financials/,
+    // browser-workflows/, etc.) that don't follow public's Tier-1 layout.
+    // Always scan the full customer root; `domains` acts as an allowlist only
+    // when the caller explicitly wants to narrow to Tier-1-named subdirs.
+    if (domains !== TIER1_SUBDIRS) {
+      // Explicit domain filter: only scan matching subdirs
+      for (const domain of domains) {
+        const dir = path.join(cidRoot, domain);
+        if (safeExistsSync(dir)) {
+          _scanMarkdownHints(dir, knowledgeBase, 'confidential', cid, hints);
+        }
+      }
+    } else {
+      // Default (no explicit filter): scan the full customer root recursively
+      _scanMarkdownHints(cidRoot, knowledgeBase, 'confidential', cid, hints);
+    }
+  }
+}
+
+function _scanPersonalTier(
+  knowledgeBase: string,
+  domains: string[],
+  customerId: string | undefined,
+  hints: KnowledgeHint[],
+): void {
+  // Customer overlay: customer/{slug}/ takes precedence over knowledge/personal/
+  const customerSlug = customerId ?? process.env.KYBERION_CUSTOMER?.trim() ?? '';
+  const projectRoot = path.dirname(knowledgeBase);
+
+  const roots: Array<{ dir: string; label: string }> = [];
+  if (customerSlug) {
+    const customerDir = path.join(projectRoot, 'customer', customerSlug);
+    if (safeExistsSync(customerDir)) {
+      roots.push({ dir: customerDir, label: customerSlug });
+    }
+  }
+  const personalDir = path.join(knowledgeBase, 'personal');
+  if (safeExistsSync(personalDir)) {
+    roots.push({ dir: personalDir, label: 'personal' });
+  }
+
+  // Deduplicate: skip a source path that already appeared from a higher-priority root
+  const seenSources = new Set<string>();
+
+  for (const { dir } of roots) {
+    const tempHints: KnowledgeHint[] = [];
+    _scanMarkdownHints(dir, knowledgeBase, 'personal', customerId, tempHints);
+    for (const hint of tempHints) {
+      if (!seenSources.has(hint.source)) {
+        seenSources.add(hint.source);
+        hints.push(hint);
+      }
+    }
+  }
+}
+
+// ─── Low-level scanners ───────────────────────────────────────────────────────
+
+function _loadJsonHints(
+  dir: string,
+  knowledgeBase: string,
+  tier: 'public' | 'confidential' | 'personal',
+  customerId: string | undefined,
+  hints: KnowledgeHint[],
+): void {
+  let files: string[];
+  try { files = safeReaddir(dir); } catch { return; }
+
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const filePath = path.join(dir, file);
+    try {
+      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const parsed = JSON.parse(content);
+      const entries: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+      const relSource = path.relative(knowledgeBase, filePath);
+      for (const entry of entries) {
+        if (
+          entry !== null &&
+          typeof entry === 'object' &&
+          'topic' in entry &&
+          'hint' in entry &&
+          typeof (entry as Record<string, unknown>).topic === 'string' &&
+          typeof (entry as Record<string, unknown>).hint === 'string'
+        ) {
+          const e = entry as Record<string, unknown>;
+          hints.push({
+            topic: e.topic as string,
+            hint: e.hint as string,
+            source: relSource,
+            confidence: typeof e.confidence === 'number' ? (e.confidence as number) : 0.5,
+            tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
+            tier,
+            ...(customerId ? { customerId } : {}),
+          });
+        }
+      }
+    } catch {
+      // Skip malformed files
+    }
+  }
+}
+
+function _scanMarkdownHints(
+  dir: string,
+  knowledgeBase: string,
+  tier: 'public' | 'confidential' | 'personal',
+  customerId: string | undefined,
+  hints: KnowledgeHint[],
+): void {
+  let entries: string[];
+  try { entries = safeReaddir(dir); } catch { return; }
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry);
 
-    // Skip the hints directory (already processed as JSON)
-    if (entry === 'hints') continue;
+    if (entry === 'hints') continue; // Already handled as JSON
 
     if (entry.endsWith('.md')) {
       try {
         const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
-        const title = extractMarkdownTitle(content, entry);
+        const title = _extractMarkdownTitle(content, entry);
         if (title) {
           const relSource = path.relative(knowledgeBase, fullPath);
-          const tags = extractFrontmatterTags(content);
+          const tags = _extractFrontmatterTags(content);
+          const excerpt = _extractFirstParagraph(content);
           hints.push({
             topic: title,
-            hint: `Procedure document: ${title}. See ${relSource} for details.`,
+            hint: excerpt
+              ? `${title}. ${excerpt.slice(0, 200)}`
+              : `See ${relSource} for details.`,
             source: relSource,
             confidence: 0.6,
             tags,
+            tier,
+            ...(customerId ? { customerId } : {}),
           });
         }
-      } catch (_) {
+      } catch {
         // Skip unreadable files
       }
     } else if (!entry.startsWith('.') && !entry.includes('.')) {
       // Likely a subdirectory — recurse
       if (safeExistsSync(fullPath)) {
         try {
-          // Check if it's a directory by trying to readdir
           safeReaddir(fullPath);
-          scanMarkdownHints(fullPath, knowledgeBase, hints);
-        } catch (_) {
+          _scanMarkdownHints(fullPath, knowledgeBase, tier, customerId, hints);
+        } catch {
           // Not a directory, skip
         }
       }
@@ -137,26 +492,17 @@ function scanMarkdownHints(dir: string, knowledgeBase: string, hints: KnowledgeH
   }
 }
 
-/**
- * Extract the first heading or frontmatter title from a markdown file.
- */
-function extractMarkdownTitle(content: string, filename: string): string {
-  // Try frontmatter title
+// ─── Markdown helpers ─────────────────────────────────────────────────────────
+
+function _extractMarkdownTitle(content: string, filename: string): string {
   const fmMatch = content.match(/^---\n[\s\S]*?title:\s*["']?(.+?)["']?\s*\n[\s\S]*?---/m);
   if (fmMatch) return fmMatch[1].trim();
-
-  // Try first H1
   const h1Match = content.match(/^#\s+(.+)$/m);
   if (h1Match) return h1Match[1].trim();
-
-  // Fallback to filename
   return filename.replace(/\.md$/, '').replace(/[-_]/g, ' ');
 }
 
-/**
- * Extract tags from YAML frontmatter.
- */
-function extractFrontmatterTags(content: string): string[] | undefined {
+function _extractFrontmatterTags(content: string): string[] | undefined {
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
   if (!fmMatch) return undefined;
 
@@ -164,8 +510,6 @@ function extractFrontmatterTags(content: string): string[] | undefined {
   if (tagsMatch) {
     return tagsMatch[1].split(',').map(t => t.trim().replace(/["']/g, '')).filter(Boolean);
   }
-
-  // YAML list style tags
   const listTagsMatch = fmMatch[1].match(/tags:\s*\n((?:\s*-\s*.+\n?)*)/);
   if (listTagsMatch) {
     return listTagsMatch[1]
@@ -173,18 +517,27 @@ function extractFrontmatterTags(content: string): string[] | undefined {
       .map(line => line.replace(/^\s*-\s*/, '').trim())
       .filter(Boolean);
   }
-
   return undefined;
 }
 
-// ─── Query ───────────────────────────────────────────────────────────────────
+function _extractFirstParagraph(content: string): string {
+  const bodyStart = content.startsWith('---\n') ? content.indexOf('\n---\n', 4) + 5 : 0;
+  const body = content.slice(bodyStart).trim();
+  for (const block of body.split('\n\n')) {
+    const t = block.trim();
+    if (t && !t.startsWith('#') && !t.startsWith('---')) return t.replace(/\s+/g, ' ');
+  }
+  return '';
+}
 
-/**
- * Query the knowledge index for relevant hints.
- * Uses keyword matching: splits the topic into words, scores each hint by
- * how many topic words appear in hint.topic + hint.tags + hint.hint.
- * Results are sorted by score * confidence.
- */
+// ─── Corpus text helper ───────────────────────────────────────────────────────
+
+function _corpusText(hint: KnowledgeHint): string {
+  return [hint.topic, ...(hint.tags ?? []), hint.hint.slice(0, 300)].filter(Boolean).join(' ');
+}
+
+// ─── Query (lexical) ─────────────────────────────────────────────────────────
+
 export function queryKnowledge(
   index: KnowledgeHintIndex,
   topic: string,
@@ -197,41 +550,128 @@ export function queryKnowledge(
 
   const scored: Array<{ hint: KnowledgeHint; score: number }> = [];
 
-  for (const hint of index.hints) {
-    // Filter by actuator if specified
-    if (options.actuator && hint.tags) {
-      const hasActuatorTag = hint.tags.some(t => t.toLowerCase() === options.actuator!.toLowerCase());
-      if (!hasActuatorTag) continue;
-    }
-
-    // Filter by op if specified
-    if (options.op && hint.tags) {
-      const hasOpTag = hint.tags.some(t => t.toLowerCase() === options.op!.toLowerCase());
-      if (!hasOpTag) continue;
-    }
-
-    // Score by keyword matching
+  for (const hint of _filteredHints(index, options)) {
     const searchable = [
       hint.topic.toLowerCase(),
-      (hint.tags || []).join(' ').toLowerCase(),
+      (hint.tags ?? []).join(' ').toLowerCase(),
       hint.hint.toLowerCase(),
     ].join(' ');
 
     let matchCount = 0;
     for (const word of queryWords) {
-      if (searchable.includes(word)) {
-        matchCount++;
-      }
+      if (searchable.includes(word)) matchCount++;
     }
 
     if (matchCount > 0) {
-      const normalizedScore = matchCount / queryWords.length;
-      scored.push({ hint, score: normalizedScore * hint.confidence });
+      scored.push({ hint, score: (matchCount / queryWords.length) * hint.confidence });
     }
   }
 
-  // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
-
   return scored.slice(0, maxResults).map(s => s.hint);
+}
+
+// ─── Query (hybrid — lexical + semantic via RRF) ──────────────────────────────
+
+/**
+ * Hybrid knowledge query combining lexical keyword matching with semantic
+ * cosine similarity via Reciprocal Rank Fusion.
+ *
+ * Uses index.embedCache (per-scope, isolated). Falls back to queryKnowledge
+ * when no EmbeddingBackend is registered or when embedding fails.
+ *
+ * buildScopedIndex() pre-populates index.embedCache from the disk cache so
+ * that first-query latency is minimal even after process restart.
+ */
+export async function queryKnowledgeHybrid(
+  index: KnowledgeHintIndex,
+  topic: string,
+  options: KnowledgeQueryOptions = {},
+): Promise<KnowledgeHint[]> {
+  const maxResults = options.maxResults ?? 5;
+  const queryWords = topic.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+
+  if (queryWords.length === 0) return [];
+
+  const pool = _filteredHints(index, options);
+
+  // ── Lexical ranking ─────────────────────────────────────────────────────
+  const lexicalScored: Array<{ hint: KnowledgeHint; score: number }> = [];
+  for (const hint of pool) {
+    const searchable = [
+      hint.topic.toLowerCase(),
+      (hint.tags ?? []).join(' ').toLowerCase(),
+      hint.hint.toLowerCase(),
+    ].join(' ');
+    let matchCount = 0;
+    for (const word of queryWords) {
+      if (searchable.includes(word)) matchCount++;
+    }
+    if (matchCount > 0) {
+      lexicalScored.push({ hint, score: (matchCount / queryWords.length) * hint.confidence });
+    }
+  }
+  lexicalScored.sort((a, b) => b.score - a.score);
+  const lexicalRanked = lexicalScored.map(s => s.hint);
+
+  const backend = getEmbeddingBackend();
+  if (!backend) return queryKnowledge(index, topic, options);
+
+  // ── Semantic ranking ────────────────────────────────────────────────────
+  let queryVec: Float32Array | null = null;
+  try {
+    queryVec = await backend.embed(topic);
+  } catch {
+    return queryKnowledge(index, topic, options);
+  }
+
+  // Use the per-index cache (populated by buildScopedIndex / _hydrateEmbedCache)
+  const cache = index.embedCache;
+
+  // Embed any hints not yet in the per-index cache
+  const unembed = pool.filter(h => !cache.has(h.source));
+  if (unembed.length > 0) {
+    try {
+      const vectors = await backend.embedBatch(unembed.map(_corpusText));
+      unembed.forEach((h, i) => cache.set(h.source, vectors[i]));
+    } catch {
+      // Remaining hints will score 0 in semantic ranking
+    }
+  }
+
+  const semanticRanked = pool
+    .map(h => {
+      const vec = cache.get(h.source);
+      return { hint: h, sim: vec ? cosineSimilarity(queryVec!, vec) : 0 };
+    })
+    .filter(x => x.sim > 0)
+    .sort((a, b) => b.sim - a.sim)
+    .map(x => x.hint);
+
+  // ── RRF fusion ──────────────────────────────────────────────────────────
+  const rrfScores = reciprocalRankFusion([
+    lexicalRanked.map(h => ({ ...h, path: h.source })),
+    semanticRanked.map(h => ({ ...h, path: h.source })),
+  ]);
+
+  const results = pool
+    .filter(h => rrfScores.has(h.source))
+    .sort((a, b) => (rrfScores.get(b.source) ?? 0) - (rrfScores.get(a.source) ?? 0))
+    .slice(0, maxResults);
+
+  return results.length > 0 ? results : queryKnowledge(index, topic, options);
+}
+
+// ─── Internal helpers ────────────────────────────────────────────────────────
+
+function _filteredHints(index: KnowledgeHintIndex, options: KnowledgeQueryOptions): KnowledgeHint[] {
+  return index.hints.filter(hint => {
+    if (options.actuator && hint.tags) {
+      if (!hint.tags.some(t => t.toLowerCase() === options.actuator!.toLowerCase())) return false;
+    }
+    if (options.op && hint.tags) {
+      if (!hint.tags.some(t => t.toLowerCase() === options.op!.toLowerCase())) return false;
+    }
+    return true;
+  });
 }

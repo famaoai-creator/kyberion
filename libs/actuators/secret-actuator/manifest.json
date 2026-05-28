@@ -1,6 +1,6 @@
 {
   "actuator_id": "secret-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "OS Native Secret Manager Bridge",
   "contract_schema": "schemas/secret-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -28,6 +28,11 @@
     },
     {
       "op": "delete",
+      "platforms": ["darwin"],
+      "requirements": { "bin": ["security"] }
+    },
+    {
+      "op": "list",
       "platforms": ["darwin"],
       "requirements": { "bin": ["security"] }
     }

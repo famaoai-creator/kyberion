@@ -62,4 +62,31 @@ describe('setup report', () => {
     expect(report.doctor.totalMissing).toBe(3);
     expect(report.services.summary.authMissing).toBe(0);
   });
+
+  it('compresses first-time-user setup output into concise next steps', async () => {
+    mocks.setupSurfaces.mockResolvedValue({
+      status: 'ok',
+      rows: [],
+      summary: { total: 2, ready: 0, missing: 1, disabled: 1, hostManaged: 0 },
+    });
+    mocks.setupServices.mockResolvedValue({
+      status: 'ok',
+      rows: [],
+      summary: { total: 2, ready: 0, authMissing: 1, connectionMissing: 1, customerConnections: 0, personalConnections: 0 },
+    });
+    mocks.runReasoningSetup.mockResolvedValue({ must: 1, should: 0, nice: 0 });
+    mocks.collectDoctorReport.mockResolvedValue({
+      totalMissing: 2,
+      summaries: [],
+    });
+
+    const { runSetupReportWithPersona } = await import('../scripts/setup_report.js');
+    const report = await runSetupReportWithPersona({ persona: 'first-time-user' });
+
+    expect(mocks.setupSurfaces).toHaveBeenCalledWith({ quiet: true });
+    expect(mocks.setupServices).toHaveBeenCalledWith({ quiet: true });
+    expect(report.surfaces.summary.missing).toBe(1);
+    expect(report.services.summary.authMissing).toBe(1);
+    expect(report.doctor.totalMissing).toBe(2);
+  });
 });

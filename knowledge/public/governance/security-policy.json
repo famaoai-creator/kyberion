@@ -3,6 +3,9 @@
   "version": "1.2.0",
   "default_allow": [
     "active/missions/${MISSION_ID}/",
+    "active/missions/confidential/${MISSION_ID}/",
+    "active/missions/personal/${MISSION_ID}/",
+    "active/missions/public/${MISSION_ID}/",
     "active/shared/tmp/",
     "active/shared/exports/",
     "work/metrics/",
@@ -132,12 +135,18 @@
         "active/projects/",
         "active/shared/tmp/",
         "active/missions/${MISSION_ID}/",
+        "active/missions/confidential/${MISSION_ID}/",
+        "active/missions/personal/${MISSION_ID}/",
+        "active/missions/public/${MISSION_ID}/",
         "knowledge/public/"
       ],
       "allow_write": [
         "active/projects/",
         "active/shared/tmp/",
-        "active/missions/${MISSION_ID}/evidence/"
+        "active/missions/${MISSION_ID}/evidence/",
+        "active/missions/confidential/${MISSION_ID}/evidence/",
+        "active/missions/personal/${MISSION_ID}/evidence/",
+        "active/missions/public/${MISSION_ID}/evidence/"
       ]
     },
     "analyst": {
@@ -152,9 +161,11 @@
         "active/archive/missions/",
         "active/audit/",
         "active/shared/",
+        "customer/",
         "knowledge/personal/",
         "knowledge/confidential/",
         "knowledge/evolution/",
+        "knowledge/public/evolution/",
         "registry.json"
       ],
       "allow_write": [
@@ -164,9 +175,11 @@
         "active/shared/",
         "active/shared/coordination/",
         "active/shared/observability/mission-control/",
+        "customer/",
         "knowledge/personal/missions/",
         "knowledge/personal/governance/",
         "knowledge/evolution/",
+        "knowledge/public/evolution/",
         "vault/private/wisdom/",
         "registry.json"
       ]
@@ -183,7 +196,11 @@
       "allow_write": [
         "active/shared/tmp/",
         "active/shared/logs/traces/",
+        "active/audit/",
+        "active/shared/logs/process/",
+        "active/shared/data-vault/",
         "customer/${KYBERION_CUSTOMER}/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/audit/",
         "knowledge/public/governance/voice-profile-registry.json",
         "knowledge/public/governance/voice-engine-registry.json",
         "knowledge/public/governance/voice-engines/"
@@ -193,7 +210,11 @@
       "allow_write": [
         "active/shared/tmp/",
         "active/shared/logs/traces/",
+        "active/audit/",
+        "active/shared/logs/process/",
+        "active/shared/data-vault/",
         "customer/${KYBERION_CUSTOMER}/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/audit/",
         "knowledge/public/governance/voice-profile-registry.json",
         "knowledge/public/governance/voice-engine-registry.json",
         "knowledge/public/governance/voice-engines/"
@@ -212,7 +233,10 @@
       ]
     },
     "ruthless_auditor": {
-      "allow_read": ["active/audit/"],
+      "allow_read": [
+        "active/audit/",
+        "customer/"
+      ],
       "allow_write": [
         "active/audit/"
       ]
@@ -436,7 +460,9 @@
       "google.com",
       "generativelanguage.googleapis.com",
       "canva.com",
-      "api.canva.com"
+      "api.canva.com",
+      "atlassian.net",
+      "atlassian.com"
     ],
     "max_request_size_kb": 2048,
     "max_requests_per_mission": 50,

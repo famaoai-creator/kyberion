@@ -82,7 +82,7 @@ filesystem (via secure-io read APIs)
   - active/missions/{tier}/{id}/evidence/*
   - active/audit/system-ledger.jsonl
   - knowledge/public/**/*.{md,json}
-  - knowledge/incidents/*.md
+  - knowledge/public/evolution/*.md
 ```
 
 No write APIs. Everything mutating routes through CLI.

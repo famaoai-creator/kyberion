@@ -219,10 +219,14 @@ export function quitApplication(appName: string) {
 export function systemNotify(title: string, message: string, subtitle?: string) {
   if (!isDarwin()) return;
   const sub = subtitle ? ` subtitle "${toAppleScriptString(subtitle)}"` : '';
-  safeExec('osascript', [
-    '-e',
-    `display notification "${toAppleScriptString(message)}" with title "${toAppleScriptString(title)}"${sub}`,
-  ]);
+  try {
+    safeExec('osascript', [
+      '-e',
+      `display notification "${toAppleScriptString(message)}" with title "${toAppleScriptString(title)}"${sub}`,
+    ]);
+  } catch {
+    // Notifications are best-effort. They must not fail the user flow.
+  }
 }
 
 export function clipboardRead(): string {

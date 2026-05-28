@@ -88,6 +88,43 @@
       "path": "spaces/{{space_id}}",
       "method": "GET",
       "description": "Get space details."
+    },
+    "search_content": {
+      "base_url": "https://{{domain}}.atlassian.net/wiki/rest/api",
+      "path": "search",
+      "method": "GET",
+      "description": "Search content using CQL (Confluence Query Language).",
+      "parameters": {
+        "cql": { "required": true, "type": "string", "description": "CQL query string" },
+        "limit": { "type": "number", "default": 25 },
+        "start": { "type": "number", "default": 0 }
+      }
+    },
+    "get_content_full": {
+      "base_url": "https://{{domain}}.atlassian.net/wiki/rest/api",
+      "path": "content/{{page_id}}",
+      "method": "GET",
+      "description": "Get full page content including body using v1 API.",
+      "parameters": {
+        "page_id": { "required": true, "type": "string" },
+        "expand": { "type": "string", "default": "body.view,children.page,ancestors" }
+      }
+    },
+    "get_page_with_body": {
+      "path": "pages/{{page_id}}",
+      "method": "GET",
+      "description": "Get a specific page with body content.",
+      "parameters": {
+        "body_format": { "type": "string", "default": "storage" }
+      }
+    },
+    "get_page_children": {
+      "path": "pages/{{page_id}}/children",
+      "method": "GET",
+      "description": "Get child pages of a specific page.",
+      "parameters": {
+        "limit": { "type": "number", "default": 50 }
+      }
     }
   }
 }

@@ -26,64 +26,94 @@ export interface MeetingPreJoinSelectors {
 
 export const MEET_SELECTORS: MeetingPreJoinSelectors = {
   name_input: [
+    // jsname is stable across locales — use as primary
+    'input[jsname="YPqjbf"]',
     'input[aria-label="Your name"]',
-    'input[aria-label="名前"]',
+    'input[placeholder="Your name"]',
+    'input[aria-label="お名前を入力"]',
+    'input[placeholder="お名前を入力"]',
   ],
   mute_mic_button: [
-    'div[role="button"][aria-label*="microphone" i][data-is-muted="false"]',
-    'div[role="button"][aria-label*="マイク"][aria-pressed="true"]',
+    // Confirmed via live DOM inspection 2026-05-26
+    '[aria-label="Turn off microphone"]',
+    '[aria-label="マイクをオフにする"]',
+    'button[aria-label*="Microphone" i]',
+    '[data-tooltip="マイクをオフにする"]',
   ],
   disable_camera_button: [
-    'div[role="button"][aria-label*="camera" i][data-is-muted="false"]',
-    'div[role="button"][aria-label*="カメラ"][aria-pressed="true"]',
+    // Confirmed via live DOM inspection 2026-05-26
+    '[aria-label="Turn off camera"]',
+    '[aria-label="カメラをオフにする"]',
+    'button[aria-label*="Camera" i]',
+    '[data-tooltip="カメラをオフにする"]',
   ],
   join_button: [
+    // "Ask to join" = guest without host present; "Join now" = host or admitted
     'button:has-text("Ask to join")',
     'button:has-text("Join now")',
     'button:has-text("参加をリクエスト")',
     'button:has-text("今すぐ参加")',
+    'button[jsname="Qx7uuf"]',
   ],
   leave_button: [
     'button[aria-label*="Leave call" i]',
     'button[aria-label*="通話を終了"]',
+    '[data-tooltip*="Leave" i]',
   ],
 };
 
 export const ZOOM_SELECTORS: MeetingPreJoinSelectors = {
   name_input: [
-    'input#inputname',
+    // Confirmed via live DOM inspection 2026-05-26 (Zoom web client /wc/ endpoint)
+    '#input-for-name',
     'input[aria-label="Your Name"]',
   ],
   mute_mic_button: [
-    'button[aria-label*="mute" i][aria-pressed="false"]',
+    // Pre-join: aria-label="Mute" = mic is ON, clicking mutes it
+    '#preview-audio-control-button',
+    'button[aria-label="Mute"]',
+    'button[aria-label="マイクをミュート"]',
   ],
   disable_camera_button: [
-    'button[aria-label*="camera" i][aria-pressed="false"]',
+    // Pre-join: aria-label="Start Video" = video already off (no click needed)
+    // If "Stop Video", click to disable
+    '#preview-video-control-button',
+    'button[aria-label="Stop Video"]',
+    'button[aria-label="ビデオの停止"]',
   ],
   join_button: [
+    '.preview-join-button',
     'button:has-text("Join")',
-    'button#joinBtn',
   ],
   leave_button: [
-    'button[aria-label*="Leave" i]',
+    // Post-join confirmed 2026-05-26
+    'button[aria-label="Leave"]',
+    'button:has-text("Leave")',
+    'button[aria-label="退出"]',
   ],
 };
 
 export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
   name_input: [
+    // Confirmed via live DOM inspection 2026-05-26 (light-meetings/launch experience)
     'input[data-tid="prejoin-display-name-input"]',
   ],
   mute_mic_button: [
-    'button[data-tid="toggle-mute"]',
+    // checkbox input — click toggles mute state
+    'input[data-tid="toggle-mute"]',
   ],
   disable_camera_button: [
-    'button[data-tid="toggle-video"]',
+    // checkbox input — click toggles camera state
+    'input[data-tid="toggle-video"]',
   ],
   join_button: [
     'button[data-tid="prejoin-join-button"]',
+    'button[id="prejoin-join-button"]',
   ],
   leave_button: [
     'button[data-tid="hangup-button"]',
+    'button[aria-label*="Leave" i]',
+    'button[aria-label*="通話を終了"]',
   ],
 };
 

@@ -1954,6 +1954,9 @@ const RATE_LIMITED_OPS = new Set([
   'extract_design_spec',
   'extract_test_plan',
   'decompose_into_tasks',
+  'reasoning',
+  'tool_use',
+  'react_loop',
 ]);
 
 export async function dispatchDecisionOp(
@@ -2050,7 +2053,7 @@ export async function dispatchDecisionOp(
       const minScore = params.min_score !== undefined
         ? Number(resolved('min_score'))
         : 0.0001;
-      const entries = findRelevantDistilledKnowledge({
+      const entries = await findRelevantDistilledKnowledge({
         topic,
         tags,
         limit,
@@ -2566,6 +2569,177 @@ export async function dispatchDecisionOp(
         releaseNotesPath: resolved('release_notes_path'),
       });
       return { handled: true, ctx: assign(result) };
+    }
+
+    // ── Adaptive Prompting: wisdom:reasoning ─────────────────────────────
+    // Routes through the active reasoning backend. Fixes the previous no-op
+    // where wisdom:reasoning fell through to default with handled=false.
+    case 'reasoning': {
+      const backend = getReasoningBackend();
+      const instruction = typeof params.instruction === 'string'
+        ? resolveVars(params.instruction, ctx)
+        : 'Analyze the context.';
+      const contextRaw = typeof params.context === 'string'
+        ? resolveVars(params.context, ctx)
+        : JSON.stringify(params.context ?? ctx);
+      // Adaptive Prompting: optional system_prompt param overrides default framing
+      const systemPrompt = typeof params.system_prompt === 'string'
+        ? resolveVars(params.system_prompt, ctx)
+        : undefined;
+      const fullPrompt = systemPrompt
+        ? `[SYSTEM: ${systemPrompt}]\n\nInstruction: ${instruction}\nContext: ${contextRaw}`
+        : `Instruction: ${instruction}\nContext: ${contextRaw}`;
+      const useSubagent = params.use_subagent === true ||
+        String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
+        String(params.execution_mode ?? params.mode ?? '') === 'delegate';
+      const response = useSubagent
+        ? await backend.delegateTask(instruction, contextRaw)
+        : await backend.prompt(fullPrompt);
+      return { handled: true, ctx: assign(response) };
+    }
+
+    // ── Mixture of Experts: wisdom:tool_use ──────────────────────────────
+    // Invokes the reasoning backend's Function Calling interface.
+    // Tools are defined inline in the pipeline step params.
+    case 'tool_use': {
+      const backend = getReasoningBackend();
+      if (!backend.generateWithTools) {
+        throw new Error(
+          '[wisdom:tool_use] Active backend does not support generateWithTools. ' +
+          'Set KYBERION_REASONING_BACKEND=anthropic.',
+        );
+      }
+      const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
+      const tools = Array.isArray(params.tools) ? params.tools : [];
+      const result = await backend.generateWithTools(prompt, tools);
+      return { handled: true, ctx: assign(result) };
+    }
+
+    // ── ReAct: wisdom:react_loop ──────────────────────────────────────────
+    // Thought → Action → Observation loop with configurable max_steps.
+    // Emits { goal, steps: [{role,content}], final_answer }.
+    case 'react_loop': {
+      const backend = getReasoningBackend();
+      const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
+      const maxSteps = Number(params.max_steps ?? 5);
+      const tools: any[] = Array.isArray(params.tools) ? params.tools : [];
+      const history: { role: string; content: string }[] = [];
+      let finalAnswer = '';
+
+      for (let s = 0; s < maxSteps; s++) {
+        const histText = history.map((h) => `[${h.role}] ${h.content}`).join('\n');
+        const thoughtPrompt =
+          `Goal: ${goal}\n\nHistory:\n${histText || '(none yet)'}\n\n` +
+          `Think step by step. Either produce FINAL ANSWER: <answer> or describe the next concrete action needed.`;
+
+        const response =
+          tools.length > 0 && backend.generateWithTools
+            ? await backend.generateWithTools(thoughtPrompt, tools)
+            : { text: await backend.prompt(thoughtPrompt) };
+
+        const text = response.text ?? '';
+        history.push({ role: 'thought', content: text });
+
+        if (text.includes('FINAL ANSWER:')) {
+          finalAnswer = text.split('FINAL ANSWER:')[1]?.trim() ?? text;
+          break;
+        }
+        if (response.toolCalls?.length) {
+          for (const call of response.toolCalls) {
+            history.push({ role: 'observation', content: `Tool "${call.name}" → ${JSON.stringify(call.input)}` });
+          }
+        }
+      }
+
+      const reactResult = {
+        goal,
+        steps: history,
+        final_answer: finalAnswer || (history.at(-1)?.content ?? ''),
+      };
+      return { handled: true, ctx: assign(reactResult) };
+    }
+
+    // ── Uncertainty Quantification → Gate: wisdom:uncertainty_gate ───────
+    // Reads ensemble convergence score and emits a gate verdict:
+    //   mean_convergence >= threshold → ready
+    //   mean_convergence >= yellow_threshold → concerns (YELLOW-CARD)
+    //   mean_convergence <  yellow_threshold → blocked
+    case 'uncertainty_gate': {
+      const convergenceKey = String(params.from ?? 'mean_convergence');
+      const severityKey = String(params.severity_from ?? 'convergence_severity');
+      const rawScore = ctx[convergenceKey] ?? params.mean_convergence;
+      const rawSeverity = ctx[severityKey] ?? params.convergence_severity;
+      const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore ?? '1'));
+      const threshold = typeof params.threshold === 'number' ? params.threshold : 0.7;
+      const yellowThreshold = typeof params.yellow_threshold === 'number' ? params.yellow_threshold : 0.5;
+
+      let verdict: 'ready' | 'concerns' | 'blocked';
+      if (!isNaN(score)) {
+        if (score >= threshold) verdict = 'ready';
+        else if (score >= yellowThreshold) verdict = 'concerns';
+        else verdict = 'blocked';
+      } else {
+        // Fall back to severity string when score unavailable
+        const sev = String(rawSeverity ?? 'ok');
+        verdict = sev === 'ok' ? 'ready' : sev === 'warn' ? 'concerns' : 'blocked';
+      }
+
+      const gateResult = {
+        verdict,
+        mean_convergence: isNaN(score) ? null : score,
+        convergence_severity: rawSeverity ?? null,
+        threshold,
+        yellow_threshold: yellowThreshold,
+        timestamp: nowIso(),
+      };
+
+      const outputPath = resolved('output_path');
+      if (outputPath) writeJSON(outputPath, gateResult);
+
+      if (verdict === 'blocked') {
+        logger.warn(`[uncertainty_gate] BLOCKED: mean_convergence=${score.toFixed?.(3) ?? score} < yellow_threshold=${yellowThreshold}`);
+      } else if (verdict === 'concerns') {
+        logger.warn(`[uncertainty_gate] YELLOW-CARD: mean_convergence=${score.toFixed?.(3) ?? score} < threshold=${threshold}`);
+      } else {
+        logger.success(`[uncertainty_gate] READY: mean_convergence=${score.toFixed?.(3) ?? score} ≥ threshold=${threshold}`);
+      }
+
+      return { handled: true, ctx: assign(gateResult) };
+    }
+
+    // ── Active Learning escalation: wisdom:escalate_for_review ───────────
+    // Writes a pending human-review record to active/shared/tmp/pending-reviews/.
+    // Downstream: a Slack/email notifier can poll this directory.
+    case 'escalate_for_review': {
+      const topic = resolveVars(String(params.topic ?? 'Untitled review'), ctx);
+      const reason = resolveVars(String(params.reason ?? ''), ctx);
+      const evidenceKey = String(params.evidence_from ?? 'evidence');
+      const evidence = params.evidence
+        ? resolveVars(String(params.evidence), ctx)
+        : ctx[evidenceKey] ?? '';
+      const missionId = resolveVars(String(params.mission_id ?? ctx.mission_id ?? ''), ctx);
+      const reviewId = `review-${Date.now()}`;
+
+      const reviewRecord = {
+        review_id: reviewId,
+        topic,
+        reason,
+        evidence: typeof evidence === 'string' ? evidence : JSON.stringify(evidence),
+        mission_id: missionId || null,
+        status: 'pending',
+        escalated_at: nowIso(),
+      };
+
+      const reviewDir = pathResolver.rootResolve('active/shared/tmp/pending-reviews');
+      safeMkdir(reviewDir, { recursive: true });
+      const reviewPath = `active/shared/tmp/pending-reviews/${reviewId}.json`;
+      writeJSON(reviewPath, reviewRecord);
+      logger.warn(`[escalate_for_review] Human review pending: "${topic}" → ${reviewPath}`);
+
+      return {
+        handled: true,
+        ctx: assign({ review_id: reviewId, review_path: reviewPath, review_status: 'pending' }),
+      };
     }
 
     default:

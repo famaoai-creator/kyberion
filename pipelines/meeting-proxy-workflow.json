@@ -1,57 +1,51 @@
 {
   "action": "pipeline",
   "name": "meeting-proxy-workflow",
-  "description": "Generic meeting-proxy orchestration: join → register voice profile → listen → transcribe → extract action items → execute caller's slice → monitor others. Persona-parameterized via context: persona_name (display), profile_id (voice slug), agent_id (proxy agent instance).",
+  "description": "Meeting proxy: join with cloned voice → listen → extract action items. Supports Google Meet, Teams, and Zoom. persona_name / profile_id / display_name control the bot identity.",
   "context": {
     "persona_name": "the operator",
     "profile_id": "operator-default-v1",
-    "agent_id": "meeting-proxy",
     "meeting_url": "",
     "platform": "auto",
-    "listen_duration_sec": 30,
-    "transcript_output": "{{mission_evidence_dir}}/meeting-transcript.txt",
-    "action_items_output": "{{mission_evidence_dir}}/action-items.json",
-    "join_action_json": "active/shared/tmp/meeting-proxy-join-{{mission_id}}.json",
-    "listen_action_json": "active/shared/tmp/meeting-proxy-listen-{{mission_id}}.json",
-    "leave_action_json": "active/shared/tmp/meeting-proxy-leave-{{mission_id}}.json"
+    "display_name": "Kyberion Agent",
+    "listen_duration_sec": 1800,
+    "language": "ja",
+    "python_bin": ".venv/bin/python3",
+    "screenshot_path": "active/shared/tmp/meeting-proxy-screenshot.png",
+    "transcript_output": "active/shared/tmp/meeting-proxy-transcript.txt",
+    "action_items_output": "active/shared/tmp/meeting-proxy-action-items.json",
+    "intro_text": "",
+    "voice_out_path": "active/shared/tmp/voice-out/{{profile_id}}/proxy-intro.wav",
+    "preferred_engine": "auto"
   },
   "steps": [
     {
       "op": "system:log",
       "params": {
-        "message": "🎙️ Activating Meeting Proxy ({{persona_name}}, profile={{profile_id}}, agent={{agent_id}})..."
+        "message": "🎙️ Activating Meeting Proxy ({{persona_name}}, profile={{profile_id}})..."
       }
     },
     {
-      "id": "write_join_action",
-      "op": "code:write_artifact",
-      "params": {
-        "path": "{{join_action_json}}",
-        "content": "{\"action\":\"join\",\"params\":{\"platform\":\"{{platform}}\",\"url\":\"{{meeting_url}}\"}}"
-      }
-    },
-    {
-      "id": "join_meeting",
+      "id": "generate_intro_voice",
       "op": "system:shell",
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{join_action_json}}",
+        "cmd": "if [ -n '{{intro_text}}' ]; then {{python_bin}} libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\":\"generate\",\"params\":{\"text\":\"{{intro_text}}\",\"profile_id\":\"{{profile_id}}\",\"output_path\":\"{{voice_out_path}}\",\"language\":\"{{language}}\",\"preferred_engine\":\"{{preferred_engine}}\"}}'  ; else echo '{\"status\":\"skipped\"}'; fi",
+        "export_as": "voice_gen_result"
+      }
+    },
+    {
+      "id": "join_session",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs --url '{{meeting_url}}' --name '{{display_name}}' --wait {{listen_duration_sec}} --python '{{python_bin}}' --screenshot '{{screenshot_path}}'",
         "export_as": "join_result"
       }
     },
     {
-      "id": "write_listen_action",
-      "op": "code:write_artifact",
+      "id": "log_session",
+      "op": "system:log",
       "params": {
-        "path": "{{listen_action_json}}",
-        "content": "{\"action\":\"listen\",\"params\":{\"platform\":\"{{platform}}\",\"duration_sec\":{{listen_duration_sec}}}}"
-      }
-    },
-    {
-      "id": "listen_meeting",
-      "op": "system:shell",
-      "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{listen_action_json}}",
-        "export_as": "listen_result"
+        "message": "✅ Session complete: {{join_result}}"
       }
     },
     {
@@ -62,30 +56,14 @@
         "project_name": "meeting-proxy",
         "source_path": "{{transcript_output}}",
         "source_type": "meeting_notes",
-        "language": "ja",
+        "language": "{{language}}",
         "export_as": "extraction"
       }
     },
     {
       "op": "system:log",
       "params": {
-        "message": "✅ Action items extracted to {{action_items_output}}. Initiating self-assigned task execution..."
-      }
-    },
-    {
-      "id": "write_leave_action",
-      "op": "code:write_artifact",
-      "params": {
-        "path": "{{leave_action_json}}",
-        "content": "{\"action\":\"leave\",\"params\":{\"platform\":\"{{platform}}\"}}"
-      }
-    },
-    {
-      "id": "leave_meeting",
-      "op": "system:shell",
-      "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --input {{leave_action_json}}",
-        "export_as": "leave_result"
+        "message": "📋 Action items extracted → {{action_items_output}}."
       }
     }
   ]

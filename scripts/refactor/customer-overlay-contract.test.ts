@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '@agent/core';
+import { pathResolver, safeReadFile } from '@agent/core';
 
-const ROOT = process.cwd();
+const ROOT = pathResolver.rootDir();
 
 function read(relPath: string): string {
   return String(safeReadFile(path.join(ROOT, relPath), { encoding: 'utf8' }) || '');

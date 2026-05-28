@@ -86,4 +86,32 @@ describe('operator-learning scenario pack', () => {
       }
     }
   });
+
+  it('covers all 4 scenario classes with at least the minimum required count', () => {
+    const pack = loadScenarioPack();
+    const byClass: Record<string, number> = {};
+    for (const scenario of pack.scenarios || []) {
+      const c: string = scenario.scenario_class || 'unknown';
+      byClass[c] = (byClass[c] || 0) + 1;
+    }
+    expect(byClass['golden'] ?? 0).toBeGreaterThanOrEqual(10);
+    expect(byClass['controlled-failure'] ?? 0).toBeGreaterThanOrEqual(3);
+    expect(byClass['ambiguous'] ?? 0).toBeGreaterThanOrEqual(2);
+    expect(byClass['approval-sensitive'] ?? 0).toBeGreaterThanOrEqual(3);
+  });
+
+  it('has at least one controlled-failure scenario per risk category (dependency, authority, missing-input)', () => {
+    const pack = loadScenarioPack();
+    const failures: string[] = (pack.scenarios || [])
+      .filter((s: { scenario_class: string }) => s.scenario_class === 'controlled-failure')
+      .map((s: { notes?: string; utterance?: string }) => `${s.notes || ''} ${s.utterance || ''}`);
+
+    const hasDependency = failures.some((t) => /depend|missing|tts|stt|voice/i.test(t));
+    const hasAuthority = failures.some((t) => /authority|policy|secret|block/i.test(t));
+    const hasMissingInput = failures.some((t) => /url|missing|clarif/i.test(t));
+
+    expect(hasDependency).toBe(true);
+    expect(hasAuthority).toBe(true);
+    expect(hasMissingInput).toBe(true);
+  });
 });

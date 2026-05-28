@@ -184,6 +184,30 @@ function normalizeFreeText(value: string): string {
     .trim();
 }
 
+// Converts full-width ASCII (\uff21\u2013\uff3a, \uff10\u2013\uff19, \uff01 etc.) to half-width equivalents
+// so "\uff21\uff29" resolves the same as "AI" in keyword matching.
+function normalizeFullWidthToHalfWidth(text: string): string {
+  return text.replace(/[\uff01-\uff5e]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)
+  );
+}
+
+// Converts katakana to hiragana so "\u30b9\u30e9\u30c3\u30af" and "\u3059\u3089\u3063\u304f" both match "slack".
+function normalizeKatakanaToHiragana(text: string): string {
+  return text.replace(/[\u30a1-\u30f6]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+
+/**
+ * Locale-aware normalization for trigger matching.
+ * Applies full-width\u2192half-width and katakana\u2192hiragana before standard text normalization,
+ * so Japanese utterances match ASCII trigger keywords and vice versa.
+ */
+export function normalizeForTriggerMatch(utterance: string): string {
+  return normalizeFreeText(normalizeKatakanaToHiragana(normalizeFullWidthToHalfWidth(utterance)));
+}
+
 function tokenize(value: string): string[] {
   return normalizeFreeText(value)
     .split(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff]+/i)
@@ -194,7 +218,11 @@ function tokenize(value: string): string[] {
 function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition): IntentResolutionCandidate | null {
   const policy = loadIntentResolutionPolicy().catalog_scoring;
   const normalized = normalizeFreeText(utterance);
-  const matchedKeywords = (intent.trigger_keywords || []).filter((keyword) => normalized.includes(String(keyword).toLowerCase()));
+  const localizedNormalized = normalizeForTriggerMatch(utterance);
+  const matchedKeywords = (intent.trigger_keywords || []).filter((keyword) => {
+    const kw = String(keyword).toLowerCase();
+    return normalized.includes(kw) || localizedNormalized.includes(kw);
+  });
   const reasons: string[] = [];
   let score = 0;
 
@@ -256,34 +284,15 @@ function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
 }
 
 function inferMessagingBridgePlatformId(utterance: string): string | undefined {
-  const normalized = normalizeFreeText(utterance);
+  const normalized = normalizeForTriggerMatch(utterance);
   if (!normalized) return undefined;
 
-  if (
-    normalized.includes('slack') ||
-    utterance.includes('Slack') ||
-    utterance.includes('スラック')
-  ) {
-    return 'slack';
-  }
-
-  if (
-    normalized.includes('imessage') ||
-    normalized.includes('i message') ||
-    utterance.includes('iMessage') ||
-    utterance.includes('i message') ||
-    utterance.includes('アイメッセージ')
-  ) {
-    return 'imessage';
-  }
-
-  if (
-    normalized.includes('telegram') ||
-    utterance.includes('Telegram') ||
-    utterance.includes('テレグラム')
-  ) {
-    return 'telegram';
-  }
+  if (normalized.includes('slack') || normalized.includes('すらっく')) return 'slack';
+  if (normalized.includes('imessage') || normalized.includes('i message') || normalized.includes('あいめっせーじ')) return 'imessage';
+  if (normalized.includes('telegram') || normalized.includes('てれぐらむ')) return 'telegram';
+  if (normalized.includes('line') || normalized.includes('らいん')) return 'line';
+  if (normalized.includes('discord') || normalized.includes('でぃすこーど')) return 'discord';
+  if (normalized.includes('teams') || normalized.includes('てぃーむす')) return 'teams';
 
   return undefined;
 }

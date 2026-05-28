@@ -22,7 +22,7 @@
  * before deletion. Always run full validate + e2e before committing removals.
  *
  * Output: prints to stdout; writes machine-readable JSON to
- * docs/legal/dead-code-candidates.json (next to the license audit report).
+ * active/shared/exports/dead-code-candidates.json.
  */
 
 import * as path from 'node:path';
@@ -49,7 +49,7 @@ interface DeadCodeCandidate extends ExportedSymbol {
 }
 
 const ROOT = pathResolver.rootDir();
-const REPORT_PATH = path.join(ROOT, 'docs', 'legal', 'dead-code-candidates.json');
+const REPORT_PATH = pathResolver.shared('exports/dead-code-candidates.json');
 
 const SCAN_ROOTS = [
   path.join(ROOT, 'libs'),

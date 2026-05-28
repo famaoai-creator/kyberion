@@ -1,5 +1,9 @@
 # Quick Start
 
+**Just want to run something?** → Jump to [§2 First Win Smoke](#2-first-win-smoke): `pnpm doctor` then `pnpm pipeline --input pipelines/verify-session.json`.
+
+---
+
 Kyberion should be approached as an intent-driven system.
 
 Start with:
@@ -54,6 +58,9 @@ pnpm pipeline --input pipelines/voice-hello.json
 ```
 
 The browser session smoke writes `active/shared/tmp/first-win-session.png`.
+If browser launch is blocked, the pipeline now automatically falls back to `active/shared/tmp/first-win-fallback.txt`.
+
+If the smoke fails because a surface looks stale or a permission is missing, open [docs/user/TROUBLESHOOTING.md](./user/TROUBLESHOOTING.md) and run `pnpm surfaces:repair` or `pnpm setup:report --persona first-time-user` before retrying.
 
 After the screenshot exists, spend the remaining 10 minutes on structure:
 

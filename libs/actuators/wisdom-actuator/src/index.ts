@@ -237,11 +237,16 @@ async function opCapture(op: string, params: any, ctx: any) {
       });
       return { ...ctx, [params.export_as || 'found_knowledge']: matched };
     case 'query': {
-      const { buildKnowledgeIndex, queryKnowledge } = await import('@agent/core');
-      if (!ctx._knowledgeIndex) {
-        ctx._knowledgeIndex = await buildKnowledgeIndex();
+      const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } = await import('@agent/core');
+      // Scope comes from pipeline knowledge_scope (set in autoContext by run_pipeline)
+      // or falls back to the default public-only scope.
+      const scope = ctx._knowledge_scope ?? DEFAULT_SCOPE;
+      const scopeKey = JSON.stringify(scope);
+      if (!ctx._knowledgeIndex || ctx._knowledgeIndexScopeKey !== scopeKey) {
+        ctx._knowledgeIndex = await buildScopedIndex(scope);
+        ctx._knowledgeIndexScopeKey = scopeKey;
       }
-      const hints = queryKnowledge(ctx._knowledgeIndex, resolveVars(params.topic, ctx), {
+      const hints = await queryKnowledgeHybrid(ctx._knowledgeIndex, resolveVars(params.topic, ctx), {
         actuator: params.actuator,
         op: params.op,
         maxResults: params.max_results || 5,

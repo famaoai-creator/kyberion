@@ -31,13 +31,10 @@ vi.mock('./path-resolver.js', () => ({
 }));
 
 describe('provider-discovery', () => {
-  it('falls back to npx codex when the codex binary is not on PATH', async () => {
+  it('marks codex as not installed when the codex binary is not on PATH', async () => {
     mocks.spawnSync.mockImplementation((cmd: string, args: string[]) => {
       if (cmd === 'which' && args[0] === 'codex') {
         return { status: 1, stdout: '', stderr: '' };
-      }
-      if (cmd === 'npx' && args[0] === 'codex' && args[1] === '--version') {
-        return { status: 0, stdout: '0.0.1', stderr: '' };
       }
       return { status: 1, stdout: '', stderr: '' };
     });
@@ -55,17 +52,9 @@ describe('provider-discovery', () => {
 
     expect(codex).toMatchObject({
       provider: 'codex',
-      installed: true,
-      version: '0.0.1',
-      healthy: true,
+      installed: false,
+      healthy: false,
     });
-    expect(mocks.spawnSync).toHaveBeenCalledWith(
-      'npx',
-      ['codex', '--version'],
-      expect.objectContaining({
-        timeout: 15000,
-      }),
-    );
     expect(mocks.rootResolve).toHaveBeenCalledWith('active/shared/runtime/provider-cache.json');
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       '/repo/active/shared/runtime/provider-cache.json',

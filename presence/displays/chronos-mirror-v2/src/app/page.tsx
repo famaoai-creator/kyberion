@@ -1,7 +1,7 @@
 "use client";
 
 import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft, ChevronDown, ChevronRight, ClipboardCheck, CalendarClock } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { FocusedOperatorView } from "../components/FocusedOperatorView";
 import { SovereignChat } from "../components/SovereignChat";
@@ -9,7 +9,7 @@ import { AgentPanel } from "../components/AgentPanel";
 import { FirstRunBanner } from "../components/FirstRunBanner";
 import { IdentityBadge } from "../components/IdentityBadge";
 import { MissionIntelligence } from "../components/MissionIntelligence";
-import { MISSION_CYCLE, OPERATOR_VIEW_LINKS, SURFACE_ROLES } from "../lib/operator-console";
+import { MISSION_CYCLE, OPERATOR_SCENARIO_PRESETS, OPERATOR_VIEW_LINKS, SURFACE_ROLES } from "../lib/operator-console";
 import { uxText } from "../lib/ux-vocabulary";
 import { useChronosLocale } from "../lib/hooks";
 
@@ -37,6 +37,45 @@ type StatusCard = {
   accent: string;
   targetId: string;
 };
+
+const OPERATOR_LAYOUT_PREFS_KEY = "chronos.operator-layout.prefs";
+
+function loadOperatorLayoutPrefs(): {
+  focusedOperatorView: string | null;
+  missionIntelligenceFocus: string | null;
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_LAYOUT_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<{
+      focusedOperatorView: string | null;
+      missionIntelligenceFocus: string | null;
+    }>;
+    return {
+      focusedOperatorView: typeof parsed.focusedOperatorView === "string" ? parsed.focusedOperatorView : null,
+      missionIntelligenceFocus:
+        typeof parsed.missionIntelligenceFocus === "string" ? parsed.missionIntelligenceFocus : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveOperatorLayoutPrefs(
+  focusedOperatorView: string | null,
+  missionIntelligenceFocus: string | null,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      OPERATOR_LAYOUT_PREFS_KEY,
+      JSON.stringify({ focusedOperatorView, missionIntelligenceFocus }),
+    );
+  } catch {
+    // localStorage may be denied; ignore.
+  }
+}
 
 
 const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
@@ -75,6 +114,7 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
       { label: "Missions", query: "chronos://quick-action/missions", icon: "🎯", tone: "observe" },
       { label: "Agents", query: "chronos://quick-action/agents", icon: "🤖", tone: "observe" },
       { label: "Audit Log", query: "chronos://quick-action/audit-log", icon: "📋", tone: "observe" },
+      { label: "Traces", query: "chronos://operator-view/trace-viewer", icon: "🔭", tone: "observe" },
     ],
   },
   {
@@ -153,12 +193,34 @@ export default function ChronosMirrorV2() {
   const [surface, setSurface] = useState<any>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [focusedOperatorView, setFocusedOperatorView] = useState<string | null>(null);
+  const [missionIntelligenceFocus, setMissionIntelligenceFocus] = useState<string | null>(null);
+  const [missionIntelligenceFocusedMissionId, setMissionIntelligenceFocusedMissionId] = useState<string | null>(null);
+  const [focusedOperatorMissionId, setFocusedOperatorMissionId] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     taxonomy: false,
     cycle: false,
     views: true
   });
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
+  const mainSurfaceRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const prefs = loadOperatorLayoutPrefs();
+    if (!prefs) return;
+    setFocusedOperatorView(prefs.focusedOperatorView);
+    setMissionIntelligenceFocus(prefs.missionIntelligenceFocus);
+  }, []);
+
+  useEffect(() => {
+    saveOperatorLayoutPrefs(focusedOperatorView, missionIntelligenceFocus);
+  }, [focusedOperatorView, missionIntelligenceFocus]);
+
+  useEffect(() => {
+    if (!focusedOperatorView) return;
+    window.requestAnimationFrame(() => {
+      mainSurfaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [focusedOperatorView]);
 
   const toggleSection = (key: string) => {
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -193,6 +255,12 @@ export default function ChronosMirrorV2() {
   }, []);
 
   const handleQuickAction = useCallback((query: string) => {
+    const operatorViewMatch = query.match(/^chronos:\/\/operator-view\/(.+)$/);
+    if (operatorViewMatch) {
+      setFocusedOperatorView(operatorViewMatch[1]);
+      setSurface(null);
+      return;
+    }
     sendQueryRef.current?.(query);
   }, []);
 
@@ -202,17 +270,76 @@ export default function ChronosMirrorV2() {
     element.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const handleOperatorViewOpen = useCallback((targetId: string) => {
+  const handleOperatorViewOpen = useCallback((targetId: string, missionId: string | null = null) => {
+    if (targetId === "mission-control-plane" && missionId) {
+      setFocusedOperatorView(null);
+      setFocusedOperatorMissionId(null);
+      setMissionIntelligenceFocus("mission-control-plane");
+      setMissionIntelligenceFocusedMissionId(missionId);
+      return;
+    }
     setFocusedOperatorView(targetId);
+    setMissionIntelligenceFocus(null);
+    setMissionIntelligenceFocusedMissionId(null);
+    setFocusedOperatorMissionId(targetId === "mission-control-plane" ? missionId : null);
     if (surface) {
       setSurface(null);
     }
   }, [surface]);
 
+  const handleScenarioOpen = useCallback((targetId: string, surfaceMode: "mission-intelligence" | "focused-operator") => {
+    if (surfaceMode === "mission-intelligence") {
+      setMissionIntelligenceFocus(targetId);
+      setFocusedOperatorView(null);
+      setMissionIntelligenceFocusedMissionId(null);
+      setFocusedOperatorMissionId(null);
+    } else {
+      setFocusedOperatorView(targetId);
+      setMissionIntelligenceFocus(null);
+      setMissionIntelligenceFocusedMissionId(null);
+      setFocusedOperatorMissionId(null);
+    }
+    setSurface(null);
+  }, []);
+
   const activeSurfaceTitle = useMemo(
     () => surface?.title || uxText("chronos_mission_intelligence", "Mission Intelligence", locale),
     [surface?.title, locale],
   );
+  const activeScenario = useMemo(
+    () =>
+      OPERATOR_SCENARIO_PRESETS.find((scenario) =>
+        scenario.surface === "mission-intelligence"
+          ? missionIntelligenceFocus === scenario.targetId
+          : focusedOperatorView === scenario.targetId,
+      ) || null,
+    [focusedOperatorView, missionIntelligenceFocus],
+  );
+
+  useEffect(() => {
+    const handleScenarioHotkey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const index = Number.parseInt(event.key, 10);
+      if (!Number.isInteger(index) || index < 1 || index > OPERATOR_SCENARIO_PRESETS.length) return;
+      const scenario = OPERATOR_SCENARIO_PRESETS[index - 1];
+      if (!scenario) return;
+      event.preventDefault();
+      handleScenarioOpen(scenario.targetId, scenario.surface);
+    };
+
+    window.addEventListener("keydown", handleScenarioHotkey);
+    return () => window.removeEventListener("keydown", handleScenarioHotkey);
+  }, [handleScenarioOpen]);
 
   return (
     <main className="min-h-screen w-screen overflow-hidden bg-[#020617] text-white">
@@ -302,6 +429,79 @@ export default function ChronosMirrorV2() {
                     );
                   })}
                 </div>
+              </section>
+
+              <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
+                <div className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">Scenarios</div>
+                      <div className="mt-1 text-sm text-slate-200/65">Pick the task. Jump once.</div>
+                    </div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">1-7</div>
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
+                      const active =
+                        (scenario.surface === "mission-intelligence" && missionIntelligenceFocus === scenario.targetId) ||
+                        (scenario.surface === "focused-operator" && focusedOperatorView === scenario.targetId);
+                      return (
+                        <button
+                          key={scenario.label}
+                          type="button"
+                          onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            active
+                              ? "border-cyan-400/30 bg-cyan-400/10"
+                              : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-black/25 text-[9px] uppercase tracking-[0.16em] text-white/60">
+                                  {index + 1}
+                                </div>
+                                <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">{scenario.label}</div>
+                              </div>
+                              <div className="mt-2 text-[11px] leading-5 text-slate-200/56">{scenario.detail}</div>
+                            </div>
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/70">{scenario.actionLabel}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] text-white/34 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">Scenarios · 1-7</div>
+                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">Thread · T / C</div>
+                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">Sessions · 1-9 / J K</div>
+                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">Traces · 1-9 / J K / R</div>
+                  </div>
+                </div>
+
+                {activeScenario ? (
+                  <section className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">Current</div>
+                    <div className="mt-1 text-sm font-semibold text-white/90">{activeScenario.label}</div>
+                    <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Next</div>
+                      <div className="mt-1 text-[11px] leading-5 text-white/72">{activeScenario.nextStep}</div>
+                      <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
+                        Hotkey {OPERATOR_SCENARIO_PRESETS.findIndex((scenario) => scenario.label === activeScenario.label) + 1}
+                      </div>
+                    </div>
+                    {activeScenario.surface === "mission-intelligence" ? (
+                      <button
+                        type="button"
+                        onClick={() => setMissionIntelligenceFocus(null)}
+                        className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </section>
+                ) : null}
               </section>
 
               <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
@@ -436,7 +636,10 @@ export default function ChronosMirrorV2() {
             </div>
           </aside>
 
-          <section className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]">
+          <section
+            ref={mainSurfaceRef}
+            className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
+          >
             <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.34em] text-stone-200/42">Active Surface</div>
@@ -444,7 +647,15 @@ export default function ChronosMirrorV2() {
               </div>
               <div className="flex items-center gap-2 rounded-full border border-white/8 bg-black/25 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
                 <PanelsTopLeft size={12} />
-                <span>{surface ? "a2ui drill-down" : focusedOperatorView ? "focused operator view" : "default operator view"}</span>
+                <span>
+                  {surface
+                    ? "a2ui drill-down"
+                    : focusedOperatorView
+                      ? "focused operator view"
+                      : missionIntelligenceFocus
+                        ? "focused mission console"
+                        : "default operator view"}
+                </span>
               </div>
             </div>
 
@@ -458,12 +669,26 @@ export default function ChronosMirrorV2() {
                       | "runtime-topology-map"
                       | "runtime-lease-doctor"
                       | "recent-surface-outbox"
-                      | "secret-approval-queue"
-                      | "owner-summaries"}
-                    onBack={() => setFocusedOperatorView(null)}
+                    | "secret-approval-queue"
+                      | "owner-summaries"
+                      | "trace-viewer"}
+                    onBack={() => {
+                      setFocusedOperatorView(null);
+                      setFocusedOperatorMissionId(null);
+                    }}
+                    onOpenView={(targetId, missionId) => handleOperatorViewOpen(targetId, missionId || null)}
+                    focusedMissionId={focusedOperatorMissionId}
+                    onOpenMissionThread={(missionId) => handleOperatorViewOpen("mission-control-plane", missionId)}
                   />
                 ) : (
-                  <MissionIntelligence />
+                  <MissionIntelligence
+                    focusedView={missionIntelligenceFocus}
+                    onClearFocus={() => {
+                      setMissionIntelligenceFocus(null);
+                      setMissionIntelligenceFocusedMissionId(null);
+                    }}
+                    focusedMissionId={missionIntelligenceFocusedMissionId}
+                  />
                 )
               ) : (
                 <div className="flex flex-col gap-6">

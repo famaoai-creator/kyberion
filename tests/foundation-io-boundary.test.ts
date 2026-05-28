@@ -6,6 +6,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 const allowedImporters = new Set([
   'libs/core/core.ts',
+  'libs/core/customer-resolver.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
 ]);

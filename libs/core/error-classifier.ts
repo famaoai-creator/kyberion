@@ -280,6 +280,42 @@ const RULES: ClassifierRule[] = [
     remediation: 'Fix the JSON syntax in the highlighted file.',
     test: (m) => /(SyntaxError|Unexpected token).*JSON|JSON\.parse|Unexpected end of JSON/i.test(m),
   },
+  // --- Build / environment ---
+  {
+    id: 'build.tsc-error',
+    category: 'invalid_input',
+    label: 'TypeScript compilation error',
+    remediation: 'Fix the TypeScript error shown above and run `pnpm build` again. Ensure all imports resolve and type signatures match.',
+    test: (m) => /error TS\d+:|\.ts\(\d+,\d+\)|TypeScript.*error|tsc.*failed/i.test(m),
+  },
+  {
+    id: 'build.node-version',
+    category: 'missing_dependency',
+    label: 'Node.js version incompatible',
+    remediation: 'This project requires Node 22+. Run `node --version` to check, then install the required version via `nvm install 22` or the version manager of your choice.',
+    test: (m) => /engine.*node|node.*version.*required|requires node.*22|EBADENGINE/i.test(m),
+  },
+  {
+    id: 'build.pnpm-workspace',
+    category: 'invalid_input',
+    label: 'pnpm workspace resolution error',
+    remediation: 'Run `pnpm install` from the repo root to sync workspace packages. If the error persists, delete `node_modules` and retry.',
+    test: (m) => /ERR_PNPM_|workspace.*not found|pnpm.*install failed|Cannot find package.*workspace/i.test(m),
+  },
+  {
+    id: 'actuator.contract-mismatch',
+    category: 'invalid_input',
+    label: 'Actuator contract mismatch',
+    remediation: "The action or params do not match the actuator's contract schema. Run `pnpm cli info <actuator-name>` to see the contract schema path and verify the required fields.",
+    test: (m) => /contract.*schema|schema.*contract|actuator.*contract|required field.*missing|unexpected.*action.?type/i.test(m),
+  },
+  {
+    id: 'env.missing-var',
+    category: 'missing_secret',
+    label: 'Required environment variable not set',
+    remediation: 'Set the missing environment variable in your shell or `.env` file. See `docs/INITIALIZATION.md` for the full list of required variables.',
+    test: (m) => /environment variable.*not set|env.*required.*not set|process\.env\.\w+ is undefined|missing.*env(ironment)? var(iable)?/i.test(m),
+  },
   // --- Mission ---
   {
     id: 'mission.not-found',
@@ -290,6 +326,149 @@ const RULES: ClassifierRule[] = [
     test: (m) => /mission .* not found|mission .* path not found/i.test(m),
   },
 ];
+
+// ─── Authority Diagnostics ────────────────────────────────────────────────────
+
+export type PolicyViolationType =
+  | 'project_scope_denied'
+  | 'tenant_scope_denied'
+  | 'tenant_broker_missing'
+  | 'tenant_broker_expired'
+  | 'path_scope_denied'
+  | 'approval_required'
+  | 'tier_access_denied'
+  | 'unknown_policy_violation';
+
+export interface PolicyViolationDiagnostic {
+  violationType: PolicyViolationType;
+  /** Human-readable explanation of what was blocked and why. */
+  explanation: string;
+  /** The role or persona typically needed to perform this action. */
+  requiredRole?: string;
+  /** The authority flag (e.g. SECRET_READ, GIT_WRITE) needed. */
+  requiredAuthority?: string;
+  /** Ordered list of repair steps the operator can take. */
+  repairSteps: string[];
+}
+
+const POLICY_VIOLATION_PATTERNS: Array<{
+  pattern: RegExp;
+  violationType: PolicyViolationType;
+  explanation: string;
+  requiredRole?: string;
+  requiredAuthority?: string;
+  repairSteps: string[];
+}> = [
+  {
+    pattern: /POLICY_VIOLATION.*not authorized for project|not authorized.*project/i,
+    violationType: 'project_scope_denied',
+    explanation: 'The current persona is not authorized to access this project.',
+    requiredRole: 'mission_controller or project owner persona',
+    repairSteps: [
+      'Set KYBERION_PERSONA to a persona listed in the project\'s auth-grants.json.',
+      'Run `pnpm mission list` to verify the mission ID is correct.',
+      'If you need project access, ask the project owner to add your persona to auth-grants.json.',
+    ],
+  },
+  {
+    pattern: /POLICY_VIOLATION.*tenant\.broker_expired|broker.*expired/i,
+    violationType: 'tenant_broker_expired',
+    explanation: 'The cross-tenant brokerage grant has expired.',
+    requiredRole: 'ecosystem_architect',
+    requiredAuthority: 'CROSS_TENANT_BROKER',
+    repairSteps: [
+      'Update the brokerage entry in active/shared/cross-tenant-broker.json with a new expires_at.',
+      'Ensure approved_by and approved_at are set by an ecosystem_architect persona.',
+      'Re-run the operation after the brokerage is refreshed.',
+    ],
+  },
+  {
+    pattern: /POLICY_VIOLATION.*tenant\.broker_missing|broker.*missing|cross.?tenant.*broker/i,
+    violationType: 'tenant_broker_missing',
+    explanation: 'A cross-tenant brokerage grant is required but not present.',
+    requiredRole: 'ecosystem_architect',
+    requiredAuthority: 'CROSS_TENANT_BROKER',
+    repairSteps: [
+      'Create a brokerage entry in active/shared/cross-tenant-broker.json.',
+      'Fields required: source_tenant, target_tenant, purpose, approved_by, approved_at, expires_at.',
+      'The approved_by value must be an ecosystem_architect persona.',
+    ],
+  },
+  {
+    pattern: /POLICY_VIOLATION.*tenant\.|tenant.*scope/i,
+    violationType: 'tenant_scope_denied',
+    explanation: 'The current persona is not authorized for this tenant scope.',
+    requiredRole: 'mission_controller with tenant binding',
+    repairSteps: [
+      'Set KYBERION_CUSTOMER to the correct tenant slug.',
+      'Verify the tenant slug is registered in knowledge/confidential/{tenant}/.',
+      'Ensure KYBERION_PERSONA is bound to this tenant in the mission state.',
+    ],
+  },
+  {
+    pattern: /POLICY_VIOLATION.*path.?scope|path-scope-policy|outside project root/i,
+    violationType: 'path_scope_denied',
+    explanation: 'The write path is outside the allowed scope for the current persona.',
+    requiredRole: 'mission_controller',
+    repairSteps: [
+      'Confirm the target path is under active/missions/{id}/ or active/shared/.',
+      'Set KYBERION_PERSONA and MISSION_ROLE to match the mission owner.',
+      'Use tenantMissionDir() instead of a hardcoded path for tenant-scoped writes.',
+    ],
+  },
+  {
+    pattern: /approval[\s_-]?required|enforceApprovalGate|approval gate/i,
+    violationType: 'approval_required',
+    explanation: 'This action requires explicit approval before it can proceed.',
+    requiredRole: 'approver persona (governance_lead or ecosystem_architect)',
+    repairSteps: [
+      'Run `pnpm cli approval` to open the approval flow.',
+      'The approver must set the approval flag in the mission state or auth-grants.json.',
+      'After approval is recorded, re-run the operation.',
+    ],
+  },
+  {
+    pattern: /POLICY_VIOLATION.*tier|tier.*(violation|guard|denied)|knowledge\/confidential/i,
+    violationType: 'tier_access_denied',
+    explanation: 'The requested operation requires access to a higher knowledge tier.',
+    requiredRole: 'knowledge_steward or ecosystem_architect',
+    requiredAuthority: 'KNOWLEDGE_WRITE',
+    repairSteps: [
+      'Set KYBERION_PERSONA to a persona with the required tier access.',
+      'Personal tier (knowledge/personal/) requires sovereign or personal persona.',
+      'Confidential tier (knowledge/confidential/) requires ecosystem_architect or knowledge_steward.',
+    ],
+  },
+];
+
+/**
+ * Produce a structured diagnosis for a POLICY_VIOLATION error string.
+ * Returns the violation type, required role/authority, and ordered repair steps.
+ * Call this when `classifyError()` returns category 'governance_block' or 'permission_denied'
+ * to present actionable guidance to the operator.
+ */
+export function explainPolicyViolation(errorText: string): PolicyViolationDiagnostic {
+  for (const entry of POLICY_VIOLATION_PATTERNS) {
+    if (entry.pattern.test(errorText)) {
+      return {
+        violationType: entry.violationType,
+        explanation: entry.explanation,
+        requiredRole: entry.requiredRole,
+        requiredAuthority: entry.requiredAuthority,
+        repairSteps: entry.repairSteps,
+      };
+    }
+  }
+  return {
+    violationType: 'unknown_policy_violation',
+    explanation: 'A policy violation was raised but the specific rule could not be identified.',
+    repairSteps: [
+      'Check KYBERION_PERSONA and MISSION_ROLE environment variables.',
+      'Run `pnpm doctor` to verify environment health.',
+      'Review the full error message for a POLICY_VIOLATION prefix with additional detail.',
+    ],
+  };
+}
 
 /**
  * Classify an error. Accepts an Error, string, or { message, code } object.

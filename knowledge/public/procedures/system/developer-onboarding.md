@@ -62,7 +62,7 @@ This is a procedure (not architecture). Architecture lives under
 
 - Pick something small (a typo fix, a missing test, a tiny new pipeline
   step). Drive it through the full mission lifecycle.
-- Touch the audit chain and see your work land in `knowledge/incidents/`
+- Touch the audit chain and see your work land in `knowledge/public/evolution/`
   via `distill`.
 
 ### Steps
@@ -97,7 +97,7 @@ This is a procedure (not architecture). Architecture lives under
 ### Done when
 
 - [ ] Your mission completes the lifecycle end-to-end
-- [ ] `knowledge/incidents/distill_msn-dev-onboard-*.md` exists
+- [ ] `knowledge/public/evolution/distill_msn-dev-onboard-*.md` exists
 - [ ] The audit chain shows your mission's create / activate / checkpoint
       / verify / distill events with hash continuity
 - [ ] `pnpm run validate` passes
@@ -145,7 +145,7 @@ work you actually do.
 3. `pnpm watch:tenant-drift` — multi-tenant integrity.
 4. `git log` on a related actuator's `examples/*.json` — learn by
    imitation.
-5. `knowledge/incidents/distill_*.md` — distilled lessons from prior
+5. `knowledge/public/evolution/distill_*.md` — distilled lessons from prior
    missions.
 
 If you hit something that should have been caught by validation but

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { buildKnowledgeIndex, queryKnowledge, type KnowledgeHintIndex } from './src/knowledge-index.js';
+import { buildScopedIndex, queryKnowledge, queryKnowledgeHybrid, DEFAULT_SCOPE, type KnowledgeHintIndex, type KnowledgeScope } from './src/knowledge-index.js';
 
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
@@ -149,9 +149,15 @@ function deriveSurfaceQueryRole(context: SurfaceRuntimeRouteContext): string | u
 }
 
 let knowledgeIndexPromise: Promise<KnowledgeHintIndex> | null = null;
+let _lastScope: KnowledgeScope | null = null;
 
-async function loadKnowledgeHintIndex(): Promise<KnowledgeHintIndex> {
-  knowledgeIndexPromise ||= buildKnowledgeIndex(pathResolver.knowledge());
+async function loadKnowledgeHintIndex(scope: KnowledgeScope = DEFAULT_SCOPE): Promise<KnowledgeHintIndex> {
+  // Rebuild if scope changed (e.g. surface switches customer context)
+  const scopeKey = JSON.stringify(scope);
+  if (!knowledgeIndexPromise || JSON.stringify(_lastScope) !== scopeKey) {
+    _lastScope = scope;
+    knowledgeIndexPromise = buildScopedIndex(scope);
+  }
   return knowledgeIndexPromise;
 }
 
@@ -327,7 +333,7 @@ async function handleSurfaceQueryRoute(
   if (queryType === 'knowledge_search') {
     const providerLabel = providerConfig.knowledge?.provider || 'local_index';
     const index = await loadKnowledgeHintIndex();
-    const results = queryKnowledge(index, queryText, { maxResults: 5 });
+    const results = await queryKnowledgeHybrid(index, queryText, { maxResults: 5 });
     const text =
       results.length === 0
         ? `No local knowledge hints matched: ${queryText}`

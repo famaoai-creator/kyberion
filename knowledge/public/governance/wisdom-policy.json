@@ -44,14 +44,14 @@
       "trigger": "mission_completion",
       "action": "distill_mission",
       "target_tier": "confidential",
-      "output_dir": "knowledge/incidents"
+      "output_dir": "knowledge/public/evolution"
     },
     {
       "id": "RULE-W002",
       "trigger": "scheduled_weekly",
       "action": "distill_ledger",
       "target_tier": "public",
-      "output_dir": "knowledge/evolution"
+      "output_dir": "knowledge/public/evolution"
     },
     {
       "id": "RULE-W003",
@@ -62,8 +62,8 @@
     }
   ],
   "tier_mapping": {
-    "public": "knowledge/evolution",
-    "confidential": "knowledge/incidents",
+    "public": "knowledge/public/evolution",
+    "confidential": "knowledge/public/evolution",
     "personal": "vault/private/wisdom"
   }
 }

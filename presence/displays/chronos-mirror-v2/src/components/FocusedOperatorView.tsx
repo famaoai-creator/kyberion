@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { findLatestMissionHandoff, type MissionAssetCategory } from "../lib/mission-progress";
-import { buildAttentionItems } from "../lib/operator-console";
+import { buildAttentionItems, type AttentionItem } from "../lib/operator-console";
 import { buildRuntimeTopologyGraph } from "../lib/runtime-topology";
 import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
+import { TraceViewer } from "./TraceViewer";
 
-type FocusedViewId =
+export type FocusedViewId =
   | "needs-attention"
   | "mission-control-plane"
   | "computer-sessions"
@@ -15,7 +16,8 @@ type FocusedViewId =
   | "runtime-lease-doctor"
   | "recent-surface-outbox"
   | "secret-approval-queue"
-  | "owner-summaries";
+  | "owner-summaries"
+  | "trace-viewer";
 
 interface Payload {
   activeMissions: Array<{
@@ -165,6 +167,7 @@ const TITLES: Record<FocusedViewId, string> = {
   "recent-surface-outbox": "Delivery Exceptions",
   "secret-approval-queue": "Secret Approvals",
   "owner-summaries": "Audit Trail",
+  "trace-viewer": "Trace Viewer",
 };
 
 const ASSET_FILTERS: Array<{ id: "all" | MissionAssetCategory; label: string }> = [
@@ -248,13 +251,128 @@ function graphNodePalette(kind: "surface" | "runtime" | "peer"): { fill: string;
 
 const RUNTIME_GRAPH_NODE_WIDTH = 156;
 const RUNTIME_GRAPH_NODE_HEIGHT = 40;
+const FOCUSED_OPERATOR_PREFS_KEY = "chronos.focused-operator.prefs";
+
+export function attentionItemTargetViewId(item: AttentionItem): FocusedViewId | null {
+  if (item.targetType === "mission") return "mission-control-plane";
+  if (item.targetType === "runtime") return "runtime-lease-doctor";
+  if (item.targetType === "surface") return "runtime-topology-map";
+  if (item.targetType === "delivery") return "recent-surface-outbox";
+  if (item.targetType === "approval") return "secret-approval-queue";
+  return null;
+}
+
+export function attentionItemTargetMissionId(item: AttentionItem): string | null {
+  return item.targetType === "mission" ? item.targetId : null;
+}
+
+function attentionItemTargetViewLabel(item: AttentionItem): string | null {
+  const viewId = attentionItemTargetViewId(item);
+  if (viewId === "mission-control-plane") return "Mission Control";
+  if (viewId === "runtime-lease-doctor") return "Runtime Governance";
+  if (viewId === "runtime-topology-map") return "Runtime Topology";
+  if (viewId === "recent-surface-outbox") return "Delivery Exceptions";
+  if (viewId === "secret-approval-queue") return "Secret Approvals";
+  return null;
+}
+
+function loadFocusedOperatorSelectedSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(FOCUSED_OPERATOR_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<{ selectedSessionId: string | null }>;
+    return typeof parsed.selectedSessionId === "string" ? parsed.selectedSessionId : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveFocusedOperatorSelectedSessionId(selectedSessionId: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      FOCUSED_OPERATOR_PREFS_KEY,
+      JSON.stringify({ selectedSessionId }),
+    );
+  } catch {
+    // localStorage may be denied; ignore.
+  }
+}
+
+export function pickDefaultSessionId(
+  sessions: Payload["computerSessions"],
+  selectedSessionId: string | null,
+): string | null {
+  if (selectedSessionId && sessions.some((session) => session.id === selectedSessionId)) {
+    return selectedSessionId;
+  }
+  const prioritized =
+    sessions.find((session) => session.kind === "browser" && session.status === "active") ||
+    sessions.find((session) => session.kind === "terminal" && session.status === "active") ||
+    sessions.find((session) => session.status === "active") ||
+    sessions
+      .slice()
+      .sort((left, right) => {
+        const leftTime = new Date(left.updatedAt).getTime();
+        const rightTime = new Date(right.updatedAt).getTime();
+        if (Number.isNaN(leftTime) && Number.isNaN(rightTime)) return 0;
+        if (Number.isNaN(leftTime)) return 1;
+        if (Number.isNaN(rightTime)) return -1;
+        return rightTime - leftTime;
+      })[0] ||
+    sessions[0] ||
+    null;
+  return prioritized?.id || null;
+}
+
+export function resolveComputerSessionHotkeySelection(
+  sessions: Payload["computerSessions"],
+  currentSessionId: string | null,
+  key: string,
+): string | null {
+  const normalized = key.toLowerCase();
+  const index = Number.parseInt(normalized, 10);
+  if (Number.isInteger(index) && index >= 1 && index <= 9) {
+    return sessions[index - 1]?.id || null;
+  }
+
+  if (normalized !== "j" && normalized !== "k") return null;
+  if (sessions.length === 0) return null;
+
+  const currentIndex = currentSessionId ? sessions.findIndex((session) => session.id === currentSessionId) : -1;
+  if (normalized === "j") {
+    return sessions[Math.min(sessions.length - 1, currentIndex + 1 >= 0 ? currentIndex + 1 : 0)]?.id || sessions[0]?.id || null;
+  }
+  if (currentIndex <= 0) {
+    return sessions[0]?.id || null;
+  }
+  return sessions[currentIndex - 1]?.id || sessions[0]?.id || null;
+}
+
+function isEditableHotkeyTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  return Boolean(
+    element &&
+      (element.tagName === "INPUT" ||
+        element.tagName === "TEXTAREA" ||
+        element.tagName === "SELECT" ||
+        element.isContentEditable),
+  );
+}
 
 export function FocusedOperatorView({
   viewId,
   onBack,
+  onOpenView,
+  focusedMissionId,
+  onOpenMissionThread,
 }: {
   viewId: FocusedViewId;
   onBack: () => void;
+  onOpenView?: (viewId: FocusedViewId, missionId?: string | null) => void;
+  focusedMissionId?: string | null;
+  onOpenMissionThread?: (missionId: string) => void;
 }) {
   const locale = resolveChronosLocale();
   const ft = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
@@ -263,6 +381,10 @@ export function FocusedOperatorView({
   const [error, setError] = useState<string | null>(null);
   const [assetFilter, setAssetFilter] = useState<"all" | MissionAssetCategory>("all");
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    () => loadFocusedOperatorSelectedSessionId(),
+  );
+  const [highlightedMissionId, setHighlightedMissionId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -314,6 +436,48 @@ export function FocusedOperatorView({
       source.close();
     };
   }, [viewId]);
+
+  useEffect(() => {
+    if (viewId !== "computer-sessions") return;
+    const sessionId = pickDefaultSessionId(data?.computerSessions || [], selectedSessionId);
+    if (!sessionId || sessionId === selectedSessionId) return;
+    setSelectedSessionId(sessionId);
+  }, [data?.computerSessions, selectedSessionId, viewId]);
+
+  useEffect(() => {
+    if (viewId !== "computer-sessions") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isEditableHotkeyTarget(event.target)) return;
+      const nextSessionId = resolveComputerSessionHotkeySelection(data?.computerSessions || [], selectedSessionId, event.key);
+      if (!nextSessionId) return;
+      event.preventDefault();
+      setSelectedSessionId(nextSessionId);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [data?.computerSessions, selectedSessionId, viewId]);
+
+  useEffect(() => {
+    saveFocusedOperatorSelectedSessionId(selectedSessionId);
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (viewId !== "mission-control-plane") return;
+    if (!focusedMissionId) {
+      setHighlightedMissionId(null);
+      return;
+    }
+    const timer = window.requestAnimationFrame(() => {
+      document.getElementById(`mission-card-${focusedMissionId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      setHighlightedMissionId(focusedMissionId);
+    });
+    return () => window.cancelAnimationFrame(timer);
+  }, [data?.activeMissions.length, focusedMissionId, viewId]);
 
   const attentionItems = useMemo(() => {
     if (!data) return [];
@@ -408,6 +572,19 @@ export function FocusedOperatorView({
               <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">{item.title}</div>
               <div className="mt-2 text-sm text-white/82">{item.reason}</div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.18em] text-white/38">{item.targetType}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {onOpenView && attentionItemTargetViewId(item) ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenView(attentionItemTargetViewId(item)!, attentionItemTargetMissionId(item))
+                    }
+                    className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/14"
+                  >
+                    {`Open ${attentionItemTargetViewLabel(item) || "related view"}`}
+                  </button>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
@@ -419,7 +596,15 @@ export function FocusedOperatorView({
             (() => {
               const progress = data.missionProgress.find((entry) => entry.missionId === mission.missionId);
               return (
-                <div key={mission.missionId} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                <div
+                  key={mission.missionId}
+                  id={`mission-card-${mission.missionId}`}
+                  className={`rounded-2xl border px-4 py-4 transition ${
+                    highlightedMissionId === mission.missionId
+                      ? "border-cyan-300/30 bg-cyan-400/12"
+                      : "border-white/8 bg-black/20"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[11px] font-semibold text-white/90">{mission.missionId}</div>
                     <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">{mission.controlSummary}</div>
@@ -447,9 +632,18 @@ export function FocusedOperatorView({
                         <div>completed <span className="font-mono text-white/82">{progress?.nextTasksCompleted ?? 0}</span></div>
                         <div>control <span className="font-mono text-white/82">{mission.controlTone}</span></div>
                       </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    {onOpenMissionThread ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenMissionThread(mission.missionId)}
+                        className="mt-3 rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/14"
+                      >
+                        Open mission thread
+                      </button>
+                    ) : null}
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
                     <div className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
                       <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">dependencies</div>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -545,37 +739,98 @@ export function FocusedOperatorView({
       )}
 
       {viewId === "computer-sessions" && (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-[0.95fr,1.05fr]">
           {data.computerSessions.length === 0 ? (
             <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/50 lg:col-span-2">
               No active browser or terminal sessions are currently registered.
             </div>
-          ) : data.computerSessions.map((session) => (
-            <div key={`${session.kind}:${session.id}`} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold text-white/90">{session.id}</div>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">{session.kind}</div>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
-                <div>status <span className="font-mono text-white/82">{session.status}</span></div>
-                <div>updated <span className="font-mono text-white/82">{formatTimestamp(session.updatedAt)}</span></div>
-                <div>pid <span className="font-mono text-white/82">{session.pid ?? "—"}</span></div>
-                <div>actions <span className="font-mono text-white/82">{session.actionCount ?? 0}</span></div>
-              </div>
-              {session.target ? (
-                <div className="mt-3 text-[10px] text-white/48">target <span className="font-mono text-white/74">{session.target}</span></div>
-              ) : null}
-              {session.detail ? (
-                <div className="mt-2 text-[10px] leading-5 text-white/62">{session.detail}</div>
-              ) : null}
-              {session.metadata && Object.keys(session.metadata).length > 0 ? (
-                <div className="mt-3 rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">metadata</div>
-                  <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-5 text-white/58">{JSON.stringify(session.metadata, null, 2)}</pre>
+          ) : (
+            <>
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">sessions</div>
+                  <div className="text-[9px] uppercase tracking-[0.16em] text-white/34">1-9 · J/K</div>
                 </div>
-              ) : null}
-            </div>
-          ))}
+                <div className="space-y-2">
+                {data.computerSessions.map((session) => {
+                  const active = session.id === selectedSessionId;
+                  return (
+                    <button
+                      key={`${session.kind}:${session.id}`}
+                      type="button"
+                      onClick={() => setSelectedSessionId(session.id)}
+                      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                        active
+                          ? "border-cyan-300/30 bg-cyan-400/10"
+                          : "border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[11px] font-semibold text-white/90">{session.id}</div>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">{session.kind}</div>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div>status <span className="font-mono text-white/82">{session.status}</span></div>
+                        <div>updated <span className="font-mono text-white/82">{formatTimestamp(session.updatedAt)}</span></div>
+                        <div>pid <span className="font-mono text-white/82">{session.pid ?? "—"}</span></div>
+                        <div>actions <span className="font-mono text-white/82">{session.actionCount ?? 0}</span></div>
+                      </div>
+                      {active ? (
+                        <div className="mt-3 text-[10px] uppercase tracking-[0.18em] text-cyan-100/70">selected</div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">selected session</div>
+                {(() => {
+                  const session = data.computerSessions.find(
+                    (entry) => entry.id === pickDefaultSessionId(data.computerSessions, selectedSessionId),
+                  );
+                  if (!session) {
+                    return (
+                      <div className="mt-2 text-[10px] text-white/38">Select a session to inspect its details.</div>
+                    );
+                  }
+                  return (
+                    <>
+                      <div className="mt-2 text-[11px] font-semibold text-white/90">{session.id}</div>
+                      <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-white/38">
+                        {session.kind} · {session.status}
+                      </div>
+                      {session.target ? (
+                        <div className="mt-3 text-[10px] text-white/48">target <span className="font-mono text-white/74">{session.target}</span></div>
+                      ) : null}
+                      {session.detail ? (
+                        <div className="mt-2 text-[10px] leading-5 text-white/62">{session.detail}</div>
+                      ) : null}
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+                        <div>updated <span className="font-mono text-white/82">{formatTimestamp(session.updatedAt)}</span></div>
+                        <div>pid <span className="font-mono text-white/82">{session.pid ?? "—"}</span></div>
+                        <div>actions <span className="font-mono text-white/82">{session.actionCount ?? 0}</span></div>
+                        <div>status <span className="font-mono text-white/82">{session.status}</span></div>
+                      </div>
+                      {session.metadata && Object.keys(session.metadata).length > 0 ? (
+                        <div className="mt-3 rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
+                          <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">metadata</div>
+                          <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-5 text-white/58">{JSON.stringify(session.metadata, null, 2)}</pre>
+                        </div>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSessionId(null)}
+                        className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                      >
+                        Reset session focus
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -845,6 +1100,8 @@ export function FocusedOperatorView({
           ))}
         </div>
       )}
+
+      {viewId === "trace-viewer" && <TraceViewer autoOpenRawTrace />}
 
       {viewId === "owner-summaries" && (
         <div className="grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">

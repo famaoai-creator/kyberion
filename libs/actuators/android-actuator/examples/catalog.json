@@ -91,6 +91,20 @@
       "path": "libs/actuators/android-actuator/examples/android-runtime-webview-handoff-template.json",
       "description": "Pulls a runtime-exported WebView session handoff artifact from an Android device and records foreground activity state.",
       "tags": ["android", "webview", "runtime-export", "session-handoff", "template"]
+    },
+    {
+      "id": "android-cli-health-check",
+      "title": "Android CLI Health Check",
+      "path": "libs/actuators/android-actuator/examples/android-cli-health-check.json",
+      "description": "Checks whether the Android CLI for AI agents binary is available and returns its version.",
+      "tags": ["android", "android-cli", "health-check", "example"]
+    },
+    {
+      "id": "android-cli-visual-workflow",
+      "title": "Android CLI Visual Workflow",
+      "path": "libs/actuators/android-actuator/examples/android-cli-visual-workflow.json",
+      "description": "Captures a JSON UI layout and annotated screenshot via Android CLI, then resolves a target label to screen coordinates and taps it.",
+      "tags": ["android", "android-cli", "layout", "screen-capture", "screen-resolve", "visual", "template"]
     }
   ]
 }

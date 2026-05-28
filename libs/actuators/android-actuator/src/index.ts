@@ -263,6 +263,106 @@ async function opCapture(
         last_ui_tree_path: outPath,
       };
     }
+    case 'android_cli_health_check': {
+      const health = collectAndroidCliHealth(options);
+      return {
+        ...ctx,
+        [params.export_as || 'android_cli_health']: health,
+        android_cli_available: health.available,
+      };
+    }
+    case 'android_cli_layout': {
+      ensureAndroidCliAvailable(options);
+      const cliArgs: string[] = ['layout'];
+      const serial = resolveSerial(ctx, options, params);
+      if (serial) cliArgs.push('--serial', serial);
+      if (params.pretty !== false) cliArgs.push('--pretty');
+      const raw = await withRetry(
+        async () => runAndroidCli(cliArgs, options),
+        buildRetryOptions(),
+      );
+      let layout: unknown;
+      try {
+        layout = JSON.parse(raw);
+      } catch {
+        layout = raw;
+      }
+      const outPath = params.path
+        ? path.resolve(rootDir, resolve(params.path))
+        : path.join(ctx.artifacts_dir, `cli-layout-${Date.now()}.json`);
+      ensureParentDir(outPath);
+      safeWriteFile(outPath, typeof layout === 'string' ? layout : JSON.stringify(layout, null, 2));
+      return {
+        ...ctx,
+        [params.export_as || 'last_cli_layout']: layout,
+        last_cli_layout_path: outPath,
+      };
+    }
+    case 'android_cli_screen_resolve': {
+      ensureAndroidCliAvailable(options);
+      const screenshotPath = String(resolve(params.screenshot_path || ctx.last_screenshot_path || ''));
+      const label = String(resolve(params.string || params.label || ''));
+      if (!screenshotPath) throw new Error('android_cli_screen_resolve requires params.screenshot_path or ctx.last_screenshot_path');
+      if (!label) throw new Error('android_cli_screen_resolve requires params.string');
+      const cliArgs = ['screen', 'resolve', `--screenshot=${screenshotPath}`, `--string=${label}`];
+      const raw = await withRetry(
+        async () => runAndroidCli(cliArgs, options),
+        buildRetryOptions(),
+      );
+      let resolved: unknown;
+      try {
+        resolved = JSON.parse(raw);
+      } catch {
+        resolved = { raw };
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_screen_resolve']: resolved,
+      };
+    }
+    case 'android_cli_describe': {
+      ensureAndroidCliAvailable(options);
+      const cliArgs: string[] = ['describe'];
+      const serial = resolveSerial(ctx, options, params);
+      if (serial) cliArgs.push('--serial', serial);
+      const apkPath = resolve(params.apk_path || '');
+      if (apkPath) cliArgs.push(String(apkPath));
+      const raw = await withRetry(
+        async () => runAndroidCli(cliArgs, options),
+        buildRetryOptions(),
+      );
+      let description: unknown;
+      try {
+        description = JSON.parse(raw);
+      } catch {
+        description = raw;
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_cli_description']: description,
+      };
+    }
+    case 'android_cli_docs_search': {
+      ensureAndroidCliAvailable(options);
+      const query = String(resolve(params.query || ''));
+      if (!query) throw new Error('android_cli_docs_search requires params.query');
+      const cliArgs = ['docs', 'search', query];
+      if (params.limit) cliArgs.push('--limit', String(resolve(params.limit)));
+      const raw = await withRetry(
+        async () => runAndroidCli(cliArgs, options),
+        buildRetryOptions(),
+      );
+      let results: unknown;
+      try {
+        results = JSON.parse(raw);
+      } catch {
+        results = raw;
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'last_docs_results']: results,
+      };
+    }
     default:
       logger.warn(`[ANDROID_CAPTURE] Unknown capture op: ${op}`);
       return ctx;
@@ -491,6 +591,25 @@ async function opApply(
       safeCleanupRemote(serial, remotePath, options);
       return { ...ctx, last_screenshot_path: outPath };
     }
+    case 'android_cli_screen_capture': {
+      ensureAndroidCliAvailable(options);
+      const outPath = path.resolve(
+        rootDir,
+        resolve(params.path || path.join(ctx.artifacts_dir, `cli-screen-${Date.now()}.png`))
+      );
+      ensureParentDir(outPath);
+      const cliArgs = ['screen', 'capture', '--output', outPath];
+      const serial = resolveSerial(ctx, options, params);
+      if (serial) cliArgs.push('--serial', serial);
+      if (params.annotate) cliArgs.push('--annotate');
+      await withRetry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
+      return {
+        ...ctx,
+        last_screenshot_path: outPath,
+        [params.export_as || 'last_cli_screenshot_path']: outPath,
+        last_cli_screenshot_annotated: Boolean(params.annotate),
+      };
+    }
     case 'wait_for_ui_text': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
@@ -690,6 +809,28 @@ function normalizeAdbInputText(input: string): string {
     .replace(/ /g, '%s')
     .replace(/[&<>|;$`"']/g, '')
     .trim();
+}
+
+function runAndroidCli(args: string[], options?: AndroidAction['options']): string {
+  return safeExec('android', args, { timeoutMs: options?.timeout_ms || 30000 }).trim();
+}
+
+function collectAndroidCliHealth(options?: AndroidAction['options']): { available: boolean; version?: string; error?: string } {
+  try {
+    const version = safeExec('android', ['--version'], {
+      timeoutMs: options?.timeout_ms || 10000,
+    }).trim();
+    return { available: true, version };
+  } catch (error: any) {
+    return { available: false, error: error.message };
+  }
+}
+
+function ensureAndroidCliAvailable(options?: AndroidAction['options']): void {
+  const health = collectAndroidCliHealth(options);
+  if (!health.available) {
+    throw new Error(`android CLI is not available: ${health.error}`);
+  }
 }
 
 function safeCleanupRemote(serial: string, remotePath: string, options?: AndroidAction['options']) {
