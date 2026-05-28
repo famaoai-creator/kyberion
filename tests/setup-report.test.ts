@@ -77,7 +77,13 @@ describe('setup report', () => {
     mocks.runReasoningSetup.mockResolvedValue({ must: 1, should: 0, nice: 0 });
     mocks.collectDoctorReport.mockResolvedValue({
       totalMissing: 2,
-      summaries: [],
+      summaries: [
+        {
+          manifestId: 'kyberion-runtime-baseline',
+          lines: ['baseline gap'],
+          counts: { must: 1, should: 1, nice: 0 },
+        },
+      ],
     });
 
     const { runSetupReportWithPersona } = await import('../scripts/setup_report.js');
@@ -88,5 +94,18 @@ describe('setup report', () => {
     expect(report.surfaces.summary.missing).toBe(1);
     expect(report.services.summary.authMissing).toBe(1);
     expect(report.doctor.totalMissing).toBe(2);
+    expect(report.nextActions).toHaveLength(3);
+    expect(report.nextActions[0]).toMatchObject({
+      title: 'Reconcile surface readiness',
+      suggested_command: 'pnpm surfaces:reconcile',
+    });
+    expect(report.nextActions[1]).toMatchObject({
+      title: 'Repair service setup',
+      suggested_command: 'pnpm services:setup',
+    });
+    expect(report.nextActions[2]).toMatchObject({
+      title: 'Bootstrap kyberion-runtime-baseline',
+      suggested_command: 'pnpm env:bootstrap --manifest kyberion-runtime-baseline --apply',
+    });
   });
 });

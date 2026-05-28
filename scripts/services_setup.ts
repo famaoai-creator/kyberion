@@ -1,6 +1,8 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   customerResolver,
+  buildNextAction,
+  formatNextAction,
   inspectServiceAuth,
   loadServiceEndpointsCatalog,
   logger,
@@ -20,6 +22,7 @@ type ServiceSetupRow = {
   secrets: string;
   cli: string;
   hint: string;
+  nextAction?: ReturnType<typeof buildNextAction>;
 };
 
 type RankedServiceSetupRow = ServiceSetupRow & { priority: number };
@@ -65,6 +68,22 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
       secrets: auth?.requiredSecrets.join(', ') || '',
       cli: auth?.cliFallbacks.join(', ') || '',
       hint: auth?.setupHint || 'Host-managed service or no preset path.',
+      nextAction:
+        auth && !auth.valid
+          ? buildNextAction({
+              title: `Fix service auth for ${serviceId}`,
+              reason: auth.setupHint,
+              next_action_type: 'bootstrap_environment',
+              suggested_command: 'pnpm services:setup',
+            })
+          : connection.connection === 'missing'
+            ? buildNextAction({
+                title: `Add connection file for ${serviceId}`,
+                reason: `Missing connection file at ${connection.connectionPath}.`,
+                next_action_type: 'inspect_artifact',
+                suggested_command: 'pnpm services:setup',
+              })
+            : undefined,
     };
   }));
 
@@ -99,6 +118,11 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
         console.log(formatSetupHintLine(row.hint));
         if (row.connection === 'missing') {
           console.log(formatSetupHintLine(`Connection file: ${path.relative(pathResolver.rootDir(), row.connectionPath)}`));
+        }
+        if (row.nextAction) {
+          for (const line of formatNextAction(row.nextAction)) {
+            console.log(line);
+          }
         }
       }
     }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { listEnvironmentManifestIds, loadEnvironmentManifest, probeManifest } from '@agent/core';
+import { buildNextAction, formatNextAction } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
@@ -90,6 +91,18 @@ async function main(): Promise<void> {
     ? ' or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps'
     : '';
   console.log(`Next step: run \`pnpm env:bootstrap --manifest <id> --apply\` for missing must/should items${meetingHint}.`);
+  const firstMissingSummary = report.summaries.find((summary) => summary.counts.must + summary.counts.should > 0);
+  if (firstMissingSummary) {
+    const nextAction = buildNextAction({
+      title: `Bootstrap ${firstMissingSummary.manifestId}`,
+      reason: `Doctor reports ${firstMissingSummary.counts.must} must and ${firstMissingSummary.counts.should} should gaps.`,
+      next_action_type: 'bootstrap_environment',
+      suggested_command: `pnpm env:bootstrap --manifest ${firstMissingSummary.manifestId} --apply`,
+    });
+    for (const line of formatNextAction(nextAction)) {
+      console.log(line);
+    }
+  }
   process.exit(1);
 }
 
