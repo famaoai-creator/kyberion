@@ -6,14 +6,22 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 const allowedCoreFsImports = [
   'libs/core/action-item-store.test.ts',
+  'libs/core/audit-chain-tenant.test.ts',
+  'libs/core/data-vault.test.ts',
   'libs/core/environment-capability.test.ts',
   'libs/core/evidence-chain.test.ts',
   'libs/core/fs-primitives.ts',
   'libs/core/heuristic-feedback.test.ts',
   'libs/core/intent-snapshot-store.test.ts',
   'libs/core/ledger.test.ts',
+  'libs/core/meeting-participation-coordinator.test.ts',
   'libs/core/metrics.test.ts',
   'libs/core/mission-evidence-doc.test.ts',
+  'libs/core/mlx-embedding-backend.ts',
+  'libs/core/process-logger.test.ts',
+  'libs/core/promoted-memory.test.ts',
+  'libs/core/python-voice-bridge.test.ts',
+  'libs/core/python-voice-bridge.ts',
   'libs/core/relationship-graph-store.test.ts',
   'libs/core/requirements-draft-store.test.ts',
   'libs/core/sdlc-artifact-store.test.ts',
@@ -25,7 +33,6 @@ const allowedCoreFsImports = [
   'libs/core/src/actuator-capability.test.ts',
   'libs/core/src/feedback-loop.test.ts',
   'libs/core/src/knowledge-index.test.ts',
-  'libs/core/validators.test.ts',
   'libs/core/src/native-docx-engine/__tests__/docx-engine.test.ts',
   'libs/core/src/native-docx-engine/engine.ts',
   'libs/core/src/native-docx-engine/examples/roundtrip_docx.ts',
@@ -40,7 +47,12 @@ const allowedCoreFsImports = [
   'libs/core/src/pfc/SovereignSentinel.test.ts',
   'libs/core/src/pipeline-engine.test.ts',
   'libs/core/src/pipeline-preview.test.ts',
+  'libs/core/src/trace.test.ts',
+  'libs/core/storage-janitor.test.ts',
+  'libs/core/tenant-registry.test.ts',
+  'libs/core/tier-guard-tenant.test.ts',
   'libs/core/trust-engine.test.ts',
+  'libs/core/validators.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {

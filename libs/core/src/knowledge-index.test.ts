@@ -4,13 +4,21 @@ import * as path from 'node:path';
 
 // Mock dependencies
 vi.mock('../path-resolver.js', () => ({
-  knowledge: () => '/tmp/test-knowledge-base',
+  knowledge: (sub = '') => sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base',
+  // Named pathResolver object used by core.ts / embedding-backend.ts
+  pathResolver: {
+    shared: (sub = '') => sub ? `/tmp/test-shared/${sub}` : '/tmp/test-shared',
+    rootDir: () => '/tmp/test-root',
+    knowledge: (sub = '') => sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base',
+  },
 }));
 
 vi.mock('../secure-io.js', () => ({
   safeExistsSync: (p: string) => fs.existsSync(p),
   safeReaddir: (p: string) => fs.readdirSync(p),
   safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
+  safeWriteFile: () => { /* no-op in tests */ },
+  safeMkdir: () => { /* no-op in tests */ },
 }));
 
 import {

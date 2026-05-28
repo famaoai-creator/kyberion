@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Activity,
@@ -30,6 +30,84 @@ interface MissionSummary {
   controlSummary: string;
   controlTone: 'planning' | 'ready' | 'attention' | 'pending';
   controlRequestedBy?: string;
+}
+
+const MISSION_INTELLIGENCE_PREFS_KEY = "chronos.mission-intelligence.prefs";
+
+function loadMissionIntelligenceSelectedMissionId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(MISSION_INTELLIGENCE_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<{ selectedMissionId: string | null }>;
+    return typeof parsed.selectedMissionId === "string" ? parsed.selectedMissionId : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveMissionIntelligenceSelectedMissionId(selectedMissionId: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      MISSION_INTELLIGENCE_PREFS_KEY,
+      JSON.stringify({ selectedMissionId }),
+    );
+  } catch {
+    // localStorage may be denied; ignore.
+  }
+}
+
+export function resolveMissionThreadHotkeyAction(key: string): "thread" | "card" | null {
+  const normalized = key.toLowerCase();
+  if (normalized === "t") return "thread";
+  if (normalized === "c") return "card";
+  return null;
+}
+
+export function resolveMissionControlFocusId(
+  missions: MissionSummary[],
+  selectedMissionId: string | null,
+  focusedMissionId: string | null,
+): string | null {
+  return pickDefaultMissionId(missions, focusedMissionId || selectedMissionId);
+}
+
+export function pickDefaultMissionId(
+  missions: MissionSummary[],
+  selectedMissionId: string | null,
+): string | null {
+  if (selectedMissionId && missions.some((mission) => mission.missionId === selectedMissionId)) {
+    return selectedMissionId;
+  }
+
+  const tonePriority = (tone: MissionSummary['controlTone']): number => {
+    if (tone === 'attention') return 3;
+    if (tone === 'pending') return 2;
+    if (tone === 'ready') return 1;
+    return 0;
+  };
+
+  const prioritized = missions.reduce<{ missionId: string; score: number } | null>((best, mission) => {
+    const score = tonePriority(mission.controlTone) * 1000 + (mission.nextTaskCount || 0);
+    if (!best || score > best.score) {
+      return { missionId: mission.missionId, score };
+    }
+    return best;
+  }, null);
+
+  return prioritized?.missionId || missions[0]?.missionId || null;
+}
+
+function isEditableHotkeyTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  return Boolean(
+    element &&
+      (element.tagName === "INPUT" ||
+        element.tagName === "TEXTAREA" ||
+        element.tagName === "SELECT" ||
+        element.isContentEditable),
+  );
 }
 
 interface OrchestrationEvent {
@@ -906,9 +984,11 @@ interface ReferenceDetail {
 export function MissionIntelligence({
   focusedView = null,
   onClearFocus,
+  focusedMissionId = null,
 }: {
   focusedView?: string | null;
   onClearFocus?: () => void;
+  focusedMissionId?: string | null;
 }) {
   const locale = resolveChronosLocale();
   const mt = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
@@ -940,11 +1020,14 @@ export function MissionIntelligence({
     null
   );
   const [messageMissionFilter, setMessageMissionFilter] = useState<string>('all');
-  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(
+    () => loadMissionIntelligenceSelectedMissionId(),
+  );
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [selectedReferencePath, setSelectedReferencePath] = useState<string | null>(null);
   const [referenceDetail, setReferenceDetail] = useState<ReferenceDetail | null>(null);
+  const missionThreadPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -963,6 +1046,10 @@ export function MissionIntelligence({
     if (project) setSelectedProjectId(project);
     if (track) setSelectedTrackId(track);
   }, []);
+
+  useEffect(() => {
+    saveMissionIntelligenceSelectedMissionId(selectedMissionId);
+  }, [selectedMissionId]);
 
   const jumpToTarget = (action: ControlActionSummary) => {
     const id =
@@ -1008,6 +1095,27 @@ export function MissionIntelligence({
       clearInterval(timer);
     };
   }, []);
+
+  const focusMissionThread = (missionId: string) => {
+    setSelectedMissionId(missionId);
+    setMessageMissionFilter(missionId);
+    if (typeof window === 'undefined') return;
+    window.requestAnimationFrame(() => {
+      missionThreadPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const focusMissionCard = (missionId: string) => {
+    setSelectedMissionId(missionId);
+    setMessageMissionFilter(missionId);
+    if (typeof window === 'undefined') return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(`mission-card-${missionId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
 
   useEffect(() => {
     const source = new EventSource('/api/intelligence/stream');
@@ -1071,6 +1179,13 @@ export function MissionIntelligence({
       source.close();
     };
   }, []);
+
+  useEffect(() => {
+    if (!focusedView) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(focusedView)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [focusedView]);
 
   const remediateLease = async (
     agentId: string,
@@ -1647,6 +1762,9 @@ export function MissionIntelligence({
   const selectedProject = selectedProjectId
     ? data.projects.find((project) => project.project_id === selectedProjectId) || null
     : null;
+  const selectedMission = selectedMissionId
+    ? data.activeMissions.find((mission) => mission.missionId === selectedMissionId) || null
+    : null;
   const availableTracks = selectedProject
     ? data.projectTracks.filter((track) => track.project_id === selectedProject.project_id)
     : data.projectTracks;
@@ -1773,6 +1891,34 @@ export function MissionIntelligence({
   const missionExceptions = filteredMissions.filter(
     (mission) => mission.controlTone === 'attention' || mission.controlTone === 'pending'
   );
+
+  useEffect(() => {
+    if (focusedView !== 'mission-control-plane') return;
+    const missionId = resolveMissionControlFocusId(filteredMissions, selectedMissionId, focusedMissionId);
+    if (!missionId || missionId === selectedMissionId) return;
+    setSelectedMissionId(missionId);
+    setMessageMissionFilter(missionId);
+  }, [filteredMissions, focusedMissionId, focusedView, selectedMissionId]);
+
+  useEffect(() => {
+    if (focusedView !== "mission-control-plane") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isEditableHotkeyTarget(event.target)) return;
+      const action = resolveMissionThreadHotkeyAction(event.key);
+      if (!action || !effectiveMissionId) return;
+      event.preventDefault();
+      if (action === "thread") {
+        focusMissionThread(effectiveMissionId);
+        return;
+      }
+      focusMissionCard(effectiveMissionId);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [effectiveMissionId, focusedView]);
+
   const surfaceExceptions = data.surfaces.filter(
     (surface) => surface.controlTone === 'attention' || surface.health === 'unhealthy'
   );
@@ -2000,6 +2146,21 @@ export function MissionIntelligence({
             <button
               type="button"
               onClick={() => setSelectedProjectId(null)}
+              className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+            >
+              clear focus
+            </button>
+          </div>
+        )}
+        {selectedMission && (
+          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
+            mission focus:{' '}
+            <span className="font-semibold text-white/90">{selectedMission.missionId}</span>
+            <span className="mx-2 text-white/40">·</span>
+            <span className="text-white/80">{buildMissionIntentSummary(data, selectedMission)}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedMissionId(null)}
               className="ml-3 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
             >
               clear focus
@@ -2393,13 +2554,27 @@ export function MissionIntelligence({
                     <div className="mt-3">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedMissionId(mission.missionId);
-                          setMessageMissionFilter(mission.missionId);
-                        }}
+                        onClick={() => focusMissionThread(mission.missionId)}
                         className="rounded-lg border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/12"
                       >
-                        {effectiveMissionId === mission.missionId ? 'focused' : 'focus thread'}
+                        <span className="inline-flex items-center gap-2">
+                          <span>Thread</span>
+                          <span className="rounded-full border border-cyan-200/20 bg-cyan-200/10 px-1.5 py-0.5 text-[8px] tracking-[0.18em] text-cyan-50/80">
+                            T
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => focusMissionCard(mission.missionId)}
+                        className="ml-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <span>Card</span>
+                          <span className="rounded-full border border-white/15 bg-white/8 px-1.5 py-0.5 text-[8px] tracking-[0.18em] text-white/60">
+                            C
+                          </span>
+                        </span>
                       </button>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -4725,70 +4900,86 @@ export function MissionIntelligence({
           </div>
         </Panel>
 
-        <Panel title={mt('chronos_selected_mission_thread', 'Selected Mission Thread')}>
-          <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-white/45">
-            <span>
-              {effectiveMissionId
-                ? `thread view · ${effectiveMissionId}`
-                : mt(
-                    'chronos_select_mission_to_inspect_thread',
-                    'select a mission to inspect a unified thread'
-                  )}
-            </span>
-            <span className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] tracking-[0.16em] text-white/55">
-              {missionPinStatusLabel}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {!effectiveMissionId || missionThread.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                {mt(
-                  'chronos_no_unified_mission_thread',
-                  'No unified mission thread is available yet.'
-                )}
-              </div>
-            ) : (
-              missionThread.map((entry, index) => (
-                <div
-                  key={`${entry.type}-${entry.agentId}-${entry.ts}-${index}`}
-                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+        <div ref={missionThreadPanelRef}>
+          <Panel title={mt('chronos_selected_mission_thread', 'Thread')}>
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-white/45">
+              <span>
+                {effectiveMissionId
+                  ? `thread · ${effectiveMissionId}`
+                  : mt(
+                      'chronos_select_mission_to_inspect_thread',
+                      'select a mission to inspect the thread'
+                    )}
+              </span>
+              <span className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] tracking-[0.16em] text-white/55">
+                {missionPinStatusLabel}
+              </span>
+              {effectiveMissionId ? (
+                <button
+                  type="button"
+                  onClick={() => focusMissionCard(effectiveMissionId)}
+                  className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-2 py-1 text-[9px] tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/14"
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div
-                      className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.2em] ${messageToneClass(entry.tone)}`}
-                    >
-                      {messageTypeLabel(entry.type)}
-                    </div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
-                      {entry.label}
-                    </div>
-                    {entry.teamRole && (
-                      <div className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/45">
-                        {entry.teamRole}
-                      </div>
-                    )}
-                    <div className="ml-auto text-[9px] font-mono text-white/30">
-                      {new Date(entry.ts).toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-[11px] leading-6 text-white/82">{entry.content}</div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
-                    {entry.channel && (
-                      <span>
-                        {mt('chronos_channel', 'channel')}: {entry.channel}
-                      </span>
-                    )}
-                    {entry.thread && (
-                      <span>
-                        {mt('chronos_thread', 'thread')}: {entry.thread}
-                      </span>
-                    )}
-                  </div>
+                  <span className="inline-flex items-center gap-2">
+                    <span>Card</span>
+                    <span className="rounded-full border border-cyan-200/20 bg-cyan-200/10 px-1.5 py-0.5 text-[8px] tracking-[0.18em] text-cyan-50/80">
+                      C
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+            </div>
+            <div className="space-y-3">
+              {!effectiveMissionId || missionThread.length === 0 ? (
+                <div className="text-[11px] italic text-kyberion-gold/30">
+                  {mt(
+                    'chronos_no_unified_mission_thread',
+                    'No thread yet.'
+                  )}
                 </div>
-              ))
-            )}
-          </div>
-        </Panel>
+              ) : (
+                missionThread.map((entry, index) => (
+                  <div
+                    key={`${entry.type}-${entry.agentId}-${entry.ts}-${index}`}
+                    className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div
+                        className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.2em] ${messageToneClass(entry.tone)}`}
+                      >
+                        {messageTypeLabel(entry.type)}
+                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                        {entry.label}
+                      </div>
+                      {entry.teamRole && (
+                        <div className="rounded-full border border-white/8 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/45">
+                          {entry.teamRole}
+                        </div>
+                      )}
+                      <div className="ml-auto text-[9px] font-mono text-white/30">
+                        {new Date(entry.ts).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="mt-2 text-[11px] leading-6 text-white/82">{entry.content}</div>
+                    <div className="mt-2 flex flex-wrap gap-3 text-[9px] uppercase tracking-[0.16em] text-white/28">
+                      {entry.channel && (
+                        <span>
+                          {mt('chronos_channel', 'channel')}: {entry.channel}
+                        </span>
+                      )}
+                      {entry.thread && (
+                        <span>
+                          {mt('chronos_thread', 'thread')}: {entry.thread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Panel>
+        </div>
 
         <Panel title={mt('chronos_a2a_handoff_trail', 'A2A Handoff Trail')}>
           <div className="space-y-3">

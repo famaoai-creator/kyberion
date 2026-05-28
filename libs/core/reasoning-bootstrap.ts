@@ -59,6 +59,8 @@ import { installShellSpeechToTextBridgeIfAvailable } from './speech-to-text-brid
 import { installShellDeploymentAdapterIfAvailable } from './deployment-adapter.js';
 import { installAuditForwarderIfAvailable } from './audit-forwarder.js';
 import { installSecretResolverIfAvailable } from './secret-resolver.js';
+import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
+import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from './provider-discovery.js';
 
 export type ReasoningBackendMode =
@@ -157,14 +159,22 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
  */
 export function installReasoningBackends(options: InstallReasoningOptions = {}): boolean {
   if (installed) return installedMode !== 'stub';
+  const result = _installReasoningBackendsCore(options);
+  // Python voice bridge must wrap the mode-specific bridge registered above.
+  installPythonVoiceBridgeIfAvailable();
+  return result;
+}
 
+function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
   const mode = resolveMode(options);
 
-  // Common infrastructure
+  // Common infrastructure (order matters: voice bridge runs after reasoning backend)
   installShellSpeechToTextBridgeIfAvailable();
   installShellDeploymentAdapterIfAvailable();
   installAuditForwarderIfAvailable();
   installSecretResolverIfAvailable();
+  // Embedding backend is independent of reasoning mode; install early.
+  installEmbeddingBackendIfAvailable();
 
   if (mode === 'stub' && !options.force) {
     installed = true;

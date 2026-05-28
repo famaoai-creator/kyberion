@@ -5,7 +5,11 @@
  * context to new decision-support / hypothesis-tree runs.
  *
  * The `distill` command produces YAML-frontmatter + markdown files in
- * `knowledge/incidents/distill_<mission-id>_<date>.md`. Each frontmatter
+ * `knowledge/public/evolution/distill_<mission-id>_<date>.md`. Legacy
+ * mission distills may still exist under `knowledge/incidents/`; those are
+ * treated as read-only compatibility inputs.
+ *
+ * Each frontmatter
  * block carries `tags`, `category`, `source_mission`, and `importance`.
  *
  * This module loads the catalog of distillations on demand and returns
@@ -28,12 +32,18 @@ import {
   safeReaddir,
   safeExistsSync,
 } from './secure-io.js';
+import {
+  getEmbeddingBackend,
+  cosineSimilarity,
+  reciprocalRankFusion,
+} from './embedding-backend.js';
 
-const INCIDENTS_DIR = 'knowledge/incidents';
+const CURRENT_DISTILL_DIR = 'knowledge/public/evolution';
+const LEGACY_DISTILL_DIRS = ['knowledge/incidents', 'knowledge/evolution'];
 const DISTILL_FILE_RE = /^distill_.+\.md$/;
 
 export interface DistilledKnowledgeEntry {
-  /** Relative path from project root, e.g. knowledge/incidents/distill_msn-foo_2026-04-27.md */
+  /** Relative path from project root, e.g. knowledge/public/evolution/distill_msn-foo_2026-04-27.md */
   path: string;
   /** Frontmatter `title` */
   title: string;
@@ -116,47 +126,76 @@ function tokenize(s: string): string[] {
 }
 
 function loadAllDistilled(): DistilledKnowledgeEntry[] {
-  const dir = pathResolver.rootResolve(INCIDENTS_DIR);
-  if (!safeExistsSync(dir)) return [];
   const out: DistilledKnowledgeEntry[] = [];
-  let entries: string[] = [];
-  try {
-    entries = safeReaddir(dir);
-  } catch {
-    return [];
-  }
-  for (const name of entries) {
-    if (!DISTILL_FILE_RE.test(name)) continue;
-    const abs = path.join(dir, name);
-    let text: string;
+  const seenNames = new Set<string>();
+  for (const dirName of [CURRENT_DISTILL_DIR, ...LEGACY_DISTILL_DIRS]) {
+    const dir = pathResolver.rootResolve(dirName);
+    if (!safeExistsSync(dir)) continue;
+    let entries: string[] = [];
     try {
-      text = safeReadFile(abs, { encoding: 'utf8' }) as string;
+      entries = safeReaddir(dir);
     } catch {
       continue;
     }
-    const fm = parseFrontmatter(text);
-    const bodyStart = text.indexOf('\n---\n', 4);
-    const body = bodyStart >= 0 ? text.slice(bodyStart + 5) : text;
-    const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
-    out.push({
-      path: `${INCIDENTS_DIR}/${name}`,
-      title: typeof fm.title === 'string' ? fm.title : name,
-      ...(typeof fm.category === 'string' ? { category: fm.category } : {}),
-      tags,
-      ...(typeof fm.source_mission === 'string'
-        ? { source_mission: fm.source_mission }
-        : {}),
-      ...(typeof fm.importance === 'number' ? { importance: fm.importance } : {}),
-      ...(typeof fm.last_updated === 'string'
-        ? { last_updated: fm.last_updated }
-        : typeof fm.audit_date === 'string'
-          ? { last_updated: fm.audit_date }
+    for (const name of entries) {
+      if (seenNames.has(name) || !DISTILL_FILE_RE.test(name)) continue;
+      const abs = path.join(dir, name);
+      let text: string;
+      try {
+        text = safeReadFile(abs, { encoding: 'utf8' }) as string;
+      } catch {
+        continue;
+      }
+      const fm = parseFrontmatter(text);
+      const bodyStart = text.indexOf('\n---\n', 4);
+      const body = bodyStart >= 0 ? text.slice(bodyStart + 5) : text;
+      const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : [];
+      out.push({
+        path: `${dirName}/${name}`,
+        title: typeof fm.title === 'string' ? fm.title : name,
+        ...(typeof fm.category === 'string' ? { category: fm.category } : {}),
+        tags,
+        ...(typeof fm.source_mission === 'string'
+          ? { source_mission: fm.source_mission }
           : {}),
-      excerpt: firstParagraph(body),
-    });
+        ...(typeof fm.importance === 'number' ? { importance: fm.importance } : {}),
+        ...(typeof fm.last_updated === 'string'
+          ? { last_updated: fm.last_updated }
+          : typeof fm.audit_date === 'string'
+            ? { last_updated: fm.audit_date }
+            : {}),
+        excerpt: firstParagraph(body),
+      });
+      seenNames.add(name);
+    }
   }
   return out;
 }
+
+// ── Embedding helpers ────────────────────────────────────────────────────────
+
+// In-process embedding cache: path/key → vector.
+// Small corpus (O(10s) of distill files) — no eviction needed.
+const _embedCache = new Map<string, Float32Array>();
+
+function _corpusText(entry: DistilledKnowledgeEntry): string {
+  return [entry.title, ...entry.tags, entry.excerpt.slice(0, 300)].filter(Boolean).join(' ');
+}
+
+async function _embedWithCache(key: string, text: string): Promise<Float32Array | null> {
+  if (_embedCache.has(key)) return _embedCache.get(key)!;
+  const backend = getEmbeddingBackend();
+  if (!backend) return null;
+  try {
+    const vec = await backend.embed(text);
+    _embedCache.set(key, vec);
+    return vec;
+  } catch {
+    return null;
+  }
+}
+
+// ── Lexical scoring ──────────────────────────────────────────────────────────
 
 /**
  * Score a single entry against a query.
@@ -190,12 +229,19 @@ function scoreEntry(
 
 /**
  * Find the top-N distilled-knowledge entries relevant to the query.
+ *
+ * When an EmbeddingBackend is registered, uses Reciprocal Rank Fusion to
+ * combine lexical scoring (tag + title overlap) with semantic cosine
+ * similarity, enabling cross-lingual and conceptual matching.
+ *
+ * Falls back to lexical-only when no embedding backend is available.
+ *
  * Returns an array sorted by score descending; entries below `minScore`
  * are dropped.
  */
-export function findRelevantDistilledKnowledge(
+export async function findRelevantDistilledKnowledge(
   input: FindRelevantInput,
-): DistilledKnowledgeEntry[] {
+): Promise<DistilledKnowledgeEntry[]> {
   const limit = input.limit ?? 5;
   const minScore = input.minScore ?? 0.0001;
   const queryTokens = new Set(tokenize(input.topic ?? ''));
@@ -204,15 +250,64 @@ export function findRelevantDistilledKnowledge(
   if (queryTokens.size === 0 && queryTags.size === 0) return [];
 
   const all = loadAllDistilled();
-  const scored = all
+
+  // ── Lexical ranking ─────────────────────────────────────────────────────
+  const lexicalScored = all
     .map((e) => ({ ...e, score: scoreEntry(e, queryTokens, queryTags) }))
     .filter((e) => (e.score ?? 0) >= minScore)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+  const backend = getEmbeddingBackend();
+  if (!backend) {
+    // Lexical-only fallback (same as before)
+    return lexicalScored
+      .sort((a, b) => {
+        if ((b.score ?? 0) !== (a.score ?? 0)) return (b.score ?? 0) - (a.score ?? 0);
+        return (b.last_updated ?? '').localeCompare(a.last_updated ?? '');
+      })
+      .slice(0, limit);
+  }
+
+  // ── Semantic ranking (hybrid path) ──────────────────────────────────────
+  const queryText = [input.topic, ...(input.tags ?? [])].filter(Boolean).join(' ');
+  const queryVec = await _embedWithCache(`__q__${queryText}`, queryText);
+
+  if (!queryVec) {
+    // Backend present but embed failed — fall back to lexical
+    return lexicalScored.slice(0, limit);
+  }
+
+  // Embed corpus entries in batch for efficiency
+  const unembed = all.filter((e) => !_embedCache.has(e.path));
+  if (unembed.length > 0) {
+    try {
+      const vectors = await backend.embedBatch(unembed.map(_corpusText));
+      unembed.forEach((e, i) => _embedCache.set(e.path, vectors[i]));
+    } catch {
+      // If batch fails, individual entries will miss and fall through
+    }
+  }
+
+  const semanticScored = all
+    .map((e) => {
+      const vec = _embedCache.get(e.path);
+      return { entry: e, sim: vec ? cosineSimilarity(queryVec, vec) : 0 };
+    })
+    .filter((x) => x.sim > 0)
+    .sort((a, b) => b.sim - a.sim)
+    .map((x) => x.entry);
+
+  // ── RRF fusion ──────────────────────────────────────────────────────────
+  const rrfScores = reciprocalRankFusion([lexicalScored, semanticScored]);
+
+  return all
+    .map((e) => ({ ...e, score: rrfScores.get(e.path) ?? 0 }))
+    .filter((e) => (e.score ?? 0) > 0)
     .sort((a, b) => {
-      if ((b.score ?? 0) !== (a.score ?? 0)) return (b.score ?? 0) - (a.score ?? 0);
-      // Tie-break on recency
+      if (b.score !== a.score) return b.score - a.score;
       return (b.last_updated ?? '').localeCompare(a.last_updated ?? '');
-    });
-  return scored.slice(0, limit);
+    })
+    .slice(0, limit);
 }
 
 /**

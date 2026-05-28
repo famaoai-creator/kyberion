@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MISSION_CYCLE,
+  OPERATOR_SCENARIO_PRESETS,
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
   buildAttentionItems,
@@ -40,6 +41,28 @@ describe("Chronos operator console helpers", () => {
     expect(OPERATOR_VIEW_LINKS.find((entry) => entry.label === "Secret Approvals")).toMatchObject({
       targetId: "secret-approval-queue",
     });
+  });
+
+  it("exposes scenario presets for common operator goals", () => {
+    expect(OPERATOR_SCENARIO_PRESETS.map((entry) => entry.label)).toEqual([
+      "Review blockers",
+      "Start a mission",
+      "Check runtime health",
+      "Inspect delivery",
+      "Investigate traces",
+      "Review sessions",
+      "Handle approvals",
+    ]);
+    expect(OPERATOR_SCENARIO_PRESETS.find((entry) => entry.label === "Review blockers")).toMatchObject({
+      targetId: "needs-attention",
+      surface: "mission-intelligence",
+    });
+    expect(OPERATOR_SCENARIO_PRESETS.find((entry) => entry.label === "Investigate traces")).toMatchObject({
+      targetId: "trace-viewer",
+      surface: "focused-operator",
+    });
+    expect(OPERATOR_SCENARIO_PRESETS.filter((entry) => entry.surface === "mission-intelligence").length).toBeGreaterThan(0);
+    expect(OPERATOR_SCENARIO_PRESETS.every((entry) => entry.nextStep.length > 0)).toBe(true);
   });
 
   it("prioritizes mission and runtime exceptions in the attention queue", () => {

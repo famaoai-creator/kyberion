@@ -51,7 +51,7 @@ const CAPABILITIES_GUIDE_PATH = pathResolver.rootResolve('CAPABILITIES_GUIDE.md'
 
 const LEGACY_RATIONALES: Record<string, string> = {
   'daemon-actuator': 'Launchd-era runtime management overlaps with surface-runtime and managed process supervision.',
-  'physical-bridge': 'Thin wrapper that shells into browser/system actuators and writes temp files instead of expressing the flow directly as ADF.',
+  'physical-bridge': 'Retired 2026-05-28 → retired/actuators/physical-bridge/. Was a thin wrapper that shelled into browser/system actuators via temp files. Replaced by direct ADF orchestration.',
 };
 
 function loadManifest(manifestPath: string): CapabilityManifest {
@@ -222,7 +222,7 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push('');
   lines.push('## Consolidation Recommendations');
   lines.push('');
-  lines.push('- Retire `physical-bridge` by expressing its orchestration as ADF over `browser-actuator`, `system-actuator`, and `media-generation-actuator` instead of shelling back through `cli.js`.');
+  lines.push('- `physical-bridge` has been retired to `retired/actuators/physical-bridge/` (2026-05-28). No action required.');
   lines.push('- Review `daemon-actuator` against `surface-runtime` and `process-actuator`; keep only one long-lived process lifecycle model.');
   lines.push('- Treat `vision-actuator` as compatibility-only and continue moving generation concerns into `media-generation-actuator` while keeping perception-oriented work elsewhere.');
   lines.push('- Keep `approval-actuator`, `code-actuator`, `network-actuator`, and `process-actuator` manifest-backed because governance or runtime layers still reference them directly.');

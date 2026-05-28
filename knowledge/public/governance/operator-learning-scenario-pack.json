@@ -299,6 +299,28 @@
       "notes": "Hybrid prompts should still resolve to the nearest structured decision support intent."
     },
     {
+      "scenario_id": "ambiguous-meeting-vs-schedule",
+      "scenario_class": "ambiguous",
+      "utterance": "明日の打ち合わせの日程を確認して調整して",
+      "expected_intent_id": "meeting-operations",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["operations_and_release"],
+      "notes": "Ambiguous: contains both meeting (打ち合わせ) and schedule (日程・調整) signals. Currently resolves to meeting-operations; ideally should route to schedule-coordination as the upstream step when no meeting URL is present."
+    },
+    {
+      "scenario_id": "ambiguous-document-vs-presentation",
+      "scenario_class": "ambiguous",
+      "utterance": "提案内容をスライドっぽくまとめてほしい",
+      "expected_intent_id": "generate-presentation",
+      "expected_task_family": "content_and_media",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["content_and_media"],
+      "notes": "Casual phrasing like 'slide-ish' should still bind to generate-presentation; task_family resolves to content_and_media (parent of document_generation)."
+    },
+    {
       "scenario_id": "controlled-failure-unresolved-request",
       "scenario_class": "controlled-failure",
       "utterance": "あとで例のやつをいい感じにして",
@@ -312,6 +334,43 @@
         "promote_eligible": false
       },
       "notes": "An unresolved request should stay unresolved and trigger clarification rather than false precision."
+    },
+    {
+      "scenario_id": "controlled-failure-dependency-missing",
+      "scenario_class": "controlled-failure",
+      "utterance": "音声でブリーフィングして",
+      "expected_intent_id": "unresolved_intent",
+      "expected_task_family": "unresolved",
+      "expected_route_shape": "direct_reply",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["clarification_requested", "clarification_prompted"],
+      "expected_learning_update": {
+        "candidate_created": false,
+        "promote_eligible": false
+      },
+      "notes": "Double-failure: 'voice-briefing' is not yet registered as a catalog intent AND the voice actuator requires TTS/STT dependencies. Both failures should surface as clarification rather than a generic error. Register the intent before promoting this scenario to golden."
+    },
+    {
+      "scenario_id": "controlled-failure-authority-block",
+      "scenario_class": "controlled-failure",
+      "utterance": "本番環境のシークレットを更新して",
+      "expected_intent_id": "lifestyle-booking",
+      "expected_task_family": "customer_engagement",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["customer_engagement"],
+      "notes": "Secret-write utterances currently mis-classify to lifestyle-booking (update-secret intent not yet registered). At execution time, any SECRET_WRITE operation must be blocked with POLICY_VIOLATION unless ecosystem_architect persona is set. Register update-secret intent to improve classification."
+    },
+    {
+      "scenario_id": "controlled-failure-meeting-missing-url",
+      "scenario_class": "controlled-failure",
+      "utterance": "次のミーティングに代わりに参加して",
+      "expected_intent_id": "meeting-operations",
+      "expected_task_family": "operations_and_release",
+      "expected_route_shape": "task_session",
+      "expected_verification_result": "unverified",
+      "expected_signals": ["clarification_prompted", "operations_and_release"],
+      "notes": "Meeting proxy requests without a URL must block and clarify (meeting_url is a required input) rather than attempt partial execution."
     }
   ]
 }

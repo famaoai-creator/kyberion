@@ -46,7 +46,7 @@ If `adapter` is omitted, the runtime falls back to `shell-json`.
 ## Operational Notes
 
 - Keep `distill` routed through a high-confidence profile.
+- Mission distills write to `knowledge/public/evolution/`; older `knowledge/incidents/` files are kept only for read compatibility.
 - Use `stub` only for deterministic offline or test runs.
 - Prefer adapter additions over provider-specific branching in mission scripts.
 - Keep user-facing explanations policy-first: avoid naming a specific CLI unless it matters to the operator.
-

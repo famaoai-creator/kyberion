@@ -90,4 +90,12 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
     expect(mocks.loadEnvironmentManifest).not.toHaveBeenCalledWith('kyberion-runtime-baseline');
   });
+
+  it('uses the same browser-capability manifest for browser runtime preflight', async () => {
+    const { collectDoctorReport } = await import('./run_doctor.js');
+
+    await collectDoctorReport({ runtime: 'browser' });
+
+    expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
+  });
 });
