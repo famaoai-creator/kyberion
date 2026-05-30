@@ -39,6 +39,14 @@ describe('logic-utils', () => {
     expect(resolveVars('{{missing|0}}', numCtx)).toBe('0');
   });
 
+  it('resolves multi-var strings that start AND end with {{ }} correctly', () => {
+    const c = { account_org: '田中製造株式会社', account_name: '田中誠' };
+    // "{{account_org}} / {{account_name}}" starts with {{ and ends with }} — must NOT be
+    // treated as a single var (which would return '' for unknown key "account_org}} / {{account_name")
+    expect(resolveVars('{{account_org}} / {{account_name}}', c)).toBe('田中製造株式会社 / 田中誠');
+    expect(resolveVars('{{account_org}}', c)).toBe('田中製造株式会社');
+  });
+
   it('resolves deep and indexed path values safely', () => {
     expect(getPathValue({ report: { metrics: [{ count: 3 }] } }, 'report.metrics[0].count')).toBe(3);
     expect(getPathValue({ report: { metrics: { count: 5 } } }, 'report.metrics.count')).toBe(5);

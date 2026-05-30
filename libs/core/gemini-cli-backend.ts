@@ -66,7 +66,13 @@ export class GeminiCliBackend implements ReasoningBackend {
       ),
     });
     const result = await this.runStructured({
-      systemPrompt: 'Generate divergent hypotheses from multiple personas independently. Output JSON ONLY.',
+      systemPrompt: [
+        'Generate divergent hypotheses from multiple personas independently.',
+        'You MUST return a JSON object with EXACTLY this key:',
+        '  hypotheses: array of { id: string, proposed_by: string, content: string, status: "pending"|"survived"|"rejected" }',
+        `Each persona (${input.personas.join(', ')}) must contribute at least ${input.minPerPersona ?? 2} hypotheses.`,
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
+      ].join('\n'),
       userPrompt: `Topic: ${input.topic}\nPersonas: ${input.personas.join(', ')}`,
       schema,
     });
@@ -78,7 +84,12 @@ export class GeminiCliBackend implements ReasoningBackend {
       hypotheses: z.array(z.any()),
     });
     return (await this.runStructured({
-      systemPrompt: 'Run a cross-critique pass. Output JSON ONLY.',
+      systemPrompt: [
+        'Run a cross-critique pass on the provided hypotheses.',
+        'You MUST return a JSON object with EXACTLY this key:',
+        '  hypotheses: array of { id, persona, hypothesis, critiques: [{ persona, content, verdict }], final_score }',
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
+      ].join('\n'),
       userPrompt: `Topic: ${input.topic}\nHypotheses: ${JSON.stringify(input.hypotheses)}`,
       schema,
     })) as CritiqueResult;
@@ -131,7 +142,16 @@ export class GeminiCliBackend implements ReasoningBackend {
       open_questions: z.array(z.any()),
     });
     return (await this.runStructured({
-      systemPrompt: 'Extract structured requirements. Output JSON ONLY.',
+      systemPrompt: [
+        'Extract structured requirements from the provided text.',
+        'You MUST return a JSON object with EXACTLY these keys (all required, all arrays):',
+        '  functional_requirements: array of { id, title, description, priority, source }',
+        '  non_functional_requirements: array of { id, title, description, category }',
+        '  constraints: array of { id, description }',
+        '  assumptions: array of { id, description }',
+        '  open_questions: array of { id, question }',
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
+      ].join('\n'),
       userPrompt: input.sourceText,
       schema,
     })) as ExtractedRequirements;
@@ -277,8 +297,16 @@ export class GeminiCliBackend implements ReasoningBackend {
     const cleanStdout = lines.slice(jsonStartIdx).join('\n');
     try {
       const cliResult = JSON.parse(cleanStdout);
-      return String(cliResult.response || stdout).trim();
-    } catch {
+      if (cliResult.error) {
+        throw new Error(`[gemini-cli] CLI returned error: ${JSON.stringify(cliResult.error)}`);
+      }
+      const responseStr: string | undefined = cliResult.response;
+      if (responseStr === undefined || responseStr === null) {
+        throw new Error('[gemini-cli] CLI result missing "response" field');
+      }
+      return responseStr.trim() || stdout.trim();
+    } catch (err: any) {
+      if (err.message.startsWith('[gemini-cli]')) throw err;
       return stdout.trim();
     }
   }
@@ -320,9 +348,12 @@ export function buildGeminiCliBackendFromEnv(
 ): GeminiCliBackend | null {
   const bin = env.KYBERION_GEMINI_CLI_BIN?.trim();
   const model = modelOverride || env.KYBERION_GEMINI_CLI_MODEL?.trim();
+  const timeoutRaw = env.KYBERION_GEMINI_CLI_TIMEOUT?.trim();
+  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const backend = new GeminiCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
+    ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
   });
   logger.info(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model ?? 'gemini-2.0-flash-exp'})`);
   return backend;

@@ -304,6 +304,12 @@ importers:
         specifier: ^17.7.2
         version: 17.7.2
 
+  libs/actuators/email-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/actuators/file-actuator:
     dependencies:
       '@agent/core':

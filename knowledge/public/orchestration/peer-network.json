@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "peers": [
+    {
+      "peer_id": "kyberion-local-a",
+      "base_url": "http://127.0.0.1:4100",
+      "shared_secret": "CHANGE_ME_LOCAL_SECRET_A",
+      "allow_local_network": true,
+      "capabilities": ["request", "handoff", "notification"],
+      "description": "Local same-host Kyberion instance A"
+    },
+    {
+      "peer_id": "kyberion-local-b",
+      "base_url": "http://127.0.0.1:4101",
+      "shared_secret": "CHANGE_ME_LOCAL_SECRET_B",
+      "allow_local_network": true,
+      "capabilities": ["request", "handoff", "notification"],
+      "description": "Local same-host Kyberion instance B"
+    },
+    {
+      "peer_id": "kyberion-lan-a",
+      "base_url": "http://192.168.1.20:4100",
+      "shared_secret": "CHANGE_ME_LAN_SECRET_A",
+      "allow_local_network": true,
+      "capabilities": ["request", "handoff", "notification"],
+      "description": "LAN peer reachable on the local network"
+    }
+  ]
+}
