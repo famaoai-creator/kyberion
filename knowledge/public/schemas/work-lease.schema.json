@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/work-lease.schema.json",
+  "title": "Work Lease",
+  "type": "object",
+  "required": [
+    "lease_id",
+    "item_id",
+    "holder_peer_id",
+    "purpose",
+    "status",
+    "expires_at",
+    "created_at",
+    "renewed_at"
+  ],
+  "properties": {
+    "lease_id": { "type": "string" },
+    "item_id": { "type": "string" },
+    "holder_peer_id": { "type": "string" },
+    "holder_user_id": { "type": "string" },
+    "purpose": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["active", "released", "expired"]
+    },
+    "expires_at": { "type": "string" },
+    "created_at": { "type": "string" },
+    "renewed_at": { "type": "string" },
+    "released_at": { "type": "string" },
+    "idempotency_key": { "type": "string" },
+    "expected_version": { "type": "integer" },
+    "previous_lease_id": { "type": "string" }
+  },
+  "additionalProperties": true
+}

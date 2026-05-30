@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/work-item.schema.json",
+  "title": "Work Item",
+  "type": "object",
+  "required": [
+    "item_id",
+    "title",
+    "description",
+    "status",
+    "priority",
+    "source",
+    "source_ref",
+    "project_id",
+    "labels",
+    "dependencies",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "item_id": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["backlog", "ready", "in_progress", "blocked", "review", "done", "archived"]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "normal", "high", "urgent"]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["local", "github", "jira", "peer"]
+    },
+    "source_ref": { "type": "string" },
+    "project_id": { "type": "string" },
+    "assignee_peer_id": { "type": "string" },
+    "assignee_user_id": { "type": "string" },
+    "labels": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "version": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "lease_id": { "type": "string" },
+    "claimed_at": { "type": "string" },
+    "released_at": { "type": "string" },
+    "claimed_by_peer_id": { "type": "string" },
+    "claimed_by_user_id": { "type": "string" },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": true
+}
