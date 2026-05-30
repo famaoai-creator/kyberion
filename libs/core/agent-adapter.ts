@@ -629,7 +629,146 @@ export class CodexAdapter implements AgentAdapter {
   }
 }
 
-type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude';
+export interface AgyAdapterOptions {
+  bin?: string;
+  cwd?: string;
+  timeoutMs?: number;
+  extraArgs?: string[];
+}
+
+export class AgyAdapter implements AgentAdapter {
+  private options: AgyAdapterOptions;
+  private logBuffer: { ts: number; type: string; content: string }[] = [];
+  private usageSummary: Record<string, unknown> | null = null;
+  private activeSessionId: string | null = null;
+
+  constructor(options?: AgyAdapterOptions) {
+    this.options = options || {};
+  }
+
+  public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    return this.logBuffer.slice(-limit);
+  }
+
+  public async boot(): Promise<void> {
+    logger.info(`[UAA] Agy CLI ready (bin: ${this.options.bin || 'agy'})`);
+  }
+
+  public async ask(text: string, options?: AgentAskOptions): Promise<AgentResponse> {
+    const isInteractive = options?.interactive === true;
+    logger.info(`[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`);
+    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    const { spawnSync } = await import('node:child_process');
+
+    try {
+      const bin = this.options.bin || process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN || 'agy';
+      
+      const args: string[] = [];
+      if (isInteractive) {
+        args.push('-i');
+      } else {
+        args.push('-p');
+      }
+
+      args.push(text);
+      args.push('--dangerously-skip-permissions');
+
+      // 1. Session Persistence & Continuity
+      const session = (options?.conversationId as string | undefined) || options?.intentId;
+      if (session) {
+        args.push('--conversation', session);
+        this.activeSessionId = session;
+      }
+
+      // 2. Dynamic Context Directories mounting
+      const addDirs = options?.addDirs as string[] | undefined;
+      if (addDirs && Array.isArray(addDirs)) {
+        for (const dir of addDirs) {
+          args.push('--add-dir', dir);
+        }
+      }
+
+      // 3. Sandboxed Execution
+      const useSandbox = options?.sandbox === true || process.env.KYBERION_AGY_SANDBOX === '1';
+      if (useSandbox) {
+        args.push('--sandbox');
+      }
+
+      if (this.options.extraArgs) {
+        args.push(...this.options.extraArgs);
+      }
+
+      const res = spawnSync(bin, args, {
+        encoding: 'utf8',
+        env: safeEnv(),
+        cwd: this.options.cwd || PROJECT_ROOT,
+        shell: false,
+        timeout: this.options.timeoutMs || 300000,
+        stdio: isInteractive ? 'inherit' : 'pipe',
+      });
+
+      if (res.error) throw res.error;
+
+      if (isInteractive) {
+        return {
+          text: 'Interactive session completed.',
+          stopReason: 'completed',
+        };
+      }
+
+      const output = (res.stdout || '').trim();
+      if (res.stderr) this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
+      this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
+      if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
+
+      // Agy response extraction (if output starts with JSON or has ```json wrapper)
+      const lines = output.split('\n');
+      const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
+      if (jsonStartIdx !== -1) {
+        const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+        try {
+          const cliResult = JSON.parse(cleanStdout);
+          this.usageSummary = extractUsageSummary(cliResult);
+          return {
+            text: (cliResult.response || output).trim(),
+            thought: cliResult.thought,
+            stopReason: res.status === 0 ? 'completed' : 'error',
+          };
+        } catch (_) {
+          // ignore parsing error and fallback
+        }
+      }
+
+      return {
+        text: output,
+        stopReason: res.status === 0 ? 'completed' : 'error',
+      };
+    } catch (e: any) {
+      logger.error(`[UAA] Agy failed: ${e.message}`);
+      return { text: '', stopReason: 'error' };
+    }
+  }
+
+  public async shutdown(): Promise<void> {}
+
+  public getRuntimeInfo(): Record<string, unknown> {
+    return {
+      usage: this.usageSummary,
+      supportsSoftRefresh: true,
+      stateless: this.activeSessionId ? false : true,
+      sessionId: this.activeSessionId,
+    };
+  }
+
+  public async refreshContext(): Promise<{ mode: 'soft' | 'stateless'; sessionId: string | null }> {
+    if (this.activeSessionId) {
+      return { mode: 'soft', sessionId: this.activeSessionId };
+    }
+    return { mode: 'stateless', sessionId: null };
+  }
+}
+
+export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy';
 
 export interface CodexAppServerAdapterOptions {
   model?: string;
@@ -1285,6 +1424,7 @@ const AGENT_ADAPTER_FACTORIES: Record<BuiltinAgentProvider, AgentAdapterFactory>
   gemini: () => new GeminiAdapter(),
   codex: () => createCodexAdapterFromEnv(),
   claude: () => new ClaudeAdapter(),
+  agy: () => new AgyAdapter(),
 };
 
 function extractUsageSummary(payload: unknown): Record<string, unknown> | null {

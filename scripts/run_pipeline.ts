@@ -7,6 +7,9 @@ import {
   safeExec,
   safeReadFile,
   safeExistsSync,
+  safeWriteFile,
+  safeMkdir,
+  withRetry,
   resolveVars,
   evaluateCondition,
   capabilityEntry,
@@ -72,10 +75,25 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             ? resolveVars(params.context, ctx)
             : params.context || ctx;
         const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}`;
-        const response = shouldUseSubagentForReasoningStep(params)
+        const rawResponse = shouldUseSubagentForReasoningStep(params)
           ? await backend.delegateTask(String(resolvedInstruction || 'Analyze the context.'), JSON.stringify(resolvedContext))
-          : await backend.prompt(prompt);
-        return { handled: true, ctx: { ...ctx, [params.export_as || 'last_reasoning']: response } };
+          : await withRetry(
+              () => backend.prompt(prompt),
+              {
+                maxRetries: 2,
+                initialDelayMs: 3000,
+                maxDelayMs: 15000,
+                factor: 2,
+                shouldRetry: (err: Error) =>
+                  err.message.includes('timed out') ||
+                  err.message.includes('INVALID_STREAM') ||
+                  err.message.includes('empty response') ||
+                  err.message.includes('missing "response"'),
+                onRetry: (err: Error, attempt: number) =>
+                  logger.warn(`  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`),
+              },
+            );
+        return { handled: true, ctx: { ...ctx, [params.export_as || 'last_reasoning']: rawResponse } };
       }
       return { handled: false, ctx };
     };
@@ -310,7 +328,23 @@ for (const step of steps) {
     try {
       if (domain === 'system' && action === 'log') {
         logger.info(resolveLogMessage(params, ctx));
-      } else if (domain === 'system' && action === 'shell') {
+      } else if (domain === 'system' && action === 'write_file') {
+          const enrichedCtx = { ...ctx, '$now': new Date().toISOString() };
+          const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
+          const writePath = nodePath.resolve(rootDir, String(resolvedParams.path ?? ''));
+          const rawContent = resolvedParams.content;
+          const contentStr = typeof rawContent === 'string'
+            ? rawContent
+            : rawContent !== undefined
+              ? JSON.stringify(rawContent, null, 2)
+              : '';
+          const dir = nodePath.dirname(writePath);
+          if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+          safeWriteFile(writePath, contentStr);
+          if (params.export_as && typeof params.export_as === 'string') {
+            ctx = { ...ctx, [params.export_as]: contentStr };
+          }
+        } else if (domain === 'system' && action === 'shell') {
           const cmd = String(resolveVars(params.cmd || '', ctx));
           const env = Object.fromEntries(
             Object.entries((params.env || {}) as Record<string, unknown>).map(([key, value]) => [
@@ -403,16 +437,18 @@ for (const step of steps) {
           const util = await import('node:util');
           const input = resolveVars(params.input || ctx, ctx);
           const script = String(params.script || 'input');
-          const sandbox = { 
-            Buffer, 
-            input, 
+          // Wrap in IIFE so pipeline scripts can use `return` statements naturally
+          const wrappedScript = `(function() { ${script} })()`;
+          const sandbox = {
+            Buffer,
+            input,
             ctx: { ...ctx },
-            console: { 
+            console: {
               log: (...args: any[]) => logger.info(`[TRANSFORM-LOG] ${args.map(a => typeof a === 'object' ? util.inspect(a) : a).join(' ')}`),
-            } 
+            }
           };
           vm.createContext(sandbox);
-          const result = await new vm.Script(script).runInContext(sandbox);
+          const result = await new vm.Script(wrappedScript).runInContext(sandbox);
           if (params.export_as && typeof params.export_as === 'string') {
             ctx = { ...ctx, [params.export_as]: result };
           } else {
@@ -594,6 +630,10 @@ export async function main() {
     process.env.MISSION_ID,
   );
   const autoContext: Record<string, unknown> = {};
+  // Propagate missionId to env so tier-guard can resolve ${MISSION_ID} in default_allow paths.
+  if (missionId && !process.env.MISSION_ID) {
+    process.env.MISSION_ID = missionId;
+  }
   if (missionId) {
     const missionPath = findMissionPath(missionId);
     const evidenceDir = missionEvidenceDir(missionId);
