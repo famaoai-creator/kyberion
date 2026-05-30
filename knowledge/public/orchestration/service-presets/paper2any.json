@@ -1,0 +1,130 @@
+{
+  "service_id": "paper2any",
+  "name": "Paper2Any REST API",
+  "description": "Convert PDF/text/topics into PPTX, draw.io, SVG figures, posters, and video scripts via the Paper2Any FastAPI server.",
+  "base_url": "{{paper2any_base_url}}",
+  "auth_strategy": "none",
+  "auth_params": {},
+  "_setup": [
+    "1. Clone and start Paper2Any: docker run -p 8000:8000 paper2any  (or: uvicorn fastapi_app.main:app --port 8000)",
+    "2. Set PAPER2ANY_BASE_URL secret: secret:set key=PAPER2ANY_BASE_URL value=http://localhost:8000/api/v1",
+    "3. Set LLM credentials inside Paper2Any via its .env (DF_API_KEY, DF_MODEL)"
+  ],
+  "recovery_policy": {
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 15000,
+      "factor": 3,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
+  "operations": {
+    "paper2ppt": {
+      "path": "paper2ppt/generate",
+      "method": "POST",
+      "description": "Convert a PDF paper or topic text into an editable PPTX slide deck.",
+      "parameters": {
+        "input_type": {
+          "required": true,
+          "type": "string",
+          "enum": ["pdf", "text", "topic"],
+          "description": "pdf = file upload; text = raw text body; topic = short topic string"
+        },
+        "content": {
+          "required": true,
+          "type": "string",
+          "description": "File path (pdf), raw text, or topic string depending on input_type"
+        },
+        "page_count": {
+          "required": false,
+          "type": "number",
+          "default": 12,
+          "description": "Target number of slides"
+        },
+        "language": {
+          "required": false,
+          "type": "string",
+          "default": "en",
+          "description": "Output language code (ja, en, zh, etc.)"
+        },
+        "template": {
+          "required": false,
+          "type": "string",
+          "description": "PPTX template file path (server-side)"
+        }
+      }
+    },
+    "paper2figure": {
+      "path": "paper2figure/generate",
+      "method": "POST",
+      "description": "Extract or generate figures from a paper: architecture diagrams, roadmaps, experiment plots.",
+      "parameters": {
+        "input_type": { "required": true, "type": "string", "enum": ["pdf", "text"] },
+        "content": { "required": true, "type": "string" },
+        "figure_type": {
+          "required": false,
+          "type": "string",
+          "enum": ["architecture", "roadmap", "plot", "auto"],
+          "default": "auto"
+        }
+      }
+    },
+    "paper2drawio": {
+      "path": "paper2drawio/generate",
+      "method": "POST",
+      "description": "Convert PDF, text, or a screenshot of a diagram into draw.io XML (editable).",
+      "parameters": {
+        "input_type": { "required": true, "type": "string", "enum": ["pdf", "text", "image"] },
+        "content": { "required": true, "type": "string" },
+        "export_format": {
+          "required": false,
+          "type": "string",
+          "enum": ["xml", "png", "svg"],
+          "default": "xml"
+        }
+      }
+    },
+    "paper2poster": {
+      "path": "paper2poster/generate",
+      "method": "POST",
+      "description": "Generate an academic-style poster (PPTX or PNG) from a PDF paper.",
+      "parameters": {
+        "input_type": { "required": true, "type": "string", "enum": ["pdf", "text"] },
+        "content": { "required": true, "type": "string" },
+        "format": {
+          "required": false,
+          "type": "string",
+          "enum": ["pptx", "png"],
+          "default": "pptx"
+        }
+      }
+    },
+    "paper2video": {
+      "path": "paper2video/generate",
+      "method": "POST",
+      "description": "Generate a video script and TTS audio assets from a PPTX or PDF.",
+      "parameters": {
+        "input_type": { "required": true, "type": "string", "enum": ["pptx", "pdf"] },
+        "content": { "required": true, "type": "string" },
+        "language": { "required": false, "type": "string", "default": "en" }
+      }
+    },
+    "paper2rebuttal": {
+      "path": "paper2rebuttal/generate",
+      "method": "POST",
+      "description": "Draft a structured rebuttal from reviewer comments + the original paper.",
+      "parameters": {
+        "paper_content": { "required": true, "type": "string", "description": "Raw text or PDF path of the paper" },
+        "review_content": { "required": true, "type": "string", "description": "Raw text of the reviewer comments" },
+        "language": { "required": false, "type": "string", "default": "en" }
+      }
+    },
+    "health": {
+      "path": "health",
+      "method": "GET",
+      "description": "Check if the Paper2Any server is running."
+    }
+  }
+}
