@@ -18,7 +18,8 @@
     "src/types/system-status-brief.ts",
     "src/types/system-status-report.ts",
     "types/**/*.ts",
-    "adapters/**/*.ts"
+    "adapters/**/*.ts",
+    "work-integrations/**/*.ts"
   ],
   "exclude": [
     "node_modules",

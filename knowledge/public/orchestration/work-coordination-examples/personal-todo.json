@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "boards": [
+    {
+      "board_id": "personal-todo-alice",
+      "name": "Alice TODO",
+      "type": "personal",
+      "description": "Personal queue for Alice",
+      "filters": {
+        "assignee_user_id": "alice"
+      },
+      "sort_by": "updated_at",
+      "lanes": ["backlog", "ready", "in_progress", "blocked", "done"],
+      "created_at": "2026-05-30T00:00:00.000Z",
+      "updated_at": "2026-05-30T00:00:00.000Z"
+    }
+  ]
+}

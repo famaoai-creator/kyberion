@@ -128,6 +128,116 @@ export type { KnowledgeHint, KnowledgeQueryOptions, KnowledgeScope } from './src
 
 // Networking
 export { secureFetch } from './network.js';
+export {
+  buildPeerMessageEnvelope,
+  clearPeerRuntime,
+  createPeerMessageNotification,
+  createPeerMessageRequest,
+  createPeerMessagingServer,
+  ensurePeerRuntimeDir,
+  loadPeerNetworkCatalog,
+  listPeerEvents,
+  listPeerInboxRecords,
+  listPeerOutboxRecords,
+  persistPeerRuntimeState,
+  resolvePeerRecord,
+  resolvePeerDispatchTarget,
+  sendPeerMessage,
+  sendPeerMessageToPeer,
+  signPeerMessage,
+  verifyPeerMessage,
+} from './peer-messaging.js';
+export type {
+  BuildPeerMessageInput,
+  PeerMessageDispatchOptions,
+  PeerMessageDispatchReceipt,
+  PeerMessageEnvelope,
+  PeerMessageResponder,
+  PeerMessageResponderContext,
+  PeerMessageType,
+  PeerMessagingCatalogOptions,
+  PeerMessagingServerOptions,
+  PeerNetworkCatalog,
+  PeerNetworkPeerRecord,
+  ResolvedPeerDispatchTarget,
+} from './peer-messaging.js';
+export {
+  appendCoordinationEvent,
+  claimWorkItem,
+  clearWorkCoordinationStore,
+  clearWorkCoordinationNamespace,
+  createBoard,
+  createDefaultWorkBoard,
+  createWorkItem,
+  describeWorkCoordinationStore,
+  expireWorkItemLeases,
+  getBoard,
+  getWorkItem,
+  handoffWorkItem,
+  importExternalWorkItem,
+  listActiveWorkLeases,
+  listBoardItems,
+  listBoards,
+  listCoordinationEvents,
+  listWorkItems,
+  normalizeWorkItemLabels,
+  releaseWorkItem,
+  renewWorkItemLease,
+  setWorkCoordinationNamespace,
+  WorkCoordinationError,
+  updateWorkItem,
+} from './work-coordination.js';
+export type {
+  AppendCoordinationEventInput,
+  ClaimWorkItemInput,
+  CoordinationEvent,
+  CreateBoardInput,
+  CreateWorkItemInput,
+  HandoffWorkItemInput,
+  ReleaseWorkItemInput,
+  RenewWorkItemLeaseInput,
+  UpdateWorkItemInput,
+  WorkBoard,
+  WorkBoardFilter,
+  WorkBoardType,
+  WorkCoordinationEventType,
+  WorkItem,
+  WorkItemFilter,
+  WorkItemPriority,
+  WorkItemSource,
+  WorkItemStatus,
+  WorkLease,
+  WorkLeaseStatus,
+} from './work-coordination.js';
+export type {
+  WorkCoordinationPeerCommandEnvelope,
+  WorkCoordinationPeerCommandPayload,
+  WorkCoordinationPeerCommandResult,
+  WorkCoordinationPeerCommandType,
+} from './work-coordination-peer.js';
+export {
+  buildWorkCoordinationPeerCommandEnvelope,
+  createWorkCoordinationPeerResponder,
+  processWorkCoordinationPeerCommand,
+} from './work-coordination-peer.js';
+export {
+  importGitHubIssue,
+  importGitHubIssueWithEvent,
+  normalizeGitHubIssue,
+} from './work-integrations/github-issues.js';
+export type {
+  GitHubIssueLike,
+  GitHubIssueNormalizationResult,
+} from './work-integrations/github-issues.js';
+export {
+  importJiraIssue,
+  importJiraIssueWithEvent,
+  normalizeJiraIssue,
+} from './work-integrations/jira-issues.js';
+export type {
+  JiraIssueLike,
+  JiraIssueNormalizationResult,
+} from './work-integrations/jira-issues.js';
 export { distillPdfDesign } from './src/pdf-utils.js';
 export { distillPptxDesign } from './src/pptx-utils.js';
 export { distillXlsxDesign } from './src/xlsx-utils.js';
@@ -357,6 +467,8 @@ export * from './a2a-bridge.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
 export * from './agent-provider-resolution.js';
+export * from './provider-health-registry.js';
+export * from './capability-broker.js';
 export * from './runtime-supervisor.js';
 export * from './surface-runtime.js';
 export * from './artifact-store.js';
@@ -706,6 +818,27 @@ export {
   resetReasoningBootstrap,
   getInstalledReasoningMode,
 } from './reasoning-bootstrap.js';
+export {
+  installEmbeddingBackendIfAvailable,
+} from './embedding-bootstrap.js';
+export {
+  getEmbeddingBackend,
+  registerEmbeddingBackend,
+  resetEmbeddingBackend,
+  cosineSimilarity,
+  reciprocalRankFusion,
+} from './embedding-backend.js';
+export type {
+  EmbeddingBackend,
+} from './embedding-backend.js';
+export {
+  MlxEmbeddingBackend,
+  isMlxAvailable,
+  probeMlxEmbeddingBackend,
+} from './mlx-embedding-backend.js';
+export type {
+  MlxEmbeddingBackendOptions,
+} from './mlx-embedding-backend.js';
 export type {
   InstallAnthropicOptions,
   InstallReasoningOptions,

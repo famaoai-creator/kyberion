@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/work-board.schema.json",
+  "title": "Work Board",
+  "type": "object",
+  "required": ["board_id", "name", "type", "filters", "sort_by", "created_at", "updated_at"],
+  "properties": {
+    "board_id": { "type": "string" },
+    "name": { "type": "string" },
+    "type": {
+      "type": "string",
+      "enum": ["project", "personal", "peer", "review", "external"]
+    },
+    "description": { "type": "string" },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "source": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "status": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "assignee_peer_id": { "type": "string" },
+        "assignee_user_id": { "type": "string" },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "sort_by": {
+      "type": "string",
+      "enum": ["priority", "updated_at", "created_at", "status"]
+    },
+    "lanes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  },
+  "additionalProperties": true
+}
