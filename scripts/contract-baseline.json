@@ -26,6 +26,17 @@
       "contract_schema_sha256": "4e1fb74a1e78517a5e8fae4ad087863c9d5bae382b029e57decb5a21e81ec889"
     },
     {
+      "actuator_id": "email-actuator",
+      "version": "1.0.0",
+      "ops": [
+        "create_draft",
+        "send",
+        "send_from_file"
+      ],
+      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
+      "contract_schema_sha256": "fb2c63205881214b3c74e2acc442ca6547c381c88d492508902a98f7df56b63b"
+    },
+    {
       "actuator_id": "approval-actuator",
       "version": "1.0.0",
       "ops": [

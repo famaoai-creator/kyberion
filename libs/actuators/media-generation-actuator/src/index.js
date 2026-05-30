@@ -601,4 +601,3 @@ if (isMain) {
         process.exit(1);
     });
 }
-//# sourceMappingURL=index.js.map

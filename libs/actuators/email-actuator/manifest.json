@@ -2,7 +2,7 @@
   "actuator_id": "email-actuator",
   "version": "1.0.0",
   "description": "Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer",
-  "contract_schema": "schemas/email-action.schema.json",
+  "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "draft_only",

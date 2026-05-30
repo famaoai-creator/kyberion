@@ -25,7 +25,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.0.0, schema schemas/browser-pipeline.schema.json)
 - `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (2 ops, v2.1.0, schema schemas/code-pipeline.schema.json)
-- `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema schemas/email-action.schema.json)
+- `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
@@ -60,4 +60,3 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - Treat `vision-actuator` as compatibility-only and continue moving generation concerns into `media-generation-actuator` while keeping perception-oriented work elsewhere.
 - Keep `approval-actuator`, `code-actuator`, `network-actuator`, and `process-actuator` manifest-backed because governance or runtime layers still reference them directly.
 - Do not use `CAPABILITIES_GUIDE.md` as the source of truth for runtime discovery; it is broader and currently includes historical capability names that do not map 1:1 to actuator packages.
-
