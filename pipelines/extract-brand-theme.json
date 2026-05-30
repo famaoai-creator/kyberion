@@ -38,7 +38,7 @@
           {
             "id": "extract-pptx",
             "type": "capture",
-            "op": "media:pptx_design_distill",
+            "op": "media:pptx_extract",
             "params": {
               "path": "{{source_file_path}}",
               "export_as": "pptx_design_data"
@@ -61,12 +61,37 @@
       }
     },
     {
-      "id": "save-profile",
+      "id": "derive-registration-data",
+      "type": "transform",
+      "op": "system:run_js",
+      "params": {
+        "code": "const spec = ctx.design_spec || {}; const brandSlug = String(ctx.brand_name_slug || 'extracted-theme').trim(); const brandName = String(ctx.brand_name || spec.brand_name || spec.name || brandSlug).trim(); const themeKey = brandSlug; const colors = spec.colors || spec.theme?.colors || {}; const fonts = spec.fonts || {}; const themeName = String(spec.name || `${brandName} Extracted Theme`); const normalizedTheme = { name: themeName, colors: { primary: colors.primary || colors.dk1 || colors.primary_color || '#0F172A', secondary: colors.secondary || colors.dk2 || colors.secondary_color || '#334155', accent: colors.accent || colors.hlink || colors.accent_color || '#38BDF8', background: colors.background || colors.lt1 || '#FFFFFF', text: colors.text || colors.tx1 || '#1E293B' }, fonts: { heading: fonts.heading || fonts.title || 'Aptos, sans-serif', body: fonts.body || 'Aptos, sans-serif' }, ...(spec.assets ? { assets: spec.assets } : {}) }; ctx.registered_theme_key = themeKey; ctx.registered_theme_name = themeName; ctx.theme_catalog_overlay = { version: '1.1.0', default_theme: themeKey, themes: { [themeKey]: normalizedTheme } }; ctx.presentation_preference_profile = { kind: 'presentation-preference-profile', profile_id: `${themeKey}-presentation-preferences`, scope: 'default', theme_selection_policy: { decision_mode: 'ask_when_uncertain', ask_user_when: ['audience_unclear', 'brand_alignment_unclear', 'new_deck_category'], default_theme_hint: themeKey }, brief_question_sets: [{ label: `${brandName} deck brief`, deck_purposes: ['proposal', 'internal_share', 'briefing'], questions: ['Who is the audience?', 'What should the deck help decide?', 'How long should the deck be?'] }], theme_sets: [{ label: `${brandName} extracted theme`, deck_purposes: ['proposal', 'internal_share', 'briefing'], theme_hint: themeKey, design_traits: ['brand_aligned', 'executive', 'minimal'] }] };"
+      }
+    },
+    {
+      "id": "save-theme-overlay",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "knowledge/personal/design-patterns/media-templates/themes/{{brand_name_slug}}.json",
+        "content": "{{theme_catalog_overlay}}"
+      }
+    },
+    {
+      "id": "register-preference-profile",
+      "type": "apply",
+      "op": "wisdom:register_presentation_preference_profile",
+      "params": {
+        "profile_from": "presentation_preference_profile"
+      }
+    },
+    {
+      "id": "save-runtime-profile",
       "type": "apply",
       "op": "code:write_artifact",
       "params": {
         "path": "active/shared/runtime/presentation-preferences/{{brand_name_slug}}.json",
-        "content": "{{design_spec}}"
+        "content": "{{presentation_preference_profile}}"
       }
     }
   ]
