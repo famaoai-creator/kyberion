@@ -1033,11 +1033,22 @@ function loadDocumentCompositionCatalog(rootDir: string): any {
 }
 
 function loadThemeCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
+  const publicCatalog = loadJsonCatalog(rootDir, {
     directoryPath: 'knowledge/public/design-patterns/media-templates/themes',
     filePath: 'knowledge/public/design-patterns/media-templates/themes.json',
     fallback: { default_theme: 'kyberion-standard', themes: {} },
   });
+  const runtimeCatalog = loadJsonCatalog(rootDir, {
+    directoryPath: 'active/shared/runtime/design-patterns/media-templates/themes',
+    filePath: 'active/shared/runtime/design-patterns/media-templates/themes.json',
+    fallback: { default_theme: 'kyberion-standard', themes: {} },
+  });
+  const personalCatalog = loadJsonCatalog(rootDir, {
+    directoryPath: 'knowledge/personal/design-patterns/media-templates/themes',
+    filePath: 'knowledge/personal/design-patterns/media-templates/themes.json',
+    fallback: { default_theme: 'kyberion-standard', themes: {} },
+  });
+  return deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
 }
 
 function loadMediaDesignSystemsCatalog(rootDir: string): any {
