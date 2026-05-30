@@ -67,7 +67,10 @@ describe('vital_check', () => {
       { encoding: 'utf8' },
     );
 
-    expect(activeMissionCount()).toBe(before + 2);
+    // a2a-lifecycle tests run concurrently and may create active missions in
+    // knowledge/personal/missions/ during this window, so allow >= not strict ==.
+    // If either root is uncounted the result would be before+1, which still fails.
+    expect(activeMissionCount()).toBeGreaterThanOrEqual(before + 2);
   });
 
   it('builds a report that mirrors the mission count helper', () => {

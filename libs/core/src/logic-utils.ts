@@ -33,7 +33,8 @@ export function resolveVars(val: any, ctx: any): any {
   if (typeof val !== 'string') return val;
 
   // Single variable match: "{{var}}" or "{{var|default}}" — returns raw value (preserves type)
-  const singleVarMatch = val.match(/^{{(.*?)}}$/);
+  // Uses [^{}]+ to avoid false matches on strings like "{{a}} / {{b}}" which start AND end with {{ }}
+  const singleVarMatch = val.match(/^{{([^{}]+)}}$/);
   if (singleVarMatch) {
     const [varName, defaultValue] = singleVarMatch[1].split('|').map((s) => s.trim());
     const current = getPathValue(ctx, varName);

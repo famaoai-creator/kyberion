@@ -34,7 +34,7 @@ export async function runSetupReportWithPersona(options: {
   return { surfaces, services, reasoning, doctor, nextActions };
 }
 
-function buildFirstTimeUserNextActions(report: SetupReport): Array<ReturnType<typeof buildNextAction>> {
+function buildFirstTimeUserNextActions(report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor'>): Array<ReturnType<typeof buildNextAction>> {
   const actions: Array<ReturnType<typeof buildNextAction>> = [];
   if (report.surfaces.summary.missing > 0 || report.surfaces.summary.disabled > 0) {
     actions.push(buildNextAction({

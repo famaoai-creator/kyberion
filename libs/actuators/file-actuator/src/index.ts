@@ -195,6 +195,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read':
+    case 'read_file':
       return {
         ...ctx,
         [params.export_as || 'last_capture']: await withRetry(
