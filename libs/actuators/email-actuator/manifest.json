@@ -1,0 +1,30 @@
+{
+  "actuator_id": "email-actuator",
+  "version": "1.0.0",
+  "description": "Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer",
+  "contract_schema": "schemas/email-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "draft_only",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 1000,
+      "maxDelayMs": 8000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+  },
+  "capabilities": [
+    { "op": "create_draft", "description": "Creates an email draft in Mail.app (does not send)", "platforms": ["darwin"] },
+    { "op": "send", "description": "Composes and sends email via Mail.app or SMTP (set KYBERION_SMTP_* env vars for SMTP mode)", "platforms": ["darwin", "linux"] },
+    { "op": "send_from_file", "description": "Reads email body from a markdown/text file and sends it", "platforms": ["darwin", "linux"] }
+  ],
+  "env_vars": {
+    "KYBERION_EMAIL_FROM": "Sender address (e.g. 'ichimura@sbisecsol.com')",
+    "KYBERION_SMTP_HOST": "SMTP host (activates SMTP mode, e.g. 'smtp.gmail.com')",
+    "KYBERION_SMTP_PORT": "SMTP port (default 587)",
+    "KYBERION_SMTP_USER": "SMTP username",
+    "KYBERION_SMTP_PASS": "SMTP password or app token"
+  }
+}

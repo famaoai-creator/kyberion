@@ -1,0 +1,172 @@
+{
+  "version": "1.0.0",
+  "description": "Defines when and how to create a Track, and which lifecycle model to apply.",
+  "track_types": {
+    "delivery": {
+      "description": "A bounded feature, service, or product delivery effort.",
+      "typical_lifecycle": "default-sdlc",
+      "gate_profile": "standard"
+    },
+    "release": {
+      "description": "A coordinated release event across multiple tracks or tenants.",
+      "typical_lifecycle": "release-sdlc",
+      "gate_profile": "strict"
+    },
+    "change": {
+      "description": "A controlled infrastructure or configuration change.",
+      "typical_lifecycle": "change-control",
+      "gate_profile": "strict"
+    },
+    "incident": {
+      "description": "An active incident requiring rapid diagnosis and remediation.",
+      "typical_lifecycle": "incident-response",
+      "gate_profile": "minimal"
+    },
+    "operations": {
+      "description": "Ongoing operational work with no fixed delivery endpoint.",
+      "typical_lifecycle": "ops-continuous",
+      "gate_profile": "minimal"
+    },
+    "governance": {
+      "description": "Policy authoring, compliance review, or audit preparation.",
+      "typical_lifecycle": "governance-sdlc",
+      "gate_profile": "strict"
+    },
+    "sales_outbound": {
+      "description": "アウトバウンド営業: こちらから顧客にアプローチし、ニーズ発掘からアポイント獲得・商談・クロージングまでを追跡するトラック。",
+      "typical_lifecycle": "sales-outbound",
+      "gate_profile": "sales",
+      "entry_criteria": [
+        "prospect account identified",
+        "initial contact attempted (call / email / LinkedIn)"
+      ],
+      "exit_criteria": [
+        "LEAD_QUALIFICATION_GATE passed",
+        "APPOINTMENT_SET artifact produced, OR opportunity marked lost with reason"
+      ],
+      "recommended_pipeline": "pipelines/sales-outbound-initial-contact.json",
+      "mission_class": "sales_engagement",
+      "tier": "confidential"
+    },
+    "sales_inbound": {
+      "description": "インバウンド営業: 顧客が自発的に問い合わせてきたケース。リード受付からヒアリング・提案・クロージングまでを追跡するトラック。",
+      "typical_lifecycle": "sales-inbound",
+      "gate_profile": "sales",
+      "entry_criteria": [
+        "inbound lead or inquiry received",
+        "prospect contact information captured"
+      ],
+      "exit_criteria": [
+        "LEAD_QUALIFICATION_GATE passed",
+        "PROPOSAL_APPROVAL_GATE passed",
+        "CLOSE_CONFIRMATION_GATE passed OR opportunity marked lost with reason"
+      ],
+      "recommended_pipeline": "pipelines/sales-inbound-lead-workflow.json",
+      "mission_class": "sales_engagement",
+      "tier": "confidential"
+    },
+    "account_expansion": {
+      "description": "既存顧客拡大: 現行契約顧客に対する追加提案・アップセル・クロスセルを追跡するトラック。新たな課題発見から拡張提案・合意・後継ミッション起票まで。",
+      "typical_lifecycle": "account-expansion",
+      "gate_profile": "sales",
+      "entry_criteria": [
+        "existing customer account relationship confirmed",
+        "expansion trigger identified (check-in call, support ticket, renewal review)"
+      ],
+      "exit_criteria": [
+        "UPSELL_QUALIFICATION_GATE passed",
+        "EXPANSION_PROPOSAL artifact produced",
+        "successor delivery or product_discovery Track created or referenced"
+      ],
+      "recommended_pipeline": "pipelines/account-expansion-workflow.json",
+      "mission_class": "account_management",
+      "tier": "confidential"
+    },
+    "product_discovery": {
+      "description": "Customer-engagement–driven product discovery: ヒアリング → 要件定義 → 解決策提案 → ロードマップ策定までの一連の探索フェーズ。discovery が完了し要件が確定したら delivery Track に引き継ぐ。",
+      "typical_lifecycle": "discovery-sdlc",
+      "gate_profile": "discovery",
+      "entry_criteria": [
+        "customer or stakeholder is identified",
+        "problem space is articulated (even loosely)",
+        "at least one discovery session is planned"
+      ],
+      "exit_criteria": [
+        "REQUIREMENTS_COMPLETENESS gate passed",
+        "CUSTOMER_SIGNOFF gate passed",
+        "product roadmap artifact produced",
+        "successor delivery Track created or referenced"
+      ],
+      "recommended_pipeline": "pipelines/customer-discovery-workflow.json",
+      "mission_class": "customer_engagement",
+      "tier": "confidential",
+      "note": "track_type='product_discovery' は mission_controller --track-type に直接渡す値。現在のバリデーションが delivery 等の列挙値のみ受け入れる場合は --track-type delivery で代替し、このポリシーへの参照を --track-note に記載する。"
+    }
+  },
+  "lifecycle_models": {
+    "discovery-sdlc": {
+      "phases": [
+        "intake",
+        "hearing",
+        "requirements_extraction",
+        "solution_hypothesis",
+        "cross_critique",
+        "roadmap_authoring",
+        "customer_signoff",
+        "handoff"
+      ],
+      "gates_per_phase": {
+        "requirements_extraction": ["REQUIREMENTS_COMPLETENESS"],
+        "customer_signoff": ["CUSTOMER_SIGNOFF"]
+      }
+    },
+    "sales-outbound": {
+      "phases": [
+        "prospect_identification",
+        "initial_contact",
+        "intent_classification",
+        "qualification",
+        "appointment_setting",
+        "discovery",
+        "proposal",
+        "negotiation",
+        "close"
+      ],
+      "gates_per_phase": {
+        "qualification": ["LEAD_QUALIFICATION_GATE"],
+        "proposal": ["PROPOSAL_APPROVAL_GATE"],
+        "close": ["CLOSE_CONFIRMATION_GATE"]
+      }
+    },
+    "sales-inbound": {
+      "phases": [
+        "lead_capture",
+        "intent_classification",
+        "qualification",
+        "discovery_meeting",
+        "proposal",
+        "negotiation",
+        "close"
+      ],
+      "gates_per_phase": {
+        "qualification": ["LEAD_QUALIFICATION_GATE"],
+        "proposal": ["PROPOSAL_APPROVAL_GATE"],
+        "close": ["CLOSE_CONFIRMATION_GATE"]
+      }
+    },
+    "account-expansion": {
+      "phases": [
+        "relationship_sync",
+        "expansion_trigger",
+        "need_identification",
+        "expansion_proposal",
+        "approval",
+        "successor_track_creation"
+      ],
+      "gates_per_phase": {
+        "expansion_proposal": ["UPSELL_QUALIFICATION_GATE"],
+        "approval": ["EXPANSION_PROPOSAL_GATE"]
+      }
+    }
+  }
+}
