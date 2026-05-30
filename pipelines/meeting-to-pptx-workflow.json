@@ -1,0 +1,174 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "meeting-to-pptx-workflow",
+  "version": "1.1.0",
+  "name": "Meeting Notes → Proposal PPTX Workflow",
+  "description": "会議メモ・議事録から提案書 PPTX を自動生成。テナントのコーポレートデザイン（tenant_slug で解決）を自動適用し、ブランド整合のとれたスライドデッキを出力する。",
+  "knowledge_scope": { "tiers": ["public", "confidential"] },
+  "context": {
+    "mission_id": "MSN-AUTO-GENERATED",
+    "project_name": "MEETING-TO-PPTX",
+    "mission_evidence_dir": "active/shared/tmp",
+    "language": "ja",
+    "meeting_notes_file": "",
+    "deck_title": "",
+    "audience": "顧客・社内上席",
+    "tenant_slug": "sbiss",
+    "output_filename": "proposal-deck.pptx"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "op": "system:log",
+      "params": {
+        "message": "📋 [MEETING→PPTX] Starting workflow (mission: {{mission_id}}, tenant: {{tenant_slug}})"
+      }
+    },
+    {
+      "id": "read_meeting_notes",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "{{meeting_notes_file}}",
+        "export_as": "meeting_notes_text"
+      }
+    },
+    {
+      "id": "log_notes_loaded",
+      "op": "system:log",
+      "params": {
+        "message": "📄 Meeting notes loaded ({{meeting_notes_file}})"
+      }
+    },
+    {
+      "id": "extract_meeting_intel",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "以下の会議メモを分析し、提案書作成に必要な情報を抽出してください。\n\n## 抽出項目\n1. **商談の目的**: 何を提案するための会議か\n2. **顧客情報**: 顧客名（法人名）、キーパーソン名・役職、意思決定構造\n3. **顧客の課題・ニーズ**: 具体的な問題点（定量データがあれば含める）\n4. **提案内容**: 弊社が提示したソリューション・アプローチ\n5. **合意事項**: 確認・合意された内容\n6. **ネクストアクション**: 誰が何をいつまでにやるか\n7. **デッキのコアメッセージ**: 「この資料で相手に最も伝えたいこと」を1文で\n8. **デッキの目的**: 送付用資料 / 商談持参用 / 社内共有用\n\n## 出力形式\n構造化されたJSONで出力してください。",
+        "context": ["{{mission_id}}", "{{meeting_notes_text}}"],
+        "export_as": "meeting_intel"
+      }
+    },
+    {
+      "id": "log_intel",
+      "op": "system:log",
+      "params": {
+        "message": "🎯 [MEETING→PPTX] Meeting intel extracted"
+      }
+    },
+    {
+      "id": "generate_deck_brief",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "以下の会議分析結果をもとに、提案書デッキのブリーフ（設計仕様）をJSON形式で生成してください。\n\n## 重要な制約\n- tenant_slug は必ず \"{{tenant_slug}}\" を使用してください\n- client には顧客の法人名を入れてください\n- slides は以下の構成で必ず7〜10枚設計してください:\n  1. 表紙（hero）\n  2. エグゼクティブサマリー（summary）— コアメッセージを3行以内で\n  3. 顧客課題の整理（problem）\n  4. 解決策概要（solution）\n  5. PoC 実施計画（plan）— 対象・方法・期間\n  6. 本番稼働ロードマップ（roadmap）— フェーズ・成果物・マイルストーン\n  7. ROI・投資概算（roi）— 表形式で\n  8. 次のステップ（cta）— アクション・日付・担当者\n\n## 出力JSONスキーマ（厳守）\n```json\n{\n  \"kind\": \"proposal-brief\",\n  \"title\": \"デッキタイトル（{{deck_title}} が空の場合は内容から生成）\",\n  \"client\": \"顧客法人名\",\n  \"tenant_slug\": \"{{tenant_slug}}\",\n  \"tenant_id\": \"{{tenant_slug}}\",\n  \"audience\": \"{{audience}}\",\n  \"core_message\": \"コアメッセージ（1文）\",\n  \"document_profile\": \"executive-proposal\",\n  \"design_system_id\": \"executive-standard\",\n  \"story\": {\n    \"core_message\": \"コアメッセージ（1文）\",\n    \"supporting_points\": [\"根拠1\", \"根拠2\", \"根拠3\"]\n  },\n  \"slides\": [\n    {\n      \"id\": \"slide_id\",\n      \"semantic_type\": \"hero|summary|problem|solution|plan|roadmap|roi|cta\",\n      \"title\": \"スライドタイトル\",\n      \"body\": [\"箇条書き1\", \"箇条書き2\"],\n      \"speaker_notes\": \"話す内容のメモ\"\n    }\n  ]\n}\n```",
+        "context": ["{{mission_id}}", "{{tenant_slug}}", "{{meeting_intel}}"],
+        "export_as": "deck_brief_raw"
+      }
+    },
+    {
+      "id": "parse_brief",
+      "type": "transform",
+      "op": "core:transform",
+      "params": {
+        "script": "const raw = ctx.deck_brief_raw; if (!raw) throw new Error('deck_brief_raw is missing from context'); const s = typeof raw === 'string' ? raw : JSON.stringify(raw); const jsonStr = s.includes('```json') ? s.split('```json')[1].split('```')[0] : s.includes('```') ? s.split('```')[1].split('```')[0] : s; const parsed = JSON.parse(jsonStr.trim()); return {...parsed, kind: 'proposal-brief', tenant_id: ctx.tenant_slug || parsed.tenant_slug};",
+        "export_as": "deck_brief"
+      }
+    },
+    {
+      "id": "write_brief",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/deck-brief.json",
+        "content": "{{deck_brief}}",
+        "export_as": "deck_brief_path"
+      }
+    },
+    {
+      "id": "log_brief",
+      "op": "system:log",
+      "params": {
+        "message": "📐 [MEETING→PPTX] Deck brief generated → {{mission_evidence_dir}}/deck-brief.json"
+      }
+    },
+    {
+      "id": "build_storyline",
+      "type": "transform",
+      "op": "media:proposal_storyline_from_brief",
+      "params": {
+        "from": "deck_brief",
+        "export_as": "proposal_storyline"
+      }
+    },
+    {
+      "id": "log_storyline",
+      "op": "system:log",
+      "params": {
+        "message": "🎬 [MEETING→PPTX] Slide storyline built ({{tenant_slug}} design system)"
+      }
+    },
+    {
+      "id": "compile_design",
+      "type": "transform",
+      "op": "media:brief_to_design_protocol",
+      "params": {
+        "from": "deck_brief",
+        "export_as": "pptx_design"
+      }
+    },
+    {
+      "id": "log_design",
+      "op": "system:log",
+      "params": {
+        "message": "🎨 [MEETING→PPTX] Design protocol compiled (theme: {{tenant_slug}})"
+      }
+    },
+    {
+      "id": "render_pptx",
+      "type": "apply",
+      "op": "media:pptx_render",
+      "params": {
+        "design_from": "pptx_design",
+        "path": "{{mission_evidence_dir}}/{{output_filename}}",
+        "export_as": "pptx_output_path"
+      }
+    },
+    {
+      "id": "log_render",
+      "op": "system:log",
+      "params": {
+        "message": "📊 [MEETING→PPTX] PPTX rendered → {{mission_evidence_dir}}/{{output_filename}}"
+      }
+    },
+    {
+      "id": "write_approval_gate",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/presentation-approval-gate.json",
+        "content": {
+          "gate": "PRESENTATION_APPROVAL_GATE",
+          "track": "delivery",
+          "status": "pending_operator_confirmation",
+          "deck_title": "{{deck_title}}",
+          "tenant": "{{tenant_slug}}",
+          "artifacts": [
+            "{{mission_evidence_dir}}/deck-brief.json",
+            "{{mission_evidence_dir}}/{{output_filename}}"
+          ],
+          "instructions": "生成された PPTX を確認し、顧客に提示可能なレベルであれば status を 'passed' に更新してください。修正が必要な場合は rejection_reason に記載し 'rejected' に更新してください。",
+          "created_at": "{{$now}}"
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 [MEETING→PPTX] Complete. PPTX: {{mission_evidence_dir}}/{{output_filename}} | Brief: {{mission_evidence_dir}}/deck-brief.json | Gate: pending review"
+      }
+    }
+  ]
+}

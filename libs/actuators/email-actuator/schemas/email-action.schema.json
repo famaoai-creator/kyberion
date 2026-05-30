@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EmailAction",
+  "type": "object",
+  "required": ["op"],
+  "properties": {
+    "op": {
+      "type": "string",
+      "enum": ["create_draft", "send", "send_from_file"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "to": { "type": "string", "description": "Recipient email address" },
+        "cc": { "type": "string", "description": "CC email address (optional)" },
+        "subject": { "type": "string", "description": "Email subject line" },
+        "body": { "type": "string", "description": "Email body (plain text or Markdown)" },
+        "body_file": { "type": "string", "description": "Path to a file containing the email body (for send_from_file)" },
+        "from": { "type": "string", "description": "Sender address override (falls back to KYBERION_EMAIL_FROM)" },
+        "export_as": { "type": "string", "description": "Context key for result" }
+      }
+    }
+  }
+}
