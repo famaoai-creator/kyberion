@@ -4901,7 +4901,7 @@ export function MissionIntelligence({
         </Panel>
 
         <div ref={missionThreadPanelRef}>
-          <Panel title={mt('chronos_selected_mission_thread', 'Thread')}>
+          <Panel title={mt('chronos_selected_mission_thread', 'Selected Mission Thread')}>
             <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-white/45">
               <span>
                 {effectiveMissionId
