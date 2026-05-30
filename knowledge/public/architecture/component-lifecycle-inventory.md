@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-05-28
+last_updated: 2026-05-30
 ---
 
 # Component Lifecycle Inventory
@@ -14,7 +14,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 ## Current Runtime Surface
 
 - Source of truth: `libs/actuators/*/manifest.json`
-- Count: 27
+- Count: 28
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (6 ops, v1.0.0, schema schemas/agent-action.schema.json)
@@ -25,7 +25,8 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.0.0, schema schemas/browser-pipeline.schema.json)
 - `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (2 ops, v2.1.0, schema schemas/code-pipeline.schema.json)
-- `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.0.0, schema schemas/file-pipeline.schema.json)
+- `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema schemas/email-action.schema.json)
+- `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
 - `media-generation-actuator`: Generative image, video, music, and screen capture actuator (10 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
@@ -43,7 +44,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (6 ops, v1.0.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
 - `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (7 ops, v1.2.0, schema schemas/voice-action.schema.json)
-- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (32 ops, v1.2.0, schema schemas/wisdom-action.schema.json)
+- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (33 ops, v1.2.1, schema schemas/wisdom-action.schema.json)
 
 ## Legacy Review Queue
 

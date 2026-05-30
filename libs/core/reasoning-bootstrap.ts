@@ -47,6 +47,9 @@ import { buildClaudeCliOptionsFromEnv } from './claude-cli-backend.js';
 import { buildShellClaudeCliBackendFromEnv } from './claude-cli-backend.js';
 import { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
 import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
+import { buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
+import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
+import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
 import {
   OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
@@ -70,6 +73,7 @@ export type ReasoningBackendMode =
   | 'anthropic'
   | 'gemini-cli'
   | 'gemini-api'
+  | 'agy-cli'
   | 'local'
   | 'stub';
 
@@ -111,6 +115,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
     'claude-agent',
     'anthropic',
     'gemini-cli',
+    'agy-cli',
     'local',
     'stub',
   ];
@@ -132,6 +137,7 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   if (process.env.GEMINI_CLI) preferredProvider = 'gemini';
   else if (process.env.CODEX_CLI || process.env.CODEX_VERSION || process.env.TERM_PROGRAM === 'codex') preferredProvider = 'codex';
   else if (process.env.CLAUDE_CLI) preferredProvider = 'claude';
+  else if (process.env.AGY_CLI || process.env.ANTIGRAVITY_CLI) preferredProvider = 'agy';
 
   // If a preferred provider is detected and healthy, use it
   if (preferredProvider && providers.some((p) => p.provider === preferredProvider && p.installed && p.healthy)) {
@@ -139,6 +145,9 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   }
 
   // Fallback to the first healthy provider found in discovery
+  if (providers.some((provider) => provider.provider === 'agy' && provider.installed && provider.healthy)) {
+    return 'agy-cli';
+  }
   if (providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy)) {
     return 'gemini-cli';
   }
@@ -297,6 +306,37 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installedMode = 'gemini-cli';
     logger.success(
       `[reasoning-bootstrap] mode=gemini-cli — shell gemini CLI (model=${options.model ?? 'gemini-2.0-flash-exp'})`,
+    );
+    return true;
+  }
+
+  if (mode === 'agy-cli') {
+    const providers = discoverProviders(shouldRefreshProviders(options));
+    const agyHealthy = providers.some((provider) => provider.provider === 'agy' && provider.installed && provider.healthy);
+    if (!agyHealthy && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=agy-cli selected but Agy CLI is not usable — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
+    const agyBackend = buildAgyCliBackendFromEnv(process.env);
+    if (!agyBackend) {
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
+
+    registerReasoningBackend(agyBackend);
+    const agyOptions = {
+      bin: (process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN)?.trim() || undefined,
+    };
+    registerIntentExtractor(new AgyCliIntentExtractor(agyOptions));
+    registerVoiceBridge(new AgyCliVoiceBridge(agyOptions));
+    
+    installed = true;
+    installedMode = 'agy-cli';
+    logger.success(
+      `[reasoning-bootstrap] mode=agy-cli — shell agy CLI`
     );
     return true;
   }

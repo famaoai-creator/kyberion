@@ -10,4 +10,6 @@ export { GeminiAdapter } from './gemini-adapter.js';
 export { CodexAdapter, CodexAppServerAdapter } from './codex-adapter.js';
 export { ClaudeAdapter } from './claude-adapter.js';
 export type { ClaudeAdapterOptions } from './claude-adapter.js';
+export { AgyAdapter } from '../agent-adapter.js';
+export type { AgyAdapterOptions } from '../agent-adapter.js';
 export { AgentFactory } from './agent-factory.js';

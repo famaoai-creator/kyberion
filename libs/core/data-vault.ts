@@ -1,12 +1,27 @@
+import * as crypto from 'node:crypto';
+import * as nodePath from 'node:path';
+import { shared } from './path-resolver.js';
+import {
+  safeReadFile,
+  safeWriteFile,
+  safeExistsSync,
+  safeMkdir,
+  safeUnlinkSync,
+  safeReaddir,
+} from './secure-io.js';
+import { logger } from './core.js';
+
 export type DataVaultTier = 'personal' | 'confidential' | 'public';
 
 export interface VaultEntry<T = unknown> {
-  vault_id: string;
-  cache_key: string;
-  data: T;
+  sourceType: string;
+  key: string;
+  projectId: string;
   tier: DataVaultTier;
-  created_at: string;
-  expires_at: string;
+  data: T;
+  contentHash: string;
+  createdAt: string;
+  expiresAt?: string;
 }
 
 export interface FetchWithVaultCacheOptions {
@@ -18,64 +33,132 @@ export interface FetchWithVaultCacheOptions {
 export interface FetchWithVaultCacheResult<T = unknown> {
   data: T;
   fromCache: boolean;
+  entry: VaultEntry<T>;
 }
 
 export interface VaultEntryFilter {
+  sourceType?: string;
+  projectId?: string;
+  includeExpired?: boolean;
+  /** @deprecated use sourceType */
   vault_id?: string;
+  /** @deprecated use key */
   cache_key?: string;
   tier?: DataVaultTier;
 }
 
-const VAULT = new Map<string, VaultEntry>();
+function vaultDir(): string {
+  return shared('data-vault');
+}
+
+function entryFileName(sourceType: string, key: string, projectId: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`${sourceType}::${projectId}::${key}`)
+    .digest('hex')
+    .slice(0, 32) + '.json';
+}
+
+function entryFilePath(sourceType: string, key: string, projectId: string): string {
+  return nodePath.join(vaultDir(), entryFileName(sourceType, key, projectId));
+}
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-function makeKey(vaultId: string, cacheKey: string): string {
-  return `${vaultId}::${cacheKey}`;
+function sha256Hex(data: unknown): string {
+  return 'sha256:' + crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+}
+
+function isExpired(entry: VaultEntry): boolean {
+  if (!entry.expiresAt) return false;
+  return Date.parse(entry.expiresAt) <= Date.now();
+}
+
+function readEntryFile<T>(filePath: string): VaultEntry<T> | null {
+  if (!safeExistsSync(filePath)) return null;
+  try {
+    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    return JSON.parse(raw) as VaultEntry<T>;
+  } catch {
+    return null;
+  }
+}
+
+function writeEntryFile(filePath: string, entry: VaultEntry): void {
+  const dir = nodePath.dirname(filePath);
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(filePath, JSON.stringify(entry, null, 2));
 }
 
 export async function fetchWithVaultCache<T>(
-  vaultId: string,
-  cacheKey: string,
+  sourceType: string,
+  key: string,
   loader: () => Promise<T> | T,
-  options: FetchWithVaultCacheOptions = {}
+  options: FetchWithVaultCacheOptions = {},
 ): Promise<FetchWithVaultCacheResult<T>> {
-  const key = makeKey(vaultId, cacheKey);
-  const cached = VAULT.get(key);
-  const expiresAtMs = cached ? Date.parse(cached.expires_at) : Number.NaN;
-  if (cached && Number.isFinite(expiresAtMs) && expiresAtMs > Date.now()) {
-    return { data: cached.data as T, fromCache: true };
+  const projectId = options.projectId ?? '_global';
+  const filePath = entryFilePath(sourceType, key, projectId);
+
+  const cached = readEntryFile<T>(filePath);
+  if (cached && !isExpired(cached)) {
+    logger.info(`[DATA-VAULT] cache hit: ${sourceType}:${key}`);
+    return { data: cached.data, fromCache: true, entry: cached };
   }
 
   const data = await loader();
-  const ttlMs = Math.max(0, Number(options.ttlMs ?? 0));
+  const ttlMs = Number(options.ttlMs ?? 0);
   const entry: VaultEntry<T> = {
-    vault_id: vaultId,
-    cache_key: cacheKey,
-    data,
+    sourceType,
+    key,
+    projectId,
     tier: options.tier ?? 'confidential',
-    created_at: nowIso(),
-    expires_at: new Date(Date.now() + ttlMs).toISOString(),
+    data,
+    contentHash: sha256Hex(data),
+    createdAt: nowIso(),
+    ...(ttlMs > 0 ? { expiresAt: new Date(Date.now() + ttlMs).toISOString() } : {}),
   };
-  VAULT.set(key, entry);
-  return { data, fromCache: false };
+
+  writeEntryFile(filePath, entry);
+  return { data, fromCache: false, entry };
 }
 
-export function getVaultEntry(vaultId: string, cacheKey: string): VaultEntry | undefined {
-  return VAULT.get(makeKey(vaultId, cacheKey));
+export function getVaultEntry(sourceType: string, key: string, projectId: string): VaultEntry | null {
+  const filePath = entryFilePath(sourceType, key, projectId);
+  const entry = readEntryFile(filePath);
+  if (!entry) return null;
+  if (isExpired(entry)) return null;
+  return entry;
 }
 
-export function invalidateVaultEntry(vaultId: string, cacheKey: string): boolean {
-  return VAULT.delete(makeKey(vaultId, cacheKey));
+export function invalidateVaultEntry(sourceType: string, key: string, projectId: string): boolean {
+  const filePath = entryFilePath(sourceType, key, projectId);
+  if (!safeExistsSync(filePath)) return false;
+  safeUnlinkSync(filePath);
+  return true;
 }
 
 export function listVaultEntries(filter: VaultEntryFilter = {}): VaultEntry[] {
-  return [...VAULT.values()].filter((entry) => {
-    if (filter.vault_id && entry.vault_id !== filter.vault_id) return false;
-    if (filter.cache_key && entry.cache_key !== filter.cache_key) return false;
-    if (filter.tier && entry.tier !== filter.tier) return false;
-    return true;
-  });
+  const dir = vaultDir();
+  if (!safeExistsSync(dir)) return [];
+
+  let files: string[];
+  try {
+    files = safeReaddir(dir).filter((f) => f.endsWith('.json'));
+  } catch {
+    return [];
+  }
+
+  const entries: VaultEntry[] = [];
+  for (const file of files) {
+    const entry = readEntryFile(nodePath.join(dir, file));
+    if (!entry) continue;
+    if (!filter.includeExpired && isExpired(entry)) continue;
+    if (filter.sourceType && entry.sourceType !== filter.sourceType) continue;
+    if (filter.projectId && entry.projectId !== filter.projectId) continue;
+    if (filter.tier && entry.tier !== filter.tier) continue;
+    entries.push(entry);
+  }
+  return entries;
 }

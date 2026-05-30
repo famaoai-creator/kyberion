@@ -79,6 +79,10 @@
       "types": "./dist/channel-surface.d.ts",
       "default": "./dist/channel-surface.js"
     },
+    "./customer-resolver": {
+      "types": "./dist/customer-resolver.d.ts",
+      "default": "./dist/customer-resolver.js"
+    },
     "./cli-utils": {
       "types": "./dist/cli-utils.d.ts",
       "default": "./dist/cli-utils.js"

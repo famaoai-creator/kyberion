@@ -197,3 +197,170 @@ export function resolveAgentProviderTarget(
     availableProviders,
   };
 }
+
+/**
+ * Requirement-first resolution.
+ *
+ * Unlike resolveAgentProviderTarget (which is provider-first: "use claude, fall back if needed"),
+ * this is intent-first: the caller declares the capabilities it needs and stays agnostic about
+ * which model satisfies them. The result adapts to whatever is installed in the current
+ * environment — one provider at work, a different set at home — without changing call sites.
+ *
+ * Graceful degrade:
+ *   - 0 installed providers  -> unresolved (preferred/default echoed back so callers still have a target)
+ *   - exactly 1 installed    -> use it, even if it doesn't cover the requirements (you can't pick what
+ *                               you don't have); unmetCapabilities reports the gap
+ *   - many installed         -> score by capability coverage, preferring `preferredProvider` as a hint
+ *
+ * `excludeProviders` lets a health layer (rate-limit failover) demote providers; if demotion would
+ * leave nothing, the demotion is ignored and the result is flagged `degraded` rather than failing.
+ */
+/**
+ * Orchestration tier requested by a task.
+ *
+ * - `leaf`: a single prompt-in / result-out call. Use this when Kyberion has ALREADY decomposed
+ *   the work into worker tasks — running each leaf on a provider that would fan out again causes
+ *   double orchestration (and loses Kyberion's audit of the inner fan-out).
+ * - `managed_workflow`: the task is a coarse goal the provider may decompose itself, fanning out
+ *   sub-agents under a recorded execution journal. Only providers advertising `managed_workflow`
+ *   (e.g. claude) qualify — gemini YOLO-style delegation, which leaves no journal, does not.
+ */
+export type OrchestrationTier = 'leaf' | 'managed_workflow';
+
+export interface CapabilityResolveOptions {
+  requiredCapabilities?: string[];
+  preferredProvider?: string;
+  preferredModelId?: string;
+  fallbackProviders?: string[];
+  excludeProviders?: string[];
+  orchestration?: OrchestrationTier;
+}
+
+export interface CapabilityResolution {
+  provider: string;
+  modelId: string;
+  strategy: 'sole' | 'preferred' | 'best-match' | 'degraded' | 'unresolved';
+  availableProviders: string[];
+  requiredCapabilities: string[];
+  unmetCapabilities: string[];
+  orchestration: OrchestrationTier;
+  rationale: string;
+}
+
+function combinedCapabilities(info: ProviderInfo | undefined, modelId: string): string[] {
+  const have = new Set(providerCapabilities(info));
+  for (const capability of modelCapabilities(info, modelId)) have.add(capability.trim().toLowerCase());
+  return Array.from(have);
+}
+
+function computeUnmet(info: ProviderInfo | undefined, modelId: string, required: string[]): string[] {
+  if (required.length === 0) return [];
+  const have = normalizeSet(combinedCapabilities(info, modelId));
+  return required.filter((capability) => !have.has(capability.trim().toLowerCase()));
+}
+
+export function resolveCapabilityTarget(
+  options: CapabilityResolveOptions,
+  discoveredProviders = discoverProviders(),
+): CapabilityResolution {
+  const orchestration: OrchestrationTier = options.orchestration || 'leaf';
+  // A managed-workflow task must land on a provider that can run a recorded fan-out.
+  const baseRequired = (options.requiredCapabilities || [])
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  const requiredCapabilities = orchestration === 'managed_workflow'
+    ? Array.from(new Set([...baseRequired, 'managed_workflow']))
+    : baseRequired;
+  const installed = discoveredProviders.filter((entry) => entry.installed && entry.healthy);
+  const availableProviders = installed.map((entry) => entry.provider);
+
+  const unresolved = (rationale: string): CapabilityResolution => ({
+    provider: options.preferredProvider || DEFAULT_PROVIDER_PRIORITY[0]!,
+    modelId: options.preferredModelId || defaultModelFor(options.preferredProvider || DEFAULT_PROVIDER_PRIORITY[0]!),
+    strategy: 'unresolved',
+    availableProviders,
+    requiredCapabilities,
+    unmetCapabilities: requiredCapabilities,
+    orchestration,
+    rationale,
+  });
+
+  if (installed.length === 0) {
+    return unresolved('no providers installed; echoing preferred/default target');
+  }
+
+  // Apply optional allowlist (always keep the preferred provider as a candidate).
+  const allowlist = normalizeSet(options.fallbackProviders);
+  let candidates = allowlist.size > 0
+    ? installed.filter((entry) => allowlist.has(entry.provider) || entry.provider === options.preferredProvider)
+    : installed;
+  if (candidates.length === 0) candidates = installed;
+
+  // Apply health-based exclusions, but never strand the caller: if exclusion empties the pool,
+  // fall back to the full pool and let the result read as `degraded`.
+  const excluded = normalizeSet(options.excludeProviders);
+  let demotionIgnored = false;
+  if (excluded.size > 0) {
+    const surviving = candidates.filter((entry) => !excluded.has(entry.provider));
+    if (surviving.length > 0) {
+      candidates = surviving;
+    } else {
+      demotionIgnored = true;
+    }
+  }
+
+  const priority = resolvePriority(options.preferredProvider || DEFAULT_PROVIDER_PRIORITY[0]!);
+  const scoreOf = (entry: ProviderInfo): number => {
+    const covers = capabilityCoverage(providerCapabilities(entry), requiredCapabilities) ? 1000 : 0;
+    const matched = capabilityScore(providerCapabilities(entry), requiredCapabilities);
+    const preferredBonus = entry.provider === options.preferredProvider ? 50 : 0;
+    return covers + matched + preferredBonus;
+  };
+
+  const ranked = [...candidates].sort((left, right) => {
+    const byScore = scoreOf(right) - scoreOf(left);
+    if (byScore !== 0) return byScore;
+    const leftRank = priority.indexOf(left.provider);
+    const rightRank = priority.indexOf(right.provider);
+    return (leftRank >= 0 ? leftRank : Number.MAX_SAFE_INTEGER) - (rightRank >= 0 ? rightRank : Number.MAX_SAFE_INTEGER);
+  });
+
+  const chosen = ranked[0]!;
+  const modelId = pickBestModel(chosen, requiredCapabilities, options.preferredModelId);
+  const unmetCapabilities = computeUnmet(chosen, modelId, requiredCapabilities);
+  const covers = unmetCapabilities.length === 0;
+
+  let strategy: CapabilityResolution['strategy'];
+  let rationale: string;
+  if (installed.length === 1) {
+    strategy = 'sole';
+    rationale = covers
+      ? `only ${chosen.provider} installed; it covers the required capabilities`
+      : `only ${chosen.provider} installed; using it despite unmet [${unmetCapabilities.join(', ')}]`;
+  } else if (demotionIgnored) {
+    strategy = 'degraded';
+    rationale = `all candidates were demoted (rate-limited); using best available ${chosen.provider}/${modelId}`;
+  } else if (!covers) {
+    strategy = 'degraded';
+    rationale = `no installed provider covers [${requiredCapabilities.join(', ')}]; best match ${chosen.provider}/${modelId} leaves [${unmetCapabilities.join(', ')}] unmet`;
+  } else if (options.preferredProvider && chosen.provider === options.preferredProvider) {
+    strategy = 'preferred';
+    rationale = `preferred ${chosen.provider} installed and covers the required capabilities`;
+  } else {
+    strategy = 'best-match';
+    rationale = options.preferredProvider
+      ? `preferred ${options.preferredProvider} not selected; ${chosen.provider}/${modelId} best covers the required capabilities`
+      : `${chosen.provider}/${modelId} best covers the required capabilities`;
+  }
+
+  return {
+    provider: chosen.provider,
+    modelId,
+    strategy,
+    availableProviders,
+    requiredCapabilities,
+    unmetCapabilities,
+    orchestration,
+    rationale,
+  };
+}

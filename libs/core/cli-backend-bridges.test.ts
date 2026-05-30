@@ -52,10 +52,38 @@ vi.mock('./gemini-cli-backend.js', () => ({
   }),
 }));
 
+vi.mock('./agy-cli-backend.js', () => ({
+  runAgyCliQuery: vi.fn(async ({ schema }: any) => {
+    const voiceCandidate = {
+      turns: [
+        { speaker: 'sovereign', text: 'hello' },
+        { speaker: 'counterparty', text: 'hi' },
+      ],
+      transcript: [
+        { speaker: 'sovereign', text: 'hello' },
+        { speaker: 'counterparty', text: 'hi' },
+      ],
+      stance: 'neutral',
+      conditions: [],
+      dissent_signals: [],
+    };
+    if (schema.safeParse(voiceCandidate).success) return schema.parse(voiceCandidate);
+    return schema.parse({
+      goal: 'rely on agy backend',
+      constraints: [],
+      deliverables: ['agent-output'],
+      excluded: [],
+      stakeholders: ['deepmind'],
+    });
+  }),
+}));
+
 import { ClaudeCliIntentExtractor } from './claude-cli-intent-extractor.js';
 import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
 import { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
 import { GeminiCliVoiceBridge } from './gemini-cli-voice-bridge.js';
+import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
+import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
 
 describe('CLI backend bridges', () => {
   afterEach(() => {
@@ -99,5 +127,25 @@ describe('CLI backend bridges', () => {
     expect(result.person_slug).toBe('alice');
     expect(result.stance).toBe('neutral');
     expect(result.written_to).toBe('tmp/one-on-one.json');
+  });
+
+  it('extracts intent through agy cli', async () => {
+    const extractor = new AgyCliIntentExtractor();
+    const body = await extractor.extract({ text: 'please ship this' });
+    expect(body.goal).toBe('rely on agy backend');
+    expect(body.deliverables).toEqual(['agent-output']);
+  });
+
+  it('produces voice transcripts through agy cli', async () => {
+    const bridge = new AgyCliVoiceBridge();
+    const result = await bridge.runOneOnOneSession({
+      counterpartyRef: 'people/bob.json',
+      proposalDraftRef: 'drafts/proposal.md',
+      structure: ['open', 'close'],
+      outputPath: 'tmp/one-on-one-agy.json',
+    });
+    expect(result.person_slug).toBe('bob');
+    expect(result.stance).toBe('neutral');
+    expect(result.written_to).toBe('tmp/one-on-one-agy.json');
   });
 });

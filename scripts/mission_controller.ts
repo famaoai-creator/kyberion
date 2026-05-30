@@ -30,6 +30,12 @@ import {
   resolveMissionWorkflowDesign,
   updateMemoryPromotionCandidateStatus,
   safeExec,
+  safeReadFile,
+  safeWriteFile,
+  safeExistsSync,
+  safeReaddir,
+  findMissionPath,
+  missionEvidenceDir,
   validateWritePermission,
 } from '@agent/core';
 
@@ -898,6 +904,69 @@ async function grantMissionAccess(missionId: string, serviceId: string, ttl: num
   return missionSystem.grantMissionAccess(missionId, serviceId, ttl);
 }
 
+async function resolveGate(missionId: string, gateFile?: string): Promise<string> {
+  const evidDir = missionEvidenceDir(missionId.toUpperCase());
+  if (!evidDir) throw new Error(`Mission ${missionId} evidence directory not found.`);
+  if (gateFile) {
+    const abs = path.isAbsolute(gateFile) ? gateFile : path.resolve(evidDir, gateFile);
+    if (!safeExistsSync(abs)) throw new Error(`Gate file not found: ${abs}`);
+    return abs;
+  }
+  const files = safeReaddir(evidDir) as string[];
+  const gates = files.filter(f => f.endsWith('-gate.json'));
+  if (gates.length === 0) throw new Error(`No gate files found in ${evidDir}`);
+  if (gates.length > 1) throw new Error(`Multiple gates found — specify gate file: ${gates.join(', ')}`);
+  return path.join(evidDir, gates[0]);
+}
+
+async function gatePass(missionId: string, gateFile?: string, note?: string): Promise<void> {
+  if (!missionId) {
+    logger.error('Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json] [--note "..."]');
+    return;
+  }
+  const gatePath = await resolveGate(missionId, gateFile);
+  const raw = safeReadFile(gatePath, { encoding: 'utf8' }) as string;
+  const gate = JSON.parse(raw);
+  gate.status = 'passed';
+  gate.confirmed_at = new Date().toISOString();
+  gate.confirmed_by = process.env.KYBERION_PERSONA || 'operator';
+  if (note) gate.note = note;
+  safeWriteFile(gatePath, JSON.stringify(gate, null, 2));
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'operator',
+    action: 'gate.passed',
+    operation: `gate-pass:${path.basename(gatePath)}`,
+    result: 'completed',
+    metadata: { mission_id: missionId.toUpperCase(), gate_file: gatePath, note },
+  });
+  logger.success(`✅ [GATE] ${path.basename(gatePath)} → passed (mission: ${missionId.toUpperCase()})`);
+  logger.info(`   Confirmed by: ${gate.confirmed_by} at ${gate.confirmed_at}`);
+}
+
+async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
+  if (!missionId) {
+    logger.error('Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json] [--note "..."]');
+    return;
+  }
+  const gatePath = await resolveGate(missionId, gateFile);
+  const raw = safeReadFile(gatePath, { encoding: 'utf8' }) as string;
+  const gate = JSON.parse(raw);
+  gate.status = 'rejected';
+  gate.rejected_at = new Date().toISOString();
+  gate.rejected_by = process.env.KYBERION_PERSONA || 'operator';
+  if (note) gate.rejection_reason = note;
+  safeWriteFile(gatePath, JSON.stringify(gate, null, 2));
+  auditChain.record({
+    agentId: process.env.KYBERION_PERSONA || 'operator',
+    action: 'gate.rejected',
+    operation: `gate-fail:${path.basename(gatePath)}`,
+    result: 'completed',
+    metadata: { mission_id: missionId.toUpperCase(), gate_file: gatePath, note },
+  });
+  logger.warn(`❌ [GATE] ${path.basename(gatePath)} → rejected (mission: ${missionId.toUpperCase()})`);
+  if (note) logger.info(`   Reason: ${note}`);
+}
+
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
   assertCanGrantMissionAuthority();
   return missionSystem.grantMissionSudo(missionId, on, ttl);
@@ -1142,6 +1211,12 @@ async function main() {
       break;
     case 'handoff':
       await handoffMission(arg1, arg2, arg3);
+      break;
+    case 'gate-pass':
+      await gatePass(arg1, arg2, getOptionValue('--note'));
+      break;
+    case 'gate-fail':
+      await gateFail(arg1, arg2, getOptionValue('--note'));
       break;
     case 'sync':
       logger.info('Syncing mission registry...');

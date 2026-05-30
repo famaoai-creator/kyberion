@@ -21,13 +21,23 @@ describe('reasoning-bootstrap', () => {
   });
 
   it('installs codex-cli adapters when requested explicitly', () => {
-    const installed = installReasoningBackends({ mode: 'codex-cli' });
+    const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
 
     expect(installed).toBe(true);
     expect(getInstalledReasoningMode()).toBe('codex-cli');
     expect(getReasoningBackend().name).toBe('codex-cli');
     expect(getIntentExtractor().name).toBe('codex-cli');
     expect(getVoiceBridge().name).toBe('codex-cli-text');
+  });
+
+  it('installs agy-cli adapters when requested explicitly', () => {
+    const installed = installReasoningBackends({ mode: 'agy-cli', force: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('agy-cli');
+    expect(getReasoningBackend().name).toBe('agy-cli');
+    expect(getIntentExtractor().name).toBe('agy-cli');
+    expect(getVoiceBridge().name).toBe('agy-cli-text');
   });
 
   it('installs the local OpenAI-compatible backend when configured', () => {

@@ -1,6 +1,6 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "schemas/wisdom-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -44,6 +44,7 @@
     { "op": "evaluate_customer_signoff", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "CUSTOMER_SIGNOFF gate evaluator." },
 
     { "op": "extract_design_spec", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "SDLC design phase: requirements-draft.json → design-spec.json via the registered ReasoningBackend." },
+    { "op": "register_presentation_preference_profile", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "Persist a presentation-preference-profile in the personal overlay registry so theme hints and question prompts can be reused." },
     { "op": "evaluate_architecture_ready", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "ARCHITECTURE_READY gate evaluator — checks design spec completeness and blocking open_decisions." },
     { "op": "extract_test_plan", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "SDLC test phase: requirements (+ optional design) → test-plan.json (test-case-adf-compatible)." },
     { "op": "evaluate_qa_ready", "platforms": ["darwin", "linux", "win32"], "implementation": "full", "note": "QA_READY gate evaluator — verifies test coverage of must-have FRs." },

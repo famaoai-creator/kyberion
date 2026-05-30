@@ -1,200 +1,119 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  AgentFactory,
-  ClaudeAdapter,
-  CodexAdapter,
-  CodexAppServerAdapter,
-  CodexExecutionEnhancer,
-  GeminiJsonModeEnforcer,
-  GeminiPhaseAwareInstructionEnhancer,
-  GeminiWisdomEnhancer,
-} from './agent-adapter.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { AgyAdapter } from './agent-adapter.js';
+import { spawnSync } from 'node:child_process';
 
-describe('CodexAppServerAdapter', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(),
+}));
+
+describe('AgyAdapter', () => {
+  let adapter: AgyAdapter;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    adapter = new AgyAdapter({ bin: 'agy' });
   });
 
-  it('requests network-enabled sandbox policy for turns', async () => {
-    const adapter = new CodexAppServerAdapter({
-      cwd: '/tmp/kyberion-test',
-      approvalMode: 'relaxed',
-    }) as any;
+  it('correctly executes a basic stateless single-prompt run', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: 'Hello World',
+      stderr: '',
+      output: [],
+      pid: 123,
+      signal: null,
+    } as any);
 
-    adapter.threadId = 'thread-1';
+    const response = await adapter.ask('Say hello');
+    expect(response.text).toBe('Hello World');
+    expect(response.stopReason).toBe('completed');
 
-    const sendRequest = vi.spyOn(adapter, 'sendRequest').mockImplementation(async (method: string, params: any) => {
-      if (method === 'turn/start') return { turn: { id: 'turn-1' } };
-      throw new Error(`Unexpected method: ${method}`);
-    });
-
-    adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
-
-    const result = await adapter.ask('Reply with exactly OK');
-
-    expect(result).toEqual(expect.objectContaining({ text: 'OK', stopReason: 'completed' }));
-    expect(adapter.getSandboxMode()).toBe('workspace-write');
-    expect(adapter.buildSandboxPolicy()).toEqual({
-      type: 'workspaceWrite',
-      writableRoots: undefined,
-      networkAccess: true,
-      excludeTmpdirEnvVar: false,
-      excludeSlashTmp: false,
-    });
-    expect(sendRequest).toHaveBeenNthCalledWith(
-      1,
-      'turn/start',
-      expect.objectContaining({
-        threadId: 'thread-1',
-        sandboxPolicy: {
-          type: 'workspaceWrite',
-          writableRoots: undefined,
-          networkAccess: true,
-          excludeTmpdirEnvVar: false,
-          excludeSlashTmp: false,
-        },
-      }),
-      expect.any(Number)
+    expect(spawnSync).toHaveBeenCalledWith(
+      'agy',
+      ['-p', 'Say hello', '--dangerously-skip-permissions'],
+      expect.any(Object),
     );
   });
 
-  it('creates provider adapters through the registry-based factory', () => {
-    const codexMode = process.env.KYBERION_CODEX_MODE;
-    process.env.KYBERION_CODEX_MODE = 'exec';
+  it('correctly passes conversationId for session persistence', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: 'Response',
+      stderr: '',
+      output: [],
+      pid: 123,
+      signal: null,
+    } as any);
 
-    try {
-      expect(AgentFactory.create('gemini').constructor.name).toBe('GeminiAdapter');
-      expect(AgentFactory.create('codex')).toBeInstanceOf(CodexAdapter);
-      expect(AgentFactory.create('claude')).toBeInstanceOf(ClaudeAdapter);
-    } finally {
-      if (codexMode === undefined) {
-        delete process.env.KYBERION_CODEX_MODE;
-      } else {
-        process.env.KYBERION_CODEX_MODE = codexMode;
-      }
-    }
+    await adapter.ask('Continuing...', { conversationId: 'session-123' });
+
+    expect(spawnSync).toHaveBeenCalledWith(
+      'agy',
+      ['-p', 'Continuing...', '--dangerously-skip-permissions', '--conversation', 'session-123'],
+      expect.any(Object),
+    );
+
+    const runtimeInfo = adapter.getRuntimeInfo();
+    expect(runtimeInfo.stateless).toBe(false);
+    expect(runtimeInfo.sessionId).toBe('session-123');
   });
 
-  it('applies codex enhancers before turn/start', async () => {
-    const adapter = new CodexAppServerAdapter({
-      cwd: '/tmp/kyberion-test',
-      approvalMode: 'relaxed',
-    }) as any;
+  it('correctly passes addDirs to mount dynamic directories', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: 'Response',
+      stderr: '',
+      output: [],
+      pid: 123,
+      signal: null,
+    } as any);
 
-    adapter.threadId = 'thread-1';
-    adapter.enhancers = [];
-    adapter.addEnhancer({
-      name: 'test-enhancer',
-      async onBeforeAsk(prompt: string) {
-        return { prompt: `${prompt}\n#enhanced` };
-      },
-    });
+    await adapter.ask('Check files', { addDirs: ['/path/to/dir1', '/path/to/dir2'] });
 
-    const sendRequest = vi.spyOn(adapter, 'sendRequest').mockImplementation(async (method: string, params: any) => {
-      if (method === 'turn/start') {
-        return { turn: { id: 'turn-1' } };
-      }
-      throw new Error(`Unexpected method: ${method}`);
-    });
-
-    adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
-    const result = await adapter.ask('Reply with exactly OK');
-
-    expect(result).toEqual(expect.objectContaining({ text: 'OK', stopReason: 'completed' }));
-    expect(sendRequest).toHaveBeenCalledWith(
-      'turn/start',
-      expect.objectContaining({
-        input: [{ type: 'text', text: 'Reply with exactly OK\n#enhanced', text_elements: [] }],
-      }),
-      expect.any(Number)
+    expect(spawnSync).toHaveBeenCalledWith(
+      'agy',
+      ['-p', 'Check files', '--dangerously-skip-permissions', '--add-dir', '/path/to/dir1', '--add-dir', '/path/to/dir2'],
+      expect.any(Object),
     );
   });
 
-  it('applies enhancer option overrides and post-ask transforms', async () => {
-    const adapter = new CodexAppServerAdapter({
-      cwd: '/tmp/kyberion-test',
-      approvalMode: 'relaxed',
-    }) as any;
+  it('correctly passes sandbox flag', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: 'Response',
+      stderr: '',
+      output: [],
+      pid: 123,
+      signal: null,
+    } as any);
 
-    adapter.threadId = 'thread-1';
-    adapter.enhancers = [];
-    adapter.addEnhancer({
-      name: 'before-after-enhancer',
-      async onBeforeAsk(prompt: string, options?: Record<string, unknown>) {
-        return {
-          prompt: `${prompt}\n#contract`,
-          options: { ...(options || {}), model: 'gpt-5.4-mini' },
-        };
-      },
-      async onAfterAsk(response) {
-        return { ...response, text: `${response.text}\n#post` };
-      },
-    });
+    await adapter.ask('Risky run', { sandbox: true });
 
-    const sendRequest = vi.spyOn(adapter, 'sendRequest').mockImplementation(async (method: string) => {
-      if (method === 'turn/start') {
-        return { turn: { id: 'turn-1' } };
-      }
-      throw new Error(`Unexpected method: ${method}`);
-    });
-
-    adapter.earlyTurnResults.set('turn-1', { text: 'OK', stopReason: 'completed' });
-    const result = await adapter.ask('Reply with exactly OK', { cwd: '/tmp/alt' });
-
-    expect(result).toEqual(expect.objectContaining({ text: 'OK\n#post', stopReason: 'completed' }));
-    expect(sendRequest).toHaveBeenCalledWith(
-      'turn/start',
-      expect.objectContaining({
-        input: [{ type: 'text', text: 'Reply with exactly OK\n#contract', text_elements: [] }],
-        model: 'gpt-5.4-mini',
-        cwd: '/tmp/alt',
-      }),
-      expect.any(Number)
+    expect(spawnSync).toHaveBeenCalledWith(
+      'agy',
+      ['-p', 'Risky run', '--dangerously-skip-permissions', '--sandbox'],
+      expect.any(Object),
     );
   });
-});
 
-describe('AgentEnhancer parity', () => {
-  const ENHANCERS = [
-    new GeminiPhaseAwareInstructionEnhancer(),
-    new GeminiJsonModeEnforcer(),
-    new GeminiWisdomEnhancer(),
-    new CodexExecutionEnhancer(),
-  ];
+  it('correctly executes in interactive mode with inherited stdio', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: '',
+      stderr: '',
+      output: [],
+      pid: 123,
+      signal: null,
+    } as any);
 
-  for (const enhancer of ENHANCERS) {
-    describe(enhancer.name, () => {
-      it('has a non-empty name', () => {
-        expect(typeof enhancer.name).toBe('string');
-        expect(enhancer.name.length).toBeGreaterThan(0);
-      });
+    const response = await adapter.ask('Interactive prompt', { interactive: true });
+    expect(response.text).toBe('Interactive session completed.');
+    expect(response.stopReason).toBe('completed');
 
-      it('onBeforeAsk always returns { prompt: string } without throwing', async () => {
-        const result = await enhancer.onBeforeAsk!('hello', {});
-        expect(typeof result.prompt).toBe('string');
-      });
-
-      it('onBeforeAsk works with an empty prompt and no options', async () => {
-        const result = await enhancer.onBeforeAsk!('', undefined);
-        expect(typeof result.prompt).toBe('string');
-      });
-
-      it('onBeforeAsk does not drop caller options (additive merge)', async () => {
-        const callerOptions = { cwd: '/test/dir', model: 'test-model' };
-        const result = await enhancer.onBeforeAsk!('test prompt', callerOptions);
-        if (result.options) {
-          expect(result.options.cwd).toBe('/test/dir');
-          expect(result.options.model).toBe('test-model');
-        }
-      });
-
-      if ('onAfterAsk' in enhancer && typeof (enhancer as any).onAfterAsk === 'function') {
-        it('onAfterAsk passes response through without throwing', async () => {
-          const response = { text: 'test', stopReason: 'completed' as const };
-          const result = await (enhancer as any).onAfterAsk(response);
-          expect(typeof result.text).toBe('string');
-        });
-      }
-    });
-  }
+    expect(spawnSync).toHaveBeenCalledWith(
+      'agy',
+      ['-i', 'Interactive prompt', '--dangerously-skip-permissions'],
+      expect.objectContaining({ stdio: 'inherit' }),
+    );
+  });
 });

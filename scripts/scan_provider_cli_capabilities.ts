@@ -3,11 +3,13 @@ import {
   buildProviderCapabilitySnapshot,
   discoverProviders,
   loadCapabilityRegistry,
+  mergeProbedCapabilitiesIntoCatalog,
   pathResolver,
   probeProviderAvailability,
   safeMkdir,
   safeWriteFile,
   scanProviderCapabilities,
+  type ProbedProviderCapabilities,
 } from '@agent/core';
 
 function main(): void {
@@ -48,6 +50,25 @@ function main(): void {
   const resolvedOutPath = pathResolver.resolve(outPath);
   safeMkdir(path.dirname(resolvedOutPath), { recursive: true });
   safeWriteFile(resolvedOutPath, JSON.stringify(summary, null, 2), { encoding: 'utf8' });
+
+  // probe -> knowledge loop: optionally merge what was discovered into the knowledge catalog
+  // (knowledge/public/orchestration/provider-capabilities.json), preserving manual edits.
+  if (process.argv.includes('--write-knowledge')) {
+    const probed: Record<string, ProbedProviderCapabilities> = {};
+    for (const provider of discoveredProviders.values()) {
+      if (!provider.installed) continue;
+      probed[provider.provider] = {
+        models: provider.models,
+        capabilities: provider.capabilities,
+        modelCapabilities: provider.modelCapabilities,
+      };
+    }
+    mergeProbedCapabilitiesIntoCatalog(probed, {
+      updatedBy: 'scan_provider_cli_capabilities',
+      note: 'Refreshed from CLI discovery; union-merged so manual entries are preserved.',
+    });
+    console.error(`[scan] merged ${Object.keys(probed).length} provider(s) into the knowledge capability catalog`);
+  }
 
   console.log(JSON.stringify(summary, null, 2));
 }

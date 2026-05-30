@@ -54,7 +54,7 @@ export function classifyDoctorDomains(cap: EnvironmentCapability): DoctorDomain[
   if (/(voice|stt|tts|speech|speak)/.test(haystack)) domains.add('voice');
   if (/(browser|playwright|chromium)/.test(haystack)) domains.add('browser');
   if (/(audio|ffmpeg|blackhole|pulse|pcm)/.test(haystack)) domains.add('audio');
-  if (/(reasoning|wisdom|claude|gemini|codex|anthropic)/.test(haystack)) domains.add('reasoning');
+  if (/(reasoning|wisdom|claude|gemini|codex|anthropic|agy|antigravity)/.test(haystack)) domains.add('reasoning');
   if (domains.size === 0) domains.add('core');
   return [...domains].sort();
 }
