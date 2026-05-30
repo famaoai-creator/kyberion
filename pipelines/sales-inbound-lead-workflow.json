@@ -1,0 +1,163 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "sales-inbound-lead-workflow",
+  "version": "1.0.0",
+  "name": "Sales Inbound — Lead to Proposal Workflow",
+  "description": "インバウンド問い合わせからヒアリング記録を受け取り、インテント分類・リード評価・マルチペルソナ解決策提案・提案書草案・ゲートアーティファクトを生成する sales_inbound Track 用パイプライン。",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "language": "ja",
+    "lead_name": "",
+    "lead_person_slug": "",
+    "lead_org": "",
+    "inquiry_source": "web_form",
+    "solution_personas": [
+      "cto-technical-evaluator",
+      "cfo-roi-optimizer",
+      "end-user-operations"
+    ]
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "op": "system:log",
+      "params": {
+        "message": "📬 [INBOUND] Starting inbound lead workflow (mission: {{mission_id}}, lead: {{lead_org}})"
+      }
+    },
+    {
+      "id": "read_inquiry",
+      "type": "capture",
+      "op": "system:read_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/inbound-inquiry.txt",
+        "export_as": "inquiry_text"
+      }
+    },
+    {
+      "id": "log_inquiry",
+      "op": "system:log",
+      "params": {
+        "message": "📄 Inbound inquiry loaded ({{mission_evidence_dir}}/inbound-inquiry.txt)"
+      }
+    },
+    {
+      "id": "classify_intent",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "以下のインバウンド問い合わせ記録（Webフォーム + 初回ヒアリング）を分析してください。\n\n## 分析項目\n1. 主要課題（具体的に）\n2. 期待するソリューションの方向性\n3. 技術的制約・前提条件\n4. 意思決定構造（キーパーソン・承認フロー）\n5. 予算感\n6. タイムライン\n7. インテント分類（high_intent / exploratory / price_shopping / wrong_fit）\n\n## 出力形式（Markdown）\n### インテント分類\n### 主要課題\n### ソリューション方向性\n### 技術制約\n### 意思決定構造\n### 予算・タイムライン\n### 推奨アクション",
+        "context": ["{{mission_id}}", "{{lead_org}}", "{{lead_name}}"],
+        "export_as": "intent_classification"
+      }
+    },
+    {
+      "id": "write_intent",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{mission_evidence_dir}}/intent-classification.md",
+        "content": "{{intent_classification}}"
+      }
+    },
+    {
+      "id": "log_intent",
+      "op": "system:log",
+      "params": {
+        "message": "🎯 [INBOUND] Intent classified → {{mission_evidence_dir}}/intent-classification.md"
+      }
+    },
+    {
+      "id": "solution_fanout",
+      "type": "apply",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas": "{{solution_personas}}",
+        "min_hypotheses_per_persona": 2,
+        "topic": "{{project_name}}: インバウンドリードへの最適解決策を提案する。問い合わせ内容={{mission_evidence_dir}}/inbound-inquiry.txt",
+        "output_path": "{{mission_evidence_dir}}/solution-proposals-raw.json"
+      }
+    },
+    {
+      "id": "log_fanout",
+      "op": "system:log",
+      "params": {
+        "message": "🧠 [INBOUND] Solution fanout complete (3 personas × 2+ hypotheses)"
+      }
+    },
+    {
+      "id": "generate_proposal",
+      "type": "transform",
+      "op": "reasoning:analyze",
+      "params": {
+        "instruction": "以下の情報を統合して、顧客向け提案書をMarkdown形式で作成してください。\n\n# 顧客情報\n- 顧客名: {{lead_org}} / {{lead_name}}\n- プロジェクト: {{project_name}}\n- 問い合わせ内容: {{mission_evidence_dir}}/inbound-inquiry.txt\n- ソリューション仮説: {{mission_evidence_dir}}/solution-proposals-raw.json\n\n# 提案書の構成\n## エグゼクティブサマリー（3行以内）\n## 顧客課題の整理\n## 提案ソリューション\n### アーキテクチャ概要\n### 主要機能\n## ROI試算\n| 項目 | 効果 | 試算根拠 |\n|---|---|---|\n## 導入ロードマップ\n| フェーズ | 期間 | 内容 |\n|---|---|---|\n## 投資概算\n## 次のステップ（顧客への依頼事項）",
+        "context": ["{{mission_id}}", "{{lead_org}}", "{{lead_name}}"],
+        "export_as": "proposal_content"
+      }
+    },
+    {
+      "id": "write_proposal",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{mission_evidence_dir}}/proposal-draft.md",
+        "content": "{{proposal_content}}"
+      }
+    },
+    {
+      "id": "log_proposal",
+      "op": "system:log",
+      "params": {
+        "message": "📋 [INBOUND] Proposal draft written → {{mission_evidence_dir}}/proposal-draft.md"
+      }
+    },
+    {
+      "id": "record_proposal_gate",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/proposal-approval-gate.json",
+        "content": {
+          "gate": "PROPOSAL_APPROVAL_GATE",
+          "track": "sales_inbound",
+          "status": "pending_operator_confirmation",
+          "lead": "{{lead_org}} / {{lead_name}}",
+          "artifacts": [
+            "{{mission_evidence_dir}}/intent-classification.md",
+            "{{mission_evidence_dir}}/solution-proposals-raw.json",
+            "{{mission_evidence_dir}}/proposal-draft.md"
+          ],
+          "instructions": "提案書の内容を確認し、顧客に提示可能なレベルであれば status を 'passed' に更新してください。提案書を顧客に送付後、CLOSE_CONFIRMATION_GATE を別途記録してください。",
+          "created_at": "{{$now}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "create_proposal_draft",
+      "type": "apply",
+      "op": "email:create_draft",
+      "params": {
+        "to": "{{lead_email}}",
+        "subject": "【ご提案】{{lead_org}} 様 — {{project_name}} 導入提案書",
+        "body_file": "{{mission_evidence_dir}}/proposal-draft.md",
+        "export_as": "proposal_email_result"
+      }
+    },
+    {
+      "id": "log_email_draft",
+      "op": "system:log",
+      "params": {
+        "message": "✉️ [INBOUND] Proposal email draft created in Mail.app → To: {{lead_email}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 [INBOUND] Pipeline complete. Artifacts in {{mission_evidence_dir}}. Next: review Mail.app draft → send proposal → schedule meeting with IT dept → close."
+      }
+    }
+  ]
+}
