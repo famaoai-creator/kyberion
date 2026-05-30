@@ -168,6 +168,12 @@ export const VALUE_FLAGS = new Set([
   '--note',
   '--execution-role',
   '--routing-decision',
+  '--id',
+  '--title',
+  '--description',
+  '--owner',
+  '--reason',
+  '--severity',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

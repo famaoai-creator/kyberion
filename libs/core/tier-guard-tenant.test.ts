@@ -14,7 +14,7 @@ async function waitForAuditEntry(
 ): Promise<any | null> {
   const auditPath = path.join(
     ROOT,
-    'active/audit',
+    'active/shared/logs/audit',
     `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
   );
   const startedAt = Date.now();

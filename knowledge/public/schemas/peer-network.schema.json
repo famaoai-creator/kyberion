@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/peer-network.schema.json",
+  "title": "Peer Network Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "peers"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "peers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/peer"
+      }
+    }
+  },
+  "definitions": {
+    "peer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["peer_id", "base_url", "shared_secret"],
+      "properties": {
+        "peer_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,63}$"
+        },
+        "base_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "shared_secret": {
+          "type": "string",
+          "minLength": 8
+        },
+        "allow_local_network": {
+          "type": "boolean",
+          "default": false
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

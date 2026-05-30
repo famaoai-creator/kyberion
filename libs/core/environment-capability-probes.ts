@@ -57,10 +57,13 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (binaryAvailable('codex', ['--version'])) {
     return { available: true };
   }
+  if (binaryAvailable('agy', ['--version'])) {
+    return { available: true };
+  }
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: claude CLI, anthropic API key (ANTHROPIC_API_KEY), local LLM URL (KYBERION_LOCAL_LLM_URL), gemini CLI, codex CLI. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: claude CLI, anthropic API key (ANTHROPIC_API_KEY), local LLM URL (KYBERION_LOCAL_LLM_URL), gemini CLI, codex CLI, agy CLI. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

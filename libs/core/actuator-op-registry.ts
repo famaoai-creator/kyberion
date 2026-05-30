@@ -110,7 +110,7 @@ const DOMAIN_REGISTRY: Record<string, DomainOpRegistry> = {
   wisdom: {
     capture: ['search', 'read', 'read_file'],
     transform: ['regex_extract', 'regex_replace', 'json_query', 'yaml_update', 'json_parse'],
-    apply: ['log'],
+    apply: ['log', 'register_presentation_preference_profile'],
   },
   network: {
     capture: ['fetch', 'read'],

@@ -8,7 +8,6 @@ const rootDir = process.cwd();
 const allowedRuntimeChildProcessConsumers = [
   'libs/actuators/browser-actuator/src/index.ts',
   'libs/actuators/code-actuator/src/index.ts',
-  'libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs',
   'libs/actuators/modeling-actuator/src/index.ts',
   'libs/actuators/orchestrator-actuator/src/index.ts',
   'libs/core/acp-mediator.ts',
@@ -16,7 +15,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/agent-lifecycle.ts',
   'libs/core/audit-forwarder.ts',
   'libs/core/blackhole-audio-bus.ts',
-  'libs/core/blackhole-routing-guard.ts',
   'libs/core/codex-cli-query.ts',
   'libs/core/deployment-adapter.ts',
   'libs/core/doctor_core.ts',

@@ -19,9 +19,14 @@
     {
       "id": "write-fallback-artifact",
       "type": "apply",
-      "op": "system:shell",
+      "op": "system:write_file",
       "params": {
-        "cmd": "printf 'Kyberion first-win fallback succeeded on %s\\n' \"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\" > \"{{ARTIFACT_PATH}}\""
+        "path": "{{ARTIFACT_PATH}}",
+        "content": {
+          "message": "Kyberion first-win fallback succeeded",
+          "written_at": "{{$now}}"
+        },
+        "format": "json"
       }
     },
     {

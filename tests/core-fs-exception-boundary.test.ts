@@ -21,7 +21,6 @@ const allowedCoreFsImports = [
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',
   'libs/core/python-voice-bridge.test.ts',
-  'libs/core/python-voice-bridge.ts',
   'libs/core/relationship-graph-store.test.ts',
   'libs/core/requirements-draft-store.test.ts',
   'libs/core/sdlc-artifact-store.test.ts',
