@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 27,
-  "u": "2026-05-28T15:33:15.058Z",
+  "t": 28,
+  "u": "2026-05-30T10:01:37.757Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -76,11 +76,20 @@
       "contract_schema": "schemas/code-pipeline.schema.json"
     },
     {
+      "n": "email-actuator",
+      "path": "libs/actuators/email-actuator",
+      "d": "Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 3,
+      "contract_schema": "schemas/email-action.schema.json"
+    },
+    {
       "n": "file-actuator",
       "path": "libs/actuators/file-actuator",
       "d": "Generic File-Actuator for Kyberion",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 1,
       "contract_schema": "schemas/file-pipeline.schema.json"
     },
@@ -240,8 +249,8 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.2.0",
-      "capability_count": 32,
+      "version": "1.2.1",
+      "capability_count": 33,
       "contract_schema": "schemas/wisdom-action.schema.json"
     }
   ]

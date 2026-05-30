@@ -24,6 +24,7 @@
           "op": {
             "enum": [
               "read",
+              "read_file",
               "list",
               "stat",
               "exists",

@@ -1,48 +1,208 @@
+import * as nodePath from 'node:path';
+import { sharedTmp, shared } from './path-resolver.js';
+import {
+  safeReaddir,
+  safeReadFile,
+  safeStat,
+  safeUnlinkSync,
+  safeExistsSync,
+} from './secure-io.js';
+import { logger } from './core.js';
+
+export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_LOG_RETENTION_DAYS = 30;
+
+export interface ScanTmpOptions {
+  dryRun: boolean;
+  ttlMs?: number;
+}
+
 export interface ScanTmpResult {
-  path: string;
-  entries: number;
-  bytes: number;
+  expired: string[];
+  deleted: string[];
+}
+
+export interface RotateLogsOptions {
+  dryRun: boolean;
+  retentionDays?: number;
 }
 
 export interface RotateLogsResult {
-  path: string;
-  rotated: number;
-  archived: number;
+  expired: string[];
+  rotated: string[];
+}
+
+export interface ScanDataVaultOptions {
+  dryRun: boolean;
 }
 
 export interface ScanDataVaultResult {
-  path: string;
-  entries: number;
-  bytes: number;
+  expired: string[];
+  deleted: string[];
 }
 
 export interface JanitorReport {
-  scanned_tmp: ScanTmpResult[];
-  rotated_logs: RotateLogsResult[];
-  scanned_data_vault: ScanDataVaultResult[];
+  expiredTmp: number;
+  deletedTmp: number;
+  expiredLogs: number;
+  rotatedLogs: number;
+  expiredDataVault: number;
+  deletedDataVault: number;
+  errors: string[];
+  timestamp: string;
+  dryRun: boolean;
+}
+
+/** @deprecated Use JanitorReport */
+export interface LegacyJanitorReport {
+  scanned_tmp: unknown[];
+  rotated_logs: unknown[];
+  scanned_data_vault: unknown[];
   removed: number;
 }
 
-export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
-export const DEFAULT_LOG_RETENTION_DAYS = 14;
-
-export function scanTmp(_paths: string[] = []): ScanTmpResult[] {
-  return [];
+function collectFiles(dir: string): string[] {
+  if (!safeExistsSync(dir)) return [];
+  const results: string[] = [];
+  const walk = (current: string): void => {
+    let entries: string[];
+    try {
+      entries = safeReaddir(current);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      const fullPath = nodePath.join(current, name);
+      try {
+        const stat = safeStat(fullPath);
+        if (stat.isDirectory()) {
+          walk(fullPath);
+        } else {
+          results.push(fullPath);
+        }
+      } catch {
+        // skip unreadable entries
+      }
+    }
+  };
+  walk(dir);
+  return results;
 }
 
-export function rotateLogs(_paths: string[] = []): RotateLogsResult[] {
-  return [];
+export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
+  const ttlMs = opts.ttlMs ?? DEFAULT_TMP_TTL_MS;
+  const dir = sharedTmp();
+  const now = Date.now();
+  const expired: string[] = [];
+  const deleted: string[] = [];
+
+  const files = collectFiles(dir);
+  for (const filePath of files) {
+    try {
+      const stat = safeStat(filePath);
+      if (now - stat.mtimeMs > ttlMs) {
+        expired.push(filePath);
+        if (!opts.dryRun) {
+          safeUnlinkSync(filePath);
+          deleted.push(filePath);
+          logger.info(`[JANITOR] deleted tmp: ${filePath}`);
+        }
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  return { expired, deleted };
 }
 
-export function scanDataVault(_paths: string[] = []): ScanDataVaultResult[] {
-  return [];
+export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
+  const retentionMs = (opts.retentionDays ?? DEFAULT_LOG_RETENTION_DAYS) * 24 * 60 * 60 * 1000;
+  const logsDir = shared('logs');
+  const now = Date.now();
+  const expired: string[] = [];
+  const rotated: string[] = [];
+
+  const files = collectFiles(logsDir);
+  for (const filePath of files) {
+    try {
+      const stat = safeStat(filePath);
+      if (now - stat.mtimeMs > retentionMs) {
+        expired.push(filePath);
+        if (!opts.dryRun) {
+          safeUnlinkSync(filePath);
+          rotated.push(filePath);
+          logger.info(`[JANITOR] rotated log: ${filePath}`);
+        }
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  return { expired, rotated };
 }
 
-export function runJanitor(): JanitorReport {
+export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
+  const dir = shared('data-vault');
+  const expired: string[] = [];
+  const deleted: string[] = [];
+
+  const files = collectFiles(dir);
+  for (const filePath of files) {
+    if (!filePath.endsWith('.json')) continue;
+    try {
+      if (!safeExistsSync(filePath)) continue;
+      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const entry = JSON.parse(raw);
+      if (entry.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
+        expired.push(filePath);
+        if (!opts.dryRun) {
+          safeUnlinkSync(filePath);
+          deleted.push(filePath);
+        }
+      }
+    } catch {
+      // skip malformed entries
+    }
+  }
+
+  return { expired, deleted };
+}
+
+export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
+  const errors: string[] = [];
+
+  let tmpResult: ScanTmpResult = { expired: [], deleted: [] };
+  try {
+    tmpResult = scanTmp({ dryRun: opts.dryRun });
+  } catch (err: any) {
+    errors.push(`tmp: ${err?.message ?? String(err)}`);
+  }
+
+  let logResult: RotateLogsResult = { expired: [], rotated: [] };
+  try {
+    logResult = rotateLogs({ dryRun: opts.dryRun });
+  } catch (err: any) {
+    errors.push(`logs: ${err?.message ?? String(err)}`);
+  }
+
+  let vaultResult: ScanDataVaultResult = { expired: [], deleted: [] };
+  try {
+    vaultResult = scanDataVault({ dryRun: opts.dryRun });
+  } catch (err: any) {
+    errors.push(`data-vault: ${err?.message ?? String(err)}`);
+  }
+
   return {
-    scanned_tmp: [],
-    rotated_logs: [],
-    scanned_data_vault: [],
-    removed: 0,
+    expiredTmp: tmpResult.expired.length,
+    deletedTmp: tmpResult.deleted.length,
+    expiredLogs: logResult.expired.length,
+    rotatedLogs: logResult.rotated.length,
+    expiredDataVault: vaultResult.expired.length,
+    deletedDataVault: vaultResult.deleted.length,
+    errors,
+    timestamp: new Date().toISOString(),
+    dryRun: opts.dryRun,
   };
 }

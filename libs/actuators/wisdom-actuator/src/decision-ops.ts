@@ -35,6 +35,7 @@ import {
   nextActionItemId,
   matchRestrictedAction,
   loadMeetingFacilitatorPolicy,
+  registerPresentationPreferenceProfile,
   type ActionItem,
   type ActionItemAssignee,
   type ActionItemAssigneeKind,
@@ -42,6 +43,7 @@ import {
   type ActionItemReviewState,
   type ActionItemProvenance,
   type MeetingFacilitatorPolicy,
+  type PresentationPreferenceProfile,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -392,6 +394,45 @@ export async function decomposeIntoTasksOp(input: DecomposeIntoTasksOpInput): Pr
     draft_path: `active/missions/${input.mission_id}/evidence/task-plan.json`,
     task_count: saved.tasks.length,
     task_plan_ready: gate,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Presentation Preference Registration — extracted deck style → reusable
+// personal registry entry. This keeps theme hints and question prompts out of
+// the code path and lets media-actuator resolve the theme from the personal
+// overlay catalog.
+// ---------------------------------------------------------------------------
+
+export interface RegisterPresentationPreferenceProfileOpInput {
+  profile?: PresentationPreferenceProfile;
+  profile_path?: string;
+  registry_path?: string;
+}
+
+export async function registerPresentationPreferenceProfileOp(input: RegisterPresentationPreferenceProfileOpInput): Promise<{
+  profile_id: string;
+  registry_path: string;
+  default_profile_id: string;
+}> {
+  const profile =
+    input.profile ??
+    (input.profile_path && safeExistsSync(pathResolver.rootResolve(input.profile_path))
+      ? JSON.parse(safeReadFile(pathResolver.rootResolve(input.profile_path), { encoding: 'utf8' }) as string)
+      : null);
+  if (!profile || typeof profile !== 'object') {
+    throw new Error('[register_presentation_preference_profile] requires a presentation-preference-profile');
+  }
+
+  const registryPath = registerPresentationPreferenceProfile(
+    profile as PresentationPreferenceProfile,
+    input.registry_path ? pathResolver.rootResolve(input.registry_path) : undefined,
+  );
+
+  return {
+    profile_id: (profile as PresentationPreferenceProfile).profile_id,
+    registry_path: registryPath,
+    default_profile_id: (profile as PresentationPreferenceProfile).profile_id,
   };
 }
 
@@ -2497,6 +2538,15 @@ export async function dispatchDecisionOp(
         project_name: resolved('project_name'),
         requirements_draft_path: resolved('requirements_draft_path'),
         design_spec_path: resolved('design_spec_path'),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'register_presentation_preference_profile': {
+      const result = await registerPresentationPreferenceProfileOp({
+        profile: params.profile !== undefined ? resolved('profile') : ctx[params.profile_from || 'presentation_preference_profile'],
+        profile_path: resolved('profile_path'),
+        registry_path: resolved('registry_path'),
       });
       return { handled: true, ctx: assign(result) };
     }

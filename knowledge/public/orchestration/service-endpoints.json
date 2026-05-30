@@ -63,6 +63,13 @@
       "base_url": "https://api.notion.com/v1",
       "preset_path": "knowledge/public/orchestration/service-presets/notion.json"
     },
+    "paper2any": {
+      "base_url": "{{paper2any_base_url}}",
+      "preset_path": "knowledge/public/orchestration/service-presets/paper2any.json",
+      "credential_suffixes": {
+        "baseUrl": ["PAPER2ANY_BASE_URL"]
+      }
+    },
     "slack": {
       "base_url": "https://slack.com/api",
       "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
