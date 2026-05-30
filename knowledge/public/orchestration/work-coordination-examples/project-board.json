@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "boards": [
+    {
+      "board_id": "project-alpha",
+      "name": "Project Alpha",
+      "type": "project",
+      "description": "Primary delivery board for Project Alpha",
+      "filters": {
+        "project_id": "PRJ-ALPHA"
+      },
+      "sort_by": "priority",
+      "lanes": ["backlog", "ready", "in_progress", "review", "done"],
+      "created_at": "2026-05-30T00:00:00.000Z",
+      "updated_at": "2026-05-30T00:00:00.000Z"
+    }
+  ]
+}
