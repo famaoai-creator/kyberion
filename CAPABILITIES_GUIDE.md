@@ -17,7 +17,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `browser-actuator` | Pipeline-driven Playwright browser execution and session artifact actuator | 1.0.0 | 2 | `schemas/browser-pipeline.schema.json` | `libs/actuators/browser-actuator` |
 | `calendar-actuator` | macOS Calendar.app integration using JXA for cross-account schedule coordination | 1.0.0 | 3 | `schemas/calendar-action.schema.json` | `libs/actuators/calendar-actuator` |
 | `code-actuator` | ADF-driven code analysis and refactoring pipeline engine | 2.1.0 | 2 | `schemas/code-pipeline.schema.json` | `libs/actuators/code-actuator` |
-| `email-actuator` | Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer | 1.0.0 | 3 | `schemas/email-action.schema.json` | `libs/actuators/email-actuator` |
+| `email-actuator` | Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer | 1.0.0 | 3 | `libs/actuators/email-actuator/schemas/email-action.schema.json` | `libs/actuators/email-actuator` |
 | `file-actuator` | Generic File-Actuator for Kyberion | 1.1.0 | 1 | `schemas/file-pipeline.schema.json` | `libs/actuators/file-actuator` |
 | `ios-actuator` | simctl-driven iOS Simulator Actuator | 1.1.0 | 1 | `schemas/mobile-device-pipeline.schema.json` | `libs/actuators/ios-actuator` |
 | `media-actuator` | Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. | 1.1.0 | 1 | `schemas/media-pipeline.schema.json` | `libs/actuators/media-actuator` |
@@ -120,4 +120,3 @@ See also:
 - Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
 - [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
 - [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/public/architecture/component-lifecycle-inventory.md)
-

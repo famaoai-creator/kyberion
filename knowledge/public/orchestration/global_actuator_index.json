@@ -82,7 +82,7 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 3,
-      "contract_schema": "schemas/email-action.schema.json"
+      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json"
     },
     {
       "n": "file-actuator",
