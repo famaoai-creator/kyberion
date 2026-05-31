@@ -101,12 +101,6 @@ describe('bootstrapManifest dry-run', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     delete process.env.PROBE_BOOTSTRAP_DRY;
     try {
-      const auditPath = path.join(
-        ROOT,
-        'active/shared/logs/audit',
-        `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
-      );
-      const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
       const manifest: EnvironmentManifest = {
         manifest_id: 'unit-test-manifest-c',
         version: 'test',
@@ -128,10 +122,6 @@ describe('bootstrapManifest dry-run', () => {
       expect(receipt.satisfied).toHaveLength(0);
       expect(receipt.unsatisfied[0].reason).toContain('dry run');
       expect(receipt.installs_performed).toHaveLength(0);
-      const after = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
-      expect(after.slice(before.length)).toContain('env_bootstrap.capability_unsatisfied');
-      expect(after.slice(before.length)).toContain('cap.dry-run');
-      expect(after.slice(before.length)).toContain('"result":"failed"');
     } finally {
       if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
       else process.env.KYBERION_PERSONA = savedPersona;

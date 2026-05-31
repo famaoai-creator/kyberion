@@ -18,6 +18,19 @@ export interface ActuatorExecutionBrief {
   deliverables: string[];
   missing_inputs: string[];
   service_binding_refs?: string[];
+  approval_system_candidates?: string[];
+  approval_system?: string;
+  approval_scope?: string;
+  workflow_steps?: {
+    id: string;
+    label: string;
+    description: string;
+    actuator: string;
+    phase: 'resolve_system' | 'authenticate' | 'list_pending' | 'review_item' | 'decide' | 'summarize';
+    requires_confirmation?: boolean;
+    input_refs?: string[];
+    output_refs?: string[];
+  }[];
   assumptions?: string[];
   clarification_questions?: {
     id: string;

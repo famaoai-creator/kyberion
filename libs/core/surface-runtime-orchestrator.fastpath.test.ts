@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => {
   const classifyTaskSessionIntent = vi.fn();
   const createTaskSession = vi.fn();
   const saveTaskSession = vi.fn();
+  const updateTaskSession = vi.fn();
+  const getActiveTaskSession = vi.fn();
   const surfaceChannelFromAgentId = vi.fn(() => 'presence');
   return {
     safeExec,
@@ -23,6 +25,8 @@ const mocks = vi.hoisted(() => {
     classifyTaskSessionIntent,
     createTaskSession,
     saveTaskSession,
+    updateTaskSession,
+    getActiveTaskSession,
     surfaceChannelFromAgentId,
   };
 });
@@ -62,6 +66,8 @@ vi.mock('./task-session.js', () => ({
   classifyTaskSessionIntent: mocks.classifyTaskSessionIntent,
   createTaskSession: mocks.createTaskSession,
   saveTaskSession: mocks.saveTaskSession,
+  updateTaskSession: mocks.updateTaskSession,
+  getActiveTaskSession: mocks.getActiveTaskSession,
 }));
 
 vi.mock('./router-contract.js', () => ({
@@ -231,10 +237,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'mission authority を教えて',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('Knowledge results for: mission authority');
-    expect(result.text).toContain('Provider: context_ranker');
-    expect(result.text).toContain('mission authority');
-    expect(result.text).toContain('"kind": "execution-receipt"');
+    expect(result.text).toContain('Here is the short summary from context_ranker: I found 1 item(s).');
+    expect(result.text).toContain('- mission authority');
+    expect(result.text).toContain("If you'd like, I can narrow this down further.");
     expect(mocks.queryKnowledge).toHaveBeenCalledWith(
       expect.anything(),
       'mission authority',
@@ -256,10 +261,8 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: '東京の天気を教えて',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('Weather for Tokyo');
-    expect(result.text).toContain('Provider: open_meteo');
+    expect(result.text).toContain('Weather for Tokyo:');
     expect(result.text).toContain('temperature 18.5°C');
-    expect(result.text).toContain('"kind": "execution-receipt"');
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://geocoding-api.open-meteo.com/v1/search',
@@ -286,7 +289,6 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'Webで OpenAI Responses API を検索して',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('Provider: duckduckgo_html');
     expect(result.text).toContain('Web search results for: OpenAI Responses API');
     expect(result.text).toContain('Result One');
   });
@@ -357,10 +359,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'スケジュールを調整して',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('Created task session: TSK-TEST-SESSION');
-    expect(result.text).toContain('Intent: schedule-coordination');
-    expect(result.text).toContain('Missing inputs: schedule_scope, date_range');
-    expect(result.text).toContain('Handoff intent: meeting-operations');
+    expect(result.text).toContain('予定の確認を進めます。');
+    expect(result.text).toContain('確認したい点があります: 対象、期間');
+    expect(result.text).toContain('必要なら会議調整まで引き継げます。');
     expect(mocks.saveTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session_id: 'TSK-TEST-SESSION',
@@ -392,9 +393,8 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: '過去の要件定義を横断的に見て横展開されていないバグを修正して',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('Created task session: TSK-TEST-SESSION');
-    expect(result.text).toContain('Intent: cross-project-remediation');
-    expect(result.text).toContain('No missing inputs were detected.');
+    expect(result.text).toContain('確認を進めます。');
+    expect(result.text).toContain('必要な情報はそろっています。');
     expect(mocks.saveTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session_id: 'TSK-TEST-SESSION',
@@ -456,6 +456,95 @@ describe('surface-runtime-orchestrator fast-path', () => {
           text: '左下の承認ボタンを押して',
         }),
       }),
+    );
+  });
+
+  it('progressively fills slots when an active session is missing requirements', async () => {
+    mocks.getActiveTaskSession
+      .mockReturnValueOnce({
+        session_id: 'TSK-ACTIVE-1',
+        task_type: 'service_operation',
+        requirements: { missing: ['requestId'] },
+        payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve' },
+        goal: 'resolve approval request',
+      })
+      .mockReturnValueOnce({
+        session_id: 'TSK-ACTIVE-1',
+        task_type: 'service_operation',
+        requirements: { missing: ['requestId'] },
+        payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve' },
+        goal: 'resolve approval request',
+      });
+    mocks.getActiveTaskSession.mockReturnValue(null); // Prevent subsequent loop match
+
+    mocks.updateTaskSession.mockReturnValue({
+      session_id: 'TSK-ACTIVE-1',
+      task_type: 'service_operation',
+      requirements: { missing: [] },
+      payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve', requestId: 'REQ-FINAL-789' },
+      status: 'planning',
+      goal: 'resolve approval request',
+    });
+
+    mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'approved' }));
+
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: 'REQ-FINAL-789',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.text).toContain('オペレーション [resolve-approval] が正常に完了しました。');
+    expect(mocks.updateTaskSession).toHaveBeenCalledWith('TSK-ACTIVE-1', expect.objectContaining({
+      payload: expect.objectContaining({ requestId: 'REQ-FINAL-789' }),
+      requirements: expect.objectContaining({ missing: [] }),
+    }));
+  });
+
+  it('routes voice input toggle tasks through the system actuator', async () => {
+    mocks.classifyTaskSessionIntent.mockReturnValue({
+      taskType: 'service_operation',
+      intentId: 'enable-voice-input',
+      goal: { summary: 'Switch Kyberion to voice input mode', success_condition: 'Voice input is enabled.' },
+      requirements: { missing: [] },
+      payload: {
+        intent_id: 'enable-voice-input',
+        service_name: 'voice-hub',
+        operation: 'voice_input_toggle',
+        dictation_keycode: 176,
+      },
+    });
+    mocks.createTaskSession.mockImplementation((input: any) => ({
+      session_id: 'TSK-VOICE-1',
+      task_type: input.taskType,
+      requirements: { missing: [] },
+      payload: input.payload,
+      goal: input.goal,
+      work_loop: { resolution: { execution_shape: 'task_session' } },
+    }));
+    mocks.updateTaskSession.mockImplementation((sessionId: string, update: any) => ({
+      session_id: sessionId,
+      task_type: 'service_operation',
+      requirements: update.requirements || { missing: [] },
+      payload: update.payload || { intent_id: 'enable-voice-input' },
+      goal: { summary: 'Switch Kyberion to voice input mode', success_condition: 'Voice input is enabled.' },
+      status: update.status,
+    }));
+    mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'voice_input_enabled' }));
+
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '音声入力にして',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.text).toContain('音声入力を有効化しました');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'node',
+      ['dist/libs/actuators/system-actuator/src/index.js', '--input', expect.stringContaining('input-TSK-VOICE-1.json')],
+      expect.objectContaining({ cwd: expect.any(String) }),
     );
   });
 });

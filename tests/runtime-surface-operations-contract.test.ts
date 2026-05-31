@@ -14,6 +14,7 @@ describe('Runtime surface operations contract', () => {
     expect(pkg.scripts['surfaces:reconcile']).toBe('node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['surfaces:status']).toBe('node dist/scripts/surface_runtime.js --action status');
     expect(pkg.scripts['surfaces:repair']).toBe('node dist/scripts/surface_runtime.js --action repair');
+    expect(pkg.scripts['channels:list']).toBe('node dist/scripts/channel_directory.js');
     expect(pkg.scripts.bootstrap).toBe('pnpm build && node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['dashboard:onboarding']).toBe('node dist/scripts/sovereign_dashboard.js --once --focus onboarding');
   });

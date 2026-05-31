@@ -1,5 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { logger } from './core.js';
+import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { getReasoningBackend } from './reasoning-backend.js';
@@ -361,6 +363,12 @@ function normalizeShape(shape?: string): ExecutionShape {
   return 'task_session';
 }
 
+function isApprovalWorkflowRequest(text: string): boolean {
+  return /(承認を依頼|承認を申請|承認依頼|稟議.*依頼|稟議|決裁|承認して|承認し|承認待ち|approve|approved?|通して|処理して)/i.test(
+    text
+  );
+}
+
 function loadIntentPolicy(): IntentPolicyFile {
   const value = JSON.parse(
     safeReadFile(INTENT_POLICY_PATH, { encoding: 'utf8' }) as string
@@ -483,11 +491,63 @@ function buildFallbackIntentContract(
       ? input.runtimeContext.platform_id
       : packet.selected_parameters?.platform_id;
   const classified = classifyTaskSessionIntent(input.text);
+  const selectedShape = normalizeShape(
+    packet.selected_resolution?.shape || (executionBrief ? 'task_session' : 'direct_reply')
+  );
+  const contextualFrame = buildContextualIntentFrame(input.text);
+  if (
+    isApprovalWorkflowRequest(input.text) ||
+    packet.selected_intent_id === 'resolve-approval' ||
+    packet.selected_intent_id === 'request-approval'
+  ) {
+    const requiredInputs = [...(executionBrief?.missing_inputs || ['approval_system', 'approval_scope'])];
+    const approvalSystem = executionBrief?.approval_system || packet.selected_parameters?.platform_id;
+    const clarificationAssessment = assessContextualClarification({
+      intentId: executionBrief?.archetype_id || packet.selected_intent_id || 'resolve-approval',
+      text: input.text,
+      executionShape: 'task_session',
+      requiredInputs,
+      confidence: executionBrief?.confidence,
+      contextualFrame,
+    });
+    const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
+    const intentId = executionBrief?.archetype_id || packet.selected_intent_id || 'resolve-approval';
+    return attachCapabilityBundle({
+      kind: 'intent-contract',
+      source_text: input.text,
+      intent_id: intentId,
+      goal: {
+        summary:
+          executionBrief?.summary ||
+          (approvalSystem ? `Process the approval queue in ${approvalSystem}` : undefined) ||
+          'Process the approval queue and resolve the requested ringi item(s).',
+        success_condition:
+          'The target approval system and approval scope are identified and the requested approvals are handled safely.',
+      },
+      resolution: {
+        execution_shape: 'task_session',
+        task_type: 'service_operation',
+      },
+      required_inputs: effectiveRequiredInputs,
+      outcome_ids: executionBrief?.deliverables || ['approval_resolved'],
+      approval: {
+        requires_approval: false,
+      },
+      delivery_mode: inferGovernedDeliveryMode(input.text, 'task_session', effectiveRequiredInputs),
+      clarification_needed: clarificationAssessment.shouldClarify,
+      confidence: executionBrief?.confidence || 0.3,
+      why: clarificationAssessment.shouldClarify
+        ? 'Fallback approval workflow request was normalized into the governed intent-contract schema.'
+        : `Fallback approval workflow request was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`,
+    });
+  }
   if (classified) {
-    const shape =
+    const classifiedShape =
       classified.payload?.bootstrap_kind === 'project_bootstrap'
         ? 'project_bootstrap'
         : 'task_session';
+    const shape = packet.selected_resolution?.shape ? selectedShape : classifiedShape;
+    const normalizedShape = normalizeShape(shape);
     const requiredInputs = [...(executionBrief?.missing_inputs || classified.requirements?.missing || [])];
     if (packet.selected_intent_id === 'setup-messaging-bridge') {
       if (selectedPlatformId) {
@@ -497,6 +557,15 @@ function buildFallbackIntentContract(
         requiredInputs.push('platform_id');
       }
     }
+    const clarificationAssessment = assessContextualClarification({
+      intentId: executionBrief?.archetype_id || classified.intentId || classified.taskType,
+      text: input.text,
+      executionShape: normalizedShape,
+      requiredInputs,
+      confidence: executionBrief?.confidence,
+      contextualFrame,
+    });
+    const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
     return attachCapabilityBundle({
       kind: 'intent-contract',
       source_text: input.text,
@@ -511,23 +580,25 @@ function buildFallbackIntentContract(
           ? 'presentation_deck'
           : classified.taskType,
       },
-      required_inputs: requiredInputs,
+      required_inputs: effectiveRequiredInputs,
       outcome_ids: executionBrief?.deliverables || [],
       approval: {
         requires_approval: Boolean(classified.payload?.approval_required),
       },
       delivery_mode:
-        shape === 'project_bootstrap'
+        normalizedShape === 'project_bootstrap'
           ? 'managed_program'
           : inferGovernedDeliveryMode(
               input.text,
-              normalizeShape(shape),
-              requiredInputs
+              normalizedShape,
+              effectiveRequiredInputs
             ),
-      clarification_needed: requiredInputs.length > 0,
+      clarification_needed: clarificationAssessment.shouldClarify,
       confidence: 0.55,
       why: executionBrief
-        ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
+        ? clarificationAssessment.shouldClarify
+          ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
+          : `Fallback classifier and execution brief were normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
         : 'Fallback classifier mapped the request to the nearest governed task session contract.',
     });
   }
@@ -544,6 +615,15 @@ function buildFallbackIntentContract(
     }
     return required;
   })();
+  const clarificationAssessment = assessContextualClarification({
+    intentId: executionBrief?.archetype_id || 'general_request',
+    text: input.text,
+    executionShape: selectedShape,
+    requiredInputs,
+    confidence: executionBrief?.confidence,
+    contextualFrame,
+  });
+  const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
 
   return attachCapabilityBundle({
     kind: 'intent-contract',
@@ -554,9 +634,9 @@ function buildFallbackIntentContract(
       success_condition:
         'The request is either clarified or answered without violating governance constraints.',
     },
-    required_inputs: requiredInputs,
+    required_inputs: effectiveRequiredInputs,
     resolution: {
-      execution_shape: executionBrief ? 'task_session' : 'direct_reply',
+      execution_shape: selectedShape,
       task_type: executionBrief?.target_actuators?.includes('pptx-generator')
         ? 'presentation_deck'
         : undefined,
@@ -565,16 +645,16 @@ function buildFallbackIntentContract(
     approval: {
       requires_approval: false,
     },
-    delivery_mode: inferGovernedDeliveryMode(
-      input.text,
-      executionBrief ? 'task_session' : 'direct_reply',
-      requiredInputs
-    ),
-    clarification_needed: requiredInputs.length > 0,
+    delivery_mode: inferGovernedDeliveryMode(input.text, selectedShape, effectiveRequiredInputs),
+    clarification_needed: clarificationAssessment.shouldClarify,
     confidence: 0.25,
     why: executionBrief
-      ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
-      : 'Fallback could not derive a safe execution contract from the current request.',
+      ? clarificationAssessment.shouldClarify
+        ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
+        : `Fallback execution brief was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
+      : clarificationAssessment.shouldClarify
+        ? 'Fallback could not derive a safe execution contract from the current request.'
+        : `Fallback could not derive a safe execution contract from the current request, but clarification was skipped by policy (${clarificationAssessment.reason}).`,
   });
 }
 
@@ -877,6 +957,24 @@ function buildClarificationPacket(
 ): OperatorInteractionPacket | undefined {
   if (!contract.clarification_needed) return undefined;
   const briefQuestions = executionBrief?.clarification_questions || [];
+  const primaryQuestion =
+    briefQuestions[0] ||
+    (contract.required_inputs[0]
+      ? {
+          id: contract.required_inputs[0],
+          question: `Please provide ${contract.required_inputs[0].replace(/_/g, ' ')}.`,
+          reason: 'The request cannot be executed safely without this input.',
+        }
+      : undefined);
+  const questions = primaryQuestion
+    ? [
+        {
+          id: primaryQuestion.id || contract.required_inputs[0] || 'missing_input_1',
+          question: primaryQuestion.question,
+          reason: primaryQuestion.reason,
+        },
+      ]
+    : [];
   return {
     kind: 'operator-interaction-packet',
     interaction_type: 'clarification',
@@ -884,18 +982,7 @@ function buildClarificationPacket(
     summary: contract.goal.summary,
     execution_brief_summary: executionBrief?.user_facing_summary || executionBrief?.summary,
     confidence: contract.confidence,
-    questions:
-      briefQuestions.length > 0
-        ? briefQuestions.map((question, index) => ({
-            id: question.id || contract.required_inputs[index] || `missing_input_${index + 1}`,
-            question: question.question,
-            reason: question.reason,
-          }))
-        : contract.required_inputs.map((item) => ({
-            id: item,
-            question: `Please provide ${item.replace(/_/g, ' ')}.`,
-            reason: 'The request cannot be executed safely without this input.',
-          })),
+    questions,
     suggested_response_style: 'clarify-first',
     llm_touchpoints: [
       {

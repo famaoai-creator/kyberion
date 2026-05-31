@@ -90,4 +90,49 @@ describe('openai-compatible-backend', () => {
     expect(firstBody.messages[1].content).not.toContain('top-secret-token');
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
   });
+
+  it('stops repeated identical tool calls through the guardrail', async () => {
+    const makeResponse = (id: string) => new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id,
+                  type: 'function',
+                  function: {
+                    name: 'read_file',
+                    arguments: JSON.stringify({ path: 'README.md' }),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+    let fetchCount = 0;
+    const fetchMock = vi.fn(() => {
+      fetchCount += 1;
+      return makeResponse(fetchCount === 1 ? 'call-1' : fetchCount === 2 ? 'call-2' : 'call-3');
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'llama3',
+      timeoutMs: 1_000,
+    });
+
+    const result = await backend.prompt('Read the file');
+
+    expect(result).toContain('stopped after 3 repeated calls to read_file');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });

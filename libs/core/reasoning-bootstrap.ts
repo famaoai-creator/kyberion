@@ -6,8 +6,8 @@
  * `options.mode`):
  *
  *   `claude-agent`  — use @anthropic-ai/claude-agent-sdk (sub-agent delegation,
- *                     CLI-harness coordination model). Auth inherits from the
- *                     parent Claude Code session if any.
+ *                     CLI-harness coordination model). Auth can be inherited
+ *                     from the surrounding interactive session when available.
  *   `anthropic`     — use @anthropic-ai/sdk directly. Requires ANTHROPIC_API_KEY.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
  *
@@ -17,13 +17,13 @@
  *
  * Auto-selection when mode is unset:
  *   - If ANTHROPIC_API_KEY is present → `anthropic`
- *   - Otherwise (including inside Claude Code without the key) → `claude-agent`
- *     is attempted; if the SDK can't authenticate at query time it will
- *     surface an error on first call rather than at bootstrap.
+ *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
+ *     then `gemini-cli`, then `agy-cli`, with `claude-agent` only when
+ *     explicitly selected.
  *
  * Override explicitly via env var to pin behavior:
- *   KYBERION_REASONING_BACKEND=claude-agent    (recommended when running
- *                                                inside Claude Code)
+ *   KYBERION_REASONING_BACKEND=codex-cli       (recommended in the Codex
+ *                                                execution environment)
  *   KYBERION_REASONING_BACKEND=anthropic       (standalone with API key)
  *   KYBERION_REASONING_BACKEND=stub            (offline / testing)
  */
@@ -134,9 +134,8 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
 
   // Determine preferred provider based on CLI context
   let preferredProvider: string | null = null;
-  if (process.env.GEMINI_CLI) preferredProvider = 'gemini';
-  else if (process.env.CODEX_CLI || process.env.CODEX_VERSION || process.env.TERM_PROGRAM === 'codex') preferredProvider = 'codex';
-  else if (process.env.CLAUDE_CLI) preferredProvider = 'claude';
+  if (process.env.CODEX_CLI || process.env.CODEX_VERSION || process.env.TERM_PROGRAM === 'codex') preferredProvider = 'codex';
+  else if (process.env.GEMINI_CLI) preferredProvider = 'gemini';
   else if (process.env.AGY_CLI || process.env.ANTIGRAVITY_CLI) preferredProvider = 'agy';
 
   // If a preferred provider is detected and healthy, use it
@@ -144,22 +143,17 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
     return `${preferredProvider}-cli` as ReasoningBackendMode;
   }
 
-  // Fallback to the first healthy provider found in discovery
-  if (providers.some((provider) => provider.provider === 'agy' && provider.installed && provider.healthy)) {
-    return 'agy-cli';
+  if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
+    return 'codex-cli';
   }
   if (providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy)) {
     return 'gemini-cli';
   }
-  if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
-    return 'codex-cli';
+  if (providers.some((provider) => provider.provider === 'agy' && provider.installed && provider.healthy)) {
+    return 'agy-cli';
   }
-  if (providers.some((provider) => provider.provider === 'claude' && provider.installed && provider.healthy)) {
-    return 'claude-cli';
-  }
-
-  // Default to Claude CLI when discovery cannot prove another backend.
-  return 'claude-cli';
+  // Default to Codex CLI when discovery cannot prove another backend.
+  return 'codex-cli';
 }
 
 /**

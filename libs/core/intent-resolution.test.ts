@@ -66,6 +66,10 @@ describe('intent-resolution', () => {
   });
 
   it('infers platform ids for messaging bridge setup intents', () => {
+    const slackPacket = resolveIntentResolutionPacket('Slackと連携して');
+    expect(slackPacket.selected_intent_id).toBe('setup-messaging-bridge');
+    expect(slackPacket.selected_parameters?.platform_id).toBe('slack');
+
     const imessagePacket = resolveIntentResolutionPacket('iMessageの連携を設定して');
     expect(imessagePacket.selected_intent_id).toBe('setup-messaging-bridge');
     expect(imessagePacket.selected_parameters?.platform_id).toBe('imessage');
@@ -118,6 +122,13 @@ describe('intent-resolution', () => {
     expect(packet.selected_resolution?.task_kind).toBe('service_operation');
   });
 
+  it('routes read-only calendar agenda requests away from schedule mutation', () => {
+    const packet = resolveIntentResolutionPacket('来週の予定教えて');
+    expect(packet.selected_intent_id).toBe('schedule-read-agenda');
+    expect(packet.selected_resolution?.shape).toBe('direct_reply');
+    expect(packet.selected_resolution?.result_shape).toBe('calendar_agenda_summary');
+  });
+
   it('resolves human-LLM conversation intents as first-class direct replies', () => {
     const cases = [
       ['不足している情報を質問して', 'clarify-user-request', 'clarification_packet'],
@@ -136,6 +147,22 @@ describe('intent-resolution', () => {
         0.45
       );
     }
+  });
+
+  it('resolves ringi approval requests and approval resolution intents from surface phrasing', () => {
+    const resolvePacket = resolveIntentResolutionPacket('稟議の決裁しておいて');
+    expect(resolvePacket.selected_intent_id).toBe('resolve-approval');
+    expect(resolvePacket.selected_resolution?.shape).toBe('task_session');
+    expect(resolvePacket.selected_resolution?.result_shape).toBe('summary');
+
+    const voiceInputPacket = resolveIntentResolutionPacket('音声入力にして');
+    expect(voiceInputPacket.selected_intent_id).toBe('enable-voice-input');
+    expect(voiceInputPacket.selected_resolution?.shape).toBe('task_session');
+    expect(voiceInputPacket.selected_resolution?.result_shape).toBe('summary');
+
+    const requestPacket = resolveIntentResolutionPacket('承認を依頼して');
+    expect(requestPacket.selected_intent_id).toBe('request-approval');
+    expect(requestPacket.selected_resolution?.shape).toBe('task_session');
   });
 
   it('resolves CEO/CTO operator harness intents from simulated requests', () => {

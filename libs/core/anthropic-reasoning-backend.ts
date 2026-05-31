@@ -149,6 +149,7 @@ const OpenQuestionSchema = z.object({
   question: z.string(),
   raised_by: z.string().optional(),
   status: z.enum(['open', 'answered', 'deferred']).optional(),
+  blocking: z.boolean().optional(),
   source_refs: z.array(SourceRefSchema).optional(),
 });
 
@@ -505,6 +506,8 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       `- Every NFR needs an NFR-<n> id and a category.`,
       `- Quote the source verbatim (short excerpt) in source_refs when possible.`,
       `- Capture ambiguity as open_questions rather than inventing facts.`,
+      `- Set open_questions[].blocking=true only when the unanswered item blocks the current MVP; otherwise omit it or set it false.`,
+      `- Do not turn interviewer follow-up questions into open questions unless the customer explicitly says the detail is unknown or blocking.`,
       `- Preserve the source language in description / acceptance_criteria.`,
       ``,
       input.projectName ? `PROJECT: ${input.projectName}` : '',

@@ -54,4 +54,27 @@ describe('execution-brief', () => {
     expect(urlBinding?.type).toBe('url');
     expect(urlBinding?.label).toBeTruthy();
   });
+
+  it('builds a staged approval workflow brief with approval system candidates', () => {
+    const brief = buildFallbackExecutionBrief({
+      requestText: '稟議の決裁しておいて',
+      intentId: 'resolve-approval',
+      taskType: 'service_operation',
+      serviceBindings: ['kintone:approval', 'slack:ops'],
+    });
+
+    expect(brief.archetype_id).toBe('resolve-approval');
+    expect(brief.approval_system).toBeTruthy();
+    expect(brief.workflow_steps?.map((step) => step.phase)).toEqual([
+      'resolve_system',
+      'authenticate',
+      'list_pending',
+      'review_item',
+      'decide',
+      'summarize',
+    ]);
+    expect(brief.workflow_steps?.[0]?.description).toContain('approval system');
+    expect(brief.workflow_steps?.[4]?.requires_confirmation).toBe(true);
+    expect(brief.readiness_reason).toContain('review pending items');
+  });
 });

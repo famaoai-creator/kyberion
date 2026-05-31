@@ -569,6 +569,101 @@ registerTaskIntentBuilder('schedule-coordination', (trimmed) => {
   };
 });
 
+registerTaskIntentBuilder('resolve-approval', (trimmed) => {
+  const base = buildPolicyBackedIntent('resolve-approval', trimmed);
+  const decisionMatch = trimmed.match(/(承認|却下|可決|否決|approve|reject)/i);
+  let decision: 'approved' | 'rejected' | undefined = undefined;
+  if (decisionMatch) {
+    const val = decisionMatch[1].toLowerCase();
+    if (/(承認|可決|approve)/i.test(val)) decision = 'approved';
+    else if (/(却下|否決|reject)/i.test(val)) decision = 'rejected';
+  }
+  const idMatch = trimmed.match(/(?:REQ|req|id|ID|案件|番号)-?(\d+)/i) || trimmed.match(/([A-Z0-9]{8,10})/i);
+  const requestId = idMatch ? idMatch[1] : undefined;
+  const systemMatch = trimmed.match(/(Slack|Email|Mail|Teams|JXA)/i);
+  const system = systemMatch ? systemMatch[1] : undefined;
+
+  const scopeMatch = trimmed.match(/(production|staging|sandbox|release|mutation)/i);
+  const scope = scopeMatch ? scopeMatch[1] : undefined;
+  const missing = [
+    !system ? 'approval_system' : null,
+    !scope ? 'approval_scope' : null,
+    !requestId ? 'requestId' : null,
+    !decision ? 'decision' : null,
+  ].filter((x): x is string => x !== null);
+
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing,
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      ...(system ? { approval_system: system, channel: system.toLowerCase() } : {}),
+      ...(scope ? { approval_scope: scope } : {}),
+      requestId,
+      decision,
+      requestedBy: 'operator',
+      decidedBy: 'operator',
+    },
+  };
+  return intent;
+});
+
+registerTaskIntentBuilder('request-approval', (trimmed) => {
+  const base = buildPolicyBackedIntent('request-approval', trimmed);
+  const systemMatch = trimmed.match(/(Slack|Email|Mail|Teams|JXA)/i);
+  const system = systemMatch ? systemMatch[1] : undefined;
+
+  const scopeMatch = trimmed.match(/(production|staging|sandbox|release|mutation)/i);
+  const scope = scopeMatch ? scopeMatch[1] : undefined;
+  const missing = [
+    !system ? 'approval_system' : null,
+    !scope ? 'approval_scope' : null,
+  ].filter((x): x is string => x !== null);
+
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing,
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      ...(system ? { approval_system: system, channel: system.toLowerCase() } : {}),
+      ...(scope ? { approval_scope: scope } : {}),
+      requestedBy: 'operator',
+      draft: {
+        title: 'Operator request',
+        summary: trimmed,
+        severity: 'medium',
+      },
+    },
+  };
+  return intent;
+});
+
+registerTaskIntentBuilder('setup-messaging-bridge', (trimmed) => {
+  const base = buildPolicyBackedIntent('setup-messaging-bridge', trimmed);
+  const platformMatch = trimmed.match(/(Slack|iMessage|Telegram|Teams)/i);
+  const platformId = platformMatch ? platformMatch[1].toLowerCase() : 'slack';
+
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing: [],
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      platform_id: platformId,
+    },
+  };
+  return intent;
+});
+
+
 export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;

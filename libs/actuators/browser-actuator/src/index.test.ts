@@ -77,6 +77,7 @@ const mocks = vi.hoisted(() => {
   const safeRmSync = vi.fn((filePath: string) => {
     fileStore.delete(filePath);
   });
+  const safeExec = vi.fn(() => '');
   const withRetry = vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn());
 
   const context = {
@@ -143,6 +144,7 @@ const mocks = vi.hoisted(() => {
     safeReadFile,
     safeWriteFile,
     safeRmSync,
+    safeExec,
     withRetry,
     fileStore,
   };
@@ -157,6 +159,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeReadFile: mocks.safeReadFile,
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
+    safeExec: mocks.safeExec,
     withRetry: mocks.withRetry,
   };
 });
@@ -815,6 +818,121 @@ describe('browser-actuator v3 contract', () => {
 
     expect(await closeBrowserSession('browser-cdp')).toBe(true);
     expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-discovers an existing Chrome instance with remote debugging enabled when no CDP target is provided', async () => {
+    const { handleAction, closeBrowserSession } = await import('./index');
+
+    mocks.safeExec.mockReturnValueOnce(
+      '12345 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9555 --user-data-dir=/tmp/kyberion-chrome'
+    );
+
+    const originalFetch = globalThis.fetch;
+    const fetchStub = vi.fn(async (url: string) => {
+      if (!String(url).includes(':9555/')) {
+        return { ok: false, json: async () => ({}) } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          Browser: 'Chrome/125.0.0.0',
+          webSocketDebuggerUrl: 'ws://127.0.0.1:9555/devtools/browser/abc',
+        }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchStub);
+
+    try {
+      await handleAction({
+        action: 'pipeline',
+        session_id: 'browser-auto-cdp',
+        steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
+        options: {
+          connect_over_cdp: true,
+          lease_ms: 60_000,
+        },
+      });
+
+      expect(mocks.safeExec).toHaveBeenCalledWith(
+        'ps',
+        ['-axo', 'pid=,command='],
+        expect.objectContaining({ timeoutMs: 2000, maxOutputMB: 2 }),
+      );
+      expect(mocks.connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9555');
+      expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+
+      expect(await closeBrowserSession('browser-auto-cdp')).toBe(true);
+      expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.stubGlobal('fetch', originalFetch);
+    }
+  });
+
+  it('prefers a freshly discovered Chrome CDP endpoint over stale persisted metadata', async () => {
+    const { handleAction, closeBrowserSession } = await import('./index');
+    const sessionId = 'browser-stale-cdp';
+    const metadataPath = path.resolve(
+      process.cwd(),
+      'active/shared/runtime/browser/sessions',
+      `${sessionId}.json`
+    );
+    safeMkdir(path.dirname(metadataPath), { recursive: true });
+    safeWriteFile(
+      metadataPath,
+      JSON.stringify(
+        {
+          session_id: sessionId,
+          user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
+          lease_status: 'inactive',
+          retained: false,
+          cdp_url: 'http://127.0.0.1:9334',
+          cdp_port: 9334,
+          updated_at: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+
+    mocks.safeExec.mockReturnValueOnce(
+      '67890 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9555 --user-data-dir=/tmp/kyberion-chrome'
+    );
+
+    const originalFetch = globalThis.fetch;
+    const fetchStub = vi.fn(async (url: string) => {
+      if (!String(url).includes(':9555/')) {
+        return { ok: false, json: async () => ({}) } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          Browser: 'Chrome/125.0.0.0',
+          webSocketDebuggerUrl: 'ws://127.0.0.1:9555/devtools/browser/abc',
+        }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchStub);
+
+    try {
+      await handleAction({
+        action: 'pipeline',
+        session_id: sessionId,
+        steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
+        options: {
+          connect_over_cdp: true,
+          lease_ms: 60_000,
+        },
+      });
+
+      expect(mocks.connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9555');
+      expect(mocks.connectOverCDP).not.toHaveBeenCalledWith('http://127.0.0.1:9334');
+      expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+
+      expect(await closeBrowserSession(sessionId)).toBe(true);
+      expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.stubGlobal('fetch', originalFetch);
+    }
   });
 
   it('reattaches to a retained browser session via persisted CDP metadata across processes', async () => {

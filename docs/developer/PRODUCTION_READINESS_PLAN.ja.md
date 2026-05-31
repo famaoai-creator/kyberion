@@ -3,7 +3,7 @@ title: Production Readiness Implementation Plan
 category: Developer
 tags: [production-readiness, oss, verification, hardening, meeting]
 importance: 10
-last_updated: 2026-05-09
+last_updated: 2026-05-30
 ---
 
 # Production Readiness Implementation Plan
@@ -74,6 +74,23 @@ last_updated: 2026-05-09
 | P3-3 | 新規 runtime の回帰固定 | 橋渡しコードの劣化を早期検出する | `scripts/vital_check.ts`, `scripts/onboarding_apply.ts`, `scripts/agent_runtime_manager.ts`, voice bridges | 入出力・失敗時挙動・権限エラーが targeted test で固定される |
 | P3-4 | UI / voice / browser の smoke 強化 | 起動するだけの品質から脱する | `presence/displays/*`, `libs/actuators/voice-actuator`, `pipelines/*-smoke.json` | 起動、主要 API 応答、初回導線、consent gate の smoke が通る |
 | P3-5 | 参照切れの継続監査 | 大きな削除後の運用事故を減らす | `package.json`, workflows, docs, runbooks | 削除済み script / op / path への参照が CI で検出される |
+
+### 2.1 50件レポート由来の追加バックログ
+
+この表は [`docs/verification/use-case-coherence-report-50_2026-05-30.ja.md`](../verification/use-case-coherence-report-50_2026-05-30.ja.md) の
+`部分整合` と `要追加` を、実装単位に畳み込んだものです。
+既存の P0/P1/P2 と重なる項目は、ここでは不足している受け口だけを記述し、実装時には既存項目へ合流させます。
+
+| ID | 改善項目 | 由来シナリオ | 主な対象 | 受入条件 |
+|---|---|---|---|---|
+| UX-0-1 | Browser / first-win の preflight と fallback | 2, 3, 11, 14, 47 | `scripts/run_doctor.ts`, `pipelines/verify-session.json`, `docs/user/TROUBLESHOOTING.md` | `doctor` が browser permission と runtime missing を先に見つけ、first-win が browser 失敗時に non-browser artifact に fallback し、troubleshooting に runnable command が載る |
+| UX-0-2 | surface health の stale / repair UX | 5, 12, 48 | `scripts/surface_runtime.ts`, `surfaces:status`, `surfaces:repair` | unhealthy surface が stale として明示され、repair command と log summary がその場で出る |
+| UX-0-3 | first-time-user 向け readiness 圧縮 | 1, 4, 13, 15 | `pnpm setup:report`, `pnpm vital:json`, `libs/core/next-action.ts` | readiness 出力が noise を畳み、must / should / nice と next action が 1〜3 個に絞られる |
+| UX-1-1 | task / delegation の human summary 化 | 8, 24, 37, 44 | `libs/core/surface-runtime-orchestrator.ts`, `libs/core/surface-response-blocks.ts` | `task_session` と delegated response が内部表現ではなく人間向け本文で返り、follow-up と反復抑止が見える |
+| UX-1-2 | channel directory の導入検討 | 49 | `satellites/slack-bridge`, `voice-hub`, `docs/` | 人間向け接続先が surface ごとに一意に引ける |
+| UX-1-3 | skill preprocessing / inline shell の採否判断 | 50 | `skills/`, `pipelines/`, `docs/developer/EXTENSION_POINTS.md` | preprocessing を採るか否かを明示し、採る場合は shell injection を防ぐ契約を持つ |
+| UX-1-4 | 日本語省略発話の context alignment | `来週の予定教えて` などの曖昧依頼 | `docs/developer/JAPANESE_CONTEXTUAL_INTENT_ALIGNMENT_ROADMAP.ja.md`, `libs/core/intent-resolution.ts`, `libs/core/task-session.ts`, `libs/core/intent-contract-learning.ts` | ContextualIntentFrame、source binding、clarification policy、learning loop の実装計画に従い、read-only agenda と schedule change が分離される |
+| UX-2-1 | 長時間 mission の復元 / repeatability | 27, 46 | `mission_controller.ts`, CI / cross-OS checks | checkpoint/resume の復元が実証され、Ubuntu/macOS でも再実行できる |
 
 ## 3. 動作確認シナリオ
 
@@ -237,7 +254,8 @@ last_updated: 2026-05-09
 7. P0-7: README first-win と smoke を固定する。
 8. P1-1 以降: error classifier、runtime receipts、action lifecycle、cross-OS CI。
 9. P2: adoption docs と good-first-issue 分解。
-10. P3: secure-io / actuator parity / smoke / 参照切れ監査。
+10. 2.1 の UX backlog は UX-0-1 -> UX-0-2 -> UX-0-3 -> UX-1-1 -> UX-1-4 -> UX-2-1 -> UX-1-2 -> UX-1-3 の順で着手する。
+11. P3: secure-io / actuator parity / smoke / 参照切れ監査。
 
 ## 5. 5.4-mini への実装依頼テンプレート
 

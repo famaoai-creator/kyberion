@@ -50,6 +50,7 @@ export class CodexCliIntentExtractor implements IntentExtractor {
         .filter(Boolean)
         .join('\n'),
       schema: IntentBodySchema,
+      mode: 'workspace-write',
       options: this.options,
     })) as z.infer<typeof IntentBodySchema>;
 
