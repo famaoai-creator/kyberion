@@ -397,7 +397,7 @@ clone から 5 分以内に、ユーザが **声で話しかけ → Kyberion が
 - `satellites/voice-hub/`（音声入出力ハブ）
 - `libs/actuators/voice-actuator/`（Style-Bert-VITS2、ローカル TTS）— upgrade 用
 - `libs/core/anthropic-voice-bridge.ts`（Anthropic Voice 経由）— upgrade 用
-- `scripts/run_realtime_voice_conversation.ts`
+- `scripts/run_realtime_voice_conversation.ts`（turn-based + interactive loop）
 
 #### A.3 三段構成（依存重量と OSS-friendly の両立）
 
