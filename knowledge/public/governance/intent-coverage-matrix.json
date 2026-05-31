@@ -83,6 +83,20 @@
       "gaps": []
     },
     {
+      "intent_id": "enable-voice-input",
+      "status": "implemented",
+      "entry_path": "voice-hub + task-session + system-actuator",
+      "work_shape": "task_session",
+      "outcome_ids": ["voice_input_enabled"],
+      "execution_path": [
+        "task-session classifier",
+        "voice input brief builder",
+        "system-actuator voice_input_toggle",
+        "input mode confirmation"
+      ],
+      "gaps": []
+    },
+    {
       "intent_id": "reconcile-capability-lifecycle",
       "status": "implemented",
       "entry_path": "voice-hub + task-session + provider-capabilities:scan",
@@ -122,6 +136,20 @@
         "meeting orchestrator",
         "meeting-actuator",
         "action-item tracking"
+      ],
+      "gaps": []
+    },
+    {
+      "intent_id": "schedule-read-agenda",
+      "status": "implemented",
+      "entry_path": "voice-hub direct reply + calendar-actuator",
+      "work_shape": "direct_reply",
+      "outcome_ids": ["calendar_agenda_summary"],
+      "execution_path": [
+        "contextual intent frame",
+        "calendar source binding",
+        "calendar-actuator list_events",
+        "agenda summary record"
       ],
       "gaps": []
     },

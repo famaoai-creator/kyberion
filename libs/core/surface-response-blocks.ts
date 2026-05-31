@@ -8,6 +8,126 @@ import type {
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 
+const REASONING_TAG_NAMES = ['think', 'thinking', 'reasoning', 'thought', 'REASONING_SCRATCHPAD'] as const;
+const REASONING_FENCE_LANGS = new Set(['thought', 'reasoning', 'internal']);
+
+function stripReasoningPairsFromLine(line: string): string {
+  let text = line;
+  for (const tag of REASONING_TAG_NAMES) {
+    const pairRegex = new RegExp(`<\\s*${tag}\\s*>[\\s\\S]*?<\\/\\s*${tag}\\s*>`, 'gi');
+    text = text.replace(pairRegex, '');
+  }
+  return text;
+}
+
+function stripReasoningTags(input: string): string {
+  if (!input || input.indexOf('<') === -1) return input;
+
+  const lines = input.split(/\r?\n/);
+  const output: string[] = [];
+  let inReasoningBlock = false;
+  let fenceLanguage = '';
+
+  for (const rawLine of lines) {
+    let line = rawLine;
+    const fenceMatch = line.trimEnd().match(/^```([a-z0-9_-]+)?\s*$/i);
+    if (fenceMatch) {
+      const language = (fenceMatch[1] || '').toLowerCase();
+      if (!inReasoningBlock && REASONING_FENCE_LANGS.has(language)) {
+        inReasoningBlock = true;
+        fenceLanguage = language;
+        continue;
+      }
+      if (inReasoningBlock && (!fenceLanguage || fenceLanguage === language)) {
+        inReasoningBlock = false;
+        fenceLanguage = '';
+        continue;
+      }
+    }
+
+    if (inReasoningBlock) {
+      const closeTagMatch = line.match(/<\/\s*(think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\s*>/i);
+      if (!closeTagMatch || closeTagMatch.index === undefined) {
+        continue;
+      }
+      line = line.slice(closeTagMatch.index + closeTagMatch[0].length);
+      inReasoningBlock = false;
+      fenceLanguage = '';
+      line = stripReasoningPairsFromLine(line);
+      if (!line.trim()) continue;
+    }
+
+    line = stripReasoningPairsFromLine(line);
+    if (!line.trim()) continue;
+
+    const openBoundary = line.match(/^\s*<\s*(think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\s*>/i);
+    if (openBoundary) {
+      const afterOpen = line.slice(openBoundary[0].length);
+      const closeRegex = new RegExp(`</\\s*${openBoundary[1]}\\s*>`, 'i');
+      const closeMatch = closeRegex.exec(afterOpen);
+      if (closeMatch && closeMatch.index !== undefined) {
+        line = afterOpen.slice(closeMatch.index + closeMatch[0].length);
+      } else {
+        inReasoningBlock = true;
+        fenceLanguage = '';
+        continue;
+      }
+    }
+
+    if (line.trim()) {
+      output.push(line);
+    } else if (output.length > 0 && output[output.length - 1] !== '') {
+      output.push('');
+    }
+  }
+
+  return output.join('\n');
+}
+
+function sanitizeSurfaceReplyText(input: string): string {
+  const lines = stripReasoningTags(input).split(/\r?\n/);
+  const sanitized: string[] = [];
+  let skippingFence = false;
+  let fenceLanguage = '';
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const fenceMatch = line.match(/^```([a-z0-9_-]+)?\s*$/i);
+    if (fenceMatch) {
+      const language = (fenceMatch[1] || '').toLowerCase();
+      if (!skippingFence && ['thought', 'analysis', 'reasoning', 'internal'].includes(language)) {
+        skippingFence = true;
+        fenceLanguage = language;
+        continue;
+      }
+      if (skippingFence && (!fenceLanguage || fenceLanguage === language)) {
+        skippingFence = false;
+        fenceLanguage = '';
+        continue;
+      }
+    }
+
+    if (skippingFence) continue;
+
+    const normalized = line.trim();
+    const boilerplatePatterns = [
+      /^\*\*responding to a user\*\*$/i,
+      /^\*\*thinking\*\*$/i,
+      /^i['’]m processing the request internally\.$/i,
+      /^i am processing the request internally\.$/i,
+      /^i['’]m thinking about the request internally\.$/i,
+      /^i am thinking about the request internally\.$/i,
+    ];
+    if (boilerplatePatterns.some((pattern) => pattern.test(normalized))) {
+      continue;
+    }
+
+    sanitized.push(rawLine);
+  }
+
+  return sanitized.join('\n').trim();
+}
+
 export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
   const a2uiMessages: A2UIMessage[] = [];
   const a2aMessages: A2AMessage[] = [];
@@ -58,6 +178,8 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     return '';
   });
 
+  text = sanitizeSurfaceReplyText(text);
+
   return {
     text: text.trim(),
     a2uiMessages,
@@ -69,3 +191,5 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     planningPackets,
   };
 }
+
+export { sanitizeSurfaceReplyText };

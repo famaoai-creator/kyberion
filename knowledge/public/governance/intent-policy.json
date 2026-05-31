@@ -109,7 +109,7 @@
       "Use task_session for browser or document work instead of inventing new shapes.",
       "Choose delivery_mode=managed_program when the request implies long-running operation, recurring revisions, project/track/mission management, or multiple staged outcomes.",
       "Choose delivery_mode=one_shot when a direct deliverable can be produced without durable project governance.",
-      "Set clarification_needed=true when required_inputs is non-empty.",
+      "Use the contextual clarification policy before setting clarification_needed.",
       "Keep outcome_ids aligned to governed catalog when possible.",
       "Do not invent low-level actuator steps."
     ],

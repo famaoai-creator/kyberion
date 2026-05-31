@@ -38,6 +38,85 @@ export interface RunAgyCliQueryParams<T> {
   options?: AgyCliBackendOptions;
 }
 
+const PrioritySchema = z.enum(['must', 'should', 'could', 'wont']);
+
+const SourceRefSchema = z.object({
+  ref: z.string().optional(),
+  quote: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+const OptionalArraySchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.array(itemSchema).optional(),
+  );
+
+const OptionalSchema = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (value === null ? undefined : value), schema.optional());
+
+const FunctionalRequirementSchema = z.object({
+  id: z.string().regex(/^FR-[0-9A-Z]+$/u),
+  description: z.string().min(1),
+  priority: PrioritySchema,
+  acceptance_criteria: OptionalArraySchema(z.string()),
+  source_refs: OptionalArraySchema(SourceRefSchema),
+  depends_on: OptionalArraySchema(z.string()),
+});
+
+const NonFunctionalRequirementSchema = z.object({
+  id: z.string().regex(/^NFR-[0-9A-Z]+$/u),
+  category: z.enum([
+    'performance',
+    'security',
+    'availability',
+    'usability',
+    'compatibility',
+    'maintainability',
+    'compliance',
+    'cost',
+    'other',
+  ]),
+  description: z.string().min(1),
+  target: OptionalSchema(z.string()),
+  priority: OptionalSchema(PrioritySchema),
+  source_refs: OptionalArraySchema(SourceRefSchema),
+});
+
+const ConstraintSchema = z.object({
+  category: z.enum(['budget', 'timeline', 'technical', 'legal', 'organizational', 'other']),
+  description: z.string(),
+  source_refs: OptionalArraySchema(SourceRefSchema),
+});
+
+const AssumptionSchema = z.object({
+  description: z.string(),
+  confidence: OptionalSchema(z.enum(['low', 'medium', 'high'])),
+  source_refs: OptionalArraySchema(SourceRefSchema),
+});
+
+const OpenQuestionSchema = z.object({
+  question: z.string(),
+  raised_by: OptionalSchema(z.string()),
+  status: OptionalSchema(z.enum(['open', 'answered', 'deferred'])),
+  blocking: OptionalSchema(z.boolean()),
+  source_refs: OptionalArraySchema(SourceRefSchema),
+});
+
+const ExtractedRequirementsSchema = z.object({
+  functional_requirements: z.array(FunctionalRequirementSchema).min(1),
+  non_functional_requirements: z.array(NonFunctionalRequirementSchema).default([]),
+  constraints: z.array(ConstraintSchema).default([]),
+  assumptions: z.array(AssumptionSchema).default([]),
+  open_questions: z.array(OpenQuestionSchema).default([]),
+  scope: z
+    .object({
+      in_scope: z.array(z.string()).default([]),
+      out_of_scope: z.array(z.string()).default([]),
+    })
+    .optional(),
+});
+
 export class AgyCliBackend implements ReasoningBackend {
   readonly name = 'agy-cli';
   private readonly bin: string;
@@ -78,7 +157,17 @@ export class AgyCliBackend implements ReasoningBackend {
 
   async crossCritique(input: CritiqueInput): Promise<CritiqueResult> {
     const schema = z.object({
-      hypotheses: z.array(z.any()),
+      hypotheses: z.array(
+        z.object({
+          id: z.string(),
+          proposed_by: z.string(),
+          content: z.string(),
+          status: z.enum(['pending', 'survived', 'rejected']),
+          survived: z.boolean(),
+          rejection_reason: OptionalSchema(z.string()),
+          critiques: z.array(z.object({ by: z.string(), content: z.string() })).optional(),
+        }),
+      ),
     });
     return (await this.runStructured({
       systemPrompt: [
@@ -130,33 +219,31 @@ export class AgyCliBackend implements ReasoningBackend {
   }
 
   async extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements> {
-    const schema = z.object({
-      functional_requirements: z.array(z.any()),
-      non_functional_requirements: z.array(z.any()),
-      constraints: z.array(z.any()),
-      assumptions: z.array(z.any()),
-      open_questions: z.array(z.any()),
-    });
     return (await this.runStructured({
       systemPrompt: [
-        'Extract structured requirements from the provided text.',
-        'Return a JSON object with the keys functional_requirements, non_functional_requirements, constraints, assumptions, open_questions.',
+        'Extract a structured requirements draft from the source text.',
+        'Use the source transcript to derive concrete requirements, but keep open_questions extremely sparse.',
+        'Only emit open_questions when the answer is required to define the current MVP and cannot be inferred from the transcript.',
+        'Questions about future phases, implementation preferences, vendor selection, or tuning details should become assumptions or deferred items, not open blockers.',
+        'Prefer status="deferred" over status="open" whenever the core scope can proceed without the answer.',
+        'When an open question is genuinely blocking the MVP, set blocking=true; otherwise leave it false or omit it.',
+        'Do not convert the interviewer/Kyberion follow-up questions into open_questions unless the customer explicitly says the detail is unknown or blocking.',
         'Return ONLY JSON.',
       ].join('\n'),
       userPrompt: input.sourceText,
-      schema,
+      schema: ExtractedRequirementsSchema,
     })) as ExtractedRequirements;
   }
 
   async extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec> {
     const schema = z.object({
-      architecture_summary: z.string().optional(),
+      architecture_summary: OptionalSchema(z.string()),
       components: z.array(z.any()),
-      data_flows: z.array(z.any()),
-      cross_cutting_concerns: z.record(z.string(), z.any()).optional(),
-      trade_offs: z.array(z.any()),
-      risks: z.array(z.any()),
-      open_decisions: z.array(z.any()),
+      data_flows: z.array(z.any()).default([]),
+      cross_cutting_concerns: OptionalSchema(z.record(z.string(), z.string())),
+      trade_offs: z.array(z.any()).default([]),
+      risks: z.array(z.any()).default([]),
+      open_decisions: z.array(z.any()).default([]),
     });
     return (await this.runStructured({
       systemPrompt: 'Derive an architectural design spec from requirements. Return JSON only.',
@@ -169,7 +256,7 @@ export class AgyCliBackend implements ReasoningBackend {
     const schema = z.object({
       app_id: z.string(),
       cases: z.array(z.any()),
-      coverage_strategy: z.string().optional(),
+      coverage_strategy: OptionalSchema(z.string()),
     });
     return (await this.runStructured({
       systemPrompt: 'Derive a test plan from requirements. Return JSON only.',
@@ -180,7 +267,7 @@ export class AgyCliBackend implements ReasoningBackend {
 
   async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
     const schema = z.object({
-      strategy_summary: z.string().optional(),
+      strategy_summary: OptionalSchema(z.string()),
       tasks: z.array(z.any()),
     });
     return (await this.runStructured({

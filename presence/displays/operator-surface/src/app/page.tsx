@@ -1,10 +1,13 @@
-import { listMissions } from '@/lib/data';
+import { listMissions, getCapabilities, getProviderPins } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
+import CapabilityDashboard from '@/components/CapabilityDashboard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MissionsPage() {
   const missions = listMissions();
+  const bundles = getCapabilities();
+  const pins = getProviderPins();
   emitMosRead({ page: '/', resource_kind: 'mission_list', result_count: missions.length });
   return (
     <section>
@@ -43,8 +46,8 @@ export default async function MissionsPage() {
               >
                 <td style={td}>
                   <a
-                    href={`/missions/${encodeURIComponent(m.mission_id)}`}
-                    style={{ color: '#8ec3ff' }}
+                     href={`/missions/${encodeURIComponent(m.mission_id)}`}
+                     style={{ color: '#8ec3ff' }}
                   >
                     {m.mission_id}
                   </a>
@@ -66,6 +69,9 @@ export default async function MissionsPage() {
           </tbody>
         </table>
       )}
+
+      {/* Capability and Pin Control Dashboard */}
+      <CapabilityDashboard bundles={bundles} pins={pins} />
     </section>
   );
 }

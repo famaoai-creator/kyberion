@@ -5,7 +5,6 @@
   "context": {
     "mission_id": "",
     "project_name": "",
-    "transcript_path": "active/missions/{{mission_id}}/evidence/call-transcript.txt",
     "source_type": "call_transcript",
     "language": "ja",
     "customer_name": "",
@@ -21,7 +20,7 @@
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "source_path": "{{transcript_path}}",
+        "source_path": "{{mission_evidence_dir}}/call-transcript.txt",
         "source_type": "{{source_type}}",
         "language": "{{language}}",
         "customer_name": "{{customer_name}}",

@@ -52,6 +52,7 @@ export class CodexCliVoiceBridge implements VoiceBridge {
         `Persona spec: ${JSON.stringify(input.personaSpec, null, 2)}`,
       ].join('\n'),
       schema: RoleplayResultSchema,
+      mode: 'workspace-write',
       options: this.options,
     })) as z.infer<typeof RoleplayResultSchema>;
     return {
@@ -70,6 +71,7 @@ export class CodexCliVoiceBridge implements VoiceBridge {
         `Structure: ${JSON.stringify(input.structure)}`,
       ].join('\n'),
       schema: OneOnOneResultSchema,
+      mode: 'workspace-write',
       options: this.options,
     })) as z.infer<typeof OneOnOneResultSchema>;
     const slugMatch = input.counterpartyRef.match(/([^/\\]+?)(?:\.json)?$/u);

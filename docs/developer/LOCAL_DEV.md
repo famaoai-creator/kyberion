@@ -12,6 +12,13 @@ How to iterate fast on Kyberion locally. Phase C'-7 of `docs/PRODUCTIZATION_ROAD
 
 ## Fast feedback loops
 
+## Source layout
+
+- Treat `libs/core/*.ts` as the source of truth.
+- Treat `dist/` as the build output.
+- `libs/core/*.js`, `*.d.ts`, and source maps under `libs/core/` are generated artifacts and should not be edited by hand.
+- Imports inside `libs/core` use `./foo.js` specifiers because the repo compiles to ESM-compatible Node output, while TypeScript resolves those specifiers back to the `.ts` source during development.
+
 ### Run a single test
 
 ```bash

@@ -53,10 +53,11 @@ export interface LlmResolutionStatus {
 }
 
 export const BUILTIN_FALLBACK: LlmProfile = {
-  command: 'claude',
-  args: ['-p', '{prompt}', '--output-format', 'json'],
+  command: 'codex',
+  args: [],
   timeout_ms: 120_000,
   response_format: 'json_envelope',
+  adapter: 'codex-cli',
 };
 
 /** Profile weight for fallback ordering: heavy → standard → light */
@@ -94,6 +95,7 @@ function registerDefaultStructuredRunners(): void {
       systemPrompt: systemPrompt || 'Return exactly one JSON object that matches the schema.',
       userPrompt: prompt,
       schema,
+      mode: 'workspace-write',
       options: profile as any,
     });
   });

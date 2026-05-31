@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExec, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
+import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -281,6 +282,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
     let response = await this.fetchChatCompletion(messages);
     let message = response.choices[0].message;
+    let guardrailState = createToolLoopGuardrailState();
 
     while (message.tool_calls && message.tool_calls.length > 0) {
       messages.push({
@@ -289,6 +291,18 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         tool_calls: message.tool_calls,
       });
       for (const toolCall of message.tool_calls) {
+        const guardrailDecision = advanceToolLoopGuardrail(
+          guardrailState,
+          {
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments,
+          },
+        );
+        guardrailState = guardrailDecision.state;
+        if (guardrailDecision.shouldStop) {
+          logger.warn(`[LOCAL_LLM] Tool loop guardrail triggered: ${guardrailDecision.reason}`);
+          return `${extractTextContent(message.content)}\n\n${guardrailDecision.reason}`.trim();
+        }
         const result = await this.handleToolCall(toolCall.function.name, toolCall.function.arguments);
         messages.push({
           role: 'tool',

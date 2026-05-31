@@ -15,6 +15,7 @@ describe('reasoning-bootstrap', () => {
     resetReasoningBackend();
     resetIntentExtractor();
     resetVoiceBridge();
+    delete process.env.CODEX_CLI;
     delete process.env.KYBERION_LOCAL_LLM_URL;
     delete process.env.KYBERION_LOCAL_LLM_MODEL;
     delete process.env.KYBERION_LOCAL_LLM_KEY;
@@ -49,6 +50,17 @@ describe('reasoning-bootstrap', () => {
     expect(installed).toBe(true);
     expect(getInstalledReasoningMode()).toBe('local');
     expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
+  it('auto-selects codex-cli when the Codex CLI is the advertised host context', () => {
+    process.env.CODEX_CLI = '1';
+    const installed = installReasoningBackends({ refreshProviders: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('codex-cli');
+    expect(getReasoningBackend().name).toBe('codex-cli');
+    expect(getIntentExtractor().name).toBe('codex-cli');
+    expect(getVoiceBridge().name).toBe('codex-cli-text');
   });
 
   it('normalizes gemini-api to the CLI-backed gemini mode', () => {

@@ -299,6 +299,23 @@ knowledge/
 - 中期: OTel exporter を出し、ユーザが自前の Grafana / Honeycomb / Datadog に接続できる（OSS friendly）。
 - 長期: trace を distillation の入力として、自動的に hint / runbook を生成（B-6）。
 
+### 5.6 Hermes 分析からの吸収結果
+
+Hermes Agent の分析で見えた「Kyberion に取り込むと実際に効く」知見は、以下のように整理する。
+この節は、単なる比較表ではなく、**採用済み・既存代替・今後の評価対象**をロードマップ上で明示するための記録でもある。
+
+| 類別 | Hermes 側の知見 | Kyberion の扱い | 現状 |
+|---|---|---|---|
+| 出力衛生 | ストリーミングの思考ブロックは state machine で除去し、surface へ漏らさない | `libs/core/surface-response-blocks.ts` に共通サニタイザを実装し、Slack / voice 系の最終出力に適用 | 採用済み |
+| 人間向け翻訳 | 委譲先や task の生出力は、そのまま返さず人間向けの最終文へ整形する | `surface-runtime-orchestrator.ts` で `direct_reply` / `task_session` / delegated response を翻訳 | 採用済み |
+| STT 統合 | STT は provider/registry 分離で差し替え可能にする | Kyberion では `speech-to-text-bridge.ts` / `voice-stt.ts` が既に同等の役割を担う | 既存代替あり |
+| 失敗ループ制御 | repeated failure / no progress を明示的に止める | `src/feedback-loop.ts` が pipeline 健全性と反復失敗を管理する土台を提供 | 既存代替あり |
+| チャネル解決 | channel directory で human-friendly name と session 由来の接続先を束ねる | `pnpm channels:list` で governed channel targets と coordination roots を確認できる。surface 層への深い統合は次段 | 部分採用 |
+| Skill preprocessing | skill テンプレや inline shell の事前展開で記述を短くする | Kyberion の skill / mission 系は構造が異なるため、同形実装は保留 | 評価対象 |
+
+この結果を踏まえ、Kyberion の短期優先は「surface 出力の安全化」と「surface ごとの人間向け翻訳」を維持しつつ、
+Hermes で見えたが Kyberion では既に別の形で担保されている領域は重複実装しない方針とする。
+
 ---
 
 ## 6. 既存ロードマップとの結線

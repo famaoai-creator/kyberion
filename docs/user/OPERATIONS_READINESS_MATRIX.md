@@ -25,6 +25,7 @@ your local environment, credentials, or host permissions.
 | Mission lifecycle | Ready | Core mission flows are in place and usable. |
 | Governance checks | Ready | Validation and policy checks are part of normal operation. |
 | Surface lifecycle | Ready | You can enable, disable, and inspect individual gateways. |
+| Channel directory | Ready | Run `pnpm channels:list` to see the governed channel targets and their coordination roots. |
 | Slack / iMessage / Discord / Telegram / Google Workspace | Conditional | They work when the host app, permissions, and credentials are present. |
 | Voice features | Conditional | They work when the device, engine, and profile are configured. |
 | Browser / desktop automation | Conditional | These need the right permissions and a supported host setup. |

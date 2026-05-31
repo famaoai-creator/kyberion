@@ -141,6 +141,7 @@ export interface OpenQuestion {
   question: string;
   raised_by?: string;
   status?: 'open' | 'answered' | 'deferred';
+  blocking?: boolean;
   source_refs?: RequirementSourceRef[];
 }
 
