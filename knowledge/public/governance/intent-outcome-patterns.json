@@ -358,6 +358,37 @@
       ]
     },
     {
+      "intent_id": "schedule-read-agenda",
+      "canonical_flow": [
+        "intent normalization",
+        "calendar source binding",
+        "time range resolution",
+        "read-only calendar fetch",
+        "agenda summary return"
+      ],
+      "contract_layers": [
+        "intent_resolution_packet",
+        "execution_brief",
+        "direct_reply",
+        "calendar_snapshot"
+      ],
+      "primary_outcome_ids": ["calendar_agenda_summary"],
+      "evidence": [
+        "calendar agenda summary",
+        "calendar snapshot or read result",
+        "source binding note"
+      ],
+      "completion_criteria": [
+        "the calendar source is explicit or resolved from the operator default",
+        "the time range is normalized",
+        "the result states that no calendar mutation occurred"
+      ],
+      "follow_up": [
+        "a follow-up can promote a default calendar source to personal memory",
+        "the same source binding can be reused on the next read request"
+      ]
+    },
+    {
       "intent_id": "schedule-coordination",
       "canonical_flow": [
         "intent normalization",

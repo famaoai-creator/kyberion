@@ -258,7 +258,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       systemPrompt:
         'You extract structured requirements from an elicitation transcript. ' +
         'Functional requirements get IDs like FR-001. Non-functional get NFR-001. ' +
-        'Be exhaustive but do not invent — flag unknowns as open_questions.',
+        'Be exhaustive but do not invent — flag unknowns as open_questions. ' +
+        'Set open_questions[].blocking=true only when the unanswered item blocks the current MVP; otherwise omit it or set it false. ' +
+        'Do not convert interviewer follow-up questions into open questions unless the customer explicitly says the detail is unknown or blocking.',
       userPrompt: [
         input.projectName ? `Project: ${input.projectName}` : '',
         input.language ? `Source language: ${input.language}` : '',

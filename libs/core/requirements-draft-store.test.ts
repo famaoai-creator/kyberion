@@ -152,12 +152,26 @@ describe('requirements-draft-store', () => {
         projectName: 'X',
         extracted: {
           ...sampleExtracted,
-          open_questions: [{ question: '予算上限は？', status: 'open' }],
+          open_questions: [{ question: '予算上限は？', status: 'open', blocking: true }],
         },
       });
       const result = evaluateRequirementsCompletenessGate('MSN-G3');
       expect(result.passed).toBe(false);
       expect(result.reasons.some((r) => r.includes('open question'))).toBe(true);
+    });
+
+    it('ignores non-blocking open questions', () => {
+      saveRequirementsDraft({
+        missionId: 'MSN-G4',
+        projectName: 'X',
+        extracted: {
+          ...sampleExtracted,
+          open_questions: [{ question: '任意の補足情報', status: 'open', blocking: false }],
+        },
+      });
+      const result = evaluateRequirementsCompletenessGate('MSN-G4');
+      expect(result.passed).toBe(true);
+      expect(result.reasons).toEqual([]);
     });
 
     it('fails when no draft exists', () => {

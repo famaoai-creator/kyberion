@@ -17,6 +17,9 @@ import {
   safeExistsSync,
   safeLstat,
   pathResolver,
+  loadCapabilityBundleRegistry,
+  scanProviderCapabilities,
+  type CapabilityBundleEntry,
 } from '@agent/core';
 
 const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
@@ -319,4 +322,69 @@ export function suggestedCommand(opts: {
     case 'view-evidence':
       return `ls active/missions/*/${opts.missionId}/evidence/`;
   }
+}
+
+export function getCapabilities() {
+  const registry = loadCapabilityBundleRegistry();
+  const scanned = scanProviderCapabilities(undefined, undefined, { includeUnavailable: true });
+
+  return registry.bundles.map((bundle: CapabilityBundleEntry) => {
+    const refs = bundle.harness_capability_refs || [];
+    const requiredCaps = scanned.filter(c => refs.includes(c.capability_id));
+    const missingCount = requiredCaps.filter(c => c.discovery_status === 'missing').length;
+    const totalCount = requiredCaps.length;
+
+    let health: 'active' | 'degraded' | 'inactive' = 'active';
+    if (totalCount > 0) {
+      if (missingCount === totalCount) {
+        health = 'inactive';
+      } else if (missingCount > 0) {
+        health = 'degraded';
+      }
+    }
+
+    return {
+      bundle_id: bundle.bundle_id,
+      status: bundle.status,
+      kind: bundle.kind,
+      summary: bundle.summary,
+      health,
+      intents: bundle.intents || [],
+      required_actuators: bundle.required_actuators || [],
+      dependencies: requiredCaps.map(c => ({
+        id: c.capability_id,
+        status: c.discovery_status as 'available' | 'missing',
+        provider: c.source.provider
+      }))
+    };
+  });
+}
+
+export function getProviderPins(): Record<string, any> {
+  const pins: Record<string, any> = {};
+
+  // 1. Read default pins
+  const defaultPath = pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
+  if (safeExistsSync(defaultPath)) {
+    try {
+      const data = JSON.parse(safeReadFile(defaultPath, { encoding: 'utf8' }) as string);
+      Object.assign(pins, data.pins || {});
+    } catch (_) {}
+  }
+
+  // 2. Scan all session pin files in active/shared/runtime/provider-pins/
+  const dirPath = pathResolver.rootResolve('active/shared/runtime/provider-pins');
+  if (safeExistsSync(dirPath)) {
+    try {
+      const files = safeReaddir(dirPath);
+      for (const file of files) {
+        if (file === 'default.json' || !file.endsWith('.json')) continue;
+        const fullPath = path.join(dirPath, file);
+        const data = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+        Object.assign(pins, data.pins || {});
+      }
+    } catch (_) {}
+  }
+
+  return pins;
 }

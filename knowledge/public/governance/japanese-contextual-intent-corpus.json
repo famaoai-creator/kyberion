@@ -1,0 +1,833 @@
+{
+  "version": "1.0.0",
+  "locale": "ja-JP",
+  "description": "Golden corpus for Japanese contextual intent alignment and schedule/source-binding regression checks.",
+  "items": [
+    {
+      "id": "JA-INTENT-001",
+      "utterance": "来週の予定教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false,
+      "notes": "Baseline read-only agenda request."
+    },
+    {
+      "id": "JA-INTENT-002",
+      "utterance": "今週の予定を見せて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "this_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-003",
+      "utterance": "明日の空き時間ある？",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-004",
+      "utterance": "今日の予定を確認して",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "today",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-005",
+      "utterance": "予定を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-006",
+      "utterance": "カレンダーの予定を見て",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-007",
+      "utterance": "来月の予定をざっと確認して",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_month",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-008",
+      "utterance": "週末の予定を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-009",
+      "utterance": "週明けの予定を見せて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-010",
+      "utterance": "午後の予定を確認して",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-011",
+      "utterance": "朝イチの予定だけ教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-012",
+      "utterance": "明日の会議予定を見て",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-013",
+      "utterance": "来週の会議だけ教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-014",
+      "utterance": "直近の空き時間を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-015",
+      "utterance": "次のミーティングを確認して",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-016",
+      "utterance": "既定カレンダーの予定を見て",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-017",
+      "utterance": "Googleカレンダーの来週予定を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "google_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-018",
+      "utterance": "Outlookの明日の予定を見せて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "outlook_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-019",
+      "utterance": "私の来週の予定を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-020",
+      "utterance": "自分の明日の空き時間は？",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-021",
+      "utterance": "俺の今週の予定を見せて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "this_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-022",
+      "utterance": "みんなの予定を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "team",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-023",
+      "utterance": "チームの来週の予定を確認して",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "team",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-024",
+      "utterance": "来週の予定を日別で教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-025",
+      "utterance": "週の予定を箇条書きで見せて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-026",
+      "utterance": "今日の会議予定を教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "today",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-027",
+      "utterance": "明日の予定を短く要約して",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-028",
+      "utterance": "今月の予定を見せて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "this_month",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-029",
+      "utterance": "来週の重要な予定だけ教えて",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": false
+    },
+    {
+      "id": "JA-INTENT-030",
+      "utterance": "予定の空きだけ見たい",
+      "expected_frame": {
+        "action": "read",
+        "object": "calendar_events",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-031",
+      "utterance": "スケジュールを調整して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-032",
+      "utterance": "来週の予定を変更したい",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-033",
+      "utterance": "明日の会議をずらして",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-034",
+      "utterance": "打ち合わせの日程を調整して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-035",
+      "utterance": "リスケして",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-036",
+      "utterance": "カレンダーを組み直して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-037",
+      "utterance": "来週の会議を前倒ししたい",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "next_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-038",
+      "utterance": "今週のアポイントを後ろにずらして",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "this_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-039",
+      "utterance": "予定を整えて",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-040",
+      "utterance": "会議の時間を変更して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-041",
+      "utterance": "午後の会議を別日に移して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-042",
+      "utterance": "明日の予定を入れ替えて",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "tomorrow",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-043",
+      "utterance": "月曜の打ち合わせを火曜に変更して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-044",
+      "utterance": "週末の予定を詰め直して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-045",
+      "utterance": "参加者全員の空き時間に合わせて調整して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "team",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-046",
+      "utterance": "顧客訪問の予定を再調整して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-047",
+      "utterance": "今週の予定を調整して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "this_week",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-048",
+      "utterance": "来月の会議を見直して",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "date_range": "next_month",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-049",
+      "utterance": "次の予定を少し後ろにずらして",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    },
+    {
+      "id": "JA-INTENT-050",
+      "utterance": "既存の予定を優先度順に並べ替えて",
+      "expected_frame": {
+        "action": "change",
+        "object": "calendar_schedule",
+        "subject": "operator_self",
+        "source_binding": "browser_calendar"
+      },
+      "expected_route": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "result_shape": "summary"
+      },
+      "clarification_needed": true
+    }
+  ]
+}
