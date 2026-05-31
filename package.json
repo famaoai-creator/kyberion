@@ -131,6 +131,7 @@
     "schedule:tick": "node dist/scripts/run_generation_schedule.js --action tick",
     "chronos": "node dist/scripts/chronos_daemon.js",
     "voice:conversation:turn": "node dist/scripts/run_realtime_voice_conversation.js",
+    "voice:conversation:live": "node dist/scripts/run_realtime_voice_conversation.js --interactive",
     "voice:profile:promote": "node dist/scripts/promote_voice_profile.js",
     "voice:setup": "command -v uv >/dev/null 2>&1 && uv venv --python ~/.pyenv/versions/3.11.5/bin/python3 .venv && uv pip install -r requirements-voice.txt || (~/.pyenv/versions/3.11.5/bin/python3 -m venv .venv && .venv/bin/pip install -r requirements-voice.txt)",
     "voice:health": "pnpm pipeline --input pipelines/voice-health-check.json",

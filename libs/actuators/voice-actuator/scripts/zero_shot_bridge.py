@@ -54,6 +54,27 @@ def _probe_mlx_qwen3() -> bool:
         return False
 
 
+def _resolve_generated_output(out: Path) -> Path | None:
+    if out.exists():
+        return out
+
+    suffix = out.suffix or ".wav"
+    candidates: list[Path] = []
+    candidates.extend(out.parent.glob(f"{out.stem}{suffix}"))
+    candidates.extend(out.parent.glob(f"{out.stem}_*{suffix}"))
+    candidates.extend(out.parent.glob(f"{out.stem}-*{suffix}"))
+    candidates = [p for p in candidates if p.is_file()]
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda p: (p.stat().st_mtime, p.stat().st_size), reverse=True)
+    resolved = candidates[0]
+    if resolved != out:
+        shutil.copy2(resolved, out)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Engine implementations
 # ---------------------------------------------------------------------------
@@ -75,7 +96,7 @@ def _cosyvoice_generate(text: str, ref_audio: str, ref_text: str, output_path: s
         ref_text=ref_text or None,
         stt_model=None if ref_text else "mlx-community/whisper-large-v3-turbo",
     )
-    if not out.exists():
+    if not _resolve_generated_output(out):
         raise RuntimeError(f"CosyVoice 2 did not produce {out}")
     return {"engine": "cosyvoice2", "output_path": str(out)}
 
@@ -95,7 +116,7 @@ def _fish_speech_generate(text: str, ref_audio: str, output_path: str) -> dict:
         play=False,
         ref_audio=ref_audio,
     )
-    if not out.exists():
+    if not _resolve_generated_output(out):
         raise RuntimeError(f"Fish Speech did not produce {out}")
     return {"engine": "fish_speech_v1.5", "output_path": str(out)}
 
@@ -119,7 +140,7 @@ def _qwen3_generate(text: str, ref_audio: str, ref_text: str, output_path: str) 
         kwargs["ref_text"] = ref_text
         kwargs["stt_model"] = None
     generate_audio(**kwargs)
-    if not out.exists():
+    if not _resolve_generated_output(out):
         raise RuntimeError(f"Qwen3-TTS did not produce {out}")
     return {"engine": "qwen3_tts_icl", "output_path": str(out)}
 

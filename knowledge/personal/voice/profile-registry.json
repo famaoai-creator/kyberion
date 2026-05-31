@@ -1,7 +1,21 @@
 {
   "version": "1.0.0",
-  "default_profile_id": "sovereign-personal",
+  "default_profile_id": "user-cloned",
   "profiles": [
+    {
+      "profile_id": "user-cloned",
+      "display_name": "User Cloned Voice",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [
+        "active/shared/tmp/voice-samples/sample-01.wav"
+      ],
+      "default_engine_id": "open_voice_clone",
+      "status": "active",
+      "notes": "Custom voice cloned via zero-shot voice training bridge."
+    },
     {
       "profile_id": "sovereign-personal",
       "display_name": "Sovereign Personal",
