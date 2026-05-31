@@ -38,7 +38,10 @@ describe('sync_service_endpoints', () => {
         return JSON.stringify({
           default_pattern: 'https://api.{service_id}.com/v1',
           services: {
-            slack: { base_url: 'https://slack.com/api' },
+            slack: {
+              base_url: 'https://slack.com/api',
+              intent_aliases: ['notify-slack'],
+            },
           },
         });
       }
@@ -46,7 +49,10 @@ describe('sync_service_endpoints', () => {
         return JSON.stringify({
           default_pattern: 'https://api.{service_id}.com/v1',
           services: {
-            github: { base_url: 'https://api.github.com' },
+            github: {
+              base_url: 'https://api.github.com',
+              intent_aliases: ['open-github'],
+            },
           },
         });
       }
@@ -63,5 +69,7 @@ describe('sync_service_endpoints', () => {
     const parsed = JSON.parse(String(content));
     expect(parsed.default_pattern).toBe('https://api.{service_id}.com/v1');
     expect(Object.keys(parsed.services)).toEqual(['github', 'slack']);
+    expect(parsed.services.github.intent_aliases).toEqual(['open-github']);
+    expect(parsed.services.slack.intent_aliases).toEqual(['notify-slack']);
   });
 });

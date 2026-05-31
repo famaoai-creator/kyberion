@@ -1,0 +1,275 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "kyberion-howto-narrated-demo",
+  "version": "1.0.0",
+  "name": "Kyberion How-To Narrated Demo",
+  "description": "Produce a minimal narrated video that explains how to use Kyberion: check baseline, create a mission, run a pipeline, and verify outputs.",
+  "context": {
+    "mission_id": "MSN-KYBERION-HOWTO-VIDEO",
+    "mission_evidence_dir": "active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence",
+    "narration_path": "active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/kyberion-howto-narration.aiff",
+    "video_output_path": "active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/kyberion-howto-demo.mp4",
+    "video_bundle_dir": "active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/video-composition/kyberion-howto-demo",
+    "content_brief_path": "active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/kyberion-howto-content-brief.json",
+    "profile_id": "operator-ja-default",
+    "voice_script": "この動画では、受け取った brief を content brief に整理し、storyboard を作り、render までつなげる流れを示します。",
+    "hook_text": "受け取った前提を、そのまま動画にしない。",
+    "feature_text": "訴求対象、利用シーン、伝える順序を整理し、必要な見出し・画面・尺を定義します。",
+    "cta_text": "最後に content brief を storyboard と render 用の指示に変換して渡します。"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "op": "system:log",
+      "params": {
+        "message": "🎬 [KYBERION-HOWTO] Starting narrated demo for mission {{mission_id}}"
+      }
+    },
+    {
+      "id": "preflight",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && command -v say >/dev/null && test -f dist/libs/actuators/voice-actuator/src/index.js && test -f dist/libs/actuators/video-composition-actuator/src/index.js && echo ok",
+        "export_as": "preflight_result"
+      }
+    },
+    {
+      "id": "write_voice_action",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-howto-voice.json",
+        "content": {
+          "action": "generate_voice",
+          "request_id": "kyberion-howto-video-audio",
+          "text": "{{voice_script}}",
+          "profile_ref": {
+            "profile_id": "{{profile_id}}"
+          },
+          "engine": {
+            "engine_id": "local_say"
+          },
+          "rendering": {
+            "language": "ja",
+            "chunking": {
+              "max_chunk_chars": 4000,
+              "crossfade_ms": 50,
+              "preserve_paralinguistic_tags": true
+            }
+          },
+          "delivery": {
+            "mode": "artifact",
+            "format": "aiff",
+            "artifact_path": "{{narration_path}}",
+            "emit_progress_packets": true
+          },
+          "routing": {
+            "personal_voice_mode": "allow_fallback"
+          }
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "generate_voice",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-howto-voice.json",
+        "export_as": "voice_result"
+      }
+    },
+    {
+      "id": "write_content_brief",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{content_brief_path}}",
+        "content": {
+          "kind": "video-content-brief",
+          "version": "1.0.0",
+          "title": "Kyberion How-To: Brief to Video in 3 Steps",
+          "audience": "operators and decision makers who already know the target use case and need a reliable way to turn approved messaging into a video asset",
+          "objective": "convert a fixed strategic brief into a renderable narrated video package",
+          "distribution_channel": "docs-demo",
+              "content_type": "howto",
+              "presentation_mode": "howto",
+          "promise": "Kyberion turns operational intent into governed execution and artifact-backed outputs",
+          "desired_takeaway": "brief, storyboard, and render bundle are all traceable outputs",
+          "constraints": [
+            "do not position the video as a product pitch",
+            "focus on the transformation from instruction to content",
+            "keep the visual language governed and deterministic"
+          ],
+          "proof_points": [
+            "brief is preserved",
+            "storyboard is generated",
+            "render bundle and mp4 are produced"
+          ],
+          "content_requirements": [
+            "show how the team receives a decided brief",
+            "show how audience, use case, and constraints are translated into a content outline",
+            "show how the outline becomes a narrated video brief and render plan"
+          ],
+          "fixed_inputs": {
+            "customer": "teams that want auditable, resumable operations",
+            "use_case": "repeatable mission-driven work with clear evidence trails",
+            "message": "Kyberion turns operational intent into governed execution and artifact-backed outputs"
+          },
+          "tone": "practical, concise, operator-oriented",
+          "language": "ja",
+          "duration_sec": 14,
+          "design_system_ref": {
+            "system_id": "operator-ja-default",
+            "brand_name": "Kyberion",
+            "theme": "kyberion-standard",
+            "background_color": "#07111f",
+            "layout_family": "process-flow",
+            "motion_profile": "guided-step",
+            "fps": 30
+          }
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "write_video_action",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-howto-video.json",
+        "content": {
+          "action": "create_narrated_video_from_content_brief",
+          "params": {
+            "video_content_brief": {
+              "kind": "video-content-brief",
+              "version": "1.0.0",
+              "title": "Kyberion How-To: Brief to Video in 3 Steps",
+              "audience": "operators and decision makers who already know the target use case and need a reliable way to turn approved messaging into a video asset",
+              "objective": "convert a fixed strategic brief into a renderable narrated video package",
+              "distribution_channel": "docs-demo",
+              "content_type": "howto",
+              "presentation_mode": "howto",
+              "promise": "Kyberion turns operational intent into governed execution and artifact-backed outputs",
+              "desired_takeaway": "brief, storyboard, and render bundle are all traceable outputs",
+              "constraints": [
+                "do not position the video as a product pitch",
+                "focus on the transformation from instruction to content",
+                "keep the visual language governed and deterministic"
+              ],
+              "proof_points": [
+                "brief is preserved",
+                "storyboard is generated",
+                "render bundle and mp4 are produced"
+              ],
+              "content_requirements": [
+                "show how the team receives a decided brief",
+                "show how audience, use case, and constraints are translated into a content outline",
+                "show how the outline becomes a narrated video brief and render plan"
+              ],
+              "fixed_inputs": {
+                "customer": "teams that want auditable, resumable operations",
+                "use_case": "repeatable mission-driven work with clear evidence trails",
+                "message": "Kyberion turns operational intent into governed execution and artifact-backed outputs"
+              },
+              "tone": "practical, concise, operator-oriented",
+              "language": "ja",
+              "duration_sec": 14,
+              "design_system_ref": {
+                "system_id": "operator-ja-default",
+                "brand_name": "Kyberion",
+                "theme": "kyberion-standard",
+                "background_color": "#07111f",
+                "layout_family": "process-flow",
+                "motion_profile": "guided-step",
+                "fps": 30
+              }
+            },
+            "narration_artifact_ref": "{{narration_path}}",
+            "output": {
+              "format": "mp4",
+              "target_path": "{{video_output_path}}",
+              "bundle_dir": "{{video_bundle_dir}}",
+              "await_completion": true,
+              "duration_sec": 14,
+              "fps": 30
+            }
+          },
+          "format": "json"
+        }
+      }
+    },
+    {
+      "id": "generate_video",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-howto-video.json",
+        "export_as": "video_result"
+      }
+    },
+    {
+      "id": "render_video_fallback",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "if test -f {{video_output_path}}; then echo 'video already rendered'; else ffmpeg -y -f lavfi -i color=c=0x07111f:s=640x360 -frames:v 1 -update 1 {{mission_evidence_dir}}/kyberion-cover.png && ffmpeg -y -loop 1 -framerate 25 -i {{mission_evidence_dir}}/kyberion-cover.png -t 6 -c:v libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {{mission_evidence_dir}}/kyberion-howto-silent.mp4 && ffmpeg -y -i {{mission_evidence_dir}}/kyberion-howto-silent.mp4 -i {{narration_path}} -c:v copy -c:a aac -t 6 -movflags +faststart {{video_output_path}}; fi",
+        "export_as": "fallback_video_result"
+      }
+    },
+    {
+      "id": "validate_outputs",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "test -f {{narration_path}} || { echo 'missing narration artifact: {{narration_path}}'; exit 1; } && test -f {{video_output_path}} || { echo 'missing video artifact: {{video_output_path}}'; exit 1; } && test -f {{video_bundle_dir}}/index.html || { echo 'missing video bundle index: {{video_bundle_dir}}/index.html'; exit 1; } && test -f {{video_bundle_dir}}/render-plan.json || { echo 'missing video bundle render plan: {{video_bundle_dir}}/render-plan.json'; exit 1; } && test -n \"$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 {{video_output_path}})\" || { echo 'missing audio stream in rendered video'; exit 1; } && echo 'outputs verified with audio-muxed mp4'",
+        "export_as": "verify_result"
+      }
+    },
+    {
+      "id": "extract_key_frames",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "mkdir -p {{mission_evidence_dir}}/kyberion-howto-frames && ffmpeg -y -i {{video_output_path}} -vf \"select='eq(n,0)'\" -vframes 1 {{mission_evidence_dir}}/kyberion-howto-frames/frame-000.png && ffmpeg -y -ss 00:00:06 -i {{video_output_path}} -vframes 1 {{mission_evidence_dir}}/kyberion-howto-frames/frame-001.png && ffmpeg -y -ss 00:00:11 -i {{video_output_path}} -vframes 1 {{mission_evidence_dir}}/kyberion-howto-frames/frame-002.png && echo 'key frames extracted'",
+        "export_as": "frame_extract_result"
+      }
+    },
+    {
+      "id": "validate_blackframe",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "if ffmpeg -hide_banner -i {{video_output_path}} -vf blackdetect=d=0.5:pic_th=0.98:pix_th=0.10 -an -f null - 2>&1 | grep -q 'black_start'; then echo 'black frame detected'; exit 1; fi && echo 'black-frame check passed'",
+        "export_as": "blackframe_result"
+      }
+    },
+    {
+      "id": "validate_duration_alignment",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "video_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{video_output_path}}) && audio_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{narration_path}}) && awk -v v=\"$video_duration\" -v a=\"$audio_duration\" 'BEGIN { diff = v - a; if (diff < 0) diff = -diff; if (diff > 1.0) { printf(\"duration mismatch: video=%s audio=%s\\n\", v, a); exit 1; } printf(\"duration aligned: video=%s audio=%s\\n\", v, a); }'",
+        "export_as": "duration_alignment_result"
+      }
+    },
+    {
+      "id": "write_completion_note",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-howto-summary.md",
+        "content": "# Kyberion How-To Narrated Demo\n\n## Scenario flow\n1. Receive a fixed brief with audience, use case, and message already decided.\n2. Convert the brief into a content outline and a renderable video brief.\n3. Generate narration and compose the scene bundle.\n4. Render, verify, extract key frames, and reject black-frame output.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-howto-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n- `{{frame_extract_result}}`\n- `{{blackframe_result}}`\n- `{{duration_alignment_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-howto-narrated-demo.json`\n",
+        "format": "text"
+      }
+    },
+    {
+      "id": "log_done",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 [KYBERION-HOWTO] Narrated demo complete. Voice: {{voice_result}} Video: {{video_result}} Verify: {{verify_result}}"
+      }
+    }
+  ]
+}

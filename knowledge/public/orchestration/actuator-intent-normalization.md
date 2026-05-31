@@ -71,6 +71,16 @@ This packet is the human-facing surface of the shared coordination protocol.
   - `outputs`
 - capability bundle は runtime primitive ではなく、actuator と pipeline を束ねる catalog 概念として扱う
 
+## Media Intent Routing
+
+The following media intents are normalized through the same shared brief flow, then routed to intent-scoped execution profiles:
+
+| Intent | Execution Profile | Capability Bundle | Primary Procedure |
+|---|---|---|---|
+| `generate-video` | `media-generate-video-default` | `video-generation-governed` | [`generate-video-from-adf.md`](knowledge/public/procedures/media/generate-video-from-adf.md) |
+| `transcribe-audio` | `audio-transcribe-default` | `audio-transcription-governed` | [`transcribe-audio-from-asset.md`](knowledge/public/procedures/media/transcribe-audio-from-asset.md) |
+| `live-voice` | `voice-live-conversation-default` | `realtime-voice-governed` | [`realtime-voice-conversation.md`](knowledge/public/procedures/media/realtime-voice-conversation.md) |
+
 ## LLM Touchpoint Rule
 
 - LLM の主な接点は `operator-interaction-packet`

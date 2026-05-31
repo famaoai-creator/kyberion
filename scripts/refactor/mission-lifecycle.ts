@@ -12,6 +12,7 @@ import {
   finalizeActuatorTrace,
   ledger,
   logger,
+  latestSnapshot,
   pathResolver,
   queueMissionMemoryPromotionCandidate,
   safeExec,
@@ -222,7 +223,7 @@ export async function finishMission(
   await emitMissionLifecycleIntentSnapshot({
     missionId: upperId,
     stage: 'delivery',
-    text: `Finish mission ${upperId}`,
+    text: latestSnapshot(upperId)?.intent.goal || `Mission ${upperId} progressing through learn`,
     source: 'mission_state',
   });
   const driftSummary = evaluateMissionIntentDrift(upperId);

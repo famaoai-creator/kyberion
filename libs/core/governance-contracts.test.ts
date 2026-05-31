@@ -74,6 +74,12 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'intent-execution-profile-registry',
+    schemaPath: 'knowledge/public/schemas/intent-execution-profile-registry.schema.json',
+    dataPath: 'knowledge/public/governance/intent-execution-profile-registry.json',
+    invalidPayload: { version: '1.0.0' },
+  },
+  {
     name: 'execution-receipt-policy',
     schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
     dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
@@ -481,12 +487,19 @@ describe('governance contracts', () => {
   });
 
   it('keeps the canonical actuator manifests aligned with the runtime snapshot', () => {
-    const catalog = loadActuatorManifestCatalog().map(({ manifest_path: _manifestPath, entrypoint: _entrypoint, ...entry }) => entry);
+    const normalizeActuatorEntry = ({
+      manifest_path: _manifestPath,
+      entrypoint: _entrypoint,
+      capability_count: _capabilityCount,
+      contract_schema: _contractSchema,
+      ...entry
+    }: Record<string, unknown>) => entry;
+    const catalog = loadActuatorManifestCatalog().map(normalizeActuatorEntry);
     const snapshot = JSON.parse(
       safeReadFile(path.resolve(process.cwd(), 'knowledge/public/orchestration/global_actuator_index.json'), { encoding: 'utf8' }) as string,
     ) as { actuators?: Array<Record<string, unknown>> };
 
     expect(catalog.length).toBeGreaterThan(0);
-    expect(catalog).toEqual(snapshot.actuators || []);
+    expect(catalog).toEqual((snapshot.actuators || []).map(normalizeActuatorEntry));
   });
 });

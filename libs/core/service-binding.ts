@@ -22,6 +22,7 @@ export interface ServiceEndpointRecord {
   allow_unsafe_cli?: boolean;
   allow_local_network?: boolean;
   auth_strategy?: string;
+  intent_aliases?: string[];
   headers?: Record<string, string>;
   oauth?: Record<string, unknown>;
   credential_suffixes?: Partial<Record<'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri', string[]>>;
@@ -181,6 +182,36 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
 
 export function getServiceEndpointRecord(serviceId: string): ServiceEndpointRecord | null {
   return loadServiceEndpointsCatalog().services?.[serviceId] || null;
+}
+
+export function getServiceEndpointRecordForIntent(intentId: string): ServiceEndpointRecord | null {
+  const normalizedIntent = intentId.trim();
+  if (!normalizedIntent) return null;
+  const catalog = loadServiceEndpointsCatalog();
+
+  if (catalog.services[normalizedIntent]) {
+    return catalog.services[normalizedIntent];
+  }
+
+  for (const record of Object.values(catalog.services)) {
+    const aliases = Array.isArray(record.intent_aliases) ? record.intent_aliases : [];
+    if (aliases.some((alias) => alias === normalizedIntent)) {
+      return record;
+    }
+  }
+
+  return null;
+}
+
+export function resolveServiceIdForIntent(intentId: string): string | null {
+  const record = getServiceEndpointRecordForIntent(intentId);
+  if (!record) return null;
+  const catalog = loadServiceEndpointsCatalog();
+  const entries = Object.entries(catalog.services);
+  for (const [serviceId, serviceRecord] of entries) {
+    if (serviceRecord === record) return serviceId;
+  }
+  return null;
 }
 
 function getServiceCredentialSuffixes(

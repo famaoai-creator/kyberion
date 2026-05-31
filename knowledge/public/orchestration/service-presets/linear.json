@@ -1,0 +1,44 @@
+{
+  "service_id": "linear",
+  "name": "Linear API Presets",
+  "base_url": "https://api.linear.app/graphql",
+  "auth_strategy": "Bearer",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "operations": {
+    "query": {
+      "path": "",
+      "method": "POST",
+      "description": "Executes a raw GraphQL query against the Linear API.",
+      "parameters": {
+        "query": { "required": true, "type": "string" },
+        "variables": { "required": false, "type": "object" }
+      },
+      "payload_template": {
+        "query": "{{query}}",
+        "variables": "{{variables}}"
+      }
+    },
+    "create_issue": {
+      "path": "",
+      "method": "POST",
+      "description": "Creates a new issue in Linear.",
+      "parameters": {
+        "team_id": { "required": true, "type": "string" },
+        "title": { "required": true, "type": "string" },
+        "description": { "required": false, "type": "string" },
+        "state_id": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "query": "mutation CreateIssue($teamId: String!, $title: String!, $description: String, $stateId: String) { issueCreate(input: { teamId: $teamId, title: $title, description: $description, stateId: $stateId }) { success issue { id title } } }",
+        "variables": {
+          "teamId": "{{team_id}}",
+          "title": "{{title}}",
+          "description": "{{description}}",
+          "stateId": "{{state_id}}"
+        }
+      }
+    }
+  }
+}

@@ -23,6 +23,36 @@
       "notes": "Left text, right supporting asset for product and proof scenes."
     },
     {
+      "template_id": "howto-guide",
+      "display_name": "How-To Guide",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["feature", "proof", "generic"],
+      "required_content_fields": ["headline", "body"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "Step-oriented guidance layout for procedure and demo scenes."
+    },
+    {
+      "template_id": "promo-spot",
+      "display_name": "Promo Spot",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["hook", "feature", "proof", "cta", "generic"],
+      "required_content_fields": ["headline", "body"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "High-energy promotion layout with value bullets and proof cards."
+    },
+    {
+      "template_id": "vtuber-stage",
+      "display_name": "VTuber Stage",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["hook", "feature", "proof", "cta", "generic"],
+      "required_content_fields": ["headline", "body"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "On-air stage layout with avatar panel, chat strip, and live cue styling."
+    },
+    {
       "template_id": "logo-outro",
       "display_name": "Logo Outro",
       "status": "active",

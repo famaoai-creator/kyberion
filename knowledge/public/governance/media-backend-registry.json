@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.comfyui",
+      "modality": "image",
+      "display_name": "ComfyUI Media Generation",
+      "kind": "service_preset",
+      "provider": "comfyui",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["png", "jpg", "jpeg", "webp"],
+        "async": true
+      },
+      "service_id": "media-generation",
+      "action": "generate_image",
+      "notes": "Routes governed image generation through the media-generation service preset."
+    },
+    {
+      "backend_id": "voice.local_say",
+      "modality": "voice",
+      "display_name": "Local System TTS",
+      "kind": "local",
+      "provider": "system_tts",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supports": {
+        "playback": true,
+        "artifact_formats": ["wav", "aiff"]
+      },
+      "notes": "Local fallback voice backend for playback and artifact generation."
+    },
+    {
+      "backend_id": "video.hyperframes_cli",
+      "modality": "video",
+      "display_name": "HyperFrames CLI Renderer",
+      "kind": "cli",
+      "provider": "hyperframes",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["mp4", "mov", "webm", "gif"],
+        "async": true,
+        "mux_audio": true
+      },
+      "command": "npx",
+      "args": ["hyperframes", "render"],
+      "notes": "Deterministic HTML-to-video render backend with optional narration mux."
+    }
+  ]
+}

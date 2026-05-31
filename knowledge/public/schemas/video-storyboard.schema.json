@@ -7,6 +7,31 @@
   "properties": {
     "kind": { "type": "string", "const": "video-storyboard" },
     "version": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "audience": { "type": "string", "minLength": 1 },
+    "objective": { "type": "string", "minLength": 1 },
+    "content_type": { "type": "string", "minLength": 1 },
+    "presentation_mode": {
+      "type": "string",
+      "enum": ["howto", "promo", "vtuber"]
+    },
+    "promise": { "type": "string", "minLength": 1 },
+    "desired_takeaway": { "type": "string", "minLength": 1 },
+    "design_system_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "system_id": { "type": "string", "minLength": 1 },
+        "brand_name": { "type": "string", "minLength": 1 },
+        "theme": { "type": "string", "minLength": 1 },
+        "background_color": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$" },
+        "layout_family": { "type": "string", "minLength": 1 },
+        "motion_profile": { "type": "string", "minLength": 1 },
+        "logo_path": { "type": "string", "minLength": 1 },
+        "hero_path": { "type": "string", "minLength": 1 },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+      }
+    },
     "format": {
       "type": "object",
       "additionalProperties": false,
@@ -29,11 +54,24 @@
           "title": { "type": "string", "minLength": 1 },
           "start_sec": { "type": "number", "minimum": 0 },
           "duration_sec": { "type": "number", "minimum": 0.1 },
+          "role": { "type": "string", "minLength": 1 },
+          "semantic": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
           "vo_cue": { "type": "string" },
           "visual_direction": { "type": "string", "minLength": 1 },
+          "visual_intent": { "type": "string", "minLength": 1 },
+          "motion_intent": { "type": "string", "minLength": 1 },
+          "caption_intent": { "type": "string", "minLength": 1 },
           "asset_refs": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
+          },
+          "asset_requirements": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "design_token_hints": {
+            "type": "object"
           }
         }
       }

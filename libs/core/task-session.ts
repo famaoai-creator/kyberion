@@ -25,6 +25,12 @@ import {
 } from './outcome-contract.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
+import {
+  findServiceByTopic,
+  topicToServiceId,
+  extractProviderFromUtterance,
+  resolveProviderUrl,
+} from './external-service-registry.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 
 export type TaskSessionSurface = string; // Replaces 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage' | 'discord'
@@ -661,6 +667,101 @@ registerTaskIntentBuilder('setup-messaging-bridge', (trimmed) => {
     },
   };
   return intent;
+});
+
+registerTaskIntentBuilder('fetch-external-data', (trimmed) => {
+  console.log("DEBUG: REGISTERED BUILDER EXECUTING ON TRIMMED UTTERANCE =", trimmed);
+  const base = buildPolicyBackedIntent('fetch-external-data', trimmed);
+
+  // 1. Extract data topic (weather, exchange rate, news, etc.)
+  const topicMatch = trimmed.match(
+    /(天気|weather|気温|温度|為替|レート|exchange\s*rate|ニュース|news|株価|stock)/i
+  );
+  const topicWord = topicMatch?.[1] ?? '';
+
+  // 2. Extract location (station/city/district names)
+  const locationMatch = trimmed.match(
+    /(秋葉原|渋谷|新宿|池袋|品川|横浜|大阪|名古屋|札幌|東京|[^\s]{2,5}(?:市|区|町|村|駅))/
+  );
+  const location = locationMatch?.[1] ?? '';
+
+  const dataTopic = [topicWord, location].filter(Boolean).join(' ');
+
+  // 3. URL already in utterance — highest priority
+  const urlInUtterance = trimmed.match(/https?:\/\/[^\s]+/)?.[0];
+  if (urlInUtterance) {
+    return {
+      ...base,
+      requirements: { missing: [], collected: {} },
+      payload: {
+        ...(base.payload ?? {}),
+        ...(dataTopic ? { data_topic: dataTopic } : {}),
+        source_url: urlInUtterance,
+        ...(dataTopic ? { service_id_hint: topicToServiceId(dataTopic) } : {}),
+      },
+    };
+  }
+
+  // 4. Provider name in utterance (e.g. "Yahoo Japanで", "ヤフーで調べて")
+  let providerResolved: { url: string; providerId: string } | undefined;
+  try {
+    const providerName = extractProviderFromUtterance(trimmed);
+    if (providerName) {
+      providerResolved = resolveProviderUrl(providerName, topicWord, location);
+    }
+  } catch (err: any) {
+    console.error("DEBUG PROVIDER RESOLUTION ERROR:", err);
+    throw err;
+  }
+
+  if (providerResolved) {
+    return {
+      ...base,
+      requirements: { missing: [], collected: {} },
+      payload: {
+        ...(base.payload ?? {}),
+        ...(dataTopic ? { data_topic: dataTopic } : {}),
+        source_url: providerResolved.url,
+        provider_id: providerResolved.providerId,
+        ...(dataTopic ? { service_id_hint: topicToServiceId(dataTopic) } : {}),
+      },
+    };
+  }
+
+  // 5. Registry lookup — previously registered service for this topic
+  let knownEntry: ReturnType<typeof findServiceByTopic> | undefined;
+  if (dataTopic) {
+    try {
+      knownEntry = findServiceByTopic(dataTopic);
+    } catch {
+      // Registry lookup failure must never block intent classification
+    }
+  }
+
+  if (knownEntry) {
+    return {
+      ...base,
+      requirements: { missing: [], collected: {} },
+      payload: {
+        ...(base.payload ?? {}),
+        ...(dataTopic ? { data_topic: dataTopic } : {}),
+        source_url: knownEntry.url,
+        known_service_id: knownEntry.service_id,
+        ...(dataTopic ? { service_id_hint: topicToServiceId(dataTopic) } : {}),
+      },
+    };
+  }
+
+  // 6. No source resolved — ask user for source_url
+  return {
+    ...base,
+    requirements: { missing: ['source_url'], collected: {} },
+    payload: {
+      ...(base.payload ?? {}),
+      ...(dataTopic ? { data_topic: dataTopic } : {}),
+      ...(dataTopic ? { service_id_hint: topicToServiceId(dataTopic) } : {}),
+    },
+  };
 });
 
 

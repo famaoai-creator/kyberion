@@ -504,7 +504,7 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
   const schemaPath = 'knowledge/public/schemas/service-endpoints.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ default_pattern?: string; services?: Record<string, unknown> }>('knowledge/public/orchestration/service-endpoints.json');
+  const snapshot = readJson<{ default_pattern?: string; services?: Record<string, { intent_aliases?: string[] }> }>('knowledge/public/orchestration/service-endpoints.json');
   const snapshotIds = new Set(Object.keys(snapshot.services || {}).map((entry) => String(entry || '')));
   const directoryIds: string[] = [];
 
@@ -518,7 +518,7 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
       }
     }
 
-    const typed = data as { default_pattern?: string; services?: Record<string, unknown> };
+    const typed = data as { default_pattern?: string; services?: Record<string, { intent_aliases?: string[] }> };
     const ids = Object.keys(typed.services || {}).filter(Boolean);
     if (ids.length !== 1) {
       violations.push(`service-endpoints/${file}: must contain exactly one service`);
@@ -534,6 +534,11 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
     }
     if (!snapshotIds.has(id)) {
       violations.push(`service-endpoints/${file}: snapshot is missing service ${id}`);
+    }
+    const snapshotAliasList = snapshot.services?.[id]?.intent_aliases || [];
+    const directoryAliasList = (typed.services?.[id]?.intent_aliases || []);
+    if (JSON.stringify(snapshotAliasList) !== JSON.stringify(directoryAliasList)) {
+      violations.push(`service-endpoints/${file}: intent_aliases must match the snapshot`);
     }
     directoryIds.push(id);
   }

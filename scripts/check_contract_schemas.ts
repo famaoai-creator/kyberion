@@ -576,6 +576,19 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'intent-execution-profile-registry',
+      schemaPath: 'knowledge/public/schemas/intent-execution-profile-registry.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/intent-execution-profile-registry.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          profiles: [],
+        },
+      ],
+    },
+    {
       id: 'execution-receipt-policy',
       schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
       validPayloads: [
