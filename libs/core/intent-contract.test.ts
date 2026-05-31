@@ -321,7 +321,7 @@ describe('intent-contract compiler', () => {
     expect(flow.executionBrief.kind).toBe('actuator-execution-brief');
     expect(flow.intentContract.intent_id).toBe('bootstrap-project');
     expect(flow.clarificationPacket?.interaction_type).toBe('clarification');
-    expect(formatClarificationPacket(flow.clarificationPacket!)).toContain('project brief');
+    expect(formatClarificationPacket(flow.clarificationPacket!)).toContain('project_brief');
   });
 
   it('falls back to the meeting operations path when the request is clearly about a meeting', async () => {
@@ -362,6 +362,21 @@ describe('intent-contract compiler', () => {
     expect(flow.intentContract.delivery_mode).toBe('managed_program');
     expect(flow.routingDecision?.mode).toBe('coordination');
     expect(flow.routingDecision?.boundary_crossing).toBe(true);
+  });
+
+  it('treats read-only agenda requests as direct replies with a calendar summary outcome', async () => {
+    const flow = await compileUserIntentFlow(
+      { text: '来週の予定教えて' },
+      {
+        askFn: async () => 'not json',
+      }
+    );
+
+    expect(flow.intentContract.intent_id).toBe('schedule-read-agenda');
+    expect(flow.intentContract.resolution.execution_shape).toBe('direct_reply');
+    expect(flow.intentContract.outcome_ids).toContain('calendar_agenda_summary');
+    expect(flow.intentContract.clarification_needed).toBe(false);
+    expect(flow.intentContract.delivery_mode).toBe('one_shot');
   });
 
   it('marks durable requests as managed programs for dispatcher decisions', async () => {
