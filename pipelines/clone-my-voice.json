@@ -77,9 +77,12 @@
       "type": "capture",
       "op": "system:exec",
       "params": {
-        "command": "sox",
-        "args": ["-d", "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav", "trim", "0", "{{duration_sec}}"],
-        "timeout_ms": 20000,
+        "command": ".venv/bin/python3",
+        "args": [
+          "libs/actuators/voice-actuator/scripts/record_bridge.py",
+          "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav\"}}"
+        ],
+        "timeout_ms": 25000,
         "export_as": "record1"
       }
     },
@@ -118,9 +121,12 @@
       "type": "capture",
       "op": "system:exec",
       "params": {
-        "command": "sox",
-        "args": ["-d", "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav", "trim", "0", "{{duration_sec}}"],
-        "timeout_ms": 20000,
+        "command": ".venv/bin/python3",
+        "args": [
+          "libs/actuators/voice-actuator/scripts/record_bridge.py",
+          "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav\"}}"
+        ],
+        "timeout_ms": 25000,
         "export_as": "record2"
       }
     },
@@ -159,9 +165,12 @@
       "type": "capture",
       "op": "system:exec",
       "params": {
-        "command": "sox",
-        "args": ["-d", "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav", "trim", "0", "{{duration_sec}}"],
-        "timeout_ms": 20000,
+        "command": ".venv/bin/python3",
+        "args": [
+          "libs/actuators/voice-actuator/scripts/record_bridge.py",
+          "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav\"}}"
+        ],
+        "timeout_ms": 25000,
         "export_as": "record3"
       }
     },

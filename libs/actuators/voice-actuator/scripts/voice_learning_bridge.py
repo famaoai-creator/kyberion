@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Kyberion Voice Learning Bridge — zero-shot engine cascade.
 
@@ -73,6 +75,35 @@ def _load_profile_meta(profile_id: str) -> dict | None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _resolve_generated_output(out: Path) -> Path | None:
+    """Find the file mlx_audio actually wrote and normalize it to `out`."""
+    if out.exists():
+        return out
+
+    suffix = out.suffix or ".wav"
+    suffixes = []
+    if suffix.startswith("."):
+        suffixes.append(suffix)
+    else:
+        suffixes.append(f".{suffix}")
+
+    candidates: list[Path] = []
+    for ext in suffixes:
+        candidates.extend(out.parent.glob(f"{out.stem}{ext}"))
+        candidates.extend(out.parent.glob(f"{out.stem}_*{ext}"))
+        candidates.extend(out.parent.glob(f"{out.stem}-*{ext}"))
+
+    candidates = [p for p in candidates if p.is_file()]
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda p: (p.stat().st_mtime, p.stat().st_size), reverse=True)
+    resolved = candidates[0]
+    if resolved != out:
+        out.write_bytes(resolved.read_bytes())
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -214,11 +245,12 @@ def action_generate(params: dict) -> dict:
                     ref_text=ref_text or None,
                     stt_model=None if ref_text else "mlx-community/whisper-large-v3-turbo",
                 )
-                if out.exists():
+                resolved = _resolve_generated_output(out)
+                if resolved:
                     return {
                         "status": "success",
                         "engine": "cosyvoice2",
-                        "output_path": str(out),
+                        "output_path": str(resolved),
                         "profile_id": profile_id,
                     }
                 errors.append("cosyvoice2: output file not produced")
@@ -235,11 +267,12 @@ def action_generate(params: dict) -> dict:
                     play=False,
                     ref_audio=ref_audio,
                 )
-                if out.exists():
+                resolved = _resolve_generated_output(out)
+                if resolved:
                     return {
                         "status": "success",
                         "engine": "fish_speech_v1.5",
-                        "output_path": str(out),
+                        "output_path": str(resolved),
                         "profile_id": profile_id,
                     }
                 errors.append("fish_speech: output file not produced")
@@ -260,11 +293,12 @@ def action_generate(params: dict) -> dict:
                     kwargs["ref_text"] = ref_text
                     kwargs["stt_model"] = None
                 generate_audio(**kwargs)
-                if out.exists():
+                resolved = _resolve_generated_output(out)
+                if resolved:
                     return {
                         "status": "success",
                         "engine": "qwen3_tts_icl",
-                        "output_path": str(out),
+                        "output_path": str(resolved),
                         "profile_id": profile_id,
                     }
                 errors.append("qwen3_tts: output file not produced")

@@ -18,6 +18,27 @@ from pathlib import Path
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
 
 
+def _resolve_generated_output(out: Path) -> Path | None:
+    if out.exists():
+        return out
+
+    suffix = out.suffix or ".wav"
+    candidates: list[Path] = []
+    candidates.extend(out.parent.glob(f"{out.stem}{suffix}"))
+    candidates.extend(out.parent.glob(f"{out.stem}_*{suffix}"))
+    candidates.extend(out.parent.glob(f"{out.stem}-*{suffix}"))
+    candidates = [p for p in candidates if p.is_file()]
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda p: (p.stat().st_mtime, p.stat().st_size), reverse=True)
+    resolved = candidates[0]
+    if resolved != out:
+        resolved.replace(out)
+    return out
+
+
 def _check_health() -> dict:
     try:
         import mlx_audio  # noqa: F401
@@ -82,7 +103,7 @@ def _generate(params: dict) -> dict:
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
 
-    if not out.exists():
+    if not _resolve_generated_output(out):
         return {"status": "error", "error": f"Output file was not created: {out}"}
 
     mode = "voice_clone" if ref_audio else "tts"
