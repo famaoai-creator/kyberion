@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "notes": [
+    "Registry of external services onboarded by users via the 'fetch-external-data' intent.",
+    "Entries are created when a user provides a URL for an unrecognized topic.",
+    "The runtime file at active/shared/runtime/external-service-registry.json overrides entries here."
+  ],
+  "services": []
+}

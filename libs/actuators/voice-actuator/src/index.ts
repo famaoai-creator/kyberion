@@ -28,6 +28,7 @@ import {
   splitVoiceTextIntoChunks,
   createActuatorTrace,
   finalizeActuatorTrace,
+  resolveVoiceBackend,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { randomUUID } from 'node:crypto';
@@ -38,6 +39,34 @@ function resolvePythonBin(): string {
   const venvPython = pathResolver.rootResolve('.venv/bin/python3');
   if (safeExistsSync(venvPython)) return venvPython;
   return 'python3';
+}
+
+const ESPEAK_NG_CANDIDATES = [
+  '/opt/homebrew/bin/espeak-ng',
+  '/usr/local/bin/espeak-ng',
+  '/opt/homebrew/bin/espeak',
+  '/usr/local/bin/espeak',
+];
+
+function hasEspeakNg(): boolean {
+  return ESPEAK_NG_CANDIDATES.some((candidate) => safeExistsSync(candidate));
+}
+
+function resolveEspeakLanguage(language: string): string {
+  const normalized = language.trim().toLowerCase();
+  if (normalized.startsWith('ja')) return 'ja';
+  if (normalized.startsWith('en')) return 'en';
+  if (normalized.startsWith('ko')) return 'ko';
+  if (normalized.startsWith('zh')) return 'zh';
+  return normalized || 'en';
+}
+
+function resolveEspeakRate(language: string, rate: number): number {
+  if (!hasEspeakNg()) return rate;
+  if (language.trim().toLowerCase().startsWith('ja')) {
+    return Math.max(260, rate);
+  }
+  return rate;
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
@@ -358,6 +387,7 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
   const rate = Number.isFinite(params.rate) ? Number(params.rate) : defaults.rate;
   const requestedEngineId = String(params.engine_id || 'local_say').trim() || 'local_say';
   const engine = resolveVoiceEngineForPlatform(requestedEngineId);
+  const backend = resolveVoiceBackend(requestedEngineId);
 
   await performPlayback(text, { language, voice, rate, engineId: engine.engine_id });
   return {
@@ -366,6 +396,9 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
     engine: engine.kind,
     engine_id: requestedEngineId,
     resolved_engine_id: engine.engine_id,
+    backend_id: backend.backend_id,
+    backend_kind: backend.kind,
+    backend_provider: backend.provider,
     language,
     voice,
     rate,
@@ -386,21 +419,25 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   const requestedEngineId = String(input.engine?.engine_id || profile.default_engine_id || '').trim() || profile.default_engine_id;
   const defaultEngine = getVoiceEngineRecord(profile.default_engine_id);
   const engine = resolveVoiceEngineForPlatform(requestedEngineId);
+  const backend = resolveVoiceBackend(requestedEngineId);
   const personalVoiceMode = String(input.routing?.personal_voice_mode || policy.routing.default_personal_voice_mode);
   const fallbackDetected = engine.engine_id !== requestedEngineId;
   const requiresPersonalVoice = personalVoiceMode === 'require_personal_voice'
     || (policy.routing.enforce_clone_engine_for_personal_tier && profile.tier === 'personal');
   if (requiresPersonalVoice && (engine.kind !== 'voice_clone_service' || fallbackDetected)) {
-    return {
-      status: 'blocked',
-      request_id: jobId,
-      profile_id: profile.profile_id,
-      profile_tier: profile.tier,
-      engine_id: requestedEngineId,
-      resolved_engine_id: engine.engine_id,
-      fallback_detected: fallbackDetected,
-      personal_voice_mode: personalVoiceMode,
-      reason: fallbackDetected
+      return {
+        status: 'blocked',
+        request_id: jobId,
+        profile_id: profile.profile_id,
+        profile_tier: profile.tier,
+        engine_id: requestedEngineId,
+        resolved_engine_id: engine.engine_id,
+        backend_id: backend.backend_id,
+        backend_kind: backend.kind,
+        backend_provider: backend.provider,
+        fallback_detected: fallbackDetected,
+        personal_voice_mode: personalVoiceMode,
+        reason: fallbackDetected
         ? `personal voice required but engine resolved to fallback (${engine.engine_id})`
         : `personal voice required but resolved engine is not clone-capable (${engine.engine_id})`,
     };
@@ -431,6 +468,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
           requestId: jobId,
           voice: defaults.voice,
           rate: defaults.rate,
+          language,
           format: requestedFormat,
           engineId: engine.engine_id,
           supportsFormats: engine.supports.artifact_formats,
@@ -488,6 +526,9 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
     language,
     engine_id: requestedEngineId,
     resolved_engine_id: engine.engine_id,
+    backend_id: backend.backend_id,
+    backend_kind: backend.kind,
+    backend_provider: backend.provider,
     chunks: chunks.length,
     progress_packets,
     artifact_refs: finalPacket.artifact_refs || [],
@@ -660,6 +701,13 @@ async function performPlayback(
 
   if (process.platform === 'darwin') {
     await withRetry(async () => {
+      if (hasEspeakNg()) {
+        safeExec(
+          'espeak-ng',
+          ['-v', resolveEspeakLanguage(options.language), '-s', String(resolveEspeakRate(options.language, options.rate)), text],
+        );
+        return;
+      }
       safeExec('say', ['-v', options.voice, '-r', String(options.rate), text]);
     }, buildRetryOptions());
     return;
@@ -718,6 +766,35 @@ async function runMlxAudioGenerate(text: string, outputPath: string, profile?: a
   }
 }
 
+async function renderWithEspeakNg(
+  text: string,
+  options: {
+    requestId: string;
+    language: string;
+    rate: number;
+    format: VoiceArtifactFormat;
+    outputPath?: string;
+  },
+): Promise<string> {
+  const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+  const artifactDir = path.dirname(artifactPath);
+  safeMkdir(artifactDir, { recursive: true });
+
+  const normalizedLanguage = resolveEspeakLanguage(options.language);
+  const adjustedRate = resolveEspeakRate(options.language, options.rate);
+
+  if (options.format === 'wav') {
+    safeExec('espeak-ng', ['-v', normalizedLanguage, '-s', String(adjustedRate), '-w', artifactPath, text]);
+    return artifactPath;
+  }
+
+  const tempWav = pathResolver.sharedTmp(`voice-generation/${options.requestId}.wav`);
+  safeMkdir(path.dirname(tempWav), { recursive: true });
+  safeExec('espeak-ng', ['-v', normalizedLanguage, '-s', String(adjustedRate), '-w', tempWav, text]);
+  safeExec('ffmpeg', ['-y', '-i', tempWav, artifactPath]);
+  return artifactPath;
+}
+
 function resolveProfileRefAudio(profile?: any): string | undefined {
   if (!profile) return undefined;
   const samples: string[] = profile.sample_refs || [];
@@ -742,6 +819,7 @@ function renderNativeArtifact(
     requestId: string;
     voice: string;
     rate: number;
+    language: string;
     format: VoiceArtifactFormat;
     engineId: string;
     supportsFormats: VoiceArtifactFormat[];
@@ -765,6 +843,15 @@ function renderNativeArtifact(
 
   if (process.platform === 'darwin') {
     return withRetry(async () => {
+      if (hasEspeakNg()) {
+        return renderWithEspeakNg(text, {
+          requestId: options.requestId,
+          language: options.language,
+          rate: options.rate,
+          format: options.format,
+          outputPath: options.outputPath,
+        });
+      }
       safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
       return artifactPath;
     }, buildRetryOptions());

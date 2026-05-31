@@ -1200,6 +1200,49 @@
           "intent_id": "escalate-governance-issue"
         }
       }
+    },
+    {
+      "id": "fetch-external-data",
+      "task_type": "external_data_fetch",
+      "goal": {
+        "summary": "外部サービスからデータを取得してユーザーに回答する",
+        "success_condition": "指定された外部URLからデータが取得され、ユーザーが求める情報が要約されて回答される。"
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "source_url",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "https?://"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "static": {
+          "intent_id": "fetch-external-data",
+          "execution_shape": "task_session"
+        },
+        "fields": [
+          {
+            "field": "output_format",
+            "default": "summary",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(json|raw|生データ)" }],
+                "value": "raw"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(markdown|md)" }],
+                "value": "markdown"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,36 @@
+{
+  "service_id": "discord",
+  "name": "Discord API Presets",
+  "base_url": "https://discord.com/api/v10",
+  "auth_strategy": "Bot",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "operations": {
+    "post_message": {
+      "path": "channels/{{channel_id}}/messages",
+      "method": "POST",
+      "description": "Sends a message to a Discord channel.",
+      "parameters": {
+        "channel_id": { "required": true, "type": "string" },
+        "content": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "content": "{{content}}"
+      }
+    },
+    "trigger_webhook": {
+      "path": "webhooks/{{webhook_id}}/{{webhook_token}}",
+      "method": "POST",
+      "description": "Triggers a channel webhook without bot token.",
+      "parameters": {
+        "webhook_id": { "required": true, "type": "string" },
+        "webhook_token": { "required": true, "type": "string" },
+        "content": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "content": "{{content}}"
+      }
+    }
+  }
+}

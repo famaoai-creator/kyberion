@@ -9,6 +9,19 @@
         "visual_fill_role": "background",
         "visual_text_role": "secondary"
       },
+      "video": {
+        "layout_family": "process-flow",
+        "density": "medium",
+        "motion_profile": "guided-step",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-40-visual-60",
+        "max_static_sec": 4,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium",
+        "typography_scale": "balanced",
+        "overlay_density": "medium",
+        "camera_distance": "medium"
+      },
       "pdf": {
         "body_x": "content",
         "body_font_size_delta": 0,
@@ -41,6 +54,19 @@
         "visual_fill_role": "background",
         "visual_text_role": "primary"
       },
+      "video": {
+        "layout_family": "hero",
+        "density": "low",
+        "motion_profile": "value-promise",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-50-visual-50",
+        "max_static_sec": 3,
+        "safe_area": "wide-16x9",
+        "beat_energy": "high",
+        "typography_scale": "expressive",
+        "overlay_density": "compact",
+        "camera_distance": "tight"
+      },
       "pdf": {
         "header_color": "primary"
       },
@@ -55,6 +81,19 @@
         "body_color_role": "primary",
         "visual_fill_role": "accent",
         "visual_text_role": "accent"
+      },
+      "video": {
+        "layout_family": "summary",
+        "density": "medium",
+        "motion_profile": "guided",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-60-visual-40",
+        "max_static_sec": 4,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium",
+        "typography_scale": "balanced",
+        "overlay_density": "medium",
+        "camera_distance": "medium"
       },
       "pdf": {
         "body_x": "margin",
@@ -73,6 +112,19 @@
         "body_color_role": "secondary",
         "visual_fill_role": "accent",
         "visual_text_role": "accent"
+      },
+      "video": {
+        "layout_family": "evidence",
+        "density": "medium",
+        "motion_profile": "artifact-reveal",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-40-visual-60",
+        "max_static_sec": 3,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium",
+        "typography_scale": "balanced",
+        "overlay_density": "compact",
+        "camera_distance": "medium"
       },
       "pdf": {
         "header_color": "primary",
@@ -105,6 +157,19 @@
         "visual_fill_role": "primary",
         "visual_text_role": "primary"
       },
+      "video": {
+        "layout_family": "control",
+        "density": "low",
+        "motion_profile": "guided-step",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-50-visual-50",
+        "max_static_sec": 4,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium",
+        "typography_scale": "balanced",
+        "overlay_density": "compact",
+        "camera_distance": "medium"
+      },
       "pdf": {
         "header_color": "primary",
         "block_fill": "primary",
@@ -123,6 +188,19 @@
         "visual_fill_role": "success",
         "visual_text_role": "success"
       },
+      "video": {
+        "layout_family": "roadmap",
+        "density": "medium",
+        "motion_profile": "chaptered",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-55-visual-45",
+        "max_static_sec": 4,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium",
+        "typography_scale": "balanced",
+        "overlay_density": "medium",
+        "camera_distance": "medium"
+      },
       "pdf": {
         "header_color": "secondary"
       },
@@ -138,6 +216,19 @@
         "visual_fill_role": "accent",
         "visual_text_role": "accent"
       },
+      "video": {
+        "layout_family": "decision",
+        "density": "low",
+        "motion_profile": "decisive",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-70-visual-30",
+        "max_static_sec": 3,
+        "safe_area": "wide-16x9",
+        "beat_energy": "low",
+        "typography_scale": "tight",
+        "overlay_density": "compact",
+        "camera_distance": "medium"
+      },
       "pdf": {
         "header_color": "accent"
       },
@@ -151,6 +242,19 @@
         "body_color_role": "secondary",
         "visual_fill_role": "background",
         "visual_text_role": "secondary"
+      },
+      "video": {
+        "layout_family": "appendix",
+        "density": "low",
+        "motion_profile": "minimal",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-80-visual-20",
+        "max_static_sec": 5,
+        "safe_area": "wide-16x9",
+        "beat_energy": "low",
+        "typography_scale": "compact",
+        "overlay_density": "compact",
+        "camera_distance": "far"
       },
       "pdf": {
         "header_color": "secondary",
@@ -181,6 +285,16 @@
         "visual_fill_role": "warning",
         "visual_text_role": "warning"
       },
+      "video": {
+        "layout_family": "signals",
+        "density": "high",
+        "motion_profile": "alert",
+        "caption_style": "top-third",
+        "visual_ratio": "text-35-visual-65",
+        "max_static_sec": 2,
+        "safe_area": "wide-16x9",
+        "beat_energy": "high"
+      },
       "pdf": {
         "header_color": "primary"
       },
@@ -195,6 +309,16 @@
         "visual_fill_role": "info",
         "visual_text_role": "info"
       },
+      "video": {
+        "layout_family": "execution",
+        "density": "medium",
+        "motion_profile": "guided-step",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-40-visual-60",
+        "max_static_sec": 4,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium"
+      },
       "pdf": {
         "header_color": "primary"
       },
@@ -208,6 +332,16 @@
         "body_color_role": "secondary",
         "visual_fill_role": "muted",
         "visual_text_role": "primary"
+      },
+      "video": {
+        "layout_family": "architecture",
+        "density": "medium",
+        "motion_profile": "layered",
+        "caption_style": "lower-third",
+        "visual_ratio": "text-45-visual-55",
+        "max_static_sec": 4,
+        "safe_area": "wide-16x9",
+        "beat_energy": "medium"
       },
       "pdf": {
         "header_color": "primary"

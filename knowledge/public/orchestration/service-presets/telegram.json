@@ -1,0 +1,26 @@
+{
+  "service_id": "telegram",
+  "name": "Telegram Bot API Presets",
+  "base_url": "https://api.telegram.org",
+  "auth_strategy": "none",
+  "operations": {
+    "post_message": {
+      "path": "bot{{token}}/sendMessage",
+      "method": "POST",
+      "description": "Sends a message to a Telegram chat/channel.",
+      "parameters": {
+        "chat_id": { "required": true, "type": "string" },
+        "text": { "required": true, "type": "string" }
+      },
+      "payload_template": {
+        "chat_id": "{{chat_id}}",
+        "text": "{{text}}"
+      }
+    },
+    "get_updates": {
+      "path": "bot{{token}}/getUpdates",
+      "method": "GET",
+      "description": "Gets incoming updates/messages for the bot."
+    }
+  }
+}

@@ -411,4 +411,27 @@ describe('task-session', () => {
       })
     ).toBe(false);
   });
+
+  describe('fetch-external-data intent & provider resolution', () => {
+    it('classifies "Yahoo Japanで秋葉原の天気を教えて" and resolves URL using provider catalog', () => {
+      const utterance = 'Yahoo Japanで秋葉原の天気を教えて';
+      const classified = classifyTaskSessionIntent(utterance);
+
+      expect(classified).toBeTruthy();
+      expect(classified?.intentId).toBe('fetch-external-data');
+      expect(classified?.taskType).toBe('external_data_fetch');
+      expect(classified?.payload?.source_url).toContain('search.yahoo.co.jp');
+      expect(classified?.payload?.provider_id).toBe('yahoo-japan-search');
+      expect(classified?.payload?.data_topic).toBe('天気 秋葉原');
+    });
+
+    it('classifies "天気を教えて" with source_url in missing requirements', () => {
+      const utterance = '天気を教えて';
+      const classified = classifyTaskSessionIntent(utterance);
+
+      expect(classified).toBeTruthy();
+      expect(classified?.intentId).toBe('fetch-external-data');
+      expect(classified?.requirements?.missing).toContain('source_url');
+    });
+  });
 });

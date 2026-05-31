@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
     validator.errors = [];
     return validator;
   }),
+  safeExec: vi.fn(() => '1'),
+  safeExistsSync: vi.fn(() => true),
   withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   getVideoCompositionTemplateRegistry: vi.fn(() => ({
     version: 'test',
@@ -37,6 +39,19 @@ const mocks = vi.hoisted(() => ({
     scenes: [],
     output: { format: 'mp4' },
   })),
+  compileVideoContentBriefToStoryboard: vi.fn(() => ({
+    kind: 'video-storyboard',
+    version: '1.0.0',
+    format: { width: 1920, height: 1080 },
+    beats: [],
+  })),
+  compileVideoStoryboardToNarratedVideoBrief: vi.fn(() => ({
+    kind: 'narrated-video-brief',
+    version: '1.0.0',
+    script: { hook: 'hook', feature: 'feature', cta: 'cta' },
+    narration: { artifact_ref: 'active/shared/exports/narration.aiff' },
+    design_system: { brand_name: 'Kyberion' },
+  })),
   renderVideoCompositionBundleAsync: vi.fn(async () => ({
     executed: true,
     backend: 'hyperframes_cli',
@@ -55,10 +70,14 @@ vi.mock('@agent/core', async () => {
   return {
     ...actual,
     compileSchemaFromPath: mocks.compileSchemaFromPath,
+    safeExec: mocks.safeExec,
+    safeExistsSync: mocks.safeExistsSync,
     withRetry: mocks.withRetry,
     getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
     getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
     compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
+    compileVideoContentBriefToStoryboard: mocks.compileVideoContentBriefToStoryboard,
+    compileVideoStoryboardToNarratedVideoBrief: mocks.compileVideoStoryboardToNarratedVideoBrief,
     safeReadFile: mocks.safeReadFile,
     renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
     writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
@@ -74,6 +93,16 @@ describe('video-composition-actuator', () => {
         return JSON.stringify({ recovery_policy: {} });
       }
       return '{}';
+    });
+    vi.mocked(mocks.safeExistsSync).mockImplementation(() => true);
+    vi.mocked(mocks.safeExec).mockImplementation((command: string, args: any[]) => {
+      if (command === 'ffprobe' && Array.isArray(args) && args.includes('a:0')) {
+        return '0';
+      }
+      if (command === 'ffprobe' && Array.isArray(args) && args.includes('v:0')) {
+        return '1';
+      }
+      return '1';
     });
   });
 
@@ -140,6 +169,104 @@ describe('video-composition-actuator', () => {
     }));
     expect(result.execution).toEqual(expect.objectContaining({
       status: 'succeeded',
+    }));
+  });
+
+  it('compiles video content brief into storyboard', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'compile_video_content_brief',
+      params: {
+        video_content_brief: {
+          kind: 'video-content-brief',
+          version: '1.0.0',
+          audience: 'operators',
+          objective: 'turn approved messaging into content',
+          distribution_channel: 'docs-demo',
+          content_type: 'howto',
+          presentation_mode: 'howto',
+          promise: 'clear process',
+          desired_takeaway: 'content brief becomes a renderable plan',
+          constraints: ['no pitch'],
+          proof_points: ['brief', 'storyboard', 'render'],
+          design_system_ref: {
+            system_id: 'operator-ops',
+            brand_name: 'Kyberion',
+          },
+        },
+      },
+    } as any);
+
+    expect(mocks.compileVideoContentBriefToStoryboard).toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      kind: 'compiled_video_storyboard',
+    }));
+  });
+
+  it('creates narrated movie from video content brief', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'create_narrated_video_from_content_brief',
+      params: {
+        video_content_brief: {
+          kind: 'video-content-brief',
+          version: '1.0.0',
+          audience: 'operators',
+          objective: 'turn approved messaging into content',
+          distribution_channel: 'docs-demo',
+          content_type: 'howto',
+          presentation_mode: 'howto',
+          promise: 'clear process',
+          desired_takeaway: 'content brief becomes a renderable plan',
+          constraints: ['no pitch'],
+          proof_points: ['brief', 'storyboard', 'render'],
+          design_system_ref: {
+            system_id: 'operator-ops',
+            brand_name: 'Kyberion',
+            background_color: '#07111f',
+          },
+        },
+        narration_artifact_ref: 'active/shared/exports/narration.aiff',
+        output: {
+          format: 'mp4',
+          target_path: '/tmp/content-brief-movie.mp4',
+          await_completion: true,
+        },
+      },
+    } as any);
+
+    expect(mocks.compileVideoContentBriefToStoryboard).toHaveBeenCalled();
+    expect(mocks.compileVideoStoryboardToNarratedVideoBrief).toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      kind: 'narrated_content_brief_movie_run',
+    }));
+    expect(result.execution).toEqual(expect.objectContaining({
+      status: 'succeeded',
+    }));
+  });
+
+  it('verifies rendered video artifacts with audio and video streams', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'verify_rendered_video_artifact',
+      params: {
+        path: '/tmp/content-brief-movie.mp4',
+        require_audio: true,
+        require_video: true,
+      },
+    } as any);
+
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'ffprobe',
+      expect.arrayContaining(['-select_streams', 'a:0']),
+      expect.objectContaining({ timeoutMs: 30000 }),
+    );
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      kind: 'video_artifact_verification',
+      has_audio: true,
+      has_video: true,
     }));
   });
 

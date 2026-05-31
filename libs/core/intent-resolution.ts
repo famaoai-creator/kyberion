@@ -27,6 +27,7 @@ export type StandardIntentDefinition = {
   trigger_keywords?: string[];
   outcome_ids?: string[];
   specialist_id?: string;
+  execution_profile_id?: string;
   plan_outline?: string[];
   intake_requirements?: string[];
   pipeline?: Array<{ op?: string; params?: Record<string, unknown> }>;

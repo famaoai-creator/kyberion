@@ -1,12 +1,16 @@
 import AjvModule from 'ajv';
 import {
   compileNarratedVideoBriefToCompositionADF,
+  compileVideoContentBriefToStoryboard,
+  compileVideoStoryboardToNarratedVideoBrief,
   compileSchemaFromPath,
   getVideoCompositionTemplateRegistry,
   getVideoRenderRuntimePolicy,
   logger,
   pathResolver,
   renderVideoCompositionBundleAsync,
+  safeExec,
+  safeExistsSync,
   safeReadFile,
   withRetry,
   classifyError,
@@ -69,6 +73,17 @@ type VideoCompositionAction =
   | VideoCompositionADF
   | { action: 'prepare_video_composition'; params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string } }
   | { action: 'compile_narrated_video_brief'; params: { narrated_video_brief: Record<string, unknown> } }
+  | { action: 'compile_video_content_brief'; params: { video_content_brief: Record<string, unknown> } }
+  | {
+    action: 'create_narrated_video_from_content_brief';
+    params: {
+      video_content_brief: Record<string, unknown>;
+      narration_artifact_ref: string;
+      job_id?: string;
+      bundle_dir?: string;
+      output?: Record<string, unknown>;
+    };
+  }
   | {
     action: 'create_narrated_intro_movie';
     params: {
@@ -81,6 +96,7 @@ type VideoCompositionAction =
   | { action: 'get_video_composition_job_status'; params: { job_id: string } }
   | { action: 'await_video_composition_job'; params: { job_id: string; timeout_ms?: number } }
   | { action: 'cancel_video_composition_job'; params: { job_id: string; reason?: string } }
+  | { action: 'verify_rendered_video_artifact'; params: { path: string; require_audio?: boolean; require_video?: boolean; export_as?: string } }
   | { action: 'get_video_composition_queue'; params?: Record<string, unknown> }
   | Record<string, any>;
 
@@ -117,26 +133,36 @@ export async function handleSingleAction(input: VideoCompositionAction) {
     });
   }
   const action = (input as any).action;
+  const params = resolveActionParams(input);
   if (action === 'prepare_video_composition') {
-    return prepareVideoComposition(((input as any).params || {}));
+    return prepareVideoComposition(params);
   }
   if (action === 'compile_narrated_video_brief') {
-    return compileNarratedVideoBrief(((input as any).params || {}));
+    return compileNarratedVideoBrief(params);
+  }
+  if (action === 'compile_video_content_brief') {
+    return compileVideoContentBrief(params);
+  }
+  if (action === 'create_narrated_video_from_content_brief') {
+    return createNarratedVideoFromContentBrief(params);
   }
   if (action === 'create_narrated_intro_movie') {
-    return createNarratedIntroMovie(((input as any).params || {}));
+    return createNarratedIntroMovie(params);
+  }
+  if (action === 'verify_rendered_video_artifact') {
+    return verifyRenderedVideoArtifact(params);
   }
   if (action === 'list_video_composition_templates') {
     return listVideoCompositionTemplates();
   }
   if (action === 'get_video_composition_job_status') {
-    return getVideoCompositionJobStatus(((input as any).params || {}));
+    return getVideoCompositionJobStatus(params);
   }
   if (action === 'await_video_composition_job') {
-    return awaitVideoCompositionJob(((input as any).params || {}));
+    return awaitVideoCompositionJob(params);
   }
   if (action === 'cancel_video_composition_job') {
-    return cancelVideoCompositionJob(((input as any).params || {}));
+    return cancelVideoCompositionJob(params);
   }
   if (action === 'get_video_composition_queue') {
     return getVideoCompositionQueue();
@@ -155,6 +181,53 @@ export async function handleAction(input: VideoCompositionAction) {
     return { status: 'succeeded', results };
   }
   return handleSingleAction(input);
+}
+
+export async function dispatchDecisionOp(
+  op: string,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+): Promise<{ handled: boolean; ctx: Record<string, unknown> }> {
+  const resolvedParams = deepResolve(params, ctx);
+  const payload = { action: op, ...(resolvedParams || {}) };
+  const result = await handleSingleAction(payload as any);
+  const exportAs = String((resolvedParams as any)?.export_as || '').trim();
+  return {
+    handled: true,
+    ctx: exportAs ? { ...ctx, [exportAs]: result } : { ...ctx, last_video_result: result },
+  };
+}
+
+function deepResolve(val: any, ctx: any): any {
+  if (typeof val === 'string') {
+    return val.replace(/{{(.*?)}}/g, (_, p) => {
+      const key = String(p).split('|')[0].trim();
+      const parts = key.split('.');
+      let current = ctx;
+      for (const part of parts) {
+        current = current?.[part];
+      }
+      return current !== undefined ? String(current) : '';
+    });
+  }
+  if (Array.isArray(val)) return val.map((item) => deepResolve(item, ctx));
+  if (val !== null && typeof val === 'object') {
+    const result: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) result[k] = deepResolve(v, ctx);
+    return result;
+  }
+  return val;
+}
+
+function resolveActionParams(input: Record<string, any>): Record<string, any> {
+  if (isPlainObject(input.params)) {
+    return input.params;
+  }
+  const params = { ...input };
+  delete (params as any).action;
+  delete (params as any).kind;
+  delete (params as any).type;
+  return params;
 }
 
 function validateVideoCompositionAction(input: unknown): void {
@@ -187,6 +260,67 @@ async function compileNarratedVideoBrief(params: { narrated_video_brief?: Record
   };
 }
 
+async function compileVideoContentBrief(params: { video_content_brief?: Record<string, unknown> }) {
+  if (!params.video_content_brief) {
+    throw new Error('compile_video_content_brief requires params.video_content_brief');
+  }
+  const storyboard = compileVideoContentBriefToStoryboard(params.video_content_brief as any);
+  return {
+    status: 'succeeded',
+    kind: 'compiled_video_storyboard',
+    video_storyboard: storyboard,
+  };
+}
+
+async function createNarratedVideoFromContentBrief(params: {
+  video_content_brief?: Record<string, unknown>;
+  narration_artifact_ref?: string;
+  job_id?: string;
+  bundle_dir?: string;
+  output?: Record<string, unknown>;
+}) {
+  if (!params.video_content_brief) {
+    throw new Error('create_narrated_video_from_content_brief requires params.video_content_brief');
+  }
+  if (!params.narration_artifact_ref) {
+    throw new Error('create_narrated_video_from_content_brief requires params.narration_artifact_ref');
+  }
+  const contentBrief = params.video_content_brief as any;
+  const storyboard = compileVideoContentBriefToStoryboard(contentBrief);
+  const narratedVideoBrief = compileVideoStoryboardToNarratedVideoBrief(storyboard, {
+    title: contentBrief.title,
+    language: contentBrief.language,
+    narration_artifact_ref: params.narration_artifact_ref,
+    brand_name: contentBrief.design_system_ref?.brand_name,
+    theme_background_color: contentBrief.design_system_ref?.background_color,
+    logo_path: contentBrief.design_system_ref?.logo_path,
+    hero_path: contentBrief.design_system_ref?.hero_path,
+    timing: {
+      duration_sec: params.output?.duration_sec || contentBrief.duration_sec,
+      fps: params.output?.fps || contentBrief.design_system_ref?.fps,
+    },
+    output: {
+      format: params.output?.format as any || 'mp4',
+      target_path: params.output?.target_path as string | undefined,
+      bundle_dir: params.output?.bundle_dir as string | undefined || params.bundle_dir,
+      await_completion: params.output?.await_completion as boolean | undefined,
+    },
+  });
+  const execution = await createNarratedIntroMovie({
+    narrated_video_brief: narratedVideoBrief as any,
+    job_id: params.job_id,
+    bundle_dir: params.bundle_dir || (params.output?.bundle_dir as string | undefined),
+  });
+  return {
+    status: execution.status,
+    kind: 'narrated_content_brief_movie_run',
+    video_storyboard: storyboard,
+    narrated_video_brief: narratedVideoBrief,
+    video_composition_adf: execution.video_composition_adf,
+    execution,
+  };
+}
+
 async function createNarratedIntroMovie(params: {
   narrated_video_brief?: Record<string, unknown>;
   job_id?: string;
@@ -206,6 +340,60 @@ async function createNarratedIntroMovie(params: {
     kind: 'narrated_intro_movie_run',
     video_composition_adf: adf,
     execution,
+  };
+}
+
+async function verifyRenderedVideoArtifact(params: {
+  path?: string;
+  require_audio?: boolean;
+  require_video?: boolean;
+  export_as?: string;
+}) {
+  const rootDir = pathResolver.rootDir();
+  const artifactPath = pathResolver.rootResolve(String(params.path || '').trim());
+  if (!artifactPath || !safeExistsSync(artifactPath)) {
+    throw new Error(`verify_rendered_video_artifact requires an existing path: ${String(params.path || '')}`);
+  }
+
+  const requireAudio = params.require_audio !== false;
+  const requireVideo = params.require_video !== false;
+  const probeStream = (selector: string) => safeExec('ffprobe', [
+    '-v',
+    'error',
+    '-select_streams',
+    selector,
+    '-show_entries',
+    'stream=index',
+    '-of',
+    'csv=p=0',
+    artifactPath,
+  ], {
+    cwd: rootDir,
+    timeoutMs: 30_000,
+  }).trim();
+
+  let audioProbe = '';
+  let videoProbe = '';
+  if (requireAudio) {
+    audioProbe = probeStream('a:0');
+    if (!audioProbe) {
+      throw new Error(`verify_rendered_video_artifact found no audio stream in ${artifactPath}`);
+    }
+  }
+  if (requireVideo) {
+    videoProbe = probeStream('v:0');
+    if (!videoProbe) {
+      throw new Error(`verify_rendered_video_artifact found no video stream in ${artifactPath}`);
+    }
+  }
+
+  return {
+    status: 'succeeded',
+    kind: 'video_artifact_verification',
+    path: artifactPath,
+    has_audio: Boolean(audioProbe),
+    has_video: Boolean(videoProbe),
+    output: artifactPath,
   };
 }
 

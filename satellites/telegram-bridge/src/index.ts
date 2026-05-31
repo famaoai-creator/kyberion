@@ -215,7 +215,7 @@ export async function sendTelegramMessage(
   }
 
   const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
-  const response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
+  let response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -224,7 +224,24 @@ export async function sendTelegramMessage(
       parse_mode: input.parseMode || options.parseMode || 'Markdown',
     }),
   });
-  const body = await response.json().catch(() => null) as any;
+  let body = await response.json().catch(() => null) as any;
+
+  if (!response.ok || body?.ok === false) {
+    const description = body?.description || response.statusText || '';
+    if (description.includes("can't parse entities") || response.status === 400) {
+      logger.warn(`⚠️ [TelegramBridge] Markdown parsing failed, retrying as plain text: ${description}`);
+      response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: input.text,
+        }),
+      });
+      body = await response.json().catch(() => null) as any;
+    }
+  }
+
   if (!response.ok || body?.ok === false) {
     throw new Error(`Telegram send failed: ${response.status} ${body?.description || response.statusText}`);
   }
@@ -247,6 +264,13 @@ export async function handleTelegramUpdate(
   }
   if (message.from?.is_bot) {
     return { ok: true, ignored: true, reason: 'bot_message' };
+  }
+
+  const allowedUserIds = ['8936171950'];
+  const senderId = String(message.from?.id || '');
+  if (!allowedUserIds.includes(senderId)) {
+    logger.warn(`⚠️ [TelegramBridge] Ignored unauthorized message from sender: ${senderId}`);
+    return { ok: true, ignored: true, reason: 'unauthorized_sender' };
   }
 
   const text = pickText(message);

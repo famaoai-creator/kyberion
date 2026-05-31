@@ -295,6 +295,145 @@ describe('intent-contract compiler', () => {
     expect(flow.routingDecision?.fanout).toBe('none');
   });
 
+  it('attaches execution profile ids when the resolved intent declares a governed profile', async () => {
+    const responses = [
+      JSON.stringify({
+        kind: 'actuator-execution-brief',
+        request_text: 'このテキストを私の声で読んで',
+        archetype_id: 'speak-with-my-voice',
+        confidence: 0.86,
+        summary: 'Generate speech in the operator voice',
+        user_facing_summary: 'Read the text in the cloned voice',
+        normalized_scope: ['voice_artifact'],
+        target_actuators: ['voice-actuator'],
+        deliverables: ['artifact:audio'],
+        missing_inputs: [],
+        assumptions: ['Use the local voice engine.'],
+        clarification_questions: [],
+        readiness: 'fully_automatable',
+        readiness_reason: 'The speech request is fully specified.',
+        llm_touchpoints: [
+          {
+            stage: 'execution_brief',
+            purpose: 'Extract the request into a governed execution brief',
+            output_contract: 'actuator-execution-brief',
+          },
+        ],
+        recommended_next_step: 'Compile the intent contract and work loop.',
+      }),
+      JSON.stringify({
+        kind: 'intent-contract',
+        source_text: 'このテキストを私の声で読んで',
+        intent_id: 'speak-with-my-voice',
+        goal: {
+          summary: 'Generate speech in the operator voice',
+          success_condition: 'A governed voice artifact is prepared.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'voice_speech',
+        },
+        required_inputs: [],
+        outcome_ids: ['artifact:audio'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.91,
+        why: 'The request is a governed voice generation task.',
+      }),
+      JSON.stringify({
+        intent: { label: 'speak-with-my-voice' },
+        context: {
+          tier: 'confidential',
+          service_bindings: [],
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'voice_speech',
+        },
+        workflow_design: {
+          workflow_id: 'single-track-default',
+          pattern: 'single_track_execution',
+          stage: 'planning',
+          phases: ['intake', 'planning', 'execution', 'verification', 'delivery'],
+          rationale: 'Default workflow for straightforward bounded work.',
+        },
+        review_design: {
+          review_mode: 'standard',
+          required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          all_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          rationale: 'Standard mode requires contract and QA gates.',
+        },
+        outcome_design: {
+          outcome_ids: ['artifact:audio'],
+          labels: ['Voice artifact'],
+        },
+        process_design: {
+          plan_outline: ['collect input text', 'synthesize speech', 'publish audio artifact'],
+          intake_requirements: [],
+          operator_checklist: ['confirm the governed voice path'],
+        },
+        runtime_design: {
+          owner_model: 'single_actor',
+          assignment_policy: 'direct_specialist',
+          coordination: {
+            bus: 'none',
+            channels: [],
+          },
+          memory: {
+            store: 'none',
+            scope: 'none',
+            purpose: [],
+          },
+        },
+        execution_boundary: {
+          llm_zone: {
+            allowed: ['draft_content_within_governed_slots'],
+            forbidden: ['override_governed_structure'],
+          },
+          knowledge_zone: {
+            owns: ['intent definitions'],
+          },
+          compiler_zone: {
+            responsibilities: ['map_intent_to_governed_execution_shape'],
+          },
+          executor_zone: {
+            responsibilities: ['perform_governed_execution'],
+          },
+          rule: 'LLM drafts within governed slots; compiler and executor remain deterministic',
+        },
+        teaming: {
+          specialist_id: 'document-specialist',
+          specialist_label: 'Document Specialist',
+          conversation_agent: 'nerve-agent',
+          team_roles: ['planner'],
+        },
+        authority: {
+          requires_approval: false,
+        },
+        learning: {
+          reusable_refs: [],
+        },
+      }),
+    ];
+
+    const flow = await compileUserIntentFlow(
+      { text: 'このテキストを私の声で読んで' },
+      {
+        askFn: async () => responses.shift() || '',
+      }
+    );
+
+    expect(flow.source).toBe('llm');
+    expect(flow.intentContract.intent_id).toBe('speak-with-my-voice');
+    expect(flow.intentContract.execution_profile_id).toBe(
+      'voice-speak-with-my-voice-local-say'
+    );
+    expect(flow.intentContract.capability_bundle_id).toBe('voice-speech-governed');
+  });
+
   it('keeps lightweight browser steps on the prompt path', async () => {
     const flow = await compileUserIntentFlow(
       { text: '左下の承認ボタンを押して' },
