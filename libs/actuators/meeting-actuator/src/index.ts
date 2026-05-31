@@ -41,6 +41,13 @@ export interface MeetingAction {
   action: 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
   params: {
     platform: 'zoom' | 'teams' | 'meet' | 'auto';
+    provider?: 'google_meet' | 'teams_pipeline' | 'zoom' | 'auto';
+    provider_profile_id?: string;
+    execution_profile_id?: string;
+    mode?: 'transcribe' | 'realtime';
+    node?: 'local' | 'named-node';
+    audio_bridge?: 'blackhole' | 'pulseaudio' | 'none';
+    url_policy?: 'explicit_only' | 'explicit_or_detected';
     url?: string;
     meeting_id?: string;
     passcode?: string;
@@ -273,6 +280,17 @@ function recordMeetingEvent(
           : {}),
       metadata: {
         platform: input.params.platform,
+        ...(input.params.provider ? { provider: input.params.provider } : {}),
+        ...(input.params.provider_profile_id
+          ? { provider_profile_id: input.params.provider_profile_id }
+          : {}),
+        ...(input.params.execution_profile_id
+          ? { execution_profile_id: input.params.execution_profile_id }
+          : {}),
+        ...(input.params.mode ? { mode: input.params.mode } : {}),
+        ...(input.params.node ? { node: input.params.node } : {}),
+        ...(input.params.audio_bridge ? { audio_bridge: input.params.audio_bridge } : {}),
+        ...(input.params.url_policy ? { url_policy: input.params.url_policy } : {}),
         ...(input.params.meeting_id ? { meeting_id: input.params.meeting_id } : {}),
         ...(input.params.duration_sec !== undefined
           ? { duration_sec: input.params.duration_sec }

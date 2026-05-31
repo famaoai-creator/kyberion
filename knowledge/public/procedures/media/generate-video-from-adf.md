@@ -3,6 +3,12 @@
 ## 1. Goal
 Generate a governed video artifact from a `video-generation-adf` contract while keeping backend workflow details internal to the compiler and actuator.
 
+This is the procedure behind the `generate-video` intent and its default execution profile:
+
+- intent: `generate-video`
+- execution profile: `media-generate-video-default`
+- capability bundle: `video-generation-governed`
+
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with a compatible video workflow
@@ -60,3 +66,8 @@ Orchestrator-ready bundle:
 ## 6. Design Rule
 Treat the `video-generation-adf` as the public contract and the embedded workflow only as a current backend strategy.  
 Do not let orchestration couple itself directly to Comfy node graphs.
+
+## 7. Related Surfaces
+
+- `generate-narrated-video` uses the narrated-video composition flow instead of this prompt-based video generation path.
+- `create-music-video-from-adf` intentionally keeps music-specific composition semantics out of this procedure.

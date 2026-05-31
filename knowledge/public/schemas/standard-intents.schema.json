@@ -139,6 +139,7 @@
           "items": { "type": "string" }
         },
         "specialist_id": { "type": "string" },
+        "execution_profile_id": { "type": "string" },
         "trigger_keywords": {
           "type": "array",
           "items": { "type": "string" }

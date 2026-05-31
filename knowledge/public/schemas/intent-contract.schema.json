@@ -31,6 +31,9 @@
     "capability_bundle_id": {
       "type": "string"
     },
+    "execution_profile_id": {
+      "type": "string"
+    },
     "goal": {
       "type": "object",
       "required": ["summary", "success_condition"],

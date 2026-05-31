@@ -9,6 +9,7 @@ This path is for deterministic scene composition, not prompt-led model generatio
 For single-action scenario execution (`brief -> compile -> prepare`), use:
 
 - [`create-narrated-intro-movie.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
+- [`create-music-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-music-video-from-adf.md)
 
 ## 2. Dependencies
 
@@ -34,7 +35,12 @@ The current implementation prepares deterministic source artifacts:
 - `render-plan.json`
 - per-scene `compositions/*.html`
 
-When backend rendering is enabled and a narration reference is present, the renderer should mux the audio track into the final output artifact instead of stopping at a silent bundle.
+When backend rendering is enabled and an audio reference is present, the renderer should mux the audio track into the final output artifact instead of stopping at a silent bundle.
+
+Audio selection is currently deterministic:
+
+- prefer `audio.narration_ref` when present
+- otherwise mux `audio.music_ref`
 
 ## 4. Execution
 

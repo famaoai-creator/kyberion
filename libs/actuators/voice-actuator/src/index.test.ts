@@ -68,6 +68,7 @@ const mocks = vi.hoisted(() => ({
     rate: 180,
   })),
   safeExec: vi.fn(() => ''),
+  safeExistsSync: vi.fn((path: string) => String(path).includes('espeak-ng')),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
@@ -150,6 +151,7 @@ vi.mock('@agent/core', async () => {
     resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
     getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
     safeExec: mocks.safeExec,
+    safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
@@ -259,7 +261,7 @@ describe('voice actuator', () => {
       rate: 180,
       resolved_engine_id: 'local_say',
     }));
-    expect(mocks.safeExec).toHaveBeenCalledWith('say', ['-v', 'Kyoko', '-r', '180', 'hello world']);
+    expect(mocks.safeExec).toHaveBeenCalledWith('espeak-ng', ['-v', 'ja', '-s', '260', 'hello world']);
     expect(mocks.withRetry).toHaveBeenCalled();
   });
 
@@ -299,8 +301,8 @@ describe('voice actuator', () => {
     expect(result.artifact_refs).toEqual(['/tmp/voice-generation/req-1.wav']);
     expect(result.progress_packets.length).toBeGreaterThan(0);
     expect(mocks.safeExec).toHaveBeenCalledWith(
-      'say',
-      ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.wav', 'hello world'],
+      'espeak-ng',
+      ['-v', 'ja', '-s', '260', '-w', '/tmp/voice-generation/req-1.wav', 'hello world'],
     );
     expect(mocks.withRetry).toHaveBeenCalled();
   });

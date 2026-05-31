@@ -3,7 +3,13 @@ import AjvModule from 'ajv';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { getServiceEndpointRecord, loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
+import {
+  getServiceEndpointRecord,
+  getServiceEndpointRecordForIntent,
+  loadServiceEndpointsCatalog,
+  resolveServiceBinding,
+  resolveServiceIdForIntent,
+} from './service-binding.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -145,6 +151,16 @@ describe('service-binding', () => {
     expect(getServiceEndpointRecord('github')).toMatchObject({
       base_url: 'https://api.github.com',
       preset_path: 'knowledge/public/orchestration/service-presets/github.json',
+    });
+  });
+
+  it('resolves service endpoints from intent aliases', () => {
+    expect(resolveServiceIdForIntent('generate-video')).toBe('media-generation');
+    expect(resolveServiceIdForIntent('transcribe-audio')).toBe('whisper');
+    expect(resolveServiceIdForIntent('live-voice')).toBe('meeting');
+    expect(getServiceEndpointRecordForIntent('generate-video')).toMatchObject({
+      preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
+      intent_aliases: expect.arrayContaining(['generate-video']),
     });
   });
 });
