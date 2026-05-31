@@ -113,6 +113,34 @@
       "downloadable": true,
       "previewable": true
     },
+    "artifact:audio": {
+      "label": "Audio artifact",
+      "description": "An audio recording or narration is generated and can be downloaded or played.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:video": {
+      "label": "Video artifact",
+      "description": "A generated narration video report or dynamic strategic video is returned.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "voice_profile_created": {
+      "label": "Voice profile created",
+      "description": "A customized cloned voice profile is registered and ready for TTS use.",
+      "deliverable_kind": "voice_profile",
+      "downloadable": false,
+      "previewable": true
+    },
+    "voice_input_enabled": {
+      "label": "Voice input enabled",
+      "description": "Voice input has been successfully enabled on the system.",
+      "deliverable_kind": "system_state",
+      "downloadable": false,
+      "previewable": true
+    },
     "service_summary": {
       "label": "Service summary",
       "description": "A concise service state or log summary is returned.",
@@ -165,6 +193,13 @@
     "schedule_coordination_summary": {
       "label": "Schedule coordination summary",
       "description": "A concise schedule adjustment summary with scope, constraints, updated slots, and follow-up path is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "calendar_agenda_summary": {
+      "label": "Calendar agenda summary",
+      "description": "A concise read-only calendar agenda summary with source binding and upcoming events is returned.",
       "deliverable_kind": "summary",
       "downloadable": false,
       "previewable": true

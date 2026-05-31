@@ -631,6 +631,37 @@
       }
     },
     {
+      "id": "setup-messaging-bridge",
+      "task_type": "service_onboarding",
+      "goal": {
+        "summary": "Set up and activate a declared messaging communication bridge",
+        "success_condition": "The requested messaging platform is verified, the surface manifest is reconciled, and the bridge service is active."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {}
+    },
+    {
+      "id": "enable-voice-input",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Switch Kyberion to voice input mode",
+        "success_condition": "The system dictation pipeline is toggled and the voice input state is reported back."
+      },
+      "requirements": {
+        "default_missing": []
+      },
+      "payload": {
+        "static": {
+          "service_name": "voice-hub",
+          "operation": "voice_input_toggle",
+          "voice_mode": "input",
+          "dictation_keycode": 176
+        }
+      }
+    },
+    {
       "id": "schedule-coordination",
       "task_type": "service_operation",
       "goal": {
@@ -1130,7 +1161,7 @@
         "success_condition": "request-approval completes with governed evidence."
       },
       "requirements": {
-        "default_missing": []
+        "default_missing": ["approval_system", "approval_scope"]
       },
       "payload": {
         "static": {
@@ -1142,11 +1173,11 @@
       "id": "resolve-approval",
       "task_type": "analysis",
       "goal": {
-        "summary": "Resolve an existing approval request.",
+        "summary": "Resolve an existing approval request or ringi decision queue.",
         "success_condition": "resolve-approval completes with governed evidence."
       },
       "requirements": {
-        "default_missing": []
+        "default_missing": ["approval_system", "approval_scope"]
       },
       "payload": {
         "static": {

@@ -42,6 +42,7 @@ function inferOutcomeKind(intent?: StandardIntentDefinition, resultShape?: strin
     resultShape === 'summary' ||
     resultShape === 'browser_navigation' ||
     resultShape === 'browser_step' ||
+    outcomeIds.includes('calendar_agenda_summary') ||
     outcomeIds.includes('service_summary')
   ) {
     return 'status_report';

@@ -151,7 +151,7 @@
           "gate": "CUSTOMER_SIGNOFF",
           "status": "pending_operator_confirmation",
           "artifacts": [
-            "{{extraction.draft_path}}",
+            "{{mission_evidence_dir}}/requirements-draft.json",
             "{{mission_evidence_dir}}/product-roadmap.md"
           ],
           "instructions": "顧客（{{customer_name}} / {{customer_org}}）に要件ドラフトとロードマップを提示し、合意を得た後にこのファイルの status を 'approved' に更新し、mission checkpoint を記録してください。",

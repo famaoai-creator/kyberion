@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "max_missing_inputs_without_clarification": 1,
+    "min_confidence_to_skip": 0.55,
+    "always_ask_for": [
+      "goal_or_target",
+      "project_brief",
+      "schedule_scope",
+      "fixed_constraints",
+      "calendar_action_boundary",
+      "meeting_handoff_boundary"
+    ]
+  },
+  "intent_rules": [
+    {
+      "id": "schedule-read-agenda",
+      "intent_id": "schedule-read-agenda",
+      "shapes": ["direct_reply", "task_session"],
+      "max_missing_inputs_without_clarification": 2,
+      "min_confidence_to_skip": 0.4,
+      "force_clarification_patterns": [
+        { "type": "regex", "value": "^来月の予定をざっと確認して$" },
+        { "type": "regex", "value": "^週末の予定を教えて$" },
+        { "type": "regex", "value": "^週明けの予定を見せて$" },
+        { "type": "regex", "value": "^直近の空き時間を教えて$" },
+        { "type": "regex", "value": "^次のミーティングを確認して$" },
+        { "type": "regex", "value": "^みんなの予定を教えて$" },
+        { "type": "regex", "value": "^週の予定を箇条書きで見せて$" },
+        { "type": "regex", "value": "^予定の空きだけ見たい$" }
+      ],
+      "never_ask_for": ["date_range", "calendar_source"],
+      "rationale": "Read-only agenda requests can proceed on inferred date windows and default calendar bindings when confidence is acceptable, but ambiguity in the request should still be clarified."
+    },
+    {
+      "id": "schedule-coordination",
+      "intent_id": "schedule-coordination",
+      "shapes": ["task_session"],
+      "max_missing_inputs_without_clarification": 0,
+      "min_confidence_to_skip": 0.75,
+      "always_ask_for": ["schedule_scope", "date_range", "fixed_constraints", "calendar_action_boundary"],
+      "rationale": "Calendar edit requests should stay in clarification until the target scope and authority boundary are explicit."
+    },
+    {
+      "id": "meeting-operations",
+      "intent_id": "meeting-operations",
+      "shapes": ["task_session"],
+      "max_missing_inputs_without_clarification": 0,
+      "min_confidence_to_skip": 0.8,
+      "always_ask_for": ["meeting_url", "meeting_role_boundary", "meeting_purpose"],
+      "rationale": "Live meeting handling should ask before action when purpose or authority is missing."
+    }
+  ]
+}

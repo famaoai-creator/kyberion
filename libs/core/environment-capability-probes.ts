@@ -41,6 +41,15 @@ export function installCoreEnvironmentProbes(): void {
  * ------------------------------------------------------------------ */
 
 async function probeReasoningBackend(): Promise<{ available: boolean; reason?: string }> {
+  if (binaryAvailable('codex', ['--version'])) {
+    return { available: true };
+  }
+  if (binaryAvailable('gemini', ['--version'])) {
+    return { available: true };
+  }
+  if (binaryAvailable('agy', ['--version'])) {
+    return { available: true };
+  }
   if (process.env.CLAUDE_API_KEY !== undefined || probeShellClaudeCliAvailability().available) {
     return { available: true };
   }
@@ -51,19 +60,10 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
     if (localProbe.available) return { available: true };
   }
-  if (binaryAvailable('gemini', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('codex', ['--version'])) {
-    return { available: true };
-  }
-  if (binaryAvailable('agy', ['--version'])) {
-    return { available: true };
-  }
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: claude CLI, anthropic API key (ANTHROPIC_API_KEY), local LLM URL (KYBERION_LOCAL_LLM_URL), gemini CLI, codex CLI, agy CLI. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, anthropic API key (ANTHROPIC_API_KEY), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

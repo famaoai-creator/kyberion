@@ -161,6 +161,12 @@ interface BrowserSessionMetadata {
   }>;
 }
 
+interface ChromeCdpEndpoint {
+  cdpUrl: string;
+  cdpPort: number;
+  source: 'process' | 'probe';
+}
+
 interface BrowserRuntime {
   context: BrowserContext;
   tabs: Map<string, Page>;
@@ -1629,7 +1635,19 @@ async function getOrCreateBrowserContext(
   }
 
   if (options.connect_over_cdp) {
-    const cdpUrl = options.cdp_url || `http://127.0.0.1:${Number(options.cdp_port || 9222)}`;
+    const discoveredEndpoint =
+      options.cdp_url || options.cdp_port
+        ? null
+        : await discoverChromeCdpEndpoint();
+    const cdpUrl =
+      options.cdp_url
+      || (options.cdp_port ? `http://127.0.0.1:${Number(options.cdp_port || 9222)}` : undefined)
+      || discoveredEndpoint?.cdpUrl
+      || persistedCdpUrl
+      || 'http://127.0.0.1:9222';
+    if (discoveredEndpoint && !options.cdp_url && !options.cdp_port) {
+      logger.info(`🔎 [BROWSER] Auto-discovered Chrome via CDP (${discoveredEndpoint.source}): ${cdpUrl}`);
+    }
     logger.info(`🔌 [BROWSER] Attaching to existing Chrome via CDP: ${cdpUrl}`);
     const browser = await chromium.connectOverCDP(cdpUrl);
     const context = browser.contexts()[0];
@@ -1768,6 +1786,71 @@ async function waitForCdpEndpoint(userDataDir: string, timeoutMs = 5_000): Promi
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+  return null;
+}
+
+function parseChromeRemoteDebuggingPorts(psOutput: string): number[] {
+  const ports = new Set<number>();
+  for (const line of psOutput.split(/\r?\n/)) {
+    const matches = [
+      ...line.matchAll(/--remote-debugging-port(?:=|\s+)(\d+)/gi),
+    ];
+    for (const match of matches) {
+      const port = Number(match[1]);
+      if (Number.isFinite(port) && port > 0 && port < 65536) {
+        ports.add(port);
+      }
+    }
+  }
+  return [...ports];
+}
+
+async function probeChromeCdpPort(port: number, timeoutMs = 600): Promise<ChromeCdpEndpoint | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const payload = await response.json().catch(() => null);
+    if (!payload || typeof payload !== 'object') return null;
+    const webSocketDebuggerUrl = (payload as any).webSocketDebuggerUrl;
+    const browser = (payload as any).Browser;
+    if (typeof webSocketDebuggerUrl === 'string' || typeof browser === 'string') {
+      return {
+        cdpUrl: `http://127.0.0.1:${port}`,
+        cdpPort: port,
+        source: 'probe',
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function discoverChromeCdpEndpoint(): Promise<ChromeCdpEndpoint | null> {
+  const candidatePorts = new Set<number>([9222, 9223, 9224, 9333, 9334]);
+  try {
+    const psOutput = String(safeExec('ps', ['-axo', 'pid=,command='], {
+      timeoutMs: 2000,
+      maxOutputMB: 2,
+    }) || '');
+    for (const port of parseChromeRemoteDebuggingPorts(psOutput)) {
+      candidatePorts.add(port);
+    }
+  } catch (error: any) {
+    logger.info(`Could not inspect local process list for Chrome CDP discovery: ${error?.message || String(error)}`);
+  }
+
+  for (const port of candidatePorts) {
+    const endpoint = await probeChromeCdpPort(port);
+    if (endpoint) return endpoint;
+  }
+
   return null;
 }
 
@@ -2356,6 +2439,7 @@ export {
   resolveRefSelector,
   renderPlaywrightSkeleton,
   renderBrowserAdf,
+  discoverChromeCdpEndpoint,
   resetBrowserRuntimeLeasesForTest,
   closeBrowserSession,
   restartBrowserSession,

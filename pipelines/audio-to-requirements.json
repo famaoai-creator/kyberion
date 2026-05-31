@@ -5,8 +5,6 @@
   "context": {
     "mission_id": "",
     "project_name": "",
-    "audio_path": "active/missions/{{mission_id}}/evidence/call-recording.wav",
-    "transcript_path": "active/missions/{{mission_id}}/evidence/call-recording.wav.transcript.txt",
     "language": "ja",
     "customer_name": "",
     "customer_person_slug": "",
@@ -18,9 +16,9 @@
       "type": "transform",
       "op": "wisdom:transcribe_audio",
       "params": {
-        "audio_path": "{{audio_path}}",
+        "audio_path": "{{mission_evidence_dir}}/call-recording.wav",
         "language": "{{language}}",
-        "output_path": "{{transcript_path}}",
+        "output_path": "{{mission_evidence_dir}}/call-recording.wav.transcript.txt",
         "export_as": "transcript"
       }
     },
@@ -39,7 +37,7 @@
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "source_path": "{{transcript_path}}",
+        "source_path": "{{mission_evidence_dir}}/call-recording.wav.transcript.txt",
         "source_type": "call_transcript",
         "language": "{{language}}",
         "customer_name": "{{customer_name}}",

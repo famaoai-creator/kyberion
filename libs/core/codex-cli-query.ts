@@ -3,7 +3,13 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { buildSafeExecEnv, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  buildSafeExecEnv,
+  safeExecResult,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 export interface CodexCliQueryOptions {
   bin?: string;
@@ -40,7 +46,7 @@ class CodexCliQuery {
   private readonly cwd: string;
 
   constructor(options: CodexCliQueryOptions = {}) {
-    this.bin = options.bin ?? 'codex';
+    this.bin = options.bin ?? resolveCodexBinary();
     this.model = options.model ?? 'gpt-5.4';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
@@ -69,7 +75,6 @@ class CodexCliQuery {
         'Return exactly one JSON object that matches the provided output schema.',
         'Do not wrap the JSON in markdown fences.',
       ].join('\n');
-
       const args = [
         'exec',
         '--sandbox',
@@ -246,13 +251,45 @@ export function buildCodexCliQueryOptionsFromEnv(
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
 
   logger.info(
-    `[codex-cli] query helper ready (bin=${bin ?? 'codex'}, model=${model ?? 'gpt-5.4'})`,
+    `[codex-cli] query helper ready (bin=${bin ?? resolveCodexBinary(env)}, model=${model ?? 'gpt-5.4'})`,
   );
 
   return {
-    ...(bin ? { bin } : {}),
+    ...(bin ? { bin } : { bin: resolveCodexBinary(env) }),
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
     ...(extraArgs ? { extraArgs } : {}),
   };
+}
+
+function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.KYBERION_CODEX_CLI_BIN?.trim();
+  if (explicit) return explicit;
+
+  if (process.platform === 'darwin') {
+    return '/opt/homebrew/bin/codex';
+  }
+
+  const repoRoot = pathResolver.rootDir();
+  const whichResult = safeExecResult('which', ['-a', 'codex'], {
+    env,
+    cwd: repoRoot,
+    timeoutMs: 5000,
+  });
+  const candidates = [
+    ...whichResult.stdout.split(/\r?\n/u),
+    ...whichResult.stderr.split(/\r?\n/u),
+  ]
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    const normalized = path.resolve(candidate);
+    if (normalized.startsWith(path.join(repoRoot, 'node_modules', '.bin'))) continue;
+    if (normalized.includes(`${path.sep}.codex${path.sep}tmp${path.sep}arg0${path.sep}`)) continue;
+    if (normalized.includes(`${path.sep}.pnpm${path.sep}@openai+codex`)) continue;
+    return normalized;
+  }
+
+  return 'codex';
 }
