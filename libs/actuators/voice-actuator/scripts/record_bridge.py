@@ -1,47 +1,80 @@
 import sys
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
 # Kyberion Voice Recorder Bridge (macOS focused)
 # Captures audio for voice cloning reference.
 
+import time
+
 def record_sample(output_path, duration=10):
     """
-    Records a voice sample using macOS native 'sox' or 'ffmpeg' if available,
-    otherwise falls back to 'sox' (often installed via brew) or instructions.
-    On macOS, 'sox' is the standard for command-line recording.
+    Records a voice sample using macOS native 'sox' or 'ffmpeg' in a background
+    process with a highly responsive, high-fidelity console countdown progress bar.
     """
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"🎙️ Recording for {duration} seconds...")
-    print(f"   Target: {output_path}")
-    print("   [Please speak clearly into the microphone...]")
+    print(f"\n🎙️  マイク初期化中 (Initializing default audio interface...)\n")
+    print(f"   保存先: {output_path}\n")
+
+    # Probe recording command
+    cmd = []
+    if shutil.which("sox"):
+        # Trim 0 duration
+        cmd = ["sox", "-d", str(out), "trim", "0", str(duration)]
+        method = "sox"
+    elif shutil.which("ffmpeg"):
+        cmd = [
+            "ffmpeg", "-y", "-f", "avfoundation", "-i", ":0", 
+            "-t", str(duration), str(out)
+        ]
+        method = "ffmpeg"
+    else:
+        return {
+            "status": "manual_action_required", 
+            "message": "sox or ffmpeg not found in path. Please install brew install ffmpeg.",
+            "target_dir": str(out.parent)
+        }
 
     try:
-        # Try 'sox' (requires 'brew install sox')
-        # -d: default audio device
-        subprocess.run(["sox", "-d", str(out), "trim", "0", str(duration)], check=True)
-        return {"status": "success", "path": str(out), "method": "sox"}
-    except FileNotFoundError:
-        try:
-            # Fallback to 'ffmpeg' (requires 'brew install ffmpeg')
-            # -f avfoundation: macOS native framework
-            # ":0": default device
-            subprocess.run([
-                "ffmpeg", "-y", "-f", "avfoundation", "-i", ":0", 
-                "-t", str(duration), str(out)
-            ], check=True)
-            return {"status": "success", "path": str(out), "method": "ffmpeg"}
-        except Exception as e:
-            return {
-                "status": "manual_action_required", 
-                "message": "sox or ffmpeg not found. Please record manually.",
-                "target_dir": str(out.parent),
-                "error": str(e)
-            }
+        # Spawn recording in the background
+        # Redirect stderr/stdout to DEVNULL to avoid cluttered output from ffmpeg/sox
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Warm-up delay to let default microphone device settle
+        time.sleep(1.0)
+        
+        print("🔴  【録音開始】マイクに向かってはっきりと読み上げてください！\n")
+        
+        # Stylized live single-line countdown progress bar
+        for i in range(duration, 0, -1):
+            bar_width = 30
+            filled_len = int(round(bar_width * (duration - i) / duration))
+            bar = "█" * filled_len + "░" * (bar_width - filled_len)
+            
+            # Print carriage return to keep progress updating on a single line
+            sys.stdout.write(f"\r    [{bar}] 残り {i:2d} 秒... ")
+            sys.stdout.flush()
+            time.sleep(1.0)
+            
+        # Print final full bar
+        sys.stdout.write(f"\r    [{'█' * 30}] 残り  0 秒... \n")
+        sys.stdout.flush()
+
+        # Wait for the recording process to cleanly wrap up and write the file
+        proc.wait(timeout=5)
+        
+        print(f"\n✅  収録成功！ (Successfully saved to {out.name})\n")
+        return {"status": "success", "path": str(out), "method": method}
+        
+    except subprocess.TimeoutExpired:
+        # Gracefully terminate if process hung
+        proc.terminate()
+        return {"status": "error", "message": "Recording process timed out."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
