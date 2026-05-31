@@ -13,7 +13,7 @@ import {
   ensureAgentRuntimeViaDaemon,
   toSupervisorEnsurePayload,
 } from './agent-runtime-supervisor-client.js';
-import { compileUserIntentFlow, formatClarificationPacket } from './intent-contract.js';
+import { compileUserIntentFlow, formatClarificationPacket, formatClarificationPacketConcise } from './intent-contract.js';
 import { logger } from './core.js';
 import {
   buildMissionTeamView,
@@ -53,6 +53,13 @@ import {
   selectContractCandidates,
   type ContractCandidate,
 } from './intent-contract-learning.js';
+import {
+  findServiceById,
+  registerService,
+  updateServiceStats,
+  extractProviderFromUtterance,
+  resolveProviderUrl,
+} from './external-service-registry.js';
 
 import type {
   NerveRoutingProposal,
@@ -735,11 +742,34 @@ async function handleTaskSessionRoute(
     const missingList = activeSession.requirements.missing;
     const nextSlot = missingList[0];
 
-    logger.info(
-      `[SURFACE] Slot-filling active session ${activeSession.session_id}: filling slot '${nextSlot}' with value '${queryText}'`
-    );
+    let slotValue = queryText;
+    let extraPayload: Record<string, any> = {};
 
-    const updatedPayload = { ...(activeSession.payload || {}), [nextSlot]: queryText };
+    if (nextSlot === 'source_url' && !queryText.match(/^https?:\/\/[^\s]+/)) {
+      try {
+        const providerName = extractProviderFromUtterance(queryText);
+        if (providerName) {
+          const dataTopic = (activeSession.payload?.data_topic as string) ?? '';
+          const topicMatch = dataTopic.match(/(天気|weather|気温|温度|為替|レート|exchange\s*rate|ニュース|news|株価|stock)/i);
+          const locationMatch = dataTopic.match(/(秋葉原|渋谷|新宿|池袋|品川|横浜|大阪|名古屋|札幌|東京|[^\s]{2,5}(?:市|区|町|村|駅))/);
+          const topic = topicMatch?.[1] ?? '';
+          const location = locationMatch?.[1] ?? '';
+
+          const providerResolved = resolveProviderUrl(providerName, topic, location);
+          if (providerResolved) {
+            slotValue = providerResolved.url;
+            extraPayload = { provider_id: providerResolved.providerId };
+            logger.info(
+              `[SURFACE] Resolved provider '${providerName}' to URL '${slotValue}' for slot 'source_url' using topic='${topic}', location='${location}'`
+            );
+          }
+        }
+      } catch (err) {
+        logger.error(`[SURFACE] Failed to resolve provider during slot-filling: ${err}`);
+      }
+    }
+
+    const updatedPayload = { ...(activeSession.payload || {}), [nextSlot]: slotValue, ...extraPayload };
     const updatedMissing = missingList.slice(1);
     const updatedRequirements = { ...activeSession.requirements, missing: updatedMissing };
     const nextStatus = updatedMissing.length === 0 ? 'planning' : 'collecting_requirements';
@@ -862,6 +892,172 @@ async function handleTaskSessionRoute(
   }
 
   const sessionIntentId = (session.payload?.intent_id as string) || intent.intentId || '';
+
+  // ── External Data Fetch (fetch-external-data) ─────────────────────────────
+  const isExternalDataFetchTask = sessionIntentId === 'fetch-external-data';
+
+  if (session.requirements?.missing?.length === 0 && isExternalDataFetchTask) {
+    const sourceUrl = (session.payload?.source_url as string) || '';
+    const dataTopic = (session.payload?.data_topic as string) || queryText;
+    const knownServiceId = session.payload?.known_service_id as string | undefined;
+    const serviceIdHint = (session.payload?.service_id_hint as string) || 'external-service';
+
+    if (!sourceUrl) {
+      return emptySurfaceResult(
+        buildTaskSessionReply({
+          session,
+          status: 'pending',
+          intentId: intent.intentId,
+          summary: 'データ取得先のURLが指定されていません。URLを入力してください。',
+          missingInputs: ['source_url'],
+        })
+      );
+    }
+
+    try {
+      logger.info(`[SURFACE] fetch-external-data: fetching ${sourceUrl} for topic "${dataTopic}"`);
+
+      // 1. Fetch the external URL
+      const fetchResult = await secureFetch<string>({
+        method: 'GET',
+        url: sourceUrl,
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Kyberion/2.0; +https://kyberion.ai)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'ja,en;q=0.5',
+        },
+      });
+
+      const rawHtml = typeof fetchResult === 'string'
+        ? fetchResult
+        : (fetchResult as any)?.body || (fetchResult as any)?.data || JSON.stringify(fetchResult);
+
+      // 2. Strip HTML tags and extract readable text
+      const plainText = String(rawHtml)
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .slice(0, 4000); // Limit context size
+
+      if (!plainText || plainText.length < 20) {
+        throw new Error(`取得したページからテキストを抽出できませんでした (URL: ${sourceUrl})`);
+      }
+
+      // 3. Register the service if this is the first time
+      if (!knownServiceId) {
+        try {
+          registerService({ service_id: serviceIdHint, topic: dataTopic, url: sourceUrl });
+          logger.info(`[SURFACE] fetch-external-data: registered new service "${serviceIdHint}" for topic "${dataTopic}"`);
+        } catch (regErr: any) {
+          logger.warn(`[SURFACE] fetch-external-data: service registration failed: ${regErr?.message}`);
+        }
+      }
+
+      // 4. Update stats
+      try {
+        updateServiceStats(knownServiceId || serviceIdHint, true);
+      } catch {
+        // Best-effort
+      }
+
+      // 5. Build the summary reply
+      const summary = [
+        `**${dataTopic}** の情報を取得しました。`,
+        ``,
+        plainText.slice(0, 1500),
+        plainText.length > 1500 ? `\n...(以降省略)` : '',
+        ``,
+        `\`ソース: ${sourceUrl}\``,
+      ].join('\n');
+
+      const updated = updateTaskSession(session.session_id, {
+        status: 'completed',
+        artifact: {
+          kind: 'external_data_fetch_result',
+          output_path: pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+          preview_text: plainText.slice(0, 500),
+          storage_class: 'tmp',
+        },
+      });
+
+      safeWriteFile(
+        pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+        `topic: ${dataTopic}\nurl: ${sourceUrl}\n\n${plainText}`,
+        { mkdir: true, encoding: 'utf8' }
+      );
+
+      recordLearningOutcomeSafely({
+        intent_id: 'fetch-external-data',
+        execution_shape: 'task_session',
+        contract_ref: { kind: 'task_session_policy', ref: 'fetch-external-data' },
+        success: true,
+        context_fingerprint: {
+          domain: dataTopic,
+          surface: context.input.surface || 'unknown',
+          execution_shape: 'task_session',
+        },
+      });
+
+      return emptySurfaceResult(
+        buildTaskSessionReply({
+          session: updated || session,
+          status: 'completed',
+          summary,
+          intentId: intent.intentId,
+        })
+      );
+    } catch (error: any) {
+      logger.warn(`[SURFACE] fetch-external-data failed: ${error?.message || String(error)}`);
+
+      // Update failure stats
+      try {
+        updateServiceStats(knownServiceId || serviceIdHint, false);
+      } catch {
+        // Best-effort
+      }
+
+      recordLearningOutcomeSafely({
+        intent_id: 'fetch-external-data',
+        execution_shape: 'task_session',
+        contract_ref: { kind: 'task_session_policy', ref: 'fetch-external-data' },
+        success: false,
+        error: error?.message || String(error),
+        context_fingerprint: {
+          domain: dataTopic,
+          surface: context.input.surface || 'unknown',
+          execution_shape: 'task_session',
+        },
+      });
+
+      const blocked = updateTaskSession(session.session_id, {
+        status: 'blocked',
+        artifact: {
+          kind: 'external_data_fetch_result',
+          preview_text: error?.message || String(error),
+          storage_class: 'tmp',
+        },
+      });
+
+      return emptySurfaceResult(
+        buildTaskSessionReply({
+          session: blocked || session,
+          status: 'failed',
+          error: `外部データの取得に失敗しました: ${error?.message || String(error)}`,
+          intentId: intent.intentId,
+        })
+      );
+    }
+  }
+  // ── /External Data Fetch ──────────────────────────────────────────────────
+
   const isRunnableServiceTask =
     sessionIntentId === 'resolve-approval' ||
     sessionIntentId === 'request-approval' ||
@@ -1781,7 +1977,7 @@ export async function runSurfaceConversation(
 
   if (compiledFlow?.clarificationPacket) {
     return attachRoutingDecision({
-      text: formatClarificationPacket(compiledFlow.clarificationPacket),
+      text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, { locale: 'ja' }),
       a2uiMessages: [],
       a2aMessages: [],
       delegationResults: [],

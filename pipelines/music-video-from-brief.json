@@ -1,0 +1,108 @@
+{
+  "pipeline_id": "music-video-from-brief",
+  "version": "1.0.0",
+  "description": "Brief-first music video workflow that generates a composition bundle and muxes a music track through the rendered video boundary.",
+  "action": "pipeline",
+  "context": {
+    "output_root": "active/shared/exports/music-video-demo",
+    "music_path": "active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/kyberion-howto-narration.aiff",
+    "video_output_path": "active/shared/exports/music-video-demo.mp4"
+  },
+  "steps": [
+    {
+      "id": "write_music_video_brief",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "active/shared/exports/music-video-demo-brief.md",
+        "content": "# Music Video Brief\n\n- Audience: Kyberion operators and maintainers\n- Objective: Show that a music artifact can be treated as a governed audio reference and muxed into a deterministic video bundle.\n- Content type: music_video\n- Presentation mode: promo\n- Promise: The same video composition boundary can render a music-driven video without a shell-heavy render script.\n- Desired takeaway: Audio generation and video rendering stay separated, but the final mux step is still governed.\n- Constraints: Keep the scene plan simple, keep audio selection explicit, and verify the final artifact with audio and video streams present.\n"
+      }
+    },
+    {
+      "id": "write_composition_adf",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "active/shared/exports/music-video-demo-composition.json",
+        "content": "{\n  \"kind\": \"video-composition-adf\",\n  \"version\": \"1.0.0\",\n  \"intent\": \"music-driven video from a governed audio reference\",\n  \"title\": \"Kyberion Music Video Demo\",\n  \"composition\": {\n    \"duration_sec\": 9,\n    \"fps\": 30,\n    \"width\": 1920,\n    \"height\": 1080,\n    \"background_color\": \"#07111f\"\n  },\n  \"audio\": {\n    \"music_ref\": \"{{music_path}}\"\n  },\n  \"scenes\": [\n    {\n      \"scene_id\": \"hook\",\n      \"role\": \"hook\",\n      \"start_sec\": 0,\n      \"duration_sec\": 3,\n      \"template_ref\": { \"template_id\": \"basic-title-card\" },\n      \"content\": {\n        \"eyebrow\": \"Kyberion\",\n        \"headline\": \"Music-driven video, no shell branching\",\n        \"body\": \"The music track is selected explicitly and carried through the governed render boundary.\"\n      }\n    },\n    {\n      \"scene_id\": \"feature\",\n      \"role\": \"feature\",\n      \"start_sec\": 3,\n      \"duration_sec\": 4,\n      \"template_ref\": { \"template_id\": \"split-highlight\" },\n      \"content\": {\n        \"headline\": \"Audio stays separate\",\n        \"body\": \"The music generator and the video renderer keep their own contracts, then mux at the end.\"\n      }\n    },\n    {\n      \"scene_id\": \"outro\",\n      \"role\": \"outro\",\n      \"start_sec\": 7,\n      \"duration_sec\": 2,\n      \"template_ref\": { \"template_id\": \"logo-outro\" },\n      \"content\": {\n        \"headline\": \"Governed muxing\",\n        \"body\": \"The final artifact still passes through the same video verification step.\"\n      }\n    }\n  ],\n  \"output\": {\n    \"format\": \"mp4\",\n    \"target_path\": \"{{video_output_path}}\",\n    \"bundle_dir\": \"active/shared/exports/music-video-demo-bundle\",\n    \"emit_progress_packets\": true,\n    \"await_completion\": true\n  }\n}\n"
+      }
+    },
+    {
+      "id": "render_music_video",
+      "type": "apply",
+      "op": "video-composition:prepare_video_composition",
+      "params": {
+        "video_composition_adf": {
+          "kind": "video-composition-adf",
+          "version": "1.0.0",
+          "intent": "music-driven video from a governed audio reference",
+          "title": "Kyberion Music Video Demo",
+          "composition": {
+            "duration_sec": 9,
+            "fps": 30,
+            "width": 1920,
+            "height": 1080,
+            "background_color": "#07111f"
+          },
+          "audio": {
+            "music_ref": "{{music_path}}"
+          },
+          "scenes": [
+            {
+              "scene_id": "hook",
+              "role": "hook",
+              "start_sec": 0,
+              "duration_sec": 3,
+              "template_ref": { "template_id": "basic-title-card" },
+              "content": {
+                "eyebrow": "Kyberion",
+                "headline": "Music-driven video, no shell branching",
+                "body": "The music track is selected explicitly and carried through the governed render boundary."
+              }
+            },
+            {
+              "scene_id": "feature",
+              "role": "feature",
+              "start_sec": 3,
+              "duration_sec": 4,
+              "template_ref": { "template_id": "split-highlight" },
+              "content": {
+                "headline": "Audio stays separate",
+                "body": "The music generator and the video renderer keep their own contracts, then mux at the end."
+              }
+            },
+            {
+              "scene_id": "outro",
+              "role": "outro",
+              "start_sec": 7,
+              "duration_sec": 2,
+              "template_ref": { "template_id": "logo-outro" },
+              "content": {
+                "headline": "Governed muxing",
+                "body": "The final artifact still passes through the same video verification step."
+              }
+            }
+          ],
+          "output": {
+            "format": "mp4",
+            "target_path": "{{video_output_path}}",
+            "bundle_dir": "active/shared/exports/music-video-demo-bundle",
+            "emit_progress_packets": true,
+            "await_completion": true
+          }
+        }
+      }
+    },
+    {
+      "id": "verify_music_video",
+      "type": "apply",
+      "op": "video-composition:verify_rendered_video_artifact",
+      "params": {
+        "path": "{{video_output_path}}",
+        "require_audio": true,
+        "require_video": true,
+        "export_as": "music_video_verification"
+      }
+    }
+  ]
+}

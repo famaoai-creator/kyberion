@@ -148,6 +148,7 @@ export interface VideoCompositionRenderPlan {
   source_kind: 'video-composition-adf';
   title: string;
   narration_ref?: string;
+  music_ref?: string;
   duration_sec: number;
   fps: number;
   width: number;

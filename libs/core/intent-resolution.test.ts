@@ -19,6 +19,9 @@ describe('intent-resolution', () => {
         'generate-report',
         'generate-workbook',
         'inspect-service',
+        'generate-video',
+        'transcribe-audio',
+        'live-voice',
         'launch-first-run-onboarding',
         'configure-organization-toolchain',
         'register-presentation-preference-profile',
@@ -114,6 +117,21 @@ describe('intent-resolution', () => {
     );
     expect(packet.selected_intent_id).toBe('meeting-operations');
     expect(packet.selected_resolution?.task_kind).toBe('meeting_operations');
+    expect(packet.bundle_candidates?.[0]?.bundle_id).toBe('meeting-operations-governed');
+  });
+
+  it('resolves video generation, transcription, and live voice as first-class surface intents', () => {
+    const videoPacket = resolveIntentResolutionPacket('動画を生成して');
+    expect(videoPacket.selected_intent_id).toBe('generate-video');
+    expect(videoPacket.selected_resolution?.shape).toBe('pipeline');
+
+    const transcriptPacket = resolveIntentResolutionPacket('この音声を書き起こして');
+    expect(transcriptPacket.selected_intent_id).toBe('transcribe-audio');
+    expect(transcriptPacket.selected_resolution?.shape).toBe('pipeline');
+
+    const liveVoicePacket = resolveIntentResolutionPacket('ライブ音声で会話したい');
+    expect(liveVoicePacket.selected_intent_id).toBe('live-voice');
+    expect(liveVoicePacket.selected_resolution?.task_kind).toBe('voice_conversation');
   });
 
   it('resolves generic schedule adjustments as a first-class surface intent', () => {

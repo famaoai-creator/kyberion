@@ -2,7 +2,8 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "media-generation": {
-      "preset_path": "knowledge/public/orchestration/service-presets/media-generation.json"
+      "preset_path": "knowledge/public/orchestration/service-presets/media-generation.json",
+      "intent_aliases": ["generate-video", "generate-image", "generate-music"]
     }
   }
 }

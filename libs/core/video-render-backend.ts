@@ -1,15 +1,26 @@
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
-import * as net from 'node:net';
-import { buildSafeExecEnv, safeExec, safeExistsSync, safeMoveSync, safeRmSync, platform, pathResolver } from './index.js';
+import {
+  buildSafeExecEnv,
+  safeExec,
+  safeExistsSync,
+  safeMoveSync,
+  safeRmSync,
+  platform,
+  pathResolver,
+} from './index.js';
+import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
 import type { VideoCompositionRenderPlan, VideoRenderRuntimePolicy } from './video-composition-contract.js';
 
 export interface VideoRenderBackendResult {
   executed: boolean;
-  backend: 'none' | 'hyperframes_cli';
+  backend: 'none' | 'hyperframes_cli' | 'ffmpeg_fallback';
   output_path?: string;
   command?: string[];
   reason?: string;
+  backend_id?: string;
+  backend_kind?: MediaBackendRecord['kind'];
+  backend_provider?: string;
 }
 
 export interface VideoRenderBackendExecutionOptions {
@@ -42,93 +53,29 @@ export async function renderVideoCompositionBundle(
   plan: VideoCompositionRenderPlan,
   policy: VideoRenderRuntimePolicy,
 ): Promise<VideoRenderBackendResult> {
-  const rootDir = pathResolver.rootDir();
-  if (!policy.render.enable_backend_rendering) {
-    return {
-      executed: false,
-      backend: policy.render.backend as any,
-      reason: 'backend rendering disabled by policy',
-    };
-  }
-
-  if (policy.render.backend === 'none') {
-    return {
-      executed: false,
-      backend: 'none',
-      reason: 'backend set to none',
-    };
-  }
-
-  // Check for render capability via platform abstraction
-  const caps = await platform.getCapabilities();
-  
-  if (policy.render.backend === 'hyperframes_cli') {
-    if (!caps.hasFFmpeg) {
-      return {
-        executed: false,
-        backend: 'hyperframes_cli',
-        reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
-      };
-    }
-
-    if (!(await canBindLocalhost())) {
-      return {
-        executed: false,
-        backend: 'hyperframes_cli',
-        reason: 'localhost bind unavailable in this environment; skipped hyperframes render',
-      };
-    }
-
-    const outputPath = resolveOutputPath(plan);
-    const execEnv = buildSafeExecEnv({
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${pathResolver.rootResolve('scripts/hyperframes-localhost-preload.cjs')}`,
-    });
-    const command = [
-      'hyperframes',
-      'render',
-      plan.bundle_dir,
-      '--output',
-      outputPath,
-      '--format',
-      plan.output_format,
-      '--fps',
-      String(plan.fps),
-      '--quality',
-      policy.render.quality,
-    ];
-
-    safeExec('npx', command, {
-      timeoutMs: policy.render.command_timeout_ms,
-      cwd: rootDir,
-      env: execEnv,
-    });
-
-    if (!safeExistsSync(outputPath)) {
-      throw new Error(`Render backend completed without output artifact: ${outputPath}`);
-    }
-
-    if (plan.narration_ref) {
-      if (!safeExistsSync(plan.narration_ref)) {
-        throw new Error(`Narration artifact missing for mux: ${plan.narration_ref}`);
-      }
-      await muxNarrationTrack(outputPath, plan.narration_ref, plan.output_format);
-    }
-
-    return {
-      executed: true,
-      backend: 'hyperframes_cli',
-      output_path: outputPath,
-      command: ['npx', ...command],
-    };
-  }
-
-  throw new Error(`Unsupported video render backend: ${policy.render.backend}`);
+  return renderVideoCompositionBundleImpl(plan, policy, { cancellable: false });
 }
 
 export async function renderVideoCompositionBundleAsync(
   plan: VideoCompositionRenderPlan,
   policy: VideoRenderRuntimePolicy,
   options: VideoRenderBackendExecutionOptions = {},
+): Promise<VideoRenderBackendResult> {
+  return renderVideoCompositionBundleImpl(plan, policy, {
+    cancellable: true,
+    isCancelled: options.isCancelled,
+    pollIntervalMs: options.poll_interval_ms || 100,
+  });
+}
+
+async function renderVideoCompositionBundleImpl(
+  plan: VideoCompositionRenderPlan,
+  policy: VideoRenderRuntimePolicy,
+  options: {
+    cancellable: boolean;
+    isCancelled?: () => boolean;
+    pollIntervalMs?: number;
+  },
 ): Promise<VideoRenderBackendResult> {
   const rootDir = pathResolver.rootDir();
   if (!policy.render.enable_backend_rendering) {
@@ -144,6 +91,7 @@ export async function renderVideoCompositionBundleAsync(
       executed: false,
       backend: 'none',
       reason: 'backend set to none',
+      backend_id: 'none',
     };
   }
 
@@ -151,19 +99,15 @@ export async function renderVideoCompositionBundleAsync(
   const caps = await platform.getCapabilities();
 
   if (policy.render.backend === 'hyperframes_cli') {
+    const backend = resolveVideoBackend(policy.render.backend);
     if (!caps.hasFFmpeg) {
       return {
         executed: false,
         backend: 'hyperframes_cli',
         reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
-      };
-    }
-
-    if (!(await canBindLocalhost())) {
-      return {
-        executed: false,
-        backend: 'hyperframes_cli',
-        reason: 'localhost bind unavailable in this environment; skipped hyperframes render',
+        backend_id: backend.backend_id,
+        backend_kind: backend.kind,
+        backend_provider: backend.provider,
       };
     }
 
@@ -185,34 +129,143 @@ export async function renderVideoCompositionBundleAsync(
       policy.render.quality,
     ];
 
-    await runCancellableCommand('npx', command, {
-      timeout_ms: policy.render.command_timeout_ms,
-      is_cancelled: options.isCancelled,
-      poll_interval_ms: options.poll_interval_ms || 100,
-      env: execEnv,
-      cwd: rootDir,
-    });
-
-    if (!safeExistsSync(outputPath)) {
-      throw new Error(`Render backend completed without output artifact: ${outputPath}`);
-    }
-
-    if (plan.narration_ref) {
-      if (!safeExistsSync(plan.narration_ref)) {
-        throw new Error(`Narration artifact missing for mux: ${plan.narration_ref}`);
+    try {
+      if (options.cancellable) {
+        await runCancellableCommand('npx', command, {
+          timeout_ms: policy.render.command_timeout_ms,
+          is_cancelled: options.isCancelled,
+          poll_interval_ms: options.pollIntervalMs || 100,
+          env: execEnv,
+          cwd: rootDir,
+        });
+      } else {
+        safeExec('npx', command, {
+          timeoutMs: policy.render.command_timeout_ms,
+          cwd: rootDir,
+          env: execEnv,
+        });
       }
-      await muxNarrationTrackAsync(outputPath, plan.narration_ref, plan.output_format);
-    }
 
-    return {
-      executed: true,
-      backend: 'hyperframes_cli',
-      output_path: outputPath,
-      command: ['npx', ...command],
-    };
+      if (!safeExistsSync(outputPath)) {
+        throw new Error(`Render backend completed without output artifact: ${outputPath}`);
+      }
+
+      const audioRef = resolveMuxAudioRef(plan);
+      if (audioRef) {
+        if (!safeExistsSync(audioRef)) {
+          throw new Error(`Audio artifact missing for mux: ${audioRef}`);
+        }
+        if (options.cancellable) {
+          await muxAudioTrackAsync(outputPath, audioRef, plan.output_format);
+        } else {
+          await muxAudioTrack(outputPath, audioRef, plan.output_format);
+        }
+      }
+
+      return {
+        executed: true,
+        backend: 'hyperframes_cli',
+        output_path: outputPath,
+        command: ['npx', ...command],
+        backend_id: backend.backend_id,
+        backend_kind: backend.kind,
+        backend_provider: backend.provider,
+      };
+    } catch (error: any) {
+      const fallbackResult = await renderVideoCompositionFallback(plan, outputPath, error);
+      return fallbackResult;
+    }
   }
 
   throw new Error(`Unsupported video render backend: ${policy.render.backend}`);
+}
+
+async function renderVideoCompositionFallback(
+  plan: VideoCompositionRenderPlan,
+  outputPath: string,
+  cause?: Error,
+): Promise<VideoRenderBackendResult> {
+  const rootDir = pathResolver.rootDir();
+  const outputDir = path.dirname(outputPath);
+  const baseName = path.basename(outputPath, path.extname(outputPath) || '.mp4');
+  const coverPath = path.join(outputDir, `${baseName}.cover.png`);
+  const silentPath = path.join(outputDir, `${baseName}.silent.mp4`);
+  const title = plan.title || 'Kyberion video';
+  const subtitle = `${plan.scenes.length} scene(s) • ${plan.duration_sec}s • fallback render`;
+
+  safeExec('python3', [
+    pathResolver.rootResolve('scripts/make_video_cover.py'),
+    '--out',
+    coverPath,
+    '--title',
+    title,
+    '--subtitle',
+    subtitle,
+  ], {
+    cwd: rootDir,
+    timeoutMs: 30_000,
+  });
+
+  safeExec('ffmpeg', [
+    '-y',
+    '-loop',
+    '1',
+    '-framerate',
+    String(Math.max(1, Math.round(plan.fps || 30))),
+    '-i',
+    coverPath,
+    '-t',
+    String(Math.max(1, Math.round(plan.duration_sec || 1))),
+    '-c:v',
+    'libx264',
+    '-preset',
+    'ultrafast',
+    '-crf',
+    '28',
+    '-pix_fmt',
+    'yuv420p',
+    silentPath,
+  ], {
+    cwd: rootDir,
+    timeoutMs: 60_000,
+  });
+
+  const audioRef = resolveMuxAudioRef(plan);
+  if (audioRef && safeExistsSync(audioRef)) {
+    const muxArgs = buildMuxArgs(silentPath, audioRef, outputPath, plan.output_format);
+    safeExec('ffmpeg', muxArgs, {
+      cwd: rootDir,
+      timeoutMs: 60_000,
+    });
+  } else {
+    safeMoveSync(silentPath, outputPath);
+  }
+
+  if (!safeExistsSync(outputPath)) {
+    throw new Error(`Fallback render failed to produce output artifact: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`);
+  }
+
+  safeRmSync(coverPath);
+  if (safeExistsSync(silentPath)) {
+    safeRmSync(silentPath);
+  }
+
+  const backend = resolveVideoBackend('hyperframes_cli');
+  return {
+    executed: true,
+    backend: 'ffmpeg_fallback',
+    output_path: outputPath,
+    command: [
+      'python3',
+      pathResolver.rootResolve('scripts/make_video_cover.py'),
+      'ffmpeg',
+      'ffmpeg',
+    ],
+    reason: cause ? `hyperframes backend failed; fallback rendered instead: ${cause.message}` : 'fallback render completed',
+    backend_id: `${backend.backend_id}.fallback`,
+    backend_kind: backend.kind,
+    backend_provider: 'ffmpeg',
+  };
 }
 
 function resolveOutputPath(plan: VideoCompositionRenderPlan): string {
@@ -223,24 +276,28 @@ function resolveOutputPath(plan: VideoCompositionRenderPlan): string {
   return path.join(plan.bundle_dir, `output.${ext}`);
 }
 
-async function muxNarrationTrack(
+function resolveMuxAudioRef(plan: VideoCompositionRenderPlan): string | undefined {
+  return plan.narration_ref || plan.music_ref;
+}
+
+async function muxAudioTrack(
   outputPath: string,
-  narrationPath: string,
+  audioPath: string,
   outputFormat: VideoCompositionRenderPlan['output_format'],
 ): Promise<void> {
   const tempOutputPath = buildMuxTempPath(outputPath);
-  const args = buildMuxArgs(outputPath, narrationPath, tempOutputPath, outputFormat);
+  const args = buildMuxArgs(outputPath, audioPath, tempOutputPath, outputFormat);
   await platform.runMediaCommand('ffmpeg', args);
   finalizeMuxedOutput(tempOutputPath, outputPath);
 }
 
-async function muxNarrationTrackAsync(
+async function muxAudioTrackAsync(
   outputPath: string,
-  narrationPath: string,
+  audioPath: string,
   outputFormat: VideoCompositionRenderPlan['output_format'],
 ): Promise<void> {
   const tempOutputPath = buildMuxTempPath(outputPath);
-  const args = buildMuxArgs(outputPath, narrationPath, tempOutputPath, outputFormat);
+  const args = buildMuxArgs(outputPath, audioPath, tempOutputPath, outputFormat);
   await platform.runMediaCommand('ffmpeg', args);
   finalizeMuxedOutput(tempOutputPath, outputPath);
 }
@@ -288,23 +345,6 @@ function buildMuxTempPath(outputPath: string): string {
   const ext = path.extname(outputPath) || '.mp4';
   const base = outputPath.slice(0, outputPath.length - ext.length);
   return `${base}.muxed${ext}`;
-}
-
-async function canBindLocalhost(): Promise<boolean> {
-  return await new Promise((resolve) => {
-    const server = net.createServer();
-    const finalize = (result: boolean) => {
-      try {
-        server.close();
-      } catch (_) {
-        // Ignore teardown errors from a failed probe.
-      }
-      resolve(result);
-    };
-
-    server.once('error', () => finalize(false));
-    server.listen(0, '127.0.0.1', () => finalize(true));
-  });
 }
 
 async function runCancellableCommand(

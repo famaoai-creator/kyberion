@@ -1,0 +1,72 @@
+{
+  "pipeline_id": "blog-article-from-brief",
+  "version": "1.0.0",
+  "description": "Brief-first blog authoring workflow that turns a topic into a brief, outline, and markdown draft.",
+  "action": "pipeline",
+  "context": {
+    "topic": "Kyberion で intent から media artifact までを一貫管理する方法",
+    "audience": "Kyberion の導入を検討する設計者とオペレーター",
+    "angle": "動画・音声・ブログを同じ brief flow で扱えること",
+    "output_root": "active/shared/exports/blog-article"
+  },
+  "variables": {
+    "topic": {
+      "type": "string",
+      "description": "Blog topic",
+      "default": "Kyberion で intent から media artifact までを一貫管理する方法"
+    },
+    "audience": {
+      "type": "string",
+      "description": "Primary audience",
+      "default": "Kyberion の導入を検討する設計者とオペレーター"
+    },
+    "angle": {
+      "type": "string",
+      "description": "Article angle",
+      "default": "動画・音声・ブログを同じ brief flow で扱えること"
+    },
+    "output_root": {
+      "type": "string",
+      "description": "Artifact root path",
+      "default": "active/missions/confidential/MSN-KYBERION-BLOG-CONTENT/evidence/blog-article"
+    }
+  },
+  "steps": [
+    {
+      "id": "draft-brief",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{output_root}}-brief.md",
+        "content": "# Blog Brief\n\n- Topic: {{topic}}\n- Audience: {{audience}}\n- Angle: {{angle}}\n- Objective: Explain how Kyberion can manage intent-driven media artifacts consistently.\n- Desired takeaway: The same governed flow can be reused across video, voice, and blog content.\n- Constraints: Keep the article practical, avoid abstract product claims, and make the operator flow obvious.\n- Source notes: Use the already established media workflow concepts and keep publication boundaries separate from drafting.\n- SEO keywords: Kyberion, intent flow, content brief, outline, draft, media artifacts\n- Recommended sections: Brief, Why it matters, Outline, Drafting flow, Practical takeaway\n"
+      }
+    },
+    {
+      "id": "draft-outline",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{output_root}}-outline.md",
+        "content": "# Outline\n\n## 1. Brief\n- Topic: {{topic}}\n- Audience: {{audience}}\n- Angle: {{angle}}\n\n## 2. Why It Matters\n- Why a brief-first flow helps\n- Why draft and publish should remain separate\n\n## 3. Article Structure\n- Introduction\n- Main idea: brief -> outline -> draft\n- Practical examples\n- Publish boundary\n- Conclusion\n\n## 4. Drafting Flow\n### 4.1 Capture intent\n### 4.2 Shape the brief\n### 4.3 Define the outline\n### 4.4 Write the draft\n### 4.5 Prepare the publish preview\n\n## 5. Practical Takeaway\n- The article should explain the operator path, not only the architecture.\n"
+      }
+    },
+    {
+      "id": "draft-article",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{output_root}}-draft.md",
+        "content": "# {{topic}}\n\nKyberion can treat content production as a governed flow. In practice, that means a blog post should not start as an undifferentiated prompt. It should start with a brief that captures the audience, the angle, the takeaway, and the constraints.\n\n## What the brief does\n\nThe brief answers three questions:\n\n1. Who is this for?\n2. What change should the reader make after reading it?\n3. What is in scope and what is not?\n\nFor this article, the intended reader is {{audience}} and the angle is {{angle}}. That keeps the outline focused on operator value rather than internal implementation trivia.\n\n## Why the outline matters\n\nThe outline turns the brief into a readable sequence. It is the blog equivalent of a storyboard. A good outline keeps the article honest: it defines the order of claims, the evidence the article needs, and where the article should stop.\n\n## Drafting the article\n\nOnce the outline exists, the draft becomes a relatively mechanical step. The writing should do two things well:\n\n- explain the flow in plain language\n- show the practical operator path without overloading the reader\n\nThat is the same reason the media flow works for video and voice. The content type changes, but the contract is the same: capture intent, shape the brief, define the outline, and then render the artifact.\n\n## Closing thought\n\nWhen this pattern is reused consistently, a blog post is no longer a one-off prompt response. It becomes an auditable content artifact that can be reviewed, revised, and published with clear boundaries.\n"
+      }
+    },
+    {
+      "id": "write-manifest",
+      "type": "apply",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{output_root}}-manifest.json",
+        "content": "{\n  \"topic\": \"{{topic}}\",\n  \"audience\": \"{{audience}}\",\n  \"angle\": \"{{angle}}\",\n  \"artifacts\": [\n    \"{{output_root}}-brief.md\",\n    \"{{output_root}}-outline.md\",\n    \"{{output_root}}-draft.md\"\n  ]\n}\n"
+      }
+    }
+  ]
+}

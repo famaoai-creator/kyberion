@@ -16,6 +16,11 @@ import {
   summarizeRelevantCapabilityBundlesForIntentIds,
   summarizeRelevantCapabilityBundlesForIntentIdsCompact,
 } from './capability-bundle-registry.js';
+import {
+  resolveExecutionProfileForIntent,
+  summarizeRelevantExecutionProfilesForIntentIds,
+  summarizeRelevantExecutionProfilesForIntentIdsCompact,
+} from './intent-execution-profile-registry.js';
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
 import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-resolution.js';
 import {
@@ -52,6 +57,7 @@ export interface IntentContract {
   source_text: string;
   intent_id: string;
   capability_bundle_id?: string;
+  execution_profile_id?: string;
   goal: {
     summary: string;
     success_condition: string;
@@ -256,6 +262,36 @@ function attachCapabilityBundle(contract: IntentContract): IntentContract {
   };
 }
 
+function attachExecutionProfile(
+  contract: IntentContract,
+  input: CompileUserIntentFlowInput
+): IntentContract {
+  const intent = findStandardIntentById(contract.intent_id);
+  const profileId = intent?.execution_profile_id;
+  if (!profileId) {
+    const { execution_profile_id: _ignored, ...rest } = contract;
+    return rest;
+  }
+
+  const profile = resolveExecutionProfileForIntent(contract.intent_id, {
+    surface: input.channel,
+    runtime_context: input.runtimeContext,
+  });
+
+  if (!profile) {
+    const { execution_profile_id: _ignored, ...rest } = contract;
+    return rest;
+  }
+
+  return {
+    ...contract,
+    execution_profile_id: profile.profile_id,
+    ...(contract.capability_bundle_id || !profile.capability_bundle_id
+      ? {}
+      : { capability_bundle_id: profile.capability_bundle_id }),
+  };
+}
+
 function validateWorkLoop(value: unknown): ValidationResult<OrganizationWorkLoopSummary> {
   const validate = ensureWorkLoopValidator();
   const valid = validate(value);
@@ -309,6 +345,16 @@ function summarizeRelevantCapabilityBundlesByIntentIds(intentIds: string[]): str
   return summarizeRelevantCapabilityBundlesForIntentIdsCompact(
     intentIds
   );
+}
+
+function summarizeRelevantExecutionProfilesByIntentIds(
+  intentIds: string[],
+  input: CompileUserIntentFlowInput
+): string {
+  return summarizeRelevantExecutionProfilesForIntentIdsCompact(intentIds, {
+    surface: input.channel,
+    runtime_context: input.runtimeContext,
+  });
 }
 
 function findStandardIntentById(intentId?: string): StandardIntentDefinition | undefined {
@@ -512,7 +558,7 @@ function buildFallbackIntentContract(
     });
     const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
     const intentId = executionBrief?.archetype_id || packet.selected_intent_id || 'resolve-approval';
-    return attachCapabilityBundle({
+    return attachExecutionProfile(attachCapabilityBundle({
       kind: 'intent-contract',
       source_text: input.text,
       intent_id: intentId,
@@ -539,7 +585,7 @@ function buildFallbackIntentContract(
       why: clarificationAssessment.shouldClarify
         ? 'Fallback approval workflow request was normalized into the governed intent-contract schema.'
         : `Fallback approval workflow request was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`,
-    });
+    }), input);
   }
   if (classified) {
     const classifiedShape =
@@ -566,7 +612,7 @@ function buildFallbackIntentContract(
       contextualFrame,
     });
     const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
-    return attachCapabilityBundle({
+    return attachExecutionProfile(attachCapabilityBundle({
       kind: 'intent-contract',
       source_text: input.text,
       intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
@@ -600,7 +646,7 @@ function buildFallbackIntentContract(
           ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
           : `Fallback classifier and execution brief were normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
         : 'Fallback classifier mapped the request to the nearest governed task session contract.',
-    });
+    }), input);
   }
 
   const requiredInputs = (() => {
@@ -625,7 +671,7 @@ function buildFallbackIntentContract(
   });
   const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
 
-  return attachCapabilityBundle({
+  return attachExecutionProfile(attachCapabilityBundle({
     kind: 'intent-contract',
     source_text: input.text,
     intent_id: executionBrief?.archetype_id || 'general_request',
@@ -655,7 +701,7 @@ function buildFallbackIntentContract(
       : clarificationAssessment.shouldClarify
         ? 'Fallback could not derive a safe execution contract from the current request.'
         : `Fallback could not derive a safe execution contract from the current request, but clarification was skipped by policy (${clarificationAssessment.reason}).`,
-  });
+  }), input);
 }
 
 function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
@@ -765,6 +811,7 @@ function buildIntentContractPrompt(
         source_text: 'string',
         intent_id: 'string',
         capability_bundle_id: 'string?',
+        execution_profile_id: 'string?',
         goal: { summary: 'string', success_condition: 'string' },
         resolution: {
           execution_shape: 'direct_reply|task_session|mission|project_bootstrap',
@@ -788,8 +835,17 @@ function buildIntentContractPrompt(
     'Relevant capability bundles:',
     summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
     '',
+    'Relevant execution profiles:',
+    summarizeRelevantExecutionProfilesByIntentIds(bundleIntentIds, input),
+    '',
     'Relevant capability bundles (detailed registry snapshot):',
     summarizeRelevantCapabilityBundlesForIntentIds(bundleIntentIds),
+    '',
+    'Relevant execution profiles (detailed registry snapshot):',
+    summarizeRelevantExecutionProfilesForIntentIds(bundleIntentIds, {
+      surface: input.channel,
+      runtime_context: input.runtimeContext,
+    }),
     '',
     'Request context:',
     JSON.stringify(
@@ -911,7 +967,7 @@ async function compileIntentContractWithLlm(
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
   const result = validateIntentContract(parsed);
-  return result.valid ? attachCapabilityBundle(result.value!) : null;
+  return result.valid ? attachExecutionProfile(attachCapabilityBundle(result.value!), input) : null;
 }
 
 async function compileWorkLoopWithLlm(
@@ -1060,7 +1116,7 @@ export function formatClarificationPacketConcise(
   if (locale === 'ja') {
     const moreHint = remaining > 0 ? `（他 ${remaining} 件）` : '';
     const lines = [
-      `次に必要な情報${moreHint}: **${first.id}**`,
+      `次に必要な情報${moreHint}: \`${first.id}\``,
       first.question,
     ];
     if (first.reason) lines.push(`理由: ${first.reason}`);
@@ -1070,7 +1126,7 @@ export function formatClarificationPacketConcise(
 
   const moreHint = remaining > 0 ? ` (+ ${remaining} more)` : '';
   const lines = [
-    `Next required${moreHint}: **${first.id}**`,
+    `Next required${moreHint}: \`${first.id}\``,
     first.question,
   ];
   if (first.reason) lines.push(`Reason: ${first.reason}`);

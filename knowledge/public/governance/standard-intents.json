@@ -231,6 +231,7 @@
         "generate narration audio using the cloned voice profile",
         "return the generated audio artifact"
       ],
+      "execution_profile_id": "voice-speak-with-my-voice-local-say",
       "outcome_ids": ["artifact:audio"],
       "specialist_id": "document-specialist",
       "trigger_keywords": ["喋らせて", "読んで", "発話", "speak", "voice", "cloned"],
@@ -263,6 +264,7 @@
         "render narrated video using video-composition-actuator",
         "verify audio-muxed video output"
       ],
+      "execution_profile_id": "media-generate-narrated-video-default",
       "outcome_ids": ["artifact:video"],
       "specialist_id": "document-specialist",
       "trigger_keywords": ["動画", "ビデオ", "映像", "ビデオレポート", "video", "movie", "narrated"],
@@ -278,6 +280,103 @@
       "execution_shape": "pipeline",
       "mission_class": "content_and_media",
       "risk_profile": "approval_required"
+    },
+    {
+      "id": "generate-video",
+      "category": "outcome_execution",
+      "description": "Generate a governed video artifact from a video-generation-adf or equivalent brief.",
+      "surface_examples": [
+        "動画を生成して",
+        "ビデオを作成して",
+        "promptベースの動画を出して",
+        "Generate video"
+      ],
+      "plan_outline": [
+        "compile a video-generation brief",
+        "generate or submit the video job",
+        "return the governed video artifact"
+      ],
+      "execution_profile_id": "media-generate-video-default",
+      "outcome_ids": ["artifact:video"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["動画", "ビデオ", "video", "clip", "generate video"],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_video",
+      "execution_shape": "pipeline",
+      "mission_class": "content_and_media",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "transcribe-audio",
+      "category": "outcome_execution",
+      "description": "Transcribe governed audio into a text transcript using the speech-to-text bridge.",
+      "surface_examples": [
+        "この音声を書き起こして",
+        "音声を文字起こしして",
+        "transcribe this audio",
+        "Transcribe audio"
+      ],
+      "plan_outline": [
+        "resolve the audio input",
+        "transcribe via the STT bridge",
+        "return the transcript artifact"
+      ],
+      "execution_profile_id": "audio-transcribe-default",
+      "outcome_ids": ["artifact:transcript"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["書き起こし", "transcribe", "transcript", "stt", "音声"],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "query",
+      "object": "artifact_transcript",
+      "execution_shape": "pipeline",
+      "mission_class": "content_and_media",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "live-voice",
+      "category": "outcome_execution",
+      "description": "Run a governed live voice conversation with STT and voice synthesis.",
+      "surface_examples": [
+        "ライブ音声で会話したい",
+        "voice conversation を始めて",
+        "live voice session",
+        "Live voice"
+      ],
+      "plan_outline": [
+        "prepare the live voice runtime profile",
+        "transcribe input turns and synthesize replies",
+        "return the session summary and transcript"
+      ],
+      "execution_profile_id": "voice-live-conversation-default",
+      "outcome_ids": ["voice_session_summary"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["live voice", "voice conversation", "会話", "音声対話"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "voice_conversation",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "voice_session",
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "risk_profile": "review_required"
     },
     {
       "id": "inspect-service",
@@ -600,6 +699,7 @@
         "prepare the meeting brief and role expectations",
         "facilitate the session, track action items, and produce a summary"
       ],
+      "execution_profile_id": "meeting-operations-google-meet-transcribe",
       "intake_requirements": ["meeting_url", "meeting_role_boundary"],
       "outcome_ids": ["meeting_operations_summary"],
       "specialist_id": "surface-concierge",
@@ -3617,6 +3717,48 @@
           "params": { "message": "Human review queued: review_id={{review_record.review_id}}, path={{review_record.review_path}}" }
         }
       ]
+    },
+    {
+      "id": "fetch-external-data",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "外部サイト・APIからデータを取得してユーザーに要約を返す。初回はURLを尋ねてレジストリに登録し、次回から自動解決する。",
+      "surface_examples": [
+        "今日の秋葉原の天気を教えて",
+        "このURLからデータを取ってきて",
+        "天気を教えて",
+        "為替レートを調べて",
+        "このサイトの最新情報を見て"
+      ],
+      "plan_outline": [
+        "identify the data topic and resolve whether a registered source URL exists",
+        "if no registered source: ask the user which external URL to fetch from",
+        "fetch the URL via network-actuator and extract the relevant information",
+        "reply with a concise summary",
+        "register the service for future automatic resolution"
+      ],
+      "outcome_ids": ["data_retrieved"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "天気", "weather", "気温", "温度",
+        "為替", "レート", "exchange rate",
+        "ニュース", "news",
+        "株価", "stock",
+        "調べて", "取得", "fetch", "取ってきて",
+        "外部データ", "url", "サイト", "このページ"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "external_resource",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
     }
   ]
 }

@@ -101,6 +101,93 @@
         }
       }
     },
+    "narrated-video": {
+      "theme": "kyberion-standard",
+      "profiles": ["narrated-howto-video", "product-walkthrough-video", "operator-demo-video"],
+      "branding": {
+        "tone": "operational",
+        "caption_style": "lower-third"
+      },
+      "mode_overrides": {
+        "howto": {
+          "video": {
+            "layout_family": "howto-guide",
+            "density": "medium",
+            "motion_profile": "guided-step",
+            "caption_style": "lower-third",
+            "typography_scale": "balanced",
+            "overlay_density": "medium",
+            "camera_distance": "wide"
+          }
+        },
+        "promo": {
+          "video": {
+            "layout_family": "promo-spot",
+            "density": "low",
+            "motion_profile": "value-punch",
+            "caption_style": "lower-third",
+            "typography_scale": "expressive",
+            "overlay_density": "dense",
+            "camera_distance": "tight"
+          }
+        },
+        "vtuber": {
+          "video": {
+            "layout_family": "vtuber-stage",
+            "density": "medium",
+            "motion_profile": "on-air",
+            "caption_style": "lower-third",
+            "typography_scale": "balanced",
+            "overlay_density": "medium",
+            "camera_distance": "medium-close"
+          }
+        }
+      },
+      "semantic_overrides": {
+        "hook": {
+          "video": {
+            "layout_family": "hero",
+            "density": "low",
+            "motion_profile": "value-promise"
+          }
+        },
+        "process": {
+          "video": {
+            "layout_family": "process-flow",
+            "density": "medium",
+            "motion_profile": "guided-step"
+          }
+        },
+        "proof": {
+          "video": {
+            "layout_family": "evidence",
+            "density": "medium",
+            "motion_profile": "artifact-reveal"
+          }
+        },
+        "demo": {
+          "video": {
+            "layout_family": "process-flow",
+            "density": "medium",
+            "motion_profile": "guided-step"
+          }
+        },
+        "decision": {
+          "video": {
+            "layout_family": "decision",
+            "density": "low",
+            "motion_profile": "decisive"
+          }
+        },
+        "cta": {
+          "video": {
+            "layout_family": "cta",
+            "density": "low",
+            "motion_profile": "minimal"
+          }
+        }
+      }
+    },
     "solution-architecture": {
       "theme": "aws-architecture",
       "profiles": ["solution-overview"],

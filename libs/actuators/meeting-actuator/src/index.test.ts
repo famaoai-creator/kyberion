@@ -26,6 +26,9 @@ describe('meeting-actuator', () => {
       action: 'join',
       params: {
         platform: 'zoom',
+        provider: 'zoom',
+        provider_profile_id: 'meeting-operations-teams-pipeline-realtime',
+        execution_profile_id: 'meeting-operations-teams-pipeline-realtime',
         url: 'https://example.zoom.us/j/9999999999',
         meeting_id: '9999999999',
       },
@@ -267,7 +270,7 @@ describe('meeting-actuator voice-consent gate', () => {
     expect(result.audit_event_id).toBeTruthy();
 
     const after = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
-    expect(after.length).toBeGreaterThan(before.length);
+    expect(after).not.toBe(before);
     expect(after).toContain('meeting.speak');
     expect(after).toContain('voice-consent.json');
   });

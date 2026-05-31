@@ -9,6 +9,9 @@
     "intent": { "type": "string", "minLength": 1 },
     "title": { "type": "string", "minLength": 1 },
     "language": { "type": "string", "minLength": 2 },
+    "storyboard": {
+      "$ref": "video-storyboard.schema.json"
+    },
     "script": {
       "type": "object",
       "additionalProperties": false,

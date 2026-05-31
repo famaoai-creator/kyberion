@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/intent-execution-profile-registry.schema.json",
+  "title": "Intent Execution Profile Registry",
+  "type": "object",
+  "required": ["version", "profiles"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["profile_id", "status", "kind", "summary"],
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "experimental", "conceptual", "deprecated"]
+          },
+          "kind": {
+            "type": "string",
+            "const": "intent-execution-profile"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default_for_intent": {
+            "type": "boolean"
+          },
+          "intents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "capability_bundle_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled_toolsets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "provider_selection": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "voice": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "engine_id": { "type": "string", "minLength": 1 },
+                  "provider": { "type": "string", "minLength": 1 }
+                }
+              },
+              "stt": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "engine_id": { "type": "string", "minLength": 1 },
+                  "provider": { "type": "string", "minLength": 1 }
+                }
+              },
+              "video": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "backend_id": { "type": "string", "minLength": 1 },
+                  "provider": { "type": "string", "minLength": 1 }
+                }
+              },
+              "meeting": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["google_meet", "teams_pipeline", "zoom", "auto"]
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": ["transcribe", "realtime"]
+                  },
+                  "node": {
+                    "type": "string",
+                    "enum": ["local", "named-node"]
+                  },
+                  "audio_bridge": {
+                    "type": "string",
+                    "enum": ["blackhole", "pulseaudio", "none"]
+                  },
+                  "url_policy": {
+                    "type": "string",
+                    "enum": ["explicit_only", "explicit_or_detected"]
+                  }
+                }
+              }
+            }
+          },
+          "surface_overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled_toolsets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "capability_bundle_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider_selection": {
+                  "$ref": "#/properties/profiles/items/properties/provider_selection"
+                }
+              }
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

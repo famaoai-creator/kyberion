@@ -470,7 +470,10 @@
       "canva.com",
       "api.canva.com",
       "atlassian.net",
-      "atlassian.com"
+      "atlassian.com",
+      "api.telegram.org",
+      "discord.com",
+      "api.discord.app"
     ],
     "max_request_size_kb": 2048,
     "max_requests_per_mission": 50,

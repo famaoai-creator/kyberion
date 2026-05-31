@@ -77,7 +77,7 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
   }
 
   if (check.id === 'service-endpoints') {
-    const typed = data as { default_pattern?: string; services?: Record<string, { base_url?: string }> };
+    const typed = data as { default_pattern?: string; services?: Record<string, { base_url?: string; intent_aliases?: string[] }> };
     const services = typed.services || {};
     if (Object.keys(services).length === 0) {
       violations.push('service-endpoints: services must not be empty');
@@ -99,6 +99,7 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
       const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { default_pattern?: string; services?: Record<string, unknown> };
+      const snapshotServices = typed.services || {};
       const payloadValidate = ajv.compile(schema);
       if (!payloadValidate(payload)) {
         for (const error of payloadValidate.errors || []) {
@@ -117,6 +118,11 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       }
       if (payload.default_pattern !== typed.default_pattern) {
         violations.push(`service-endpoints: ${fileName} default_pattern must match the snapshot`);
+      }
+      const snapshotAliasList = snapshotServices[serviceId]?.intent_aliases || [];
+      const payloadAliasList = (payloadServices[serviceId] as { intent_aliases?: string[] } | undefined)?.intent_aliases || [];
+      if (JSON.stringify(snapshotAliasList) !== JSON.stringify(payloadAliasList)) {
+        violations.push(`service-endpoints: ${fileName} intent_aliases must match the snapshot`);
       }
       directoryServiceIds.push(serviceId);
     }

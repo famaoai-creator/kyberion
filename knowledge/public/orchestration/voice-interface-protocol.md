@@ -33,12 +33,21 @@ last_updated: 2026-03-06
 - 「お疲れ様」→ `task_manager.js` の退勤処理を起動。
 - 「今の状況は？」→ `PERFORMANCE_DASHBOARD` の要約を読み上げ。
 - 「資料を作って」→ `Executive Reporting Maestro` を召喚。
+- 「この音声を書き起こして」→ `transcribe-audio` / STT bridge を起動。
+- 「ライブ音声で会話したい」→ `live-voice` / realtime voice conversation を起動。
+- 「動画を生成して」→ `generate-video` / prompt-based video generation を起動。
 
 ### 実装済みスキル
 - **voice-notifier**: CLI から直接音声を発生させる基本スキル。
   ```bash
   gemini run voice-notifier --text "任務を完了しました。" --voice "Kyoko"
   ```
+
+### Related Media Intents
+
+- `speak-with-my-voice`: local TTS / cloned-voice generation
+- `transcribe-audio`: batch audio transcription
+- `live-voice`: turn-based live conversation with STT and TTS
 
 ---
 

@@ -6,12 +6,15 @@ Execute a single top-level scenario that:
 
 - compiles a `narrated-video-brief` into `video-composition-adf`
 - renders a composed video bundle and, when narration is present, muxes the audio track into the final output
+- when a `video-content-brief` is available, prefer compiling it into a storyboard and then rendering through `create_narrated_video_from_content_brief`
+- include `presentation_mode` (`howto`, `promo`, or `vtuber`) so the storyboard can choose the correct layout family
 
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
 - **Schemas**:
   - [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
+  - [`video-content-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-content-brief.schema.json)
   - [`video-composition-action.schema.json`](/Users/famao/kyberion/schemas/video-composition-action.schema.json)
 - **Procedure**:
   - [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
@@ -25,6 +28,7 @@ Action:
 Required:
 
 - `params.narrated_video_brief`
+- or `params.video_content_brief` and `params.narration_artifact_ref` when using `create_narrated_video_from_content_brief`
 
 Optional:
 

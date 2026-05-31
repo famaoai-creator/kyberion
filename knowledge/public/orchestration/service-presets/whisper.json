@@ -20,11 +20,35 @@
         }
       ]
     },
+    "transcribe_audio": {
+      "type": "auto",
+      "alternatives": [
+        {
+          "type": "api",
+          "base_url": "{{whisperkit_base_url}}",
+          "path": "transcribe",
+          "method": "POST",
+          "description": "Intent-aligned batch audio transcription via WhisperKit"
+        },
+        {
+          "type": "cli",
+          "command": "{{whisper_cli_path}}",
+          "args": ["--model", "{{whisper_model_path}}", "--file", "{{audio_path}}", "--language", "{{language}}", "--output-json"],
+          "description": "Intent-aligned batch audio transcription via whisper.cpp CLI"
+        }
+      ]
+    },
     "stream": {
       "type": "cli",
       "command": "{{whisper_stream_path}}",
       "args": ["--model", "{{whisper_model_path}}", "--language", "{{language}}"],
       "description": "Real-time Whisper streaming"
+    },
+    "stream_transcribe": {
+      "type": "cli",
+      "command": "{{whisper_stream_path}}",
+      "args": ["--model", "{{whisper_model_path}}", "--language", "{{language}}"],
+      "description": "Intent-aligned real-time transcription stream"
     }
   }
 }
