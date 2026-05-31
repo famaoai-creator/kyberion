@@ -9,6 +9,10 @@ Run a turn-based realtime voice conversation using:
 - a configured reasoning backend
 - governed voice generation for the assistant reply
 
+The same runtime also exposes an interactive loop mode that records repeated turns,
+transcribes each turn, and plays the assistant reply back through the local voice
+stack.
+
 ## Preconditions
 
 - personal voice usage requires a registered and promoted `active` profile
@@ -28,6 +32,23 @@ pnpm voice:conversation:turn \
   --personal-voice-mode require_personal_voice
 ```
 
+Interactive loop mode:
+
+```bash
+pnpm voice:conversation:turn -- \
+  --interactive \
+  --session-id user-voice-live \
+  --profile-id your-active-voice-profile \
+  --language ja \
+  --record-seconds 8 \
+  --turns 3
+```
+
+If you need the recorder to capture from a different local setup, set:
+
+- `KYBERION_PYTHON_BIN` for the Python bridge runner
+- `KYBERION_STT_COMMAND` for the speech-to-text backend
+
 ## Result
 
 The command writes:
@@ -36,6 +57,8 @@ The command writes:
   - `active/shared/runtime/realtime-voice-conversations/<session_id>.json`
 - optional reply artifact:
   - `active/shared/tmp/realtime-voice-conversation/<request_id>.wav`
+- interactive recording cache:
+  - `active/shared/tmp/realtime-voice-conversation-recordings/<session_id>/turn-XX.wav`
 
 Returned payload includes:
 
