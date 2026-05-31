@@ -16,6 +16,7 @@ import {
   derivePipelineStatus,
   createActuatorTrace,
   finalizeActuatorTrace,
+  resolveImageBackend,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -56,6 +57,18 @@ type PromptGenerationRequest = {
   compiled?: any;
   workflow?: any;
 };
+
+function resolveGenerationBackend(action: string, params: any) {
+  const backendId = String(
+    params?.backend_id
+    || params?.image_adf?.engine?.backend_id
+    || params?.video_adf?.engine?.backend_id
+    || params?.music_adf?.engine?.backend_id
+    || 'media-generation.comfyui',
+  ).trim() || 'media-generation.comfyui';
+  void action;
+  return resolveImageBackend(backendId, process.platform);
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -221,6 +234,7 @@ async function collectGenerationResult(action: string, params: any, promptId: st
   const history = await waitForPromptCompletion(promptId, timeoutMs, pollIntervalMs);
   const artifacts = extractArtifacts(history);
   const primaryArtifact = artifacts[0];
+  const backend = resolveGenerationBackend(action, params);
   const copiedTo = primaryArtifact
     ? maybeCopyArtifact(primaryArtifact.path, params.target_path || params.music_adf?.output?.target_path)
     : undefined;
@@ -233,6 +247,9 @@ async function collectGenerationResult(action: string, params: any, promptId: st
     artifact: primaryArtifact || null,
     copied_to: copiedTo,
     compiled_generation_request: compiled?.resolved,
+    backend_id: backend.backend_id,
+    backend_kind: backend.kind,
+    backend_provider: backend.provider,
   };
 }
 
@@ -369,6 +386,7 @@ async function submitGenerationJob(params: any) {
       throw new Error(`submit_generation failed to receive prompt_id for ${action}`);
     }
 
+    const backend = resolveGenerationBackend(action, params.params || {});
     const job: GenerationJob = {
       kind: 'generation-job',
       job_id: params.existing_job_id || createGenerationJobId(action),
@@ -389,6 +407,9 @@ async function submitGenerationJob(params: any) {
       result: {
         compiled_music_adf: compiled?.resolved,
         compiled_generation_request: compiled?.resolved,
+        backend_id: backend.backend_id,
+        backend_kind: backend.kind,
+        backend_provider: backend.provider,
       },
       retry_policy: params.retry_policy || {
         max_attempts: Number(loadRecoveryPolicy().retry?.maxRetries || 1),
@@ -466,6 +487,9 @@ async function getGenerationJob(params: any) {
         artifacts: result.artifacts,
         copied_to: result.copied_to,
         compiled_generation_request: result.compiled_generation_request,
+        backend_id: result.backend_id,
+        backend_kind: result.backend_kind,
+        backend_provider: result.backend_provider,
       },
       updated_at: nowIso(),
       completed_at: nowIso(),

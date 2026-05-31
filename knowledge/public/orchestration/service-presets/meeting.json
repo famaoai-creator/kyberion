@@ -8,17 +8,35 @@
       "args": ["libs/actuators/meeting-actuator/meeting-bridge.py", "{\"action\": \"join\", \"params\": {{params}} }"],
       "description": "Join an online meeting (Zoom/Teams/Meet) via Bridge"
     },
+    "join_meeting": {
+      "type": "cli",
+      "command": "{{meeting_python_bin}}",
+      "args": ["libs/actuators/meeting-actuator/meeting-bridge.py", "{\"action\": \"join\", \"params\": {{params}} }"],
+      "description": "Intent-aligned meeting join via Bridge"
+    },
     "status": {
       "type": "cli",
       "command": "{{meeting_python_bin}}",
       "args": ["libs/actuators/meeting-actuator/meeting-bridge.py", "{\"action\": \"status\", \"params\": {\"platform\": \"{{platform}}\"} }"],
       "description": "Get current meeting status"
     },
+    "meeting_status": {
+      "type": "cli",
+      "command": "{{meeting_python_bin}}",
+      "args": ["libs/actuators/meeting-actuator/meeting-bridge.py", "{\"action\": \"status\", \"params\": {\"platform\": \"{{platform}}\"} }"],
+      "description": "Intent-aligned meeting status check"
+    },
     "leave": {
       "type": "cli",
       "command": "{{meeting_python_bin}}",
       "args": ["libs/actuators/meeting-actuator/meeting-bridge.py", "{\"action\": \"leave\"}"],
       "description": "Leave the current meeting"
+    },
+    "leave_meeting": {
+      "type": "cli",
+      "command": "{{meeting_python_bin}}",
+      "args": ["libs/actuators/meeting-actuator/meeting-bridge.py", "{\"action\": \"leave\"}"],
+      "description": "Intent-aligned meeting leave"
     }
   }
 }

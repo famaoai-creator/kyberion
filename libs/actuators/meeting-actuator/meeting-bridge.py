@@ -86,6 +86,16 @@ def _detect_platform(url):
     return "meet"
 
 
+def _provider_to_platform(provider):
+    if provider in ("google_meet", "meet"):
+        return "meet"
+    if provider in ("teams_pipeline", "teams"):
+        return "teams"
+    if provider == "zoom":
+        return "zoom"
+    return "auto"
+
+
 class MeetingBridge:
     """Playwright-backed meeting driver."""
 
@@ -93,15 +103,27 @@ class MeetingBridge:
 
     def join(self, platform, url=None, meeting_id=None, passcode=None,
              duration_sec=0, name=None, profile_id=None, audio_path=None,
-             screenshot_path=None, python_bin=None):
+             screenshot_path=None, python_bin=None, provider=None,
+             provider_profile_id=None, execution_profile_id=None, mode=None,
+             node=None, audio_bridge=None, url_policy=None):
         """Run the full meeting session via playwright-meet-join.mjs.
 
         duration_sec=0 means join, take a screenshot, and immediately leave.
         """
-        sys.stderr.write(f"[bridge] join platform={platform} url={url} duration={duration_sec}s\n")
+        sys.stderr.write(
+            f"[bridge] join platform={platform} provider={provider} mode={mode} "
+            f"duration={duration_sec}s\n"
+        )
 
         if platform == "auto":
-            platform = _detect_platform(url or "")
+            provider_platform = _provider_to_platform(provider)
+            if provider_platform != "auto":
+                platform = provider_platform
+            else:
+                platform = _detect_platform(url or "")
+        if provider_platform := _provider_to_platform(provider):
+            if platform == "auto":
+                platform = provider_platform
 
         ok, reason = _validate_url(platform, url)
         if not ok:
@@ -128,7 +150,10 @@ class MeetingBridge:
         if python_bin:
             cmd += ["--python", python_bin]
 
-        sys.stderr.write(f"[bridge] running: {' '.join(cmd[:6])} ...\n")
+        sys.stderr.write(
+            f"[bridge] running: {' '.join(cmd[:6])} ... "
+            f"profile={provider_profile_id or execution_profile_id or 'n/a'}\n"
+        )
         try:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, cwd=str(ROOT),
@@ -146,6 +171,20 @@ class MeetingBridge:
                 payload = json.loads(line)
                 if "status" in payload:
                     sys.stderr.write(f"[bridge] join result: {payload}\n")
+                    if provider:
+                        payload.setdefault("provider", provider)
+                    if provider_profile_id:
+                        payload.setdefault("provider_profile_id", provider_profile_id)
+                    if execution_profile_id:
+                        payload.setdefault("execution_profile_id", execution_profile_id)
+                    if mode:
+                        payload.setdefault("mode", mode)
+                    if node:
+                        payload.setdefault("node", node)
+                    if audio_bridge:
+                        payload.setdefault("audio_bridge", audio_bridge)
+                    if url_policy:
+                        payload.setdefault("url_policy", url_policy)
                     return payload
             except json.JSONDecodeError:
                 continue
@@ -336,6 +375,13 @@ def main():
                 audio_path=params.get("audio_path"),
                 screenshot_path=params.get("screenshot_path"),
                 python_bin=params.get("python_bin"),
+                provider=params.get("provider"),
+                provider_profile_id=params.get("provider_profile_id"),
+                execution_profile_id=params.get("execution_profile_id"),
+                mode=params.get("mode"),
+                node=params.get("node"),
+                audio_bridge=params.get("audio_bridge"),
+                url_policy=params.get("url_policy"),
             )
         elif action == "speak":
             result = bridge.speak(

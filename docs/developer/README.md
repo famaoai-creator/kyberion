@@ -15,6 +15,8 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 | [CHAOS_DRILLS.md](./CHAOS_DRILLS.md) | Recurring failure-injection runs. |
 | [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or risky in the current Kyberion runtime. Pair it with `pnpm setup:report`. |
 | [VOICE_FIRST_WIN.md](./VOICE_FIRST_WIN.md) | Tier-0 voice setup (Phase A-5). |
+| [NARRATED_VIDEO_CONTENT_IMPLEMENTATION_CHECKPOINT.ja.md](./NARRATED_VIDEO_CONTENT_IMPLEMENTATION_CHECKPOINT.ja.md) | Current state, resume path, and validation commands for the narrated video implementation. |
+| [NARRATED_VIDEO_CONTENT_IMPLEMENTATION_ROADMAP.ja.md](./NARRATED_VIDEO_CONTENT_IMPLEMENTATION_ROADMAP.ja.md) | How to turn a fixed content brief into a narrated video through a video-specific design system. |
 | [REGISTRY_SPLIT_PLAN.md](./REGISTRY_SPLIT_PLAN.md) | Taskized backlog for moving global catalogs to per-item canonical files. |
 | [RELEASE_OPERATIONS.md](./RELEASE_OPERATIONS.md) | How releases get cut. |
 | [GOOD_FIRST_ISSUES.md](./GOOD_FIRST_ISSUES.md) | Starter slices for first-time contributors. |

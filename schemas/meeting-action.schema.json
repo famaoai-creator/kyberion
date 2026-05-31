@@ -12,6 +12,13 @@
       "type": "object",
       "properties": {
         "platform": { "enum": ["zoom", "teams", "meet", "auto"] },
+        "provider": { "enum": ["google_meet", "teams_pipeline", "zoom", "auto"] },
+        "provider_profile_id": { "type": "string" },
+        "execution_profile_id": { "type": "string" },
+        "mode": { "enum": ["transcribe", "realtime"] },
+        "node": { "enum": ["local", "named-node"] },
+        "audio_bridge": { "enum": ["blackhole", "pulseaudio", "none"] },
+        "url_policy": { "enum": ["explicit_only", "explicit_or_detected"] },
         "url": { "type": "string", "format": "uri" },
         "meeting_id": { "type": "string" },
         "passcode": { "type": "string" },
