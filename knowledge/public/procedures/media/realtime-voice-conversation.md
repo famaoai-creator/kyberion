@@ -13,6 +13,12 @@ The same runtime also exposes an interactive loop mode that records repeated tur
 transcribes each turn, and plays the assistant reply back through the local voice
 stack.
 
+This is the procedure behind the `live-voice` intent and its default execution profile:
+
+- intent: `live-voice`
+- execution profile: `voice-live-conversation-default`
+- capability bundle: `realtime-voice-governed`
+
 ## Preconditions
 
 - personal voice usage requires a registered and promoted `active` profile
@@ -76,3 +82,8 @@ If the user says `use my voice`, registration and promotion still have to happen
 
 - [register-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
 - [promote-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)
+
+## Related Procedures
+
+- [`transcribe-audio-from-asset.md`](/Users/famao/kyberion/knowledge/public/procedures/media/transcribe-audio-from-asset.md) covers batch transcription without the live turn-taking loop.
+- [`generate-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/generate-video-from-adf.md) covers prompt-based video generation.

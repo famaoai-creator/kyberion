@@ -15,6 +15,10 @@ Use Kyberion when the task has at least one of these properties:
 3. It should produce reusable script, scene, and thumbnail assets.
 4. It might be uploaded to YouTube or another public channel.
 
+If the request is prompt-based rather than narrated, route it through
+[`generate-video-from-adf.md`](knowledge/public/procedures/media/generate-video-from-adf.md)
+instead of the narrated composition flow.
+
 ## Brief And Theme Separation
 
 Keep two layers distinct inside the shared coordination flow:
@@ -48,6 +52,12 @@ Good fits for this preflight include tutorial videos, product intros, onboarding
 7. Generate: render the video artifact.
 8. Publish preparation: prepare a `narrated-video-publish-plan` with title, thumbnail, description, tags, captions, and visibility.
 9. Review: propose reusable preference updates for `knowledge/personal/` only when the user approves.
+
+## Nearby Media Surfaces
+
+- [`generate-video-from-adf.md`](knowledge/public/procedures/media/generate-video-from-adf.md)
+- [`transcribe-audio-from-asset.md`](knowledge/public/procedures/media/transcribe-audio-from-asset.md)
+- [`realtime-voice-conversation.md`](knowledge/public/procedures/media/realtime-voice-conversation.md)
 
 ## Publish Boundary
 

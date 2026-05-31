@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "notes": [
+    "Well-known external service providers with URL templates.",
+    "personal/orchestration/service-provider-catalog.json can override or extend these entries.",
+    "Template variables: {topic}, {location}, {query}",
+    "{query} = topic + location joined with space (URL-encoded)"
+  ],
+  "providers": [
+    {
+      "id": "wttr-weather",
+      "aliases": ["wttr", "wttr.in"],
+      "topics": ["天気", "weather", "気温", "温度"],
+      "url_template": "https://wttr.in/{location}?lang=ja",
+      "notes": "Returns human-readable weather. Location can be a city name in English or Japanese."
+    },
+    {
+      "id": "yahoo-japan-search",
+      "aliases": ["Yahoo Japan", "Yahoo", "ヤフー", "yahoo japan", "yahoo"],
+      "topics": ["*"],
+      "url_template": "https://search.yahoo.co.jp/search?p={query}",
+      "notes": "Yahoo Japan general web search. Works for any topic."
+    },
+    {
+      "id": "yahoo-japan-weather",
+      "aliases": ["Yahoo天気", "Yahoo Japan天気", "ヤフー天気", "yahoo japan weather", "yahoo weather"],
+      "topics": ["天気", "weather", "気温", "温度"],
+      "url_template": "https://search.yahoo.co.jp/search?p={query}+天気",
+      "notes": "Yahoo Japan weather search."
+    },
+    {
+      "id": "google-search",
+      "aliases": ["Google", "グーグル", "google"],
+      "topics": ["*"],
+      "url_template": "https://www.google.co.jp/search?q={query}",
+      "notes": "Google Japan general search."
+    },
+    {
+      "id": "tenki-jp",
+      "aliases": ["tenki.jp", "tenki", "天気jp", "日本気象協会"],
+      "topics": ["天気", "weather", "気温", "温度"],
+      "url_template": "https://tenki.jp/forecast/3/16/",
+      "notes": "Japan Meteorological Association weather. URL is for Tokyo area."
+    },
+    {
+      "id": "wikipedia-ja",
+      "aliases": ["Wikipedia", "ウィキペディア", "wiki", "wikipedia"],
+      "topics": ["*"],
+      "url_template": "https://ja.wikipedia.org/wiki/{query}",
+      "notes": "Japanese Wikipedia."
+    },
+    {
+      "id": "coinmarketcap",
+      "aliases": ["CoinMarketCap", "coinmarketcap", "CMC"],
+      "topics": ["仮想通貨", "crypto", "bitcoin", "ビットコイン", "ethereum", "イーサリアム"],
+      "url_template": "https://coinmarketcap.com/",
+      "notes": "Cryptocurrency market data."
+    }
+  ]
+}

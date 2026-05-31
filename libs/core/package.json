@@ -231,6 +231,10 @@
       "types": "./dist/intent-contract.d.ts",
       "default": "./dist/intent-contract.js"
     },
+    "./intent-execution-profile-registry": {
+      "types": "./dist/intent-execution-profile-registry.d.ts",
+      "default": "./dist/intent-execution-profile-registry.js"
+    },
     "./intelligence-primitives": {
       "types": "./dist/intelligence-primitives.d.ts",
       "default": "./dist/intelligence-primitives.js"

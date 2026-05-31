@@ -221,6 +221,40 @@
       ]
     },
     {
+      "intent_id": "generate-blog-post",
+      "canonical_flow": [
+        "intent normalization",
+        "blog brief creation",
+        "article outline from brief",
+        "brief to draft protocol",
+        "generate document",
+        "artifact record persistence"
+      ],
+      "contract_layers": [
+        "task_session",
+        "document_brief",
+        "document_outline_adf",
+        "draft_protocol",
+        "artifact_record"
+      ],
+      "primary_outcome_ids": ["artifact:md", "artifact:html"],
+      "evidence": [
+        "governed markdown or html draft",
+        "artifact record",
+        "task session work loop"
+      ],
+      "completion_criteria": [
+        "blog topic and audience resolve",
+        "article structure is compiled",
+        "draft artifact is written to a governed path",
+        "artifact record is persisted"
+      ],
+      "follow_up": [
+        "draft can be exported to CMS or static site workflow",
+        "preview can be reused in review or publish gating"
+      ]
+    },
+    {
       "intent_id": "generate-workbook",
       "canonical_flow": [
         "intent normalization",

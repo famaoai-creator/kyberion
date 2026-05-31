@@ -1,0 +1,107 @@
+import { describe, expect, it } from 'vitest';
+import { compileVideoContentBriefToStoryboard, compileVideoStoryboardToNarratedVideoBrief } from './video-content-brief-contract.js';
+
+describe('video content brief contract', () => {
+  it('compiles a how-to brief into a storyboard and narrated brief', () => {
+    const storyboard = compileVideoContentBriefToStoryboard({
+      kind: 'video-content-brief',
+      version: '1.0.0',
+      title: 'Kyberion how-to',
+      audience: 'operators',
+      objective: 'turn a brief into a video',
+      distribution_channel: 'docs-demo',
+      content_type: 'howto',
+      presentation_mode: 'howto',
+      promise: 'clear governed output',
+      desired_takeaway: 'content brief becomes renderable',
+      constraints: ['no pitch'],
+      proof_points: ['brief', 'storyboard', 'render'],
+      content_requirements: ['show intake', 'show plan', 'show render'],
+      fixed_inputs: {
+        customer: 'operators',
+        use_case: 'governed work',
+        message: 'brief to video',
+      },
+      tone: 'practical',
+      language: 'ja',
+      duration_sec: 12,
+      design_system_ref: {
+        system_id: 'operator-ops',
+        brand_name: 'Kyberion',
+        background_color: '#07111f',
+        hero_path: 'active/shared/assets/hero.png',
+        logo_path: 'active/shared/assets/logo.png',
+        fps: 30,
+      },
+    });
+
+    expect(storyboard.kind).toBe('video-storyboard');
+    expect(storyboard.beats).toHaveLength(4);
+    expect(storyboard.beats[1].semantic).toBe('process');
+    expect(storyboard.beats[1].design_token_hints?.typography_scale).toBe('balanced');
+
+    const narrated = compileVideoStoryboardToNarratedVideoBrief(storyboard, {
+      narration_artifact_ref: 'active/shared/exports/narration.aiff',
+      output: {
+        format: 'mp4',
+      },
+    });
+
+    expect(narrated.kind).toBe('narrated-video-brief');
+    expect(narrated.storyboard?.kind).toBe('video-storyboard');
+    expect(narrated.script.hook).toContain('clear governed output');
+    expect(narrated.script.cta).toContain('content brief');
+  });
+
+  it('compiles promo briefs into promo-oriented beats and layout defaults', () => {
+    const storyboard = compileVideoContentBriefToStoryboard({
+      kind: 'video-content-brief',
+      version: '1.0.0',
+      audience: 'prospective customers',
+      objective: 'promote a product launch',
+      distribution_channel: 'youtube',
+      content_type: 'product-launch',
+      presentation_mode: 'promo',
+      promise: 'launch value in the first beat',
+      desired_takeaway: 'click to learn more',
+      constraints: ['no generic pitch'],
+      proof_points: ['launch date', 'customer proof'],
+      design_system_ref: {
+        system_id: 'promo-kit',
+        brand_name: 'Kyberion',
+      },
+    });
+
+    expect(storyboard.presentation_mode).toBe('promo');
+    expect(storyboard.design_system_ref?.layout_family).toBe('promo-spot');
+    expect(storyboard.beats).toHaveLength(4);
+    expect(storyboard.beats[1].semantic).toBe('value');
+    expect(storyboard.beats[0].design_token_hints?.typography_scale).toBe('expressive');
+  });
+
+  it('compiles vtuber briefs into stage-oriented beats with live presentation hints', () => {
+    const storyboard = compileVideoContentBriefToStoryboard({
+      kind: 'video-content-brief',
+      version: '1.0.0',
+      audience: 'live viewers',
+      objective: 'present an on-air persona and demo',
+      distribution_channel: 'live-stream',
+      content_type: 'vtuber',
+      presentation_mode: 'vtuber',
+      promise: 'live persona with governed workflow',
+      desired_takeaway: 'the viewer sees the persona, demo, and CTA',
+      constraints: ['keep it live'],
+      proof_points: ['persona', 'demo', 'cta'],
+      design_system_ref: {
+        system_id: 'vtuber-kit',
+        brand_name: 'Kyberion',
+      },
+    });
+
+    expect(storyboard.presentation_mode).toBe('vtuber');
+    expect(storyboard.design_system_ref?.layout_family).toBe('vtuber-stage');
+    expect(storyboard.beats).toHaveLength(4);
+    expect(storyboard.beats[0].design_token_hints?.camera_distance).toBe('medium-close');
+    expect(storyboard.beats[2].design_token_hints?.overlay_density).toBe('dense');
+  });
+});
