@@ -207,9 +207,19 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('voice-hub のログを見て')?.payload?.service_name).toBe(
       'voice-hub'
     );
+    const slackIntent = classifyTaskSessionIntent('Slackと連携して');
+    expect(slackIntent?.intentId).toBe('setup-messaging-bridge');
     expect(classifyTaskSessionIntent('voice-hub を再起動して')?.requirements?.missing).toContain(
       'approval_confirmation'
     );
+    expect(classifyTaskSessionIntent('承認を依頼して')?.requirements?.missing).toEqual([
+      'approval_system',
+      'approval_scope',
+    ]);
+    const voiceInputIntent = classifyTaskSessionIntent('音声入力にして');
+    expect(voiceInputIntent?.intentId).toBe('enable-voice-input');
+    expect(voiceInputIntent?.payload?.service_name).toBe('voice-hub');
+    expect(voiceInputIntent?.payload?.operation).toBe('voice_input_toggle');
     expect(
       classifyTaskSessionIntent('voice-hub のログを見て')?.requirements?.missing || []
     ).not.toContain('approval_confirmation');

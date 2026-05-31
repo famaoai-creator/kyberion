@@ -30,10 +30,11 @@ describe('mission-llm resolution', () => {
     },
     profiles: {
       heavy: {
-        command: 'claude',
-        args: ['-p', '{prompt}', '--output-format', 'json'],
+        command: 'codex',
+        args: [],
         timeout_ms: 10,
         response_format: 'json_envelope',
+        adapter: 'codex-cli',
       },
       standard: {
         command: 'gemini',
@@ -43,9 +44,10 @@ describe('mission-llm resolution', () => {
       },
       light: {
         command: 'codex',
-        args: ['-p', '{prompt}'],
+        args: [],
         timeout_ms: 10,
-        response_format: 'raw_json',
+        response_format: 'json_envelope',
+        adapter: 'codex-cli',
       },
     },
   };
@@ -54,8 +56,8 @@ describe('mission-llm resolution', () => {
     const status = inspectLlmResolution('distill', policy as any, {
       userTools: {},
       isCommandAvailable: (command) => ({
-        available: command !== 'claude',
-        reason: command === 'claude' ? 'broken binary' : undefined,
+        available: command !== 'codex',
+        reason: command === 'codex' ? 'broken binary' : undefined,
       }),
     });
 
@@ -67,8 +69,8 @@ describe('mission-llm resolution', () => {
     const profile = resolveLlmConfig('distill', policy as any, {
       userTools: {},
       isCommandAvailable: (command) => ({
-        available: command !== 'claude',
-        reason: command === 'claude' ? 'broken binary' : undefined,
+        available: command !== 'codex',
+        reason: command === 'codex' ? 'broken binary' : undefined,
       }),
     });
 
@@ -93,8 +95,32 @@ describe('mission-llm resolution', () => {
       }),
     });
 
-    expect(status.selectedProfile).toBe('light');
+    expect(status.selectedProfile).toBe('heavy');
     expect(status.selectedCommand).toBe('codex');
+  });
+
+  it('falls back to builtin codex when no configured profile is usable', () => {
+    const status = inspectLlmResolution('summarize', { profiles: {} } as any, {
+      userTools: {},
+      isCommandAvailable: (command) => ({
+        available: command === 'codex',
+        reason: command !== 'codex' ? 'unavailable' : undefined,
+      }),
+    });
+
+    expect(status.selectedProfile).toBe('builtin-fallback');
+    expect(status.selectedCommand).toBe('codex');
+
+    const profile = resolveLlmConfig('summarize', { profiles: {} } as any, {
+      userTools: {},
+      isCommandAvailable: (command) => ({
+        available: command === 'codex',
+        reason: command !== 'codex' ? 'unavailable' : undefined,
+      }),
+    });
+
+    expect(profile.command).toBe('codex');
+    expect(profile.adapter).toBe('codex-cli');
   });
 
   it('dispatches to a custom adapter without hardcoded provider branches', async () => {

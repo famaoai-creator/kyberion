@@ -23,9 +23,9 @@
       },
       "light": {
         "description": "Fast, low-cost — tagging, classification",
-        "command": "claude",
-        "adapter": "shell-json",
-        "args": ["-p", "{prompt}", "--model", "haiku", "--output-format", "json"],
+        "command": "codex",
+        "adapter": "codex-cli",
+        "args": [],
         "timeout_ms": 30000,
         "response_format": "json_envelope"
       }

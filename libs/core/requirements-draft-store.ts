@@ -178,7 +178,9 @@ export function evaluateRequirementsCompletenessGate(missionId: string): GateRes
       `must-have FRs without acceptance_criteria: ${mustsWithoutCriteria.map((r) => r.id).join(', ')}`,
     );
   }
-  const openBlocking = draft.open_questions.filter((q) => (q.status ?? 'open') === 'open');
+  const openBlocking = draft.open_questions.filter(
+    (q) => (q.status ?? 'open') === 'open' && q.blocking !== false,
+  );
   if (openBlocking.length > 0) {
     reasons.push(`${openBlocking.length} open question(s) unresolved`);
   }

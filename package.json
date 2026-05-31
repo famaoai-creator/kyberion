@@ -63,6 +63,7 @@
     "voice:upgrade-cloud": "KYBERION_VOICE_UPGRADE_ALIAS=cloud node dist/scripts/voice_upgrade.js",
     "voice:upgrade-local": "KYBERION_VOICE_UPGRADE_ALIAS=local node dist/scripts/voice_upgrade.js",
     "check:doc-examples": "node dist/scripts/check_doc_examples.js",
+    "eval:japanese-contextual-intent": "pnpm exec tsx scripts/eval_japanese_contextual_intent.ts",
     "check:first-win-smoke": "node dist/scripts/check_first_win_smoke.js",
     "find:dead-code": "node dist/scripts/find_dead_code.js",
     "dev:watch": "pnpm vitest watch libs/core/",
@@ -122,6 +123,7 @@
     "surfaces:start": "node dist/scripts/surface_runtime.js --action start",
     "surfaces:stop": "node dist/scripts/surface_runtime.js --action stop",
     "services:setup": "node dist/scripts/services_setup.js",
+    "channels:list": "node dist/scripts/channel_directory.js",
     "setup:report": "node dist/scripts/setup_report.js",
     "generation:schedule": "node dist/scripts/run_generation_schedule.js",
     "generation:daemon": "node dist/scripts/run_generation_schedule_daemon.js",
@@ -181,7 +183,9 @@
     "nerve:pulse": "node dist/scripts/pulse_aggregator.js",
     "nerve:start": "pnpm surfaces:reconcile",
     "nerve:stop": "pnpm surfaces:stop",
-    "nerve:status": "pnpm surfaces:status"
+    "nerve:status": "pnpm surfaces:status",
+    "skill:install": "pnpm tsx scripts/skill_installer.ts",
+    "actuator:play": "pnpm tsx scripts/actuator_playground.ts"
   },
   "lint-staged": {
     "knowledge/**/*.md": [
@@ -211,7 +215,7 @@
     "adm-zip": "^0.5.16",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
-    "axios": "^1.13.6",
+    "axios": "^1.15.2",
     "chalk": "^4.1.2",
     "chokidar": "^5.0.0",
     "claude-code": "^1.0.0",
@@ -242,10 +246,10 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@next/eslint-plugin-next": "^16.2.0",
-    "@playwright/test": "^1.41.0",
+    "@playwright/test": "^1.60.0",
     "@types/js-yaml": "^4.0.9",
     "@types/jszip": "^3.4.1",
-    "@types/node": "^25.2.1",
+    "@types/node": "^25.6.2",
     "@types/yargs": "^17.0.35",
     "@vitest/coverage-v8": "^4.1.0",
     "c8": "^10.1.3",

@@ -4,6 +4,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { resolveCapabilityBundleForIntent } from './capability-bundle-registry.js';
+import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -270,6 +271,160 @@ function scoreCatalogIntent(utterance: string, intent: StandardIntentDefinition)
   };
 }
 
+function scoreScheduleReadAgendaIntent(utterance: string): IntentResolutionCandidate | null {
+  const frame = buildContextualIntentFrame(utterance);
+  const normalized = normalizeFreeText(utterance);
+  const calendarHint = /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(normalized);
+  const readHint = frame.action === 'read';
+  if (!calendarHint || !readHint) return null;
+
+  let confidence = 0.78;
+  const reasons: string[] = ['read-only calendar agenda request'];
+  if (frame.date_range) {
+    confidence += 0.08;
+    reasons.push(`date range resolved: ${frame.date_range.value}`);
+  }
+  if (frame.source_binding.selected) {
+    confidence += 0.08;
+    reasons.push(`source binding resolved: ${frame.source_binding.selected}`);
+  }
+  if (frame.subject === 'operator_self') {
+    confidence += 0.04;
+    reasons.push('subject inferred as operator self');
+  }
+  if (/(教えて|見せて|確認|見る|空き|show|see|check)/i.test(normalized)) {
+    confidence += 0.04;
+    reasons.push('read verb matched');
+  }
+  confidence = Math.min(0.97, confidence);
+
+  return {
+    intent_id: 'schedule-read-agenda',
+    confidence: Number(confidence.toFixed(2)),
+    source: 'heuristic',
+    matched_keywords: [],
+    reasons,
+    resolution: {
+      shape: 'direct_reply',
+      result_shape: 'calendar_agenda_summary',
+    },
+  };
+}
+
+function scoreScheduleCoordinationIntent(utterance: string): IntentResolutionCandidate | null {
+  const frame = buildContextualIntentFrame(utterance);
+  const normalized = normalizeFreeText(utterance);
+  const scheduleHint = /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|参加者|全員|合わせて|calendar|schedule)/i.test(
+    normalized
+  );
+  const changeHint = frame.action === 'change';
+  if (!scheduleHint || !changeHint) return null;
+
+  let confidence = 0.8;
+  const reasons: string[] = ['schedule change request'];
+  if (frame.date_range) {
+    confidence += 0.05;
+    reasons.push(`date range resolved: ${frame.date_range.value}`);
+  }
+  if (frame.source_binding.selected) {
+    confidence += 0.05;
+    reasons.push(`source binding resolved: ${frame.source_binding.selected}`);
+  }
+  if (frame.subject !== 'unknown') {
+    confidence += 0.03;
+    reasons.push(`subject inferred as ${frame.subject}`);
+  }
+  confidence = Math.min(0.97, confidence);
+
+  return {
+    intent_id: 'schedule-coordination',
+    confidence: Number(confidence.toFixed(2)),
+    source: 'heuristic',
+    matched_keywords: [],
+    reasons,
+    resolution: {
+      shape: 'task_session',
+      task_kind: 'service_operation',
+      result_shape: 'summary',
+    },
+  };
+}
+
+function scoreApprovalWorkflowIntent(utterance: string): IntentResolutionCandidate | null {
+  const normalized = normalizeFreeText(utterance);
+  const approvalHint = /(稟議|決裁|承認|approval|approve)/i.test(normalized);
+  if (!approvalHint) return null;
+
+  const requestHint = /(依頼|申請|お願い|作成|request|create)/i.test(normalized);
+  const resolveHint = /(決裁|承認して|承認し|approveして|approve|処理して|通して|通しといて)/i.test(
+    normalized
+  );
+
+  const reasons: string[] = ['approval workflow request'];
+  let intentId = 'resolve-approval';
+  let confidence = 0.82;
+  let resultShape = 'summary';
+  if (requestHint && !resolveHint) {
+    intentId = 'request-approval';
+    confidence = 0.8;
+    reasons.push('approval request phrasing matched');
+  } else {
+    reasons.push('approval resolution phrasing matched');
+  }
+  if (/(稟議|決裁)/i.test(normalized)) {
+    confidence += 0.08;
+    reasons.push('ringi vocabulary matched');
+  }
+  if (/(システム|一覧|案件|申請|ワークフロー|workflow|system)/i.test(normalized)) {
+    confidence += 0.04;
+    reasons.push('workflow/system context matched');
+  }
+
+  return {
+    intent_id: intentId,
+    confidence: Number(Math.min(0.97, confidence).toFixed(2)),
+    source: 'heuristic',
+    matched_keywords: [],
+    reasons,
+    resolution: {
+      shape: 'task_session',
+      task_kind: 'service_operation',
+      result_shape: resultShape,
+    },
+  };
+}
+
+function scoreVoiceInputIntent(utterance: string): IntentResolutionCandidate | null {
+  const normalized = normalizeFreeText(utterance);
+  const voiceInputHint = /(音声入力|dictation|voice input|入力モード|マイク入力)/i.test(normalized);
+  if (!voiceInputHint) return null;
+
+  let confidence = 0.84;
+  const reasons: string[] = ['voice input toggle request'];
+  if (/(音声入力|dictation)/i.test(normalized)) {
+    confidence += 0.08;
+    reasons.push('voice input vocabulary matched');
+  }
+  if (/(オン|on|enable|有効)/i.test(normalized)) {
+    confidence += 0.03;
+    reasons.push('enable phrasing matched');
+  }
+  confidence = Math.min(0.97, confidence);
+
+  return {
+    intent_id: 'enable-voice-input',
+    confidence: Number(confidence.toFixed(2)),
+    source: 'heuristic',
+    matched_keywords: [],
+    reasons,
+    resolution: {
+      shape: 'task_session',
+      task_kind: 'service_operation',
+      result_shape: 'summary',
+    },
+  };
+}
+
 function buildLegacyCandidates(utterance: string): IntentResolutionCandidate[] {
   return loadIntentResolutionPolicy().legacy_candidates
     .filter((candidate) => matchesAnyTextRule(utterance, candidate.patterns))
@@ -325,6 +480,18 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
     ...surfaceIntents
       .map((intent) => scoreCatalogIntent(trimmed, intent))
       .filter((candidate): candidate is IntentResolutionCandidate => Boolean(candidate)),
+    ...[scoreScheduleCoordinationIntent(trimmed)].filter(
+      (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
+    ),
+    ...[scoreApprovalWorkflowIntent(trimmed)].filter(
+      (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
+    ),
+    ...[scoreVoiceInputIntent(trimmed)].filter(
+      (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
+    ),
+    ...[scoreScheduleReadAgendaIntent(trimmed)].filter(
+      (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
+    ),
     ...buildLegacyCandidates(trimmed),
   ];
 

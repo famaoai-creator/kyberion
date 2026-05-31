@@ -217,6 +217,69 @@
       "risk_profile": "review_required"
     },
     {
+      "id": "speak-with-my-voice",
+      "category": "outcome_execution",
+      "description": "Generate speech in the operator's cloned voice using mlx-audio TTS.",
+      "surface_examples": [
+        "私の声で喋らせて",
+        "このテキストを私の声で読んで",
+        "クローンボイスで発話して",
+        "Speak with my voice"
+      ],
+      "plan_outline": [
+        "log voice speech request",
+        "generate narration audio using the cloned voice profile",
+        "return the generated audio artifact"
+      ],
+      "outcome_ids": ["artifact:audio"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["喋らせて", "読んで", "発話", "speak", "voice", "cloned"],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_audio",
+      "execution_shape": "pipeline",
+      "mission_class": "content_and_media",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "generate-narrated-video",
+      "category": "outcome_execution",
+      "description": "Generate a narrated strategic video report from a conceptual brief.",
+      "surface_examples": [
+        "ナレーション付きの動画レポートを作って",
+        "報告書のスライドと声を合成して動画にして",
+        "音声付きの解説動画をレンダリングして",
+        "Generate narrated video report"
+      ],
+      "plan_outline": [
+        "compile narrated video brief",
+        "generate voice narration audio",
+        "render narrated video using video-composition-actuator",
+        "verify audio-muxed video output"
+      ],
+      "outcome_ids": ["artifact:video"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["動画", "ビデオ", "映像", "ビデオレポート", "video", "movie", "narrated"],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "artifact_video",
+      "execution_shape": "pipeline",
+      "mission_class": "content_and_media",
+      "risk_profile": "approval_required"
+    },
+    {
       "id": "inspect-service",
       "category": "system_observability",
       "description": "Inspect service state or logs and return a concise summary.",
@@ -609,6 +672,50 @@
       ]
     },
     {
+      "id": "schedule-read-agenda",
+      "category": "outcome_execution",
+      "description": "Read the operator's upcoming calendar agenda without mutating the calendar.",
+      "surface_examples": [
+        "来週の予定教えて",
+        "今週の予定を見せて",
+        "明日の空き時間ある？",
+        "今日の予定を確認して",
+        "予定を教えて",
+        "カレンダーの予定を見て",
+        "Show my calendar agenda"
+      ],
+      "plan_outline": [
+        "resolve the calendar source and time range",
+        "read upcoming events from the governed calendar",
+        "summarize the agenda without mutating the schedule"
+      ],
+      "intake_requirements": ["date_range"],
+      "outcome_ids": ["calendar_agenda_summary"],
+      "specialist_id": "surface-concierge",
+      "trigger_keywords": [
+        "予定",
+        "agenda",
+        "calendar",
+        "空き時間",
+        "availability",
+        "確認",
+        "教えて",
+        "見せて"
+      ],
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "calendar_agenda_summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "query",
+      "object": "calendar_events",
+      "execution_shape": "direct_reply",
+      "mission_class": "customer_engagement",
+      "risk_profile": "low"
+    },
+    {
       "id": "schedule-coordination",
       "category": "outcome_execution",
       "description": "Adjust, reschedule, or coordinate a calendar or schedule while preserving constraints and follow-up.",
@@ -818,6 +925,7 @@
       "category": "environment_setup",
       "description": "Onboard and activate a declared messaging communication channel implementation (currently Slack and macOS iMessage) by verifying credentials, reconciling the surface manifest, and starting the bridge service. Unsupported platforms require a scaffolded bridge first.",
       "surface_examples": [
+        "Slackと連携して",
         "Slackブリッジを起動して",
         "iMessageの連携を設定して",
         "Setup Slack bridge",
@@ -844,6 +952,70 @@
       "action": "activate",
       "object": "communication_bridge",
       "execution_shape": "task_session",
+      "mission_class": "platform_onboarding",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "enable-voice-input",
+      "category": "system_observability",
+      "description": "Switch Kyberion to voice input mode by toggling the system dictation pipeline.",
+      "surface_examples": [
+        "音声入力にして",
+        "音声入力をオンにして",
+        "dictation を有効にして",
+        "Enable voice input"
+      ],
+      "plan_outline": [
+        "resolve the voice input target",
+        "toggle the system dictation pipeline",
+        "confirm the input mode change"
+      ],
+      "outcome_ids": ["voice_input_enabled"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["音声入力", "dictation", "voice input", "入力モード"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "execute",
+      "object": "voice_input_pipeline",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "clone-my-voice",
+      "category": "environment_setup",
+      "description": "Create a custom voice clone profile by recording samples from the operator.",
+      "surface_examples": [
+        "自分の声をクローンして",
+        "声の登録をして",
+        "クローンボイスを作って",
+        "Clone my voice"
+      ],
+      "plan_outline": [
+        "check sox cli availability",
+        "record 3 audio samples from prompt cues",
+        "write sample transcripts",
+        "generate and register cloned voice profile"
+      ],
+      "outcome_ids": ["voice_profile_created"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["クローン", "登録", "録音", "声", "clone", "voice"],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "create",
+      "object": "voice_profile",
+      "execution_shape": "pipeline",
       "mission_class": "platform_onboarding",
       "risk_profile": "approval_required"
     },
@@ -2869,7 +3041,11 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Create a governance approval request.",
-      "surface_examples": ["承認を依頼して"],
+      "surface_examples": [
+        "承認を依頼して",
+        "稟議の承認を依頼して",
+        "この案件の承認を申請して"
+      ],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
@@ -2877,7 +3053,7 @@
       ],
       "outcome_ids": ["approval_request_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["request", "承認を依頼して"],
+      "trigger_keywords": ["request", "承認を依頼して", "稟議", "承認を申請", "approval request"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -2895,7 +3071,12 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Resolve an existing approval request.",
-      "surface_examples": ["承認依頼を解決して"],
+      "surface_examples": [
+        "承認依頼を解決して",
+        "稟議の決裁しておいて",
+        "この案件を承認して",
+        "承認待ちの案件を処理して"
+      ],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
@@ -2903,7 +3084,7 @@
       ],
       "outcome_ids": ["approval_resolved"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["resolve", "承認依頼を解決して"],
+      "trigger_keywords": ["resolve", "承認依頼を解決して", "稟議", "決裁", "承認して", "approve"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"

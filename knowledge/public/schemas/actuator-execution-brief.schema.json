@@ -43,6 +43,43 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "approval_system_candidates": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "approval_system": {
+      "type": "string"
+    },
+    "approval_scope": {
+      "type": "string"
+    },
+    "workflow_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "description", "actuator", "phase"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "actuator": { "type": "string" },
+          "phase": {
+            "type": "string",
+            "enum": ["resolve_system", "authenticate", "list_pending", "review_item", "decide", "summarize"]
+          },
+          "requires_confirmation": { "type": "boolean" },
+          "input_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "output_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
     "assumptions": {
       "type": "array",
       "items": { "type": "string" }
