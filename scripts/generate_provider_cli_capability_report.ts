@@ -1,4 +1,11 @@
-import { safeMkdir, safeWriteFile, pathResolver, loadCapabilityRegistry, probeProviderAvailability } from '@agent/core';
+import {
+  loadCapabilityRegistry,
+  pathResolver,
+  probeProviderAvailability,
+  resolveProviderCliCapabilityReportPolicy,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import * as path from 'node:path';
 import type { CapabilityRegistryEntry } from '@agent/core';
@@ -46,6 +53,7 @@ function buildReport(
   adapters: AdapterEntry[],
   providerAvailability: Map<string, { ok: boolean; evidence: string }>,
 ): string {
+  const policy = resolveProviderCliCapabilityReportPolicy();
   const adapterByCapability = new Map(adapters.map((adapter) => [adapter.capability_id, adapter]));
   const byProvider = new Map<string, CapabilityRegistryEntry[]>();
   for (const capability of capabilities) {
@@ -65,8 +73,8 @@ function buildReport(
     .map(([provider]) => provider)
     .sort();
 
-  let md = '# Provider CLI Capability Report\n\n';
-  md += '## Summary\n\n';
+  let md = `# ${policy.title}\n\n`;
+  md += `## ${policy.summary_title}\n\n`;
   md += `- Capabilities registered: ${capabilities.length}\n`;
   md += `- Active capabilities: ${activeCount}\n`;
   md += `- Experimental capabilities: ${experimentalCount}\n`;
@@ -75,7 +83,7 @@ function buildReport(
   md += `- Providers available: ${availableProviders}/${providerAvailability.size}\n`;
   md += `- Available providers: ${availableProviderNames.join(', ') || 'none'}\n\n`;
 
-  md += '## Capability Inventory\n\n';
+  md += `## ${policy.capability_inventory_title}\n\n`;
   md += '| Provider | Capability | Kind | Risk | Replayability | Status | Provider Probe | Adapter |\n';
   md += '|---|---|---|---|---|---|---|---|\n';
 
@@ -98,7 +106,7 @@ function buildReport(
     ]) + '\n';
   }
 
-  md += '\n## By Provider\n\n';
+  md += `\n## ${policy.provider_title_prefix}\n\n`;
   for (const [provider, providerCapabilities] of [...byProvider.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     md += `### ${provider}\n\n`;
     md += `Provider probe: ${providerAvailability.get(provider)?.ok ? 'available' : 'missing'}\n\n`;
@@ -116,8 +124,8 @@ function buildReport(
   }
 
   if (missingAdapter.length > 0) {
-    md += '## Missing Adapter Coverage\n\n';
-    md += 'The following capabilities are registered but do not yet have a matching adapter profile:\n\n';
+    md += `## ${policy.missing_adapter_title}\n\n`;
+    md += `${policy.missing_adapter_message}\n\n`;
     for (const capability of missingAdapter.sort((a, b) => a.capability_id.localeCompare(b.capability_id))) {
       md += `- ${capability.capability_id} (${capability.source.provider})\n`;
     }

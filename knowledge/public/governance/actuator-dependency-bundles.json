@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "id": "core",
+      "actuator": "core",
+      "dependency_ids": ["node22", "pnpm"],
+      "summary": "Core build/runtime prerequisites."
+    },
+    {
+      "id": "browser",
+      "actuator": "browser",
+      "dependency_ids": ["node22", "playwright-browser"],
+      "summary": "Browser actuator prerequisites."
+    },
+    {
+      "id": "voice",
+      "actuator": "voice",
+      "dependency_ids": ["node22", "python3", "native-tts", "whisper", "ffmpeg"],
+      "summary": "Voice actuator prerequisites."
+    },
+    {
+      "id": "media-generation",
+      "actuator": "media-generation",
+      "dependency_ids": ["node22", "python3", "comfyui-server", "ffmpeg"],
+      "summary": "Media generation prerequisites."
+    },
+    {
+      "id": "meeting",
+      "actuator": "meeting",
+      "dependency_ids": ["node22", "playwright-browser", "native-tts"],
+      "summary": "Live meeting participation prerequisites."
+    },
+    {
+      "id": "all",
+      "actuator": "all",
+      "dependency_ids": ["node22", "pnpm", "python3", "playwright-browser", "native-tts", "whisper", "ffmpeg", "comfyui-server"],
+      "summary": "All common dependency checks."
+    }
+  ]
+}

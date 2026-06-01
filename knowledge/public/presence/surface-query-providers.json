@@ -8,11 +8,25 @@
   "weather": {
     "enabled": true,
     "provider": "open_meteo",
+    "geocodingUrl": "https://geocoding-api.open-meteo.com/v1/search",
+    "forecastUrl": "https://api.open-meteo.com/v1/forecast",
     "timeoutMs": 5000
   },
   "location": {
     "enabled": true,
-    "provider": "presence_context"
+    "provider": "presence_context",
+    "providers": [
+      {
+        "id": "ipapi",
+        "provider": "ipapi",
+        "url": "https://ipapi.co/json/"
+      },
+      {
+        "id": "ipwho",
+        "provider": "ipwho",
+        "url": "https://ipwho.is/"
+      }
+    ]
   },
   "knowledge": {
     "enabled": true,

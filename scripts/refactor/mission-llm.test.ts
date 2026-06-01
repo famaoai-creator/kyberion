@@ -99,6 +99,56 @@ describe('mission-llm resolution', () => {
     expect(status.selectedCommand).toBe('codex');
   });
 
+  it('applies organization overrides before user overrides', () => {
+    const organizationProfile = {
+      version: '1.0.0',
+      organization_id: 'demo-org',
+      name: 'Demo Org',
+      mission_defaults: {
+        default_mission_class: 'operations_and_release',
+      },
+      team_defaults: {
+        default_team_template: 'default',
+      },
+      llm: {
+        profile_overrides: {
+          heavy: {
+            command: 'org-codex',
+            args: ['--org'],
+            adapter: 'codex-cli',
+          },
+        },
+      },
+    } as any;
+
+    const orgProfile = resolveLlmConfig('distill', policy as any, {
+      userTools: {},
+      organizationProfile,
+      isCommandAvailable: (command) => ({
+        available: command === 'org-codex',
+      }),
+    });
+    expect(orgProfile.command).toBe('org-codex');
+    expect(orgProfile.args).toEqual(['--org']);
+
+    const userOverrideProfile = resolveLlmConfig('distill', policy as any, {
+      userTools: {
+        profile_overrides: {
+          heavy: {
+            command: 'user-codex',
+            args: ['--user'],
+          },
+        },
+      },
+      organizationProfile,
+      isCommandAvailable: (command) => ({
+        available: command === 'user-codex' || command === 'org-codex',
+      }),
+    });
+    expect(userOverrideProfile.command).toBe('user-codex');
+    expect(userOverrideProfile.args).toEqual(['--user']);
+  });
+
   it('falls back to builtin codex when no configured profile is usable', () => {
     const status = inspectLlmResolution('summarize', { profiles: {} } as any, {
       userTools: {},

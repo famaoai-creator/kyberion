@@ -21,6 +21,7 @@ export interface ServiceEndpointRecord {
   preset_path?: string;
   allow_unsafe_cli?: boolean;
   allow_local_network?: boolean;
+  allow_stream_ingress?: boolean;
   auth_strategy?: string;
   intent_aliases?: string[];
   headers?: Record<string, string>;

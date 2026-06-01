@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "ops": [
+    "document_report_design_from_brief",
+    "document_spreadsheet_design_from_brief",
+    "document_diagram_render_from_brief"
+  ]
+}

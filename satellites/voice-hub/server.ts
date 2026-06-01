@@ -16,6 +16,8 @@ import {
   classifyBrowserConversationCommand,
   classifySurfaceQueryIntent,
   classifyTaskSessionIntent,
+  findServiceBootstrapEntriesByUtterance,
+  getServiceBootstrapCatalogEntryByServiceId,
   confirmBrowserConversationCandidate,
   createTaskSession,
   createBrowserConversationCommand,
@@ -35,6 +37,7 @@ import {
   getSurfaceAgentCatalogEntry,
   getSurfaceAsyncRequest,
   getVoiceTtsLanguageConfig,
+  getVoiceProfileRecord,
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getSurfaceQueryProviderConfig,
@@ -88,6 +91,10 @@ import {
   recordBrowserConversationHistory,
   saveBrowserConversationSession,
   formatClarificationPacket,
+  resolveFallbackLocationCoordinates,
+  resolveFallbackLocationSummary,
+  resolveVoiceTaskDistillTargetKind,
+  resolveVoiceTaskProfile,
   type TaskSession,
 } from '@agent/core';
 
@@ -116,6 +123,15 @@ function buildIntentPatternHint(
   return section === 'completion'
     ? ` Completion is measured by ${items.slice(0, 2).join(', ')}.`
     : ` Next: ${items[0]}.`;
+}
+
+function renderVoiceTemplate(template: string, values: Record<string, string | undefined>): string {
+  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) => values[key] ?? '');
+}
+
+function renderVoiceList(values: string[] | undefined, replacements: Record<string, string | undefined>): string[] {
+  if (!Array.isArray(values)) return [];
+  return values.map((value) => renderVoiceTemplate(value, replacements));
 }
 
 interface VoiceHubResponseRecord {
@@ -160,10 +176,7 @@ type TaskSessionShape = TaskSession;
 function inferDistillTargetKind(
   taskType: string
 ): 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template' {
-  if (taskType === 'presentation_deck' || taskType === 'workbook_wbs') return 'pattern';
-  if (taskType === 'report_document') return 'report_template';
-  if (taskType === 'service_operation') return 'sop_candidate';
-  return 'knowledge_hint';
+  return resolveVoiceTaskDistillTargetKind({ taskType });
 }
 
 function buildDistillCandidateMetadata(
@@ -226,93 +239,37 @@ function buildDistillCandidateMetadata(
       output_format: 'project kickoff brief',
     };
   }
-  if (session.task_type === 'presentation_deck') {
-    const purpose = String(payload.deck_purpose || 'proposal');
-    return {
+  const profile = resolveVoiceTaskProfile({
+    taskType: session.task_type,
+    bootstrapKind: String(payload.bootstrap_kind || ''),
+    analysisKind: String(payload.analysis_kind || ''),
+    reportKind: String(payload.report_kind || ''),
+    operation: String(payload.operation || ''),
+  });
+  if (profile) {
+    const replacements = {
+      projectName,
+      serviceName: String(payload.service_name || 'service'),
+      operation: String(payload.operation || 'status'),
+      reportKind: String(payload.report_kind || 'summary'),
+      granularity: String(payload.granularity || 'work_package'),
+      label: profile.label_ja || profile.label_en || session.task_type,
+    };
+    const result: Record<string, unknown> = {
       preview_text: previewText,
       task_type: session.task_type,
       project_name: projectName,
-      applicability: ['presentation delivery', purpose, projectName],
-      reusable_steps: [
-        'Capture the user goal, audience, and success condition.',
-        'Translate the request into an executive slide storyline.',
-        'Generate the PPTX artifact and verify the result.',
-      ],
-      expected_outcome: previewText || 'A reusable presentation artifact is delivered.',
     };
-  }
-  if (session.task_type === 'workbook_wbs') {
-    return {
-      preview_text: previewText,
-      task_type: session.task_type,
-      project_name: projectName,
-      applicability: [
-        'work breakdown structure',
-        String(payload.granularity || 'work_package'),
-        projectName,
-      ],
-      reusable_steps: [
-        'Resolve the project scope and desired WBS granularity.',
-        'Translate the work into a structured workbook layout.',
-        'Generate the XLSX artifact and confirm it can be reused.',
-      ],
-      expected_outcome: previewText || 'A reusable workbook artifact is delivered.',
-    };
-  }
-  if (session.task_type === 'report_document') {
-    const reportKind = String(payload.report_kind || 'summary');
-    const format = String(payload.format || 'docx');
-    return {
-      preview_text: previewText,
-      task_type: session.task_type,
-      project_name: projectName,
-      template_sections:
-        reportKind === 'status'
-          ? ['Summary', 'Current Status', 'Risks', 'Next Actions']
-          : reportKind === 'spec'
-            ? ['Overview', 'Requirements', 'Constraints', 'Acceptance Criteria']
-            : reportKind === 'proposal'
-              ? ['Summary', 'Context', 'Recommendation', 'Next Step']
-              : ['Summary', 'Findings', 'Implications', 'Next Actions'],
-      audience: reportKind === 'proposal' ? 'decision makers' : 'internal stakeholders',
-      output_format: format,
-    };
-  }
-  if (session.task_type === 'service_operation') {
-    const operation = String(payload.operation || 'status');
-    const serviceName = String(payload.service_name || 'service');
-    return {
-      preview_text: previewText,
-      task_type: session.task_type,
-      project_name: projectName,
-      procedure_steps:
-        operation === 'logs'
-          ? [
-              `Resolve the managed surface for ${serviceName}.`,
-              'Read the latest governed logs.',
-              'Summarize the most relevant operational signal.',
-            ]
-          : operation === 'status'
-            ? [
-                `Resolve the managed surface for ${serviceName}.`,
-                'Inspect runtime state and health evidence.',
-                'Summarize the observed service status.',
-              ]
-            : [
-                `Resolve the managed surface for ${serviceName}.`,
-                `Request the controlled ${operation} action.`,
-                'Confirm the post-action state and report the outcome.',
-              ],
-      safety_notes: [
-        'Require explicit approval for start, stop, or restart actions.',
-        'Capture before/after evidence and keep the summary concise.',
-      ],
-      escalation_conditions: [
-        'Managed surface could not be resolved.',
-        'The runtime action failed or timed out.',
-        'The post-action state does not match the requested operation.',
-      ],
-    };
+    if (profile.applicability) result.applicability = renderVoiceList(profile.applicability, replacements);
+    if (profile.reusable_steps) result.reusable_steps = renderVoiceList(profile.reusable_steps, replacements);
+    if (profile.template_sections) result.template_sections = renderVoiceList(profile.template_sections, replacements);
+    if (profile.procedure_steps) result.procedure_steps = renderVoiceList(profile.procedure_steps, replacements);
+    if (profile.safety_notes) result.safety_notes = renderVoiceList(profile.safety_notes, replacements);
+    if (profile.escalation_conditions) result.escalation_conditions = renderVoiceList(profile.escalation_conditions, replacements);
+    if (profile.audience) result.audience = profile.audience;
+    if (profile.output_format) result.output_format = profile.output_format;
+    if (profile.expected_outcome) result.expected_outcome = renderVoiceTemplate(profile.expected_outcome, replacements);
+    return result;
   }
   return {
     preview_text: previewText,
@@ -1213,8 +1170,113 @@ async function speakReplyManaged(text: string): Promise<void> {
   if (process.platform !== 'darwin') return;
 
   const language = detectReplyLanguage(text);
-  const profile = getVoiceTtsLanguageConfig(language);
   const normalized = normalizeTextForTts(text, language);
+
+  let voiceProfile: any = null;
+  try {
+    voiceProfile = getVoiceProfileRecord();
+  } catch (error) {
+    logger.warn(`[voice-hub] Failed to load voice profile record: ${error}`);
+  }
+
+  if (voiceProfile && voiceProfile.default_engine_id === 'mlx_audio_qwen3') {
+    logger.info(`[voice-hub] Using Qwen3-TTS mlx_audio_qwen3 cloned voice for active profile: ${voiceProfile.profile_id}`);
+    
+    const bridgeScript = pathResolver.rootResolve(
+      'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'
+    );
+    const pythonBin = process.env.KYBERION_PYTHON || (safeExistsSync(pathResolver.rootResolve('.venv/bin/python3')) ? pathResolver.rootResolve('.venv/bin/python3') : 'python3');
+    
+    const samples = voiceProfile.sample_refs || [];
+    const refAudio = samples.length > 0 ? pathResolver.rootResolve(samples[0]) : undefined;
+    const refTextFile = refAudio ? `${refAudio}.transcript.txt` : undefined;
+    let refText: string | undefined;
+    if (refTextFile && safeExistsSync(refTextFile)) {
+      try {
+        refText = (safeReadFile(refTextFile, { encoding: 'utf8' }) as string).trim();
+      } catch (_) {}
+    }
+
+    const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
+    const payload = JSON.stringify({
+      action: 'generate',
+      params: {
+        text: normalized,
+        output_path: tmpPath,
+        ...(refAudio ? { ref_audio: refAudio } : {}),
+        ...(refText ? { ref_text: refText } : {}),
+      },
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const pyProcess = spawn(pythonBin, [bridgeScript], {
+          cwd: pathResolver.rootDir(),
+          env: process.env,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        pyProcess.stdout.on('data', (chunk) => { stdout += String(chunk); });
+        pyProcess.stderr.on('data', (chunk) => { stderr += String(chunk); });
+        
+        pyProcess.on('close', (code) => {
+          if (code !== 0) {
+            reject(new Error(`MLX Qwen3-TTS generation failed with code ${code}. Stderr: ${stderr}`));
+          } else {
+            resolve();
+          }
+        });
+        
+        pyProcess.stdin.write(payload);
+        pyProcess.stdin.end();
+      });
+      
+      // MLX voice synthesized successfully! Let's play it using afplay.
+      if (safeExistsSync(tmpPath)) {
+        await new Promise<void>((resolve, reject) => {
+          const afplay = spawn('/usr/bin/afplay', [tmpPath], {
+            cwd: pathResolver.rootDir(),
+            env: process.env,
+            stdio: ['ignore', 'ignore', 'pipe'],
+          });
+          activeSpeechProcess = afplay;
+          activeSpeechState = {
+            status: 'speaking',
+            text: normalized,
+            startedAt: Date.now(),
+            pid: afplay.pid,
+          };
+          
+          afplay.on('close', (code) => {
+            if (activeSpeechProcess === afplay) {
+              activeSpeechProcess = null;
+              recentSpeechGuardState = {
+                text: normalized,
+                finishedAt: Date.now(),
+              };
+              activeSpeechState = { status: 'idle' };
+            }
+            resolve();
+          });
+          afplay.on('error', (err) => {
+            if (activeSpeechProcess === afplay) {
+              activeSpeechProcess = null;
+              activeSpeechState = { status: 'idle' };
+            }
+            reject(err);
+          });
+        });
+        return;
+      }
+    } catch (err: any) {
+      logger.warn(`[voice-hub] MLX Qwen3-TTS synthesis failed, falling back to OS say: ${err.message}`);
+    }
+  }
+
+  // Fallback to macOS say
+  const profile = getVoiceTtsLanguageConfig(language);
   const args = ['-v', profile.voice, '-r', String(profile.rate), normalized];
 
   await new Promise<void>((resolve, reject) => {
@@ -1463,11 +1525,13 @@ function buildPresenceSurfaceConversationMessageInput(
   options?: {
     forcedReceiver?: string;
     delegationSummaryInstruction?: string;
+    surfaceText?: string;
   }
 ): Parameters<typeof runSurfaceMessageConversation>[0] {
   return {
     surface: 'presence',
     text,
+    surfaceText: options?.surfaceText,
     channel: 'voice',
     threadTs: 'voice-live',
     actorId: 'voice-user',
@@ -1621,17 +1685,25 @@ async function tryBuildLocationReply(userText: string): Promise<string | null> {
   if (config?.enabled === false) return null;
   const location = await fetchPresenceLocationContext();
   const isJapanese = detectReplyLanguage(userText) === 'ja';
-  if (!location) {
+  if (location) {
+    const lat = location.latitude.toFixed(4);
+    const lon = location.longitude.toFixed(4);
+    if (isJapanese) {
+      return `現在地の共有コンテキストは緯度 ${lat}、経度 ${lon} です。取得時刻は ${location.timestamp} です。`;
+    }
+    return `The current shared location context is latitude ${lat}, longitude ${lon}, captured at ${location.timestamp}.`;
+  }
+
+  const fallback = await resolveFallbackLocationSummary();
+  if (fallback === 'unknown location') {
     return isJapanese
       ? 'この surface では現在地の共有がまだありません。ブラウザの位置情報許可を与えると答えられます。'
       : 'This surface does not have a current location yet. Allow browser location access and I can answer that.';
   }
-  const lat = location.latitude.toFixed(4);
-  const lon = location.longitude.toFixed(4);
-  if (isJapanese) {
-    return `現在地の共有コンテキストは緯度 ${lat}、経度 ${lon} です。取得時刻は ${location.timestamp} です。`;
-  }
-  return `The current shared location context is latitude ${lat}, longitude ${lon}, captured at ${location.timestamp}.`;
+
+  return isJapanese
+    ? `現在地の共有がまだないため、取得できている位置情報として ${fallback} をもとに案内します。`
+    : `Current location is not shared yet, so I will use the available location information for ${fallback}.`;
 }
 
 function weatherCodeLabel(code: number, language: 'ja' | 'en'): string {
@@ -1663,18 +1735,25 @@ function weatherCodeLabel(code: number, language: 'ja' | 'en'): string {
 async function tryBuildWeatherReply(userText: string): Promise<string | null> {
   const config = getSurfaceQueryProviderConfig().weather;
   if (config?.enabled === false) return null;
-  const location = await fetchPresenceLocationContext();
   const isJapanese = detectReplyLanguage(userText) === 'ja';
-  if (!location) {
-    return isJapanese
-      ? '天気を答えるには現在地が必要です。ブラウザの位置情報を共有すると取得できます。'
-      : 'I need your current location to answer the weather. Share browser location and I can fetch it.';
-  }
+  const location = await fetchPresenceLocationContext();
 
   const timeoutMs = config?.timeoutMs || 5000;
-  const url = new URL('https://api.open-meteo.com/v1/forecast');
-  url.searchParams.set('latitude', String(location.latitude));
-  url.searchParams.set('longitude', String(location.longitude));
+  const resolvedLocation = location || (await resolveFallbackLocationCoordinates());
+  const usingFallbackLocation = !location;
+  const fallbackLocationLabel =
+    'label' in resolvedLocation ? resolvedLocation.label : 'current location';
+  if (resolvedLocation.latitude === undefined || resolvedLocation.longitude === undefined) {
+    return isJapanese
+      ? '天気を答えるには現在地が必要です。ブラウザの位置情報を共有すると、より正確に取得できます。'
+      : 'I need your current location to answer the weather. Share browser location for a more accurate result.';
+  }
+  if (!config?.forecastUrl) {
+    return null;
+  }
+  const url = new URL(config.forecastUrl);
+  url.searchParams.set('latitude', String(resolvedLocation.latitude));
+  url.searchParams.set('longitude', String(resolvedLocation.longitude));
   url.searchParams.set('current', 'temperature_2m,weather_code');
   url.searchParams.set(
     'daily',
@@ -1694,9 +1773,17 @@ async function tryBuildWeatherReply(userText: string): Promise<string | null> {
     const rainChance = payload?.daily?.precipitation_probability_max?.[0];
     const label = weatherCodeLabel(weatherCode, isJapanese ? 'ja' : 'en');
     if (isJapanese) {
-      return `今日の天気は ${label} です。現在 ${currentTemp} 度、予想最高 ${maxTemp} 度、最低 ${minTemp} 度、降水確率は最大 ${rainChance}% です。`;
+      const prefix = usingFallbackLocation
+        ? `現在地の共有がまだないため、取得できている位置情報として ${fallbackLocationLabel} をもとに天気を案内します。`
+        : '';
+      const body = `今日の天気は ${label} です。現在 ${currentTemp} 度、予想最高 ${maxTemp} 度、最低 ${minTemp} 度、降水確率は最大 ${rainChance}% です。`;
+      return prefix ? `${prefix} ${body}` : body;
     }
-    return `Today's weather is ${label}. It is currently ${currentTemp} degrees, with a high of ${maxTemp}, a low of ${minTemp}, and up to ${rainChance}% precipitation chance.`;
+    const prefix = usingFallbackLocation
+      ? `Current location is not shared yet, so I will use the available location information for ${fallbackLocationLabel}.`
+      : '';
+    const body = `Today's weather is ${label}. It is currently ${currentTemp} degrees, with a high of ${maxTemp}, a low of ${minTemp}, and up to ${rainChance}% precipitation chance.`;
+    return prefix ? `${prefix} ${body}` : body;
   } catch (error: any) {
     logger.warn(`[voice-hub] weather lookup failed: ${error?.message || error}`);
     return isJapanese
@@ -2317,16 +2404,14 @@ function inferTaskRequirementUpdate(
 }
 
 function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
-  const taskLabelJa: Record<string, string> = {
-    analysis: 'プロジェクト整理',
-    capture_photo: '写真撮影',
-    workbook_wbs: 'WBS 作成',
-    presentation_deck: 'PowerPoint 資料作成',
-    report_document: 'レポート作成',
-    service_operation: 'サービス操作',
-  };
-  const label = taskLabelJa[session.task_type] || session.task_type;
   const missing = session.requirements?.missing || [];
+  const profile = resolveVoiceTaskProfile({
+    taskType: session.task_type,
+    bootstrapKind: String(session.payload?.bootstrap_kind || ''),
+    analysisKind: String(session.payload?.analysis_kind || ''),
+    reportKind: String(session.payload?.report_kind || ''),
+    operation: String(session.payload?.operation || ''),
+  });
   const workDesign = resolveWorkDesign({
     taskType: session.task_type,
     shape: 'task_session',
@@ -2363,31 +2448,25 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
     language,
     'completion'
   );
+  const values = {
+    projectName: session.project_context?.project_name || 'project',
+    specialistLabel,
+    learnedHint,
+    completionHint,
+    suggestedRefHint: language === 'ja' ? suggestedRefHintJa : suggestedRefHintEn,
+    missing: language === 'ja' ? missing.join('、') : missing.join(', '),
+  };
+  const template = profile
+    ? (missing.includes('approval_confirmation')
+        ? (language === 'ja' ? profile.approval_reply_ja : profile.approval_reply_en)
+        : missing.length > 0
+          ? (language === 'ja' ? profile.missing_reply_ja : profile.missing_reply_en)
+          : (language === 'ja' ? profile.accepted_reply_ja : profile.accepted_reply_en))
+    : null;
+  if (template) return renderVoiceTemplate(template, values);
+
+  const label = session.task_type;
   if (language === 'ja') {
-    if (
-      session.task_type === 'analysis' &&
-      session.payload?.bootstrap_kind === 'project_bootstrap'
-    ) {
-      return `${session.project_context?.project_name || 'プロジェクト'} の立ち上げを受け取りました。${specialistLabel} が担当します。${learnedHint}まず、何を作るか、誰向けか、最初の成果物をまとめて教えてください。`;
-    }
-    if (
-      session.task_type === 'analysis' &&
-      session.payload?.analysis_kind === 'cross_project_remediation'
-    ) {
-      if (missing.length > 0) {
-        return `横断 remediation 依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}${suggestedRefHintJa}進めるには ${missing.join('、')} が必要です。`;
-      }
-      return `横断 remediation 依頼を受け取りました。${specialistLabel} が要件・incident・既存知見を横断して未展開箇所を洗い出します。${learnedHint}${suggestedRefHintJa}${completionHint}`.trim();
-    }
-    if (
-      session.task_type === 'analysis' &&
-      session.payload?.analysis_kind === 'incident_informed_review'
-    ) {
-      if (missing.length > 0) {
-        return `incident-aware review を受け取りました。${specialistLabel} が担当します。${learnedHint}${suggestedRefHintJa}進めるには ${missing.join('、')} が必要です。`;
-      }
-      return `incident-aware review を受け取りました。${specialistLabel} が過去 incident を踏まえてレビューします。${learnedHint}${suggestedRefHintJa}${completionHint}`.trim();
-    }
     if (missing.includes('approval_confirmation')) {
       return `${label} の依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}実行前に確認が必要です。続けてよければ「はい」と返してください。`;
     }
@@ -2395,27 +2474,6 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
       return `${label} の依頼を受け取りました。${specialistLabel} が担当します。${learnedHint}進めるには ${missing.join('、')} が必要です。わかったらそのまま教えてください。`;
     }
     return `${label} の依頼を受け取りました。${specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。${learnedHint}${completionHint}`.trim();
-  }
-  if (session.task_type === 'analysis' && session.payload?.bootstrap_kind === 'project_bootstrap') {
-    return `I started the project kickoff. ${specialistLabel} will handle it. ${learnedHint}Tell me what you want to build, who it is for, and the first deliverable.`;
-  }
-  if (
-    session.task_type === 'analysis' &&
-    session.payload?.analysis_kind === 'cross_project_remediation'
-  ) {
-    if (missing.length > 0) {
-      return `I received the cross-project remediation request. ${specialistLabel} will handle it. ${learnedHint}${suggestedRefHintEn}I still need ${missing.join(', ')}.`;
-    }
-    return `I received the cross-project remediation request. ${specialistLabel} will review requirements, incidents, and reusable findings to identify propagation gaps. ${learnedHint}${suggestedRefHintEn}${completionHint}`.trim();
-  }
-  if (
-    session.task_type === 'analysis' &&
-    session.payload?.analysis_kind === 'incident_informed_review'
-  ) {
-    if (missing.length > 0) {
-      return `I received the incident-informed review request. ${specialistLabel} will handle it. ${learnedHint}${suggestedRefHintEn}I still need ${missing.join(', ')}.`;
-    }
-    return `I received the incident-informed review request. ${specialistLabel} will review the current scope against prior incidents and known failures. ${learnedHint}${suggestedRefHintEn}${completionHint}`.trim();
   }
   if (missing.includes('approval_confirmation')) {
     return `I received the ${label} request. ${specialistLabel} will handle it. ${learnedHint}This action needs confirmation first. Reply yes to continue.`;
@@ -2428,6 +2486,13 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
 
 function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja' | 'en'): string {
   const missing = session.requirements?.missing || [];
+  const profile = resolveVoiceTaskProfile({
+    taskType: session.task_type,
+    bootstrapKind: String(session.payload?.bootstrap_kind || ''),
+    analysisKind: String(session.payload?.analysis_kind || ''),
+    reportKind: String(session.payload?.report_kind || ''),
+    operation: String(session.payload?.operation || ''),
+  });
   const workDesign = resolveWorkDesign({
     taskType: session.task_type,
     shape: 'task_session',
@@ -2449,6 +2514,27 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
   const suggestedRefHintEn = suggestedRefs.length
     ? ` Suggested references: ${suggestedRefs.join(', ')}.`
     : '';
+  const values = {
+    projectName: session.project_context?.project_name || 'project',
+    specialistLabel: workDesign.primary_specialist?.label || 'Kyberion',
+    learnedHint,
+    suggestedRefHint: language === 'ja' ? suggestedRefHintJa : suggestedRefHintEn,
+    missing: language === 'ja' ? missing.join('、') : missing.join(', '),
+  };
+  const template = profile
+    ? (missing.includes('approval_confirmation')
+        ? (language === 'ja'
+            ? profile.approval_reply_ja
+            : profile.approval_reply_en)
+        : missing.length > 0
+          ? (language === 'ja'
+              ? profile.progress_reply_ja || profile.missing_reply_ja
+              : profile.progress_reply_en || profile.missing_reply_en)
+          : (language === 'ja'
+              ? profile.progress_reply_ja || profile.accepted_reply_ja
+              : profile.progress_reply_en || profile.accepted_reply_en))
+    : null;
+  if (template) return renderVoiceTemplate(template, values);
   if (language === 'ja') {
     if (
       session.task_type === 'analysis' &&
@@ -3149,14 +3235,28 @@ function inferProjectNameFromUtterance(text: string): string {
 }
 
 function inferBindingDraftsFromUtterance(text: string): Array<{
+  service_id: string;
   binding_id: string;
   service_type: string;
   scope: string;
   target: string;
   allowed_actions: string[];
 }> {
+  const matched = findServiceBootstrapEntriesByUtterance(text);
+  if (matched.length > 0) {
+    return matched.map((entry) => ({
+      service_id: entry.service_id,
+      binding_id: entry.binding_id,
+      service_type: entry.service_type,
+      scope: entry.scope,
+      target: entry.target,
+      allowed_actions: [...entry.allowed_actions],
+    }));
+  }
+
   const normalized = text.toLowerCase();
   const drafts: Array<{
+    service_id: string;
     binding_id: string;
     service_type: string;
     scope: string;
@@ -3164,22 +3264,30 @@ function inferBindingDraftsFromUtterance(text: string): Array<{
     allowed_actions: string[];
   }> = [];
   if (/github|git hub/.test(normalized) || /webサービス|web service/.test(normalized)) {
-    drafts.push({
-      binding_id: 'github:default:new-project',
-      service_type: 'github',
-      scope: 'repository',
-      target: 'default/new-project',
-      allowed_actions: ['read', 'push_branch', 'pull_request'],
-    });
+    const entry = getServiceBootstrapCatalogEntryByServiceId('github');
+    if (entry) {
+      drafts.push({
+        service_id: entry.service_id,
+        binding_id: entry.binding_id,
+        service_type: entry.service_type,
+        scope: entry.scope,
+        target: entry.target,
+        allowed_actions: [...entry.allowed_actions],
+      });
+    }
   }
   if (/slack/.test(normalized)) {
-    drafts.push({
-      binding_id: 'slack:default:workspace',
-      service_type: 'slack',
-      scope: 'workspace',
-      target: 'default',
-      allowed_actions: ['read', 'post_message'],
-    });
+    const entry = getServiceBootstrapCatalogEntryByServiceId('slack');
+    if (entry) {
+      drafts.push({
+        service_id: entry.service_id,
+        binding_id: entry.binding_id,
+        service_type: entry.service_type,
+        scope: entry.scope,
+        target: entry.target,
+        allowed_actions: [...entry.allowed_actions],
+      });
+    }
   }
   return drafts;
 }
@@ -3220,7 +3328,7 @@ function tryHandleProjectBootstrap(userText: string): string | null {
         ])
       ) as Record<string, 'allowed' | 'approval_required' | 'denied'>,
       auth_mode: 'secret-guard',
-      service_id: draft.service_type,
+      service_id: draft.service_id,
       metadata: {
         draft: true,
         created_by: 'voice-hub',
@@ -4089,6 +4197,33 @@ function processAsyncDelegation(params: {
 
 async function generateReply(userText: string, context: { sessionKey: string }): Promise<string> {
   try {
+    // 1. 共通のインテントフローのコンパイルを試みる
+    const compiledFlow = await compileUserIntentFlow({
+      text: userText,
+      channel: 'voice',
+    }).catch(() => null);
+
+    // インテントにマッチした場合、またはパラメータ不足の聞き返し(clarificationPacket)がある場合
+    if (compiledFlow && (compiledFlow.clarificationPacket || compiledFlow.intentContract)) {
+      logger.info(`[voice-hub] Common intent match found. Routing via runSurfaceMessageConversation.`);
+      const result = await runSurfaceMessageConversation(
+        buildPresenceSurfaceConversationMessageInput(
+          buildPresenceConversationPrompt(userText, context.sessionKey),
+          {
+            surfaceText: userText,
+            delegationSummaryInstruction:
+              'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
+          }
+        )
+      );
+      const text = (result.text || '').trim();
+      if (text) return text;
+    }
+  } catch (error) {
+    logger.warn(`[voice-hub] Common intent routing failed, falling back to local handlers: ${error}`);
+  }
+
+  try {
     const projectBootstrapReply = tryHandleProjectBootstrap(userText);
     if (projectBootstrapReply) return projectBootstrapReply;
 
@@ -4220,6 +4355,7 @@ async function generateReply(userText: string, context: { sessionKey: string }):
           buildPresenceConversationPrompt(userText, context.sessionKey),
           {
             forcedReceiver,
+            surfaceText: userText,
             delegationSummaryInstruction:
               'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',
           }

@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "title": "Provider CLI Capability Report",
+  "summary_title": "Summary",
+  "capability_inventory_title": "Capability Inventory",
+  "provider_title_prefix": "By Provider",
+  "missing_adapter_title": "Missing Adapter Coverage",
+  "missing_adapter_message": "The following capabilities are registered but do not yet have a matching adapter profile:"
+}

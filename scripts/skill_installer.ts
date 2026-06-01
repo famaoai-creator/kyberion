@@ -3,6 +3,7 @@ import {
   scanProviderCapabilities,
   loadProviderCapabilityScanPolicy,
   safeExec,
+  findSkillInstallPackageMapEntry,
   type CapabilityBundleEntry,
   type DiscoveredCapability
 } from '@agent/core';
@@ -103,23 +104,11 @@ async function runInstaller() {
   for (const cap of missingCapabilities) {
     console.log(chalk.white(`\nResolving dependency for: ${chalk.bold.yellow(cap.capability_id)}`));
 
-    // Deduce package name based on provider or id
-    let installType: 'brew' | 'pip' | null = null;
-    let packageName = '';
-
-    if (cap.capability_id.includes('whisper')) {
-      installType = 'pip';
-      packageName = 'faster-whisper';
-    } else if (cap.capability_id.includes('ffmpeg')) {
-      installType = 'brew';
-      packageName = 'ffmpeg';
-    } else if (cap.source.provider === 'hermes-agent' || cap.capability_id.includes('hermes')) {
-      installType = 'brew';
-      packageName = 'sox'; // Hermes audio pipeline often uses sox
-    } else if (cap.capability_id.includes('gh')) {
-      installType = 'brew';
-      packageName = 'gh';
-    }
+    const mapped = findSkillInstallPackageMapEntry(
+      `${cap.capability_id} ${cap.source.provider}`
+    );
+    const installType = mapped?.install_type || null;
+    const packageName = mapped?.package_name || '';
 
     if (installType && packageName) {
       const ans = await question(chalk.bold.blue(`Would you like Kyberion to install '${packageName}' via ${installType}? [Y/n]: `));

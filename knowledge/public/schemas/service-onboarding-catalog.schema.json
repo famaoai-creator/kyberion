@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/service-onboarding-catalog.schema.json",
+  "title": "Service Onboarding Catalog",
+  "type": "object",
+  "required": ["version", "services"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["service_id", "prompt_kind"],
+        "properties": {
+          "service_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt_kind": {
+            "type": "string",
+            "enum": ["comfyui", "whisper", "generic"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -113,6 +113,15 @@ describe('surface-runtime-orchestrator fast-path', () => {
           longitude: 139.6503,
         };
       }
+      if (url.includes('ipwho.is')) {
+        return {
+          city: 'Tokyo',
+          region: 'Tokyo',
+          country: 'Japan',
+          latitude: 35.6762,
+          longitude: 139.6503,
+        };
+      }
       if (url.includes('geocoding-api.open-meteo.com')) {
         return {
           results: [
@@ -271,6 +280,106 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://api.open-meteo.com/v1/forecast',
+      }),
+    );
+  });
+
+  it('falls back to ipwho when ipapi is unavailable for current location queries', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'live-query',
+      shape: 'direct_reply',
+      routeFamily: 'direct_reply',
+      queryType: 'location',
+      queryText: '現在地を教えて',
+    });
+    mocks.secureFetch.mockImplementation(async (options: { url?: string }) => {
+      const url = String(options.url || '');
+      if (url.includes('ipapi.co/json')) {
+        throw new Error('ipapi blocked');
+      }
+      if (url.includes('ipwho.is')) {
+        return {
+          city: 'Tokyo',
+          region: 'Tokyo',
+          country: 'Japan',
+          latitude: 35.6762,
+          longitude: 139.6503,
+        };
+      }
+      return {};
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '現在地を教えて',
+      senderAgentId: 'test-sender',
+    });
+    expect(result.text).toContain('Current location: Tokyo, Tokyo, Japan');
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://ipapi.co/json/',
+      }),
+    );
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://ipwho.is/',
+      }),
+    );
+  });
+
+  it('falls back to current-location coordinates when geocoding fails for weather queries', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'live-query',
+      shape: 'direct_reply',
+      routeFamily: 'direct_reply',
+      queryType: 'weather',
+      queryText: '大阪の天気を教えて',
+    });
+    mocks.secureFetch.mockImplementation(async (options: { url?: string }) => {
+      const url = String(options.url || '');
+      if (url.includes('geocoding-api.open-meteo.com')) {
+        return { results: [] };
+      }
+      if (url.includes('ipapi.co/json')) {
+        throw new Error('ipapi blocked');
+      }
+      if (url.includes('ipwho.is')) {
+        return {
+          city: 'Tokyo',
+          region: 'Tokyo',
+          country: 'Japan',
+          latitude: 35.6762,
+          longitude: 139.6503,
+        };
+      }
+      if (url.includes('api.open-meteo.com')) {
+        return {
+          current: {
+            temperature_2m: 18.5,
+            weather_code: 2,
+            wind_speed_10m: 4.2,
+            relative_humidity_2m: 62,
+          },
+        };
+      }
+      return {};
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '大阪の天気を教えて',
+      senderAgentId: 'test-sender',
+    });
+    expect(result.text).toContain('Weather for Tokyo, Tokyo, Japan:');
+    expect(result.text).toContain('temperature 18.5°C');
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://geocoding-api.open-meteo.com/v1/search',
+      }),
+    );
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://ipwho.is/',
       }),
     );
   });

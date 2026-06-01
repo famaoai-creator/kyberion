@@ -1,15 +1,16 @@
 import * as path from 'node:path';
-import { 
-  safeExistsSync, 
+import {
+  safeExistsSync,
   safeReaddir,
-  safeReadFile 
+  safeReadFile,
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
-import { 
-  Persona, 
-  Authority, 
-  IdentityContext 
+import {
+  Persona,
+  Authority,
+  IdentityContext,
 } from './types.js';
+import { getServiceAuthorities } from './service-authority-map.js';
 
 type RolePersonaIndex = {
   authority_roles?: Record<string, { default_persona?: Persona }>;
@@ -264,7 +265,9 @@ export function resolveIdentityContext(): IdentityContext {
       );
       
       for (const grant of activeGrants) {
-        if (grant.serviceId === 'github') authorities.push('GIT_WRITE', 'NETWORK_FETCH');
+        for (const authority of getServiceAuthorities(String(grant.serviceId || ''))) {
+          authorities.push(authority as Authority);
+        }
         if (grant.authority) authorities.push(grant.authority as Authority);
       }
     } catch (_) {}

@@ -10,6 +10,7 @@ import { readJsonFile } from './cli-input.js';
 export interface MissionStartCreateOptions {
   tier?: 'personal' | 'confidential' | 'public';
   tenantId?: string;
+  organizationId?: string;
   /**
    * Tenant slug — multi-tenant isolation key. When set, the resulting
    * mission carries `tenant_slug` and tier-guard / audit-chain enforce
@@ -148,6 +149,7 @@ export function extractMissionStartCreateOptionsFromArgv(argv: string[] = proces
   return {
     tier: getOptionValue('--tier', argv) as MissionStartCreateOptions['tier'] | undefined,
     tenantId: getOptionValue('--tenant-id', argv) || getOptionValue('--tenant', argv),
+    organizationId: getOptionValue('--organization-id', argv) || getOptionValue('--org', argv),
     ...(tenantSlug ? { tenantSlug } : {}),
     missionType: getOptionValue('--mission-type', argv),
     visionRef: getOptionValue('--vision-ref', argv) || getOptionValue('--vision', argv),

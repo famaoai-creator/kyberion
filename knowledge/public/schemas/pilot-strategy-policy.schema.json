@@ -1,0 +1,25 @@
+{
+  "$id": "https://kyberion.local/schemas/pilot-strategy-policy.schema.json",
+  "title": "Pilot Strategy Policy",
+  "type": "object",
+  "required": ["version", "title", "target", "value_proposition_title", "market_strategy_title", "key_benefits_title", "phase_titles"],
+  "properties": {
+    "version": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "minLength": 1 },
+    "value_proposition_title": { "type": "string", "minLength": 1 },
+    "market_strategy_title": { "type": "string", "minLength": 1 },
+    "key_benefits_title": { "type": "string", "minLength": 1 },
+    "phase_titles": {
+      "type": "object",
+      "required": ["education", "pilot", "expansion"],
+      "properties": {
+        "education": { "type": "string", "minLength": 1 },
+        "pilot": { "type": "string", "minLength": 1 },
+        "expansion": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

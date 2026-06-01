@@ -430,7 +430,7 @@ function normalizeClarificationPacket(
         priority: 'now',
       },
     ],
-    readiness: contract.resolution.execution_shape,
+    readiness: 'needs_clarification',
   };
 }
 

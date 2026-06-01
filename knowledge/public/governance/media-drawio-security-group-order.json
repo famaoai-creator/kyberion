@@ -1,0 +1,4 @@
+{
+  "version": "1.0.0",
+  "relation_prefix": "aws_security_group."
+}

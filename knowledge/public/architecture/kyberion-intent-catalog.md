@@ -190,6 +190,11 @@ Repeated coordination work should now be modeled through the shared
 schedule, and onboarding playbooks acting as domain overlays rather than
 independent one-off flows.
 
+For an end-to-end view of user-facing onboarding and runtime scenarios,
+including voice, Slack, mission inventory, schedule inspection, and fallback
+paths into setup flows, see
+[`intent-scenario-catalog.md`](knowledge/public/orchestration/intent-scenario-catalog.md).
+
 When the deployment serves more than one organization, follow
 [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) for directory
 layout, `tenant-scope-policy.json`, per-tenant adapter routing, and the
@@ -297,8 +302,9 @@ adapter wiring for the current environment.
 
 ### 5.2 Mission and knowledge auditing
 
-- `mission_controller list [status]` — mission inventory
-- `mission_controller status <ID>` — checkpoint history, git refs
+- `inspect-mission-inventory` / `mission_controller list [status]` — mission inventory
+- `inspect-generation-schedules` / `schedule:list` — scheduled generation job inventory
+- `inspect-mission-state` / `mission_controller status <ID>` — checkpoint history, git refs
 - `audit-chain` ledger (hash-chained, tamper-evident) → forwarded to SIEM
 - `intent-snapshot-store` → temporal record of every intent decision
 - `policy-engine` policies in `knowledge/public/governance/*.json`

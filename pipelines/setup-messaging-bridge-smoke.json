@@ -1,0 +1,202 @@
+{
+  "action": "pipeline",
+  "name": "setup-messaging-bridge-smoke",
+  "description": "Smoke-test the declared messaging bridge path without invoking the reasoning analyzer.",
+  "steps": [
+    {
+      "id": "require-platform-id",
+      "type": "control",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "platform_id", "operator": "exists" },
+        "then": [
+          {
+            "id": "route-slack-bridge",
+            "type": "control",
+            "op": "core:if",
+            "params": {
+              "condition": { "from": "platform_id", "operator": "eq", "value": "slack" },
+              "then": [
+                {
+                  "id": "check-readiness",
+                  "type": "capture",
+                  "op": "system:shell",
+                  "params": {
+                    "cmd": "test -d satellites/slack-bridge && echo installed || echo not_installed",
+                    "export_as": "install_status"
+                  }
+                },
+                {
+                  "id": "verify-bridge-package",
+                  "type": "control",
+                  "op": "core:if",
+                  "params": {
+                    "condition": { "from": "install_status", "operator": "eq", "value": "installed" },
+                    "then": [
+                      {
+                        "id": "log-success",
+                        "type": "apply",
+                        "op": "system:log",
+                        "params": {
+                          "message": "✅ Messaging bridge for slack is declared and the source package is present."
+                        }
+                      }
+                    ],
+                    "else": [
+                      {
+                        "id": "log-missing-bridge",
+                        "type": "apply",
+                        "op": "system:log",
+                        "params": {
+                          "message": "⚠️ slack bridge source package is missing. Scaffold satellites/slack-bridge before activation."
+                        }
+                      },
+                      {
+                        "id": "fail-missing-bridge",
+                        "type": "apply",
+                        "op": "system:shell",
+                        "params": {
+                          "cmd": "exit 1"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "id": "route-imessage-bridge",
+                  "type": "control",
+                  "op": "core:if",
+                  "params": {
+                    "condition": { "from": "platform_id", "operator": "eq", "value": "imessage" },
+                    "then": [
+                      {
+                        "id": "check-host-platform",
+                        "type": "capture",
+                        "op": "system:shell",
+                        "params": {
+                          "cmd": "case \"{{platform_name}}\" in darwin) echo darwin ;; *) echo unsupported ;; esac",
+                          "export_as": "host_platform"
+                        }
+                      },
+                      {
+                        "id": "verify-host-platform",
+                        "type": "control",
+                        "op": "core:if",
+                        "params": {
+                          "condition": { "from": "host_platform", "operator": "eq", "value": "darwin" },
+                          "then": [
+                            {
+                              "id": "check-readiness",
+                              "type": "capture",
+                              "op": "system:shell",
+                              "params": {
+                                "cmd": "test -d satellites/imessage-bridge && echo installed || echo not_installed",
+                                "export_as": "install_status"
+                              }
+                            },
+                            {
+                              "id": "verify-bridge-package",
+                              "type": "control",
+                              "op": "core:if",
+                              "params": {
+                                "condition": { "from": "install_status", "operator": "eq", "value": "installed" },
+                                "then": [
+                                  {
+                                    "id": "log-success",
+                                    "type": "apply",
+                                    "op": "system:log",
+                                    "params": {
+                                      "message": "✅ Messaging bridge for imessage is declared and the source package is present."
+                                    }
+                                  }
+                                ],
+                                "else": [
+                                  {
+                                    "id": "log-missing-bridge",
+                                    "type": "apply",
+                                    "op": "system:log",
+                                    "params": {
+                                      "message": "⚠️ imessage bridge source package is missing. Scaffold satellites/imessage-bridge before activation."
+                                    }
+                                  },
+                                  {
+                                    "id": "fail-missing-bridge",
+                                    "type": "apply",
+                                    "op": "system:shell",
+                                    "params": {
+                                      "cmd": "exit 1"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "else": [
+                            {
+                              "id": "log-unsupported-host",
+                              "type": "apply",
+                              "op": "system:log",
+                              "params": {
+                                "message": "iMessage bridge activation requires macOS. The current host is not Darwin."
+                              }
+                            },
+                            {
+                              "id": "fail-unsupported-host",
+                              "type": "apply",
+                              "op": "system:shell",
+                              "params": {
+                                "cmd": "exit 1"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "else": [
+                      {
+                        "id": "log-unsupported-platform",
+                        "type": "apply",
+                        "op": "system:log",
+                        "params": {
+                          "message": "Messaging bridge activation currently supports declared bridge implementations only. {{platform_id}} needs a scaffolded satellite and manifest entry before activation."
+                        }
+                      },
+                      {
+                        "id": "fail-unsupported-platform",
+                        "type": "apply",
+                        "op": "system:shell",
+                        "params": {
+                          "cmd": "exit 1"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log-missing-platform-id",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "Provide platform_id in the pipeline context before onboarding a messaging bridge."
+            }
+          },
+          {
+            "id": "fail-missing-platform-id",
+            "type": "apply",
+            "op": "system:shell",
+            "params": {
+              "cmd": "exit 1"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

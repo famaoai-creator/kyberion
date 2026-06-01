@@ -1,0 +1,35 @@
+{
+  "$id": "https://kyberion.local/schemas/onboarding-flow-policy.schema.json",
+  "title": "Onboarding Flow Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "phase_titles",
+    "tutorial_plan_title",
+    "tutorial_next_step_title",
+    "tutorial_skipped_message",
+    "tutorial_default_summary",
+    "complete_message"
+  ],
+  "properties": {
+    "version": { "type": "string" },
+    "phase_titles": {
+      "type": "object",
+      "required": ["identity", "services", "tenants", "tutorial", "summary"],
+      "properties": {
+        "identity": { "type": "string", "minLength": 1 },
+        "services": { "type": "string", "minLength": 1 },
+        "tenants": { "type": "string", "minLength": 1 },
+        "tutorial": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "tutorial_plan_title": { "type": "string", "minLength": 1 },
+    "tutorial_next_step_title": { "type": "string", "minLength": 1 },
+    "tutorial_skipped_message": { "type": "string", "minLength": 1 },
+    "tutorial_default_summary": { "type": "string", "minLength": 1 },
+    "complete_message": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

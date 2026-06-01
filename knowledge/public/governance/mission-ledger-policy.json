@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "section_title": "Mission Ledger",
+  "table_headers": {
+    "mission_id": "Mission ID",
+    "relationship": "Relationship",
+    "status": "Status",
+    "summary": "Summary",
+    "affected_artifacts": "Affected Artifacts",
+    "gate_impact": "Gate Impact",
+    "traceability_refs": "Traceability Refs"
+  }
+}

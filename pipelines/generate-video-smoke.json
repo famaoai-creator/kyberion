@@ -1,0 +1,15 @@
+{
+  "action": "pipeline",
+  "name": "generate-video-smoke",
+  "description": "Run prompt-based video generation through the media-generation actuator CLI using the governed sample job.",
+  "steps": [
+    {
+      "id": "run_video_generation_cli",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json"
+      }
+    }
+  ]
+}

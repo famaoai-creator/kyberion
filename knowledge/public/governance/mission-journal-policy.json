@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "title": "Mission Journal: Ecosystem Evolution",
+  "summary_title": "Summary",
+  "trust_scores_title": "Agent Trust Scores",
+  "empty_message": "No missions recorded yet.",
+  "relationship_labels": {
+    "prerequisites": "Prerequisites",
+    "successors": "Successors"
+  }
+}

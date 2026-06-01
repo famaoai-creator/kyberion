@@ -3,6 +3,7 @@ import {
   createStandardYargs,
   composeMissionTeamPlan,
   composeMissionTeamBrief,
+  loadOrganizationProfile,
   writeMissionTeamBrief,
   findMissionPath,
   initializeMissionTeamBindings,
@@ -10,6 +11,7 @@ import {
   writeMissionTeamPlan,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
+import { withOrganizationContext } from './refactor/organization-context.js';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
   const previousRole = process.env.MISSION_ROLE;
@@ -52,6 +54,10 @@ async function main() {
       description: 'Comma-separated progress signals used for stage detection',
     })
     .option('persona', { type: 'string' })
+    .option('organization-id', {
+      type: 'string',
+      description: 'Explicit organization slug used to resolve organization defaults and catalogs',
+    })
     .option('write', { type: 'boolean', default: false })
     .parse();
 
@@ -79,35 +85,42 @@ async function main() {
     .filter(Boolean);
   const missionTypeArg = argv['mission-type'] ? String(argv['mission-type']) : undefined;
   const request = argv.request ? String(argv.request) : '';
+  const organizationId = argv['organization-id'] ? String(argv['organization-id']) : undefined;
 
-  const plan = composeMissionTeamPlan({
-    missionId,
-    missionType: missionTypeArg,
-    intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
-    taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
-    shape: argv.shape ? String(argv.shape) : undefined,
-    utterance: request || undefined,
-    artifactPaths,
-    progressSignals,
-    tier,
-    assignedPersona,
-  });
-
-  const brief = request
-    ? composeMissionTeamBrief({
+  const { plan, brief } = withOrganizationContext(organizationId, () => {
+    const organizationProfile = loadOrganizationProfile();
+    const nextPlan = composeMissionTeamPlan({
       missionId,
       missionType: missionTypeArg,
-      request,
       intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
       taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
       shape: argv.shape ? String(argv.shape) : undefined,
+      utterance: request || undefined,
       artifactPaths,
       progressSignals,
       tier,
       assignedPersona,
-      executionShape: argv['execution-shape'] as 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap',
-    })
-    : null;
+      organizationProfile,
+    });
+
+    const nextBrief = request
+      ? composeMissionTeamBrief({
+        missionId,
+        missionType: missionTypeArg,
+        request,
+        intentId: argv['intent-id'] ? String(argv['intent-id']) : undefined,
+        taskType: argv['task-type'] ? String(argv['task-type']) : undefined,
+        shape: argv.shape ? String(argv.shape) : undefined,
+        artifactPaths,
+        progressSignals,
+        tier,
+        assignedPersona,
+        organizationProfile,
+        executionShape: argv['execution-shape'] as 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap',
+      })
+      : null;
+    return { plan: nextPlan, brief: nextBrief };
+  });
 
   if (argv.write) {
     const targetDir = missionPath || missionDir(missionId, tier);

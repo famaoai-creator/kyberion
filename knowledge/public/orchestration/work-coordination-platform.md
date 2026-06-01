@@ -44,6 +44,8 @@ Common commands:
 - `import-github-issue-file`
 - `import-jira-issue-file`
 
+Import commands are catalog-driven from [`knowledge/public/governance/work-coordination-import-catalog.json`](../governance/work-coordination-import-catalog.json). Additions should go through the catalog instead of hardcoding new command bindings in the CLI.
+
 ## Board Types
 
 - `project`: project / track に紐づく board

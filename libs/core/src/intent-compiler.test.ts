@@ -55,6 +55,50 @@ describe('intent-compiler', () => {
         },
       ],
     },
+    {
+      id: 'live-voice',
+      triggers: ['live voice', 'voice conversation', '会話', '音声対話'],
+      pipeline: [
+        {
+          id: 'live-voice-smoke',
+          op: 'system:shell',
+          params: { cmd: 'node dist/scripts/run_pipeline.js --input pipelines/live-voice-smoke.json' },
+        },
+      ],
+    },
+    {
+      id: 'clone-my-voice',
+      triggers: ['クローン', '録音', 'register', 'clone', 'voice clone', '使えるようにして'],
+      pipeline: [
+        {
+          id: 'clone-voice',
+          op: 'system:shell',
+          params: { cmd: 'node dist/scripts/run_pipeline.js --input pipelines/clone-my-voice.json' },
+        },
+      ],
+    },
+    {
+      id: 'start-service',
+      triggers: ['start service', 'start', '起動', '立ち上げて'],
+      pipeline: [
+        {
+          id: 'start-service-list',
+          op: 'system:shell',
+          params: { cmd: 'node dist/scripts/service_lifecycle_control.js --operation start' },
+        },
+      ],
+    },
+    {
+      id: 'stop-service',
+      triggers: ['stop service', 'stop', '停止', '止めて'],
+      pipeline: [
+        {
+          id: 'stop-service-list',
+          op: 'system:shell',
+          params: { cmd: 'node dist/scripts/service_lifecycle_control.js --operation list' },
+        },
+      ],
+    },
   ];
 
   describe('compileIntent', () => {
@@ -107,6 +151,46 @@ describe('intent-compiler', () => {
       expect(result).not.toBeNull();
       expect(result!.intentId).toBe('meeting-operations');
       expect(result!.steps.some((step) => step.op === 'core:if')).toBe(true);
+    });
+
+    it('synthesizes deterministic live voice and voice clone steps', () => {
+      const liveVoiceResult = compileIntent('ライブ音声で会話したい', {
+        standardIntents,
+      });
+      expect(liveVoiceResult).not.toBeNull();
+      expect(liveVoiceResult!.intentId).toBe('live-voice');
+      expect(liveVoiceResult!.steps[0]?.params?.cmd).toContain('pipelines/live-voice-smoke.json');
+
+      const cloneVoiceResult = compileIntent('自分の声を使えるようにして', {
+        standardIntents,
+      });
+      expect(cloneVoiceResult).not.toBeNull();
+      expect(cloneVoiceResult!.intentId).toBe('clone-my-voice');
+      expect(cloneVoiceResult!.steps[0]?.params?.cmd).toContain('pipelines/clone-my-voice.json');
+    });
+
+    it('lists running services before stopping when no target is selected', () => {
+      const result = compileIntent('サービスを停止して', {
+        standardIntents,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.intentId).toBe('stop-service');
+      expect(result!.steps[0]?.params?.cmd).toContain('service_lifecycle_control.js');
+      expect(result!.steps[0]?.params?.cmd).toContain('--operation list');
+      expect(result!.steps[0]?.params?.cmd).not.toContain('voice-hub');
+    });
+
+    it('lists startable services before starting when no target is selected', () => {
+      const result = compileIntent('サービスを起動して', {
+        standardIntents,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.intentId).toBe('start-service');
+      expect(result!.steps[0]?.params?.cmd).toContain('service_lifecycle_control.js');
+      expect(result!.steps[0]?.params?.cmd).toContain('--operation start');
+      expect(result!.steps[0]?.params?.cmd).not.toContain('voice-hub');
     });
   });
 

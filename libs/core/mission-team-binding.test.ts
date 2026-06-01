@@ -7,16 +7,23 @@ import {
   buildMissionTeamBlueprint,
   initializeMissionTeamBindings,
 } from './mission-team-binding.js';
-import type { MissionTeamPlan } from './mission-team-plan-composer.js';
+import type { MissionTeamOrganizationProfileSummary, MissionTeamPlan } from './mission-team-plan-composer.js';
 
 const MISSION_ID = 'MSN-BINDING-TEST-001';
 const TEST_MISSION_DIR = pathResolver.sharedTmp(`mission-team-binding-tests/${MISSION_ID}`);
+const SAMPLE_ORG_PROFILE: MissionTeamOrganizationProfileSummary = {
+  organization_id: 'demo-org',
+  name: 'Demo Org',
+  default_team_template: 'development',
+  default_agent_profile: 'planner-agent',
+};
 
 const SAMPLE_PLAN: MissionTeamPlan = {
   mission_id: MISSION_ID,
   mission_type: 'development',
   tier: 'public',
   template: 'development',
+  organization_profile: SAMPLE_ORG_PROFILE,
   generated_at: '2026-04-19T00:00:00.000Z',
   team_governance: {
     lifecycle: {
@@ -84,9 +91,11 @@ describe('mission-team-binding', () => {
     const blueprint = buildMissionTeamBlueprint(SAMPLE_PLAN);
     const staffing = buildMissionStaffingAssignments(SAMPLE_PLAN);
 
+    expect(blueprint.organization_profile?.organization_id).toBe('demo-org');
     expect(blueprint.roles.length).toBe(2);
     expect(blueprint.roles[0]?.team_role).toBe('owner');
     expect(blueprint.team_governance?.lifecycle.max_members).toBe(7);
+    expect(staffing.organization_profile?.default_agent_profile).toBe('planner-agent');
     expect(staffing.assignments.length).toBe(1);
     expect(staffing.assignments[0]?.actor_id).toBe('nerve-agent');
     expect(staffing.assignments[0]?.status).toBe('active');

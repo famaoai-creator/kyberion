@@ -57,6 +57,15 @@ Use each document for a distinct purpose:
 | `docs/USER_EXPERIENCE_CONTRACT.md` | user-facing language contract |
 | `knowledge/public/architecture/organization-work-loop.md` | full organization loop model |
 | `knowledge/public/architecture/enterprise-operating-kernel.md` | enterprise authority/accountability model |
+| `knowledge/public/architecture/organization-profile-model.md` | organization defaults and policy profile model |
+| `knowledge/public/architecture/mission-team-composition-model.md` | mission team template and staffing binding model |
+| `knowledge/public/orchestration/organization-selection-guide.md` | operator-facing organization switching guide |
+| `knowledge/public/orchestration/README.md` | orchestration directory index |
+| `knowledge/public/orchestration/organization-discovery-reports.md` | machine-readable organization discovery report index |
+| `knowledge/public/governance/organization-team-template-catalogs/README.md` | organization-specific team template overlay guide |
+| `knowledge/public/schemas/organization-profile-report.schema.json` | organization profile JSON output contract |
+| `knowledge/public/schemas/organization-catalog-report.schema.json` | organization catalog JSON output contract |
+| `knowledge/public/schemas/organization-profiles-report.schema.json` | organization profiles inventory JSON output contract |
 | `knowledge/public/architecture/kyberion-concept-map.md` | layer mapping and concept placement |
 | `docs/INTENT_LOOP_CONCEPT.md` | non-replaceable intent-loop closure model |
 | `knowledge/public/orchestration/guided-coordination-protocol.md` | shared repeated-work coordination flow |
@@ -73,8 +82,17 @@ For onboarding and implementation alignment, read in this order:
 1. `docs/USER_EXPERIENCE_CONTRACT.md`
 2. `docs/INTENT_LOOP_CONCEPT.md`
 3. `knowledge/public/architecture/organization-work-loop.md`
-4. `knowledge/public/architecture/enterprise-operating-kernel.md`
-5. `knowledge/public/architecture/kyberion-concept-map.md`
+4. `knowledge/public/architecture/organization-profile-model.md`
+5. `knowledge/public/architecture/mission-team-composition-model.md`
+6. `knowledge/public/orchestration/organization-selection-guide.md`
+7. `knowledge/public/governance/organization-team-template-catalogs/README.md`
+8. `knowledge/public/architecture/enterprise-operating-kernel.md`
+9. `knowledge/public/orchestration/README.md`
+10. `knowledge/public/orchestration/organization-discovery-reports.md`
+11. `knowledge/public/architecture/kyberion-concept-map.md`
+12. `knowledge/public/schemas/organization-profile-report.schema.json`
+13. `knowledge/public/schemas/organization-catalog-report.schema.json`
+14. `knowledge/public/schemas/organization-profiles-report.schema.json`
 
 ## 7. Implementation Rule
 

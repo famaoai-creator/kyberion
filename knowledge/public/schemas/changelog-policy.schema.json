@@ -1,0 +1,19 @@
+{
+  "$id": "https://kyberion.local/schemas/changelog-policy.schema.json",
+  "title": "Changelog Policy",
+  "type": "object",
+  "required": ["version", "breaking_changes_title", "uncategorized_title", "no_commits_template", "header_template", "type_labels"],
+  "properties": {
+    "version": { "type": "string" },
+    "breaking_changes_title": { "type": "string", "minLength": 1 },
+    "uncategorized_title": { "type": "string", "minLength": 1 },
+    "no_commits_template": { "type": "string", "minLength": 1 },
+    "header_template": { "type": "string", "minLength": 1 },
+    "type_labels": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": false
+}

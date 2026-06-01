@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "required": ["version", "sheet_title", "columns", "empty_message", "elevated_tones", "elevated_status_keywords", "entry_types"],
+  "properties": {
+    "version": { "type": "string" },
+    "sheet_title": { "type": "string" },
+    "columns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "empty_message": { "type": "string" },
+    "elevated_tones": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "elevated_status_keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "entry_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_key", "signal_type", "default_tone", "title_fields", "owner_fields", "status_fields"],
+        "properties": {
+          "source_key": { "type": "string" },
+          "signal_type": { "type": "string" },
+          "default_tone": { "type": "string" },
+          "title_fields": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "owner_fields": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "status_fields": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

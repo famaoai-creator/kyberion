@@ -18,7 +18,7 @@
 
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { resolveChangelogPolicy, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
 
 const ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
 const CHANGELOG_PATH = path.join(ROOT, 'CHANGELOG.md');
@@ -32,20 +32,6 @@ interface ParsedCommit {
   subject: string;
   body: string;
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  feat: 'Added',
-  fix: 'Fixed',
-  perf: 'Performance',
-  refactor: 'Changed (internal)',
-  docs: 'Documentation',
-  test: 'Tests',
-  build: 'Build',
-  ci: 'CI',
-  chore: 'Chore',
-  revert: 'Reverted',
-  security: 'Security',
-};
 
 const ORDER = ['feat', 'fix', 'security', 'perf', 'refactor', 'docs', 'test', 'build', 'ci', 'chore', 'revert'];
 
@@ -120,8 +106,9 @@ function group(commits: ParsedCommit[]): Map<string, ParsedCommit[]> {
 }
 
 function renderSection(commits: ParsedCommit[], from: string | null, to: string): string {
+  const policy = resolveChangelogPolicy();
   if (commits.length === 0) {
-    return `_No commits between ${from ?? 'root'} and ${to}._\n`;
+    return `${policy.no_commits_template.replace('{from}', from ?? 'root').replace('{to}', to)}\n`;
   }
 
   const groups = group(commits);
@@ -130,7 +117,7 @@ function renderSection(commits: ParsedCommit[], from: string | null, to: string)
   // Breaking first
   const breaking = groups.get('breaking') ?? [];
   if (breaking.length > 0) {
-    lines.push('### ⚠ BREAKING CHANGES');
+    lines.push(`### ${policy.breaking_changes_title}`);
     for (const c of breaking) {
       const scope = c.scope ? `**${c.scope}**: ` : '';
       lines.push(`- ${scope}${c.subject} (\`${c.shortHash}\`)`);
@@ -141,7 +128,7 @@ function renderSection(commits: ParsedCommit[], from: string | null, to: string)
   for (const type of ORDER) {
     const group = groups.get(type);
     if (!group || group.length === 0) continue;
-    const label = TYPE_LABELS[type] ?? type;
+    const label = policy.type_labels[type] ?? type;
     lines.push(`### ${label}`);
     for (const c of group) {
       if (c.breaking) continue; // already shown
@@ -154,7 +141,7 @@ function renderSection(commits: ParsedCommit[], from: string | null, to: string)
   // "other" — non-conventional commits
   const other = groups.get('other');
   if (other && other.length > 0) {
-    lines.push('### Uncategorized');
+    lines.push(`### ${policy.uncategorized_title}`);
     for (const c of other) {
       lines.push(`- ${c.subject} (\`${c.shortHash}\`)`);
     }
@@ -199,7 +186,8 @@ function main(): void {
     prependToChangelog(section);
     console.log(`✅ Prepended to ${CHANGELOG_PATH}`);
   } else {
-    console.log(`# Changes since ${from ?? 'root'} (${commits.length} commits)\n`);
+    const policy = resolveChangelogPolicy();
+    console.log(`${policy.header_template.replace('{from}', from ?? 'root').replace('{count}', String(commits.length))}\n`);
     console.log(section);
   }
 }

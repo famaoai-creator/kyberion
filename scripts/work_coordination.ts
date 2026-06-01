@@ -1,6 +1,7 @@
 import { createStandardYargs, logger } from '@agent/core';
 import {
   appendCoordinationEvent,
+  getWorkCoordinationImportCatalogEntryByCommand,
   claimWorkItem,
   createBoard,
   createWorkItem,
@@ -9,6 +10,7 @@ import {
   listBoardItems,
   listBoards,
   listCoordinationEvents,
+  listWorkCoordinationImportCatalogEntries,
   listWorkItems,
   releaseWorkItem,
   renewWorkItemLease,
@@ -38,7 +40,7 @@ function print(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+  const yargs = createStandardYargs()
     .command('create-item', 'Create a new work item', () => undefined)
     .command('create-board', 'Create or update a board', () => undefined)
     .command('list-board', 'List board items or boards', () => undefined)
@@ -51,8 +53,6 @@ async function main(): Promise<void> {
     .command('list-items', 'List work items', () => undefined)
     .command('list-events', 'List coordination events', () => undefined)
     .command('list-leases', 'List active leases', () => undefined)
-    .command('import-github-issue-file', 'Import a GitHub issue JSON file', () => undefined)
-    .command('import-jira-issue-file', 'Import a Jira issue JSON file', () => undefined)
     .demandCommand(1)
     .option('item-id', { type: 'string' })
     .option('board-id', { type: 'string' })
@@ -89,7 +89,13 @@ async function main(): Promise<void> {
     .option('note', { type: 'string' })
     .option('payload', { type: 'string' })
     .option('project', { type: 'string' })
-    .parseSync();
+    ;
+
+  for (const entry of listWorkCoordinationImportCatalogEntries()) {
+    yargs.command(entry.command, entry.summary || `Import a ${entry.source} issue JSON file`, () => undefined);
+  }
+
+  const argv = await yargs.parseSync();
 
   const command = String(argv._[0]);
 
@@ -231,22 +237,21 @@ async function main(): Promise<void> {
     case 'list-leases':
       print({ leases: listActiveWorkLeases() });
       break;
-    case 'import-github-issue-file': {
+    default: {
+      const importEntry = getWorkCoordinationImportCatalogEntryByCommand(command);
+      if (!importEntry) {
+        throw new Error(`unknown command '${command}'`);
+      }
       if (!argv.input) throw new Error('Missing --input issue JSON file');
       const issue = JSON.parse(String(safeReadFile(String(argv.input), { encoding: 'utf8' }) || '{}'));
-      const result = importGitHubIssueWithEvent(issue, argv.project ? String(argv.project) : 'github');
+      const projectId = argv.project ? String(argv.project) : importEntry.default_project_id || undefined;
+      const result =
+        importEntry.source === 'github'
+          ? importGitHubIssueWithEvent(issue, projectId || 'github')
+          : importJiraIssueWithEvent(issue, projectId);
       print(result);
       break;
     }
-    case 'import-jira-issue-file': {
-      if (!argv.input) throw new Error('Missing --input issue JSON file');
-      const issue = JSON.parse(String(safeReadFile(String(argv.input), { encoding: 'utf8' }) || '{}'));
-      const result = importJiraIssueWithEvent(issue, argv.project ? String(argv.project) : undefined);
-      print(result);
-      break;
-    }
-    default:
-      throw new Error(`unknown command '${command}'`);
   }
 }
 

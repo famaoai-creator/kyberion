@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "github-default",
+      "service_id": "github",
+      "authorities": ["GIT_WRITE", "NETWORK_FETCH"],
+      "summary": "GitHub mission grants need write and network authority."
+    }
+  ]
+}

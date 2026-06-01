@@ -1,0 +1,32 @@
+{
+  "$id": "https://kyberion.local/schemas/onboarding-summary-policy.schema.json",
+  "title": "Onboarding Summary Policy",
+  "type": "object",
+  "required": ["version", "title", "sections", "empty_states"],
+  "properties": {
+    "version": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "sections": {
+      "type": "object",
+      "required": ["identity", "services", "tenants", "tutorial", "next_steps"],
+      "properties": {
+        "identity": { "type": "string", "minLength": 1 },
+        "services": { "type": "string", "minLength": 1 },
+        "tenants": { "type": "string", "minLength": 1 },
+        "tutorial": { "type": "string", "minLength": 1 },
+        "next_steps": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "empty_states": {
+      "type": "object",
+      "required": ["services", "tenants"],
+      "properties": {
+        "services": { "type": "string", "minLength": 1 },
+        "tenants": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

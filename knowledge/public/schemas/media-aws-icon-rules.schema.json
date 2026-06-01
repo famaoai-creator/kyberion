@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "required": ["version", "exact_resources", "rules"],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "exact_resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["match_type", "match_value", "icons"],
+        "properties": {
+          "match_type": {
+            "type": "string",
+            "enum": ["starts_with", "contains"]
+          },
+          "match_value": {
+            "type": "string"
+          },
+          "icons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

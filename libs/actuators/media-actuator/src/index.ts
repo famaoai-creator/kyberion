@@ -22,6 +22,36 @@ import {
   withRetry,
   createActuatorTrace,
   finalizeActuatorTrace,
+  resolveMediaToneStyle,
+  resolveMediaDrawioBoundaryPalette,
+  resolveMediaDrawioNodeSize,
+  resolveMediaAwsIconCandidates,
+  resolveMediaSemanticType,
+  resolveProposalEvidenceIndex,
+  resolveSignalToneRank,
+  resolveBorderKeySides,
+  loadMediaSignalEntryPolicyCatalog,
+  loadTrackerSheetPolicyCatalog,
+  resolveDocumentContentsLabel,
+  resolveDocumentContentsSubtitle,
+  resolveReportSectionTitle,
+  resolveReportSummaryTitle,
+  resolveThemeColorRole as resolveThemeColorRolePolicy,
+  resolveThemeHexRole as resolveThemeHexRolePolicy,
+  resolveDrawioEdgeLabelStyleParts,
+  resolveDrawioEdgeRoutingStyleParts,
+  resolveDrawioBoundaryIconCandidates,
+  resolveDrawioBoundaryPaletteOverride,
+  resolveMediaDrawioTierRank,
+  resolveMediaDrawioGroupRank,
+  resolveMediaDrawioTypeRank,
+  resolveMediaDrawioSecurityGroupRelationPrefix,
+  resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
+  resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
+  resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
+  resolveProposalSectionKeywords,
+  resolveSpreadsheetStyleIndex,
+  isLegacyMediaOp,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
@@ -1378,7 +1408,7 @@ function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protoc
       : null;
     if (contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0) {
       const contentsSlide = {
-        title: contentsEntry.title || 'Contents',
+        title: contentsEntry.title || resolveDocumentContentsLabel(),
         body: contentsEntry.body,
         subtitle: contentsEntry.objective || 'Document navigation',
         visual: 'outline navigation',
@@ -1435,14 +1465,9 @@ function buildPresentationPptxProtocol(rootDir: string, brief: any): { protocol:
 
 type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
-const LEGACY_MEDIA_OPS = new Set([
-  'document_report_design_from_brief',
-  'document_spreadsheet_design_from_brief',
-  'document_diagram_render_from_brief',
-]);
 
 function warnLegacyMediaOp(op: string): void {
-  if (!LEGACY_MEDIA_OPS.has(op)) return;
+  if (!isLegacyMediaOp(op)) return;
   logger.warn(
     `[MEDIA_COMPAT] ${op} is a compatibility adapter. Prefer document_outline_from_brief -> brief_to_design_protocol -> generate_document.`,
   );
@@ -1873,11 +1898,10 @@ function themeToDocxStyleHints(theme: any, locale?: string): { headingFont: stri
 }
 
 function resolveThemeColorRole(palette: any, accentHex: string, role?: string): string {
-  switch (String(role || '').trim()) {
+  const resolvedRole = resolveThemeColorRolePolicy(role, 'secondary');
+  switch (resolvedRole) {
     case 'accent':
       return accentHex || palette.accent1 || '2563EB';
-    case 'secondary':
-      return palette.dk2 || palette.dk1 || '334155';
     case 'primary':
       return palette.dk1 || '111827';
     default:
@@ -1886,13 +1910,12 @@ function resolveThemeColorRole(palette: any, accentHex: string, role?: string): 
 }
 
 function resolveThemeHexColor(themeColors: any, role?: string, fallback = '#334155'): string {
-  switch (String(role || '').trim()) {
+  const resolvedRole = resolveThemeHexRolePolicy(role, 'secondary');
+  switch (resolvedRole) {
     case 'accent':
       return String(themeColors.accent || fallback);
     case 'primary':
       return String(themeColors.primary || fallback);
-    case 'secondary':
-      return String(themeColors.secondary || themeColors.text || fallback);
     case 'background':
       return String(themeColors.background || '#F8FAFC');
     case 'success':
@@ -1914,25 +1937,7 @@ function applyCompositionTemplate(template: any, tokens: Record<string, string>,
 }
 
 function classifyRenderSemantic(layoutKey?: string, mediaKind?: string): string {
-  const layout = String(layoutKey || '').trim();
-  const media = String(mediaKind || '').trim();
-
-  if (['cover-statement', 'doc-title'].includes(layout) || ['hero', 'title-page'].includes(media)) return 'hero';
-  if (['contents', 'doc-contents'].includes(layout) || ['contents'].includes(media)) return 'summary';
-  if (['title-body', 'doc-summary', 'sheet-overview'].includes(layout) || ['summary', 'dashboard'].includes(media)) return 'summary';
-  if (['evidence-callout'].includes(layout) || ['evidence'].includes(media)) return 'evidence';
-  if (['risk-controls'].includes(layout) || ['controls'].includes(media)) return 'control';
-  if (['timeline-roadmap'].includes(layout) || ['timeline'].includes(media)) return 'roadmap';
-  if (['decision-cta'].includes(layout) || ['cta'].includes(media)) return 'decision';
-  if (['doc-appendix'].includes(layout) || ['appendix'].includes(media)) return 'appendix';
-  if (['sheet-signals'].includes(layout) || ['signals'].includes(media)) return 'signals';
-  if (['sheet-main-table'].includes(layout) || ['table'].includes(media)) return 'execution';
-  if (['three-point-architecture', 'diagram-context', 'operating-model'].includes(layout) || ['architecture', 'diagram', 'model'].includes(media)) return 'architecture';
-  return 'content';
-}
-
-function resolveDocumentContentsLabel(locale?: string): string {
-  return String(locale || '').toLowerCase().startsWith('ja') ? '目次' : 'Contents';
+  return resolveMediaSemanticType(layoutKey, mediaKind);
 }
 
 function buildDocumentContentsSection(entries: any[], locale?: string): any | null {
@@ -1943,15 +1948,16 @@ function buildDocumentContentsSection(entries: any[], locale?: string): any | nu
       })
     : [];
   if (navigable.length < 2) return null;
+  const reportSectionTitle = resolveReportSectionTitle();
   const body = navigable.map((entry, index) => {
-    const title = String(entry?.title || entry?.section_id || `Section ${index + 1}`).trim();
+    const title = String(entry?.title || entry?.section_id || `${reportSectionTitle} ${index + 1}`).trim();
     const objective = String(entry?.objective || '').trim();
     return `${index + 1}. ${title}${objective ? ` — ${objective}` : ''}`;
   });
   return {
     section_id: 'contents',
     title: resolveDocumentContentsLabel(locale),
-    objective: 'Document navigation',
+    objective: resolveDocumentContentsSubtitle(),
     body,
     media_kind: 'contents',
     layout_key: 'doc-contents',
@@ -1972,30 +1978,18 @@ function insertDocumentContentsSection(entries: any[], locale?: string): any[] {
 }
 
 function rankSignalTone(tone?: string): number {
-  const key = String(tone || '').toLowerCase();
-  const fallback: Record<string, number> = { danger: 0, critical: 0, high: 0, warning: 1, medium: 1, info: 2, success: 3, low: 3 };
-  return fallback[key] ?? 2;
+  return resolveSignalToneRank(tone);
 }
 
 function chooseProposalSectionEvidence(sectionId: string, brief: any): any {
   const evidence = Array.isArray(brief.evidence) ? brief.evidence : [];
   const chapters = Array.isArray(brief.story?.chapters) ? brief.story.chapters : [];
   const lowerChapters = chapters.map((entry: string) => String(entry).toLowerCase());
-  const keywordMap: Record<string, string[]> = {
-    'why-change': ['why', 'change', 'pain', 'problem', 'now'],
-    'target-outcome': ['target', 'journey', 'future', 'outcome', 'vision'],
-    'solution-shape': ['solution', 'approach', 'shape', 'architecture'],
-    'governance': ['governance', 'control', 'risk', 'operation'],
-    'delivery-plan': ['delivery', 'plan', 'roadmap', 'phase'],
-  };
-  const keywords = keywordMap[sectionId] || [];
+  const keywords = resolveProposalSectionKeywords(sectionId);
   const chapterIndex = lowerChapters.findIndex((chapter) => keywords.some((keyword) => chapter.includes(keyword)));
   if (chapterIndex >= 0 && evidence[chapterIndex]) return evidence[chapterIndex];
-  if (sectionId === 'why-change') return evidence[0];
-  if (sectionId === 'target-outcome') return evidence[1] || evidence[0];
-  if (sectionId === 'solution-shape') return evidence[2] || evidence[1] || evidence[0];
-  if (sectionId === 'governance') return evidence[2] || evidence[0];
-  if (sectionId === 'delivery-plan') return evidence[3] || evidence[evidence.length - 1];
+  const evidenceIndex = resolveProposalEvidenceIndex(sectionId);
+  if (evidenceIndex !== null) return evidence[evidenceIndex] || evidence[0];
   return evidence[0];
 }
 
@@ -2051,6 +2045,8 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
   const payloadSections = Array.isArray(brief.payload?.sections) ? brief.payload.sections : [];
   const presetSections = Array.isArray(preset.sections) ? preset.sections : [];
   const appendixPattern = /\b(appendix|appendices|annex|supplement|reference)\b/i;
+  const reportSummaryTitle = resolveReportSummaryTitle();
+  const reportSectionTitle = resolveReportSectionTitle();
   const tokens = buildCompositionTokenMap(brief);
   const chapters = Array.isArray(brief.story?.chapters || brief.payload?.story?.chapters)
     ? (brief.story?.chapters || brief.payload?.story?.chapters)
@@ -2058,7 +2054,7 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
   const sections = payloadSections.length > 0
     ? payloadSections.map((section: any) => ({
         section_id: String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        title: String(section.heading || 'Section'),
+        title: String(section.heading || reportSectionTitle),
         objective: Array.isArray(section.body) ? String(section.body[0] || '') : '',
         body: [
           ...(Array.isArray(section.body) ? section.body.map((value: any) => String(value)) : []),
@@ -2078,7 +2074,7 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
         ].filter(Boolean);
         return {
           section_id: String(section.section_id || 'section'),
-          title: applyCompositionTemplate(section.title, tokens, section.title || 'Section'),
+          title: applyCompositionTemplate(section.title, tokens, section.title || reportSectionTitle),
           objective: objective || chapter || brief.objective || '',
           body,
           visual: evidence?.title ? String(evidence.title) : undefined,
@@ -2117,7 +2113,7 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
       },
       ...((brief.payload?.summary || brief.summary) ? [{
         section_id: 'summary',
-        title: 'Summary',
+        title: reportSummaryTitle,
         objective: brief.payload?.summary || brief.summary || brief.objective || '',
         body: [brief.payload?.summary || brief.summary || brief.objective || ''].filter(Boolean),
         visual: chooseDocumentSectionEvidence(0, brief)?.title || 'summary',
@@ -2127,7 +2123,7 @@ function buildReportNarrativeOutline(rootDir: string, brief: any): any {
       }] : []),
       ...toc.map((section: any) => ({
         section_id: String(section.section_id || 'section'),
-        title: String(section.title || 'Section'),
+        title: String(section.title || reportSectionTitle),
         objective: String(section.objective || ''),
         body: Array.isArray(section.body) ? section.body : [section.objective].filter(Boolean),
         visual: section.visual,
@@ -2152,6 +2148,8 @@ function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any): any {
   const sectionIndex = new Map<string, any>(
     presetSections.map((section: any) => [String(section.section_id || ''), section]),
   );
+  const signalEntryPolicy = loadMediaSignalEntryPolicyCatalog();
+  const trackerSheetPolicy = loadTrackerSheetPolicyCatalog();
   return {
     kind: 'document-outline-adf',
     artifact_family: brief.artifact_family,
@@ -2172,21 +2170,21 @@ function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any): any {
     toc: [
       {
         section_id: 'overview',
-        title: sectionIndex.get('overview')?.title || 'Overview',
+        title: sectionIndex.get('overview')?.title || trackerSheetPolicy.sheet_titles.overview,
         media_kind: sectionIndex.get('overview')?.media_kind || 'dashboard',
         layout_key: sectionIndex.get('overview')?.layout_key || 'sheet-overview',
         semantic_type: classifyRenderSemantic(sectionIndex.get('overview')?.layout_key || 'sheet-overview', sectionIndex.get('overview')?.media_kind || 'dashboard'),
       },
       {
         section_id: 'execution-board',
-        title: sectionIndex.get('execution-board')?.title || 'Execution Board',
+        title: sectionIndex.get('execution-board')?.title || trackerSheetPolicy.sheet_titles.execution_board,
         media_kind: sectionIndex.get('execution-board')?.media_kind || 'table',
         layout_key: sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table',
         semantic_type: classifyRenderSemantic(sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table', sectionIndex.get('execution-board')?.media_kind || 'table'),
       },
       {
         section_id: 'signals',
-        title: sectionIndex.get('signals')?.title || 'Signals and Risks',
+        title: sectionIndex.get('signals')?.title || signalEntryPolicy.sheet_title,
         media_kind: sectionIndex.get('signals')?.media_kind || 'signals',
         layout_key: sectionIndex.get('signals')?.layout_key || 'sheet-signals',
         semantic_type: classifyRenderSemantic(sectionIndex.get('signals')?.layout_key || 'sheet-signals', sectionIndex.get('signals')?.media_kind || 'signals'),
@@ -2343,45 +2341,15 @@ function gatherDocumentClueText(source: any, data: any): string {
 
 function inferDocumentTypeFromClues(source: any, data: any): string {
   const clueText = gatherDocumentClueText(source, data);
-  const orderedRules: Array<[string, string[]]> = [
-    ['meeting-notes', ['minutes', 'meeting', 'agenda', 'attendees', 'action items', 'decision']],
-    ['proposal', ['proposal', 'pitch', 'vision', 'charter', 'commitment']],
-    ['specification', ['specification', 'requirements', 'brd', 'api', 'architecture', 'design', 'icd', 'data dictionary', 'use case']],
-    ['report', ['report', 'summary', 'weekly', 'milestone', 'closure', 'audit', 'security', 'postmortem']],
-    ['plan', ['plan', 'test', 'qa', 'strategy', 'roadmap', 'runbook', 'release', 'governance']],
-    ['contract', ['contract', 'agreement', 'msa', 'dpa', 'licensing', 'terms', 'service agreement']],
-    ['record', ['log', 'register', 'issue', 'lessons learned', 'stakeholder']],
-  ];
-  for (const [type, keywords] of orderedRules) {
-    if (keywords.some((keyword) => clueText.includes(keyword))) return type;
-  }
-  return '';
+  return resolveDocumentTypeFromCluesPolicy(clueText);
 }
 
 function inferDocumentProfileId(rootDir: string, artifactFamily: string, documentType: string, source: any, data: any): string | null {
   const clueText = gatherDocumentClueText(source, data);
   const docType = String(documentType || '').trim();
   const family = String(artifactFamily || '').trim();
-  const profileOrder: Record<string, string[]> = {
-    proposal: ['executive-proposal', 'vision-proposal', 'project-charter'],
-    report: ['summary-report', 'weekly-status-report', 'milestone-report', 'project-closure-report', 'security-audit-report', 'test-validation-report'],
-    plan: ['test-plan', 'quality-assurance-strategy', 'master-test-plan', 'project-management-plan', 'risk-management-plan', 'quality-management-plan'],
-    specification: ['requirements-definition', 'business-requirements-document', 'api-specification', 'detailed-design', 'basic-design', 'interface-control-document', 'database-design', 'use-case-specification', 'data-dictionary'],
-    'meeting-notes': ['meeting-minutes', 'mission-ledger', 'stakeholder-register', 'issue-log', 'change-log', 'lessons-learned-register'],
-    record: ['meeting-minutes', 'mission-ledger', 'stakeholder-register', 'issue-log', 'change-log', 'lessons-learned-register'],
-    contract: ['master-services-agreement', 'data-processing-agreement-dpa', 'ip-licensing-agreement', 'internal-control-policy'],
-  };
-  const keywordMap: Record<string, string[]> = {
-    proposal: ['proposal', 'pitch', 'vision', 'charter', 'decision', 'next step', 'commitment'],
-    report: ['report', 'summary', 'weekly', 'milestone', 'closure', 'audit', 'security', 'postmortem'],
-    plan: ['plan', 'test', 'qa', 'strategy', 'roadmap', 'runbook', 'release', 'governance'],
-    specification: ['spec', 'specification', 'requirements', 'brd', 'api', 'architecture', 'design', 'icd', 'data dictionary', 'use case'],
-    'meeting-notes': ['minutes', 'meeting', 'agenda', 'attendees', 'action items', 'decision', 'issues', 'register', 'log'],
-    record: ['minutes', 'meeting', 'agenda', 'attendees', 'action items', 'decision', 'issues', 'register', 'log'],
-    contract: ['contract', 'agreement', 'msa', 'dpa', 'licensing', 'terms', 'service agreement'],
-  };
-  const candidates = profileOrder[docType] || profileOrder[family] || [];
-  const keywords = keywordMap[docType] || keywordMap[family] || [];
+  const candidates = resolveDocumentProfileCandidatesPolicy(docType, family);
+  const keywords = resolveDocumentProfileKeywordsPolicy(docType, family);
   for (const profileId of candidates) {
     if (keywords.length === 0) return profileId;
     if (keywords.some((keyword) => clueText.includes(keyword))) return profileId;
@@ -2623,6 +2591,7 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
   const evidenceCalloutTitleRule = resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_title');
   const evidenceCalloutBodyRule = resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_body');
   const tableCaptionRule = resolveSemanticComponentRule(rootDir, 'content', 'docx', 'table_caption');
+  const reportSectionTitle = resolveReportSectionTitle();
   const contentsEntry = Array.isArray(outline.toc)
     ? outline.toc.find((entry: any) => String(entry.section_id) === 'contents')
     : null;
@@ -2650,7 +2619,7 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
       type: 'paragraph',
       paragraph: {
         pPr: { pStyle: 'Heading2' },
-        content: [{ type: 'run', run: { content: [{ type: 'text', text: contentsEntry.title || 'Contents' }] } }],
+        content: [{ type: 'run', run: { content: [{ type: 'text', text: contentsEntry.title || resolveDocumentContentsLabel(brief.locale) }] } }],
       },
     });
     contentsEntry.body.forEach((line: string) => {
@@ -2674,7 +2643,7 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
       type: 'paragraph',
       paragraph: {
         pPr: { pStyle: headingStyle },
-        content: [{ type: 'run', run: { content: [{ type: 'text', text: section.heading || 'Section' }] } }],
+        content: [{ type: 'run', run: { content: [{ type: 'text', text: section.heading || reportSectionTitle }] } }],
       },
     });
 
@@ -2825,12 +2794,12 @@ function buildReportDocxProtocol(rootDir: string, brief: any): any {
     source: {
       format: 'markdown',
       title: brief.payload.title || 'Report',
-      body: [
+    body: [
         brief.payload.summary || '',
         '',
         ...(Array.isArray(brief.payload.sections)
           ? brief.payload.sections.flatMap((section: any) => [
-              section.heading || 'Section',
+              section.heading || reportSectionTitle,
               ...(Array.isArray(section.body) ? section.body.map((paragraph: any) => String(paragraph)) : []),
               ...(Array.isArray(section.bullets) ? section.bullets.map((bullet: string) => `- ${bullet}`) : []),
               '',
@@ -4573,10 +4542,9 @@ function buildXlsxProtocolFromPdfDesign(pdfDesign: PdfDesignProtocol, hints?: Pd
     if (!key) return noBorder;
     if (borderCache.has(key)) return borderCache.get(key)!;
     const border: any = {};
-    if (key.includes('T')) border.top = thinSide;
-    if (key.includes('B')) border.bottom = thinSide;
-    if (key.includes('L')) border.left = thinSide;
-    if (key.includes('R')) border.right = thinSide;
+    for (const side of resolveBorderKeySides(key)) {
+      border[side] = thinSide;
+    }
     borderCache.set(key, border);
     borders.push(border);
     return border;
@@ -4671,22 +4639,87 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
   const themeSecondary = String(activeTheme?.colors?.secondary || template?.colors?.secondary || '#4b5563');
   const themeAccent = String(activeTheme?.colors?.accent || template?.colors?.accent || '#2563eb');
   const themeBackground = String(activeTheme?.colors?.background || '#ffffff');
+  const reportSectionTitle = resolveReportSectionTitle();
   const vectors: any[] = [];
   const contentsEntry = Array.isArray(outline.toc)
     ? outline.toc.find((entry: any) => String(entry.section_id) === 'contents')
     : null;
-  const bodySections = [
-    brief.payload.title || 'Report',
-    brief.payload.summary || '',
-    ...(contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0
-      ? [contentsEntry.title || 'Contents', ...contentsEntry.body]
-      : []),
-    ...brief.payload.sections.flatMap((section: any) => [
-      section.heading || 'Section',
-      ...(Array.isArray(section.body) ? section.body : []),
-      ...(Array.isArray(section.bullets) ? section.bullets.map((item: string) => `- ${item}`) : []),
-    ]),
-  ].filter(Boolean);
+  const bodySections = (() => {
+    const sections = Array.isArray(brief.payload.sections) ? brief.payload.sections : [];
+    const bodySectionOrder = Array.isArray(template?.body_sections) && template.body_sections.length > 0
+      ? template.body_sections.map((value: any) => String(value))
+      : ['title', 'summary', 'contents', 'section', 'callout', 'bullet', 'table'];
+    const collected: string[] = [];
+    const pushValue = (value: unknown) => {
+      if (value === undefined || value === null) return;
+      const text = String(value).trim();
+      if (text) collected.push(text);
+    };
+
+    for (const entry of bodySectionOrder) {
+      if (entry === 'title') {
+        pushValue(brief.payload.title || 'Report');
+        continue;
+      }
+      if (entry === 'summary') {
+        pushValue(brief.payload.summary || '');
+        continue;
+      }
+      if (entry === 'contents') {
+        if (contentsEntry && Array.isArray(contentsEntry.body) && contentsEntry.body.length > 0) {
+          pushValue(contentsEntry.title || resolveDocumentContentsLabel(brief.locale));
+          contentsEntry.body.forEach(pushValue);
+        }
+        continue;
+      }
+      if (entry === 'section') {
+        for (const section of sections) {
+          pushValue(section.heading || reportSectionTitle);
+          if (Array.isArray(section.body)) section.body.forEach(pushValue);
+        }
+        continue;
+      }
+      if (entry === 'callout') {
+        for (const section of sections) {
+          if (Array.isArray(section.callouts)) {
+            for (const callout of section.callouts) {
+              pushValue(callout.title ? [callout.title, callout.tone ? `(${callout.tone})` : ''].filter(Boolean).join(' ') : '');
+              pushValue(callout.body || '');
+            }
+          }
+        }
+        continue;
+      }
+      if (entry === 'bullet') {
+        for (const section of sections) {
+          if (Array.isArray(section.bullets)) {
+            section.bullets.forEach((item: string) => pushValue(`- ${item}`));
+          }
+        }
+        continue;
+      }
+      if (entry === 'table') {
+        for (const section of sections) {
+          if (Array.isArray(section.tables)) {
+            for (const table of section.tables) {
+              pushValue(table.title || '');
+              const columns = Array.isArray(table.columns) ? table.columns : [];
+              const rows = Array.isArray(table.rows) ? table.rows : [];
+              if (columns.length > 0) {
+                pushValue(columns.join(' | '));
+                rows.forEach((row: any) => {
+                  const values = Array.isArray(row) ? row : columns.map((column: string) => row?.[column] ?? '');
+                  pushValue(values.map((value: any) => String(value ?? '')).join(' | '));
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return collected;
+  })();
 
   const elements: any[] = [
     {
@@ -4715,7 +4748,7 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
       type: 'text',
       x: pdfLayout.margin_left || 48,
       y: cursorY,
-      text: contentsEntry.title || 'Contents',
+      text: contentsEntry.title || resolveDocumentContentsLabel(brief.locale),
       fontSize: pdfLayout.section_font_size || 14,
       color: hexToPdfRgb(themePrimary, [0.12, 0.16, 0.22]),
     });
@@ -4758,7 +4791,7 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
       type: 'text',
       x: pdfLayout.margin_left || 48,
       y: cursorY,
-      text: section.heading || 'Section',
+      text: section.heading || reportSectionTitle,
       fontSize: isAppendix ? Math.max((pdfLayout.section_font_size || 14) - 2, 11) : (pdfLayout.section_font_size || 14),
       color: sectionHeaderColor,
     });
@@ -5015,6 +5048,8 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
   const outline = buildSpreadsheetNarrativeOutline(rootDir, brief);
   const { preset } = resolveDocumentCompositionPreset(rootDir, brief);
   const semanticCatalog = loadSemanticRenderTokenCatalog(rootDir);
+  const signalEntryPolicy = loadMediaSignalEntryPolicyCatalog();
+  const trackerSheetPolicy = loadTrackerSheetPolicyCatalog();
   const { template } = resolveDocumentLayoutTemplate(rootDir, {
     document_type: 'tracker',
     layout_template_id: brief.layout_template_id,
@@ -5054,27 +5089,19 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
     : null;
 
   const styleMap = {
-    base: 0,
-    title: 1,
-    subtitle: 2,
-    header: 3,
-    section: 4,
-    info: 5,
-    success: 6,
-    warning: 7,
-    danger: 8,
-    body: 9,
+    base: resolveSpreadsheetStyleIndex('base'),
+    title: resolveSpreadsheetStyleIndex('title'),
+    subtitle: resolveSpreadsheetStyleIndex('subtitle'),
+    header: resolveSpreadsheetStyleIndex('header'),
+    section: resolveSpreadsheetStyleIndex('section'),
+    info: resolveSpreadsheetStyleIndex('info'),
+    success: resolveSpreadsheetStyleIndex('success'),
+    warning: resolveSpreadsheetStyleIndex('warning'),
+    danger: resolveSpreadsheetStyleIndex('danger'),
+    body: resolveSpreadsheetStyleIndex('body'),
   } as const;
 
-  const toneToStyle = (tone?: string) => {
-    switch (tone) {
-      case 'success': return styleMap.success;
-      case 'warning': return styleMap.warning;
-      case 'danger': return styleMap.danger;
-      case 'info': return styleMap.info;
-      default: return styleMap.info;
-    }
-  };
+  const toneToStyle = (tone?: string) => styleMap[resolveMediaToneStyle(tone)];
 
   const sheetRows: any[] = [
     {
@@ -5243,7 +5270,7 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
       index: 1,
       height: layout.title_row_height || 30,
       customHeight: true,
-      cells: [{ ref: 'A1', type: 's', value: overviewSection?.title || 'Overview', styleIndex: styleMap.title }],
+      cells: [{ ref: 'A1', type: 's', value: overviewSection?.title || trackerSheetPolicy.sheet_titles.overview, styleIndex: styleMap.title }],
     },
   ];
   if (summaryCards.length > 0) {
@@ -5264,41 +5291,49 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
       index: 3,
       height: layout.summary_row_height || 20,
       customHeight: true,
-      cells: [{ ref: 'A3', type: 's', value: 'No summary cards provided.', styleIndex: styleMap.body }],
+      cells: [{ ref: 'A3', type: 's', value: trackerSheetPolicy.summary_empty_message, styleIndex: styleMap.body }],
     });
   }
   const signalRowsSource = rows.filter((row: any) => {
     const tone = rowToneKey ? String(row[rowToneKey] ?? '') : '';
     const status = String(row.status ?? '');
-    return ['warning', 'danger'].includes(String(rowTones[tone] || tone).toLowerCase()) || /risk|blocked|late|issue/i.test(status);
+    return signalEntryPolicy.elevated_tones.includes(String(rowTones[tone] || tone).toLowerCase())
+      || signalEntryPolicy.elevated_status_keywords.some((keyword) => status.toLowerCase().includes(keyword));
   });
-  const explicitSignalEntries = [
-    ...(Array.isArray(brief.payload.signals) ? brief.payload.signals.map((entry: any) => ({ ...entry, signalType: 'signal' })) : []),
-    ...(Array.isArray(brief.payload.risks) ? brief.payload.risks.map((entry: any) => ({ ...entry, signalType: 'risk' })) : []),
-    ...(Array.isArray(brief.payload.incidents) ? brief.payload.incidents.map((entry: any) => ({ ...entry, signalType: 'incident' })) : []),
-    ...(Array.isArray(brief.payload.controls) ? brief.payload.controls.map((entry: any) => ({ ...entry, signalType: 'control' })) : []),
-  ];
+  const pickFirstFieldValue = (entry: any, fields: string[]): string => {
+    for (const field of fields) {
+      const value = entry?.[field];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        return String(value);
+      }
+    }
+    return '';
+  };
+  const explicitSignalEntries = signalEntryPolicy.entry_types.flatMap((entryType) => {
+    const payloadEntries = Array.isArray(brief.payload?.[entryType.source_key]) ? brief.payload[entryType.source_key] : [];
+    return payloadEntries.map((entry: any) => ({ ...entry, signalType: entryType.signal_type, signalPolicy: entryType }));
+  });
   const normalizedSignalEntries = explicitSignalEntries.map((entry: any) => ({
-    task: String(entry.title || entry.name || entry.control || entry.risk || entry.incident || entry.summary || 'Signal'),
-    owner: String(entry.owner || entry.assignee || entry.team || entry.function || ''),
-    status: String(entry.status || entry.severity || entry.tone || entry.state || entry.signalType || ''),
-    tone: String(entry.tone || entry.severity || (entry.signalType === 'risk' ? 'warning' : entry.signalType === 'incident' ? 'danger' : 'info')),
+    task: pickFirstFieldValue(entry, entry.signalPolicy.title_fields) || 'Signal',
+    owner: pickFirstFieldValue(entry, entry.signalPolicy.owner_fields),
+    status: pickFirstFieldValue(entry, entry.signalPolicy.status_fields) || entry.signalType,
+    tone: String(entry.tone || entry.severity || entry.signalPolicy.default_tone || 'info'),
   }));
   const signalRows: any[] = [
     {
       index: 1,
       height: layout.title_row_height || 30,
       customHeight: true,
-      cells: [{ ref: 'A1', type: 's', value: signalsSection?.title || 'Signals and Risks', styleIndex: styleMap.title }],
+      cells: [{ ref: 'A1', type: 's', value: signalsSection?.title || signalEntryPolicy.sheet_title, styleIndex: styleMap.title }],
     },
     {
       index: 3,
       height: layout.header_row_height || 22,
       customHeight: true,
       cells: [
-        { ref: 'A3', type: 's', value: 'Task', styleIndex: styleMap.header },
-        { ref: 'B3', type: 's', value: 'Owner', styleIndex: styleMap.header },
-        { ref: 'C3', type: 's', value: 'Status', styleIndex: styleMap.header },
+        { ref: 'A3', type: 's', value: signalEntryPolicy.columns[0] || 'Task', styleIndex: styleMap.header },
+        { ref: 'B3', type: 's', value: signalEntryPolicy.columns[1] || 'Owner', styleIndex: styleMap.header },
+        { ref: 'C3', type: 's', value: signalEntryPolicy.columns[2] || 'Status', styleIndex: styleMap.header },
       ],
     },
   ];
@@ -5327,7 +5362,7 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
       index: 4,
       height: layout.data_row_height || 20,
       customHeight: Boolean(layout.data_row_height),
-      cells: [{ ref: 'A4', type: 's', value: 'No elevated signals detected.', styleIndex: styleMap.body }],
+      cells: [{ ref: 'A4', type: 's', value: signalEntryPolicy.empty_message, styleIndex: styleMap.body }],
     });
   } else {
     combinedSignalEntries.forEach((row: any, index: number) => {
@@ -5417,9 +5452,9 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
       recommendedTheme: preset?.recommended_theme || 'kyberion-standard',
       branding: preset?.branding || {},
       sheetRoles: [
-        { role: 'overview', title: overviewSection?.title || 'Overview' },
-        { role: 'execution-board', title: boardSection?.title || 'Execution Board' },
-        { role: 'signals', title: signalsSection?.title || 'Signals and Risks' },
+        { role: 'overview', title: overviewSection?.title || trackerSheetPolicy.sheet_titles.overview },
+        { role: 'execution-board', title: boardSection?.title || trackerSheetPolicy.sheet_titles.execution_board },
+        { role: 'signals', title: signalsSection?.title || signalEntryPolicy.sheet_title },
       ],
       sheetSemantics: [
         {
@@ -5445,7 +5480,7 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
     sheets: [
       {
         id: 'sheet-overview',
-        name: overviewSection?.title || 'Overview',
+        name: overviewSection?.title || trackerSheetPolicy.sheet_titles.overview,
         dimension: `A1:B${Math.max(overviewRows.length, 1)}`,
         sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: 1 },
         columns: [
@@ -5461,7 +5496,7 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
       },
       {
         id: 'sheet1',
-        name: brief.payload.sheet_name || boardSection?.title || 'Tracker',
+        name: brief.payload.sheet_name || boardSection?.title || trackerSheetPolicy.sheet_titles.execution_board,
         dimension: `A1:${lastColumnLetter}${Math.max(sheetRows.length, 1)}`,
         sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: layout.freeze_header === false ? 0 : headerRowIndex },
         columns: widths.map((width: number, index: number) => ({ min: index + 1, max: index + 1, width, customWidth: true })),
@@ -5475,7 +5510,7 @@ function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
       },
       {
         id: 'sheet-signals',
-        name: signalsSection?.title || 'Signals and Risks',
+        name: signalsSection?.title || signalEntryPolicy.sheet_title,
         dimension: `A1:C${Math.max(signalRows.length, 1)}`,
         sheetView: { showGridLines: false, zoomScale: layout.zoom_scale || 95, frozenRows: 3 },
         columns: [
@@ -5599,6 +5634,19 @@ function buildDocumentPdfProtocol(rawBrief: any): any {
 
   const noteLines = Array.isArray(brief.notes) ? brief.notes.filter(Boolean) : [];
   const { templateId, template } = resolveDocumentLayoutTemplate(pathResolver.rootDir(), brief);
+  const invoiceBodySections = Array.isArray(template.body_sections) && template.body_sections.length > 0
+    ? template.body_sections.map((value: any) => String(value))
+    : ['header', 'issuer', 'recipient', 'items', 'tax_summary', 'totals', 'payment', 'notes', 'compliance'];
+  const complianceBullets = Array.isArray(template.compliance_bullets) && template.compliance_bullets.length > 0
+    ? template.compliance_bullets.map((value: any) => String(value))
+    : [
+      '・発行事業者名および登録番号',
+      '・取引年月日',
+      '・取引内容（軽減税率対象である旨を含む）',
+      '・税率ごとに区分した対価の額および適用税率',
+      '・税率ごとに区分した消費税額等',
+      '・書類の交付を受ける事業者の氏名又は名称',
+    ];
   const pageWidth = Number(template.page?.width || 595);
   const pageHeight = Number(template.page?.height || 842);
   const left = Number(template.page?.left || 48);
@@ -5771,50 +5819,36 @@ function buildDocumentPdfProtocol(rawBrief: any): any {
   vectors.push({ shape: { kind: 'rect', x: left, y: notesTop, width: tableWidth, height: Number(notesBlock.height || 110) }, strokeColor: border, lineWidth: 0.8 });
   pushWrappedLines(left + 8, notesTop + 24, noteLines, Number(notesBlock.body_font_size || 9), Number(notesBlock.body_max_units || 48), Number(notesBlock.body_line_height || 14));
   pushText(left + 8, notesTop + 56, labels.invoice_requirements || '【適格請求書の主な記載事項】', 9);
-  [
-    '・発行事業者名および登録番号',
-    '・取引年月日',
-    '・取引内容（軽減税率対象である旨を含む）',
-    '・税率ごとに区分した対価の額および適用税率',
-    '・税率ごとに区分した消費税額等',
-    '・書類の交付を受ける事業者の氏名又は名称',
-  ].forEach((line, index) => pushText(left + 10, notesTop + 72 + index * 12, line, 8));
+  complianceBullets.forEach((line, index) => pushText(left + 10, notesTop + 72 + index * 12, line, 8));
 
-  const bodySections = [
-    '請求書',
-    '',
-    `請求書番号: ${brief.invoice_number}`,
-    `発行日: ${brief.issue_date}`,
-    `取引日: ${brief.transaction_date}`,
-    brief.due_date ? `支払期日: ${brief.due_date}` : '',
-    brief.subject ? `件名: ${brief.subject}` : '',
-    '',
-    '請求元',
-    ...issuerLines,
-    '',
-    '請求先',
-    ...recipientLines,
-    '',
-    '明細',
-    ...itemLines,
-    '',
-    '税率別集計',
-    ...taxSummaryLines,
-    '',
-    `小計(税抜): ${formatJpy(subtotal)}`,
-    `消費税額計: ${formatJpy(totalTax)}`,
-    `合計請求額: ${formatJpy(totalAmount)}`,
-    '',
-    ...(paymentLines.length ? ['お支払い情報', ...paymentLines, ''] : []),
-    ...(noteLines.length ? ['備考', ...noteLines, ''] : []),
-    '【適格請求書の記載事項】',
-    '- 適格請求書発行事業者名および登録番号',
-    '- 取引年月日',
-    '- 取引内容（軽減税率対象である旨を含む）',
-    '- 税率ごとに区分した対価の額および適用税率',
-    '- 税率ごとに区分した消費税額等',
-    '- 書類の交付を受ける事業者の氏名又は名称',
-  ].filter(Boolean);
+  const sectionBodies: Record<string, string[]> = {
+    header: [
+      labels.section_header || '請求書',
+      '',
+      `請求書番号: ${brief.invoice_number}`,
+      `発行日: ${brief.issue_date}`,
+      `取引日: ${brief.transaction_date}`,
+      brief.due_date ? `支払期日: ${brief.due_date}` : '',
+      brief.subject ? `件名: ${brief.subject}` : '',
+    ].filter(Boolean),
+    issuer: [labels.section_issuer || '請求元', ...issuerLines],
+    recipient: [labels.section_recipient || '請求先', ...recipientLines],
+    items: [labels.section_items || '明細', ...itemLines],
+    tax_summary: [labels.section_tax_summary || '税率別集計', ...taxSummaryLines],
+    totals: [
+      `小計(税抜): ${formatJpy(subtotal)}`,
+      `消費税額計: ${formatJpy(totalTax)}`,
+      `合計請求額: ${formatJpy(totalAmount)}`,
+    ],
+    payment: paymentLines.length ? [labels.section_payment || 'お支払い情報', ...paymentLines] : [],
+    notes: noteLines.length ? [labels.section_notes || '備考', ...noteLines] : [],
+    compliance: [labels.section_compliance || '【適格請求書の記載事項】', ...complianceBullets.map((line: string) => `- ${line.replace(/^・/, '')}`)],
+  };
+
+  const bodySections = invoiceBodySections.flatMap((sectionId) => {
+    const lines = sectionBodies[sectionId] || [];
+    return lines.length > 0 ? [...lines, ''] : [];
+  }).filter(Boolean);
 
   return {
     version: '1.0.0',
@@ -6038,9 +6072,6 @@ function generateDrawioDocument(
   const geometry = new Map<string, { x: number; y: number; width: number; height: number }>();
   let cursorX = 40;
   let cursorY = 40;
-  const groupOrder = ['edge', 'web', 'application', 'app', 'data', 'database', 'network', 'security', 'module', 'control', 'state'];
-  const groupPriority = new Map(groupOrder.map((group, index) => [group, index]));
-
   const layoutNode = (node: any, depth: number, parentX: number, parentY: number): { width: number; height: number } => {
     const nodeChildren = childrenByParent.get(node.id) || [];
     const { width: preferredWidth, height: preferredHeight } = resolveDrawioNodeSize(node);
@@ -6079,8 +6110,8 @@ function generateDrawioDocument(
     }
 
     const sortedGroups = [...groupedLeaves.keys()].sort((left, right) => {
-      const leftRank = groupPriority.has(left) ? groupPriority.get(left)! : groupOrder.length;
-      const rightRank = groupPriority.has(right) ? groupPriority.get(right)! : groupOrder.length;
+      const leftRank = resolveMediaDrawioGroupRank(left);
+      const rightRank = resolveMediaDrawioGroupRank(right);
       return leftRank === rightRank ? left.localeCompare(right) : leftRank - rightRank;
     });
 
@@ -6179,36 +6210,22 @@ function generateDrawioDocument(
       `fontColor=${colors.text || '#111827'}`,
       `fontFamily=${normalizeFontFamily(fonts.body || fonts.heading || 'Arial')}`,
     ];
-    if (edge.label === 'uses') {
-      styleParts.push('dashed=1', 'strokeOpacity=55');
-    }
-    if (edge.label === 'source') {
+    const labelStyleParts = resolveDrawioEdgeLabelStyleParts(edge.label);
+    if (labelStyleParts.length > 0) {
       styleParts.push(
-        'dashed=1',
-        `strokeColor=${colors.accent || '#ff9900'}`,
-        'strokeWidth=2',
-        'endArrow=open',
-        'endFill=0',
-        'labelBackgroundColor=#FFF7ED',
+        ...labelStyleParts.map((part) => (
+          part.includes('strokeColor=')
+            ? part.replace(
+                /strokeColor=[^;]+/,
+                edge.label === 'source'
+                  ? `strokeColor=${colors.accent || '#ff9900'}`
+                  : `strokeColor=${colors.secondary || '#4b5563'}`
+              )
+            : part
+        )),
       );
     }
-    if (edge.label === 'expands') {
-      styleParts.push(
-        'dashed=1',
-        'dashPattern=8 4',
-        `strokeColor=${colors.secondary || '#4b5563'}`,
-        'strokeWidth=2',
-        'endArrow=block',
-        'endFill=1',
-        'labelBackgroundColor=#EFF6FF',
-      );
-    }
-    const horizontalTiers = new Set(['edge', 'web', 'application', 'app', 'data', 'security']);
-    if (sourceTier === 'security' && ['web', 'application', 'app'].includes(targetTier)) {
-      styleParts.push('exitX=0', 'exitY=0.5', 'entryX=1', 'entryY=0.5');
-    } else if (horizontalTiers.has(sourceTier) && horizontalTiers.has(targetTier) && sourceTier !== targetTier) {
-      styleParts.push('exitX=1', 'exitY=0.5', 'entryX=0', 'entryY=0.5');
-    }
+    styleParts.push(...resolveDrawioEdgeRoutingStyleParts({ sourceTier, targetTier }));
     const style = styleParts.join(';');
     const label = edge.label ? ` value="${escapeXml(edge.label)}"` : '';
     cellXml.push(
@@ -6306,46 +6323,12 @@ function resolveDrawioBoundaryIcon(node: any, iconRoot?: string): string | null 
   const boundary = String(node?.boundary || '');
   const name = String(node?.name || '').toLowerCase();
   const tier = String(node?.render_hints?.semantic_tier || '').toLowerCase();
-  const candidates =
-    boundary === 'account' || node?.type === 'aws_account' ? [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Account_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Account_32.svg',
-    ] :
-    boundary === 'region' || node?.type === 'aws_region' ? [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.svg',
-    ] :
-    boundary === 'vpc' || node?.type === 'aws_vpc' ? [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Virtual-private-cloud-VPC_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Virtual-private-cloud-VPC_32.svg',
-    ] :
-    boundary === 'subnet' || node?.type === 'aws_subnet' ? (
-      name.includes('public') ? [
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.png',
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.svg',
-      ] : [
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.png',
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.svg',
-      ]
-    ) :
-    boundary === 'az' || node?.type === 'aws_availability_zone' ? [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.svg',
-    ] :
-    boundary === 'scope' ? (
-      tier === 'state' || tier === 'data' ? [
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Corporate-data-center_32.png',
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Corporate-data-center_32.svg',
-      ] :
-      tier === 'web' || tier === 'module' ? [
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Server-contents_32.png',
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Server-contents_32.svg',
-      ] : [
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud-logo_32.png',
-        'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud-logo_32.svg',
-      ]
-    ) :
-    [];
+  const candidates = resolveDrawioBoundaryIconCandidates({
+    boundary,
+    type: node?.type,
+    tier,
+    name,
+  });
 
   for (const candidate of candidates) {
     const absolutePath = iconRoot
@@ -6369,65 +6352,16 @@ function resolveDrawioBoundaryPalette(
   const boundary = String(node?.boundary || '');
   const type = String(node?.type || '');
   const tier = String(node?.render_hints?.semantic_tier || '').trim().toLowerCase();
-  const laneName = String(node?.name || '').trim().toLowerCase();
-  switch (boundary || type) {
-    case 'account':
-    case 'aws_account':
-      return { fill: '#F8FAFC', stroke: '#0F172A' };
-    case 'region':
-    case 'aws_region':
-      return { fill: '#EFF6FF', stroke: '#1D4ED8' };
-    case 'vpc':
-    case 'aws_vpc':
-      return { fill: '#FFF7ED', stroke: '#C2410C' };
-    case 'az':
-    case 'aws_availability_zone':
-      return { fill: '#F9FAFB', stroke: '#6B7280' };
-    case 'subnet':
-    case 'aws_subnet': {
-      const name = String(node?.name || '').toLowerCase();
-      if (name.includes('public')) return { fill: '#ECFDF5', stroke: '#059669' };
-      if (name.includes('data')) return { fill: '#FEF2F2', stroke: '#DC2626' };
-      return { fill: '#FFF7ED', stroke: '#EA580C' };
-    }
-    case 'lane':
-      switch (tier || laneName) {
-        case 'edge':
-          return { fill: '#ECFDF5', stroke: '#059669' };
-        case 'network':
-          return { fill: '#F0F9FF', stroke: '#0284C7' };
-        case 'web':
-        case 'application':
-        case 'app':
-          return { fill: '#FFF7ED', stroke: '#EA580C' };
-        case 'security':
-          return { fill: '#FEF2F2', stroke: '#DC2626' };
-        case 'data':
-        case 'database':
-          return { fill: '#EFF6FF', stroke: '#2563EB' };
-        case 'control':
-        case 'state':
-          return { fill: '#F8FAFC', stroke: '#64748B' };
-        default:
-          return { fill: '#FFFFFF', stroke: '#94A3B8' };
-      }
-    case 'scope':
-      switch (tier || laneName) {
-        case 'state':
-          return { fill: '#F8FAFC', stroke: '#475569' };
-        case 'data':
-          return { fill: '#EFF6FF', stroke: '#2563EB' };
-        case 'web':
-        case 'module':
-          return { fill: '#FFF7ED', stroke: '#C2410C' };
-        case 'network':
-          return { fill: '#F0F9FF', stroke: '#0284C7' };
-        default:
-          return { fill: '#FFFFFF', stroke: '#232F3E' };
-      }
-    default:
-      return { fill: fallbackFill, stroke: fallbackStroke };
-  }
+  const override = resolveDrawioBoundaryPaletteOverride({ boundary, type, tier, name: node?.name });
+  if (override) return override;
+  const palette = resolveMediaDrawioBoundaryPalette({
+    boundary,
+    type,
+    name: node?.name,
+    fallbackFill,
+    fallbackStroke,
+  });
+  return palette;
 }
 
 function resolveDrawioNodeSize(node: any): { width: number; height: number } {
@@ -6438,18 +6372,8 @@ function resolveDrawioNodeSize(node: any): { width: number; height: number } {
   }
 
   const tier = typeof node?.render_hints?.semantic_tier === 'string' ? node.render_hints.semantic_tier : '';
-  if (node?.type === 'terraform_module') {
-    return { width: 196, height: 112 };
-  }
-  if (tier === 'edge' || tier === 'data') {
-    return { width: 92, height: 92 };
-  }
-  if (tier === 'security' || tier === 'control' || tier === 'network') {
-    return { width: 80, height: 80 };
-  }
-  if (tier === 'web' || tier === 'application' || tier === 'app') {
-    return { width: 88, height: 88 };
-  }
+  const resolved = resolveMediaDrawioNodeSize({ type: node?.type, tier });
+  if (resolved) return resolved;
   return { width: 160, height: 120 };
 }
 
@@ -6496,9 +6420,8 @@ function iconCandidatePriority(candidate: string): number {
 function compareDrawioNodesByTier(left: any, right: any): number {
   const leftTier = typeof left?.render_hints?.semantic_tier === 'string' ? left.render_hints.semantic_tier : '';
   const rightTier = typeof right?.render_hints?.semantic_tier === 'string' ? right.render_hints.semantic_tier : '';
-  const tierOrder = ['network', 'edge', 'web', 'application', 'app', 'data', 'database', 'security', 'module', 'control', 'state'];
-  const leftRank = leftTier ? Math.max(0, tierOrder.indexOf(leftTier)) : tierOrder.length;
-  const rightRank = rightTier ? Math.max(0, tierOrder.indexOf(rightTier)) : tierOrder.length;
+  const leftRank = resolveMediaDrawioTierRank(leftTier);
+  const rightRank = resolveMediaDrawioTierRank(rightTier);
   if (leftRank !== rightRank) {
     return leftRank - rightRank;
   }
@@ -6526,25 +6449,9 @@ function compareDrawioLeafNodes(left: any, right: any): number {
   const rightRelatedSg = String(right?.render_hints?.related_security_group || '');
   const leftClusterKey = String(left?.render_hints?.cluster_key || '');
   const rightClusterKey = String(right?.render_hints?.cluster_key || '');
-  const typeOrder = [
-    'aws_provider',
-    'aws_availability_zones',
-    'terraform_remote_state',
-    'aws_internet_gateway',
-    'aws_nat_gateway',
-    'aws_route_table',
-    'aws_security_group',
-    'aws_security_group_rule',
-    'aws_elb',
-    'aws_lb',
-    'aws_launch_configuration',
-    'aws_autoscaling_group',
-    'aws_db_instance',
-    'aws_rds_instance',
-    'aws_s3_bucket',
-  ];
-  const leftRank = typeOrder.includes(leftType) ? typeOrder.indexOf(leftType) : typeOrder.length;
-  const rightRank = typeOrder.includes(rightType) ? typeOrder.indexOf(rightType) : typeOrder.length;
+  const relationPrefix = resolveMediaDrawioSecurityGroupRelationPrefix();
+  const leftRank = resolveMediaDrawioTypeRank(leftType);
+  const rightRank = resolveMediaDrawioTypeRank(rightType);
   if (leftRank !== rightRank) {
     return leftRank - rightRank;
   }
@@ -6557,10 +6464,10 @@ function compareDrawioLeafNodes(left: any, right: any): number {
   if (!leftClusterKey && rightClusterKey) {
     return 1;
   }
-  if (leftType === 'aws_security_group' && rightType === 'aws_security_group_rule' && rightRelatedSg.includes(`aws_security_group.${leftName}`)) {
+  if (leftType === 'aws_security_group' && rightType === 'aws_security_group_rule' && rightRelatedSg.includes(`${relationPrefix}${leftName}`)) {
     return -1;
   }
-  if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group' && leftRelatedSg.includes(`aws_security_group.${rightName}`)) {
+  if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group' && leftRelatedSg.includes(`${relationPrefix}${rightName}`)) {
     return 1;
   }
   if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group_rule' && leftRelatedSg !== rightRelatedSg) {
@@ -6570,131 +6477,7 @@ function compareDrawioLeafNodes(left: any, right: any): number {
 }
 
 function awsIconCandidatesForResourceType(resourceType: string): string[] {
-  const exactMap: Record<string, string[]> = {
-    aws_provider: [
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Compute_32.png',
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Compute_32.svg',
-    ],
-    aws_vpc: [
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Virtual-private-cloud-VPC_48.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Virtual-private-cloud-VPC_32.svg',
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Virtual-private-cloud-VPC_48.svg',
-    ],
-    aws_subnet: [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Public-subnet_32.svg',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Private-subnet_32.svg',
-    ],
-    aws_region: [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Region_32.svg',
-    ],
-    aws_internet_gateway: [
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Internet-Gateway_48.png',
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_Internet-Gateway_48.svg',
-    ],
-    aws_nat_gateway: [
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_NAT-Gateway_48.png',
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-VPC_NAT-Gateway_48.svg',
-    ],
-    aws_route_table: [
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-Route-53_Route-Table_48.png',
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Networking-Content-Delivery/Res_Amazon-Route-53_Route-Table_48.svg',
-    ],
-    aws_availability_zones: [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/AWS-Cloud_32.svg',
-    ],
-    aws_lb: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.svg',
-    ],
-    aws_elb: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Networking-Content-Delivery/48/Arch_Elastic-Load-Balancing_48.svg',
-    ],
-    aws_instance: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.svg',
-    ],
-    aws_launch_configuration: [
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/EC2-instance-contents_32.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/EC2-instance-contents_32.svg',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2_48.svg',
-    ],
-    aws_autoscaling_group: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.png',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Auto-Scaling-group_32.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.svg',
-      'active/shared/assets/aws-icons/Architecture-Group-Icons_01302026/Auto-Scaling-group_32.svg',
-    ],
-    aws_rds_instance: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.svg',
-    ],
-    aws_db_instance: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Databases/48/Arch_Amazon-RDS_48.svg',
-    ],
-    aws_s3_bucket: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg',
-    ],
-    aws_cloudwatch_metric_alarm: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.png',
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Management-Governance/Res_Amazon-CloudWatch_Alarm_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.svg',
-      'active/shared/assets/aws-icons/Resource-Icons_01302026/Res_Management-Governance/Res_Amazon-CloudWatch_Alarm_48.svg',
-    ],
-    terraform_remote_state: [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg',
-    ],
-    aws_security_group: [
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
-    ],
-    aws_security_group_rule: [
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
-    ],
-  };
-
-  if (exactMap[resourceType]) {
-    return exactMap[resourceType];
-  }
-
-  if (resourceType.startsWith('aws_iam_')) {
-    return [
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
-    ];
-  }
-
-  if (resourceType.includes('cloudwatch')) {
-    return [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.svg',
-    ];
-  }
-
-  if (resourceType.includes('security_group')) {
-    return [
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.png',
-      'active/shared/assets/aws-icons/Category-Icons_01302026/Arch-Category_32/Arch-Category_Security-Identity_32.svg',
-    ];
-  }
-
-  if (resourceType.includes('autoscaling')) {
-    return [
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.png',
-      'active/shared/assets/aws-icons/Architecture-Service-Icons_01302026/Arch_Compute/48/Arch_Amazon-EC2-Auto-Scaling_48.svg',
-    ];
-  }
-
-  return [];
+  return resolveMediaAwsIconCandidates(resourceType);
 }
 
 function normalizeFontFamily(input: string): string {

@@ -121,9 +121,6 @@ function resolveServiceBaseUrl(serviceId: string): string {
     const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
     if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
   } catch (_) {}
-
-  if (serviceId === 'moltbook') return 'https://www.moltbook.com/api/v1';
-  if (serviceId === 'slack') return 'https://slack.com/api';
   return `https://api.${serviceId}.com/v1`;
 }
 
@@ -314,8 +311,8 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       return { status: 'reconciled', active_services: Object.keys(pids) };
 
     case 'STREAM':
-      if (input.service_id === 'slack') {
-        throw new Error('Slack streaming ingress belongs to the Slack gateway (satellites/slack-bridge), not service-actuator.');
+      if ((loadServiceEndpointsCatalog().services[input.service_id]?.allow_stream_ingress ?? true) === false) {
+        throw new Error(`Streaming ingress is disabled for ${input.service_id}; use the service gateway instead.`);
       }
       throw new Error(`Streaming not implemented for ${input.service_id}`);
 

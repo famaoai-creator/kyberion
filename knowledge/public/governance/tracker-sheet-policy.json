@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "sheet_titles": {
+    "overview": "Overview",
+    "execution_board": "Execution Board",
+    "signals": "Signals and Risks"
+  },
+  "summary_empty_message": "No summary cards provided."
+}

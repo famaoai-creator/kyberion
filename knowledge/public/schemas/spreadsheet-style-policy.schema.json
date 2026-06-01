@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "spreadsheet-style-policy",
+  "type": "object",
+  "required": ["version", "role_indices"],
+  "properties": {
+    "version": { "type": "string" },
+    "role_indices": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "number" }
+    }
+  },
+  "additionalProperties": false
+}

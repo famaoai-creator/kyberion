@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "title_prefix": "production evidence",
+  "invalid_entries_title": "invalid register entries",
+  "pending_title": "pending external evidence",
+  "complete_message": "all production evidence is verified"
+}

@@ -7,6 +7,7 @@ import {
 import { resolveMissionWorkflowDesign, type MissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign, type MissionReviewDesign } from './mission-review-gates.js';
 import { composeMissionTeamPlan, type MissionTeamPlan } from './mission-team-plan-composer.js';
+import { type OrganizationProfile } from './organization-profile.js';
 import { inferMissingInputs, inferOptionalRoleHints, summarizeRequestText } from './mission-team-brief-utils.js';
 import { safeWriteFile, safeExistsSync, safeMkdir } from './secure-io.js';
 
@@ -21,6 +22,7 @@ export interface MissionTeamCompositionBriefInput {
   progressSignals?: string[];
   tier?: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
+  organizationProfile?: OrganizationProfile | null;
   executionShape?: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
 }
 
@@ -75,6 +77,7 @@ export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput)
     progressSignals: input.progressSignals,
     tier,
     assignedPersona: input.assignedPersona,
+    organizationProfile: input.organizationProfile,
   });
   const workflowDesign = resolveMissionWorkflowDesign({
     missionClass: missionClassification.mission_class,
