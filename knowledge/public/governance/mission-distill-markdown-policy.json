@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "title_suffix": "Completion Summary",
+  "section_titles": {
+    "summary": "Summary",
+    "key_learnings": "Key Learnings",
+    "patterns_discovered": "Patterns Discovered",
+    "failures_and_recoveries": "Failures & Recoveries",
+    "reusable_artifacts": "Reusable Artifacts"
+  },
+  "prompt_titles": {
+    "mission_state": "Mission State",
+    "evidence_context": "Evidence & Context"
+  }
+}

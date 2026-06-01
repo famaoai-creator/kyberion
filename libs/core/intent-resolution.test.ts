@@ -20,6 +20,8 @@ describe('intent-resolution', () => {
         'generate-workbook',
         'inspect-service',
         'generate-video',
+        'clone-my-voice',
+        'speak-with-my-voice',
         'transcribe-audio',
         'live-voice',
         'launch-first-run-onboarding',
@@ -45,8 +47,8 @@ describe('intent-resolution', () => {
 
   it('keeps service operations and document intents bound to their catalog resolution', () => {
     const servicePacket = resolveIntentResolutionPacket('voice-hub を再起動して');
-    expect(servicePacket.selected_intent_id).toBe('inspect-service');
-    expect(servicePacket.selected_resolution?.task_kind).toBe('service_operation');
+    expect(servicePacket.selected_intent_id).toBe('restart-service');
+    expect(servicePacket.selected_resolution?.result_shape).toBe('service_restarted');
 
     const reportPacket = resolveIntentResolutionPacket('今週の進捗レポートを docx で作って');
     expect(reportPacket.selected_intent_id).toBe('generate-report');
@@ -90,12 +92,15 @@ describe('intent-resolution', () => {
       ['推論バックエンドを設定して', 'configure-reasoning-backend', 'reasoning_backend_configured'],
       ['CI/CDを設定して', 'configure-organization-toolchain', 'organization_toolchain_configured'],
       ['デザインテーマを登録して', 'register-presentation-preference-profile', 'presentation_preference_profile_registered'],
+      ['ミッション一覧を教えて', 'inspect-mission-inventory', 'mission_inventory_summary'],
+      ['スケジュールタスクの一覧を教えて', 'inspect-generation-schedules', 'generation_schedule_summary'],
       ['Kyberionのベースライン状態を確認して', 'check-kyberion-baseline', 'kyberion_baseline_status'],
       ['Kyberionのvitalを確認して', 'check-kyberion-vital', 'kyberion_vital_status'],
       ['Kyberionを診断して', 'diagnose-kyberion-system', 'kyberion_diagnostics_report'],
       ['runtime supervisorの状態を確認して', 'inspect-runtime-supervisor', 'runtime_supervisor_summary'],
       ['サービスを起動して', 'start-service', 'service_started'],
       ['サービスを停止して', 'stop-service', 'service_stopped'],
+      ['サービスを再起動して', 'restart-service', 'service_restarted'],
       ['新しいadapterを追加して', 'register-actuator-adapter', 'actuator_adapter_registered'],
     ] as const;
 

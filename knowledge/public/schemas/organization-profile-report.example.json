@@ -1,0 +1,53 @@
+{
+  "requested": "demo-org",
+  "resolved": "Demo Org (demo-org)",
+  "selected_catalog": "demo-org",
+  "mission_default_template": "development",
+  "agent_profile": "default",
+  "team_default_template": "development",
+  "lifecycle": "default",
+  "max_parallel_missions": 6,
+  "llm_default": "light",
+  "template_catalogs": 3,
+  "selected_catalog_templates": [
+    "development"
+  ],
+  "operating_principles": [
+    "Organization owns policy and defaults.",
+    "Teams own execution and delegation.",
+    "User overrides take precedence over organization defaults."
+  ],
+  "profile": {
+    "$schema": "https://kyberion.local/schemas/organization-profile.schema.json",
+    "version": "1.0.0",
+    "organization_id": "demo-org",
+    "name": "Demo Org",
+    "description": "Demo organization profile used for mission planning and catalog selection.",
+    "operating_principles": [
+      "Organization owns policy and defaults.",
+      "Teams own execution and delegation.",
+      "User overrides take precedence over organization defaults."
+    ],
+    "mission_defaults": {
+      "default_mission_class": "operations_and_release",
+      "default_team_template": "development",
+      "default_agent_profile": "default"
+    },
+    "team_defaults": {
+      "default_team_template": "development",
+      "team_template_catalog_id": "demo-org",
+      "default_lifecycle_template": "default",
+      "max_parallel_missions": 6
+    },
+    "llm": {
+      "purpose_map": {
+        "distill": "heavy",
+        "validate": "standard",
+        "summarize": "light",
+        "classify": "light"
+      },
+      "default_profile": "light",
+      "profile_overrides": {}
+    }
+  }
+}

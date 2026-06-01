@@ -155,10 +155,10 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       return _purgeMissions(rootDir, dryRun);
     },
     showMissionTeam(id: string, refresh = false) {
-      return _showMissionTeam(id, refresh);
+      return _showMissionTeam(id, refresh, rootDir);
     },
     staffMissionTeam(id: string) {
-      return _staffMissionTeam(id);
+      return _staffMissionTeam(id, rootDir);
     },
     prewarmMissionTeam(id: string, teamRolesArg?: string) {
       return _prewarmMissionTeam(id, teamRolesArg);

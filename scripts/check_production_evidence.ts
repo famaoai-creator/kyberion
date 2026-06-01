@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, resolveProductionEvidenceSummaryPolicy, safeExistsSync, safeReadFile } from '@agent/core';
 
 export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
 
@@ -365,18 +365,19 @@ export function checkProductionEvidenceRegister(
 }
 
 function formatSummary(summary: ProductionEvidenceSummary): string {
+  const policy = resolveProductionEvidenceSummaryPolicy();
   const lines = [
-    `production evidence: ${summary.verified}/${summary.total} verified; release_decision=${summary.release_decision}`,
+    `${policy.title_prefix}: ${summary.verified}/${summary.total} verified; release_decision=${summary.release_decision}`,
   ];
   if (summary.invalid.length > 0) {
-    lines.push('invalid register entries:');
+    lines.push(`${policy.invalid_entries_title}:`);
     for (const issue of summary.invalid) lines.push(`- ${issue}`);
   }
   if (summary.pending.length > 0) {
-    lines.push('pending external evidence:');
+    lines.push(`${policy.pending_title}:`);
     for (const item of summary.pending) lines.push(`- ${item.id}: ${item.gate}`);
   }
-  if (summary.complete) lines.push('all production evidence is verified');
+  if (summary.complete) lines.push(policy.complete_message);
   return `${lines.join('\n')}\n`;
 }
 

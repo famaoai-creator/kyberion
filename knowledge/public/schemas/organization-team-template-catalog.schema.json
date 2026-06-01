@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "organization-team-template-catalog.schema.json",
+  "title": "Organization Team Template Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "templates"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "organization_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "templates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "required_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "optional_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "lifecycle": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "max_parallel_members": { "type": "integer", "minimum": 1 },
+              "max_members": { "type": "integer", "minimum": 1 },
+              "max_messages_per_run": { "type": "integer", "minimum": 1 },
+              "max_wall_clock_minutes": { "type": "integer", "minimum": 1 },
+              "max_member_turns": { "type": "integer", "minimum": 1 },
+              "shutdown_policy": {
+                "type": "string",
+                "enum": ["graceful_handoff", "manual", "auto_shutdown"]
+              },
+              "resume_policy": {
+                "type": "string",
+                "enum": ["checkpoint_resume", "manual_resume"]
+              },
+              "cooldown_minutes": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

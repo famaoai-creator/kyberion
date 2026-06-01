@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "github-new-project",
+      "service_id": "github",
+      "service_type": "github",
+      "binding_id": "github:default:new-project",
+      "scope": "repository",
+      "target": "default/new-project",
+      "allowed_actions": [
+        "read",
+        "push_branch",
+        "pull_request"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "(github|git hub|webサービス|web service)"
+        }
+      ],
+      "summary": "Default repository bootstrap binding for new web service projects."
+    },
+    {
+      "id": "slack-workspace",
+      "service_id": "slack",
+      "service_type": "slack",
+      "binding_id": "slack:default:workspace",
+      "scope": "workspace",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "post_message"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\bslack\\b"
+        }
+      ],
+      "default_for_surfaces": [
+        "presence"
+      ],
+      "summary": "Default workspace binding for the presence surface."
+    }
+  ]
+}

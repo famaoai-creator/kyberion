@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "surface": "slack",
+      "role": "slack_bridge",
+      "summary": "Slack surface records coordination artifacts as bridge-owned outputs."
+    },
+    {
+      "surface": "chronos",
+      "role": "chronos_gateway",
+      "summary": "Chronos surface records coordination artifacts as gateway-owned outputs."
+    },
+    {
+      "surface": "presence",
+      "role": "surface_runtime",
+      "summary": "Presence requests and notifications are stored as runtime-owned artifacts."
+    }
+  ]
+}

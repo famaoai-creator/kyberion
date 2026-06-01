@@ -196,6 +196,7 @@
                 "type": "string",
                 "enum": ["record", "share", "reference", "ocr_source"]
               },
+              "intent_id": { "type": "string" },
               "device_preference": { "type": "string" },
               "save_path": { "type": "string" },
               "post_process": {
@@ -226,6 +227,7 @@
             "required": ["project_name"],
             "properties": {
               "project_name": { "type": "string", "minLength": 1 },
+              "intent_id": { "type": "string" },
               "time_horizon": { "type": "string" },
               "granularity": {
                 "type": "string",
@@ -260,6 +262,7 @@
                 "type": "string",
                 "enum": ["proposal", "internal_share", "briefing", "marketing"]
               },
+              "intent_id": { "type": "string" },
               "source_paths": {
                 "type": "array",
                 "items": { "type": "string" }
@@ -290,6 +293,7 @@
                 "type": "string",
                 "enum": ["status", "summary", "proposal", "spec"]
               },
+              "intent_id": { "type": "string" },
               "format": {
                 "type": "string",
                 "enum": ["docx", "pdf", "markdown"]
@@ -310,8 +314,24 @@
       "if": {
         "properties": {
           "task_type": { "const": "service_operation" },
-          "status": { "not": { "const": "collecting_requirements" } }
-        }
+          "status": { "not": { "const": "collecting_requirements" } },
+          "work_loop": {
+            "type": "object",
+            "properties": {
+              "intent": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "enum": ["inspect-service", "start-service", "stop-service", "restart-service"]
+                  }
+                },
+                "required": ["label"]
+              }
+            },
+            "required": ["intent"]
+          }
+        },
+        "required": ["work_loop"]
       },
       "then": {
         "properties": {
@@ -320,6 +340,7 @@
             "required": ["service_name", "operation"],
             "properties": {
               "service_name": { "type": "string", "minLength": 1 },
+              "intent_id": { "type": "string" },
               "operation": {
                 "type": "string",
                 "enum": ["start", "stop", "restart", "status", "logs"]

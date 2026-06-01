@@ -235,6 +235,7 @@ export type SurfaceConversationInput = SurfaceConversationInputBase & {
 
 interface SurfaceConversationMessageInputBase {
   text: string;
+  surfaceText?: string;
   correlationId?: string;
   messageId?: string;
   receivedAt?: string;

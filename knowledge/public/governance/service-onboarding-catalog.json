@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "services": [
+    {
+      "service_id": "comfyui",
+      "prompt_kind": "comfyui",
+      "label": "ComfyUI"
+    },
+    {
+      "service_id": "whisper",
+      "prompt_kind": "whisper",
+      "label": "Whisper"
+    },
+    {
+      "service_id": "tts",
+      "prompt_kind": "generic",
+      "label": "TTS"
+    },
+    {
+      "service_id": "meeting",
+      "prompt_kind": "generic",
+      "label": "Meeting"
+    }
+  ]
+}

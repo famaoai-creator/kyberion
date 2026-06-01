@@ -16,6 +16,10 @@ import {
 import { compileUserIntentFlow, formatClarificationPacket, formatClarificationPacketConcise } from './intent-contract.js';
 import { logger } from './core.js';
 import {
+  resolveFallbackLocationCoordinates,
+  resolveFallbackLocationSummary,
+} from './location-fallback.js';
+import {
   buildMissionTeamView,
   loadMissionTeamPlan,
   resolveMissionTeamReceiver,
@@ -27,8 +31,8 @@ import { executeApprovedClaudeTaskSession } from './claude-task-session-executor
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
-  deriveSlackIntentLabelFromProviderPolicy,
-  shouldForceSlackDelegationFromProviderPolicy,
+  deriveSurfaceIntentLabelFromProviderPolicy,
+  shouldForceSurfaceDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
@@ -166,6 +170,17 @@ function buildTaskSessionReply(params: {
   missingInputs?: string[];
   handoffIntentId?: string;
   kind?: string;
+  serviceOptions?: Array<
+    | string
+    | {
+        service_name?: string;
+        service_id?: string;
+        surface_id?: string;
+        description?: string;
+        kind?: string;
+        startup_mode?: string;
+      }
+  >;
 }): string {
   const lines: string[] = [];
   const isScheduleCoordination = params.intentId === 'schedule-coordination';
@@ -196,6 +211,45 @@ function buildTaskSessionReply(params: {
       })
       .join('、');
     lines.push(isScheduleCoordination ? `確認したい点があります: ${readableMissing}` : `必要な情報があります: ${readableMissing}`);
+  }
+
+  const serviceOptions = params.serviceOptions || [];
+  if (params.intentId === 'stop-service' && serviceOptions.length > 0) {
+    lines.push('停止するサービス候補:');
+    serviceOptions.forEach((choice, index) => {
+      const serviceName = typeof choice === 'string'
+        ? choice
+        : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
+      const serviceId = typeof choice === 'string'
+        ? undefined
+        : choice.service_id && choice.service_id !== serviceName
+          ? choice.service_id
+          : undefined;
+      const description = typeof choice === 'string'
+        ? undefined
+        : choice.description;
+      lines.push(`  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`);
+    });
+    lines.push('停止したいサービス名を指定してください。');
+  }
+
+  if (params.intentId === 'start-service' && serviceOptions.length > 0) {
+    lines.push('起動するサービス候補:');
+    serviceOptions.forEach((choice, index) => {
+      const serviceName = typeof choice === 'string'
+        ? choice
+        : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
+      const serviceId = typeof choice === 'string'
+        ? undefined
+        : choice.service_id && choice.service_id !== serviceName
+          ? choice.service_id
+          : undefined;
+      const description = typeof choice === 'string'
+        ? undefined
+        : choice.description;
+      lines.push(`  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`);
+    });
+    lines.push('起動したいサービス名を指定してください。');
   }
 
   if (params.handoffIntentId) {
@@ -529,29 +583,23 @@ function extractLocationHint(queryText: string): string | null {
   return stripped;
 }
 
-async function fetchCurrentLocationSummary(): Promise<string> {
-  const data = await secureFetch<any>({
-    method: 'GET',
-    url: 'https://ipapi.co/json/',
-  });
-  const parts = [
-    data?.city,
-    data?.region || data?.region_code,
-    data?.country_name || data?.country,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : 'unknown location';
-}
-
 async function fetchWeatherSummary(queryText: string): Promise<string> {
   const locationHint = extractLocationHint(queryText);
   let latitude: number | undefined;
   let longitude: number | undefined;
   let label = locationHint || '';
+  const providerConfig = getSurfaceQueryProviderConfig();
+  const weatherConfig = providerConfig.weather || {};
+  const geocodingUrl = weatherConfig.geocodingUrl;
+  const forecastUrl = weatherConfig.forecastUrl;
 
   if (locationHint) {
+    if (!geocodingUrl) {
+      throw new Error('weather geocoding endpoint is not configured');
+    }
     const geocode = await secureFetch<any>({
       method: 'GET',
-      url: 'https://geocoding-api.open-meteo.com/v1/search',
+      url: geocodingUrl,
       params: {
         name: locationHint,
         count: 1,
@@ -566,26 +614,22 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
   }
 
   if (latitude === undefined || longitude === undefined) {
-    const currentLocation = await secureFetch<any>({
-      method: 'GET',
-      url: 'https://ipapi.co/json/',
-    });
-    latitude = currentLocation?.latitude;
-    longitude = currentLocation?.longitude;
-    label = currentLocation?.city
-      ? [currentLocation.city, currentLocation.region, currentLocation.country_name]
-          .filter(Boolean)
-          .join(', ')
-      : 'current location';
+    const currentLocation = await resolveFallbackLocationCoordinates();
+    latitude = currentLocation.latitude;
+    longitude = currentLocation.longitude;
+    label = currentLocation.label;
   }
 
   if (latitude === undefined || longitude === undefined) {
     throw new Error('weather location could not be resolved');
   }
+  if (!forecastUrl) {
+    throw new Error('weather forecast endpoint is not configured');
+  }
 
   const weather = await secureFetch<any>({
     method: 'GET',
-    url: 'https://api.open-meteo.com/v1/forecast',
+    url: forecastUrl,
     params: {
       latitude,
       longitude,
@@ -691,7 +735,7 @@ async function handleSurfaceQueryRoute(
       return emptySurfaceResult('Location provider is disabled by configuration.');
     }
     const providerLabel = providerConfig.location?.provider || 'presence_context';
-    answer = `Provider: ${providerLabel}\nCurrent location: ${await fetchCurrentLocationSummary()}`;
+    answer = `Provider: ${providerLabel}\nCurrent location: ${await resolveFallbackLocationSummary()}`;
   } else if (queryType === 'weather') {
     if (providerConfig.weather?.enabled === false) {
       return emptySurfaceResult('Weather provider is disabled by configuration.');
@@ -1063,6 +1107,8 @@ async function handleTaskSessionRoute(
     sessionIntentId === 'request-approval' ||
     sessionIntentId === 'setup-messaging-bridge' ||
     sessionIntentId === 'inspect-service' ||
+    sessionIntentId === 'start-service' ||
+    sessionIntentId === 'stop-service' ||
     sessionIntentId === 'enable-voice-input';
 
   if (session.requirements?.missing?.length === 0 && isRunnableServiceTask) {
@@ -1104,6 +1150,38 @@ async function handleTaskSessionRoute(
           cwd: pathResolver.rootDir(),
         });
         output = `サービス [${serviceName}] のステータスを確認しました。\n\n${supervisorOutput}`;
+      } else if (sessionIntentId === 'start-service') {
+        const serviceName = String(session.payload?.service_name || '').trim();
+        const controlOutput = safeExec(
+          'node',
+          [
+            'dist/scripts/service_lifecycle_control.js',
+            '--operation',
+            'start',
+            '--service-name',
+            serviceName,
+          ],
+          {
+            cwd: pathResolver.rootDir(),
+          }
+        );
+        output = `サービス [${serviceName}] を起動しました。\n\n${controlOutput}`;
+      } else if (sessionIntentId === 'stop-service') {
+        const serviceName = String(session.payload?.service_name || '').trim();
+        const controlOutput = safeExec(
+          'node',
+          [
+            'dist/scripts/service_lifecycle_control.js',
+            '--operation',
+            'stop',
+            '--service-name',
+            serviceName,
+          ],
+          {
+            cwd: pathResolver.rootDir(),
+          }
+        );
+        output = `サービス [${serviceName}] を停止しました。\n\n${controlOutput}`;
       } else if (sessionIntentId === 'enable-voice-input') {
         const serviceName = session.payload?.service_name || 'voice-hub';
         const tempFile = pathResolver.sharedTmp(`system-actuator-inputs/input-${session.session_id}.json`);
@@ -1238,6 +1316,13 @@ async function handleTaskSessionRoute(
         ? `必要な確認点があります。`
         : '必要な情報はそろっています。',
       missingInputs: session.requirements?.missing || [],
+      serviceOptions: Array.isArray(session.payload?.startable_services) && sessionIntentId === 'start-service'
+        ? (session.payload?.startable_services as Array<string | { service_name?: string; service_id?: string; surface_id?: string; description?: string; kind?: string; startup_mode?: string }>)
+        : Array.isArray(session.payload?.active_services)
+          ? (session.payload?.active_services as string[])
+        : Array.isArray(session.payload?.service_choices)
+          ? (session.payload?.service_choices as string[])
+          : undefined,
       handoffIntentId: handoffIntentId || undefined,
     })
   );
@@ -1627,7 +1712,7 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
 }
 
 export function deriveSlackIntentLabel(text: string): string {
-  return deriveSlackIntentLabelFromProviderPolicy(text);
+  return deriveSurfaceIntentLabelFromProviderPolicy('slack', text);
 }
 
 export function deriveSlackExecutionMode(text: string): SlackExecutionMode {
@@ -1635,7 +1720,7 @@ export function deriveSlackExecutionMode(text: string): SlackExecutionMode {
 }
 
 export function shouldForceSlackDelegation(text: string): boolean {
-  return shouldForceSlackDelegationFromProviderPolicy(text);
+  return shouldForceSurfaceDelegationFromProviderPolicy('slack', text);
 }
 
 export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {

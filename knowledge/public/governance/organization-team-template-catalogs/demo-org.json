@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "organization_id": "demo-org",
+  "templates": {
+    "development": {
+      "optional_roles": [
+        "operator",
+        "surface_liaison"
+      ],
+      "lifecycle": {
+        "max_parallel_members": 6,
+        "max_members": 8,
+        "max_messages_per_run": 75,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 10,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 8
+      }
+    }
+  }
+}

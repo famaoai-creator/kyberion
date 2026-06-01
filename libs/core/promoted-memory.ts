@@ -5,6 +5,11 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
+import {
+  resolvePromotedReportAudience,
+  resolvePromotedReportOutputFormat,
+  resolvePromotedReportTemplateSections,
+} from './promoted-report-template-policy.js';
 
 interface PromotedMemoryRecordBase {
   record_id: string;
@@ -315,13 +320,13 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     kind: 'report_template',
     template_sections: normalizeLines(metadata.template_sections).length > 0
       ? normalizeLines(metadata.template_sections)
-      : ['Summary', 'Current State', 'Findings', 'Next Actions'],
+      : resolvePromotedReportTemplateSections(),
     audience: typeof metadata.audience === 'string' && metadata.audience.trim()
       ? metadata.audience.trim()
-      : 'internal stakeholders',
+      : resolvePromotedReportAudience(),
     output_format: typeof metadata.output_format === 'string' && metadata.output_format.trim()
       ? metadata.output_format.trim()
-      : 'structured document',
+      : resolvePromotedReportOutputFormat(),
   };
 }
 

@@ -42,15 +42,29 @@
         "service operation heuristic"
       ],
       "patterns": [
-        {
-          "type": "regex",
-          "value": "(再起動|restart|起動して|起動|stop|停止して|停止|status|状態|ログ|logs?)"
-        }
+        { "type": "regex", "value": "(status|状態|ログ|logs?)" }
       ],
       "resolution": {
         "shape": "task_session",
         "task_kind": "service_operation",
         "result_shape": "summary"
+      }
+    },
+    {
+      "id": "restart-service-heuristic",
+      "intent_id": "restart-service",
+      "confidence": 0.9,
+      "source": "heuristic",
+      "reasons": [
+        "service restart heuristic"
+      ],
+      "patterns": [
+        { "type": "regex", "value": "(再起動|restart|reboot)" }
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "service_restarted"
       }
     }
   ]

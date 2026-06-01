@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "required": ["version", "tones"],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "tones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tone", "style"],
+        "properties": {
+          "tone": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "base",
+              "title",
+              "subtitle",
+              "header",
+              "section",
+              "info",
+              "success",
+              "warning",
+              "danger",
+              "body"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

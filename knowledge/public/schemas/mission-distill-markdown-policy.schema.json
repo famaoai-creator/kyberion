@@ -1,0 +1,32 @@
+{
+  "$id": "https://kyberion.local/schemas/mission-distill-markdown-policy.schema.json",
+  "title": "Mission Distill Markdown Policy",
+  "type": "object",
+  "required": ["version", "title_suffix", "section_titles", "prompt_titles"],
+  "properties": {
+    "version": { "type": "string" },
+    "title_suffix": { "type": "string", "minLength": 1 },
+    "section_titles": {
+      "type": "object",
+      "required": ["summary", "key_learnings", "patterns_discovered", "failures_and_recoveries", "reusable_artifacts"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "key_learnings": { "type": "string", "minLength": 1 },
+        "patterns_discovered": { "type": "string", "minLength": 1 },
+        "failures_and_recoveries": { "type": "string", "minLength": 1 },
+        "reusable_artifacts": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "prompt_titles": {
+      "type": "object",
+      "required": ["mission_state", "evidence_context"],
+      "properties": {
+        "mission_state": { "type": "string", "minLength": 1 },
+        "evidence_context": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

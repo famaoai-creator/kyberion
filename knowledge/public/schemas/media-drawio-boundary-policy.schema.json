@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "media-drawio-boundary-policy",
+  "type": "object",
+  "required": ["version", "palette_overrides", "icon_rules"],
+  "properties": {
+    "version": { "type": "string" },
+    "palette_overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fill", "stroke"],
+        "properties": {
+          "boundary": { "type": "string" },
+          "type": { "type": "string" },
+          "tier": { "type": "string" },
+          "name_contains": { "type": "string" },
+          "fill": { "type": "string" },
+          "stroke": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "icon_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["icons"],
+        "properties": {
+          "boundary": { "type": "string" },
+          "type": { "type": "string" },
+          "tier": { "type": "string" },
+          "name_contains": { "type": "string" },
+          "icons": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

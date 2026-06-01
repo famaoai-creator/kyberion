@@ -1065,7 +1065,7 @@ function buildClarificationPacket(
         priority: 'now',
       },
     ],
-    readiness: workLoop.resolution.execution_shape,
+    readiness: 'needs_clarification',
   };
 }
 
@@ -1308,6 +1308,8 @@ export function deriveAgentRoutingDecision(
   };
 }
 
+const SIMPLE_GREETING_REGEX = /^(こんにちは|おはよう|こんばんは|ありがとう|さようなら|バイバイ|お疲れ様|おつかれ|hello|hi|thanks|thank you|bye)[！!！？?]?$/i;
+
 export async function compileUserIntentFlow(
   input: CompileUserIntentFlowInput,
   options: LlmCompileOptions = {}
@@ -1322,18 +1324,42 @@ export async function compileUserIntentFlow(
   let workLoop: OrganizationWorkLoopSummary | null = null;
   let source: 'llm' | 'fallback' = 'llm';
 
-  try {
-    executionBrief = await compileExecutionBriefWithLlm(resolvedInput, options);
-    if (!executionBrief) {
-      source = 'fallback';
-      executionBrief = buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
+  const isSimpleGreeting = SIMPLE_GREETING_REGEX.test(input.text.trim());
+
+  if (isSimpleGreeting) {
+    source = 'fallback';
+    intentContract = {
+      kind: 'intent-contract',
+      source_text: input.text,
+      intent_id: 'generic-conversation',
+      goal: {
+        summary: 'Conversational acknowledgment',
+        success_condition: 'Polite greeting acknowledged.',
+      },
+      resolution: {
+        execution_shape: 'direct_reply',
+        task_type: 'service_operation',
+      },
+      required_inputs: [],
+      outcome_ids: ['conversational_reply'],
+      approval: {
+        requires_approval: false,
+      },
+    } as any;
+  } else {
+    try {
+      executionBrief = await compileExecutionBriefWithLlm(resolvedInput, options);
+      if (!executionBrief) {
+        source = 'fallback';
+        executionBrief = buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
+      }
+      intentContract = await compileIntentContractWithLlm(resolvedInput, executionBrief, options);
+      if (intentContract) {
+        workLoop = await compileWorkLoopWithLlm(resolvedInput, executionBrief, intentContract, options);
+      }
+    } catch (error: any) {
+      logger.warn(`[INTENT_CONTRACT] LLM compilation failed: ${error?.message || String(error)}`);
     }
-    intentContract = await compileIntentContractWithLlm(resolvedInput, executionBrief, options);
-    if (intentContract) {
-      workLoop = await compileWorkLoopWithLlm(resolvedInput, executionBrief, intentContract, options);
-    }
-  } catch (error: any) {
-    logger.warn(`[INTENT_CONTRACT] LLM compilation failed: ${error?.message || String(error)}`);
   }
 
   if (!intentContract) {

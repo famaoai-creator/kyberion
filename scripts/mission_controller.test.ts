@@ -1,13 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeRmSync, saveProjectRecord, saveProjectTrackRecord } from '@agent/core';
+import path from 'node:path';
+import AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver, safeReadFile, safeRmSync, saveProjectRecord, saveProjectTrackRecord } from '@agent/core';
 import {
   assertCanGrantMissionAuthority,
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
   extractProjectRelationshipOptionsFromArgv,
+  buildHelpText,
+  buildOrganizationDiscoveryReport,
+  main,
   resolveMissionStartCreateInputFromArgv,
   validateMissionStartCreateInput,
 } from './mission_controller.js';
+
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('mission_controller argument parsing', () => {
   beforeEach(() => {
@@ -238,6 +247,8 @@ describe('mission_controller argument parsing', () => {
       'Ecosystem Architect',
       '--mission-type',
       'development',
+      '--organization-id',
+      'demo-org',
       '--relationships',
       '{"project":{"project_id":"PRJ-1","project_path":"projects/sample","relationship_type":"belongs_to"}}',
       '--routing-decision',
@@ -247,6 +258,7 @@ describe('mission_controller argument parsing', () => {
     expect(options.tier).toBe('public');
     expect(options.persona).toBe('Ecosystem Architect');
     expect(options.missionType).toBe('development');
+    expect(options.organizationId).toBe('demo-org');
     expect(options.routingDecision).toContain('"mode":"subagent"');
     expect(options.relationships).toEqual({
       project: {
@@ -303,6 +315,473 @@ describe('mission_controller argument parsing', () => {
         note: 'release lane',
       },
     });
+  });
+
+  it('resolves organization id from named mission input options', () => {
+    const input = resolveMissionStartCreateInputFromArgv([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'start',
+      'MSN-9',
+      '--tier',
+      'confidential',
+      '--organization-id',
+      'demo-org',
+      '--tenant-id',
+      'tenant-a',
+      '--mission-type',
+      'operations',
+    ]);
+
+    expect(input.organizationId).toBe('demo-org');
+    expect(input.tenantId).toBe('tenant-a');
+    expect(input.tier).toBe('confidential');
+    expect(input.missionType).toBe('operations');
+  });
+
+  it('accepts the short --org alias for organization id', () => {
+    const options = extractMissionStartCreateOptionsFromArgv([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-10',
+      '--org',
+      'demo-org',
+    ]);
+
+    expect(options.organizationId).toBe('demo-org');
+  });
+
+  it('includes the organization selection guide in the help text', () => {
+    const help = buildHelpText();
+
+    expect(help).toContain('Organization Selection:');
+    expect(help).toContain('knowledge/public/orchestration/organization-selection-guide.md');
+    expect(help).toContain('Organization Discovery:');
+    expect(help).toContain('knowledge/public/orchestration/organization-discovery.md');
+    expect(help).toContain('knowledge/public/orchestration/organization-discovery-reports.md');
+    expect(help).toContain('--organization-id <ORG>');
+    expect(help).toContain('--org <ORG>');
+    expect(help).toContain('--summary');
+    expect(help).toContain('organization-discovery [--json]');
+    expect(help).toContain('organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]');
+    expect(help).toContain('organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]');
+    expect(help).toContain('organization-profile [--json] [--organization-id <ORG>] [--summary]');
+    expect(help).toContain('organization-profiles --json --summary');
+    expect(help).toContain('organization-profile --json --summary');
+    expect(help).toContain('organization-catalogs --json --selected-only --summary');
+  });
+
+  it('treats --json as a boolean flag for organization profile inventory', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profiles',
+      '--json',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-profiles']);
+  });
+
+  it('treats organization inventory organization selectors as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profiles',
+      '--organization-id',
+      'demo-org',
+      '--json',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-profiles']);
+  });
+
+  it('treats organization discovery as a positional command with json as a boolean flag', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-discovery',
+      '--json',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-discovery']);
+  });
+
+  it('dispatches organization discovery through the mission_controller main entrypoint', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery', '--json'];
+
+    try {
+      await main();
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(output).toContain('"title": "Organization Discovery"');
+      expect(output).toContain('"Organization Selection Guide"');
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('emits clean JSON for organization profile inventory', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-profiles', '--json'];
+
+    try {
+      await main();
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(() => JSON.parse(output)).not.toThrow();
+      const payload = JSON.parse(output);
+      expect(payload).toHaveProperty('summary');
+      expect(payload).toHaveProperty('profiles');
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('emits clean JSON for organization discovery', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery', '--json'];
+
+    try {
+      await main();
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(() => JSON.parse(output)).not.toThrow();
+      const payload = JSON.parse(output);
+      expect(payload).toHaveProperty('title', 'Organization Discovery');
+      expect(payload).toHaveProperty('documents');
+      expect(payload).toHaveProperty('examples');
+      expect(payload).toHaveProperty('common_questions');
+      expect(payload.documents).toHaveLength(3);
+      expect(payload.examples).toHaveLength(4);
+      expect(payload.common_questions).toHaveLength(4);
+      expect(payload.examples.map((example: any) => example.name)).toEqual([
+        'Organization Discovery Example',
+        'Organization Profile Example',
+        'Organization Profiles Example',
+        'Organization Catalog Example',
+      ]);
+      expect(payload.examples.map((example: any) => example.path)).toEqual([
+        'knowledge/public/schemas/organization-discovery-report.example.json',
+        'knowledge/public/schemas/organization-profile-report.example.json',
+        'knowledge/public/schemas/organization-profiles-report.example.json',
+        'knowledge/public/schemas/organization-catalog-report.example.json',
+      ]);
+      expect(payload.examples.map((example: any) => example.schema)).toEqual([
+        'knowledge/public/schemas/organization-discovery-report.schema.json',
+        'knowledge/public/schemas/organization-profile-report.schema.json',
+        'knowledge/public/schemas/organization-profiles-report.schema.json',
+        'knowledge/public/schemas/organization-catalog-report.schema.json',
+      ]);
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('emits canonical examples in the organization discovery text output', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery'];
+
+    try {
+      await main();
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(output).toContain('Canonical examples:');
+      expect(output).toContain('Organization Discovery Example');
+      expect(output).toContain('Organization Profiles Example');
+      expect(output).toContain('organization-discovery-report.example.json');
+      expect(output).toContain('organization-profile-report.example.json');
+      expect(output).toContain('organization-profiles-report.example.json');
+      expect(output).toContain('organization-catalog-report.example.json');
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('emits clean JSON for organization profile detail', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-profile', '--json'];
+
+    try {
+      await main();
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(() => JSON.parse(output)).not.toThrow();
+      const payload = JSON.parse(output);
+      expect(payload).toHaveProperty('selected_catalog');
+      expect(payload).toHaveProperty('profile');
+      const ajv = new Ajv({ allErrors: true });
+      addFormats(ajv);
+      const profileSchema = JSON.parse(
+        safeReadFile(
+          path.resolve(process.cwd(), 'knowledge/public/schemas/organization-profile.schema.json'),
+          { encoding: 'utf8' },
+        ) as string,
+      );
+      ajv.addSchema(profileSchema, 'https://kyberion.local/schemas/organization-profile.schema.json');
+      const validate = ajv.compile(
+        JSON.parse(
+          safeReadFile(
+            path.resolve(process.cwd(), 'knowledge/public/schemas/organization-profile-report.schema.json'),
+            { encoding: 'utf8' },
+          ) as string,
+        ),
+      );
+      expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('emits clean JSON for organization catalog inventory', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-catalogs', '--json'];
+
+    try {
+      await main();
+      const output = logSpy.mock.calls.flat().join('\n');
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(() => JSON.parse(output)).not.toThrow();
+      const payload = JSON.parse(output);
+      expect(payload).toHaveProperty('selected_catalog');
+      expect(payload).toHaveProperty('catalogs');
+      const ajv = new Ajv({ allErrors: true });
+      addFormats(ajv);
+      const validate = ajv.compile(
+        JSON.parse(
+          safeReadFile(
+            path.resolve(process.cwd(), 'knowledge/public/schemas/organization-catalog-report.schema.json'),
+            { encoding: 'utf8' },
+          ) as string,
+        ),
+      );
+      expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('dispatches the compact organization discovery summary through the main entrypoint', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery', '--summary'];
+
+    try {
+      await main();
+      const output = [...logSpy.mock.calls, ...infoSpy.mock.calls].flat().join('\n');
+      expect(output).toContain('Organization Discovery');
+      expect(output).toContain('Organization Selection Guide');
+      expect(output).toContain('Organization Discovery Reports');
+      expect(output).toContain('Organization Discovery Copy/Paste');
+      expect(output).toContain('Canonical examples:');
+      expect(output).toContain('Organization Profiles Example');
+      expect(output).not.toContain('Common questions:');
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  it('builds the organization discovery report with the expected documents and questions', () => {
+    const report = buildOrganizationDiscoveryReport();
+
+    expect(report.title).toBe('Organization Discovery');
+    expect(report.summary).toContain('organization selection, inventory, and template overlay inspection');
+    expect(report.documents).toHaveLength(3);
+    expect(report.documents.map((doc) => doc.name)).toEqual([
+      'Organization Selection Guide',
+      'Organization Discovery Reports',
+      'Organization Discovery Copy/Paste',
+    ]);
+    expect(report.documents.map((doc) => doc.path)).toEqual([
+      'knowledge/public/orchestration/organization-selection-guide.md',
+      'knowledge/public/orchestration/organization-discovery-reports.md',
+      'knowledge/public/orchestration/README.md',
+    ]);
+    expect(report.examples.map((example) => example.schema)).toEqual([
+      'knowledge/public/schemas/organization-discovery-report.schema.json',
+      'knowledge/public/schemas/organization-profile-report.schema.json',
+      'knowledge/public/schemas/organization-profiles-report.schema.json',
+      'knowledge/public/schemas/organization-catalog-report.schema.json',
+    ]);
+    expect(report.examples.map((example) => example.name)).toEqual([
+      'Organization Discovery Example',
+      'Organization Profile Example',
+      'Organization Profiles Example',
+      'Organization Catalog Example',
+    ]);
+    expect(report.examples.map((example) => example.path)).toEqual([
+      'knowledge/public/schemas/organization-discovery-report.example.json',
+      'knowledge/public/schemas/organization-profile-report.example.json',
+      'knowledge/public/schemas/organization-profiles-report.example.json',
+      'knowledge/public/schemas/organization-catalog-report.example.json',
+    ]);
+    expect(report.common_questions).toHaveLength(4);
+    expect(report.common_questions.map((item) => item.question)).toEqual([
+      'What organization is selected right now?',
+      'Which customer orgs are missing a profile?',
+      'Which team template overlays are active for this org?',
+      'Which organization profiles are ready to use?',
+    ]);
+  });
+
+  it('validates the organization discovery report against its schema', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = ajv.compile(
+      JSON.parse(
+        safeReadFile(
+          path.resolve(process.cwd(), 'knowledge/public/schemas/organization-discovery-report.schema.json'),
+          { encoding: 'utf8' },
+        ) as string,
+      ),
+    );
+
+    expect(validate(buildOrganizationDiscoveryReport()), JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('accepts the canonical organization discovery example', () => {
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = ajv.compile(
+      JSON.parse(
+        safeReadFile(
+          path.resolve(process.cwd(), 'knowledge/public/schemas/organization-discovery-report.schema.json'),
+          { encoding: 'utf8' },
+        ) as string,
+      ),
+    );
+    const example = JSON.parse(
+      safeReadFile(
+        path.resolve(process.cwd(), 'knowledge/public/schemas/organization-discovery-report.example.json'),
+        { encoding: 'utf8' },
+      ) as string,
+    );
+
+    expect(validate(example), JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('treats organization inventory filters as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profiles',
+      '--active-only',
+      '--ready-only',
+      '--missing-only',
+      '--source',
+      'customer',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-profiles']);
+  });
+
+  it('treats --missing-only as a boolean flag for organization inventory', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profiles',
+      '--missing-only',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-profiles']);
+  });
+
+  it('treats --json as a boolean flag for organization catalog inventory', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-catalogs',
+      '--json',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-catalogs']);
+  });
+
+  it('treats selected-only as a boolean flag for organization catalog inventory', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-catalogs',
+      '--selected-only',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-catalogs']);
+  });
+
+  it('treats summary as a boolean flag for organization inventory commands', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-catalogs',
+      '--summary',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-catalogs']);
+  });
+
+  it('parses organization profile compact summary flags without disturbing positional arguments', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profile',
+      '--organization-id',
+      'demo-org',
+      '--summary',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-profile']);
+  });
+
+  it('treats --json as a boolean flag for organization profile detail output', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profile',
+      '--organization-id',
+      'demo-org',
+      '--json',
+    ]);
+
+    expect(positionalArgs).toEqual(['organization-profile']);
+  });
+
+  it('includes the selected catalog template ids in the organization profile summary text', () => {
+    const help = buildHelpText();
+
+    expect(help).toContain('--summary');
+    expect(help).toContain('organization-profile');
+    expect(help).toContain('organization-catalogs');
+    expect(help).toContain('knowledge/public/schemas/organization-discovery-report.example.json');
+    expect(help).toContain('knowledge/public/schemas/organization-profile-report.example.json');
+    expect(help).toContain('knowledge/public/schemas/organization-profiles-report.example.json');
+    expect(help).toContain('knowledge/public/schemas/organization-catalog-report.example.json');
   });
 
   it('resolves normalized ledger targets for linked missions', () => {

@@ -100,5 +100,6 @@ describe('assistant compiler request', () => {
     expect(result.intent_contract.outcome_ids).toEqual(['artifact:pptx']);
     expect(result.work_loop.process_design.plan_outline[0]).toContain('確認');
     expect(result.clarification_packet?.interaction_type).toBe('clarification');
+    expect(result.clarification_packet?.readiness).toBe('needs_clarification');
   });
 });

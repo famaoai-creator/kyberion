@@ -7,6 +7,11 @@ import {
   isMeaningfulPromotionCandidate,
   NotMeaningfulPromotionCandidateError,
 } from './promoted-memory.js';
+import {
+  resolvePromotedReportAudience,
+  resolvePromotedReportOutputFormat,
+  resolvePromotedReportTemplateSections,
+} from './promoted-report-template-policy.js';
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { buildOrganizationWorkLoopSummary } from './work-design.js';
@@ -78,6 +83,23 @@ describe('promoted-memory', () => {
     expect(record.hint_scope).toBe('browser navigation');
     expect(record.hint_triggers).toContain('open site');
     expect(record.recommended_refs[0]).toContain('navigate-web.md');
+  });
+
+  it('uses the promoted report template policy defaults when metadata is absent', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'public',
+      title: 'Report template',
+      summary: 'Reusable report layout candidate.',
+      status: 'promoted',
+      target_kind: 'report_template',
+    });
+    const record = buildPromotedMemoryRecord(candidate);
+    expect(record.kind).toBe('report_template');
+    if (record.kind !== 'report_template') throw new Error('expected report_template');
+    expect(record.template_sections).toEqual(resolvePromotedReportTemplateSections());
+    expect(record.audience).toBe(resolvePromotedReportAudience());
+    expect(record.output_format).toBe(resolvePromotedReportOutputFormat());
   });
 
   it('writes structured json and markdown outputs with kind-specific sections', () => {

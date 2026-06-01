@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "whisper",
+      "patterns": ["whisper"],
+      "install_type": "pip",
+      "package_name": "faster-whisper",
+      "summary": "Install package for whisper capabilities."
+    },
+    {
+      "id": "ffmpeg",
+      "patterns": ["ffmpeg"],
+      "install_type": "brew",
+      "package_name": "ffmpeg",
+      "summary": "Install package for ffmpeg capabilities."
+    },
+    {
+      "id": "hermes",
+      "patterns": ["hermes"],
+      "install_type": "brew",
+      "package_name": "sox",
+      "summary": "Install package for Hermes audio capabilities."
+    },
+    {
+      "id": "gh",
+      "patterns": ["gh"],
+      "install_type": "brew",
+      "package_name": "gh",
+      "summary": "Install package for GitHub CLI capabilities."
+    }
+  ]
+}

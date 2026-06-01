@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "media-drawio-security-group-order",
+  "type": "object",
+  "required": ["version", "relation_prefix"],
+  "properties": {
+    "version": { "type": "string" },
+    "relation_prefix": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

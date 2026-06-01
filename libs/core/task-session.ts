@@ -139,6 +139,9 @@ const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
 const TASK_SESSION_POLICY_PATH = pathResolver.knowledge(
   'public/governance/task-session-policy.json'
 );
+const SERVICE_PID_FILE = pathResolver.shared('services-pids.json');
+const SURFACE_MANIFEST_DIR = pathResolver.knowledge('public/governance/surfaces');
+const SURFACE_STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
 let taskSessionValidateFn: ValidateFunction | null = null;
@@ -202,6 +205,127 @@ function errorsFrom(validate: ValidateFunction): string[] {
 
 function taskSessionPath(sessionId: string): string {
   return `${TASK_SESSION_DIR}/${sessionId}.json`;
+}
+
+function extractServiceNameFromUtterance(trimmed: string): string | undefined {
+  const serviceMatch =
+    trimmed.match(
+      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
+    ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
+  return serviceMatch?.[1];
+}
+
+function isRunningPid(pid: unknown): pid is number {
+  if (typeof pid !== 'number' || !Number.isFinite(pid)) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadRunningServiceIds(): string[] {
+  if (!safeExistsSync(SERVICE_PID_FILE)) return [];
+  try {
+    const parsed = JSON.parse(safeReadFile(SERVICE_PID_FILE, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+    return Object.entries(parsed)
+      .filter(([, pid]) => isRunningPid(pid))
+      .map(([serviceId]) => serviceId)
+      .sort((left, right) => left.localeCompare(right));
+  } catch {
+    return [];
+  }
+}
+
+type SurfaceStartableChoice = {
+  service_name: string;
+  surface_id: string;
+  description?: string;
+  kind?: string;
+  startup_mode?: string;
+  service_id?: string;
+};
+
+function loadSurfaceStateRunningIds(): Set<string> {
+  if (!safeExistsSync(SURFACE_STATE_PATH)) return new Set();
+  try {
+    const parsed = JSON.parse(safeReadFile(SURFACE_STATE_PATH, { encoding: 'utf8' }) as string) as {
+      surfaces?: Record<string, { pid?: unknown }>;
+    };
+    return new Set(
+      Object.entries(parsed.surfaces || {})
+        .filter(([, record]) => isRunningPid(record?.pid))
+        .map(([surfaceId]) => surfaceId),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function loadStartableServiceChoices(): SurfaceStartableChoice[] {
+  if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return [];
+  const runningIds = loadSurfaceStateRunningIds();
+  return safeReaddir(SURFACE_MANIFEST_DIR)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .flatMap((entry) => {
+      try {
+        const manifest = JSON.parse(
+          safeReadFile(pathResolver.knowledge(`public/governance/surfaces/${entry}`), {
+            encoding: 'utf8',
+          }) as string
+        ) as { surfaces?: Array<Record<string, unknown>> };
+        return (manifest.surfaces || [])
+          .filter((surface) => surface && surface.enabled !== false)
+          .map((surface) => {
+            const serviceName = String(surface.id || '').trim();
+            return {
+              service_name: serviceName,
+              surface_id: serviceName,
+              description: typeof surface.description === 'string' ? surface.description : undefined,
+              kind: typeof surface.kind === 'string' ? surface.kind : undefined,
+              startup_mode: typeof surface.startupMode === 'string' ? surface.startupMode : undefined,
+              service_id: typeof surface.service_id === 'string' ? surface.service_id : undefined,
+            } satisfies SurfaceStartableChoice;
+          })
+          .filter(
+            (choice) =>
+              choice.service_name &&
+              choice.startup_mode === 'background' &&
+              !runningIds.has(choice.surface_id)
+          );
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) => left.service_name.localeCompare(right.service_name));
+}
+
+function resolveSurfaceId(serviceName: string): string | undefined {
+  const normalized = serviceName.trim();
+  if (!normalized) return undefined;
+  if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return normalized;
+  try {
+    for (const entry of safeReaddir(SURFACE_MANIFEST_DIR).filter((file) => file.endsWith('.json'))) {
+      const manifest = JSON.parse(
+        safeReadFile(pathResolver.knowledge(`public/governance/surfaces/${entry}`), {
+          encoding: 'utf8',
+        }) as string
+      ) as { surfaces?: Array<Record<string, unknown>> };
+      for (const surface of manifest.surfaces || []) {
+        if (!surface || surface.enabled === false) continue;
+        const surfaceId = String(surface.id || '').trim();
+        const alias = String(surface.service_id || '').trim();
+        if (surfaceId === normalized || alias === normalized) {
+          return surfaceId;
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return normalized;
 }
 
 function inferRequiresApproval(input: {
@@ -301,6 +425,13 @@ export function createTaskSession(input: {
     verificationMethod: outcomeContract.verification_method,
   });
 
+  const payload = input.intentId
+    ? {
+        ...(input.payload || {}),
+        intent_id: input.intentId,
+      }
+    : input.payload;
+
   return {
     session_id: provisionalSessionId,
     surface: input.surface,
@@ -319,7 +450,7 @@ export function createTaskSession(input: {
     outcome_contract: normalizedOutcomeContract,
     history: [],
     updated_at: now,
-    payload: input.payload,
+    payload,
   };
 }
 
@@ -509,10 +640,7 @@ registerTaskIntentBuilder('evolve-agent-harness', (trimmed) => {
 });
 registerTaskIntentBuilder('inspect-service', (trimmed) => {
   const base = buildPolicyBackedIntent('inspect-service', trimmed);
-  const serviceMatch =
-    trimmed.match(
-      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(再起動|restart|起動|停止|status|状態|ログ)/i
-    ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
+  const serviceMatch = extractServiceNameFromUtterance(trimmed);
   const intent: TaskSessionIntent = {
     ...base,
     requirements: {
@@ -521,7 +649,7 @@ registerTaskIntentBuilder('inspect-service', (trimmed) => {
     },
     payload: {
       ...(base.payload || {}),
-      service_name: serviceMatch?.[1],
+      service_name: serviceMatch,
       log_tail_lines: /ログ|logs?/i.test(trimmed) ? 100 : undefined,
     },
   };
@@ -530,6 +658,114 @@ registerTaskIntentBuilder('inspect-service', (trimmed) => {
     intent.payload || {},
     intent.requirements!
   );
+  return {
+    ...intent,
+    requirements: approvalApplied.requirements,
+    payload: approvalApplied.payload,
+  };
+});
+registerTaskIntentBuilder('stop-service', (trimmed) => {
+  const base = buildPolicyBackedIntent('stop-service', trimmed);
+  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const activeServices = loadRunningServiceIds();
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing: serviceName ? ['approval_confirmation'] : ['service_name', 'approval_confirmation'],
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      operation: 'stop',
+      service_name: serviceName,
+      active_services: activeServices,
+      service_choices: activeServices,
+      approval_required: true,
+    },
+  };
+  const approvalApplied = applyApprovalPolicy(
+    intent.intentId!,
+    intent.payload || {},
+    intent.requirements!
+  );
+  if (!approvalApplied.requirements.missing.includes('approval_confirmation')) {
+    approvalApplied.requirements.missing.push('approval_confirmation');
+  }
+  approvalApplied.payload = {
+    ...approvalApplied.payload,
+    approval_required: true,
+  };
+  return {
+    ...intent,
+    requirements: approvalApplied.requirements,
+    payload: approvalApplied.payload,
+  };
+});
+registerTaskIntentBuilder('start-service', (trimmed) => {
+  const base = buildPolicyBackedIntent('start-service', trimmed);
+  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const startableServices = loadStartableServiceChoices();
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing: serviceName ? ['approval_confirmation'] : ['service_name', 'approval_confirmation'],
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      operation: 'start',
+      service_name: serviceName,
+      startable_services: startableServices,
+      service_choices: startableServices,
+      approval_required: true,
+    },
+  };
+  const approvalApplied = applyApprovalPolicy(
+    intent.intentId!,
+    intent.payload || {},
+    intent.requirements!
+  );
+  if (!approvalApplied.requirements.missing.includes('approval_confirmation')) {
+    approvalApplied.requirements.missing.push('approval_confirmation');
+  }
+  approvalApplied.payload = {
+    ...approvalApplied.payload,
+    approval_required: true,
+  };
+  return {
+    ...intent,
+    requirements: approvalApplied.requirements,
+    payload: approvalApplied.payload,
+  };
+});
+registerTaskIntentBuilder('restart-service', (trimmed) => {
+  const base = buildPolicyBackedIntent('restart-service', trimmed);
+  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const intent: TaskSessionIntent = {
+    ...base,
+    requirements: {
+      missing: serviceName ? ['approval_confirmation'] : ['service_name', 'approval_confirmation'],
+      collected: {},
+    },
+    payload: {
+      ...(base.payload || {}),
+      operation: 'restart',
+      service_name: serviceName,
+      approval_required: true,
+    },
+  };
+  const approvalApplied = applyApprovalPolicy(
+    intent.intentId!,
+    intent.payload || {},
+    intent.requirements!
+  );
+  if (!approvalApplied.requirements.missing.includes('approval_confirmation')) {
+    approvalApplied.requirements.missing.push('approval_confirmation');
+  }
+  approvalApplied.payload = {
+    ...approvalApplied.payload,
+    approval_required: true,
+  };
   return {
     ...intent,
     requirements: approvalApplied.requirements,
@@ -670,7 +906,6 @@ registerTaskIntentBuilder('setup-messaging-bridge', (trimmed) => {
 });
 
 registerTaskIntentBuilder('fetch-external-data', (trimmed) => {
-  console.log("DEBUG: REGISTERED BUILDER EXECUTING ON TRIMMED UTTERANCE =", trimmed);
   const base = buildPolicyBackedIntent('fetch-external-data', trimmed);
 
   // 1. Extract data topic (weather, exchange rate, news, etc.)
@@ -710,8 +945,7 @@ registerTaskIntentBuilder('fetch-external-data', (trimmed) => {
       providerResolved = resolveProviderUrl(providerName, topicWord, location);
     }
   } catch (err: any) {
-    console.error("DEBUG PROVIDER RESOLUTION ERROR:", err);
-    throw err;
+    logger.warn(`[TASK_SESSION] provider resolution skipped: ${err?.message || err}`);
   }
 
   if (providerResolved) {

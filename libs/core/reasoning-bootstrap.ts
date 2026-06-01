@@ -65,17 +65,14 @@ import { installSecretResolverIfAvailable } from './secret-resolver.js';
 import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
 import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from './provider-discovery.js';
+import {
+  loadReasoningBackendPolicy,
+  normalizeReasoningBackendMode as normalizeReasoningBackendModeFromPolicy,
+  resolveReasoningBackendModeFromContext,
+  type ReasoningBackendMode,
+} from './reasoning-backend-policy.js';
 
-export type ReasoningBackendMode =
-  | 'claude-cli'
-  | 'codex-cli'
-  | 'claude-agent'
-  | 'anthropic'
-  | 'gemini-cli'
-  | 'gemini-api'
-  | 'agy-cli'
-  | 'local'
-  | 'stub';
+export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
@@ -85,9 +82,8 @@ export function normalizeReasoningBackendMode(
 ): Exclude<ReasoningBackendMode, 'gemini-api'> {
   if (mode === 'gemini-api') {
     logger.warn('[reasoning-bootstrap] mode=gemini-api is deprecated; using gemini-cli instead.');
-    return 'gemini-cli';
   }
-  return mode;
+  return normalizeReasoningBackendModeFromPolicy(mode, loadReasoningBackendPolicy());
 }
 
 export interface InstallReasoningOptions {
@@ -107,53 +103,12 @@ export interface InstallReasoningOptions {
 export type InstallAnthropicOptions = InstallReasoningOptions;
 
 function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
-  if (options.mode) return normalizeReasoningBackendMode(options.mode);
-  const envMode = process.env.KYBERION_REASONING_BACKEND as ReasoningBackendMode | undefined;
-  const validModes: Array<Exclude<ReasoningBackendMode, 'gemini-api'>> = [
-    'claude-cli',
-    'codex-cli',
-    'claude-agent',
-    'anthropic',
-    'gemini-cli',
-    'agy-cli',
-    'local',
-    'stub',
-  ];
-  if (envMode) {
-    const normalizedEnvMode = normalizeReasoningBackendMode(envMode);
-    if (validModes.includes(normalizedEnvMode)) {
-      return normalizedEnvMode;
-    }
-  }
-  // Auto-selection logic
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
-  if (process.env.GEMINI_API_KEY) return 'gemini-cli';
-  if (process.env.KYBERION_LOCAL_LLM_URL) return 'local';
-
-  const providers = discoverProviders(shouldRefreshProviders(options));
-
-  // Determine preferred provider based on CLI context
-  let preferredProvider: string | null = null;
-  if (process.env.CODEX_CLI || process.env.CODEX_VERSION || process.env.TERM_PROGRAM === 'codex') preferredProvider = 'codex';
-  else if (process.env.GEMINI_CLI) preferredProvider = 'gemini';
-  else if (process.env.AGY_CLI || process.env.ANTIGRAVITY_CLI) preferredProvider = 'agy';
-
-  // If a preferred provider is detected and healthy, use it
-  if (preferredProvider && providers.some((p) => p.provider === preferredProvider && p.installed && p.healthy)) {
-    return `${preferredProvider}-cli` as ReasoningBackendMode;
-  }
-
-  if (providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy)) {
-    return 'codex-cli';
-  }
-  if (providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy)) {
-    return 'gemini-cli';
-  }
-  if (providers.some((provider) => provider.provider === 'agy' && provider.installed && provider.healthy)) {
-    return 'agy-cli';
-  }
-  // Default to Codex CLI when discovery cannot prove another backend.
-  return 'codex-cli';
+  return resolveReasoningBackendModeFromContext({
+    requestedMode: options.mode,
+    env: process.env,
+    providers: discoverProviders(shouldRefreshProviders(options)),
+    policy: loadReasoningBackendPolicy(),
+  }) as ReasoningBackendMode;
 }
 
 /**

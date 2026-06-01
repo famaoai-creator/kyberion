@@ -545,7 +545,7 @@ export function createSurfaceMessageFromConversationInput(input: SurfaceConversa
 export function buildSurfaceConversationInput(input: SurfaceConversationMessageInput): SurfaceConversationInput {
   const message = createSurfaceMessageFromConversationInput(input);
   const manifest = getSurfaceProviderManifest(input.surface);
-  return buildSurfaceConversationInputFromMessage(message, {
+  const baseInput = buildSurfaceConversationInputFromMessage(message, {
       agentId: input.agentId || manifest.agentId,
       senderAgentId: input.senderAgentId,
       cwd: input.cwd,
@@ -562,4 +562,8 @@ export function buildSurfaceConversationInput(input: SurfaceConversationMessageI
       }
       : undefined,
   });
+  if (typeof input.surfaceText === 'string') {
+    baseInput.surfaceText = input.surfaceText;
+  }
+  return baseInput;
 }

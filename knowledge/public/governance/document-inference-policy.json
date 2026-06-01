@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "type_rules": [
+    { "document_type": "meeting-notes", "keywords": ["minutes", "meeting", "agenda", "attendees", "action items", "decision"] },
+    { "document_type": "proposal", "keywords": ["proposal", "pitch", "vision", "charter", "commitment"] },
+    { "document_type": "specification", "keywords": ["specification", "requirements", "brd", "api", "architecture", "design", "icd", "data dictionary", "use case"] },
+    { "document_type": "report", "keywords": ["report", "summary", "weekly", "milestone", "closure", "audit", "security", "postmortem"] },
+    { "document_type": "plan", "keywords": ["plan", "test", "qa", "strategy", "roadmap", "runbook", "release", "governance"] },
+    { "document_type": "contract", "keywords": ["contract", "agreement", "msa", "dpa", "licensing", "terms", "service agreement"] },
+    { "document_type": "record", "keywords": ["log", "register", "issue", "lessons learned", "stakeholder"] }
+  ],
+  "profile_rules": [
+    { "document_type": "proposal", "profile_ids": ["executive-proposal", "vision-proposal", "project-charter"], "keywords": ["proposal", "pitch", "vision", "charter", "decision", "next step", "commitment"] },
+    { "document_type": "report", "profile_ids": ["summary-report", "weekly-status-report", "milestone-report", "project-closure-report", "security-audit-report", "test-validation-report"], "keywords": ["report", "summary", "weekly", "milestone", "closure", "audit", "security", "postmortem"] },
+    { "document_type": "plan", "profile_ids": ["test-plan", "quality-assurance-strategy", "master-test-plan", "project-management-plan", "risk-management-plan", "quality-management-plan"], "keywords": ["plan", "test", "qa", "strategy", "roadmap", "runbook", "release", "governance"] },
+    { "document_type": "specification", "profile_ids": ["requirements-definition", "business-requirements-document", "api-specification", "detailed-design", "basic-design", "interface-control-document", "database-design", "use-case-specification", "data-dictionary"], "keywords": ["spec", "specification", "requirements", "brd", "api", "architecture", "design", "icd", "data dictionary", "use case"] },
+    { "document_type": "meeting-notes", "profile_ids": ["meeting-minutes", "mission-ledger", "stakeholder-register", "issue-log", "change-log", "lessons-learned-register"], "keywords": ["minutes", "meeting", "agenda", "attendees", "action items", "decision", "issues", "register", "log"] },
+    { "document_type": "record", "profile_ids": ["meeting-minutes", "mission-ledger", "stakeholder-register", "issue-log", "change-log", "lessons-learned-register"], "keywords": ["minutes", "meeting", "agenda", "attendees", "action items", "decision", "issues", "register", "log"] },
+    { "document_type": "contract", "profile_ids": ["master-services-agreement", "data-processing-agreement-dpa", "ip-licensing-agreement", "internal-control-policy"], "keywords": ["contract", "agreement", "msa", "dpa", "licensing", "terms", "service agreement"] }
+  ]
+}

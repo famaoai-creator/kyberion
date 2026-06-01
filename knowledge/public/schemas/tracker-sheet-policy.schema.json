@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "required": ["version", "sheet_titles", "summary_empty_message"],
+  "properties": {
+    "version": { "type": "string" },
+    "sheet_titles": {
+      "type": "object",
+      "required": ["overview", "execution_board", "signals"],
+      "properties": {
+        "overview": { "type": "string" },
+        "execution_board": { "type": "string" },
+        "signals": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "summary_empty_message": { "type": "string" }
+  },
+  "additionalProperties": false
+}

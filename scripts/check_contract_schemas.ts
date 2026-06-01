@@ -2856,6 +2856,496 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'service-bootstrap-catalog',
+      schemaPath: 'knowledge/public/schemas/service-bootstrap-catalog.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/service-bootstrap-catalog.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          entries: [
+            {
+              id: 'broken',
+              service_id: 'slack',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'service-onboarding-catalog',
+      schemaPath: 'knowledge/public/schemas/service-onboarding-catalog.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/service-onboarding-catalog.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          services: [{ service_id: 'comfyui' }],
+        },
+      ],
+    },
+    {
+      id: 'work-coordination-import-catalog',
+      schemaPath: 'knowledge/public/schemas/work-coordination-import-catalog.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/work-coordination-import-catalog.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          imports: [{ id: 'broken', command: 'import-github-issue-file' }],
+        },
+      ],
+    },
+    {
+      id: 'service-authority-map',
+      schemaPath: 'knowledge/public/schemas/service-authority-map.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/service-authority-map.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          services: [{ id: 'broken', service_id: 'github' }],
+        },
+      ],
+    },
+    {
+      id: 'actuator-dependency-bundles',
+      schemaPath: 'knowledge/public/schemas/actuator-dependency-bundles.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/actuator-dependency-bundles.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          bundles: [{ id: 'broken', actuator: 'voice' }],
+        },
+      ],
+    },
+    {
+      id: 'skill-install-package-map',
+      schemaPath: 'knowledge/public/schemas/skill-install-package-map.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/skill-install-package-map.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          entries: [{ id: 'broken', patterns: ['whisper'] }],
+        },
+      ],
+    },
+    {
+      id: 'surface-coordination-role-map',
+      schemaPath: 'knowledge/public/schemas/surface-coordination-role-map.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/surface-coordination-role-map.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          entries: [{ surface: 'slack' }],
+        },
+      ],
+    },
+    {
+      id: 'voice-task-profile-catalog',
+      schemaPath: 'knowledge/public/schemas/voice-task-profile-catalog.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/voice-task-profile-catalog.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          profiles: [{ id: 'broken', task_type: 'presentation_deck' }],
+        },
+      ],
+    },
+    {
+      id: 'media-tone-style-map',
+      schemaPath: 'knowledge/public/schemas/media-tone-style-map.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-tone-style-map.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          tones: [{ tone: 'success' }],
+        },
+      ],
+    },
+    {
+      id: 'media-drawio-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-drawio-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          boundary_palettes: [{ boundary: 'account', fill: '#fff' }],
+        },
+      ],
+    },
+    {
+      id: 'media-drawio-boundary-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-boundary-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-drawio-boundary-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          palette_overrides: [{ boundary: 'lane', tier: 'web', fill: '#fff' }],
+        },
+      ],
+    },
+    {
+      id: 'media-drawio-tier-order',
+      schemaPath: 'knowledge/public/schemas/media-drawio-tier-order.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-drawio-tier-order.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          tier_order: [],
+        },
+      ],
+    },
+    {
+      id: 'media-drawio-sort-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-sort-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-drawio-sort-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          group_order: [],
+          type_order: ['aws_provider'],
+        },
+      ],
+    },
+    {
+      id: 'media-drawio-security-group-order',
+      schemaPath: 'knowledge/public/schemas/media-drawio-security-group-order.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-drawio-security-group-order.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          relation_prefix: '',
+        },
+      ],
+    },
+    {
+      id: 'document-inference-policy',
+      schemaPath: 'knowledge/public/schemas/document-inference-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/document-inference-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          type_rules: [{ document_type: 'report' }],
+          profile_rules: [{ document_type: 'report', profile_ids: ['summary-report'] }],
+        },
+      ],
+    },
+    {
+      id: 'document-contents-policy',
+      schemaPath: 'knowledge/public/schemas/document-contents-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/document-contents-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title_by_locale: { ja: '目次' },
+        },
+      ],
+    },
+    {
+      id: 'document-outline-label-policy',
+      schemaPath: 'knowledge/public/schemas/document-outline-label-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/document-outline-label-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          report_summary_title: 'Summary',
+        },
+      ],
+    },
+    {
+      id: 'promoted-report-template-policy',
+      schemaPath: 'knowledge/public/schemas/promoted-report-template-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/promoted-report-template-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          template_sections: [],
+        },
+      ],
+    },
+    {
+      id: 'onboarding-summary-policy',
+      schemaPath: 'knowledge/public/schemas/onboarding-summary-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/onboarding-summary-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title: 'Kyberion Onboarding Summary',
+        },
+      ],
+    },
+    {
+      id: 'onboarding-flow-policy',
+      schemaPath: 'knowledge/public/schemas/onboarding-flow-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/onboarding-flow-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          phase_titles: {
+            identity: 'Identity & Purpose',
+          },
+        },
+      ],
+    },
+    {
+      id: 'mission-distill-markdown-policy',
+      schemaPath: 'knowledge/public/schemas/mission-distill-markdown-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-distill-markdown-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title_suffix: 'Completion Summary',
+        },
+      ],
+    },
+    {
+      id: 'mission-ledger-policy',
+      schemaPath: 'knowledge/public/schemas/mission-ledger-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-ledger-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          section_title: 'Mission Ledger',
+        },
+      ],
+    },
+    {
+      id: 'provider-cli-capability-report-policy',
+      schemaPath: 'knowledge/public/schemas/provider-cli-capability-report-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/provider-cli-capability-report-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title: 'Provider CLI Capability Report',
+        },
+      ],
+    },
+    {
+      id: 'mission-journal-policy',
+      schemaPath: 'knowledge/public/schemas/mission-journal-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/mission-journal-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title: 'Mission Journal: Ecosystem Evolution',
+        },
+      ],
+    },
+    {
+      id: 'pilot-strategy-policy',
+      schemaPath: 'knowledge/public/schemas/pilot-strategy-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/pilot-strategy-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title: 'Kyberion AI Consulting: Go-to-Market Strategy',
+        },
+      ],
+    },
+    {
+      id: 'production-evidence-summary-policy',
+      schemaPath: 'knowledge/public/schemas/production-evidence-summary-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/production-evidence-summary-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          title_prefix: 'production evidence',
+        },
+      ],
+    },
+    {
+      id: 'changelog-policy',
+      schemaPath: 'knowledge/public/schemas/changelog-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/changelog-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          breaking_changes_title: '⚠ BREAKING CHANGES',
+        },
+      ],
+    },
+    {
+      id: 'spreadsheet-style-policy',
+      schemaPath: 'knowledge/public/schemas/spreadsheet-style-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/spreadsheet-style-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          role_indices: {},
+        },
+      ],
+    },
+    {
+      id: 'legacy-media-ops',
+      schemaPath: 'knowledge/public/schemas/legacy-media-ops.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/legacy-media-ops.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          ops: [],
+        },
+      ],
+    },
+    {
+      id: 'media-drawio-edge-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-edge-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-drawio-edge-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          edge_labels: [{ label: 'uses' }],
+        },
+      ],
+    },
+    {
+      id: 'media-aws-icon-rules',
+      schemaPath: 'knowledge/public/schemas/media-aws-icon-rules.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-aws-icon-rules.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          rules: [{ match_type: 'contains', match_value: 'cloudwatch' }],
+        },
+      ],
+    },
+    {
+      id: 'media-semantic-map',
+      schemaPath: 'knowledge/public/schemas/media-semantic-map.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-semantic-map.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          rules: [{ semantic_type: 'hero' }],
+        },
+      ],
+    },
+    {
+      id: 'media-style-policy',
+      schemaPath: 'knowledge/public/schemas/media-style-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-style-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          signal_tone_ranks: { danger: 0 },
+        },
+      ],
+    },
+    {
+      id: 'media-signal-entry-policy',
+      schemaPath: 'knowledge/public/schemas/media-signal-entry-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-signal-entry-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          entry_types: [{ source_key: 'signals', signal_type: 'signal' }],
+        },
+      ],
+    },
+    {
+      id: 'tracker-sheet-policy',
+      schemaPath: 'knowledge/public/schemas/tracker-sheet-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/tracker-sheet-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          sheet_titles: { overview: 'Overview' },
+        },
+      ],
+    },
+    {
+      id: 'media-theme-role-policy',
+      schemaPath: 'knowledge/public/schemas/media-theme-role-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/media-theme-role-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          theme_color_roles: { accent: 'accent' },
+        },
+      ],
+    },
+    {
+      id: 'reasoning-backend-policy',
+      schemaPath: 'knowledge/public/schemas/reasoning-backend-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/public/governance/reasoning-backend-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          allowed_modes: [],
+        },
+      ],
+    },
+    {
       id: 'specialist-catalog',
       schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
       validPayloads: [

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import type { MissionTeamPlan } from './mission-team-plan-composer.js';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import type { MissionTeamGovernance } from './mission-team-plan-composer.js';
+import type { MissionTeamGovernance, MissionTeamOrganizationProfileSummary } from './mission-team-plan-composer.js';
 
 export interface TeamBlueprintRole {
   team_role: string;
@@ -19,6 +19,7 @@ export interface MissionTeamBlueprint {
   mission_type: string;
   generated_at: string;
   source_artifact: string;
+  organization_profile?: MissionTeamOrganizationProfileSummary;
   team_governance?: MissionTeamGovernance;
   roles: TeamBlueprintRole[];
 }
@@ -44,6 +45,7 @@ export interface MissionStaffingAssignments {
   version: '1.0.0';
   mission_id: string;
   generated_at: string;
+  organization_profile?: MissionTeamOrganizationProfileSummary;
   assignments: MissionStaffingAssignment[];
 }
 
@@ -99,6 +101,7 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
     mission_type: plan.mission_type,
     generated_at: new Date().toISOString(),
     source_artifact: 'team-composition.json',
+    organization_profile: plan.organization_profile,
     team_governance: plan.team_governance,
     roles: plan.assignments.map((assignment) => ({
       team_role: assignment.team_role,
@@ -133,6 +136,7 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
     version: '1.0.0',
     mission_id: plan.mission_id,
     generated_at: new Date().toISOString(),
+    organization_profile: plan.organization_profile,
     assignments,
   };
 }

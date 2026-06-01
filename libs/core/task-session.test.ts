@@ -120,6 +120,7 @@ describe('task-session', () => {
     });
     expect(session.control.requires_approval).toBe(true);
     expect(session.work_loop?.authority.requires_approval).toBe(true);
+    expect(session.payload?.intent_id).toBe('restart-service');
   });
 
   it('records history updates', () => {
@@ -201,6 +202,20 @@ describe('task-session', () => {
       'report_document'
     );
     expect(classifyTaskSessionIntent('voice-hub を再起動して')?.taskType).toBe('service_operation');
+    expect(classifyTaskSessionIntent('サービスを起動して')?.intentId).toBe('start-service');
+    expect(classifyTaskSessionIntent('サービスを起動して')?.requirements?.missing).toContain(
+      'service_name'
+    );
+    expect(classifyTaskSessionIntent('voice-hub を起動して')?.payload?.service_name).toBe(
+      'voice-hub'
+    );
+    expect(classifyTaskSessionIntent('サービスを停止して')?.intentId).toBe('stop-service');
+    expect(classifyTaskSessionIntent('サービスを停止して')?.requirements?.missing).toContain(
+      'service_name'
+    );
+    expect(classifyTaskSessionIntent('voice-hub を停止して')?.payload?.service_name).toBe(
+      'voice-hub'
+    );
     expect(classifyTaskSessionIntent('presence-studio の状態を見て')?.payload?.service_name).toBe(
       'presence-studio'
     );
@@ -223,6 +238,49 @@ describe('task-session', () => {
     expect(
       classifyTaskSessionIntent('voice-hub のログを見て')?.requirements?.missing || []
     ).not.toContain('approval_confirmation');
+
+    // Weather and transit simulation intents
+    const weatherIntent = classifyTaskSessionIntent('東京の天気を教えて');
+    expect(weatherIntent?.intentId).toBe('weather-lookup');
+    expect(weatherIntent?.payload?.location).toBe('東京');
+
+    const transitIntent = classifyTaskSessionIntent('新宿から渋谷への電車の時間を教えて');
+    expect(transitIntent?.intentId).toBe('transit-lookup');
+    expect(transitIntent?.payload?.departure_station).toBe('新宿');
+    expect(transitIntent?.payload?.arrival_station).toBe('渋谷');
+
+    // Restaurant, News, and Email simulation intents
+    const restaurantIntent = classifyTaskSessionIntent('渋谷の美味しいラーメン屋を調べて');
+    expect(restaurantIntent?.intentId).toBe('restaurant-search');
+    expect(restaurantIntent?.payload?.location).toBe('渋谷');
+    expect(restaurantIntent?.payload?.genre).toBe('ラーメン');
+
+    const newsIntent = classifyTaskSessionIntent('AI業界の最近の動向を要約して');
+    expect(newsIntent?.intentId).toBe('news-summary');
+    expect(newsIntent?.payload?.topic).toBe('AI');
+
+    const emailIntent = classifyTaskSessionIntent('田中さんへの返信メールの下書きを作って');
+    expect(emailIntent?.intentId).toBe('email-draft');
+    expect(emailIntent?.payload?.recipient).toBe('田中さん');
+
+    // New simulation intents: Calendar, Device, Reminder, Translation
+    const calendarIntent = classifyTaskSessionIntent('明日10時のミーティングを登録して');
+    expect(calendarIntent?.intentId).toBe('calendar-schedule');
+    expect(calendarIntent?.payload?.date).toBe('明日');
+
+    const deviceIntent = classifyTaskSessionIntent('エアコンをつけて');
+    expect(deviceIntent?.intentId).toBe('device-control');
+    expect(deviceIntent?.payload?.device_name).toBe('エアコン');
+    expect(deviceIntent?.payload?.operation).toBe('オン');
+
+    const reminderIntent = classifyTaskSessionIntent('買い物リストに牛乳を追加して');
+    expect(reminderIntent?.intentId).toBe('reminder-task');
+    expect(reminderIntent?.payload?.task_detail).toBe('牛乳');
+
+    const translationIntent = classifyTaskSessionIntent('「こんにちは」を英語に翻訳して');
+    expect(translationIntent?.intentId).toBe('translation-service');
+    expect(translationIntent?.payload?.target_language).toBe('英語');
+
     expect(
       classifyTaskSessionIntent('過去の要件定義を横断的に見て横展開されていないバグを修正して')
         ?.intentId
