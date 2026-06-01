@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "tones": [
+    {
+      "tone": "success",
+      "style": "success"
+    },
+    {
+      "tone": "warning",
+      "style": "warning"
+    },
+    {
+      "tone": "danger",
+      "style": "danger"
+    },
+    {
+      "tone": "info",
+      "style": "info"
+    }
+  ]
+}

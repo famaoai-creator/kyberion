@@ -29,9 +29,13 @@ import { summarizeHeuristics } from './heuristic-feedback.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
 
-// Install Anthropic-backed reasoning + intent extractor at worker import.
-// No-op when ANTHROPIC_API_KEY is unset (stubs remain active).
-installAnthropicBackendsIfAvailable();
+let workerBackendsInstalled = false;
+
+function ensureWorkerBackendsInstalled(): void {
+  if (workerBackendsInstalled) return;
+  installAnthropicBackendsIfAvailable();
+  workerBackendsInstalled = true;
+}
 
 /**
  * Emit a lifecycle intent snapshot for a worker-driven stage transition.
@@ -369,6 +373,7 @@ function markTaskBoardInProgress(missionId: string): void {
 }
 
 export async function dispatchMissionNextTasks(missionId: string): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
+  ensureWorkerBackendsInstalled();
   const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
   const allTasks = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string) as PlannedNextTask[];
@@ -889,6 +894,7 @@ async function handleSurfaceControlRequested(event: MissionOrchestrationEvent<Su
 }
 
 export async function processMissionOrchestrationEventPath(eventPath: string): Promise<void> {
+  ensureWorkerBackendsInstalled();
   const event = loadMissionOrchestrationEvent<SlackPayload>(eventPath);
   emitMissionOrchestrationObservation({
     decision: 'mission_orchestration_event_started',

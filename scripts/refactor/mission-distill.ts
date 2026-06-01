@@ -9,6 +9,7 @@ import {
   ledger,
   logger,
   pathResolver,
+  resolveMissionDistillMarkdownPolicy,
   safeExistsSync,
   safeExec,
   safeMkdir,
@@ -107,6 +108,7 @@ export function gatherDistillContext(missionId: string, state: MissionState, mis
 }
 
 export function buildFallbackWisdom(missionId: string, state: MissionState): any {
+  const distillPolicy = resolveMissionDistillMarkdownPolicy();
   const failureEvents = state.history.filter(
     h => h.event === 'FAIL' || h.event === 'VERIFY' || h.note.includes('failed') || h.note.includes('Error')
   );
@@ -114,7 +116,7 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
   const lastError = failureEvents.length > 0 ? failureEvents[failureEvents.length - 1].note : 'None';
 
   return {
-    title: `Mission ${missionId} Completion Summary`,
+    title: `Mission ${missionId} ${distillPolicy.title_suffix}`,
     category: hasFailures ? 'Incident' : 'Operations',
     tags: [state.tier, state.assigned_persona.toLowerCase().replace(/\s+/g, '-'), 'auto-distilled'],
     importance: hasFailures ? 5 : 3,
@@ -134,6 +136,7 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
 }
 
 export function formatWisdomMarkdown(wisdom: any, missionId: string): string {
+  const distillPolicy = resolveMissionDistillMarkdownPolicy();
   const now = new Date().toISOString().slice(0, 10);
   const tags = (wisdom.tags || []).map((t: string) => `"${t}"`).join(', ');
   const sections = wisdom.sections || {};
@@ -154,29 +157,29 @@ export function formatWisdomMarkdown(wisdom: any, missionId: string): string {
   ];
 
   if (sections.summary) {
-    lines.push('## Summary', sections.summary, '');
+    lines.push(`## ${distillPolicy.section_titles.summary}`, sections.summary, '');
   }
 
   if (sections.key_learnings?.length) {
-    lines.push('## Key Learnings');
+    lines.push(`## ${distillPolicy.section_titles.key_learnings}`);
     for (const l of sections.key_learnings) lines.push(`- ${l}`);
     lines.push('');
   }
 
   if (sections.patterns_discovered?.length) {
-    lines.push('## Patterns Discovered');
+    lines.push(`## ${distillPolicy.section_titles.patterns_discovered}`);
     for (const p of sections.patterns_discovered) lines.push(`- ${p}`);
     lines.push('');
   }
 
   if (sections.failures_and_recoveries?.length && sections.failures_and_recoveries[0] !== 'None') {
-    lines.push('## Failures & Recoveries');
+    lines.push(`## ${distillPolicy.section_titles.failures_and_recoveries}`);
     for (const f of sections.failures_and_recoveries) lines.push(`- ${f}`);
     lines.push('');
   }
 
   if (sections.reusable_artifacts?.length && sections.reusable_artifacts[0] !== 'None identified') {
-    lines.push('## Reusable Artifacts');
+    lines.push(`## ${distillPolicy.section_titles.reusable_artifacts}`);
     for (const a of sections.reusable_artifacts) lines.push(`- ${a}`);
     lines.push('');
   }
@@ -221,12 +224,12 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     promptTemplate,
     '',
     '---',
-    '## Mission State',
+    `## ${resolveMissionDistillMarkdownPolicy().prompt_titles.mission_state}`,
     '```json',
     JSON.stringify(state, null, 2),
     '```',
     '',
-    '## Evidence & Context',
+    `## ${resolveMissionDistillMarkdownPolicy().prompt_titles.evidence_context}`,
     '```',
     context,
     '```',

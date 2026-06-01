@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "required": ["version", "theme_color_roles", "theme_hex_roles"],
+  "properties": {
+    "version": { "type": "string" },
+    "theme_color_roles": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "theme_hex_roles": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

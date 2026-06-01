@@ -23,6 +23,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { getActuatorDependencyBundle, loadActuatorDependencyBundles, type ActuatorDependencyBundleEntry } from '@agent/core';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -211,16 +212,39 @@ const PNPM: Dependency = {
   installCommand: 'npm install -g pnpm',
 };
 
+const DEPENDENCY_BY_ID: Record<string, Dependency> = {
+  node22: NODE22,
+  pnpm: PNPM,
+  python3: PYTHON3,
+  'playwright-browser': PLAYWRIGHT_BROWSER,
+  'native-tts': NATIVE_TTS,
+  whisper: WHISPER,
+  ffmpeg: FFMPEG,
+  'comfyui-server': COMFYUI,
+};
+
+function buildDependenciesForBundle(bundle: ActuatorDependencyBundleEntry): Dependency[] {
+  return bundle.dependency_ids.map((dependencyId) => {
+    const dependency = DEPENDENCY_BY_ID[dependencyId];
+    if (!dependency) throw new Error(`Unknown dependency id in actuator bundle: ${dependencyId}`);
+    return dependency;
+  });
+}
+
 // ─── Actuator Dep Bundles ─────────────────────────────────────────────────────
 
-export const ACTUATOR_DEPS: Record<string, Dependency[]> = {
-  core: [NODE22, PNPM],
-  browser: [NODE22, PLAYWRIGHT_BROWSER],
-  voice: [NODE22, PYTHON3, NATIVE_TTS, WHISPER, FFMPEG],
-  'media-generation': [NODE22, PYTHON3, COMFYUI, FFMPEG],
-  meeting: [NODE22, PLAYWRIGHT_BROWSER, NATIVE_TTS],
-  all: [NODE22, PNPM, PYTHON3, PLAYWRIGHT_BROWSER, NATIVE_TTS, WHISPER, FFMPEG, COMFYUI],
-};
+export const ACTUATOR_DEPS: Record<string, Dependency[]> = (() => {
+  const bundles = loadActuatorDependencyBundles();
+  const deps: Record<string, Dependency[]> = {};
+  for (const bundle of bundles.bundles) {
+    deps[bundle.actuator] = buildDependenciesForBundle(bundle);
+  }
+  if (!deps.all) {
+    const allBundle = getActuatorDependencyBundle('all');
+    if (allBundle) deps.all = buildDependenciesForBundle(allBundle);
+  }
+  return deps;
+})();
 
 // ─── Resolver ─────────────────────────────────────────────────────────────────
 

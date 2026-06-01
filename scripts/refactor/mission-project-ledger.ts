@@ -8,6 +8,7 @@ import {
   findMissionPath,
   logger,
   pathResolver,
+  resolveMissionLedgerPolicy,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -43,10 +44,12 @@ export function escapeTableCell(value: string): string {
 }
 
 export function upsertMissionLedgerRow(content: string, row: string, missionId: string): string {
+  const policy = resolveMissionLedgerPolicy();
   const lines = content.split('\n');
-  const headerIndex = lines.findIndex((line) => line.includes('| Mission ID | Relationship | Status | Summary |'));
+  const headerLine = `| ${policy.table_headers.mission_id} | ${policy.table_headers.relationship} | ${policy.table_headers.status} | ${policy.table_headers.summary} | ${policy.table_headers.affected_artifacts} | ${policy.table_headers.gate_impact} | ${policy.table_headers.traceability_refs} |`;
+  const headerIndex = lines.findIndex((line) => line.includes(headerLine));
   if (headerIndex === -1) {
-    return `${content.trimEnd()}\n\n## Mission Ledger\n\n| Mission ID | Relationship | Status | Summary | Affected Artifacts | Gate Impact | Traceability Refs |\n|---|---|---|---|---|---|---|\n${row}\n`;
+    return `${content.trimEnd()}\n\n## ${policy.section_title}\n\n${headerLine}\n|---|---|---|---|---|---|---|\n${row}\n`;
   }
 
   let tableEnd = headerIndex + 2;

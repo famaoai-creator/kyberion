@@ -238,6 +238,47 @@ export type {
   JiraIssueLike,
   JiraIssueNormalizationResult,
 } from './work-integrations/jira-issues.js';
+export {
+  getWorkCoordinationImportCatalogEntryByCommand,
+  listWorkCoordinationImportCatalogEntries,
+  loadWorkCoordinationImportCatalog,
+} from './work-coordination-import-catalog.js';
+export type {
+  WorkCoordinationImportCatalogEntry,
+} from './work-coordination-import-catalog.js';
+export {
+  getServiceBootstrapCatalogEntryByServiceId,
+  findServiceBootstrapEntriesByUtterance,
+  getDefaultServiceIdForSurface,
+  loadServiceBootstrapCatalog,
+  listServiceBootstrapCatalogEntries,
+} from './service-bootstrap-catalog.js';
+export type {
+  ServiceBootstrapCatalogEntry,
+} from './service-bootstrap-catalog.js';
+export {
+  getActuatorDependencyBundle,
+  loadActuatorDependencyBundles,
+} from './actuator-dependency-bundles.js';
+export type {
+  ActuatorDependencyBundleEntry,
+} from './actuator-dependency-bundles.js';
+export {
+  findSkillInstallPackageMapEntry,
+  loadSkillInstallPackageMap,
+} from './skill-install-package-map.js';
+export type {
+  SkillInstallPackageMapEntry,
+} from './skill-install-package-map.js';
+export {
+  getServiceAuthorities,
+  listServiceAuthorityMapEntries,
+  loadServiceAuthorityMap,
+} from './service-authority-map.js';
+export type {
+  ServiceAuthorityMapEntry,
+} from './service-authority-map.js';
+export { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 export { distillPdfDesign } from './src/pdf-utils.js';
 export { distillPptxDesign } from './src/pptx-utils.js';
 export { distillXlsxDesign } from './src/xlsx-utils.js';
@@ -479,6 +520,7 @@ export * from './provider-health-registry.js';
 export * from './capability-broker.js';
 export * from './runtime-supervisor.js';
 export * from './surface-runtime.js';
+export * from './organization-profile.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
 export * from './provider-capability-scanner.js';
@@ -827,6 +869,173 @@ export {
   getInstalledReasoningMode,
 } from './reasoning-bootstrap.js';
 export {
+  loadReasoningBackendPolicy,
+  normalizeReasoningBackendMode as normalizeReasoningBackendModePolicy,
+  resolveReasoningBackendModeFromContext,
+  resetReasoningBackendPolicyCache,
+} from './reasoning-backend-policy.js';
+export {
+  loadVoiceTaskProfileCatalog,
+  resolveVoiceTaskDistillTargetKind,
+  resolveVoiceTaskProfile,
+  resetVoiceTaskProfileCatalogCache,
+} from './voice-task-profile-catalog.js';
+export {
+  loadMediaToneStyleMapCatalog,
+  resolveMediaToneStyle,
+  resetMediaToneStyleMapCatalogCache,
+} from './media-tone-style-map.js';
+export {
+  loadMediaDrawioPolicyCatalog,
+  resolveMediaDrawioBoundaryPalette,
+  resolveMediaDrawioNodeSize,
+  resetMediaDrawioPolicyCatalogCache,
+} from './media-drawio-policy.js';
+export {
+  loadMediaAwsIconRuleCatalog,
+  resolveMediaAwsIconCandidates,
+  resetMediaAwsIconRuleCatalogCache,
+} from './media-aws-icon-rules.js';
+export {
+  loadMediaSemanticMapCatalog,
+  resolveMediaSemanticType,
+  resolveProposalEvidenceIndex,
+  resetMediaSemanticMapCatalogCache,
+} from './media-semantic-map.js';
+export {
+  loadMediaStylePolicyCatalog,
+  resolveSignalToneRank,
+  resolveBorderKeySides,
+  resetMediaStylePolicyCatalogCache,
+} from './media-style-policy.js';
+export {
+  loadMediaSignalEntryPolicyCatalog,
+  resolveMediaSignalEntryPolicy,
+  resetMediaSignalEntryPolicyCatalogCache,
+} from './media-signal-entry-policy.js';
+export {
+  loadTrackerSheetPolicyCatalog,
+  resetTrackerSheetPolicyCatalogCache,
+} from './tracker-sheet-policy.js';
+export {
+  loadMediaThemeRolePolicyCatalog,
+  resolveThemeColorRole,
+  resolveThemeHexRole,
+  resetMediaThemeRolePolicyCatalogCache,
+} from './media-theme-role-policy.js';
+export {
+  loadMediaDrawioEdgePolicyCatalog,
+  resolveDrawioEdgeLabelStyleParts,
+  resolveDrawioEdgeRoutingStyleParts,
+  resetMediaDrawioEdgePolicyCatalogCache,
+} from './media-drawio-edge-policy.js';
+export {
+  loadMediaDrawioBoundaryPolicyCatalog,
+  resolveDrawioBoundaryIconCandidates,
+  resolveDrawioBoundaryPaletteOverride,
+  resetMediaDrawioBoundaryPolicyCatalogCache,
+} from './media-drawio-boundary-policy.js';
+export {
+  loadMediaDrawioTierOrderCatalog,
+  resolveMediaDrawioTierRank,
+  resetMediaDrawioTierOrderCatalogCache,
+} from './media-drawio-tier-order.js';
+export {
+  loadMediaDrawioSortPolicyCatalog,
+  resolveMediaDrawioGroupRank,
+  resolveMediaDrawioTypeRank,
+  resetMediaDrawioSortPolicyCatalogCache,
+} from './media-drawio-sort-policy.js';
+export {
+  loadMediaDrawioSecurityGroupOrderCatalog,
+  resolveMediaDrawioSecurityGroupRelationPrefix,
+  resetMediaDrawioSecurityGroupOrderCatalogCache,
+} from './media-drawio-security-group-order.js';
+export {
+  loadDocumentInferencePolicyCatalog,
+  resolveDocumentProfileCandidates,
+  resolveDocumentProfileKeywords,
+  resolveDocumentTypeFromClues,
+  resetDocumentInferencePolicyCatalogCache,
+} from './document-inference-policy.js';
+export {
+  loadDocumentContentsPolicyCatalog,
+  resolveDocumentContentsLabel,
+  resolveDocumentContentsSubtitle,
+  resetDocumentContentsPolicyCatalogCache,
+} from './document-contents-policy.js';
+export {
+  loadDocumentOutlineLabelPolicyCatalog,
+  resolveReportSectionTitle,
+  resolveReportSummaryTitle,
+  resetDocumentOutlineLabelPolicyCatalogCache,
+} from './document-outline-label-policy.js';
+export {
+  loadPromotedReportTemplatePolicyCatalog,
+  resolvePromotedReportAudience,
+  resolvePromotedReportOutputFormat,
+  resolvePromotedReportTemplateSections,
+  resetPromotedReportTemplatePolicyCatalogCache,
+} from './promoted-report-template-policy.js';
+export {
+  loadOnboardingSummaryPolicyCatalog,
+  resolveOnboardingSummaryPolicy,
+  resetOnboardingSummaryPolicyCatalogCache,
+} from './onboarding-summary-policy.js';
+export {
+  loadOnboardingFlowPolicyCatalog,
+  resolveOnboardingFlowPolicy,
+  resetOnboardingFlowPolicyCatalogCache,
+} from './onboarding-flow-policy.js';
+export {
+  loadMissionDistillMarkdownPolicyCatalog,
+  resolveMissionDistillMarkdownPolicy,
+  resetMissionDistillMarkdownPolicyCatalogCache,
+} from './mission-distill-markdown-policy.js';
+export {
+  loadMissionLedgerPolicyCatalog,
+  resolveMissionLedgerPolicy,
+  resetMissionLedgerPolicyCatalogCache,
+} from './mission-ledger-policy.js';
+export {
+  loadProviderCliCapabilityReportPolicyCatalog,
+  resolveProviderCliCapabilityReportPolicy,
+  resetProviderCliCapabilityReportPolicyCatalogCache,
+} from './provider-cli-capability-report-policy.js';
+export {
+  loadMissionJournalPolicyCatalog,
+  resolveMissionJournalPolicy,
+  resetMissionJournalPolicyCatalogCache,
+} from './mission-journal-policy.js';
+export {
+  loadPilotStrategyPolicyCatalog,
+  resolvePilotStrategyPolicy,
+  resetPilotStrategyPolicyCatalogCache,
+} from './pilot-strategy-policy.js';
+export {
+  loadProductionEvidenceSummaryPolicyCatalog,
+  resolveProductionEvidenceSummaryPolicy,
+  resetProductionEvidenceSummaryPolicyCatalogCache,
+} from './production-evidence-summary-policy.js';
+export {
+  loadChangelogPolicyCatalog,
+  resolveChangelogPolicy,
+  resetChangelogPolicyCatalogCache,
+} from './changelog-policy.js';
+export {
+  resolveProposalSectionKeywords,
+} from './media-semantic-map.js';
+export {
+  loadSpreadsheetStylePolicyCatalog,
+  resolveSpreadsheetStyleIndex,
+  resetSpreadsheetStylePolicyCatalogCache,
+} from './spreadsheet-style-policy.js';
+export {
+  isLegacyMediaOp,
+  loadLegacyMediaOpsCatalog,
+  resetLegacyMediaOpsCatalogCache,
+} from './legacy-media-ops.js';
+export {
   installEmbeddingBackendIfAvailable,
 } from './embedding-bootstrap.js';
 export {
@@ -929,12 +1138,15 @@ export * from './surface-interaction-model.js';
 export * from './surface-provider-manifest.js';
 export * from './surface-query-overlay-catalog.js';
 export * from './surface-provider-manifest-catalog.js';
+export * from './service-bootstrap-catalog.js';
+export * from './service-onboarding-catalog.js';
 export * from './surface-provider-policy.js';
 export { resolveRef, handleStepError } from './src/pipeline-engine.js';
 export type { OnErrorConfig, RefParams } from './src/pipeline-engine.js';
 export * from './channel-surface.js';
 export * from './surface-runtime-router.js';
 export * from './surface-runtime-orchestrator.js';
+export * from './location-fallback.js';
 export * from './surface-response-blocks.js';
 export * from './surface-artifact-store.js';
 export * from './surface-mission-proposals.js';

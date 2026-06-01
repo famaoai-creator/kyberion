@@ -234,11 +234,19 @@
       "execution_profile_id": "voice-speak-with-my-voice-local-say",
       "outcome_ids": ["artifact:audio"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["喋らせて", "読んで", "発話", "speak", "voice", "cloned"],
+      "trigger_keywords": ["喋らせて", "読んで", "発話", "speak", "cloned", "私の声", "クローンボイス"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/speak-with-my-voice.json"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "outcome",
@@ -267,11 +275,19 @@
       "execution_profile_id": "media-generate-narrated-video-default",
       "outcome_ids": ["artifact:video"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["動画", "ビデオ", "映像", "ビデオレポート", "video", "movie", "narrated"],
+      "trigger_keywords": ["ナレーション", "説明", "解説", "レポート", "narrated", "voice-over"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/kyberion-howto-narrated-demo.json"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "outcome",
@@ -304,6 +320,14 @@
         "shape": "pipeline",
         "result_shape": "summary"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "outcome",
@@ -369,6 +393,14 @@
         "task_kind": "voice_conversation",
         "result_shape": "summary"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/live-voice-smoke.json"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "outcome",
@@ -411,17 +443,26 @@
       "description": "Start a governed service and report the resulting state.",
       "surface_examples": ["サービスを起動して", "start the service", "このサービスを立ち上げて"],
       "plan_outline": [
-        "resolve target service",
-        "start the service under policy",
+        "list the startable services",
+        "select the target service",
+        "start the chosen service under policy",
         "report startup state and blockers"
       ],
       "outcome_ids": ["service_started"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["start", "service", "起動", "立ち上げて"],
+      "trigger_keywords": ["サービスを起動して", "起動して", "start the service", "立ち上げて", "start"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "service_started"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/service_lifecycle_control.js --operation start"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "external_service",
@@ -437,17 +478,26 @@
       "description": "Stop a governed service and report the resulting state.",
       "surface_examples": ["サービスを停止して", "stop the service", "このサービスを止めて"],
       "plan_outline": [
-        "resolve target service",
-        "stop the service under policy",
+        "list the running services",
+        "select the target service",
+        "stop the chosen service under policy",
         "report shutdown state and blockers"
       ],
       "outcome_ids": ["service_stopped"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["stop", "service", "停止", "止めて"],
+      "trigger_keywords": ["サービスを停止して", "stop the service", "止めて", "停止", "stop"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "service_stopped"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/service_lifecycle_control.js --operation list"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "external_service",
@@ -799,7 +849,6 @@
         "空き時間",
         "availability",
         "確認",
-        "教えて",
         "見せて"
       ],
       "resolution": {
@@ -1046,6 +1095,14 @@
         "task_kind": "service_onboarding",
         "result_shape": "summary"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/setup-messaging-bridge-smoke.json --context '{\"platform_id\":\"{{platform_id}}\"}'"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "external_service",
@@ -1105,11 +1162,19 @@
       ],
       "outcome_ids": ["voice_profile_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["クローン", "登録", "録音", "声", "clone", "voice"],
+      "trigger_keywords": ["クローン", "録音", "register", "clone", "voice clone", "使えるようにして", "声を使えるようにして", "自分の声"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/clone-my-voice.json"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "external_service",
@@ -2063,6 +2128,14 @@
         "shape": "task_session",
         "result_shape": "onboarding_plan"
       },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/launch-first-run-onboarding.json"
+          }
+        }
+      ],
       "legacy_category": "surface",
       "exposed_to_surface": true,
       "target": "environment",
@@ -2480,7 +2553,7 @@
       ],
       "outcome_ids": ["mission_state_summary"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["mission", "state", "status"],
+      "trigger_keywords": ["state", "status", "状態", "進捗", "履歴"],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_state_summary"
@@ -2493,6 +2566,84 @@
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
       "risk_profile": "review_required"
+    },
+    {
+      "id": "inspect-mission-inventory",
+      "category": "system_observability",
+      "description": "List the current mission inventory and high-level statuses.",
+      "surface_examples": [
+        "ミッション一覧を教えて",
+        "今あるミッションを一覧で見せて",
+        "mission list を表示して",
+        "active missions を見せて"
+      ],
+      "plan_outline": [
+        "list current missions",
+        "summarize active statuses",
+        "return the mission inventory"
+      ],
+      "outcome_ids": ["mission_inventory_summary"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["mission", "missions", "ミッション", "active", "inventory"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "mission_inventory_summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "mission_process",
+      "action": "inspect",
+      "object": "missions",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/mission_controller.js list"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inspect-generation-schedules",
+      "category": "system_observability",
+      "description": "List scheduled generation jobs and their current states.",
+      "surface_examples": [
+        "スケジュールタスクの一覧を教えて",
+        "予定されたジョブを一覧で見せて",
+        "schedule list を表示して",
+        "cron の一覧を見せて"
+      ],
+      "plan_outline": [
+        "list generation schedules",
+        "summarize current schedule states",
+        "return the scheduled job inventory"
+      ],
+      "outcome_ids": ["generation_schedule_summary"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["schedule", "scheduled", "cron", "task", "jobs", "スケジュール", "タスク"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "generation_schedule_summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "inspect",
+      "object": "generation_schedules",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_generation_schedule.js --action list"
+          }
+        }
+      ]
     },
     {
       "id": "reconcile-capability-lifecycle",
@@ -2566,6 +2717,40 @@
           }
         }
       ]
+    },
+    {
+      "id": "restart-service",
+      "category": "system_observability",
+      "description": "Restart a governed background service and report the resulting state.",
+      "surface_examples": ["サービスを再起動して", "restart the service", "このサービスを再起動して"],
+      "plan_outline": [
+        "resolve target service",
+        "restart the service under policy",
+        "report restart state and blockers"
+      ],
+      "outcome_ids": ["service_restarted"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": ["restart", "reboot", "再起動", "再起動して"],
+      "resolution": {
+        "shape": "task_session",
+        "result_shape": "service_restarted"
+      },
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node dist/scripts/run_pipeline.js --input pipelines/service-lifecycle-smoke.json --context '{\"service_name\":\"voice-hub\",\"operation\":\"restart\"}'"
+          }
+        }
+      ],
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "execute",
+      "object": "service_runtime",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
     },
     {
       "id": "verify-audit-chain",
@@ -3759,6 +3944,402 @@
       "execution_shape": "task_session",
       "mission_class": "operations_and_release",
       "risk_profile": "review_required"
+    },
+    {
+      "id": "weather-lookup",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "天気の情報を取得してユーザーに簡潔な要約を返す。特定の地域や日程の天候、気温を提示する。",
+      "surface_examples": [
+        "東京の天気を教えて",
+        "明日雨降る？",
+        "今週末の札幌の天気は？",
+        "今日の気温はどのくらい？",
+        "What is the weather in Tokyo?"
+      ],
+      "plan_outline": [
+        "対象となる地域と日程を特定する",
+        "気象情報ソースから天気予報を取得する",
+        "天気、最高・最低気温、降水確率を要約してユーザーに報告する"
+      ],
+      "outcome_ids": ["weather_report"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "天気", "天候", "晴れ", "雨", "雪", "曇り", "気温",
+        "降水確率", "台風", "weather", "forecast", "rain", "sunny"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "weather_report",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/weather_mock.js",
+            "export_as": "weather_report"
+          }
+        }
+      ]
+    },
+    {
+      "id": "transit-lookup",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "電車の時間や乗り換え経路、路線運行情報を検索し、経路を提示する。",
+      "surface_examples": [
+        "新宿から渋谷への電車の時間を教えて",
+        "次の電車の発車時刻を調べて",
+        "東京から京都への新幹線の時間を教えて",
+        "山手線は遅れてない？",
+        "Transit schedule from Tokyo to Kyoto"
+      ],
+      "plan_outline": [
+        "出発駅、目的駅、出発/到着時刻の条件を特定する",
+        "経路検索エンジンまたは時刻表データソースから情報を取得する",
+        "最適な経路、所要時間、料金を整理して報告する"
+      ],
+      "outcome_ids": ["transit_plan"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "電車", "時間", "乗換", "時刻表", "発車", "新宿",
+        "渋谷", "東京", "路線", "駅", "運行情報", "新幹線",
+        "遅延", "ダイヤ", "transit", "train", "schedule", "station"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "transit_plan",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/transit_mock.js",
+            "export_as": "transit_plan"
+          }
+        }
+      ]
+    },
+    {
+      "id": "restaurant-search",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "飲食店の検索やテーブルの予約手配を行う。",
+      "surface_examples": [
+        "渋谷の美味しいラーメン屋を調べて",
+        "今夜19時に新宿の居酒屋を予約して",
+        "Search sushi places near Akihabara"
+      ],
+      "plan_outline": [
+        "目的の地域、料理ジャンル、日時や人数を特定する",
+        "グルメ情報ソースや店舗予約APIから空き情報を検索する",
+        "おすすめの店舗情報や予約結果を要約して提示する"
+      ],
+      "outcome_ids": ["restaurant_reservation"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "レストラン", "居酒屋", "ラーメン", "カフェ", "予約",
+        "ディナー", "ランチ", "ごはん", "美味しい", "グルメ",
+        "restaurant", "cafe", "sushi", "dining", "booking"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "restaurant_reservation",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/restaurant_mock.js",
+            "export_as": "restaurant_reservation"
+          }
+        }
+      ]
+    },
+    {
+      "id": "news-summary",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "最新のニュースや特定技術の動向を取得して要約を提示する。",
+      "surface_examples": [
+        "今日の最新ニュースを教えて",
+        "AI業界の最近の動向を要約して",
+        "What is the trending topic in tech?"
+      ],
+      "plan_outline": [
+        "問い合わせたいトピックやジャンルを特定する",
+        "最新ニュース配信フィードや検索エンジンから情報をキュレートする",
+        "重要なヘッドラインや要約を箇条書きで分かりやすく整理して報告する"
+      ],
+      "outcome_ids": ["news_summary"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "ニュース", "トピック", "トレンド", "動向", "話題",
+        "最新情報", "news", "trend", "tech", "headline", "summary"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "news_summary",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/news_mock.js",
+            "export_as": "news_summary"
+          }
+        }
+      ]
+    },
+    {
+      "id": "email-draft",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "指示に基づいて、メールや返信文の適切な下書きを生成する。",
+      "surface_examples": [
+        "田中さんへの返信メールの下書きを作って",
+        "お詫びのメール文面を作成して",
+        "Draft a feedback email to the lead developer"
+      ],
+      "plan_outline": [
+        "宛先、メールの目的、含めるべき要点を特定する",
+        "TPOに合わせたビジネスまたはカジュアルな文章を生成する",
+        "件名と本文を含む美しいメールドラフトを提示する"
+      ],
+      "outcome_ids": ["email_draft"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "メール", "下書き", "文面", "返信", "作成して",
+        "email", "draft", "response", "reply", "write"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "create",
+      "object": "email_draft",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/email_mock.js",
+            "export_as": "email_draft"
+          }
+        }
+      ]
+    },
+    {
+      "id": "calendar-schedule",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "カレンダーの予定を確認・登録する。",
+      "surface_examples": [
+        "今日の予定を教えて",
+        "明日10時のミーティングを登録して",
+        "今週末のスケジュールを教えて",
+        "What is my schedule for today?"
+      ],
+      "plan_outline": [
+        "対象となる日付や予定の内容を特定する",
+        "カレンダー・データベースから予定を取得、あるいは新規登録する",
+        "予定の一覧または登録結果を要約してユーザーに報告する"
+      ],
+      "outcome_ids": ["calendar_update"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "予定", "スケジュール", "カレンダー", "ミーティング",
+        "会議", "登録して", "教えて", "schedule", "calendar", "meeting"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "calendar_update",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/calendar_mock.js",
+            "export_as": "calendar_update"
+          }
+        }
+      ]
+    },
+    {
+      "id": "device-control",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "スマートホーム機器やオフィスデバイスの電源・調整を制御する。",
+      "surface_examples": [
+        "エアコンをつけて",
+        "電気を消して",
+        "温度を24度にして",
+        "Turn off the lights"
+      ],
+      "plan_outline": [
+        "制御対象のデバイスと実行する操作を特定する",
+        "デバイス制御APIにコマンドを送信して状態を遷移させる",
+        "実行結果と現在のデバイスのステータスを報告する"
+      ],
+      "outcome_ids": ["device_state_change"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "エアコン", "電気", "照明", "ライト", "温度", "消して", "つけて",
+        "オン", "オフ", "設定して", "device", "light", "aircon", "turn on", "turn off"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "execute",
+      "object": "device_state_change",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/device_mock.js",
+            "export_as": "device_state_change"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reminder-task",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "リマインダーやToDoリストにタスクを追加・確認する。",
+      "surface_examples": [
+        "15時に会議があることをリマインドして",
+        "買い物リストに牛乳を追加して",
+        "やることリストを見せて",
+        "Remind me to buy milk"
+      ],
+      "plan_outline": [
+        "リマインドする時刻やタスクの内容を特定する",
+        "リマインダー・データベースに登録する",
+        "設定されたリマインダー内容を要約してユーザーに報告する"
+      ],
+      "outcome_ids": ["reminder_created"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "リマインド", "リマインダー", "ToDo", "ToDoリスト", "やること",
+        "買い物リスト", "追加して", "登録して", "remind", "todo", "reminder"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "create",
+      "object": "reminder_created",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/reminder_mock.js",
+            "export_as": "reminder_created"
+          }
+        }
+      ]
+    },
+    {
+      "id": "translation-service",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "指定されたテキストを目的の言語に翻訳する。",
+      "surface_examples": [
+        "この文を英語に翻訳して",
+        "「ありがとう」は英語で何て言う？",
+        "Translate this into Japanese",
+        "翻訳して"
+      ],
+      "plan_outline": [
+        "翻訳対象のテキストと目的の翻訳言語を特定する",
+        "量子翻訳エンジンを使用して高品質な翻訳結果を生成する",
+        "翻訳結果を元のテキストと対比させてユーザーに報告する"
+      ],
+      "outcome_ids": ["translation_result"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "翻訳", "英語で", "日本語で", "何て言う", "訳して", "translate", "translation"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "service_operation",
+        "result_shape": "summary"
+      },
+      "exposed_to_surface": true,
+      "target": "external_service",
+      "action": "query",
+      "object": "translation_result",
+      "execution_shape": "task_session",
+      "mission_class": "operations_and_release",
+      "risk_profile": "low",
+      "pipeline": [
+        {
+          "op": "system:shell",
+          "params": {
+            "cmd": "node scripts/translation_mock.js",
+            "export_as": "translation_result"
+          }
+        }
+      ]
     }
   ]
 }

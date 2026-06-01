@@ -1,0 +1,317 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "id": "analysis-project-bootstrap",
+      "task_type": "analysis",
+      "bootstrap_kind": "project_bootstrap",
+      "distill_target_kind": "knowledge_hint",
+      "label_ja": "プロジェクト整理",
+      "label_en": "project kickoff",
+      "accepted_reply_ja": "{projectName} の立ち上げを受け取りました。{specialistLabel} が担当します。{learnedHint}まず、何を作るか、誰向けか、最初の成果物をまとめて教えてください。",
+      "accepted_reply_en": "I started the project kickoff. {specialistLabel} will handle it. {learnedHint}Tell me what you want to build, who it is for, and the first deliverable.",
+      "progress_reply_ja": "初期要件を受け取りました。{learnedHint}ここから最初の work plan を固めて返します。",
+      "progress_reply_en": "I captured the kickoff requirements. {learnedHint}I will turn them into the first work plan now.",
+      "template_sections": [
+        "Project Goal",
+        "Audience",
+        "Initial Deliverable",
+        "Bootstrap Work Items",
+        "Next Durable Work"
+      ],
+      "applicability": [
+        "project bootstrap"
+      ],
+      "reusable_steps": [
+        "Capture the project brief, audience, and first deliverable.",
+        "Translate the brief into the first bounded work items.",
+        "Promote durable work candidates for architecture, implementation, and verification."
+      ],
+      "audience": "project lead and leadership",
+      "output_format": "project kickoff brief"
+    },
+    {
+      "id": "analysis-cross-project-remediation",
+      "task_type": "analysis",
+      "analysis_kind": "cross_project_remediation",
+      "distill_target_kind": "knowledge_hint",
+      "label_ja": "横断 remediation",
+      "label_en": "cross-project remediation",
+      "accepted_reply_ja": "横断 remediation 依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}{suggestedRefHint}進めるには {missing} が必要です。",
+      "accepted_reply_en": "I received the cross-project remediation request. {specialistLabel} will handle it. {learnedHint}{suggestedRefHint}I still need {missing}.",
+      "progress_reply_ja": "依頼内容を更新しました。残りは {missing} です。{suggestedRefHint}",
+      "progress_reply_en": "Updated. Remaining requirements: {missing}.{suggestedRefHint}",
+      "template_sections": [
+        "Scope",
+        "Signal",
+        "Gap Analysis",
+        "Propagation Plan"
+      ],
+      "applicability": [
+        "cross project remediation"
+      ],
+      "reusable_steps": [
+        "Review requirements, incidents, and reusable findings.",
+        "Identify propagation gaps across related projects.",
+        "Produce a focused remediation plan."
+      ],
+      "audience": "cross-project maintainers",
+      "output_format": "remediation brief"
+    },
+    {
+      "id": "analysis-incident-informed-review",
+      "task_type": "analysis",
+      "analysis_kind": "incident_informed_review",
+      "distill_target_kind": "knowledge_hint",
+      "label_ja": "incident-aware review",
+      "label_en": "incident-informed review",
+      "accepted_reply_ja": "incident-aware review を受け取りました。{specialistLabel} が担当します。{learnedHint}{suggestedRefHint}進めるには {missing} が必要です。",
+      "accepted_reply_en": "I received the incident-informed review request. {specialistLabel} will handle it. {learnedHint}{suggestedRefHint}I still need {missing}.",
+      "progress_reply_ja": "依頼内容を更新しました。残りは {missing} です。{suggestedRefHint}",
+      "progress_reply_en": "Updated. Remaining requirements: {missing}.{suggestedRefHint}",
+      "template_sections": [
+        "Incident Summary",
+        "Current Scope",
+        "Risk Assessment",
+        "Action Items"
+      ],
+      "applicability": [
+        "incident informed review"
+      ],
+      "reusable_steps": [
+        "Review the current scope against prior incidents.",
+        "Surface known failures and recurring risks.",
+        "Produce a concise review with next actions."
+      ],
+      "audience": "maintainers and operators",
+      "output_format": "review brief"
+    },
+    {
+      "id": "presentation-deck",
+      "task_type": "presentation_deck",
+      "distill_target_kind": "pattern",
+      "label_ja": "PowerPoint 資料作成",
+      "label_en": "presentation deck",
+      "accepted_reply_ja": "PowerPoint 資料作成の依頼を受け取りました。{specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。{learnedHint}{completionHint}",
+      "accepted_reply_en": "I received the presentation deck request. {specialistLabel} will plan it, run it, and report back when it's done. {learnedHint}{completionHint}",
+      "progress_reply_ja": "依頼内容が揃いました。{learnedHint}ここから実行して、終わったら結果を返します。",
+      "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
+      "missing_reply_ja": "PowerPoint 資料作成の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
+      "missing_reply_en": "I received the presentation deck request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
+      "template_sections": [
+        "Story",
+        "Audience",
+        "Decision",
+        "Next Step"
+      ],
+      "applicability": [
+        "presentation delivery"
+      ],
+      "reusable_steps": [
+        "Capture the user goal, audience, and success condition.",
+        "Translate the request into an executive slide storyline.",
+        "Generate the PPTX artifact and verify the result."
+      ],
+      "expected_outcome": "A reusable presentation artifact is delivered.",
+      "audience": "decision makers",
+      "output_format": "pptx"
+    },
+    {
+      "id": "workbook-wbs",
+      "task_type": "workbook_wbs",
+      "distill_target_kind": "pattern",
+      "label_ja": "WBS 作成",
+      "label_en": "work breakdown structure",
+      "accepted_reply_ja": "WBS 作成の依頼を受け取りました。{specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。{learnedHint}{completionHint}",
+      "accepted_reply_en": "I received the work breakdown request. {specialistLabel} will plan it, run it, and report back when it's done. {learnedHint}{completionHint}",
+      "progress_reply_ja": "依頼内容が揃いました。{learnedHint}ここから実行して、終わったら結果を返します。",
+      "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
+      "missing_reply_ja": "WBS 作成の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
+      "missing_reply_en": "I received the work breakdown request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
+      "template_sections": [
+        "Scope",
+        "Work Packages",
+        "Dependencies",
+        "Milestones"
+      ],
+      "applicability": [
+        "work breakdown structure"
+      ],
+      "reusable_steps": [
+        "Resolve the project scope and desired WBS granularity.",
+        "Translate the work into a structured workbook layout.",
+        "Generate the XLSX artifact and confirm it can be reused."
+      ],
+      "expected_outcome": "A reusable workbook artifact is delivered.",
+      "audience": "project team",
+      "output_format": "xlsx"
+    },
+    {
+      "id": "report-document-summary",
+      "task_type": "report_document",
+      "report_kind": "summary",
+      "distill_target_kind": "report_template",
+      "label_ja": "レポート作成",
+      "label_en": "report document",
+      "template_sections": [
+        "Summary",
+        "Findings",
+        "Next Actions"
+      ],
+      "audience": "internal stakeholders",
+      "output_format": "docx"
+    },
+    {
+      "id": "report-document-status",
+      "task_type": "report_document",
+      "report_kind": "status",
+      "distill_target_kind": "report_template",
+      "label_ja": "進捗レポート",
+      "label_en": "status report",
+      "template_sections": [
+        "Summary",
+        "Current Status",
+        "Risks",
+        "Next Actions"
+      ],
+      "audience": "internal stakeholders",
+      "output_format": "docx"
+    },
+    {
+      "id": "report-document-spec",
+      "task_type": "report_document",
+      "report_kind": "spec",
+      "distill_target_kind": "report_template",
+      "label_ja": "仕様書",
+      "label_en": "specification document",
+      "template_sections": [
+        "Overview",
+        "Requirements",
+        "Constraints",
+        "Acceptance Criteria"
+      ],
+      "audience": "internal stakeholders",
+      "output_format": "docx"
+    },
+    {
+      "id": "report-document-proposal",
+      "task_type": "report_document",
+      "report_kind": "proposal",
+      "distill_target_kind": "report_template",
+      "label_ja": "提案書",
+      "label_en": "proposal document",
+      "template_sections": [
+        "Summary",
+        "Context",
+        "Recommendation",
+        "Next Step"
+      ],
+      "audience": "decision makers",
+      "output_format": "docx"
+    },
+    {
+      "id": "report-document-generic",
+      "task_type": "report_document",
+      "distill_target_kind": "report_template",
+      "label_ja": "レポート作成",
+      "label_en": "report document",
+      "accepted_reply_ja": "レポート作成の依頼を受け取りました。{specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。{learnedHint}{completionHint}",
+      "accepted_reply_en": "I received the report document request. {specialistLabel} will plan it, run it, and report back when it's done. {learnedHint}{completionHint}",
+      "progress_reply_ja": "依頼内容が揃いました。{learnedHint}ここから実行して、終わったら結果を返します。",
+      "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
+      "missing_reply_ja": "レポート作成の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
+      "missing_reply_en": "I received the report document request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
+      "template_sections": [
+        "Summary",
+        "Findings",
+        "Implications",
+        "Next Actions"
+      ],
+      "audience": "internal stakeholders",
+      "output_format": "docx"
+    },
+    {
+      "id": "service-operation-logs",
+      "task_type": "service_operation",
+      "operation": "logs",
+      "distill_target_kind": "sop_candidate",
+      "label_ja": "サービス操作",
+      "label_en": "service operation",
+      "accepted_reply_ja": "サービス操作の依頼を受け取りました。{specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。{learnedHint}{completionHint}",
+      "accepted_reply_en": "I received the service operation request. {specialistLabel} will plan it, run it, and report back when it's done. {learnedHint}{completionHint}",
+      "progress_reply_ja": "依頼内容が揃いました。{learnedHint}ここから実行して、終わったら結果を返します。",
+      "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
+      "missing_reply_ja": "サービス操作の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
+      "missing_reply_en": "I received the service operation request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
+      "procedure_steps": [
+        "Resolve the managed surface for {serviceName}.",
+        "Read the latest governed logs.",
+        "Summarize the most relevant operational signal."
+      ],
+      "safety_notes": [
+        "Require explicit approval for start, stop, or restart actions.",
+        "Capture before/after evidence and keep the summary concise."
+      ],
+      "escalation_conditions": [
+        "Managed surface could not be resolved.",
+        "The runtime action failed or timed out.",
+        "The post-action state does not match the requested operation."
+      ]
+    },
+    {
+      "id": "service-operation-status",
+      "task_type": "service_operation",
+      "operation": "status",
+      "distill_target_kind": "sop_candidate",
+      "label_ja": "サービス操作",
+      "label_en": "service operation",
+      "accepted_reply_ja": "サービス操作の依頼を受け取りました。{specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。{learnedHint}{completionHint}",
+      "accepted_reply_en": "I received the service operation request. {specialistLabel} will plan it, run it, and report back when it's done. {learnedHint}{completionHint}",
+      "progress_reply_ja": "依頼内容が揃いました。{learnedHint}ここから実行して、終わったら結果を返します。",
+      "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
+      "missing_reply_ja": "サービス操作の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
+      "missing_reply_en": "I received the service operation request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
+      "procedure_steps": [
+        "Resolve the managed surface for {serviceName}.",
+        "Inspect runtime state and health evidence.",
+        "Summarize the observed service status."
+      ],
+      "safety_notes": [
+        "Require explicit approval for start, stop, or restart actions.",
+        "Capture before/after evidence and keep the summary concise."
+      ],
+      "escalation_conditions": [
+        "Managed surface could not be resolved.",
+        "The runtime action failed or timed out.",
+        "The post-action state does not match the requested operation."
+      ]
+    },
+    {
+      "id": "service-operation-default",
+      "task_type": "service_operation",
+      "distill_target_kind": "sop_candidate",
+      "label_ja": "サービス操作",
+      "label_en": "service operation",
+      "accepted_reply_ja": "サービス操作の依頼を受け取りました。{specialistLabel} を中心に進め方を固めて実行し、完了したら結果を返します。{learnedHint}{completionHint}",
+      "accepted_reply_en": "I received the service operation request. {specialistLabel} will plan it, run it, and report back when it's done. {learnedHint}{completionHint}",
+      "progress_reply_ja": "依頼内容が揃いました。{learnedHint}ここから実行して、終わったら結果を返します。",
+      "progress_reply_en": "I have enough to proceed now. {learnedHint}I'll report back with the result.",
+      "missing_reply_ja": "サービス操作の依頼を受け取りました。{specialistLabel} が担当します。{learnedHint}進めるには {missing} が必要です。わかったらそのまま教えてください。",
+      "missing_reply_en": "I received the service operation request. {specialistLabel} will handle it. {learnedHint}I still need {missing}. Tell me when you're ready.",
+      "procedure_steps": [
+        "Resolve the managed surface for {serviceName}.",
+        "Request the controlled {operation} action.",
+        "Confirm the post-action state and report the outcome."
+      ],
+      "safety_notes": [
+        "Require explicit approval for start, stop, or restart actions.",
+        "Capture before/after evidence and keep the summary concise."
+      ],
+      "escalation_conditions": [
+        "Managed surface could not be resolved.",
+        "The runtime action failed or timed out.",
+        "The post-action state does not match the requested operation."
+      ]
+    }
+  ]
+}

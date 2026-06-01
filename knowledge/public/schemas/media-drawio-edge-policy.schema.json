@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "required": ["version", "edge_labels", "routing_rules"],
+  "properties": {
+    "version": { "type": "string" },
+    "edge_labels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "style_parts"],
+        "properties": {
+          "label": { "type": "string" },
+          "style_parts": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "routing_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule"],
+        "properties": {
+          "rule": { "type": "string", "enum": ["security_to_web", "horizontal"] },
+          "source_tiers": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "target_tiers": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

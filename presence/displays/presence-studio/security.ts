@@ -72,6 +72,11 @@ export function checkPresenceStudioRateLimit(
   req: Pick<Request, 'method' | 'socket'>,
   options?: { limit?: number; windowMs?: number },
 ): { ok: boolean; status: number; reason: string; retryAfterSeconds?: number } {
+  const clientAddress = getPresenceStudioClientAddress(req);
+  if (isLoopbackAddress(clientAddress)) {
+    return { ok: true, status: 200, reason: 'allowed' };
+  }
+
   const windowMs = options?.windowMs ?? Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS || RATE_LIMIT_DEFAULT_WINDOW_MS);
   const method = String(req.method || 'UNKNOWN').toUpperCase();
   const limit = options?.limit ?? (

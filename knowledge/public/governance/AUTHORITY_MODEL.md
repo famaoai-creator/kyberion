@@ -59,5 +59,27 @@ Authority role definitions live canonically under `knowledge/public/governance/a
 - `mission_controller sudo <MISSION_ID> ON`
 - この操作は `system-ledger` に永久に記録され、監査の対象となります。
 
+## 5. 起動時の環境変数マージと注意点 (v2.4 追加)
+
+サーフェス（特に `voice-hub` などのバックグラウンドゲートウェイやサービス）を起動する際、プロセスに対して適切な `KYBERION_PERSONA` と `MISSION_ROLE` の環境変数が渡されている必要があります。
+
+これらの環境変数は、Secure-I/O ガード（`tier-guard.ts`）において `resolveIdentityContext()` を通じて解釈され、各操作の権限がチェックされます。
+
+### 🚨 重要な注意点とトラブルシューティング
+* **症状**: 音声インジェスト（あるいは他のAPI）を叩いた際に、`500 Internal Server Error` となり、ログに以下のような Secure-I/O のポリシー違反が出力される。
+  ```
+  Error: [POLICY_VIOLATION] Persona 'unknown' with authority role 'voice_hub' is NOT authorized to write to 'presence/bridge/runtime/stimuli.jsonl'.
+  ```
+* **原因**: 起動プロセスに対して `KYBERION_PERSONA`（および `MISSION_ROLE`）が正しくマージされなかったため、ペルソナが `unknown` になり、書き込み権限が拒否されました。
+* **解決策**: 
+  1. `surface_runtime` を介してサービスを起動する場合、マニフェストファイル（`knowledge/public/governance/active-surfaces.json`）および**個々の JSON 定義ファイル**（`knowledge/public/governance/surfaces/<surface-id>.json`）の両方に `"env"` プロパティが定義されている必要があります。
+     ```json
+     "env": {
+       "KYBERION_PERSONA": "sovereign",
+       "MISSION_ROLE": "surface_runtime"
+     }
+     ```
+  2. 設定を書き換えた後は、古いプロセスがポート（`3031`, `3032` など）を掴んだまま残っている（ゾンビ化している）可能性があるため、必ず `lsof -i :<port>` を使って PID を特定し、`kill -9` でクリーンアップしてから、`surface_runtime` スクリプトで起動し直してください。
+
 ---
-*Status: Updated for v2.3 Persona / Authority Role separation (2026-03-22)*
+*Status: Updated for v2.4 Surface Startup & Env Merge Guidelines (2026-05-31)*
