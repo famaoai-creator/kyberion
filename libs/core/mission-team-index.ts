@@ -1,15 +1,68 @@
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
+import type { OrganizationProfile } from './organization-profile.js';
 import type { AuthorityRoleRecord, AgentProfileRecord, TeamRoleRecord } from './team-role-assignment-selection.js';
 
 interface MissionTeamTemplate {
   required_roles: string[];
   optional_roles: string[];
+  lifecycle?: {
+    max_parallel_members: number;
+    max_members: number;
+    max_messages_per_run: number;
+    max_wall_clock_minutes: number;
+    max_member_turns: number;
+    shutdown_policy: 'graceful_handoff' | 'manual' | 'auto_shutdown';
+    resume_policy: 'checkpoint_resume' | 'manual_resume';
+    cooldown_minutes: number;
+  };
+}
+
+interface OrganizationMissionTeamTemplateCatalog {
+  version: string;
+  organization_id?: string;
+  templates: Record<string, Partial<MissionTeamTemplate>>;
+}
+
+export interface OrganizationMissionTeamTemplateCatalogSummary {
+  organization_id: string;
+  catalog_id: string;
+  template_ids: string[];
+  template_count: number;
+  optional_role_count: number;
+  required_role_count: number;
+}
+
+export interface OrganizationMissionTeamTemplateCatalogSelectionSummary extends OrganizationMissionTeamTemplateCatalogSummary {
+  selected: boolean;
+}
+
+export function resolveOrganizationMissionTeamTemplateCatalogId(
+  organizationProfile?: OrganizationProfile | null,
+): string | null {
+  const catalogId = organizationProfile?.team_defaults?.team_template_catalog_id?.trim();
+  return catalogId || null;
 }
 
 function loadJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+}
+
+function mergeMissionTeamTemplate(
+  base: MissionTeamTemplate,
+  overlay: Partial<MissionTeamTemplate>,
+): MissionTeamTemplate {
+  return {
+    ...base,
+    ...overlay,
+    required_roles: overlay.required_roles ? [...overlay.required_roles] : [...base.required_roles],
+    optional_roles: overlay.optional_roles ? [...overlay.optional_roles] : [...base.optional_roles],
+    lifecycle: {
+      ...(base.lifecycle || ({} as NonNullable<MissionTeamTemplate['lifecycle']>)),
+      ...(overlay.lifecycle || {}),
+    },
+  };
 }
 
 export function loadAgentProfileDirectory(rootDir?: string): Record<string, AgentProfileRecord> | null {
@@ -119,9 +172,63 @@ export function loadAgentProfileIndex(rootDir?: string): Record<string, AgentPro
   return loadAgentProfileSnapshot(rootDir);
 }
 
-export function loadMissionTeamTemplates(): Record<string, MissionTeamTemplate> {
+export function loadMissionTeamTemplates(
+  organizationProfile?: OrganizationProfile | null,
+): Record<string, MissionTeamTemplate> {
   const index = loadJson<{ templates: Record<string, MissionTeamTemplate> }>(
     pathResolver.knowledge('public/orchestration/mission-team-templates.json'),
   );
-  return index.templates;
+  const templates = { ...index.templates };
+  const catalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile);
+  if (!catalogId) return templates;
+
+  const catalogPath = pathResolver.knowledge(`public/governance/organization-team-template-catalogs/${catalogId}.json`);
+  if (!safeExistsSync(catalogPath)) return templates;
+
+  const catalog = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
+  for (const [templateId, overlay] of Object.entries(catalog.templates || {})) {
+    const base = templates[templateId] || templates.default;
+    if (!base) continue;
+    templates[templateId] = mergeMissionTeamTemplate(base, overlay);
+  }
+  return templates;
+}
+
+export function listOrganizationMissionTeamTemplateCatalogSummaries(): OrganizationMissionTeamTemplateCatalogSummary[] {
+  const catalogDir = pathResolver.knowledge('public/governance/organization-team-template-catalogs');
+  if (!safeExistsSync(catalogDir)) return [];
+
+  return safeReaddir(catalogDir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((file) => {
+      const catalogPath = pathResolver.knowledge(`public/governance/organization-team-template-catalogs/${file}`);
+      const payload = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
+      const templateEntries = Object.entries(payload.templates || {});
+      const templateIds = templateEntries.map(([templateId]) => templateId).sort();
+      let optionalRoleCount = 0;
+      let requiredRoleCount = 0;
+      for (const [, template] of templateEntries) {
+        optionalRoleCount += template.optional_roles?.length || 0;
+        requiredRoleCount += template.required_roles?.length || 0;
+      }
+      return {
+        organization_id: (payload.organization_id || file.replace(/\.json$/i, '')).trim(),
+        catalog_id: file.replace(/\.json$/i, ''),
+        template_ids: templateIds,
+        template_count: templateEntries.length,
+        optional_role_count: optionalRoleCount,
+        required_role_count: requiredRoleCount,
+      };
+    });
+}
+
+export function listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(
+  organizationProfile?: OrganizationProfile | null,
+): OrganizationMissionTeamTemplateCatalogSelectionSummary[] {
+  const selectedCatalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile);
+  return listOrganizationMissionTeamTemplateCatalogSummaries().map((catalog) => ({
+    ...catalog,
+    selected: Boolean(selectedCatalogId && catalog.catalog_id === selectedCatalogId),
+  }));
 }

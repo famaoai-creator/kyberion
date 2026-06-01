@@ -31,6 +31,14 @@
             "type": "apply",
             "op": "system:log",
             "params": { "message": "[clone-my-voice] sox が見つかりません。brew install sox を実行してください。" }
+          },
+          {
+            "id": "halt_missing_sox",
+            "type": "apply",
+            "op": "system:shell",
+            "params": {
+              "cmd": "exit 1"
+            }
           }
         ]
       }

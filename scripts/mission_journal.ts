@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { logger, pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
+import { logger, pathResolver, resolveMissionJournalPolicy, safeExistsSync, safeReaddir } from '@agent/core';
 import chalk from 'chalk';
 import { readJsonFile } from './refactor/cli-input.js';
 
@@ -54,12 +54,13 @@ function scanMissions() {
 }
 
 function renderJournal() {
-  console.log(chalk.bold.cyan('\n📜 [KYBERION] Mission Journal: Ecosystem Evolution\n'));
+  const policy = resolveMissionJournalPolicy();
+  console.log(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
   
   const missions = scanMissions();
   
   if (missions.length === 0) {
-    console.log('No missions recorded yet.');
+    console.log(policy.empty_message);
     return;
   }
 
@@ -72,10 +73,10 @@ function renderJournal() {
     // Relationships
     if (m.relationships) {
       if (m.relationships.prerequisites?.length) {
-        console.log(`   ${chalk.blue('← Prerequisites:')} ${m.relationships.prerequisites.join(', ')}`);
+        console.log(`   ${chalk.blue(`← ${policy.relationship_labels.prerequisites}:`)} ${m.relationships.prerequisites.join(', ')}`);
       }
       if (m.relationships.successors?.length) {
-        console.log(`   ${chalk.magenta('→ Successors:')} ${m.relationships.successors.join(', ')}`);
+        console.log(`   ${chalk.magenta(`→ ${policy.relationship_labels.successors}:`)} ${m.relationships.successors.join(', ')}`);
       }
     }
 
@@ -94,7 +95,7 @@ function renderJournal() {
     return acc;
   }, {} as any);
 
-  console.log(chalk.bold('📈 Summary:'));
+  console.log(chalk.bold(`📈 ${policy.summary_title}:`));
   Object.keys(stats).forEach(s => {
     console.log(`  - ${s.toUpperCase()}: ${stats[s]}`);
   });
@@ -105,7 +106,7 @@ function renderJournal() {
   if (safeExistsSync(ledgerPath)) {
     const raw = readJsonFile<any>(ledgerPath);
     const ledger = raw?.agents ?? raw ?? {};
-    console.log(chalk.bold('🤝 Agent Trust Scores:'));
+    console.log(chalk.bold(`🤝 ${policy.trust_scores_title}:`));
     Object.keys(ledger).forEach(a => {
       const score = ledger[a].current_score;
       const normalized = score / 100;

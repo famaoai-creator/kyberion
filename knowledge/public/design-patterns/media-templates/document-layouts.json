@@ -22,6 +22,15 @@
             "recipient": "請求先",
             "issuer": "発行者",
             "amount_due": "御請求金額（税込）",
+            "section_header": "請求書",
+            "section_issuer": "請求元",
+            "section_recipient": "請求先",
+            "section_items": "明細",
+            "section_tax_summary": "税率別集計",
+            "section_totals": "合計",
+            "section_payment": "お支払い情報",
+            "section_notes": "備考",
+            "section_compliance": "【適格請求書の記載事項】",
             "table_description": "内容",
             "table_quantity": "数量",
             "table_unit_price": "単価（税抜）",
@@ -66,7 +75,16 @@
             "tax_summary": { "x": 48, "width": 240, "height": 82 },
             "payment": { "x": 312, "width": 235, "height": 120 },
             "notes": { "height": 110, "body_font_size": 9, "body_max_units": 48, "body_line_height": 14 }
-          }
+          },
+          "body_sections": ["header", "issuer", "recipient", "items", "tax_summary", "totals", "payment", "notes", "compliance"],
+          "compliance_bullets": [
+            "・発行事業者名および登録番号",
+            "・取引年月日",
+            "・取引内容（軽減税率対象である旨を含む）",
+            "・税率ごとに区分した対価の額および適用税率",
+            "・税率ごとに区分した消費税額等",
+            "・書類の交付を受ける事業者の氏名又は名称"
+          ]
         },
         "jp-qualified-invoice-compact": {
           "document_profile": "qualified-invoice",
@@ -87,6 +105,15 @@
             "recipient": "請求先",
             "issuer": "発行者",
             "amount_due": "今回ご請求額（税込）",
+            "section_header": "請求書",
+            "section_issuer": "請求元",
+            "section_recipient": "請求先",
+            "section_items": "明細",
+            "section_tax_summary": "税区分集計",
+            "section_totals": "合計",
+            "section_payment": "振込先",
+            "section_notes": "備考",
+            "section_compliance": "【適格請求書の主な記載事項】",
             "table_description": "摘要",
             "table_quantity": "数量",
             "table_unit_price": "単価",
@@ -131,7 +158,16 @@
             "tax_summary": { "x": 48, "width": 240, "height": 78 },
             "payment": { "x": 312, "width": 235, "height": 112 },
             "notes": { "height": 104, "body_font_size": 8, "body_max_units": 50, "body_line_height": 13 }
-          }
+          },
+          "body_sections": ["header", "issuer", "recipient", "items", "tax_summary", "totals", "payment", "notes", "compliance"],
+          "compliance_bullets": [
+            "・発行事業者名および登録番号",
+            "・取引年月日",
+            "・取引内容（軽減税率対象である旨を含む）",
+            "・税率ごとに区分した対価の額および適用税率",
+            "・税率ごとに区分した消費税額等",
+            "・書類の交付を受ける事業者の氏名又は名称"
+          ]
         }
       }
     },
@@ -233,7 +269,16 @@
               "zebra_fill": "#f8fafc",
               "show_zebra": true
             }
-          }
+          },
+          "body_sections": [
+            "title",
+            "summary",
+            "contents",
+            "section",
+            "callout",
+            "bullet",
+            "table"
+          ]
         }
       }
     },

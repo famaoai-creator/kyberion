@@ -1,0 +1,17 @@
+{
+  "$id": "https://kyberion.local/schemas/promoted-report-template-policy.schema.json",
+  "title": "Promoted Report Template Policy",
+  "type": "object",
+  "required": ["version", "template_sections", "audience", "output_format"],
+  "properties": {
+    "version": { "type": "string" },
+    "template_sections": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "audience": { "type": "string", "minLength": 1 },
+    "output_format": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

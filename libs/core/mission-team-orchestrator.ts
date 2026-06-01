@@ -1,7 +1,11 @@
 import { ensureAgentRuntime } from './agent-runtime-supervisor.js';
 import { ensureAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
 import { agentRegistry } from './agent-registry.js';
-import { loadMissionTeamPlan, type MissionTeamAssignment } from './mission-team-plan-composer.js';
+import {
+  loadMissionTeamPlan,
+  type MissionTeamAssignment,
+  type MissionTeamOrganizationProfileSummary,
+} from './mission-team-plan-composer.js';
 
 export interface MissionTeamRuntimeAssignment extends MissionTeamAssignment {
   runtime_status: 'spawned' | 'already_ready' | 'unfilled' | 'failed';
@@ -10,6 +14,7 @@ export interface MissionTeamRuntimeAssignment extends MissionTeamAssignment {
 
 export interface MissionTeamRuntimePlan {
   mission_id: string;
+  organization_profile?: MissionTeamOrganizationProfileSummary;
   assignments: MissionTeamRuntimeAssignment[];
 }
 
@@ -108,6 +113,7 @@ export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeam
 
   return {
     mission_id: plan.mission_id,
+    organization_profile: plan.organization_profile,
     assignments,
   };
 }

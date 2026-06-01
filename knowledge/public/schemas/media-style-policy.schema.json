@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "required": ["version", "signal_tone_ranks", "border_key_sides"],
+  "properties": {
+    "version": { "type": "string" },
+    "signal_tone_ranks": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "border_key_sides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key_char", "side"],
+        "properties": {
+          "key_char": { "type": "string", "enum": ["T", "B", "L", "R"] },
+          "side": { "type": "string", "enum": ["top", "bottom", "left", "right"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "title": "Kyberion Onboarding Summary",
+  "sections": {
+    "identity": "Identity",
+    "services": "Services",
+    "tenants": "Tenants",
+    "tutorial": "Tutorial",
+    "next_steps": "Next Steps"
+  },
+  "empty_states": {
+    "services": "None captured yet",
+    "tenants": "None registered yet"
+  }
+}

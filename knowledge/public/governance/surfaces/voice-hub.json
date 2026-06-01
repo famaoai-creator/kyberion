@@ -9,6 +9,10 @@
       "args": [
         "dist/satellites/voice-hub/server.js"
       ],
+      "env": {
+        "KYBERION_PERSONA": "sovereign",
+        "MISSION_ROLE": "surface_runtime"
+      },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",

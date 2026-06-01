@@ -100,18 +100,22 @@ export function getSurfaceProviderManifestRecord(surface: SurfaceAsyncChannel): 
   return loadSurfaceProviderManifestFile().providers[surface];
 }
 
-export function deriveSlackIntentLabelFromProviderPolicy(text: string): string {
+export function deriveSurfaceIntentLabelFromProviderPolicy(surface: SurfaceAsyncChannel, text: string): string {
   const normalized = text.trim();
-  const slack = getSurfaceProviderManifestRecord('slack');
-  if (!normalized) return slack.intent_rules?.default_label || 'general_request';
-  const matchedRule = (slack.intent_rules?.rules || []).find((rule) => matchesAnyTextRule(normalized, rule.patterns));
-  return matchedRule?.label || slack.intent_rules?.default_label || 'request_deeper_reasoning';
+  const manifest = getSurfaceProviderManifestRecord(surface);
+  if (!normalized) return manifest.intent_rules?.default_label || 'general_request';
+  const matchedRule = (manifest.intent_rules?.rules || []).find((rule) => matchesAnyTextRule(normalized, rule.patterns));
+  return matchedRule?.label || manifest.intent_rules?.default_label || 'request_deeper_reasoning';
 }
 
-export function deriveSlackExecutionModeFromProviderPolicy(text: string): 'conversation' | 'task' {
+export function deriveSlackIntentLabelFromProviderPolicy(text: string): string {
+  return deriveSurfaceIntentLabelFromProviderPolicy('slack', text);
+}
+
+export function deriveSurfaceExecutionModeFromProviderPolicy(surface: SurfaceAsyncChannel, text: string): 'conversation' | 'task' {
   const normalized = text.trim();
   if (!normalized) return 'conversation';
-  const rules = getSurfaceProviderManifestRecord('slack').surface_rules;
+  const rules = getSurfaceProviderManifestRecord(surface).surface_rules;
   if (matchesAnyTextRule(normalized, rules?.execution_mode?.feasibility_patterns)) {
     return 'conversation';
   }
@@ -124,11 +128,19 @@ export function deriveSlackExecutionModeFromProviderPolicy(text: string): 'conve
     : 'conversation';
 }
 
-export function shouldForceSlackDelegationFromProviderPolicy(text: string): boolean {
+export function deriveSlackExecutionModeFromProviderPolicy(text: string): 'conversation' | 'task' {
+  return deriveSurfaceExecutionModeFromProviderPolicy('slack', text);
+}
+
+export function shouldForceSurfaceDelegationFromProviderPolicy(surface: SurfaceAsyncChannel, text: string): boolean {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return false;
-  const rules = getSurfaceProviderManifestRecord('slack').surface_rules;
+  const rules = getSurfaceProviderManifestRecord(surface).surface_rules;
   return !matchesAnyTextRule(normalized, rules?.delegation?.lightweight_patterns);
+}
+
+export function shouldForceSlackDelegationFromProviderPolicy(text: string): boolean {
+  return shouldForceSurfaceDelegationFromProviderPolicy('slack', text);
 }
 
 export function deriveSurfaceDelegationReceiverForProvider(

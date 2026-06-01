@@ -168,6 +168,33 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'organization-profile',
+    schemaPath: 'knowledge/public/schemas/organization-profile.schema.json',
+    dataPath: 'knowledge/public/governance/organization-profile.json',
+    invalidPayload: {
+      version: '1.0.0',
+      organization_id: 'default',
+    },
+  },
+  {
+    name: 'organization-team-template-catalog',
+    schemaPath: 'knowledge/public/schemas/organization-team-template-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/organization-team-template-catalogs/demo-org.json',
+    invalidPayload: {
+      version: '1.0.0',
+      organization_id: 'demo-org',
+    },
+  },
+  {
+    name: 'organization-team-template-catalog-ops',
+    schemaPath: 'knowledge/public/schemas/organization-team-template-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/organization-team-template-catalogs/ops-org.json',
+    invalidPayload: {
+      version: '1.0.0',
+      organization_id: 'ops-org',
+    },
+  },
+  {
     name: 'mission-workflow-catalog',
     schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
     dataPath: 'knowledge/public/governance/mission-workflow-catalog.json',
@@ -270,10 +297,352 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
-    name: 'specialist-catalog',
-    schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
-    dataPath: 'knowledge/public/orchestration/specialist-catalog.json',
+    name: 'service-bootstrap-catalog',
+    schemaPath: 'knowledge/public/schemas/service-bootstrap-catalog.schema.json',
+    dataPath: 'knowledge/public/governance/service-bootstrap-catalog.json',
     invalidPayload: {
+      version: '1.0.0',
+      entries: [
+        {
+          id: 'broken',
+          service_id: 'slack',
+        },
+      ],
+    },
+  },
+    {
+      name: 'service-onboarding-catalog',
+      schemaPath: 'knowledge/public/schemas/service-onboarding-catalog.schema.json',
+      dataPath: 'knowledge/public/governance/service-onboarding-catalog.json',
+      invalidPayload: {
+        version: '1.0.0',
+        services: [{ service_id: 'comfyui' }],
+      },
+    },
+    {
+      name: 'work-coordination-import-catalog',
+      schemaPath: 'knowledge/public/schemas/work-coordination-import-catalog.schema.json',
+      dataPath: 'knowledge/public/governance/work-coordination-import-catalog.json',
+      invalidPayload: {
+        version: '1.0.0',
+        imports: [{ id: 'broken', command: 'import-github-issue-file' }],
+      },
+    },
+    {
+      name: 'service-authority-map',
+      schemaPath: 'knowledge/public/schemas/service-authority-map.schema.json',
+      dataPath: 'knowledge/public/governance/service-authority-map.json',
+      invalidPayload: {
+        version: '1.0.0',
+        services: [{ id: 'broken', service_id: 'github' }],
+      },
+    },
+    {
+      name: 'actuator-dependency-bundles',
+      schemaPath: 'knowledge/public/schemas/actuator-dependency-bundles.schema.json',
+      dataPath: 'knowledge/public/governance/actuator-dependency-bundles.json',
+      invalidPayload: {
+        version: '1.0.0',
+        bundles: [{ id: 'broken', actuator: 'voice' }],
+      },
+    },
+    {
+      name: 'skill-install-package-map',
+      schemaPath: 'knowledge/public/schemas/skill-install-package-map.schema.json',
+      dataPath: 'knowledge/public/governance/skill-install-package-map.json',
+      invalidPayload: {
+        version: '1.0.0',
+        entries: [{ id: 'broken', patterns: ['whisper'] }],
+      },
+    },
+    {
+      name: 'surface-coordination-role-map',
+      schemaPath: 'knowledge/public/schemas/surface-coordination-role-map.schema.json',
+      dataPath: 'knowledge/public/governance/surface-coordination-role-map.json',
+      invalidPayload: {
+        version: '1.0.0',
+        entries: [{ surface: 'slack' }],
+      },
+    },
+    {
+      name: 'voice-task-profile-catalog',
+      schemaPath: 'knowledge/public/schemas/voice-task-profile-catalog.schema.json',
+      dataPath: 'knowledge/public/governance/voice-task-profile-catalog.json',
+      invalidPayload: {
+        version: '1.0.0',
+        profiles: [{ id: 'broken', task_type: 'presentation_deck' }],
+      },
+    },
+    {
+      name: 'media-tone-style-map',
+      schemaPath: 'knowledge/public/schemas/media-tone-style-map.schema.json',
+      dataPath: 'knowledge/public/governance/media-tone-style-map.json',
+      invalidPayload: {
+        version: '1.0.0',
+        tones: [{ tone: 'success' }],
+      },
+    },
+    {
+      name: 'media-drawio-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-drawio-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        boundary_palettes: [{ boundary: 'account', fill: '#fff' }],
+      },
+    },
+    {
+      name: 'media-drawio-boundary-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-boundary-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-drawio-boundary-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        palette_overrides: [{ boundary: 'lane', tier: 'web', fill: '#fff' }],
+      },
+    },
+    {
+      name: 'media-drawio-tier-order',
+      schemaPath: 'knowledge/public/schemas/media-drawio-tier-order.schema.json',
+      dataPath: 'knowledge/public/governance/media-drawio-tier-order.json',
+      invalidPayload: {
+        version: '1.0.0',
+        tier_order: [],
+      },
+    },
+    {
+      name: 'media-drawio-sort-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-sort-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-drawio-sort-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        group_order: [],
+        type_order: ['aws_provider'],
+      },
+    },
+    {
+      name: 'media-drawio-security-group-order',
+      schemaPath: 'knowledge/public/schemas/media-drawio-security-group-order.schema.json',
+      dataPath: 'knowledge/public/governance/media-drawio-security-group-order.json',
+      invalidPayload: {
+        version: '1.0.0',
+        relation_prefix: '',
+      },
+    },
+    {
+      name: 'document-inference-policy',
+      schemaPath: 'knowledge/public/schemas/document-inference-policy.schema.json',
+      dataPath: 'knowledge/public/governance/document-inference-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        type_rules: [{ document_type: 'report' }],
+        profile_rules: [{ document_type: 'report', profile_ids: ['summary-report'] }],
+      },
+    },
+    {
+      name: 'document-contents-policy',
+      schemaPath: 'knowledge/public/schemas/document-contents-policy.schema.json',
+      dataPath: 'knowledge/public/governance/document-contents-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title_by_locale: { ja: '目次' },
+      },
+    },
+    {
+      name: 'document-outline-label-policy',
+      schemaPath: 'knowledge/public/schemas/document-outline-label-policy.schema.json',
+      dataPath: 'knowledge/public/governance/document-outline-label-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        report_summary_title: 'Summary',
+      },
+    },
+    {
+      name: 'promoted-report-template-policy',
+      schemaPath: 'knowledge/public/schemas/promoted-report-template-policy.schema.json',
+      dataPath: 'knowledge/public/governance/promoted-report-template-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        template_sections: [],
+      },
+    },
+    {
+      name: 'onboarding-summary-policy',
+      schemaPath: 'knowledge/public/schemas/onboarding-summary-policy.schema.json',
+      dataPath: 'knowledge/public/governance/onboarding-summary-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title: 'Kyberion Onboarding Summary',
+      },
+    },
+    {
+      name: 'onboarding-flow-policy',
+      schemaPath: 'knowledge/public/schemas/onboarding-flow-policy.schema.json',
+      dataPath: 'knowledge/public/governance/onboarding-flow-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        phase_titles: {
+          identity: 'Identity & Purpose',
+        },
+      },
+    },
+    {
+      name: 'mission-distill-markdown-policy',
+      schemaPath: 'knowledge/public/schemas/mission-distill-markdown-policy.schema.json',
+      dataPath: 'knowledge/public/governance/mission-distill-markdown-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title_suffix: 'Completion Summary',
+      },
+    },
+    {
+      name: 'mission-ledger-policy',
+      schemaPath: 'knowledge/public/schemas/mission-ledger-policy.schema.json',
+      dataPath: 'knowledge/public/governance/mission-ledger-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        section_title: 'Mission Ledger',
+      },
+    },
+    {
+      name: 'provider-cli-capability-report-policy',
+      schemaPath: 'knowledge/public/schemas/provider-cli-capability-report-policy.schema.json',
+      dataPath: 'knowledge/public/governance/provider-cli-capability-report-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title: 'Provider CLI Capability Report',
+      },
+    },
+    {
+      name: 'mission-journal-policy',
+      schemaPath: 'knowledge/public/schemas/mission-journal-policy.schema.json',
+      dataPath: 'knowledge/public/governance/mission-journal-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title: 'Mission Journal: Ecosystem Evolution',
+      },
+    },
+    {
+      name: 'pilot-strategy-policy',
+      schemaPath: 'knowledge/public/schemas/pilot-strategy-policy.schema.json',
+      dataPath: 'knowledge/public/governance/pilot-strategy-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title: 'Kyberion AI Consulting: Go-to-Market Strategy',
+      },
+    },
+    {
+      name: 'production-evidence-summary-policy',
+      schemaPath: 'knowledge/public/schemas/production-evidence-summary-policy.schema.json',
+      dataPath: 'knowledge/public/governance/production-evidence-summary-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        title_prefix: 'production evidence',
+      },
+    },
+    {
+      name: 'changelog-policy',
+      schemaPath: 'knowledge/public/schemas/changelog-policy.schema.json',
+      dataPath: 'knowledge/public/governance/changelog-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        breaking_changes_title: '⚠ BREAKING CHANGES',
+      },
+    },
+    {
+      name: 'spreadsheet-style-policy',
+      schemaPath: 'knowledge/public/schemas/spreadsheet-style-policy.schema.json',
+      dataPath: 'knowledge/public/governance/spreadsheet-style-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        role_indices: {},
+      },
+    },
+    {
+      name: 'legacy-media-ops',
+      schemaPath: 'knowledge/public/schemas/legacy-media-ops.schema.json',
+      dataPath: 'knowledge/public/governance/legacy-media-ops.json',
+      invalidPayload: {
+        version: '1.0.0',
+        ops: [],
+      },
+    },
+    {
+      name: 'media-drawio-edge-policy',
+      schemaPath: 'knowledge/public/schemas/media-drawio-edge-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-drawio-edge-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        edge_labels: [{ label: 'uses' }],
+      },
+    },
+    {
+      name: 'media-aws-icon-rules',
+      schemaPath: 'knowledge/public/schemas/media-aws-icon-rules.schema.json',
+      dataPath: 'knowledge/public/governance/media-aws-icon-rules.json',
+      invalidPayload: {
+        version: '1.0.0',
+        rules: [{ match_type: 'contains', match_value: 'cloudwatch' }],
+      },
+    },
+    {
+      name: 'media-semantic-map',
+      schemaPath: 'knowledge/public/schemas/media-semantic-map.schema.json',
+      dataPath: 'knowledge/public/governance/media-semantic-map.json',
+      invalidPayload: {
+        version: '1.0.0',
+        rules: [{ semantic_type: 'hero' }],
+      },
+    },
+    {
+      name: 'media-style-policy',
+      schemaPath: 'knowledge/public/schemas/media-style-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-style-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        signal_tone_ranks: { danger: 0 },
+      },
+    },
+    {
+      name: 'media-signal-entry-policy',
+      schemaPath: 'knowledge/public/schemas/media-signal-entry-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-signal-entry-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        entry_types: [{ source_key: 'signals', signal_type: 'signal' }],
+      },
+    },
+    {
+      name: 'tracker-sheet-policy',
+      schemaPath: 'knowledge/public/schemas/tracker-sheet-policy.schema.json',
+      dataPath: 'knowledge/public/governance/tracker-sheet-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        sheet_titles: { overview: 'Overview' },
+      },
+    },
+    {
+      name: 'media-theme-role-policy',
+      schemaPath: 'knowledge/public/schemas/media-theme-role-policy.schema.json',
+      dataPath: 'knowledge/public/governance/media-theme-role-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        theme_color_roles: { accent: 'accent' },
+      },
+    },
+    {
+      name: 'reasoning-backend-policy',
+      schemaPath: 'knowledge/public/schemas/reasoning-backend-policy.schema.json',
+      dataPath: 'knowledge/public/governance/reasoning-backend-policy.json',
+      invalidPayload: {
+        version: '1.0.0',
+        allowed_modes: [],
+      },
+    },
+    {
+      name: 'specialist-catalog',
+      schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
+      dataPath: 'knowledge/public/orchestration/specialist-catalog.json',
+      invalidPayload: {
       version: '1.0.0',
       specialists: {
         broken: {},

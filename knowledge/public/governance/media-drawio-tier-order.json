@@ -1,0 +1,4 @@
+{
+  "version": "1.0.0",
+  "tier_order": ["network", "edge", "web", "application", "app", "data", "database", "security", "module", "control", "state"]
+}

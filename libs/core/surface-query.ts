@@ -15,11 +15,18 @@ export interface SurfaceQueryProviderConfig {
   weather?: {
     enabled?: boolean;
     provider?: string;
+    geocodingUrl?: string;
+    forecastUrl?: string;
     timeoutMs?: number;
   };
   location?: {
     enabled?: boolean;
     provider?: string;
+    providers?: Array<{
+      id?: string;
+      provider?: string;
+      url?: string;
+    }>;
   };
   knowledge?: {
     enabled?: boolean;

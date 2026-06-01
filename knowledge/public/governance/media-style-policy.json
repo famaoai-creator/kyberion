@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "signal_tone_ranks": {
+    "danger": 0,
+    "critical": 0,
+    "high": 0,
+    "warning": 1,
+    "medium": 1,
+    "info": 2,
+    "success": 3,
+    "low": 3
+  },
+  "border_key_sides": [
+    { "key_char": "T", "side": "top" },
+    { "key_char": "B", "side": "bottom" },
+    { "key_char": "L", "side": "left" },
+    { "key_char": "R", "side": "right" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "theme_color_roles": {
+    "accent": "accent",
+    "secondary": "secondary",
+    "primary": "primary",
+    "default": "secondary"
+  },
+  "theme_hex_roles": {
+    "accent": "accent",
+    "primary": "primary",
+    "secondary": "secondary",
+    "background": "background",
+    "success": "success",
+    "warning": "warning",
+    "danger": "danger"
+  }
+}

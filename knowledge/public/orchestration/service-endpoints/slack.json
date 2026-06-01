@@ -4,6 +4,7 @@
     "slack": {
       "base_url": "https://slack.com/api",
       "preset_path": "knowledge/public/orchestration/service-presets/slack.json",
+      "allow_stream_ingress": false,
       "credential_suffixes": {
         "accessToken": [
           "ACCESS_TOKEN",

@@ -2,7 +2,7 @@ import { classifyTaskSessionIntent } from './task-session.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
   resolveSurfaceConversationReceiverForProvider,
-  shouldForceSlackDelegationFromProviderPolicy,
+  shouldForceSurfaceDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
@@ -121,7 +121,7 @@ export function shouldCompileSurfaceIntent(
   if (input.forcedReceiver || ruleBasedReceiver) return false;
   const normalized = routingText.trim();
   if (!normalized) return false;
-  if (input.agentId === 'slack-surface-agent' && !shouldForceSlackDelegationFromProviderPolicy(normalized)) {
+  if (input.agentId === 'slack-surface-agent' && !shouldForceSurfaceDelegationFromProviderPolicy('slack', normalized)) {
     return false;
   }
   if (classifyTaskSessionIntent(normalized)) return true;

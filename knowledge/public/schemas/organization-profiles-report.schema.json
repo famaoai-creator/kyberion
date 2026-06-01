@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-profiles-report.schema.json",
+  "title": "Organization Profiles Report",
+  "type": "object",
+  "required": ["requested", "resolved", "selected_organization_id", "profiles"],
+  "properties": {
+    "requested": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolved": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_organization_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "active_only": {
+      "type": "boolean"
+    },
+    "ready_only": {
+      "type": "boolean"
+    },
+    "missing_only": {
+      "type": "boolean"
+    },
+    "source_filter": {
+      "type": ["string", "null"],
+      "enum": ["customer", "public", null]
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total_count",
+        "ready_count",
+        "missing_count",
+        "customer_count",
+        "public_count",
+        "active_count"
+      ],
+      "properties": {
+        "total_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ready_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "customer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "public_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "slug",
+          "source",
+          "active",
+          "ready",
+          "organization_id",
+          "name",
+          "mission_default_template",
+          "team_default_template",
+          "team_template_catalog_id",
+          "llm_default",
+          "operating_principles_count"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": ["customer", "public"]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "organization_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mission_default_template": {
+            "type": "string",
+            "minLength": 1
+          },
+          "team_default_template": {
+            "type": "string",
+            "minLength": 1
+          },
+          "team_template_catalog_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "llm_default": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operating_principles_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

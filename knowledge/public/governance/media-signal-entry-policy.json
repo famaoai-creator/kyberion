@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "sheet_title": "Signals and Risks",
+  "columns": ["Task", "Owner", "Status"],
+  "empty_message": "No elevated signals detected.",
+  "elevated_tones": ["warning", "danger"],
+  "elevated_status_keywords": ["risk", "blocked", "late", "issue"],
+  "entry_types": [
+    {
+      "source_key": "signals",
+      "signal_type": "signal",
+      "default_tone": "info",
+      "title_fields": ["title", "name", "summary"],
+      "owner_fields": ["owner", "assignee", "team", "function"],
+      "status_fields": ["status", "tone", "state"]
+    },
+    {
+      "source_key": "risks",
+      "signal_type": "risk",
+      "default_tone": "warning",
+      "title_fields": ["title", "name", "risk", "summary"],
+      "owner_fields": ["owner", "assignee", "team", "function"],
+      "status_fields": ["status", "severity", "tone", "state"]
+    },
+    {
+      "source_key": "incidents",
+      "signal_type": "incident",
+      "default_tone": "danger",
+      "title_fields": ["title", "name", "incident", "summary"],
+      "owner_fields": ["owner", "assignee", "team", "function"],
+      "status_fields": ["status", "severity", "tone", "state"]
+    },
+    {
+      "source_key": "controls",
+      "signal_type": "control",
+      "default_tone": "info",
+      "title_fields": ["title", "name", "control", "summary"],
+      "owner_fields": ["owner", "assignee", "team", "function"],
+      "status_fields": ["status", "severity", "tone", "state"]
+    }
+  ]
+}

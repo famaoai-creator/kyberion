@@ -22,6 +22,7 @@ export interface AgentRuntimeEnsureResult {
   requested_by: string;
   created_at: string;
   completed_at: string;
+  organization_profile?: MissionTeamRuntimePlan['organization_profile'];
   runtime_plan: MissionTeamRuntimePlan;
 }
 
@@ -123,6 +124,7 @@ export async function processMissionTeamPrewarmRequest(requestPath: string): Pro
   const result: AgentRuntimeEnsureResult = {
     ...request,
     completed_at: new Date().toISOString(),
+    organization_profile: runtime_plan.organization_profile,
     runtime_plan,
   };
   safeWriteFile(getAgentRuntimeEnsureResultPath(request.request_id), JSON.stringify(result, null, 2));

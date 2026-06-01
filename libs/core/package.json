@@ -199,6 +199,126 @@
       "types": "./dist/reasoning-bootstrap.d.ts",
       "default": "./dist/reasoning-bootstrap.js"
     },
+    "./reasoning-backend-policy": {
+      "types": "./dist/reasoning-backend-policy.d.ts",
+      "default": "./dist/reasoning-backend-policy.js"
+    },
+    "./voice-task-profile-catalog": {
+      "types": "./dist/voice-task-profile-catalog.d.ts",
+      "default": "./dist/voice-task-profile-catalog.js"
+    },
+    "./media-tone-style-map": {
+      "types": "./dist/media-tone-style-map.d.ts",
+      "default": "./dist/media-tone-style-map.js"
+    },
+    "./media-drawio-policy": {
+      "types": "./dist/media-drawio-policy.d.ts",
+      "default": "./dist/media-drawio-policy.js"
+    },
+    "./media-aws-icon-rules": {
+      "types": "./dist/media-aws-icon-rules.d.ts",
+      "default": "./dist/media-aws-icon-rules.js"
+    },
+    "./media-semantic-map": {
+      "types": "./dist/media-semantic-map.d.ts",
+      "default": "./dist/media-semantic-map.js"
+    },
+    "./media-style-policy": {
+      "types": "./dist/media-style-policy.d.ts",
+      "default": "./dist/media-style-policy.js"
+    },
+    "./media-signal-entry-policy": {
+      "types": "./dist/media-signal-entry-policy.d.ts",
+      "default": "./dist/media-signal-entry-policy.js"
+    },
+    "./tracker-sheet-policy": {
+      "types": "./dist/tracker-sheet-policy.d.ts",
+      "default": "./dist/tracker-sheet-policy.js"
+    },
+    "./media-theme-role-policy": {
+      "types": "./dist/media-theme-role-policy.d.ts",
+      "default": "./dist/media-theme-role-policy.js"
+    },
+    "./media-drawio-edge-policy": {
+      "types": "./dist/media-drawio-edge-policy.d.ts",
+      "default": "./dist/media-drawio-edge-policy.js"
+    },
+    "./media-drawio-boundary-policy": {
+      "types": "./dist/media-drawio-boundary-policy.d.ts",
+      "default": "./dist/media-drawio-boundary-policy.js"
+    },
+    "./media-drawio-tier-order": {
+      "types": "./dist/media-drawio-tier-order.d.ts",
+      "default": "./dist/media-drawio-tier-order.js"
+    },
+    "./media-drawio-sort-policy": {
+      "types": "./dist/media-drawio-sort-policy.d.ts",
+      "default": "./dist/media-drawio-sort-policy.js"
+    },
+    "./media-drawio-security-group-order": {
+      "types": "./dist/media-drawio-security-group-order.d.ts",
+      "default": "./dist/media-drawio-security-group-order.js"
+    },
+    "./document-inference-policy": {
+      "types": "./dist/document-inference-policy.d.ts",
+      "default": "./dist/document-inference-policy.js"
+    },
+    "./document-contents-policy": {
+      "types": "./dist/document-contents-policy.d.ts",
+      "default": "./dist/document-contents-policy.js"
+    },
+    "./document-outline-label-policy": {
+      "types": "./dist/document-outline-label-policy.d.ts",
+      "default": "./dist/document-outline-label-policy.js"
+    },
+    "./promoted-report-template-policy": {
+      "types": "./dist/promoted-report-template-policy.d.ts",
+      "default": "./dist/promoted-report-template-policy.js"
+    },
+    "./onboarding-summary-policy": {
+      "types": "./dist/onboarding-summary-policy.d.ts",
+      "default": "./dist/onboarding-summary-policy.js"
+    },
+    "./onboarding-flow-policy": {
+      "types": "./dist/onboarding-flow-policy.d.ts",
+      "default": "./dist/onboarding-flow-policy.js"
+    },
+    "./mission-distill-markdown-policy": {
+      "types": "./dist/mission-distill-markdown-policy.d.ts",
+      "default": "./dist/mission-distill-markdown-policy.js"
+    },
+    "./mission-ledger-policy": {
+      "types": "./dist/mission-ledger-policy.d.ts",
+      "default": "./dist/mission-ledger-policy.js"
+    },
+    "./provider-cli-capability-report-policy": {
+      "types": "./dist/provider-cli-capability-report-policy.d.ts",
+      "default": "./dist/provider-cli-capability-report-policy.js"
+    },
+    "./mission-journal-policy": {
+      "types": "./dist/mission-journal-policy.d.ts",
+      "default": "./dist/mission-journal-policy.js"
+    },
+    "./pilot-strategy-policy": {
+      "types": "./dist/pilot-strategy-policy.d.ts",
+      "default": "./dist/pilot-strategy-policy.js"
+    },
+    "./production-evidence-summary-policy": {
+      "types": "./dist/production-evidence-summary-policy.d.ts",
+      "default": "./dist/production-evidence-summary-policy.js"
+    },
+    "./changelog-policy": {
+      "types": "./dist/changelog-policy.d.ts",
+      "default": "./dist/changelog-policy.js"
+    },
+    "./spreadsheet-style-policy": {
+      "types": "./dist/spreadsheet-style-policy.d.ts",
+      "default": "./dist/spreadsheet-style-policy.js"
+    },
+    "./legacy-media-ops": {
+      "types": "./dist/legacy-media-ops.d.ts",
+      "default": "./dist/legacy-media-ops.js"
+    },
     "./claude-task-runner": {
       "types": "./dist/claude-task-runner.d.ts",
       "default": "./dist/claude-task-runner.js"

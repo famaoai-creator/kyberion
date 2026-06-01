@@ -631,6 +631,54 @@
       }
     },
     {
+      "id": "start-service",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Select a governed service and start it under policy",
+        "success_condition": "The operator has chosen a target service, the service is started safely, and the startup state is reported back."
+      },
+      "requirements": {
+        "default_missing": ["service_name"]
+      },
+      "payload": {
+        "static": {
+          "operation": "start"
+        }
+      }
+    },
+    {
+      "id": "stop-service",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Select a running service and stop it under policy",
+        "success_condition": "The operator has chosen a running service, the service is stopped safely, and the shutdown state is reported back."
+      },
+      "requirements": {
+        "default_missing": ["service_name"]
+      },
+      "payload": {
+        "static": {
+          "operation": "stop"
+        }
+      }
+    },
+    {
+      "id": "restart-service",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Select a governed service and restart it under policy",
+        "success_condition": "The operator has chosen a target service, the service is restarted safely, and the restart state is reported back."
+      },
+      "requirements": {
+        "default_missing": ["service_name"]
+      },
+      "payload": {
+        "static": {
+          "operation": "restart"
+        }
+      }
+    },
+    {
       "id": "setup-messaging-bridge",
       "task_type": "service_onboarding",
       "goal": {
@@ -1238,6 +1286,520 @@
               {
                 "when": [{ "type": "regex", "value": "(markdown|md)" }],
                 "value": "markdown"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "weather-lookup",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Retrieve and summarize weather information for the requested region and date",
+        "success_condition": "A concise weather summary containing forecast, temperature, and precipitation is prepared."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "location",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(東京|大阪|京都|福岡|札幌|横浜|名古屋|神戸|那覇|秋葉原|渋谷|新宿)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "location",
+            "default": "東京",
+            "rules": [
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "大阪"
+                  }
+                ],
+                "value": "大阪"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "京都"
+                  }
+                ],
+                "value": "京都"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "秋葉原"
+                  }
+                ],
+                "value": "秋葉原"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "transit-lookup",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Search and display optimal transit route, timetable, or line delay status",
+        "success_condition": "An optimal transit plan or delay update is organized and reported back."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "departure_station",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(新宿|渋谷|東京|池袋|品川|横浜|大阪|京都|秋葉原)"
+              }
+            ]
+          },
+          {
+            "requirement": "arrival_station",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(新宿|渋谷|東京|池袋|品川|横浜|大阪|京都|秋葉原)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "departure_station",
+            "default": "東京",
+            "rules": [
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(新宿から|新宿発|新宿)"
+                  }
+                ],
+                "value": "新宿"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(渋谷から|渋谷発|渋谷)"
+                  }
+                ],
+                "value": "渋谷"
+              }
+            ]
+          },
+          {
+            "field": "arrival_station",
+            "default": "京都",
+            "rules": [
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(新宿へ|新宿着|新宿行き|新宿まで)"
+                  }
+                ],
+                "value": "新宿"
+              },
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(渋谷へ|渋谷着|渋谷行き|渋谷まで|渋谷)"
+                  }
+                ],
+                "value": "渋谷"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "restaurant-search",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Search dining places and handle table reservations",
+        "success_condition": "A list of candidate dining spots or reservation details is prepared and reported back."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "location",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(東京|渋谷|新宿|秋葉原|銀座|六本木)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "location",
+            "default": "東京",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "渋谷" }],
+                "value": "渋谷"
+              },
+              {
+                "when": [{ "type": "regex", "value": "新宿" }],
+                "value": "新宿"
+              },
+              {
+                "when": [{ "type": "regex", "value": "秋葉原" }],
+                "value": "秋葉原"
+              }
+            ]
+          },
+          {
+            "field": "genre",
+            "default": "居酒屋",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "ラーメン" }],
+                "value": "ラーメン"
+              },
+              {
+                "when": [{ "type": "regex", "value": "寿司" }],
+                "value": "寿司"
+              },
+              {
+                "when": [{ "type": "regex", "value": "カフェ" }],
+                "value": "カフェ"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "news-summary",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Retrieve latest news headlines and distill a structured summary",
+        "success_condition": "A structured news summary of key topics is delivered to the user."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "topic",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(AI|人工知能|技術|tech|ビジネス|一般|最新)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "topic",
+            "default": "一般",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(AI|人工知能)" }],
+                "value": "AI"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(技術|tech)" }],
+                "value": "tech"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "email-draft",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Draft a governed professional or casual email according to user instructions",
+        "success_condition": "A beautiful email draft containing subject and body is generated."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "recipient",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}|(田中|佐藤|鈴木|山田|高橋)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "recipient",
+            "default": "お仕事関係者",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "田中" }],
+                "value": "田中さん"
+              },
+              {
+                "when": [{ "type": "regex", "value": "佐藤" }],
+                "value": "佐藤さん"
+              }
+            ]
+          },
+          {
+            "field": "tone",
+            "default": "丁寧",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(謝罪|お詫び)" }],
+                "value": "お詫び/謝罪"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(カジュアル|ラフ)" }],
+                "value": "カジュアル"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "calendar-schedule",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Check or register calendar schedules and meetings",
+        "success_condition": "The requested schedule is retrieved or a new event is registered and summarized."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "date",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(今日|明日|明後日|今週末|来週|\\d+月\\d+日|\\d+日)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "date",
+            "default": "今日",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "明日" }],
+                "value": "明日"
+              },
+              {
+                "when": [{ "type": "regex", "value": "明後日" }],
+                "value": "明後日"
+              },
+              {
+                "when": [{ "type": "regex", "value": "今週末" }],
+                "value": "今週末"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(\\d+月\\d+日)" }],
+                "value": "特定の日付"
+              }
+            ]
+          },
+          {
+            "field": "event_title",
+            "default": "スケジュール確認",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(ミーティング|会議|面談|アポイント)" }],
+                "value": "ミーティング"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "device-control",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Control smart devices such as lights and climate control",
+        "success_condition": "The specified command is transmitted to the device and state confirmation is reported."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "device_name",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(エアコン|電気|照明|ライト|空調|テレビ|鍵|ドア)"
+              }
+            ]
+          },
+          {
+            "requirement": "operation",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(オン|オフ|つけて|消して|起動|停止|調整|設定)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "device_name",
+            "default": "照明",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(エアコン|空調)" }],
+                "value": "エアコン"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(電気|照明|ライト)" }],
+                "value": "照明"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(テレビ)" }],
+                "value": "テレビ"
+              }
+            ]
+          },
+          {
+            "field": "operation",
+            "default": "状態確認",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(オン|つけて|起動|点灯)" }],
+                "value": "オン"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(オフ|消して|停止|消灯)" }],
+                "value": "オフ"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "reminder-task",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Create or check reminders and todo list items",
+        "success_condition": "A new reminder is successfully registered or requested task list is summarized."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "task_detail",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(買い物|牛乳|メール|会議|電話|予約|チケット|提出)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "task_detail",
+            "default": "リマインダータスク",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "牛乳" }],
+                "value": "牛乳"
+              },
+              {
+                "when": [{ "type": "regex", "value": "会議" }],
+                "value": "会議"
+              }
+            ]
+          },
+          {
+            "field": "remind_time",
+            "default": "指定なし",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(\\d+時)" }],
+                "value": "指定時刻"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "translation-service",
+      "task_type": "service_operation",
+      "goal": {
+        "summary": "Translate specified text into the target language",
+        "success_condition": "The input text is translated into the target language with high fidelity."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "target_language",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(英語|日本語|中国語|韓国語|フランス語|スペイン語|english|japanese)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "fields": [
+          {
+            "field": "target_language",
+            "default": "英語",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(英語|english)" }],
+                "value": "英語"
+              },
+              {
+                "when": [{ "type": "regex", "value": "(日本語|japanese)" }],
+                "value": "日本語"
+              }
+            ]
+          },
+          {
+            "field": "text_to_translate",
+            "default": "こんにちは",
+            "rules": [
+              {
+                "when": [{ "type": "regex", "value": "(「[^」]+」|'[^']+'|\\\"[^\\\"]+\\\")" }],
+                "value": "指定文字列"
               }
             ]
           }
