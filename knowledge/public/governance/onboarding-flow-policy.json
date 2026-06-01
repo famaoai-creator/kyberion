@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "phase_titles": {
+    "identity": "Identity & Purpose",
+    "services": "Infrastructure & Services",
+    "tenants": "Multi-Tenant Registration",
+    "tutorial": "Hands-on Tutorial",
+    "summary": "Summary"
+  },
+  "tutorial_plan_title": "Onboarding Tutorial Plan",
+  "tutorial_next_step_title": "Suggested next step",
+  "tutorial_skipped_message": "Tutorial skipped during onboarding.",
+  "tutorial_default_summary": "Demonstrate the initial Kyberion setup with a safe dry-run.",
+  "complete_message": "Onboarding complete."
+}

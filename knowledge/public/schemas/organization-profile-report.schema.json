@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/organization-profile-report.schema.json",
+  "title": "Organization Profile Report",
+  "type": "object",
+  "required": [
+    "requested",
+    "resolved",
+    "selected_catalog",
+    "mission_default_template",
+    "agent_profile",
+    "team_default_template",
+    "lifecycle",
+    "max_parallel_missions",
+    "llm_default",
+    "template_catalogs",
+    "selected_catalog_templates",
+    "operating_principles",
+    "profile"
+  ],
+  "properties": {
+    "requested": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolved": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_catalog": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mission_default_template": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "team_default_template": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lifecycle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_parallel_missions": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "llm_default": {
+      "type": "string",
+      "minLength": 1
+    },
+    "template_catalogs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected_catalog_templates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "operating_principles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "profile": {
+      "anyOf": [
+        { "$ref": "./organization-profile.schema.json" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

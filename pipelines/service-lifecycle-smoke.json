@@ -1,0 +1,56 @@
+{
+  "action": "pipeline",
+  "name": "service-lifecycle-smoke",
+  "description": "Smoke pipeline for background service lifecycle intents. Validates that the intent landed in the service control path and that a target service can be resolved before taking action.",
+  "context": {
+    "service_name": "voice-hub",
+    "operation": "inspect"
+  },
+  "steps": [
+    {
+      "id": "resolve_service_name",
+      "type": "control",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "service_name", "operator": "exists" },
+        "then": [
+          {
+            "id": "log_service_name",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "[service-lifecycle-smoke] target service resolved: {{service_name}} (operation={{operation}})"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_missing_service_name",
+            "type": "apply",
+            "op": "system:log",
+            "params": {
+              "message": "[service-lifecycle-smoke] service_name is required for lifecycle control. Please specify the target service."
+            }
+          },
+          {
+            "id": "fail_missing_service_name",
+            "type": "apply",
+            "op": "system:shell",
+            "params": {
+              "cmd": "exit 1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "inspect_runtime_supervisor",
+      "type": "capture",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/agent_runtime_supervisor_status.js",
+        "export_as": "runtime_supervisor_status"
+      }
+    }
+  ]
+}

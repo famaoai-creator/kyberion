@@ -1,0 +1,49 @@
+{
+  "requested": "demo-org",
+  "resolved": "Demo Org (demo-org)",
+  "selected_catalog": "demo-org",
+  "selected_only": false,
+  "summary": {
+    "total_count": 3,
+    "selected_count": 1,
+    "template_count": 3,
+    "required_role_count": 0,
+    "optional_role_count": 8
+  },
+  "catalogs": [
+    {
+      "catalog_id": "default",
+      "organization_id": "default",
+      "selected": false,
+      "template_ids": [
+        "default"
+      ],
+      "template_count": 1,
+      "required_role_count": 0,
+      "optional_role_count": 2
+    },
+    {
+      "catalog_id": "demo-org",
+      "organization_id": "demo-org",
+      "selected": true,
+      "template_ids": [
+        "development"
+      ],
+      "template_count": 1,
+      "required_role_count": 0,
+      "optional_role_count": 2
+    },
+    {
+      "catalog_id": "ops-org",
+      "organization_id": "ops-org",
+      "selected": false,
+      "template_ids": [
+        "incident",
+        "operations"
+      ],
+      "template_count": 2,
+      "required_role_count": 0,
+      "optional_role_count": 4
+    }
+  ]
+}

@@ -146,6 +146,7 @@ describe('service-binding', () => {
     expect(catalog.services.slack).toMatchObject({
       base_url: 'https://slack.com/api',
       preset_path: 'knowledge/public/orchestration/service-presets/slack.json',
+      allow_stream_ingress: false,
     });
 
     expect(getServiceEndpointRecord('github')).toMatchObject({

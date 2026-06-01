@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "name": "launch-first-run-onboarding",
+  "description": "Create a deterministic first-run onboarding input and apply it through the governed onboarding CLI.",
+  "context": {
+    "identity_name": "Kyberion Operator",
+    "language": "ja",
+    "interaction_style": "Senior Partner",
+    "primary_domain": "automation",
+    "vision": "Kyberion を使って、日常の運用とコンテンツ制作をひとつの governed flow にまとめる。",
+    "agent_id": "KYB-ONBOARD-001"
+  },
+  "steps": [
+    {
+      "id": "write_identity_input",
+      "type": "apply",
+      "op": "system:write_file",
+      "params": {
+        "path": "active/shared/tmp/launch-first-run-onboarding-identity.json",
+        "content": "{\n  \"identity\": {\n    \"name\": \"{{identity_name}}\",\n    \"language\": \"{{language}}\",\n    \"interaction_style\": \"{{interaction_style}}\",\n    \"primary_domain\": \"{{primary_domain}}\",\n    \"vision\": \"{{vision}}\",\n    \"agent_id\": \"{{agent_id}}\"\n  },\n  \"tenants\": [],\n  \"tutorial\": {\n    \"mode\": \"simulate\",\n    \"summary\": \"Initial onboarding dry-run for Kyberion.\"\n  }\n}\n"
+      }
+    },
+    {
+      "id": "apply_onboarding",
+      "type": "apply",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/onboarding_apply.js --identity active/shared/tmp/launch-first-run-onboarding-identity.json"
+      }
+    }
+  ]
+}

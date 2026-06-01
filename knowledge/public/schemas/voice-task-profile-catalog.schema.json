@@ -1,0 +1,122 @@
+{
+  "type": "object",
+  "required": ["version", "profiles"],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "task_type", "distill_target_kind"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "task_type": {
+            "type": "string"
+          },
+          "bootstrap_kind": {
+            "type": "string"
+          },
+          "analysis_kind": {
+            "type": "string"
+          },
+          "report_kind": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "distill_target_kind": {
+            "type": "string",
+            "enum": [
+              "pattern",
+              "sop_candidate",
+              "knowledge_hint",
+              "report_template"
+            ]
+          },
+          "label_ja": {
+            "type": "string"
+          },
+          "label_en": {
+            "type": "string"
+          },
+          "accepted_reply_ja": {
+            "type": "string"
+          },
+          "accepted_reply_en": {
+            "type": "string"
+          },
+          "missing_reply_ja": {
+            "type": "string"
+          },
+          "missing_reply_en": {
+            "type": "string"
+          },
+          "approval_reply_ja": {
+            "type": "string"
+          },
+          "approval_reply_en": {
+            "type": "string"
+          },
+          "progress_reply_ja": {
+            "type": "string"
+          },
+          "progress_reply_en": {
+            "type": "string"
+          },
+          "applicability": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reusable_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "template_sections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "audience": {
+            "type": "string"
+          },
+          "output_format": {
+            "type": "string"
+          },
+          "procedure_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "safety_notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "escalation_conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_outcome": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

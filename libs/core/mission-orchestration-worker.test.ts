@@ -57,6 +57,20 @@ describe('mission-orchestration-worker', () => {
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
   });
 
+  it('does not install reasoning backends during import', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await import('./mission-orchestration-worker.js');
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
   it('dispatches planned next tasks and marks them requested', async () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeWriteFile, safeReadFile } = await import('./secure-io.js');

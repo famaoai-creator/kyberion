@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "template_sections": [
+    "Summary",
+    "Current State",
+    "Findings",
+    "Next Actions"
+  ],
+  "audience": "internal stakeholders",
+  "output_format": "structured document"
+}

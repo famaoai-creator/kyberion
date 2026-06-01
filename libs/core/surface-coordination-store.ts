@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import { appendGovernedArtifactJsonl, writeGovernedArtifactJson, type GovernedArtifactRole } from './artifact-store.js';
+import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 import type {
   SlackOutboxMessage,
   SurfaceAsyncChannel,
@@ -13,9 +14,7 @@ import type {
 } from './channel-surface-types.js';
 
 function surfaceCoordinationRole(surface: SurfaceAsyncChannel): GovernedArtifactRole {
-  if (surface === 'slack') return 'slack_bridge';
-  if (surface === 'chronos') return 'chronos_gateway';
-  return 'surface_runtime';
+  return getSurfaceCoordinationRole(surface);
 }
 
 function asyncRequestLogicalPath(surface: SurfaceAsyncChannel, requestId: string): string {

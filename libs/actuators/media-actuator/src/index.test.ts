@@ -1069,6 +1069,12 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect.arrayContaining(['Overview', 'Execution Board', 'Signals and Risks']),
     );
     const signalsSheet = result.context.tracker_design.sheets.find((sheet: any) => sheet.id === 'sheet-signals');
+    expect(signalsSheet.rows.find((row: any) => row.index === 1)?.cells.find((cell: any) => cell.ref === 'A1')?.value).toBe('Signals and Risks');
+    expect(signalsSheet.rows.find((row: any) => row.index === 3)?.cells.map((cell: any) => cell.value)).toEqual([
+      'Task',
+      'Owner',
+      'Status',
+    ]);
     expect(signalsSheet.rows.some((row: any) => row.cells.some((cell: any) => cell.value === 'Vendor dependency slippage'))).toBe(true);
     expect(signalsSheet.rows.some((row: any) => row.cells.some((cell: any) => cell.value === 'Payment timeout spike'))).toBe(true);
     const signalTaskRows = signalsSheet.rows
@@ -1076,6 +1082,44 @@ describe('media-actuator pdf to pptx bridge', () => {
       .map((row: any) => row.cells.find((cell: any) => String(cell.ref).startsWith('A'))?.value)
       .filter(Boolean);
     expect(signalTaskRows[0]).toBe('Payment timeout spike');
+  });
+
+  it('uses the tracker sheet policy empty summary message when there are no summary cards', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        last_json: {
+          kind: 'document-brief',
+          artifact_family: 'spreadsheet',
+          document_type: 'tracker',
+          document_profile: 'operator-tracker',
+          render_target: 'xlsx',
+          locale: 'en-US',
+          payload: {
+            title: 'Empty Tracker',
+            columns: [
+              { key: 'task', label: 'Task' },
+              { key: 'owner', label: 'Owner' },
+            ],
+            rows: [],
+          },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'document_spreadsheet_design_from_brief',
+          params: {
+            from: 'last_json',
+            export_as: 'tracker_design',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const overviewSheet = result.context.tracker_design.sheets.find((sheet: any) => sheet.id === 'sheet-overview');
+    expect(overviewSheet.rows.some((row: any) => row.cells.some((cell: any) => cell.value === 'No summary cards provided.'))).toBe(true);
   });
 
   it('bridges pdf design into pptx design before render', async () => {

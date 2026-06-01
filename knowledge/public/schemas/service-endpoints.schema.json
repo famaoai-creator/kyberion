@@ -12,6 +12,7 @@
         "properties": {
           "base_url": { "type": "string" },
           "preset_path": { "type": "string" },
+          "allow_stream_ingress": { "type": "boolean" },
           "credential_suffixes": {
             "type": "object",
             "properties": {

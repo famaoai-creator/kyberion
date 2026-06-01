@@ -8,6 +8,8 @@ import {
   compileSchemaFromPath,
   customerResolver,
   pathResolver,
+  resolveOnboardingFlowPolicy,
+  resolveOnboardingSummaryPolicy,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -171,15 +173,16 @@ export async function applyTenants(input: ApplyInput, now: string): Promise<Arra
 
 export async function applyTutorial(input: ApplyInput, now: string) {
   const mode = input.tutorial?.mode || 'simulate';
-  const summary = input.tutorial?.summary || 'Demonstrate the initial Kyberion setup with a safe dry-run.';
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  const summary = input.tutorial?.summary || flowPolicy.tutorial_default_summary;
   const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
   await writeText(planPath, [
-    '# Onboarding Tutorial Plan',
+    `# ${flowPolicy.tutorial_plan_title}`,
     '',
     `- Mode: ${mode}`,
     `- Summary: ${summary}`,
     '',
-    '## Suggested next step',
+    `## ${flowPolicy.tutorial_next_step_title}`,
     mode === 'apply'
       ? '- Review the plan and create a mission manually if the setup is ready.'
       : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
@@ -205,10 +208,11 @@ export function buildState(input: ApplyInput, now: string, tenantEntries: Array<
 
 export function buildSummary(input: ApplyInput, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string }) {
   const id = input.identity;
+  const summaryPolicy = resolveOnboardingSummaryPolicy();
   const lines = [
-    '# Kyberion Onboarding Summary',
+    `# ${summaryPolicy.title}`,
     '',
-    '## Identity',
+    `## ${summaryPolicy.sections.identity}`,
     `- Name: ${id.name}`,
     `- Language: ${id.language}`,
     `- Style: ${id.interaction_style}`,
@@ -216,19 +220,19 @@ export function buildSummary(input: ApplyInput, tenantEntries: Array<Record<stri
     `- Vision: ${id.vision}`,
     `- Agent ID: ${id.agent_id}`,
     '',
-    '## Services',
-    '- None captured yet',
+    `## ${summaryPolicy.sections.services}`,
+    `- ${summaryPolicy.empty_states.services}`,
     '',
-    '## Tenants',
+    `## ${summaryPolicy.sections.tenants}`,
     ...(tenantEntries.length > 0
       ? tenantEntries.map((t) => `- ${t.tenant_slug}: ${t.display_name} [${t.assigned_role}]`)
-      : ['- None registered yet']),
+      : [`- ${summaryPolicy.empty_states.tenants}`]),
     '',
-    '## Tutorial',
+    `## ${summaryPolicy.sections.tutorial}`,
     `- Mode: ${tutorial.mode}`,
     `- Summary: ${tutorial.summary}`,
     '',
-    '## Next Steps',
+    `## ${summaryPolicy.sections.next_steps}`,
     '- Run `pnpm vital --format=json` to verify the live ecosystem health.',
     '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
     '',

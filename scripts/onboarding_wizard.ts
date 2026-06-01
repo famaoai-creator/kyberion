@@ -7,7 +7,10 @@ import {
   customerResolver,
   ensureDefaultTenantProfile,
   compileSchemaFromPath,
+  listServiceOnboardingCatalogEntries,
   pathResolver,
+  resolveOnboardingFlowPolicy,
+  resolveOnboardingSummaryPolicy,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -85,7 +88,6 @@ interface OnboardingState {
   tutorial?: TutorialDraft;
 }
 
-const DEFAULT_SERVICES = ['comfyui', 'whisper', 'tts', 'meeting'] as const;
 const PHASES: OnboardingPhase[] = ['identity', 'services', 'tenants', 'tutorial', 'summary'];
 function profileRoot(): string {
   return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
@@ -233,11 +235,12 @@ function buildSummaryMarkdown(state: OnboardingState): string {
   const services = state.services?.candidates || [];
   const tenants = state.tenants?.entries || [];
   const tutorial = state.tutorial;
+  const summaryPolicy = resolveOnboardingSummaryPolicy();
 
   return [
-    '# Kyberion Onboarding Summary',
+    `# ${summaryPolicy.title}`,
     '',
-    '## Identity',
+    `## ${summaryPolicy.sections.identity}`,
     `- Name: ${identity?.name || 'n/a'}`,
     `- Language: ${identity?.language || 'n/a'}`,
     `- Style: ${identity?.interaction_style || 'n/a'}`,
@@ -245,21 +248,21 @@ function buildSummaryMarkdown(state: OnboardingState): string {
     `- Vision: ${identity?.vision || 'n/a'}`,
     `- Agent ID: ${identity?.agent_id || 'n/a'}`,
     '',
-    '## Services',
+    `## ${summaryPolicy.sections.services}`,
     ...(services.length > 0
       ? services.map((entry) => `- ${entry.service_id}: ${entry.status}${entry.connection_kind ? ` (${entry.connection_kind})` : ''}`)
-      : ['- None captured yet']),
+      : [`- ${summaryPolicy.empty_states.services}`]),
     '',
-    '## Tenants',
+    `## ${summaryPolicy.sections.tenants}`,
     ...(tenants.length > 0
       ? tenants.map((tenant) => `- ${tenant.tenant_slug}: ${tenant.display_name} [${tenant.assigned_role}]`)
-      : ['- None registered yet']),
+      : [`- ${summaryPolicy.empty_states.tenants}`]),
     '',
-    '## Tutorial',
+    `## ${summaryPolicy.sections.tutorial}`,
     `- Mode: ${tutorial?.mode || 'skipped'}`,
     `- Summary: ${tutorial?.summary || 'n/a'}`,
     '',
-    '## Next Steps',
+    `## ${summaryPolicy.sections.next_steps}`,
     '- Review candidate service connections before using them in missions.',
     '- Register additional tenants one at a time.',
     '- Convert the tutorial into an explicit mission only after confirming the setup.',
@@ -268,7 +271,8 @@ function buildSummaryMarkdown(state: OnboardingState): string {
 }
 
 async function runIdentityPhase(state: OnboardingState): Promise<void> {
-  console.log('\n🧬 Phase 1 — Identity & Purpose\n');
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  console.log(`\n🧬 Phase 1 — ${flowPolicy.phase_titles.identity}\n`);
   const identity = buildIdentityFromState(state);
 
   identity.name = await ask(`How should I call you? [${identity.name}]: `, identity.name);
@@ -350,14 +354,17 @@ async function promptGenericConnection(serviceId: string): Promise<Record<string
 }
 
 async function runServicesPhase(state: OnboardingState): Promise<void> {
-  console.log('\n🔌 Phase 2 — Infrastructure & Services\n');
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  console.log(`\n🔌 Phase 2 — ${flowPolicy.phase_titles.services}\n`);
   const wantsServiceSetup = isAffirmative(await ask('Capture service connection candidates now? (y/N): ', 'n'));
   const candidates: ServiceCandidateDraft[] = [];
   const connDir = connectionDir();
   if (!safeExistsSync(connDir)) safeMkdir(connDir, { recursive: true });
+  const onboardingServices = listServiceOnboardingCatalogEntries();
 
   if (wantsServiceSetup) {
-    for (const serviceId of DEFAULT_SERVICES) {
+    for (const service of onboardingServices) {
+      const serviceId = service.service_id;
       const wantsThisService = isAffirmative(await ask(`Add ${serviceId} connection now? (y/N): `, 'n'));
       if (!wantsThisService) {
         candidates.push({
@@ -370,9 +377,9 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
       }
 
       let payload: Record<string, unknown> | null = null;
-      if (serviceId === 'comfyui') {
+      if (service.prompt_kind === 'comfyui') {
         payload = await promptComfyuiConnection();
-      } else if (serviceId === 'whisper') {
+      } else if (service.prompt_kind === 'whisper') {
         payload = await promptWhisperConnection();
       } else {
         payload = await promptGenericConnection(serviceId);
@@ -415,7 +422,8 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
 }
 
 async function runTenantsPhase(state: OnboardingState): Promise<void> {
-  console.log('\n🏢 Phase 3 — Multi-Tenant Registration\n');
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  console.log(`\n🏢 Phase 3 — ${flowPolicy.phase_titles.tenants}\n`);
   const entries: TenantDraft[] = [];
   const defaultTenant = withExecutionContext(
     'knowledge_steward',
@@ -492,21 +500,22 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
 }
 
 async function runTutorialPhase(state: OnboardingState): Promise<void> {
-  console.log('\n🎓 Phase 4 — Hands-on Tutorial\n');
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  console.log(`\n🎓 Phase 4 — ${flowPolicy.phase_titles.tutorial}\n`);
   const modeInput = (await ask('Tutorial mode: simulate / apply / skipped [simulate]: ', 'simulate')).trim().toLowerCase();
   const mode: TutorialDraft['mode'] = modeInput === 'apply' ? 'apply' : modeInput === 'skipped' ? 'skipped' : 'simulate';
   const summary = mode === 'skipped'
-    ? 'Tutorial skipped during onboarding.'
-    : await ask('Describe the first tutorial mission in one sentence: ', 'Demonstrate the initial Kyberion setup with a safe dry-run.');
+    ? flowPolicy.tutorial_skipped_message
+    : await ask('Describe the first tutorial mission in one sentence: ', flowPolicy.tutorial_default_summary);
 
   const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
   const planMarkdown = [
-    '# Onboarding Tutorial Plan',
+    `# ${flowPolicy.tutorial_plan_title}`,
     '',
     `- Mode: ${mode}`,
     `- Summary: ${summary}`,
     '',
-    '## Suggested next step',
+    `## ${flowPolicy.tutorial_next_step_title}`,
     mode === 'apply'
       ? '- Review the plan and create a mission manually if the setup is ready.'
       : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
@@ -523,7 +532,8 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
 }
 
 async function runSummaryPhase(state: OnboardingState): Promise<void> {
-  console.log('\n📊 Phase 5 — Summary\n');
+  const flowPolicy = resolveOnboardingFlowPolicy();
+  console.log(`\n📊 Phase 5 — ${flowPolicy.phase_titles.summary}\n`);
   const summary = buildSummaryMarkdown(state);
   await writeTextArtifact(summaryPath(), summary, 'onboarding-summary');
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'summary']));
@@ -533,7 +543,7 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   await saveState(state);
 
   const identity = state.identity;
-  console.log(chalk.green('✅ Onboarding complete.'));
+  console.log(chalk.green(`✅ ${flowPolicy.complete_message}`));
   console.log(`Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`);
   console.log(`Summary written to: ${summaryPath()}`);
   console.log(`State written to: ${statePath()}`);

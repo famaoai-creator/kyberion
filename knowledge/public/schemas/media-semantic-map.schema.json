@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "required": ["version", "rules", "proposal_evidence_rules", "proposal_section_keywords"],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["semantic_type"],
+        "properties": {
+          "layout": { "type": "string" },
+          "media": { "type": "string" },
+          "semantic_type": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "proposal_evidence_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["section_id", "evidence_index"],
+        "properties": {
+          "section_id": { "type": "string" },
+          "evidence_index": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "proposal_section_keywords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["section_id", "keywords"],
+        "properties": {
+          "section_id": { "type": "string" },
+          "keywords": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

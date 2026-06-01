@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "role_indices": {
+    "base": 0,
+    "title": 1,
+    "subtitle": 2,
+    "header": 3,
+    "section": 4,
+    "info": 5,
+    "success": 6,
+    "warning": 7,
+    "danger": 8,
+    "body": 9
+  }
+}

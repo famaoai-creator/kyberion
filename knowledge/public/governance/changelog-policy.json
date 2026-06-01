@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "breaking_changes_title": "⚠ BREAKING CHANGES",
+  "uncategorized_title": "Uncategorized",
+  "no_commits_template": "_No commits between {from} and {to}._",
+  "header_template": "# Changes since {from} ({count} commits)",
+  "type_labels": {
+    "feat": "Added",
+    "fix": "Fixed",
+    "perf": "Performance",
+    "refactor": "Changed (internal)",
+    "docs": "Documentation",
+    "test": "Tests",
+    "build": "Build",
+    "ci": "CI",
+    "chore": "Chore",
+    "revert": "Reverted",
+    "security": "Security"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "edge_labels": [
+    {
+      "label": "uses",
+      "style_parts": [
+        "dashed=1",
+        "strokeOpacity=55"
+      ]
+    },
+    {
+      "label": "source",
+      "style_parts": [
+        "dashed=1",
+        "strokeWidth=2",
+        "endArrow=open",
+        "endFill=0",
+        "labelBackgroundColor=#FFF7ED"
+      ]
+    },
+    {
+      "label": "expands",
+      "style_parts": [
+        "dashed=1",
+        "dashPattern=8 4",
+        "strokeWidth=2",
+        "endArrow=block",
+        "endFill=1",
+        "labelBackgroundColor=#EFF6FF"
+      ]
+    }
+  ],
+  "routing_rules": [
+    {
+      "rule": "security_to_web",
+      "source_tiers": ["security"],
+      "target_tiers": ["web", "application", "app"]
+    },
+    {
+      "rule": "horizontal",
+      "source_tiers": ["edge", "web", "application", "app", "data", "security"],
+      "target_tiers": ["edge", "web", "application", "app", "data", "security"]
+    }
+  ]
+}
