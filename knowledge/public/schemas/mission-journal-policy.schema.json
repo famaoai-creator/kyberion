@@ -1,0 +1,23 @@
+{
+  "$id": "https://kyberion.local/schemas/mission-journal-policy.schema.json",
+  "title": "Mission Journal Policy",
+  "type": "object",
+  "required": ["version", "title", "summary_title", "trust_scores_title", "empty_message", "relationship_labels"],
+  "properties": {
+    "version": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "summary_title": { "type": "string", "minLength": 1 },
+    "trust_scores_title": { "type": "string", "minLength": 1 },
+    "empty_message": { "type": "string", "minLength": 1 },
+    "relationship_labels": {
+      "type": "object",
+      "required": ["prerequisites", "successors"],
+      "properties": {
+        "prerequisites": { "type": "string", "minLength": 1 },
+        "successors": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

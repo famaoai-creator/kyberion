@@ -39,7 +39,7 @@ export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessa
     conversationCtx = { ...conversationCtx, _a2a_header: input.header, conversation_id: input.header.conversation_id };
     if (input.payload.intent) {
       const { resolveIntentToSteps } = await import('./resolver.js');
-      steps = await resolveIntentToSteps(input.payload.intent);
+      steps = await resolveIntentToSteps(input.payload.intent, input.payload.context || {});
       conversationCtx = { ...conversationCtx, ...input.payload.context };
     } else {
       steps = input.payload.steps || [];

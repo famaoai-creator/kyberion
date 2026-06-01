@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "imports": [
+    {
+      "id": "github-issue-import",
+      "command": "import-github-issue-file",
+      "source": "github",
+      "default_project_id": "github",
+      "summary": "Import a GitHub issue JSON file"
+    },
+    {
+      "id": "jira-issue-import",
+      "command": "import-jira-issue-file",
+      "source": "jira",
+      "summary": "Import a Jira issue JSON file"
+    }
+  ]
+}

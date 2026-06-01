@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "required": ["version", "boundary_palettes", "node_sizes"],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "boundary_palettes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["boundary", "fill", "stroke"],
+        "properties": {
+          "boundary": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "fill": {
+            "type": "string"
+          },
+          "stroke": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "node_sizes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "required": ["width", "height"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "mode_aliases": {
+    "gemini-api": "gemini-cli"
+  },
+  "allowed_modes": [
+    "claude-cli",
+    "codex-cli",
+    "claude-agent",
+    "anthropic",
+    "gemini-cli",
+    "agy-cli",
+    "local",
+    "stub"
+  ],
+  "auto_select_env_priority": [
+    {
+      "env": "ANTHROPIC_API_KEY",
+      "mode": "anthropic"
+    },
+    {
+      "env": "GEMINI_API_KEY",
+      "mode": "gemini-cli"
+    },
+    {
+      "env": "KYBERION_LOCAL_LLM_URL",
+      "mode": "local"
+    }
+  ],
+  "cli_preference_rules": [
+    {
+      "env_any": [
+        "CODEX_CLI",
+        "CODEX_VERSION"
+      ],
+      "env_equals": {
+        "TERM_PROGRAM": "codex"
+      },
+      "provider": "codex",
+      "mode": "codex-cli"
+    },
+    {
+      "env_any": [
+        "GEMINI_CLI"
+      ],
+      "provider": "gemini",
+      "mode": "gemini-cli"
+    },
+    {
+      "env_any": [
+        "AGY_CLI",
+        "ANTIGRAVITY_CLI"
+      ],
+      "provider": "agy",
+      "mode": "agy-cli"
+    }
+  ],
+  "provider_fallback_order": [
+    {
+      "provider": "codex",
+      "mode": "codex-cli"
+    },
+    {
+      "provider": "gemini",
+      "mode": "gemini-cli"
+    },
+    {
+      "provider": "agy",
+      "mode": "agy-cli"
+    }
+  ],
+  "default_mode": "codex-cli"
+}

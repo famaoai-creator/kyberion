@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "required": ["version", "title_by_locale", "subtitle"],
+  "properties": {
+    "version": { "type": "string" },
+    "title_by_locale": {
+      "type": "object",
+      "required": ["ja", "default"],
+      "properties": {
+        "ja": { "type": "string" },
+        "default": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "subtitle": { "type": "string" }
+  },
+  "additionalProperties": false
+}

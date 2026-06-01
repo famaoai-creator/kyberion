@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "title_by_locale": {
+    "ja": "目次",
+    "default": "Contents"
+  },
+  "subtitle": "Document navigation"
+}

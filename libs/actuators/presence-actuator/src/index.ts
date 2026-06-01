@@ -1,4 +1,4 @@
-import { logger, recordInteraction, resolveServiceBinding, safeReadFile, validatePresenceTimeline, pathResolver, classifyError, withRetry } from '@agent/core';
+import { logger, recordInteraction, resolveServiceBinding, safeReadFile, validatePresenceTimeline, pathResolver, classifyError, withRetry, getDefaultServiceIdForSurface } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { WebClient } from '@slack/web-api';
 import * as path from 'node:path';
@@ -99,7 +99,8 @@ export async function handleAction(input: PresenceAction) {
 
   let slack: WebClient | null = null;
   try {
-    const binding = resolveServiceBinding('slack', 'secret-guard');
+    const serviceId = getDefaultServiceIdForSurface('presence') || 'slack';
+    const binding = resolveServiceBinding(serviceId, 'secret-guard');
     if (binding.accessToken) {
       slack = new WebClient(binding.accessToken);
     }

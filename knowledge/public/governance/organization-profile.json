@@ -1,0 +1,34 @@
+{
+  "$schema": "https://kyberion.local/schemas/organization-profile.schema.json",
+  "version": "1.0.0",
+  "organization_id": "default",
+  "name": "Default Kyberion Organization Profile",
+  "description": "Organization-level defaults for mission formation, team composition, and policy-aware backend selection.",
+  "operating_principles": [
+    "Organization owns policy and defaults.",
+    "Teams own execution and delegation.",
+    "Agent profiles describe capability and authority, not the organization itself.",
+    "User overrides take precedence over organization defaults."
+  ],
+  "mission_defaults": {
+    "default_mission_class": "operations_and_release",
+    "default_team_template": "default",
+    "default_agent_profile": "default"
+  },
+  "team_defaults": {
+    "default_team_template": "default",
+    "team_template_catalog_id": "default",
+    "default_lifecycle_template": "default",
+    "max_parallel_missions": 4
+  },
+  "llm": {
+    "purpose_map": {
+      "distill": "heavy",
+      "validate": "standard",
+      "summarize": "light",
+      "classify": "light"
+    },
+    "default_profile": "standard",
+    "profile_overrides": {}
+  }
+}

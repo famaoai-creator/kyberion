@@ -12,6 +12,8 @@ import {
   safeExec,
   runCodexCliQuery,
   runGeminiCliQuery,
+  loadOrganizationProfile,
+  type OrganizationProfile,
 } from '@agent/core';
 import { readJsonFile } from './cli-input.js';
 
@@ -38,6 +40,7 @@ export interface UserLlmTools {
 export interface LlmResolutionOptions {
   userTools?: UserLlmTools;
   isCommandAvailable?: (command: string) => { available: boolean; reason?: string };
+  organizationProfile?: OrganizationProfile | null;
 }
 
 export interface LlmResolutionStatus {
@@ -193,6 +196,7 @@ export function inspectLlmResolution(
   options: LlmResolutionOptions = {},
 ): LlmResolutionStatus {
   const userTools = options.userTools ?? loadUserLlmTools();
+  const organizationProfile = options.organizationProfile ?? loadOrganizationProfile();
   const profiles = policy?.profiles || {};
   const checkedProfiles: LlmResolutionStatus['checkedProfiles'] = [];
   const candidateNames = resolveCandidateProfileNames(purpose, policy);
@@ -211,8 +215,13 @@ export function inspectLlmResolution(
 
     const profile = profiles[name];
     if (!profile) continue;
+    const orgOverride = organizationProfile?.llm?.profile_overrides?.[name];
     const userOverride = userTools.profile_overrides?.[name];
-    const effectiveProfile = userOverride ? ({ ...profile, ...userOverride } as LlmProfile) : profile;
+    const effectiveProfile = {
+      ...profile,
+      ...(orgOverride || {}),
+      ...(userOverride || {}),
+    } as LlmProfile;
     if (!isToolAvailable(effectiveProfile.command, userTools)) {
       checkedProfiles.push({
         name,
@@ -274,21 +283,23 @@ export function resolveLlmConfig(
   options: LlmResolutionOptions = {},
 ): LlmProfile {
   const userTools = options.userTools ?? loadUserLlmTools();
+  const organizationProfile = options.organizationProfile ?? loadOrganizationProfile();
   const profiles = policy?.profiles || {};
-  const status = inspectLlmResolution(purpose, policy, { ...options, userTools });
+  const status = inspectLlmResolution(purpose, policy, { ...options, userTools, organizationProfile });
 
   for (const entry of status.checkedProfiles) {
     if (entry.available && entry.name !== 'builtin-fallback') {
       const profile = profiles[entry.name];
       if (!profile) continue;
+      const orgOverride = organizationProfile?.llm?.profile_overrides?.[entry.name];
       const userOverride = userTools.profile_overrides?.[entry.name];
+      const merged = { ...profile, ...(orgOverride || {}), ...(userOverride || {}) } as LlmProfile;
       if (userOverride?.command && isToolAvailable(userOverride.command, userTools)) {
-        const merged = { ...profile, ...userOverride } as LlmProfile;
         logger.info(`🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (user override, cmd=${merged.command})`);
         return merged;
       }
-      logger.info(`🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (cmd=${entry.command})`);
-      return userOverride ? ({ ...profile, ...userOverride } as LlmProfile) : profile;
+      logger.info(`🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (cmd=${merged.command})`);
+      return merged;
     }
   }
 

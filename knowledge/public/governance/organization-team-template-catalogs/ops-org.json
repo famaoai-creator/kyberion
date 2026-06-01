@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "organization_id": "ops-org",
+  "templates": {
+    "operations": {
+      "optional_roles": [
+        "tester",
+        "surface_liaison",
+        "decision_maker"
+      ],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 7,
+        "max_messages_per_run": 65,
+        "max_wall_clock_minutes": 240,
+        "max_member_turns": 10,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 12
+      }
+    },
+    "incident": {
+      "optional_roles": [
+        "planner",
+        "tester",
+        "surface_liaison"
+      ],
+      "lifecycle": {
+        "max_parallel_members": 6,
+        "max_members": 8,
+        "max_messages_per_run": 80,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 5
+      }
+    }
+  }
+}

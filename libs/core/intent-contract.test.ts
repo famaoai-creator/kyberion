@@ -460,6 +460,7 @@ describe('intent-contract compiler', () => {
     expect(flow.executionBrief.kind).toBe('actuator-execution-brief');
     expect(flow.intentContract.intent_id).toBe('bootstrap-project');
     expect(flow.clarificationPacket?.interaction_type).toBe('clarification');
+    expect(flow.clarificationPacket?.readiness).toBe('needs_clarification');
     expect(formatClarificationPacket(flow.clarificationPacket!)).toContain('project_brief');
   });
 

@@ -1,0 +1,14 @@
+{
+  "$id": "https://kyberion.local/schemas/production-evidence-summary-policy.schema.json",
+  "title": "Production Evidence Summary Policy",
+  "type": "object",
+  "required": ["version", "title_prefix", "invalid_entries_title", "pending_title", "complete_message"],
+  "properties": {
+    "version": { "type": "string" },
+    "title_prefix": { "type": "string", "minLength": 1 },
+    "invalid_entries_title": { "type": "string", "minLength": 1 },
+    "pending_title": { "type": "string", "minLength": 1 },
+    "complete_message": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

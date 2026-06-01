@@ -1,21 +1,22 @@
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { pathResolver, resolvePilotStrategyPolicy, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
 
 async function main() {
+  const policy = resolvePilotStrategyPolicy();
   const strategy = `
-# Kyberion AI Consulting: Go-to-Market Strategy
-## Target: Japanese Mid-sized Enterprise (SMB) Managers
+# ${policy.title}
+## Target: ${policy.target}
 
-### 1. Value Proposition: "Safety through Governance"
+### 1. ${policy.value_proposition_title}
 - **Automated Compliance:** AI handles the tedious task of ensuring all internal processes meet Japanese corporate standards.
 - **Simplicity through Intents:** Managers don't need to know 'how' it works, only 'what' they want to achieve.
 
-### 2. Market Strategy (Japanese SMB Focus)
-- **Phase 1 (Education):** Host webinars on "How AI can solve the 2024 Logistics/Labor Crisis".
-- **Phase 2 (Pilot):** 3-month trial focusing on document automation and decision support.
-- **Phase 3 (Expansion):** Full organization work-loop engine implementation.
+### 2. ${policy.market_strategy_title}
+- **Phase 1 (${policy.phase_titles.education}):** Host webinars on "How AI can solve the 2024 Logistics/Labor Crisis".
+- **Phase 2 (${policy.phase_titles.pilot}):** 3-month trial focusing on document automation and decision support.
+- **Phase 3 (${policy.phase_titles.expansion}):** Full organization work-loop engine implementation.
 
-### 3. Key Benefits
+### 3. ${policy.key_benefits_title}
 - Reduction in administrative overhead by 40%.
 - 100% audit trail for all AI-driven decisions.
   `;

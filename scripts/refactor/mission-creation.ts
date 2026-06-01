@@ -15,6 +15,7 @@ import {
   pathResolver,
   inferMissionOutcomeContract,
   ensureDefaultTenantProfile,
+  loadOrganizationProfile,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -84,6 +85,7 @@ export async function createMission(
   const upperId = id.toUpperCase();
   const isEphemeral = process.argv.includes('--ephemeral');
   const normalizedRelationships = normalizeRelationships(relationships);
+  const organizationProfile = loadOrganizationProfile(rootDir);
   const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
   const templates = readJsonFile<{
     templates: Array<{
@@ -129,6 +131,7 @@ export async function createMission(
     missionType,
     tier: finalTier,
     assignedPersona: persona,
+    organizationProfile,
   });
   writeMissionTeamPlan(missionDir, teamPlan);
   initializeMissionTeamBindings(missionDir, teamPlan);

@@ -1,0 +1,110 @@
+{
+  "requested": "default",
+  "resolved": "Default Kyberion Organization Profile (default)",
+  "selected_organization_id": "default",
+  "active_only": false,
+  "ready_only": false,
+  "missing_only": false,
+  "source_filter": null,
+  "summary": {
+    "total_count": 7,
+    "ready_count": 3,
+    "missing_count": 4,
+    "customer_count": 6,
+    "public_count": 1,
+    "active_count": 1
+  },
+  "profiles": [
+    {
+      "slug": "default",
+      "source": "public",
+      "active": true,
+      "ready": true,
+      "organization_id": "default",
+      "name": "Default Kyberion Organization Profile",
+      "mission_default_template": "default",
+      "team_default_template": "default",
+      "team_template_catalog_id": "default",
+      "llm_default": "standard",
+      "operating_principles_count": 4
+    },
+    {
+      "slug": "demo-org",
+      "source": "customer",
+      "active": false,
+      "ready": true,
+      "organization_id": "demo-org",
+      "name": "Demo Org",
+      "mission_default_template": "development",
+      "team_default_template": "development",
+      "team_template_catalog_id": "demo-org",
+      "llm_default": "light",
+      "operating_principles_count": 3
+    },
+    {
+      "slug": "e2e-onboard-1",
+      "source": "customer",
+      "active": false,
+      "ready": false,
+      "organization_id": "e2e-onboard-1",
+      "name": "e2e-onboard-1",
+      "mission_default_template": "default",
+      "team_default_template": "default",
+      "team_template_catalog_id": "default",
+      "llm_default": "default",
+      "operating_principles_count": 0
+    },
+    {
+      "slug": "ops-org",
+      "source": "customer",
+      "active": false,
+      "ready": true,
+      "organization_id": "ops-org",
+      "name": "Ops Org",
+      "mission_default_template": "operations",
+      "team_default_template": "operations",
+      "team_template_catalog_id": "ops-org",
+      "llm_default": "standard",
+      "operating_principles_count": 3
+    },
+    {
+      "slug": "story-demo",
+      "source": "customer",
+      "active": false,
+      "ready": false,
+      "organization_id": "story-demo",
+      "name": "story-demo",
+      "mission_default_template": "default",
+      "team_default_template": "default",
+      "team_template_catalog_id": "default",
+      "llm_default": "default",
+      "operating_principles_count": 0
+    },
+    {
+      "slug": "story-e2e-1",
+      "source": "customer",
+      "active": false,
+      "ready": false,
+      "organization_id": "story-e2e-1",
+      "name": "story-e2e-1",
+      "mission_default_template": "default",
+      "team_default_template": "default",
+      "team_template_catalog_id": "default",
+      "llm_default": "default",
+      "operating_principles_count": 0
+    },
+    {
+      "slug": "story-migrate",
+      "source": "customer",
+      "active": false,
+      "ready": false,
+      "organization_id": "story-migrate",
+      "name": "story-migrate",
+      "mission_default_template": "default",
+      "team_default_template": "default",
+      "team_template_catalog_id": "default",
+      "llm_default": "default",
+      "operating_principles_count": 0
+    }
+  ]
+}

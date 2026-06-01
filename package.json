@@ -19,6 +19,7 @@
     "test": "vitest run tests/smoke.test.ts",
     "test:unit": "vitest run libs/core/ libs/actuators/",
     "test:core": "vitest run libs/core/",
+    "avatar:dev": "pnpm --filter avatar-studio dev",
     "test:meeting-dry-run": "vitest run libs/core/meeting-participation-coordinator.test.ts libs/actuators/meeting-browser-driver/src/index.test.ts",
     "test:ui-voice-browser-smoke": "vitest run tests/voice-browser-smoke-contract.test.ts scripts/check_first_win_smoke.test.ts libs/actuators/meeting-actuator/src/index.test.ts",
     "test:integration": "vitest run tests/smoke.test.ts",
