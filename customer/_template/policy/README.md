@@ -1,6 +1,6 @@
 # Customer Policy Overrides
 
-Place customer-specific policy override files here. They override defaults from `knowledge/public/governance/*.json`.
+Place customer-specific policy override files here. They override defaults from `knowledge/product/governance/*.json`.
 
 Common overrides:
 

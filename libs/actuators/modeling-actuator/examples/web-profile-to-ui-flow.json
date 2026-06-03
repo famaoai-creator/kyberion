@@ -8,7 +8,7 @@
       "type": "capture",
       "op": "read_json",
       "params": {
-        "path": "knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json",
+        "path": "knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json",
         "export_as": "web_profile"
       }
     },

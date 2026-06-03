@@ -10,7 +10,7 @@ last_updated: 2026-05-15
 
 この register は、`PRODUCTION_RELEASE_GATE_AUDIT.ja.md` で local test だけでは証明できないと判定した
 production-readiness evidence を追跡する。機械判定の canonical source は
-`knowledge/public/governance/production-evidence-register.json` で、この文書は運用者向けの要約と更新手順を示す。
+`knowledge/product/governance/production-evidence-register.json` で、この文書は運用者向けの要約と更新手順を示す。
 収集手順は [`../operator/PRODUCTION_EVIDENCE_COLLECTION.md`](../operator/PRODUCTION_EVIDENCE_COLLECTION.md) を正とする。
 
 ## 判定ルール
@@ -34,6 +34,6 @@ production-readiness evidence を追跡する。機械判定の canonical source
 
 1. Add evidence as a dated row or linked artifact.
 2. Record the reviewer and exact verification date.
-3. Update `knowledge/public/governance/production-evidence-register.json` and this summary together.
+3. Update `knowledge/product/governance/production-evidence-register.json` and this summary together.
 4. Change `Current status` only after the artifact exists and has been reviewed.
 5. Update `PRODUCTION_RELEASE_GATE_AUDIT.ja.md` if the evidence changes the release-gate conclusion.

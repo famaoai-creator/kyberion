@@ -22,8 +22,8 @@ export interface SurfaceQueryOverlayCatalog {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const CATALOG_PATH = pathResolver.knowledge('public/governance/surface-query-overlay-catalog.json');
-const CATALOG_SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-query-overlay-catalog.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/surface-query-overlay-catalog.json');
+const CATALOG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-query-overlay-catalog.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: SurfaceQueryOverlayCatalog | null = null;

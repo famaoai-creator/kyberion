@@ -1330,7 +1330,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'list_incidents':
     case 'list_knowledge': {
       // list_knowledge is kept as an alias for backward compatibility; prefer list_incidents
-      const incidentRoot = pathResolver.rootResolve('knowledge/incidents');
+      const incidentRoot = pathResolver.rootResolve('knowledge/product/incidents');
       const { safeReaddir: readIncidentDir } = await import('@agent/core/secure-io');
       const incidents: any[] = [];
       if (safeExistsSync(incidentRoot)) {
@@ -1338,7 +1338,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         for (const entry of entries.filter(e => e.endsWith('.md'))) {
           incidents.push({
             id: entry.replace(/\.md$/, ''),
-            path: path.join('knowledge/incidents', entry)
+            path: path.join('knowledge/product/incidents', entry)
           });
         }
       }
@@ -1718,7 +1718,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
  * Strategic Reconciliation
  */
 async function performReconcile(input: SystemAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/system-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/system-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {

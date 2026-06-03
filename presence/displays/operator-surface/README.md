@@ -5,7 +5,7 @@ this app exists to give operators and non-operator stakeholders (CEO,
 compliance) a visual view of mission state, audit chain, and health
 **without** introducing a mutation surface.
 
-Strategy: [`knowledge/public/architecture/operator-surface-strategy.md`](../../../knowledge/public/architecture/operator-surface-strategy.md)
+Strategy: [`knowledge/product/architecture/operator-surface-strategy.md`](../../../knowledge/product/architecture/operator-surface-strategy.md)
 
 ## What this MVP includes
 
@@ -34,11 +34,11 @@ import {
 A contract test (`test/no-write-api.test.ts`) scans every TS / TSX file
 under `src/` and fails if any of `safeWriteFile`, `safeMkdir`,
 `safeAppendFileSync`, etc. appear. This guard is acceptance-gating per
-[`operator-surface-strategy.md` §9.1](../../../knowledge/public/architecture/operator-surface-strategy.md#91-security-baseline-mandatory-before-any-external-exposure).
+[`operator-surface-strategy.md` §9.1](../../../knowledge/product/architecture/operator-surface-strategy.md#91-security-baseline-mandatory-before-any-external-exposure).
 
 ## Acceptance criteria status
 
-From [`operator-surface-strategy.md` §9](../../../knowledge/public/architecture/operator-surface-strategy.md#9-acceptance-criteria-for-mos-shipped):
+From [`operator-surface-strategy.md` §9](../../../knowledge/product/architecture/operator-surface-strategy.md#9-acceptance-criteria-for-mos-shipped):
 
 - [x] No write API in the app's network surface
 - [x] Renders mission list, mission detail, audit timeline, health,

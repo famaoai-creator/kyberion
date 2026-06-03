@@ -80,7 +80,7 @@ const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ajv = new AjvCtor({ allErrors: true });
 addFormats(ajv);
-const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge('public/orchestration/browser-execution-presets.json');
+const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge('product/orchestration/browser-execution-presets.json');
 
 /**
  * Main Entry Point
@@ -581,7 +581,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
  * Strategic Reconciliation
  */
 async function performReconcile(input: ModelingAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/modeling-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/modeling-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await withRetry(
     async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),

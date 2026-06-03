@@ -1,11 +1,15 @@
 {
   "action": "pipeline",
   "name": "voice-clone-speak-fragment",
+  "version": "2.0.0",
   "description": "Reusable fragment: generate speech in a registered voice clone profile via mlx-audio Qwen3-TTS ICL. Append to any pipeline that produces text output needing personal voice synthesis. Required context vars: profile_id, text. Optional: delivery_mode (default artifact_and_playback), language (default ja), output_path.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as inside params.",
   "steps": [
     {
       "id": "generate_cloned_voice",
+      "role": "source",
       "op": "voice:generate_voice",
+      "produces": { "channel": "voice_gen_result", "type": "VoiceResult" },
       "params": {
         "action": "generate_voice",
         "request_id": "vcspeak-{{profile_id}}",
@@ -26,20 +30,20 @@
         },
         "routing": {
           "personal_voice_mode": "require_personal_voice"
-        },
-        "export_as": "voice_gen_result"
+        }
       }
     },
     {
       "id": "notify_voice_ready",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "voice_gen_result",
       "params": {
         "condition": { "from": "voice_gen_result.status", "operator": "eq", "value": "succeeded" },
         "then": [
           {
             "id": "notify_ok",
-            "type": "apply",
+            "role": "sink",
             "op": "system:system_notify",
             "params": {
               "title": "音声生成完了",
@@ -51,7 +55,7 @@
         "else": [
           {
             "id": "notify_blocked",
-            "type": "apply",
+            "role": "sink",
             "op": "system:log",
             "params": {
               "message": "[voice-clone-speak] generation result: {{voice_gen_result}}"

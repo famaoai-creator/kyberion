@@ -119,7 +119,7 @@ async function main() {
     ? pathResolver.rootResolve(String(argv.out))
     : pathResolver.sharedTmp(path.join('project-os', slug));
 
-  const artifactMapPath = pathResolver.knowledge('public/orchestration/project-operating-system-artifact-map.json');
+  const artifactMapPath = pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json');
   const artifactMap = readJsonFile<ArtifactMap>(artifactMapPath);
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
 

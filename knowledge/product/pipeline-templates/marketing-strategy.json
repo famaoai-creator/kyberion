@@ -1,0 +1,55 @@
+{
+  "pipeline_id": "marketing-strategy-distillation",
+  "version": "2.0.0",
+  "description": "Distill a marketing strategy for general users",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "context": {
+    "target_audience": "General users, Business managers, Solo entrepreneurs",
+    "product_name": "Kyberion",
+    "output_path": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/strategy.md"
+  },
+  "steps": [
+    {
+      "id": "strategy-distill",
+      "role": "source",
+      "op": "wisdom:distill",
+      "produces": { "channel": "marketing_copy", "type": "MarketingCopy" },
+      "params": {
+        "context": "Produce a marketing strategy for {{product_name}} aimed at {{target_audience}}. Focus on 'Safety through Governance' and 'Simplicity through Intents'.",
+        "format": "markdown"
+      }
+    },
+    {
+      "id": "render-deck",
+      "role": "sink",
+      "op": "media:generate_document",
+      "consumes": "marketing_copy",
+      "params": {
+        "profile_id": "summary-report",
+        "render_target": "pdf",
+        "data": {
+          "title": "Kyberion Marketing Expansion Plan",
+          "summary": "{{marketing_copy}}",
+          "sections": [
+            {
+              "heading": "Strategy",
+              "body": ["{{marketing_copy}}"]
+            }
+          ]
+        },
+        "output_path": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/expansion_plan.pdf"
+      }
+    },
+    {
+      "id": "write-markdown",
+      "role": "sink",
+      "op": "file:write",
+      "consumes": "marketing_copy",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{marketing_copy}}"
+      }
+    }
+  ]
+}

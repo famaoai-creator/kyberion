@@ -12,7 +12,7 @@ This is the procedure behind the `generate-video` intent and its default executi
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with a compatible video workflow
-- **Schema**: [`video-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-generation-adf.schema.json)
+- **Schema**: [`video-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-generation-adf.schema.json)
 
 ## 3. Contract Shape
 `video-generation-adf` is the stable public interface.

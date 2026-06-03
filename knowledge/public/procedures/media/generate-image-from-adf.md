@@ -6,7 +6,7 @@ Generate a governed image artifact from an `image-generation-adf` contract inste
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with an SDXL-compatible checkpoint available
-- **Schema**: [`image-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/image-generation-adf.schema.json)
+- **Schema**: [`image-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/image-generation-adf.schema.json)
 
 ## 3. Contract Shape
 `image-generation-adf` is the stable public interface.

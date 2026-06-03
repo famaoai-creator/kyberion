@@ -55,8 +55,8 @@ type WorkflowCatalogFile = {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-workflow-catalog.schema.json');
-const WORKFLOW_CATALOG_PATH = pathResolver.knowledge('public/governance/mission-workflow-catalog.json');
+const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-workflow-catalog.schema.json');
+const WORKFLOW_CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
 
 let workflowCatalogValidateFn: ValidateFunction | null = null;
 

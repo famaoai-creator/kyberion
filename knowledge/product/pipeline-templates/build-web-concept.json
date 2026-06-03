@@ -1,0 +1,36 @@
+{
+  "pipeline_id": "build-web-concept",
+  "version": "2.0.0",
+  "description": "Generate and build a web site prototype from a conceptual brief.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "site-structure",
+      "role": "source",
+      "op": "reasoning:analyze",
+      "produces": { "channel": "site_html", "type": "HtmlContent" },
+      "params": {
+        "instruction": "Define and write a complete HTML document for a website based on this concept: {{concept_brief}}. Include landing page sections (Hero, Features, Pricing, Footer). If a design theme is provided ({{design_theme}}), incorporate those brand styles directly into the HTML and CSS. Return a single self-contained HTML string."
+      }
+    },
+    {
+      "id": "generate-code",
+      "role": "sink",
+      "op": "code:write_artifact",
+      "consumes": "site_html",
+      "params": {
+        "path": "active/shared/tmp/preview/index.html",
+        "content": "{{site_html}}"
+      }
+    },
+    {
+      "id": "preview",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Web concept written to active/shared/tmp/preview/index.html"
+      }
+    }
+  ]
+}

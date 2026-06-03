@@ -26,4 +26,4 @@
 - guarded route は `auth_state` が無ければ `/login` へ戻す
 - `/__kyberion/session-export` は debug 時だけ handoff JSON を返す
 
-profile は [`example-web-login-guarded.json`](/Users/famao/kyberion/knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json) と揃っています。
+profile は [`example-web-login-guarded.json`](/Users/famao/kyberion/knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json) と揃っています。

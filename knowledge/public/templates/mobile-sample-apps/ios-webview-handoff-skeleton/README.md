@@ -26,4 +26,4 @@ xcrun simctl launch booted com.example.iosmobile \
 - relative path:
   `Library/Application Support/kyberion/webview-session.json`
 
-これは [`example-ios-login-passkey.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json) と揃っています。
+これは [`example-ios-login-passkey.json`](/Users/famao/kyberion/knowledge/product/orchestration/mobile-app-profiles/example-ios-login-passkey.json) と揃っています。

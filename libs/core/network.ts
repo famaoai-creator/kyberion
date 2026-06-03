@@ -11,7 +11,7 @@ import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
 
 function loadAllowedDomains(): string[] {
   try {
-    const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
+    const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
     if (safeExistsSync(policyPath)) {
       const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
       return policy.network_guardrails.allowed_domains || [];
@@ -22,7 +22,7 @@ function loadAllowedDomains(): string[] {
 
 function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
   try {
-    const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
+    const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
     if (safeExistsSync(policyPath)) {
       const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
       const maxRequestSizeKb = Number(policy?.network_guardrails?.max_request_size_kb);

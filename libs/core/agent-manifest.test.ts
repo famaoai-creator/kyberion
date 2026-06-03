@@ -4,8 +4,8 @@ import { loadAgentManifests, resolveSelectionHints, safeMkdir, safeWriteFile, pa
 describe('agent-manifest selection hint loading', () => {
   it('fills provider and model from the agent profile directory selection hints when frontmatter omits them', () => {
     const root = pathResolver.sharedTmp('agent-manifest-fallback-test');
-    const agentsDir = `${root}/knowledge/agents`;
-    const profileDir = `${root}/knowledge/public/orchestration/agent-profiles`;
+    const agentsDir = `${root}/knowledge/product/agents`;
+    const profileDir = `${root}/knowledge/product/orchestration/agent-profiles`;
 
     safeMkdir(agentsDir, { recursive: true });
     safeMkdir(profileDir, { recursive: true });
@@ -42,8 +42,8 @@ describe('agent-manifest selection hint loading', () => {
 
   it('falls back to the legacy snapshot when the canonical directory is absent', () => {
     const root = pathResolver.sharedTmp('agent-manifest-snapshot-fallback-test');
-    const agentsDir = `${root}/knowledge/agents`;
-    const profileDir = `${root}/knowledge/public/orchestration`;
+    const agentsDir = `${root}/knowledge/product/agents`;
+    const profileDir = `${root}/knowledge/product/orchestration`;
 
     safeMkdir(agentsDir, { recursive: true });
     safeMkdir(profileDir, { recursive: true });

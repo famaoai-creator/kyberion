@@ -1,0 +1,61 @@
+{
+  "pipeline_id": "persona-beginner-product-concept",
+  "version": "2.0.0",
+  "description": "初心者のための新商品企画ビジュアライザー。トピックからコンセプト、イメージ画像、BGM、PPTを一括生成します。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "variables": {
+    "topic": {
+      "type": "string",
+      "description": "新商品のテーマ（例：未来のスマートウォッチ）",
+      "default": "エコフレンドリーな空飛ぶ靴"
+    }
+  },
+  "steps": [
+    {
+      "id": "create-brief",
+      "role": "source",
+      "op": "wisdom:synthesize",
+      "produces": { "channel": "product_brief", "type": "ProductBrief" },
+      "params": {
+        "instruction": "テーマ「{{topic}}」に基づき、商品のキャッチコピー、ターゲット層、主要機能をまとめた企画ブリーフを作成してください。また、画像生成用のプロンプトと音楽生成用のスタイル指定も含めてください。"
+      }
+    },
+    {
+      "id": "gen-image",
+      "role": "sink",
+      "op": "media-generation:generate_image",
+      "consumes": "product_brief",
+      "params": {
+        "image_adf": {
+          "intent": "product_visual",
+          "prompt": "{{product_brief.image_prompt}}",
+          "output": { "target_path": "active/shared/exports/{{topic}}_concept.png" }
+        }
+      }
+    },
+    {
+      "id": "gen-music",
+      "role": "sink",
+      "op": "media-generation:generate_music",
+      "consumes": "product_brief",
+      "params": {
+        "music_adf": {
+          "intent": "product_bgm",
+          "style": "{{product_brief.music_style}}",
+          "output": { "target_path": "active/shared/exports/{{topic}}_bgm.mp3" }
+        }
+      }
+    },
+    {
+      "id": "render-pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "product_brief",
+      "params": {
+        "brief_from": "product_brief",
+        "path": "active/shared/exports/{{topic}}_企画書.pptx"
+      }
+    }
+  ]
+}

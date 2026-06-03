@@ -33,7 +33,7 @@ describe('service-bootstrap-catalog', () => {
 
   it('emits a catalog that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/service-bootstrap-catalog.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/service-bootstrap-catalog.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const catalog = loadServiceBootstrapCatalog();
     expect(validate(catalog), JSON.stringify(validate.errors || [])).toBe(true);

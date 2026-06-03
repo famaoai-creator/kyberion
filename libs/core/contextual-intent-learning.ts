@@ -11,7 +11,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ajv = new Ajv({ allErrors: true });
 addFormats(ajv);
 const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/contextual-intent-learning.schema.json'
+  'product/schemas/contextual-intent-learning.schema.json'
 );
 
 function learningStorePath(): string {

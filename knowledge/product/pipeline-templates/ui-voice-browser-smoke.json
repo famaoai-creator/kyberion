@@ -1,0 +1,63 @@
+{
+  "pipeline_id": "ui-voice-browser-smoke",
+  "version": "2.0.0",
+  "description": "Static smoke contract for UI health endpoints, voice runtime entrypoints, browser first-win flow, and meeting consent gate wiring.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "labels": ["smoke", "ui", "voice", "browser", "consent"],
+  "steps": [
+    {
+      "id": "presence-studio-health-surface",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "presence_studio_server", "type": "FileContent" },
+      "params": {
+        "path": "presence/displays/presence-studio/server.ts"
+      }
+    },
+    {
+      "id": "presence-studio-voice-ui",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "presence_studio_ui", "type": "FileContent" },
+      "params": {
+        "path": "presence/displays/presence-studio/static/index.html"
+      }
+    },
+    {
+      "id": "voice-runtime-first-line",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "voice_hello_pipeline", "type": "FileContent" },
+      "params": {
+        "path": "pipelines/voice-hello.json"
+      }
+    },
+    {
+      "id": "browser-first-win-pipeline",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "browser_first_win_pipeline", "type": "JsonData" },
+      "params": {
+        "path": "pipelines/verify-session.json"
+      }
+    },
+    {
+      "id": "meeting-consent-gate",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "meeting_consent_gate", "type": "FileContent" },
+      "params": {
+        "path": "libs/actuators/meeting-actuator/src/index.ts"
+      }
+    },
+    {
+      "id": "smoke-summary",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[ui-voice-browser-smoke] checked presence health surface, voice runtime pipeline, browser first-win pipeline, and meeting consent gate"
+      }
+    }
+  ]
+}

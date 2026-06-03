@@ -11,11 +11,11 @@ It does not auto-promote the profile to active runtime usage.
 
 - **Actuator**: `voice-actuator`
 - **Schemas**:
-  - [`voice-sample-collection.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/voice-sample-collection.schema.json)
-  - [`voice-profile-registration.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/voice-profile-registration.schema.json)
-  - [`voice-sample-ingestion-policy.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/voice-sample-ingestion-policy.schema.json)
+  - [`voice-sample-collection.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/voice-sample-collection.schema.json)
+  - [`voice-profile-registration.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/voice-profile-registration.schema.json)
+  - [`voice-sample-ingestion-policy.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/voice-sample-ingestion-policy.schema.json)
 - **Governance**:
-  - [`voice-sample-ingestion-policy.json`](/Users/famao/kyberion/knowledge/public/governance/voice-sample-ingestion-policy.json)
+  - [`voice-sample-ingestion-policy.json`](/Users/famao/kyberion/knowledge/product/governance/voice-sample-ingestion-policy.json)
 
 ## 3. Contract Shape
 

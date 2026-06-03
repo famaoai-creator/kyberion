@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "name": "Ecosystem Orchestration Governance",
+  "defaults": {
+    "capability_category": "utilities",
+    "namespace": "general",
+    "tier": "personal"
+  },
+  "scaffolding": {
+    "template_dir": "templates/scaffold",
+    "required_files": ["package.json", "tsconfig.json", "src/index.ts"]
+  },
+  "pipelines": {
+    "dir": "pipelines",
+    "timeout_ms": 120000
+  },
+  "plugins": {
+    "registry": "knowledge/product/orchestration/plugin-registry.json",
+    "allowed_categories": ["core", "engineering", "audit", "connector", "media", "intelligence", "ux", "business", "utilities"]
+  },
+  "jobs": [
+    {
+      "name": "System Onboarding",
+      "id": "sys_onboarding",
+      "steps": [
+        {
+          "id": "stabilize_links",
+          "skill": "run_shell_command",
+          "args": "--command \"find skills -name 'core' -type l -path '*/node_modules/@agent/core' -exec rm {} \\; && find skills -name '@agent' -type d -path '*/node_modules/@agent' -exec ln -s ../../../../../dist/libs/core {}/core \\;\""
+        },
+        {
+          "id": "build_sync",
+          "skill": "run_shell_command",
+          "args": "--command \"npm run build\""
+        },
+        {
+          "id": "start_services",
+          "skill": "run_shell_command",
+          "args": "--command \"node dist/scripts/surface_runtime.js --action reconcile\""
+        },
+        {
+          "id": "verify_status",
+          "skill": "run_shell_command",
+          "args": "--command \"node dist/scripts/surface_runtime.js --action status\""
+        },
+        {
+          "id": "smoke_test",
+          "skill": "run_shell_command",
+          "args": "--command \"npm run test:smoke\""
+        }
+      ]
+    }
+  ]
+}

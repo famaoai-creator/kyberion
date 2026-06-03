@@ -1,0 +1,96 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "reconcile-config-fallbacks",
+  "version": "1.0.0",
+  "name": "Config Fallback Reconciler",
+  "description": "Reads the config fallback registry and closes the feedback loop: creates missing knowledge JSON files from defaults (file_not_found), and writes corrected proposals for parse errors for human review.",
+  "context": {
+    "registry_path": "active/shared/tmp/config-fallback-registry.json",
+    "proposals_dir": "active/shared/tmp/config-fallback-proposals"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "[CONFIG-FALLBACK] Starting reconcile cycle..." }
+    },
+    {
+      "id": "run_reconciler",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "reconcile_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/reconcile_config_fallbacks.js 2>/dev/null || echo '{\"repaired\":[],\"proposals_written\":[],\"skipped\":[],\"pruned\":0}'"
+      }
+    },
+    {
+      "id": "log_result",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": { "message": "[CONFIG-FALLBACK] Reconcile result: {{reconcile_result}}" }
+    },
+    {
+      "id": "check_proposals",
+      "role": "gate",
+      "op": "core:if",
+      "consumes": "reconcile_result",
+      "params": {
+        "condition": { "from": "reconcile_result.proposals_written.length", "operator": "gt", "value": 0 },
+        "then": [
+          {
+            "id": "analyze_proposals",
+            "role": "source",
+            "op": "reasoning:analyze",
+            "produces": { "channel": "analysis_result", "type": "AnalysisResult" },
+            "params": {
+              "instruction": "Review each proposal file in active/shared/tmp/config-fallback-proposals/. For each .proposal.json: verify that defaults_snapshot is a valid, complete JSON object matching what the knowledge file should contain. If it looks correct, confirm it. If it needs adjustment, provide a corrected version. Output a JSON array of {knowledge_path, status: 'ok'|'needs_correction', corrected_content?} for each proposal.",
+              "source_path": "{{proposals_dir}}",
+              "analysis_type": "config_proposal_review",
+              "output_path": "active/shared/tmp/config-fallback-review.json"
+            }
+          },
+          {
+            "id": "log_proposals",
+            "role": "sink",
+            "op": "system:log",
+            "consumes": "analysis_result",
+            "params": {
+              "message": "[CONFIG-FALLBACK] Proposal review complete. See active/shared/tmp/config-fallback-review.json. Apply corrections manually or re-run with --apply flag."
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_no_proposals",
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "[CONFIG-FALLBACK] No parse errors found. All fallbacks were file_not_found type." }
+          }
+        ]
+      }
+    },
+    {
+      "id": "write_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "reconcile_result",
+      "params": {
+        "path": "active/shared/tmp/config-fallback-last-run.json",
+        "content": {
+          "ran_at": "{{_now}}",
+          "result": "{{reconcile_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": { "message": "[CONFIG-FALLBACK] Done. Repaired: {{reconcile_result.repaired.length}}, Proposals: {{reconcile_result.proposals_written.length}}, Skipped: {{reconcile_result.skipped.length}}, Pruned: {{reconcile_result.pruned}}" }
+    }
+  ]
+}

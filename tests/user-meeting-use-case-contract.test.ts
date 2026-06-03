@@ -29,7 +29,7 @@ describe('User meeting use-case contract', () => {
   });
 
   it('keeps the architecture use-case aligned with live participation guardrails', () => {
-    const architecture = read('knowledge/public/architecture/meeting-facilitator-use-case.md');
+    const architecture = read('knowledge/product/architecture/meeting-facilitator-use-case.md');
     expect(architecture).toContain('Participation consent (`meeting:participate`)');
     expect(architecture).toContain('meeting_participation.recording_denied');
     expect(architecture).toContain('meeting_participation.speak_denied');

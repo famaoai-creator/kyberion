@@ -19,7 +19,7 @@ export const TIERS: TierWeightMap = {
 };
 
 const PROJECT_ROOT = pathResolver.rootDir();
-const POLICY_PATH = pathResolver.knowledge('public/governance/security-policy.json');
+const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
 
 function normalizePath(p: string): string {
   return p.replace(/\/+$/, '');
@@ -536,7 +536,7 @@ export function scanForConfidentialMarkers(content: string): MarkerScanResult {
 function loadMarkerPatterns(): { name: string; regex: string }[] {
   const patterns: { name: string; regex: string }[] = [];
   try {
-    const policyPath = pathResolver.knowledge('public/governance/knowledge-sync-rules.json');
+    const policyPath = pathResolver.knowledge('product/governance/knowledge-sync-rules.json');
     if (rawExistsSync(policyPath)) {
       const rules = JSON.parse(rawReadTextFile(policyPath));
       const pii = rules?.security?.pii_patterns || [];

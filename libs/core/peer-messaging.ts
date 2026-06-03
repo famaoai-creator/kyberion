@@ -104,7 +104,7 @@ export interface PeerMessagingCatalogOptions {
   catalogPath?: string;
 }
 
-const DEFAULT_CATALOG_PATH = pathResolver.knowledge('public/orchestration/peer-network.json');
+const DEFAULT_CATALOG_PATH = pathResolver.knowledge('product/orchestration/peer-network.json');
 const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/peer-messaging';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/peer-messaging';
 const DEFAULT_INBOX_ROLE: GovernedArtifactRole = 'surface_runtime';

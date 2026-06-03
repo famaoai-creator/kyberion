@@ -6,12 +6,12 @@ import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const MEMORY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-contract-memory.schema.json');
-const POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-contract-selection-policy.schema.json');
-const MEMORY_SEED_PATH = pathResolver.knowledge('public/governance/intent-contract-memory.json');
+const MEMORY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-contract-memory.schema.json');
+const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-contract-selection-policy.schema.json');
+const MEMORY_SEED_PATH = pathResolver.knowledge('product/governance/intent-contract-memory.json');
 const MEMORY_RUNTIME_PATH = pathResolver.shared('runtime/intent-contract-memory.json');
-const POLICY_PATH = pathResolver.knowledge('public/governance/intent-contract-selection-policy.json');
-const ONTOLOGY_PATH = pathResolver.knowledge('public/governance/intent-domain-ontology.json');
+const POLICY_PATH = pathResolver.knowledge('product/governance/intent-contract-selection-policy.json');
+const ONTOLOGY_PATH = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
 
 type ContractKind = 'pipeline' | 'schema' | 'task_session_policy' | 'mission_command' | 'direct_reply';
 

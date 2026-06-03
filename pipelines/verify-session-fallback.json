@@ -1,7 +1,8 @@
 {
   "pipeline_id": "verify-session-fallback",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Non-browser first-win fallback for environments where Playwright cannot launch. Writes a small local artifact so first-win still succeeds with a useful result.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "action": "pipeline",
   "labels": ["first-win", "fallback", "clean-env"],
   "context": {
@@ -10,7 +11,7 @@
   "steps": [
     {
       "id": "announce-fallback",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
       "params": {
         "message": "Browser first-win was unavailable. Falling back to a non-browser artifact at {{ARTIFACT_PATH}}."
@@ -18,7 +19,7 @@
     },
     {
       "id": "write-fallback-artifact",
-      "type": "apply",
+      "role": "sink",
       "op": "system:write_file",
       "params": {
         "path": "{{ARTIFACT_PATH}}",
@@ -31,7 +32,7 @@
     },
     {
       "id": "confirm-fallback",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
       "params": {
         "message": "✅ Fallback first-win artifact written to {{ARTIFACT_PATH}}"

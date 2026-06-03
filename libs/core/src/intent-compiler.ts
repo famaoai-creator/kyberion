@@ -35,7 +35,7 @@ export function compileIntent(
   intent: string,
   options?: { knowledgeHints?: any[]; standardIntents?: any[] }
 ): CompiledIntent | null {
-  const intentsPath = pathResolver.knowledge('public/governance/standard-intents.json');
+  const intentsPath = pathResolver.knowledge('product/governance/standard-intents.json');
   let standardIntents: any[] = options?.standardIntents || [];
 
   if (standardIntents.length === 0 && safeExistsSync(intentsPath)) {

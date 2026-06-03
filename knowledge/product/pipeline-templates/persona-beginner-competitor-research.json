@@ -1,0 +1,59 @@
+{
+  "pipeline_id": "persona-beginner-competitor-research",
+  "version": "2.0.0",
+  "description": "初心者のための競合調査自動化。会社名を入力するだけでWeb検索から特徴を抽出し、PPT資料を作成します。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "variables": {
+    "target_name": {
+      "type": "string",
+      "description": "調査したい会社名またはサービス名",
+      "default": "Kyberion"
+    }
+  },
+  "steps": [
+    {
+      "id": "search-competitor",
+      "role": "source",
+      "op": "browser:pipeline",
+      "produces": { "channel": "search_results", "type": "BrowserContent" },
+      "params": {
+        "steps": [
+          { "type": "apply", "op": "goto", "params": { "url": "https://www.google.com/search?q={{target_name}}+特徴+強み+価格" } },
+          { "type": "capture", "op": "content", "params": { "export_as": "search_results" } }
+        ]
+      }
+    },
+    {
+      "id": "synthesize-report",
+      "role": "transform",
+      "op": "wisdom:synthesize",
+      "consumes": "search_results",
+      "produces": { "channel": "competitor_brief", "type": "CompetitorBrief" },
+      "params": {
+        "instruction": "検索結果から、{{target_name}}の特徴、強み、想定される価格情報を抽出し、プレゼン資料用の構造化データ（JSON形式のブリーフ）を作成してください。",
+        "context": ["{{search_results}}"]
+      }
+    },
+    {
+      "id": "generate-storyline",
+      "role": "transform",
+      "op": "media:proposal_storyline_from_brief",
+      "consumes": "competitor_brief",
+      "produces": { "channel": "storyline", "type": "StorylineData" },
+      "params": {
+        "from": "competitor_brief"
+      }
+    },
+    {
+      "id": "render-pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "storyline",
+      "params": {
+        "storyline_from": "storyline",
+        "path": "active/shared/exports/{{target_name}}_調査レポート.pptx"
+      }
+    }
+  ]
+}

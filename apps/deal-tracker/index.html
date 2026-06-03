@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deal Tracker — 営業案件管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --card-bg: #ffffff;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #dc2626;
+      --warning: #f59e0b;
+      --success: #16a34a;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-600: #4b5563;
+      --gray-800: #1f2937;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,.1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--gray-800);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-md);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+    header .subtitle { font-size: 12px; opacity: .75; margin-top: 1px; }
+    header .header-right { display: flex; gap: 8px; align-items: center; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-ghost { background: rgba(255,255,255,.15); color: #fff; }
+    .btn-ghost:hover { background: rgba(255,255,255,.25); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 16px 24px 0;
+      border-bottom: 2px solid var(--gray-200);
+      background: var(--card-bg);
+    }
+    .tab {
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-600);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color .15s, border-color .15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab.active { color: var(--primary); border-color: var(--primary); }
+    .tab .badge {
+      background: var(--danger);
+      color: #fff;
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .tab .badge.gray { background: var(--gray-400); }
+
+    /* ── Main content ── */
+    main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Today alert ── */
+    .today-banner {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #92400e;
+    }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .stat-card .num {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-card .label { font-size: 11px; color: var(--gray-600); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+    .stat-card.danger .num { color: var(--danger); }
+    .stat-card.primary .num { color: var(--primary); }
+    .stat-card.success .num { color: var(--success); }
+
+    /* ── Pipeline board ── */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .pipeline { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 540px) {
+      .pipeline { grid-template-columns: 1fr; }
+    }
+
+    .stage-col {
+      background: var(--gray-100);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .stage-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .stage-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--gray-600);
+    }
+    .stage-count {
+      background: var(--gray-200);
+      color: var(--gray-600);
+      border-radius: 10px;
+      padding: 1px 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    /* ── Deal card ── */
+    .deal-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: box-shadow .15s, transform .1s;
+      border-left: 3px solid transparent;
+      position: relative;
+    }
+    .deal-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .deal-card.overdue { border-left-color: var(--danger); }
+    .deal-card.due-today { border-left-color: var(--warning); }
+    .deal-card.upcoming { border-left-color: var(--primary); }
+
+    .deal-company { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+    .deal-contact { font-size: 11px; color: var(--gray-600); margin-bottom: 6px; }
+    .deal-amount {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .deal-follow {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .deal-follow.overdue { color: var(--danger); font-weight: 600; }
+    .deal-follow.due-today { color: #b45309; font-weight: 600; }
+    .deal-follow.upcoming { color: var(--gray-600); }
+    .deal-follow.none { color: var(--gray-400); }
+
+    .card-actions {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: none;
+      gap: 4px;
+    }
+    .deal-card:hover .card-actions { display: flex; }
+
+    /* ── Today list ── */
+    .today-list { display: flex; flex-direction: column; gap: 10px; }
+    .today-item {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-left: 4px solid var(--warning);
+    }
+    .today-item.overdue { border-left-color: var(--danger); }
+    .today-item-info { flex: 1; }
+    .today-item-company { font-size: 14px; font-weight: 700; }
+    .today-item-meta { font-size: 12px; color: var(--gray-600); margin-top: 2px; }
+    .today-item-date { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .today-item-date.overdue { color: var(--danger); }
+    .today-item-date.due-today { color: #b45309; }
+
+    .stage-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--gray-200);
+      color: var(--gray-600);
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--gray-400);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* ── Modal ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--gray-600); margin-bottom: 5px; }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius);
+      font-size: 14px;
+      color: var(--gray-800);
+      transition: border-color .15s;
+      outline: none;
+      background: #fff;
+    }
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--primary); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+    .btn-cancel { background: var(--gray-100); color: var(--gray-800); }
+    .btn-cancel:hover { background: var(--gray-200); }
+
+    /* ── Funnel overview ── */
+    .funnel {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .funnel h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+    .funnel-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .funnel-label { font-size: 12px; width: 80px; text-align: right; color: var(--gray-600); font-weight: 500; }
+    .funnel-track { flex: 1; background: var(--gray-100); border-radius: 4px; height: 28px; position: relative; overflow: hidden; }
+    .funnel-fill { height: 100%; border-radius: 4px; transition: width .5s ease; display: flex; align-items: center; padding-left: 10px; }
+    .funnel-fill span { font-size: 12px; font-weight: 700; color: #fff; }
+    .funnel-amount { font-size: 12px; width: 80px; color: var(--gray-600); font-weight: 600; }
+
+    .won-count { font-size: 13px; color: var(--success); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📊 Deal Tracker</h1>
+    <div class="subtitle">営業案件管理システム</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost" onclick="openModal()">＋ 案件追加</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchView('today')" id="tab-today">
+    📋 今日のフォロー
+    <span class="badge" id="today-badge" style="display:none"></span>
+  </div>
+  <div class="tab" onclick="switchView('pipeline')" id="tab-pipeline">
+    🗂 パイプライン
+    <span class="badge gray" id="pipeline-badge"></span>
+  </div>
+  <div class="tab" onclick="switchView('overview')" id="tab-overview">
+    📈 全体概況
+  </div>
+</div>
+
+<main>
+  <!-- Today view -->
+  <div class="view active" id="view-today">
+    <div id="today-banner" class="today-banner" style="display:none">
+      ⚠️ <span id="today-banner-text"></span>
+    </div>
+    <div id="today-list" class="today-list">
+      <div class="empty-state"><div class="icon">🎉</div><p>今日フォローする案件はありません</p></div>
+    </div>
+  </div>
+
+  <!-- Pipeline view -->
+  <div class="view" id="view-pipeline">
+    <div class="pipeline" id="pipeline-board"></div>
+  </div>
+
+  <!-- Overview view -->
+  <div class="view" id="view-overview">
+    <div class="stats-row" id="stats-row"></div>
+    <div class="funnel" id="funnel"></div>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <h2 id="modal-title">案件を追加</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>会社名 *</label>
+        <input id="f-company" type="text" placeholder="株式会社サンプル" />
+      </div>
+      <div class="form-group">
+        <label>担当者名</label>
+        <input id="f-contact" type="text" placeholder="山田 太郎" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>金額（万円）</label>
+        <input id="f-amount" type="number" placeholder="300" min="0" />
+      </div>
+      <div class="form-group">
+        <label>ステージ</label>
+        <select id="f-stage">
+          <option value="contact">初回接触</option>
+          <option value="proposal">提案</option>
+          <option value="negotiation">交渉</option>
+          <option value="won">受注</option>
+          <option value="lost">失注</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>フォローアップ期日</label>
+      <input id="f-followup" type="date" />
+    </div>
+    <div class="form-group">
+      <label>メモ</label>
+      <input id="f-note" type="text" placeholder="次回訪問で提案書を提出する" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveDeal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data layer ──────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'deal-tracker-v1';
+
+function loadDeals() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveDeals(deals) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(deals));
+}
+
+function seedDemoData() {
+  if (loadDeals().length > 0) return;
+  const today = new Date();
+  const d = (offset) => {
+    const dt = new Date(today);
+    dt.setDate(dt.getDate() + offset);
+    return dt.toISOString().slice(0, 10);
+  };
+  saveDeals([
+    { id: 1, company: '三菱商事株式会社', contact: '鈴木 一郎', amount: 500, stage: 'proposal', followup: d(-2), note: '提案書送付済み、返答待ち', createdAt: d(-10) },
+    { id: 2, company: 'ソフトバンク株式会社', contact: '田中 花子', amount: 1200, stage: 'negotiation', followup: d(0), note: '価格交渉中、決裁者同席希望', createdAt: d(-20) },
+    { id: 3, company: '株式会社リクルート', contact: '佐藤 次郎', amount: 280, stage: 'contact', followup: d(3), note: '初回訪問後、資料送付した', createdAt: d(-3) },
+    { id: 4, company: 'トヨタ自動車株式会社', contact: '山田 三郎', amount: 3000, stage: 'proposal', followup: d(-1), note: 'カスタマイズ要件確認中', createdAt: d(-15) },
+    { id: 5, company: 'パナソニック株式会社', contact: '伊藤 由美', amount: 450, stage: 'won', followup: null, note: '受注確定！契約書手続き中', createdAt: d(-30) },
+    { id: 6, company: '株式会社NTTデータ', contact: '渡辺 健', amount: 800, stage: 'negotiation', followup: d(7), note: 'セキュリティ要件のすり合わせ', createdAt: d(-8) },
+    { id: 7, company: '楽天グループ株式会社', contact: '小林 美咲', amount: 150, stage: 'lost', followup: null, note: 'コスト面で他社に流れた', createdAt: d(-45) },
+    { id: 8, company: '株式会社サイバーエージェント', contact: '加藤 剛', amount: 600, stage: 'contact', followup: d(1), note: '製品デモの日程調整中', createdAt: d(-1) },
+  ]);
+}
+
+// ── State ───────────────────────────────────────────────────────────────────
+let editingId = null;
+let currentView = 'today';
+
+// ── Stage config ─────────────────────────────────────────────────────────────
+const STAGES = [
+  { id: 'contact',     label: '初回接触', color: '#6366f1' },
+  { id: 'proposal',    label: '提案',     color: '#f59e0b' },
+  { id: 'negotiation', label: '交渉',     color: '#f97316' },
+  { id: 'won',         label: '受注',     color: '#16a34a' },
+];
+
+// ── Date utils ───────────────────────────────────────────────────────────────
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+function followupStatus(dateStr) {
+  if (!dateStr) return 'none';
+  const today = todayStr();
+  if (dateStr < today) return 'overdue';
+  if (dateStr === today) return 'due-today';
+  return 'upcoming';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${m}/${d}`;
+}
+
+function formatAmount(n) {
+  if (!n) return '—';
+  return Number(n).toLocaleString() + '万円';
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const deals = loadDeals();
+  const today = todayStr();
+
+  // Count today/overdue (active deals only — not won/lost)
+  const activeDeals = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
+  const urgentDeals = activeDeals.filter(d => d.followup && d.followup <= today);
+  const overdue = activeDeals.filter(d => d.followup && d.followup < today);
+  const dueToday = activeDeals.filter(d => d.followup === today);
+
+  // Badges
+  const todayBadge = document.getElementById('today-badge');
+  if (urgentDeals.length > 0) {
+    todayBadge.textContent = urgentDeals.length;
+    todayBadge.style.display = '';
+  } else {
+    todayBadge.style.display = 'none';
+  }
+  document.getElementById('pipeline-badge').textContent = activeDeals.length;
+
+  // Banner
+  const banner = document.getElementById('today-banner');
+  const bannerText = document.getElementById('today-banner-text');
+  const msgs = [];
+  if (overdue.length) msgs.push(`期限超過 ${overdue.length}件`);
+  if (dueToday.length) msgs.push(`本日期限 ${dueToday.length}件`);
+  if (msgs.length > 0) {
+    bannerText.textContent = msgs.join('、') + ' — 今すぐフォローしましょう！';
+    banner.style.display = '';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  renderToday(deals, today);
+  renderPipeline(deals);
+  renderOverview(deals);
+}
+
+function followupLabel(status, dateStr) {
+  const icons = { overdue: '🔴', 'due-today': '🟡', upcoming: '🔵', none: '' };
+  const prefixes = { overdue: '期限超過', 'due-today': '本日', upcoming: '', none: '' };
+  if (status === 'none') return '<span class="deal-follow none">期日なし</span>';
+  return `<span class="deal-follow ${status}">${icons[status]} ${prefixes[status] ? prefixes[status] + ' ' : ''}${formatDate(dateStr)}</span>`;
+}
+
+function stagePill(stageId) {
+  const s = STAGES.find(x => x.id === stageId);
+  const label = s ? s.label : (stageId === 'won' ? '受注' : '失注');
+  const color = s ? s.color : (stageId === 'won' ? '#16a34a' : '#9ca3af');
+  return `<span class="stage-pill" style="background:${color}22;color:${color}">${label}</span>`;
+}
+
+function renderToday(deals, today) {
+  const container = document.getElementById('today-list');
+  const active = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost' && d.followup && d.followup <= today);
+  active.sort((a, b) => a.followup.localeCompare(b.followup));
+
+  if (active.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🎉</div><p>今日フォローする案件はありません</p></div>';
+    return;
+  }
+
+  container.innerHTML = active.map(deal => {
+    const status = followupStatus(deal.followup);
+    const isOverdue = status === 'overdue';
+    return `
+      <div class="today-item ${isOverdue ? 'overdue' : ''}" onclick="openModal(${deal.id})">
+        <div class="today-item-info">
+          <div class="today-item-company">${esc(deal.company)}</div>
+          <div class="today-item-meta">${esc(deal.contact || '—')} &nbsp;|&nbsp; ${formatAmount(deal.amount)} &nbsp;|&nbsp; ${esc(deal.note || '—')}</div>
+        </div>
+        ${stagePill(deal.stage)}
+        <div class="today-item-date ${isOverdue ? 'overdue' : 'due-today'}">${isOverdue ? '⚠ ' : '📅 '}${formatDate(deal.followup)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderPipeline(deals) {
+  const board = document.getElementById('pipeline-board');
+  board.innerHTML = STAGES.map(stage => {
+    const cards = deals.filter(d => d.stage === stage.id);
+    const cardsHtml = cards.length === 0
+      ? '<div style="text-align:center;padding:20px 0;font-size:12px;color:var(--gray-400)">案件なし</div>'
+      : cards.map(deal => dealCard(deal)).join('');
+    return `
+      <div class="stage-col">
+        <div class="stage-header">
+          <span class="stage-title" style="color:${stage.color}">${stage.label}</span>
+          <span class="stage-count">${cards.length}</span>
+        </div>
+        ${cardsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+function dealCard(deal) {
+  const status = followupStatus(deal.followup);
+  return `
+    <div class="deal-card ${status !== 'none' ? status : ''}" onclick="openModal(${deal.id})">
+      <div class="card-actions">
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteDeal(${deal.id})">🗑</button>
+      </div>
+      <div class="deal-company">${esc(deal.company)}</div>
+      <div class="deal-contact">${esc(deal.contact || '—')}</div>
+      <div class="deal-amount">${formatAmount(deal.amount)}</div>
+      ${followupLabel(status, deal.followup)}
+    </div>
+  `;
+}
+
+function renderOverview(deals) {
+  const active = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
+  const won = deals.filter(d => d.stage === 'won');
+  const wonAmount = won.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  const pipelineAmount = active.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  const overdue = active.filter(d => d.followup && d.followup < todayStr()).length;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card ${overdue > 0 ? 'danger' : ''}">
+      <div class="num">${overdue}</div>
+      <div class="label">期限超過</div>
+    </div>
+    <div class="stat-card primary">
+      <div class="num">${active.length}</div>
+      <div class="label">進行中案件</div>
+    </div>
+    <div class="stat-card primary">
+      <div class="num">${pipelineAmount.toLocaleString()}<span style="font-size:14px">万</span></div>
+      <div class="label">パイプライン</div>
+    </div>
+    <div class="stat-card success">
+      <div class="num">${won.length}</div>
+      <div class="label">受注件数</div>
+    </div>
+    <div class="stat-card success">
+      <div class="num">${wonAmount.toLocaleString()}<span style="font-size:14px">万</span></div>
+      <div class="label">受注金額</div>
+    </div>
+  `;
+
+  const maxAmount = Math.max(...STAGES.map(s => deals.filter(d => d.stage === s.id).reduce((sum, d) => sum + (Number(d.amount) || 0), 0)), 1);
+  const funnelRows = STAGES.map(stage => {
+    const stageDeals = deals.filter(d => d.stage === stage.id);
+    const amt = stageDeals.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    const pct = Math.round((amt / maxAmount) * 100);
+    return `
+      <div class="funnel-bar-row">
+        <div class="funnel-label">${stage.label}</div>
+        <div class="funnel-track">
+          <div class="funnel-fill" style="width:${pct}%;background:${stage.color}">
+            <span>${stageDeals.length}件</span>
+          </div>
+        </div>
+        <div class="funnel-amount">${amt.toLocaleString()}万円</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('funnel').innerHTML = `
+    <h3>📊 ステージ別パイプライン</h3>
+    ${funnelRows}
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200);font-size:13px">
+      受注済み: <span class="won-count">¥${wonAmount.toLocaleString()}万円 (${won.length}件)</span>
+    </div>
+  `;
+}
+
+// ── View switching ────────────────────────────────────────────────────────────
+function switchView(name) {
+  currentView = name;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+function openModal(id) {
+  editingId = id || null;
+  const deal = id ? loadDeals().find(d => d.id === id) : null;
+  document.getElementById('modal-title').textContent = deal ? '案件を編集' : '案件を追加';
+  document.getElementById('f-company').value = deal?.company || '';
+  document.getElementById('f-contact').value = deal?.contact || '';
+  document.getElementById('f-amount').value = deal?.amount || '';
+  document.getElementById('f-stage').value = deal?.stage || 'contact';
+  document.getElementById('f-followup').value = deal?.followup || '';
+  document.getElementById('f-note').value = deal?.note || '';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-company').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  editingId = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+function saveDeal() {
+  const company = document.getElementById('f-company').value.trim();
+  if (!company) { document.getElementById('f-company').focus(); return; }
+
+  const deals = loadDeals();
+  const data = {
+    company,
+    contact: document.getElementById('f-contact').value.trim(),
+    amount: Number(document.getElementById('f-amount').value) || 0,
+    stage: document.getElementById('f-stage').value,
+    followup: document.getElementById('f-followup').value || null,
+    note: document.getElementById('f-note').value.trim(),
+  };
+
+  if (editingId) {
+    const idx = deals.findIndex(d => d.id === editingId);
+    if (idx >= 0) deals[idx] = { ...deals[idx], ...data };
+  } else {
+    data.id = Date.now();
+    data.createdAt = new Date().toISOString().slice(0, 10);
+    deals.push(data);
+  }
+
+  saveDeals(deals);
+  closeModal();
+  render();
+}
+
+function deleteDeal(id) {
+  if (!confirm('この案件を削除しますか？')) return;
+  saveDeals(loadDeals().filter(d => d.id !== id));
+  render();
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openModal(); }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+seedDemoData();
+render();
+</script>
+</body>
+</html>

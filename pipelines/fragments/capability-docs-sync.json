@@ -1,11 +1,13 @@
 {
   "action": "pipeline",
   "name": "capability-docs-sync-fragment",
+  "version": "2.0.0",
   "description": "Synchronizes the global CAPABILITIES_GUIDE.md with all registered CLI and Gateway capabilities across knowledge tiers.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "steps": [
     {
       "id": "sync_docs",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "node dist/scripts/check_doc_examples.js",
@@ -14,7 +16,7 @@
     },
     {
       "id": "log_sync",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
       "params": {
         "message": "CAPABILITIES_GUIDE.md has been synchronized with the latest registry state."

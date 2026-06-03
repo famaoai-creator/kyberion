@@ -1,0 +1,87 @@
+{
+  "pipeline_id": "external-intelligence-radar",
+  "version": "2.0.0",
+  "description": "Compare external competitive intelligence with internal strategy docs.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-confidential-tier",
+      "role": "gate",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+          {
+            "id": "load-targets",
+            "role": "source",
+            "op": "system:read_json",
+            "produces": { "channel": "radar_targets", "type": "JsonData" },
+            "params": {
+              "path": "knowledge/confidential/strategy/radar-targets.json"
+            }
+          },
+          {
+            "id": "mock-findings",
+            "role": "transform",
+            "op": "reasoning:analyze",
+            "consumes": "radar_targets",
+            "produces": { "channel": "web_findings", "type": "AnalysisResult" },
+            "params": {
+              "instruction": "Simulate latest market findings for keywords: {{radar_targets.keywords}}. Focus on a new breakthrough from 'Agent-X' in autonomous SDR capability."
+            }
+          },
+          {
+            "id": "load-internal-strategy",
+            "role": "source",
+            "op": "wisdom:knowledge_search",
+            "produces": { "channel": "internal_strategy", "type": "KnowledgeResult" },
+            "params": {
+              "query": "current business strategy",
+              "tier": "confidential",
+              "limit": 5
+            }
+          },
+          {
+            "id": "impact-analysis",
+            "role": "transform",
+            "op": "reasoning:analyze",
+            "consumes": ["web_findings", "internal_strategy"],
+            "produces": { "channel": "radar_analysis", "type": "AnalysisResult" },
+            "params": {
+              "instruction": "Compare internal strategy with simulated findings. Identify critical gaps or threats.",
+              "context": [
+                "{{web_findings}}",
+                "{{internal_strategy}}"
+              ]
+            }
+          },
+          {
+            "id": "emit-report",
+            "role": "sink",
+            "op": "wisdom:write_file",
+            "consumes": "radar_analysis",
+            "params": {
+              "path": "{{mission_evidence_dir}}/radar-report.md",
+              "content": "{{radar_analysis}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "external-intelligence-radar requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

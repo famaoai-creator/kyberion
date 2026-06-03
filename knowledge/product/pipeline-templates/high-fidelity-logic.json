@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "name": "high-fidelity-logic",
+  "version": "2.0.0",
+  "description": "Distilled from mission MSN-SIM-LOG-001",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used skill without roles.",
+  "steps": [
+    {
+      "id": "json_check",
+      "role": "sink",
+      "op": "codebase-mapper",
+      "params": {
+        "args": "--dir ."
+      }
+    }
+  ]
+}

@@ -42,7 +42,7 @@ Open seats are filled by self-nomination + 30-day trial period (5 merged PRs in 
 |---|---|
 | Actuator framework | `libs/actuators/*`, `schemas/*-action.schema.json`, `docs/developer/EXTENSION_POINTS.md` |
 | Mission lifecycle | `scripts/mission_controller.ts`, `scripts/refactor/mission-*`, `libs/core/mission-*` |
-| Knowledge / governance | `knowledge/public/governance/*`, `libs/core/tier-guard.ts`, `docs/developer/CUSTOMER_AGGREGATION.md` |
+| Knowledge / governance | `knowledge/product/governance/*`, `libs/core/tier-guard.ts`, `docs/developer/CUSTOMER_AGGREGATION.md` |
 | Voice / surfaces | `presence/displays/*`, `satellites/voice-hub/*`, `libs/actuators/voice-actuator/*` |
 | Build / release | `package.json`, `.github/workflows/*`, `scripts/check_*.ts`, `migration/*` |
 

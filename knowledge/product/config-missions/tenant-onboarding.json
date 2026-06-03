@@ -1,0 +1,38 @@
+{
+  "preset_id": "tenant-onboarding",
+  "type": "config_mission",
+  "category": "tenant",
+  "description": "Bootstrap a new tenant or customer namespace. Creates the confidential knowledge structure, default service bindings, and access policy for the tenant.",
+  "inputs": {
+    "tenant": {
+      "type": "string",
+      "description": "Tenant slug (lowercase, hyphenated). Becomes the directory name under knowledge/confidential/.",
+      "required": true
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Human-readable tenant name.",
+      "required": true
+    },
+    "tier": {
+      "type": "enum",
+      "description": "Initial tenant tier.",
+      "values": ["trial", "standard", "enterprise"],
+      "default": "standard",
+      "required": false
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email address of the tenant owner for notifications and auth.",
+      "required": true
+    }
+  },
+  "pipeline": "pipelines/config/tenant-onboarding.json",
+  "write_targets": [
+    "knowledge/confidential/{{tenant}}/",
+    "knowledge/confidential/{{tenant}}/profile.json",
+    "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
+  ],
+  "authority_role": "system_configurator",
+  "notes": "Run `pnpm surfaces:reconcile` after applying to surface the new tenant in the operator dashboard."
+}

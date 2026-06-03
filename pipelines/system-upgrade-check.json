@@ -1,29 +1,33 @@
 {
   "action": "pipeline",
   "name": "Sovereign System Upgrade",
+  "version": "2.0.0",
   "description": "Checks for updates on GitHub and self-manages the upgrade mission through validation and merge.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "steps": [
-    { "op": "system:log", "params": { "message": "🔍 Step 1: Checking for remote updates on GitHub..." } },
+    { "role": "sink", "op": "system:log", "params": { "message": "🔍 Step 1: Checking for remote updates on GitHub..." } },
     {
+      "role": "source",
       "op": "system:shell",
-      "params": {
-        "cmd": "git fetch origin main && git rev-parse HEAD",
-        "export_as": "local_hash"
-      }
+      "produces": { "channel": "local_hash", "type": "GitHash" },
+      "params": { "cmd": "git fetch origin main && git rev-parse HEAD" }
     },
     {
+      "role": "source",
       "op": "system:shell",
-      "params": {
-        "cmd": "git rev-parse origin/main",
-        "export_as": "remote_hash"
-      }
+      "produces": { "channel": "remote_hash", "type": "GitHash" },
+      "params": { "cmd": "git rev-parse origin/main" }
     },
     {
+      "role": "sink",
       "op": "system:log",
+      "consumes": ["local_hash", "remote_hash"],
       "params": { "message": "Local: {{local_hash}} | Remote: {{remote_hash}}" }
     },
     {
+      "role": "gate",
       "op": "core:if",
+      "consumes": ["local_hash", "remote_hash"],
       "params": {
         "condition": {
           "from": "local_hash",
@@ -31,19 +35,20 @@
           "value": "{{remote_hash}}"
         },
         "then": [
-          { "op": "system:log", "params": { "message": "🚀 Update detected! Initializing upgrade mission..." } },
+          { "role": "sink", "op": "system:log", "params": { "message": "🚀 Update detected! Initializing upgrade mission..." } },
           {
+            "role": "source",
             "op": "system:shell",
+            "produces": { "channel": "create_result", "type": "ShellResult" },
             "params": {
-              "cmd": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development /knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'",
-              "export_as": "create_result"
+              "cmd": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development /knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'"
             }
           },
-          { "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: node dist/scripts/mission_controller.js start MSN-SYS-UPGRADE-{{remote_hash}}" } },
-          { "op": "system:log", "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" } }
+          { "role": "sink", "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: node dist/scripts/mission_controller.js start MSN-SYS-UPGRADE-{{remote_hash}}" } },
+          { "role": "sink", "op": "system:log", "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" } }
         ],
         "else": [
-          { "op": "system:log", "params": { "message": "✅ System is already up to date. No action needed." } }
+          { "role": "sink", "op": "system:log", "params": { "message": "✅ System is already up to date. No action needed." } }
         ]
       }
     }

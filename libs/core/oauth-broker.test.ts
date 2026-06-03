@@ -64,7 +64,7 @@ describe('oauth-broker', () => {
     mocks.loadServiceEndpointsCatalog.mockReturnValue({
       default_pattern: 'https://api.{service_id}.com/v1',
       services: {
-        canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
+        canva: { preset_path: 'knowledge/product/orchestration/service-presets/canva.json' },
       },
     });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
@@ -102,7 +102,7 @@ describe('oauth-broker', () => {
     mocks.loadServiceEndpointsCatalog.mockReturnValue({
       default_pattern: 'https://api.{service_id}.com/v1',
       services: {
-        canva: { preset_path: 'knowledge/public/orchestration/service-presets/canva.json' },
+        canva: { preset_path: 'knowledge/product/orchestration/service-presets/canva.json' },
       },
     });
     mocks.safeReadFile.mockImplementation((filePath: string) => {

@@ -1,58 +1,65 @@
 {
   "action": "pipeline",
   "name": "vital-health-check-fragment",
+  "version": "2.0.0",
   "description": "Scans the environment for necessary tools, network connectivity, and resource availability.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "check_node",
-      "type": "capture",
+      "role": "source",
       "op": "system:cli_health_check",
-      "params": { "command": "node", "export_as": "node_health" }
+      "produces": { "channel": "node_health", "type": "HealthResult" },
+      "params": { "command": "node" }
     },
     {
       "id": "check_git",
-      "type": "capture",
+      "role": "source",
       "op": "system:cli_health_check",
-      "params": { "command": "git", "export_as": "git_health" }
+      "produces": { "channel": "git_health", "type": "HealthResult" },
+      "params": { "command": "git" }
     },
     {
       "id": "check_gh",
-      "type": "capture",
+      "role": "source",
       "op": "system:cli_health_check",
-      "params": { "command": "gh", "export_as": "gh_health" }
+      "produces": { "channel": "gh_health", "type": "HealthResult" },
+      "params": { "command": "gh" }
     },
     {
       "id": "check_pnpm",
-      "type": "capture",
+      "role": "source",
       "op": "system:cli_health_check",
-      "params": { "command": "pnpm", "export_as": "pnpm_health" }
+      "produces": { "channel": "pnpm_health", "type": "HealthResult" },
+      "params": { "command": "pnpm" }
     },
     {
       "id": "check_network",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "network_health", "type": "ShellResult" },
       "params": {
         "command": "curl",
         "args": ["-I", "https://github.com"],
         "timeout_ms": 5000,
-        "allow_error": true,
-        "export_as": "network_health"
+        "allow_error": true
       }
     },
     {
       "id": "check_disk",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "disk_health", "type": "ShellResult" },
       "params": {
         "command": "df",
-        "args": ["-h", "."],
-        "export_as": "disk_health"
+        "args": ["-h", "."]
       }
     },
     {
       "id": "summary",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": ["node_health", "git_health", "gh_health", "pnpm_health", "network_health"],
       "params": {
         "message": "Health Check Complete. Node: {{node_health.available}}, Git: {{git_health.available}}, GH: {{gh_health.available}}, PNPM: {{pnpm_health.available}}, Network: {{network_health.status}}"
       }

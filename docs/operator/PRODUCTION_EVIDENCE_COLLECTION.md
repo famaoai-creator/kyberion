@@ -9,7 +9,7 @@ last_updated: 2026-05-15
 # Production Evidence Collection Runbook
 
 This runbook defines how operators collect and review the non-local evidence required before Kyberion can be called production-ready. The canonical machine-readable register is
-`knowledge/public/governance/production-evidence-register.json`; the developer-facing summary is
+`knowledge/product/governance/production-evidence-register.json`; the developer-facing summary is
 [`../developer/PRODUCTION_EVIDENCE_REGISTER.ja.md`](../developer/PRODUCTION_EVIDENCE_REGISTER.ja.md).
 
 Do not mark an item `verified` until the artifact exists, the reviewer has checked it, and the register contains `reviewed_at`, `reviewer`, and at least one `evidence_refs` entry.
@@ -88,7 +88,7 @@ Minimum evidence refs:
 
 After evidence review:
 
-1. Update `knowledge/public/governance/production-evidence-register.json`.
+1. Update `knowledge/product/governance/production-evidence-register.json`.
 2. Mirror the status in `docs/developer/PRODUCTION_EVIDENCE_REGISTER.ja.md`.
 3. Run `pnpm run check:production-evidence-status`.
 4. Run `pnpm run check:production-evidence-complete` only when all items are expected to be verified.

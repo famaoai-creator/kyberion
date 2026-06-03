@@ -21,7 +21,7 @@ describe('service-authority-map', () => {
 
   it('emits a map that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/service-authority-map.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/service-authority-map.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const map = loadServiceAuthorityMap();
     expect(validate(map), JSON.stringify(validate.errors || [])).toBe(true);

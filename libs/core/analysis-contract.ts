@@ -18,7 +18,7 @@ let analysisExecutionContractCache: AnalysisExecutionContractDefinition[] | null
 
 export function loadAnalysisExecutionContracts(): AnalysisExecutionContractDefinition[] {
   if (analysisExecutionContractCache) return analysisExecutionContractCache;
-  const filePath = pathResolver.knowledge('public/governance/analysis-execution-contracts.json');
+  const filePath = pathResolver.knowledge('product/governance/analysis-execution-contracts.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as AnalysisExecutionContractFile;
   analysisExecutionContractCache = Array.isArray(parsed.contracts) ? parsed.contracts : [];
   return analysisExecutionContractCache;

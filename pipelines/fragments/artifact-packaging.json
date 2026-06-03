@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "artifact-packaging-fragment",
+  "version": "2.0.0",
   "description": "Bundles project artifacts into a compressed archive for delivery.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "context": {
     "source_dir": "dist",
     "package_name": "kyberion-delivery.zip"
@@ -9,7 +11,7 @@
   "steps": [
     {
       "id": "zip_artifacts",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "zip -r active/shared/tmp/{{package_name}} {{source_dir}}"
@@ -17,7 +19,7 @@
     },
     {
       "id": "log_package",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
       "params": {
         "message": "Artifacts packaged into active/shared/tmp/{{package_name}}."

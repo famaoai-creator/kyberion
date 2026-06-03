@@ -12,8 +12,8 @@ interface LegacyMediaOpsCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/legacy-media-ops.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/legacy-media-ops.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/legacy-media-ops.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/legacy-media-ops.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: LegacyMediaOpsCatalog | null = null;

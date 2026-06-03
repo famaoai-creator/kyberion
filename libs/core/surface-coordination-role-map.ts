@@ -17,9 +17,9 @@ interface SurfaceCoordinationRoleMap {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_MAP_PATH = pathResolver.knowledge('public/governance/surface-coordination-role-map.json');
+const PUBLIC_MAP_PATH = pathResolver.knowledge('product/governance/surface-coordination-role-map.json');
 const PERSONAL_MAP_PATH = pathResolver.knowledge('personal/governance/surface-coordination-role-map.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-coordination-role-map.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-coordination-role-map.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedMap: SurfaceCoordinationRoleMap | null = null;

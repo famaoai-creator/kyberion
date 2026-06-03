@@ -67,7 +67,7 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('Mobile app profiles');
     expect(output).toContain('example-mobile-login-passkey');
-    expect(output).toContain('knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
+    expect(output).toContain('knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
   });
 
   it('prints a specific shared mobile app profile', async () => {
@@ -78,7 +78,7 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('example-mobile-login-passkey (android)');
     expect(output).toContain('Example Mobile Login + Passkey');
-    expect(output).toContain('Path: knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
+    expect(output).toContain('Path: knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
   });
 
   it('prints shared web app profile summary', async () => {
@@ -89,7 +89,7 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('Web app profiles');
     expect(output).toContain('example-web-login-guarded');
-    expect(output).toContain('knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
+    expect(output).toContain('knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json');
   });
 
   it('prints a specific shared web app profile', async () => {
@@ -100,7 +100,7 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('example-web-login-guarded (browser)');
     expect(output).toContain('Example Web Login + Guarded Routes');
-    expect(output).toContain('Path: knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json');
+    expect(output).toContain('Path: knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json');
   });
 
   it('includes the email workflow command in help output', async () => {

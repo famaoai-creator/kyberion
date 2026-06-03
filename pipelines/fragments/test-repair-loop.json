@@ -1,45 +1,53 @@
 {
   "action": "pipeline",
   "name": "test-repair-loop-fragment",
+  "version": "2.0.0",
   "description": "Runs the test suite and automatically attempts to repair any identified failures using LLM reasoning.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "run_tests",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "test_results", "type": "ShellResult" },
       "params": {
         "command": "pnpm",
         "args": ["test"],
-        "allow_error": true,
-        "export_as": "test_results"
+        "allow_error": true
       }
     },
     {
       "id": "conditional_repair",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "test_results",
       "params": {
         "condition": { "from": "test_results.status", "operator": "not_equals", "value": 0 },
         "then": [
           {
+            "role": "sink",
             "op": "system:log",
             "params": { "message": "Tests failed. Initiating self-healing loop..." }
           },
           {
+            "role": "source",
             "op": "reasoning:synthesize",
+            "produces": { "channel": "proposed_fix", "type": "TextResult" },
             "params": {
               "instruction": "Analyze these test failures and propose a fix. Output a Git patch or direct code instructions.",
-              "context": "{{test_results.stderr}}",
-              "export_as": "proposed_fix"
+              "context": "{{test_results.stderr}}"
             }
           },
           {
+            "role": "sink",
             "op": "system:log",
+            "consumes": "proposed_fix",
             "params": { "message": "Proposed Fix: {{proposed_fix}}" }
           }
         ],
         "else": [
           {
+            "role": "sink",
             "op": "system:log",
             "params": { "message": "All tests passed. System is stable." }
           }

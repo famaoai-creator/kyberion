@@ -31,8 +31,8 @@ export interface VoiceEngineRegistry {
   engines: VoiceEngineRecord[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/voice-engine-registry.json');
-const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('public/governance/voice-engines');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/voice-engine-registry.json');
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/voice-engines');
 
 const FALLBACK_REGISTRY: VoiceEngineRegistry = {
   version: 'fallback',

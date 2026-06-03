@@ -24,7 +24,7 @@ vi.mock('./secure-io.js', () => ({
   safeUnlinkSync: (p: string) => { files.delete(p); },
 }));
 
-const CATALOG = '/repo/knowledge/public/orchestration/provider-capabilities.json';
+const CATALOG = '/repo/knowledge/product/orchestration/provider-capabilities.json';
 
 describe('mergeProbedCapabilitiesIntoCatalog (probe -> knowledge loop)', () => {
   beforeEach(async () => {

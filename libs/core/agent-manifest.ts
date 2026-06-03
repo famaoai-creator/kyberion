@@ -161,7 +161,7 @@ function readDirMtime(dir: string): number {
  */
 export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   const root = rootDir || findProjectRoot();
-  const agentsDir = path.join(root, 'knowledge', 'agents');
+  const agentsDir = path.join(root, 'knowledge', 'product', 'agents');
 
   const cached = manifestCache.get(agentsDir);
   const now = Date.now();
