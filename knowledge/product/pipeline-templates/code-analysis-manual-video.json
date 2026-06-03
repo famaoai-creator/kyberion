@@ -1,0 +1,719 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "code-analysis-manual-video",
+  "version": "2.0.0",
+  "name": "Code Analysis To Manual And Video",
+  "description": "Analyze Kyberion source surfaces, generate a manual and design spec from the same brief, then render a narrated video manual from that same analysis.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "MSN-KYBERION-CODE-TO-MANUAL-VIDEO",
+    "mission_evidence_dir": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence",
+    "analysis_notes_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-notes.md",
+    "manual_brief_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-manual-brief.json",
+    "design_brief_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-design-brief.json",
+    "manual_doc_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-manual.docx",
+    "design_doc_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-design-spec.docx",
+    "content_brief_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-video-content-brief.json",
+    "narration_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-narration.aiff",
+    "video_output_path": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/code-analysis-video.mp4",
+    "video_bundle_dir": "active/missions/confidential/MSN-KYBERION-CODE-TO-MANUAL-VIDEO/evidence/video-composition/code-analysis-video",
+    "profile_id": "operator-ja-default"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📚 [CODE-TO-MANUAL-VIDEO] Starting code analysis to manual and video flow for mission {{mission_id}}"
+      }
+    },
+    {
+      "id": "capture_code_actuator_files",
+      "role": "source",
+      "op": "code:glob_files",
+      "produces": { "channel": "code_actuator_files", "type": "FileList" },
+      "params": {
+        "dir": "libs/actuators/code-actuator/src",
+        "ext": ".ts"
+      }
+    },
+    {
+      "id": "capture_media_actuator_files",
+      "role": "source",
+      "op": "code:glob_files",
+      "produces": { "channel": "media_actuator_files", "type": "FileList" },
+      "params": {
+        "dir": "libs/actuators/media-actuator/src",
+        "ext": ".ts"
+      }
+    },
+    {
+      "id": "capture_video_actuator_files",
+      "role": "source",
+      "op": "code:glob_files",
+      "produces": { "channel": "video_actuator_files", "type": "FileList" },
+      "params": {
+        "dir": "libs/actuators/video-composition-actuator/src",
+        "ext": ".ts"
+      }
+    },
+    {
+      "id": "capture_code_actuator_index",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "code_actuator_index", "type": "ReadResult" },
+      "params": {
+        "path": "libs/actuators/code-actuator/src/index.ts"
+      }
+    },
+    {
+      "id": "capture_media_actuator_index",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "media_actuator_index", "type": "ReadResult" },
+      "params": {
+        "path": "libs/actuators/media-actuator/src/index.ts"
+      }
+    },
+    {
+      "id": "capture_video_actuator_index",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "video_actuator_index", "type": "ReadResult" },
+      "params": {
+        "path": "libs/actuators/video-composition-actuator/src/index.ts"
+      }
+    },
+    {
+      "id": "capture_video_content_contract",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "video_content_contract", "type": "ReadResult" },
+      "params": {
+        "path": "libs/core/video-content-brief-contract.ts"
+      }
+    },
+    {
+      "id": "capture_narrated_video_brief",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "narrated_video_brief_compiler", "type": "ReadResult" },
+      "params": {
+        "path": "libs/core/narrated-video-brief-compiler.ts"
+      }
+    },
+    {
+      "id": "capture_video_composition_compiler",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "video_composition_compiler", "type": "ReadResult" },
+      "params": {
+        "path": "libs/core/video-composition-compiler.ts"
+      }
+    },
+    {
+      "id": "capture_media_backend_registry",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "media_backend_registry", "type": "ReadResult" },
+      "params": {
+        "path": "libs/core/media-backend-registry.ts"
+      }
+    },
+    {
+      "id": "capture_video_render_backend",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "video_render_backend", "type": "ReadResult" },
+      "params": {
+        "path": "libs/core/video-render-backend.ts"
+      }
+    },
+    {
+      "id": "capture_media_document_procedure",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "report_procedure", "type": "ReadResult" },
+      "params": {
+        "path": "knowledge/public/procedures/media/generate-report-from-document-brief.md"
+      }
+    },
+    {
+      "id": "capture_video_procedure",
+      "role": "source",
+      "op": "code:read_file",
+      "produces": { "channel": "video_procedure", "type": "ReadResult" },
+      "params": {
+        "path": "knowledge/public/procedures/media/create-narrated-intro-movie.md"
+      }
+    },
+    {
+      "id": "write_analysis_notes",
+      "role": "sink",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{analysis_notes_path}}",
+        "content": "# Kyberion Source Code Analysis Notes\n\n## Source Surfaces Inspected\n- `libs/actuators/code-actuator/src/index.ts`\n- `libs/actuators/media-actuator/src/index.ts`\n- `libs/actuators/video-composition-actuator/src/index.ts`\n- `libs/core/video-content-brief-contract.ts`\n- `libs/core/video-render-backend.ts`\n- `knowledge/public/procedures/media/generate-report-from-document-brief.md`\n- `knowledge/public/procedures/media/create-narrated-intro-movie.md`\n\n## What The Code Is Doing\n- `code-actuator` is a generic pipeline engine with capture, transform, apply, and control steps.\n- `media-actuator` owns the canonical document route: `document_outline_from_brief -> brief_to_design_protocol -> generate_document`.\n- `video-composition-actuator` compiles a video content brief into a storyboard and then into a narrated video brief.\n- `video-render-backend` performs the final backend render and audio muxing boundary.\n\n## Documentation Strategy\n- The manual document should explain how the code surfaces are analyzed and how the governed docs are produced.\n- The design spec should explain how the same analysis becomes a deterministic document and video pipeline.\n- The video manual should show the same flow as a narrated how-to, not as a product pitch.\n"
+      }
+    },
+    {
+      "id": "write_manual_brief",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["code_actuator_files", "media_actuator_files", "video_actuator_files"],
+      "params": {
+        "path": "{{manual_brief_path}}",
+        "content": {
+          "kind": "document-brief",
+          "artifact_family": "document",
+          "document_type": "report",
+          "document_profile": "summary-report",
+          "render_target": "docx",
+          "locale": "ja-JP",
+          "payload": {
+            "title": "Kyberion ソースコード分析マニュアル",
+            "summary": "Kyberion の source surfaces を分析し、同じ brief から manual, design spec, and narrated video を生成する流れを説明する。",
+            "source_inventory": {
+              "code_actuator_files": "{{code_actuator_files}}",
+              "media_actuator_files": "{{media_actuator_files}}",
+              "video_actuator_files": "{{video_actuator_files}}"
+            },
+            "sections": [
+              {
+                "heading": "1. 分析対象",
+                "body": [
+                  "このマニュアルは、code-actuator, media-actuator, video-composition-actuator, そして共有 core contract を横断して分析した結果をまとめる。"
+                ],
+                "bullets": [
+                  "source capture の入口を確認する",
+                  "manual 生成の canonical route を確認する",
+                  "video 生成の canonical route を確認する"
+                ]
+              },
+              {
+                "heading": "2. 観察結果",
+                "body": [
+                  "code-actuator は一般化された pipeline engine であり、文書そのものを作るのではなく、分析材料を収集する役割を持つ。",
+                  "media-actuator は document_outline_from_brief -> brief_to_design_protocol -> generate_document という canonical route を提供する。",
+                  "video-composition-actuator は video-content-brief を storyboard に変換し、さらに narrated video brief へ compile できる。"
+                ],
+                "callouts": [
+                  {
+                    "tone": "info",
+                    "title": "Source-backed",
+                    "body": "この flow はコードの実装と既存 procedure の両方から確認できる。"
+                  }
+                ]
+              },
+              {
+                "heading": "3. 手順の要点",
+                "body": [
+                  "1つの code-analysis brief を作り、そこから manual, design spec, video の3つに分岐する。",
+                  "manual と design spec は文書の profile を変えるだけで、同じ brief routing を使う。",
+                  "video は同じ分析結果を `video-content-brief` に変換し、narration と render を分離する。"
+                ],
+                "bullets": [
+                  "source surfaces を明示する",
+                  "document brief を govern する",
+                  "video brief は presentation_mode で分岐する"
+                ]
+              },
+              {
+                "heading": "4. 生成物",
+                "tables": [
+                  {
+                    "title": "Artifact Set",
+                    "columns": ["Artifact", "Purpose", "Path"],
+                    "rows": [
+                      ["manual docx", "operator-facing manual", "{{manual_doc_path}}"],
+                      ["design spec docx", "structural explanation", "{{design_doc_path}}"],
+                      ["narration aiff", "voice track for the walkthrough", "{{narration_path}}"],
+                      ["narrated mp4", "final video manual", "{{video_output_path}}"]
+                    ]
+                  }
+                ]
+              },
+              {
+                "heading": "5. 検証",
+                "body": [
+                  "ビルドされた actuator を使い、document と video の両経路が実行可能であることを確認する。",
+                  "final video については audio stream と bundle artifacts を確認する。"
+                ],
+                "bullets": [
+                  "build artifact exists",
+                  "docx artifacts exist",
+                  "audio artifact exists",
+                  "rendered video artifact exists"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "render_manual_doc",
+      "role": "sink",
+      "op": "media:generate_document",
+      "params": {
+        "brief": {
+          "kind": "document-brief",
+          "artifact_family": "document",
+          "document_type": "report",
+          "document_profile": "summary-report",
+          "render_target": "docx",
+          "locale": "ja-JP",
+          "payload": {
+            "title": "Kyberion ソースコード分析マニュアル",
+            "summary": "Kyberion の source surfaces を分析し、同じ brief から manual, design spec, and narrated video を生成する流れを説明する。",
+            "source_inventory": {
+              "code_actuator_files": "{{code_actuator_files}}",
+              "media_actuator_files": "{{media_actuator_files}}",
+              "video_actuator_files": "{{video_actuator_files}}"
+            },
+            "sections": [
+              {
+                "heading": "1. 分析対象",
+                "body": [
+                  "このマニュアルは、code-actuator, media-actuator, video-composition-actuator, そして共有 core contract を横断して分析した結果をまとめる。"
+                ],
+                "bullets": [
+                  "source capture の入口を確認する",
+                  "manual 生成の canonical route を確認する",
+                  "video 生成の canonical route を確認する"
+                ]
+              },
+              {
+                "heading": "2. 観察結果",
+                "body": [
+                  "code-actuator は一般化された pipeline engine であり、文書そのものを作るのではなく、分析材料を収集する役割を持つ。",
+                  "media-actuator は document outline と design protocol を経由して generate_document へ到達する canonical route を提供する。",
+                  "video-composition-actuator は video-content-brief を storyboard に変換し、さらに narrated video brief へ compile できる。"
+                ],
+                "callouts": [
+                  {
+                    "tone": "info",
+                    "title": "Source-backed",
+                    "body": "この flow はコードの実装と既存 procedure の両方から確認できる。"
+                  }
+                ]
+              },
+              {
+                "heading": "3. 手順の要点",
+                "body": [
+                  "1つの code-analysis brief を作り、そこから manual, design spec, video の3つに分岐する。",
+                  "manual と design spec は文書の profile を変えるだけで、同じ brief routing を使う。",
+                  "video は同じ分析結果を `video-content-brief` に変換し、narration と render を分離する。"
+                ],
+                "bullets": [
+                  "source surfaces を明示する",
+                  "document brief を govern する",
+                  "video brief は presentation_mode で分岐する"
+                ]
+              },
+              {
+                "heading": "4. 生成物",
+                "tables": [
+                  {
+                    "title": "Artifact Set",
+                    "columns": ["Artifact", "Purpose", "Path"],
+                    "rows": [
+                      ["manual docx", "operator-facing manual", "{{manual_doc_path}}"],
+                      ["design spec docx", "structural explanation", "{{design_doc_path}}"],
+                      ["narration aiff", "voice track for the walkthrough", "{{narration_path}}"],
+                      ["narrated mp4", "final video manual", "{{video_output_path}}"]
+                    ]
+                  }
+                ]
+              },
+              {
+                "heading": "5. 検証",
+                "body": [
+                  "ビルドされた actuator を使い、document と video の両経路が実行可能であることを確認する。",
+                  "final video については audio stream と bundle artifacts を確認する。"
+                ],
+                "bullets": [
+                  "build artifact exists",
+                  "docx artifacts exist",
+                  "audio artifact exists",
+                  "rendered video artifact exists"
+                ]
+              }
+            ]
+          }
+        },
+        "path": "{{manual_doc_path}}"
+      }
+    },
+    {
+      "id": "write_design_brief",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["code_actuator_files", "media_actuator_files", "video_actuator_files"],
+      "params": {
+        "path": "{{design_brief_path}}",
+        "content": {
+          "kind": "document-brief",
+          "artifact_family": "document",
+          "document_type": "specification",
+          "document_profile": "detailed-design",
+          "render_target": "docx",
+          "locale": "ja-JP",
+          "payload": {
+            "title": "Kyberion コード分析から文書化・動画化までの設計",
+            "summary": "source surfaces を capture し、manual と design spec を同じ brief から生成し、最後に narrated video manual に落とし込む governed pipeline の設計。",
+            "source_inventory": {
+              "code_actuator_files": "{{code_actuator_files}}",
+              "media_actuator_files": "{{media_actuator_files}}",
+              "video_actuator_files": "{{video_actuator_files}}"
+            },
+            "sections": [
+              {
+                "heading": "1. Module Logic & Algorithms",
+                "body": [
+                  "source capture -> code-analysis brief -> manual document -> design specification -> narrated video の順で処理する。",
+                  "LLM は brief を draft できるが、protocol と renderer の境界は knowledge owned である。"
+                ],
+                "bullets": [
+                  "analysis brief is the bridge",
+                  "documents and video share the same semantic source"
+                ]
+              },
+              {
+                "heading": "2. Internal Interfaces",
+                "body": [
+                  "code-actuator は source surface の capture と artifact writing を担当する。",
+                  "media-actuator は document outline と design protocol の compiler boundary を提供する。",
+                  "video-composition-actuator は storyboard と narrated video brief の compiler boundary を提供する。"
+                ],
+                "tables": [
+                  {
+                    "title": "Interface Boundary",
+                    "columns": ["Surface", "Role", "Owned By"],
+                    "rows": [
+                      ["code capture", "collect source evidence", "code-actuator"],
+                      ["document compiler", "compile analysis into document protocol", "media-actuator"],
+                      ["video compiler", "compile analysis into storyboard and narrated brief", "video-composition-actuator"]
+                    ]
+                  }
+                ]
+              },
+              {
+                "heading": "3. Data Flow & State Changes",
+                "body": [
+                  "state is preserved in mission evidence paths and generated artifacts.",
+                  "manual and design spec are rendered as docx outputs from the same source analysis.",
+                  "video content brief drives voice, storyboard, and final muxed video output."
+                ],
+                "bullets": [
+                  "capture source",
+                  "normalize brief",
+                  "compile docs",
+                  "compile video",
+                  "verify outputs"
+                ]
+              },
+              {
+                "heading": "4. Error Handling & Logging",
+                "body": [
+                  "preflight checks should fail fast if build artifacts or runtime tools are missing.",
+                  "video rendering should verify audio muxing and bundle outputs.",
+                  "documentation generation should keep render target and profile explicit."
+                ],
+                "callouts": [
+                  {
+                    "tone": "warning",
+                    "title": "Boundary",
+                    "body": "Do not let the narrated video redefine the source analysis or the manual structure."
+                  }
+                ]
+              },
+              {
+                "heading": "5. Appendix",
+                "body": [
+                  "This design is intentionally brief-first and contract-driven so the same code analysis can be reused for later codebases or subsystems."
+                ],
+                "bullets": [
+                  "reuse the brief across docs and video",
+                  "keep publish separate from render",
+                  "promote reusable patterns only after verification"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "render_design_doc",
+      "role": "sink",
+      "op": "media:generate_document",
+      "params": {
+        "brief": {
+          "kind": "document-brief",
+          "artifact_family": "document",
+          "document_type": "specification",
+          "document_profile": "detailed-design",
+          "render_target": "docx",
+          "locale": "ja-JP",
+          "payload": {
+            "title": "Kyberion コード分析から文書化・動画化までの設計",
+            "summary": "source surfaces を capture し、manual と design spec を同じ brief から生成し、最後に narrated video manual に落とし込む governed pipeline の設計。",
+            "source_inventory": {
+              "code_actuator_files": "{{code_actuator_files}}",
+              "media_actuator_files": "{{media_actuator_files}}",
+              "video_actuator_files": "{{video_actuator_files}}"
+            },
+            "sections": [
+              {
+                "heading": "1. Module Logic & Algorithms",
+                "body": [
+                  "source capture -> code-analysis brief -> manual document -> design specification -> narrated video の順で処理する。",
+                  "LLM は brief を draft できるが、protocol と renderer の境界は knowledge owned である。"
+                ],
+                "bullets": [
+                  "analysis brief is the bridge",
+                  "documents and video share the same semantic source"
+                ]
+              },
+              {
+                "heading": "2. Internal Interfaces",
+                "body": [
+                  "code-actuator は source surface の capture と artifact writing を担当する。",
+                  "media-actuator は document outline と design protocol の compiler boundary を提供する。",
+                  "video-composition-actuator は storyboard と narrated video brief の compiler boundary を提供する。"
+                ],
+                "tables": [
+                  {
+                    "title": "Interface Boundary",
+                    "columns": ["Surface", "Role", "Owned By"],
+                    "rows": [
+                      ["code capture", "collect source evidence", "code-actuator"],
+                      ["document compiler", "compile analysis into document protocol", "media-actuator"],
+                      ["video compiler", "compile analysis into storyboard and narrated brief", "video-composition-actuator"]
+                    ]
+                  }
+                ]
+              },
+              {
+                "heading": "3. Data Flow & State Changes",
+                "body": [
+                  "state is preserved in mission evidence paths and generated artifacts.",
+                  "manual and design spec are rendered as docx outputs from the same source analysis.",
+                  "video content brief drives voice, storyboard, and final muxed video output."
+                ],
+                "bullets": [
+                  "capture source",
+                  "normalize brief",
+                  "compile docs",
+                  "compile video",
+                  "verify outputs"
+                ]
+              },
+              {
+                "heading": "4. Error Handling & Logging",
+                "body": [
+                  "preflight checks should fail fast if build artifacts or runtime tools are missing.",
+                  "video rendering should verify audio muxing and bundle outputs.",
+                  "documentation generation should keep render target and profile explicit."
+                ],
+                "callouts": [
+                  {
+                    "tone": "warning",
+                    "title": "Boundary",
+                    "body": "Do not let the narrated video redefine the source analysis or the manual structure."
+                  }
+                ]
+              },
+              {
+                "heading": "5. Appendix",
+                "body": [
+                  "This design is intentionally brief-first and contract-driven so the same code analysis can be reused for later codebases or subsystems."
+                ],
+                "bullets": [
+                  "reuse the brief across docs and video",
+                  "keep publish separate from render",
+                  "promote reusable patterns only after verification"
+                ]
+              }
+            ]
+          }
+        },
+        "path": "{{design_doc_path}}"
+      }
+    },
+    {
+      "id": "write_video_content_brief",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{content_brief_path}}",
+        "content": {
+          "kind": "video-content-brief",
+          "version": "1.0.0",
+          "title": "Kyberion Code to Manual to Video",
+          "audience": "operators and builders who want source code analysis to become documentation and a narrated walkthrough",
+          "objective": "show how source code analysis becomes a manual, a design spec, and a narrated video manual",
+          "distribution_channel": "docs-demo",
+          "content_type": "docs-demo",
+          "presentation_mode": "howto",
+          "promise": "the same source analysis can produce governed docs and a narrated video without duplicating the explanation",
+          "desired_takeaway": "one source analysis yields manual, design spec, and video evidence",
+          "constraints": [
+            "make the source capture explicit",
+            "keep document and video boundaries governed",
+            "use the same analysis brief across all artifacts"
+          ],
+          "proof_points": [
+            "code surfaces captured",
+            "manual docx generated",
+            "design docx generated",
+            "video bundle and mp4 rendered"
+          ],
+          "content_requirements": [
+            "show source capture",
+            "show manual generation",
+            "show design document generation",
+            "show narration and muxed video render"
+          ],
+          "fixed_inputs": {
+            "customer": "Kyberion operators and maintainers",
+            "use_case": "turn repo source code into reusable documentation assets",
+            "message": "the same analysis can drive docs and video"
+          },
+          "tone": "practical, technical, operator-oriented",
+          "language": "ja",
+          "duration_sec": 14,
+          "design_system_ref": {
+            "system_id": "operator-ja-default",
+            "brand_name": "Kyberion",
+            "theme": "kyberion-standard",
+            "background_color": "#07111f",
+            "layout_family": "process-flow",
+            "motion_profile": "guided-step",
+            "fps": 30
+          }
+        }
+      }
+    },
+    {
+      "id": "generate_voice",
+      "role": "source",
+      "op": "voice:generate_voice",
+      "produces": { "channel": "voice_result", "type": "VoiceResult" },
+      "params": {
+        "request_id": "code-analysis-manual-video-audio",
+        "text": "この動画では、Kyberion のソースコードを読み取り、そこからマニュアル文書、設計書、動画マニュアルを同じ brief で生成する流れを示します。まず code-actuator で source surfaces を集め、次に document brief を作り、最後に video-content-brief へ変換して render します。",
+        "profile_ref": {
+          "profile_id": "{{profile_id}}"
+        },
+        "engine": {
+          "engine_id": "local_say"
+        },
+        "rendering": {
+          "language": "ja",
+          "chunking": {
+            "max_chunk_chars": 4000,
+            "crossfade_ms": 50,
+            "preserve_paralinguistic_tags": true
+          }
+        },
+        "delivery": {
+          "mode": "artifact",
+          "format": "aiff",
+          "artifact_path": "{{narration_path}}",
+          "emit_progress_packets": true
+        },
+        "routing": {
+          "personal_voice_mode": "allow_fallback"
+        }
+      }
+    },
+    {
+      "id": "render_video",
+      "role": "source",
+      "op": "video-composition:create_narrated_video_from_content_brief",
+      "consumes": "voice_result",
+      "produces": { "channel": "video_result", "type": "VideoResult" },
+      "params": {
+        "video_content_brief": {
+          "kind": "video-content-brief",
+          "version": "1.0.0",
+          "title": "Kyberion Code to Manual to Video",
+          "audience": "operators and builders who want source code analysis to become documentation and a narrated walkthrough",
+          "objective": "show how source code analysis becomes a manual, a design spec, and a narrated video manual",
+          "distribution_channel": "docs-demo",
+          "content_type": "docs-demo",
+          "presentation_mode": "howto",
+          "promise": "the same source analysis can produce governed docs and a narrated video without duplicating the explanation",
+          "desired_takeaway": "one source analysis yields manual, design spec, and video evidence",
+          "constraints": [
+            "make the source capture explicit",
+            "keep document and video boundaries governed",
+            "use the same analysis brief across all artifacts"
+          ],
+          "proof_points": [
+            "code surfaces captured",
+            "manual docx generated",
+            "design docx generated",
+            "video bundle and mp4 rendered"
+          ],
+          "content_requirements": [
+            "show source capture",
+            "show manual generation",
+            "show design document generation",
+            "show narration and muxed video render"
+          ],
+          "fixed_inputs": {
+            "customer": "Kyberion operators and maintainers",
+            "use_case": "turn repo source code into reusable documentation assets",
+            "message": "the same analysis can drive docs and video"
+          },
+          "tone": "practical, technical, operator-oriented",
+          "language": "ja",
+          "duration_sec": 14,
+          "design_system_ref": {
+            "system_id": "operator-ja-default",
+            "brand_name": "Kyberion",
+            "theme": "kyberion-standard",
+            "background_color": "#07111f",
+            "layout_family": "process-flow",
+            "motion_profile": "guided-step",
+            "fps": 30
+          }
+        },
+        "narration_artifact_ref": "{{narration_path}}",
+        "output": {
+          "format": "mp4",
+          "target_path": "{{video_output_path}}",
+          "bundle_dir": "{{video_bundle_dir}}",
+          "await_completion": true,
+          "duration_sec": 14,
+          "fps": 30
+        }
+      }
+    },
+    {
+      "id": "verify_video",
+      "role": "source",
+      "op": "video-composition:verify_rendered_video_artifact",
+      "consumes": "video_result",
+      "produces": { "channel": "video_verification", "type": "VerifyResult" },
+      "params": {
+        "path": "{{video_output_path}}",
+        "require_audio": true,
+        "require_video": true
+      }
+    },
+    {
+      "id": "final_log",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["voice_result", "video_result", "video_verification"],
+      "params": {
+        "message": "✅ Code analysis to manual and video flow attempted. Voice: {{voice_result.status}} Video: {{video_result.status}} Verify: {{video_verification.status}}"
+      }
+    }
+  ]
+}

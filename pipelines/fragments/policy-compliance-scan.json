@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "policy-compliance-scan-fragment",
+  "version": "2.0.0",
   "description": "Scans a directory for security policy violations and sensitive content markers.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "target_dir": "active/shared/tmp",
     "target_tier": "public"
@@ -9,8 +11,9 @@
   "steps": [
     {
       "id": "run_scan",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "scan_result", "type": "ComplianceResult" },
       "params": {
         "command": "node",
         "args": [
@@ -19,21 +22,21 @@
           "--tier", "{{target_tier}}"
         ],
         "env": { "KYBERION_PERSONA": "sovereign" },
-        "allow_error": true,
-        "export_as": "scan_result"
+        "allow_error": true
       }
     },
     {
       "id": "check_violations",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "scan_result",
       "params": {
         "condition": { "from": "scan_result.status", "operator": "equals", "value": "passed" },
         "then": [
-          { "op": "system:log", "params": { "message": "Compliance scan passed for {{target_dir}}." } }
+          { "role": "sink", "op": "system:log", "params": { "message": "Compliance scan passed for {{target_dir}}." } }
         ],
         "else": [
-          { "op": "system:log", "params": { "message": "Compliance scan FAILED for {{target_dir}}. Violations: {{scan_result.violations}}" } }
+          { "role": "sink", "op": "system:log", "params": { "message": "Compliance scan FAILED for {{target_dir}}. Violations: {{scan_result.violations}}" } }
         ]
       }
     }

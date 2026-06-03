@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('public/governance/tool-actuator-routing-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/tool-actuator-routing-policy.json');
 
 export interface ToolActuatorRouteRule {
   tool_name: string;

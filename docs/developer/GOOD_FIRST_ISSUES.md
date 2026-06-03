@@ -42,7 +42,7 @@ service credentials, or multi-area coordination, keep it off the
 Use these categories when creating more starter slices:
 
 - Docs: one concrete paragraph, command, or link in `README.md`, `docs/`,
-  or `knowledge/public/architecture/`.
+  or `knowledge/product/architecture/`.
 - Tests: one regression or contract assertion around existing behavior.
 - Core: one narrow guardrail, classifier rule, trace event, or lifecycle
   invariant with an adjacent unit test.

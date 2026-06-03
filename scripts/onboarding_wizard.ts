@@ -27,7 +27,7 @@ const onboardingStateAjv = new AjvCtor({ allErrors: true });
 addFormats(onboardingStateAjv);
 const onboardingStateValidate = compileSchemaFromPath(
   onboardingStateAjv,
-  pathResolver.rootResolve('knowledge/public/schemas/onboarding-state.schema.json'),
+  pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json'),
 );
 
 const rl = readline.createInterface({

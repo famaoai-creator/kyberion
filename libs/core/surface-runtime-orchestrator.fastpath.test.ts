@@ -72,6 +72,7 @@ vi.mock('./task-session.js', () => ({
 
 vi.mock('./router-contract.js', () => ({
   resolveSurfaceIntent: mocks.resolveSurfaceIntent,
+  resolveDirectIntentCommand: () => null,
 }));
 
 vi.mock('./surface-runtime-router.js', () => ({

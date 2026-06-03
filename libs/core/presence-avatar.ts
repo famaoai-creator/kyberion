@@ -16,7 +16,7 @@ interface PresenceAvatarProfileRegistry {
   profiles?: PresenceAvatarProfile[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/presence/avatar-profiles.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/presence/avatar-profiles.json');
 
 const DEFAULT_PROFILE: PresenceAvatarProfile = {
   agentId: 'default-surface-agent',

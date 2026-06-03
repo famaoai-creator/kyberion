@@ -15,7 +15,7 @@ This procedure is for long-form text content where the article structure should 
 
 - **Actuator**: `wisdom-actuator`
 - **Actuator**: `code-actuator` or `system-actuator`
-- **Playbook**: [`blog-authoring-playbook.md`](/Users/famao/kyberion/knowledge/public/orchestration/blog-authoring-playbook.md)
+- **Playbook**: [`blog-authoring-playbook.md`](/Users/famao/kyberion/knowledge/product/orchestration/blog-authoring-playbook.md)
 
 ## 3. Contract Shape
 

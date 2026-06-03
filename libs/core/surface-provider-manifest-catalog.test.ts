@@ -19,8 +19,8 @@ describe('surface-provider-manifest-catalog', () => {
 
   it('keeps the canonical directory in sync with the snapshot', () => {
     const rootDir = process.cwd();
-    const dir = path.join(rootDir, 'knowledge/public/governance/surface-provider-manifest-catalogs');
-    const snapshot = readJson(path.join(rootDir, 'knowledge/public/governance/surface-provider-manifest-catalog.json'));
+    const dir = path.join(rootDir, 'knowledge/product/governance/surface-provider-manifest-catalogs');
+    const snapshot = readJson(path.join(rootDir, 'knowledge/product/governance/surface-provider-manifest-catalog.json'));
     const snapshotIds = (snapshot.entries || []).map((entry: { id?: string }) => entry.id).sort();
 
     expect(safeExistsSync(dir)).toBe(true);

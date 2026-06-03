@@ -33,18 +33,18 @@ describe('scenario coverage contracts', () => {
   it('keeps the documented scenario references pointing at real playbooks and pipelines', () => {
     const scenarioDoc = safeReadFile(pathResolver.rootResolve('docs/SCENARIOS.md'), { encoding: 'utf8' }) as string;
 
-    expect(scenarioDoc).toContain('[product-audit](knowledge/public/orchestration/mission-playbooks/product-audit.md)');
+    expect(scenarioDoc).toContain('[product-audit](knowledge/product/orchestration/mission-playbooks/product-audit.md)');
     expect(scenarioDoc).toContain('[ceo-strategic-report](../pipelines/ceo-strategic-report.json)');
 
     expect(
-      safeExistsSync(pathResolver.rootResolve('knowledge/public/orchestration/mission-playbooks/product-audit.md'))
+      safeExistsSync(pathResolver.rootResolve('knowledge/product/orchestration/mission-playbooks/product-audit.md'))
     ).toBe(true);
     expect(safeExistsSync(pathResolver.rootResolve('pipelines/ceo-strategic-report.json'))).toBe(true);
-    expect(safeExistsSync(pathResolver.rootResolve('knowledge/public/orchestration/mission-playbooks/ceo-strategy.md'))).toBe(true);
+    expect(safeExistsSync(pathResolver.rootResolve('knowledge/product/orchestration/mission-playbooks/ceo-strategy.md'))).toBe(true);
   });
 
   it('keeps the scenario packs populated with the flagship multi-actuator scenarios', () => {
-    const orchestrationPack = readJson('knowledge/public/governance/mission-orchestration-scenario-pack.json') as {
+    const orchestrationPack = readJson('knowledge/product/governance/mission-orchestration-scenario-pack.json') as {
       scenarios?: Array<{ scenario_id?: string; notes?: string }>;
     };
 
@@ -62,7 +62,7 @@ describe('scenario coverage contracts', () => {
   it('keeps the canonical actuator archetype targets backed by manifests', () => {
     const manifestCatalog = loadActuatorManifestCatalog();
     const manifestNames = new Set(manifestCatalog.map((entry) => entry.n));
-    const archetypePack = readJson('knowledge/public/orchestration/actuator-request-archetypes.json') as {
+    const archetypePack = readJson('knowledge/product/orchestration/actuator-request-archetypes.json') as {
       archetypes?: Array<{ id?: string; target_actuators?: string[] }>;
     };
 

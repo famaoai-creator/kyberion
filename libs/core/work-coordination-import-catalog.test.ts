@@ -30,7 +30,7 @@ describe('work-coordination-import-catalog', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = path.join(
       pathResolver.rootDir(),
-      'knowledge/public/schemas/work-coordination-import-catalog.schema.json',
+      'knowledge/product/schemas/work-coordination-import-catalog.schema.json',
     );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const catalog = loadWorkCoordinationImportCatalog();

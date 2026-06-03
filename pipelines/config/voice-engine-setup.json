@@ -1,0 +1,63 @@
+{
+  "action": "pipeline",
+  "name": "Config: Voice Engine Setup",
+  "version": "1.0.0",
+  "description": "Registers a voice engine in the voice-engine-registry and optionally creates a tenant voice profile.",
+  "steps": [
+    {
+      "id": "preflight_inputs",
+      "role": "gate",
+      "op": "system:assert",
+      "params": {
+        "conditions": [
+          "{{input.engine_id}} != ''",
+          "{{input.engine_kind}} != ''",
+          "{{input.tenant}} != ''"
+        ],
+        "message": "engine_id, engine_kind, and tenant are required"
+      }
+    },
+    {
+      "id": "check_voice_actuator",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "voice_build", "type": "ProbeResult" },
+      "params": { "dir": "dist/libs/actuators/voice-actuator/src", "kind": "dir" }
+    },
+    {
+      "id": "write_engine_definition",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/product/governance/voice-engines/{{input.engine_id}}.json",
+        "content": "{\"engine_id\":\"{{input.engine_id}}\",\"kind\":\"{{input.engine_kind}}\",\"status\":\"active\",\"registered_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "write_tenant_voice_profile",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/voice-profile/{{input.engine_id}}.json",
+        "content": "{\"engine_id\":\"{{input.engine_id}}\",\"tenant\":\"{{input.tenant}}\",\"is_default\":{{input.set_as_default}},\"sample_path\":\"{{input.operator_voice_sample_path}}\",\"created_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "write_evidence",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/config-missions/{{input.instance_id}}/evidence/result.json",
+        "content": "{\"preset_id\":\"voice-engine-setup\",\"engine_id\":\"{{input.engine_id}}\",\"tenant\":\"{{input.tenant}}\",\"applied_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "final_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Voice engine '{{input.engine_id}}' registered for tenant '{{input.tenant}}'."
+      }
+    }
+  ]
+}

@@ -8,8 +8,8 @@ import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge('public/schemas/standard-intents.schema.json');
-const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/intent-resolution-policy.schema.json');
+const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/standard-intents.schema.json');
+const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-resolution-policy.schema.json');
 
 export type StandardIntentDefinition = {
   id?: string;
@@ -139,7 +139,7 @@ function ensureIntentResolutionPolicyValidator(): ValidateFunction {
 
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
-  const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
+  const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntentDefinition[] };
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
@@ -152,7 +152,7 @@ export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
 
 function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
   if (intentResolutionPolicyCache) return intentResolutionPolicyCache;
-  const filePath = pathResolver.knowledge('public/governance/intent-resolution-policy.json');
+  const filePath = pathResolver.knowledge('product/governance/intent-resolution-policy.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentResolutionPolicyFile;
   const validate = ensureIntentResolutionPolicyValidator();
   if (!validate(parsed)) {
@@ -165,7 +165,7 @@ function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
 
 function loadIntentDomainOntology(): Map<string, IntentDomainOntologyEntry> {
   if (intentDomainOntologyCache) return intentDomainOntologyCache;
-  const filePath = pathResolver.knowledge('public/governance/intent-domain-ontology.json');
+  const filePath = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
     intents?: IntentDomainOntologyEntry[];
   };
@@ -319,7 +319,8 @@ function scoreScheduleCoordinationIntent(utterance: string): IntentResolutionCan
     normalized
   );
   const changeHint = frame.action === 'change';
-  if (!scheduleHint || !changeHint) return null;
+  const meetingProxyHint = /(代わりに参加|代理参加|ファシリテート|進行|議事録|アクションアイテム|proxy|facilitate)/i.test(normalized);
+  if (!scheduleHint || !changeHint || meetingProxyHint) return null;
 
   let confidence = 0.8;
   const reasons: string[] = ['schedule change request'];

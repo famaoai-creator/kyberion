@@ -53,8 +53,8 @@ last_updated: 2026-03-21
 
 ## Core Contracts
 
-- [`proposal-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/proposal-brief.schema.json)
-- [`proposal-storyline-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/proposal-storyline-adf.schema.json)
+- [`proposal-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/proposal-brief.schema.json)
+- [`proposal-storyline-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/proposal-storyline-adf.schema.json)
 
 ## Media Example
 

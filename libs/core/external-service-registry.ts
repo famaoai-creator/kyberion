@@ -6,7 +6,7 @@
  * it is registered here so future requests can auto-resolve the source.
  *
  * Storage:
- *   Seed (read-only): knowledge/public/orchestration/external-service-registry.json
+ *   Seed (read-only): knowledge/product/orchestration/external-service-registry.json
  *   Runtime (mutable): active/shared/runtime/external-service-registry.json
  */
 
@@ -33,7 +33,7 @@ interface ExternalServiceRegistry {
 // ─── Paths ──────────────────────────────────────────────────────────────────
 
 /** Org-wide defaults (Kyberion-managed, read-only). */
-const PUBLIC_SEED_PATH = pathResolver.knowledge('public/orchestration/external-service-registry.json');
+const PUBLIC_SEED_PATH = pathResolver.knowledge('product/orchestration/external-service-registry.json');
 
 /**
  * Personal overrides (user-managed, read-only at runtime).
@@ -223,7 +223,7 @@ interface ServiceProviderCatalog {
   providers: ServiceProvider[];
 }
 
-const PUBLIC_PROVIDER_CATALOG_PATH = pathResolver.knowledge('public/orchestration/service-provider-catalog.json');
+const PUBLIC_PROVIDER_CATALOG_PATH = pathResolver.knowledge('product/orchestration/service-provider-catalog.json');
 const PERSONAL_PROVIDER_CATALOG_PATH = pathResolver.knowledge('personal/orchestration/service-provider-catalog.json');
 
 function loadProviderCatalog(): ServiceProvider[] {

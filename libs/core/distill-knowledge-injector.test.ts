@@ -43,7 +43,7 @@ describe('distill-knowledge-injector (E5)', () => {
 
   it('formats a summary that includes title, tags, and source path', () => {
     const fake = {
-      path: 'knowledge/public/evolution/distill_test.md',
+      path: 'knowledge/product/evolution/distill_test.md',
       title: 'Test Title',
       tags: ['a', 'b', 'c'],
       excerpt: 'A useful insight about something important happens here.',
@@ -53,7 +53,7 @@ describe('distill-knowledge-injector (E5)', () => {
     expect(formatted).toContain('Test Title');
     expect(formatted).toContain('[a, b, c]');
     expect(formatted).toContain('score=0.85');
-    expect(formatted).toContain('knowledge/public/evolution/distill_test.md');
+    expect(formatted).toContain('knowledge/product/evolution/distill_test.md');
   });
 });
 

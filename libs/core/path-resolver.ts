@@ -28,7 +28,7 @@ const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
 const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
 const VISION_ROOT = path.join(PROJECT_ROOT_DIR, 'vision');
 const INDEX_PATHS = [
-  path.join(KNOWLEDGE_ROOT, 'public/orchestration/global_actuator_index.json'),
+  path.join(KNOWLEDGE_ROOT, 'product/orchestration/global_actuator_index.json'),
 ];
 
 export function rootDir() { return PROJECT_ROOT_DIR; }
@@ -37,7 +37,7 @@ export function active(subPath = '') { return path.join(ACTIVE_ROOT, subPath); }
 export function scripts(subPath = '') { return path.join(SCRIPTS_ROOT, subPath); }
 export function vault(subPath = '') { return path.join(VAULT_ROOT, subPath); }
 export function vision(subPath = '') { return path.join(VISION_ROOT, subPath); }
-export function capabilityAssets(subPath = '') { return path.join(KNOWLEDGE_ROOT, 'public/capability-assets', subPath); }
+export function capabilityAssets(subPath = '') { return path.join(KNOWLEDGE_ROOT, 'product/capability-assets', subPath); }
 export function shared(subPath = '') { return path.join(ACTIVE_SHARED_ROOT, subPath); }
 export function sharedTmp(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'tmp');
@@ -106,7 +106,7 @@ export function capabilityEntry(capabilityName: string) {
 }
 
 export function missionDir(missionId: string, tier: 'personal' | 'confidential' | 'public' = 'confidential') {
-  const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
+  const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   let subPath = 'active/missions';
   
   if (rawExistsSync(configPath)) {
@@ -153,7 +153,7 @@ export function tenantMissionDir(
   tenantSlug: string,
   tier: 'personal' | 'confidential' | 'public' = 'confidential'
 ): string {
-  const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
+  const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   let subPath = 'active/missions';
   if (rawExistsSync(configPath)) {
     try {
@@ -171,7 +171,7 @@ export function tenantMissionDir(
  * Priority: personal -> confidential -> public
  */
 export function findMissionPath(missionId: string): string | null {
-  const configPath = path.join(KNOWLEDGE_ROOT, 'public/governance/mission-management-config.json');
+  const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   const tiers: ('personal' | 'confidential' | 'public')[] = ['personal', 'confidential', 'public'];
   
   if (rawExistsSync(configPath)) {

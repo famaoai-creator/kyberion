@@ -30,7 +30,7 @@ export interface ArtifactRecord {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const ARTIFACT_SCHEMA_PATH = pathResolver.knowledge('public/schemas/artifact-record.schema.json');
+const ARTIFACT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/artifact-record.schema.json');
 const ARTIFACT_DIR = pathResolver.shared('runtime/artifacts');
 let artifactValidateFn: ValidateFunction | null = null;
 

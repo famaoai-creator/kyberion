@@ -86,7 +86,7 @@ export async function createMission(
   const isEphemeral = process.argv.includes('--ephemeral');
   const normalizedRelationships = normalizeRelationships(relationships);
   const organizationProfile = loadOrganizationProfile(rootDir);
-  const templatePath = pathResolver.knowledge('public/governance/mission-templates.json');
+  const templatePath = pathResolver.knowledge('product/governance/mission-templates.json');
   const templates = readJsonFile<{
     templates: Array<{
       name?: string;

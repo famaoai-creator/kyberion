@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "security-incident-containment",
+  "version": "2.0.0",
   "description": "Fragment for Scenario 9: Security incident response with audit logging and approval gates.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "threat_type": "unknown",
     "affected_resources": [],
@@ -10,16 +12,16 @@
   "steps": [
     {
       "id": "triage_incident",
-      "type": "capture",
+      "role": "source",
       "op": "wisdom:knowledge_search",
+      "produces": { "channel": "triage_plan", "type": "KnowledgeSearchResult" },
       "params": {
-        "query": "incident triage procedures for {{threat_type}}",
-        "export_as": "triage_plan"
+        "query": "incident triage procedures for {{threat_type}}"
       }
     },
     {
       "id": "collect_evidence",
-      "type": "capture",
+      "role": "sink",
       "op": "system:collect_logs",
       "params": {
         "scope": "{{affected_resources}}",
@@ -28,7 +30,7 @@
     },
     {
       "id": "audit_record_start",
-      "type": "apply",
+      "role": "sink",
       "op": "blockchain:record_event",
       "params": {
         "event": "INCIDENT_TRIAGE_STARTED",
@@ -37,7 +39,7 @@
     },
     {
       "id": "approval_gate_containment",
-      "type": "control",
+      "role": "sink",
       "op": "approval:request",
       "params": {
         "title": "Incident Containment Approval",
@@ -47,7 +49,7 @@
     },
     {
       "id": "execute_containment",
-      "type": "apply",
+      "role": "sink",
       "op": "system:execute_procedure",
       "params": {
         "procedure": "isolate_resources",
@@ -56,7 +58,7 @@
     },
     {
       "id": "audit_record_finish",
-      "type": "apply",
+      "role": "sink",
       "op": "blockchain:record_event",
       "params": {
         "event": "INCIDENT_CONTAINMENT_EXECUTED",

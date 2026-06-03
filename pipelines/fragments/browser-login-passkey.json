@@ -1,36 +1,36 @@
 {
   "pipeline_id": "browser-login-passkey",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Fragment demonstrating how to setup a virtual authenticator and authenticate with a passkey.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "action": "pipeline",
   "options": {
     "headless": false
   },
   "steps": [
     {
-      "type": "apply",
+      "role": "source",
       "op": "setup_passkey_authenticator",
-      "params": {
-        "export_as": "passkey_authenticator"
-      }
+      "produces": { "channel": "passkey_authenticator", "type": "AuthenticatorResult" },
+      "params": {}
     },
     {
-      "type": "apply",
+      "role": "sink",
       "op": "goto",
       "params": {
         "url": "https://webauthn.io/"
       }
     },
     {
-      "type": "apply",
+      "role": "source",
       "op": "authenticate_passkey",
+      "produces": { "channel": "auth_result", "type": "AuthResult" },
       "params": {
-        "username": "{{env.PASSKEY_USERNAME}}",
-        "export_as": "auth_result"
+        "username": "{{env.PASSKEY_USERNAME}}"
       }
     },
     {
-      "type": "apply",
+      "role": "sink",
       "op": "remove_passkey_authenticator",
       "params": {}
     }

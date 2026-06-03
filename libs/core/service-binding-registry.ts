@@ -17,7 +17,7 @@ export interface ServiceBindingRecord {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const BINDING_SCHEMA_PATH = pathResolver.knowledge('public/schemas/service-binding-record.schema.json');
+const BINDING_SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-binding-record.schema.json');
 const BINDING_DIR = pathResolver.shared('runtime/service-bindings');
 let bindingValidateFn: ValidateFunction | null = null;
 

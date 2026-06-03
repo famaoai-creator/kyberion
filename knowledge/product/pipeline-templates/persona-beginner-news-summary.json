@@ -1,0 +1,49 @@
+{
+  "pipeline_id": "persona-beginner-news-summary",
+  "version": "2.0.0",
+  "description": "初心者のためのニュースまとめ。キーワードに関連する最新情報を検索し、要点スライドを作成します。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "variables": {
+    "keyword": {
+      "type": "string",
+      "description": "調べたいキーワード",
+      "default": "生成AI"
+    }
+  },
+  "steps": [
+    {
+      "id": "search-news",
+      "role": "source",
+      "op": "browser:pipeline",
+      "produces": { "channel": "news_content", "type": "BrowserContent" },
+      "params": {
+        "steps": [
+          { "type": "apply", "op": "goto", "params": { "url": "https://news.google.com/search?q={{keyword}}&hl=ja&gl=JP" } },
+          { "type": "capture", "op": "content", "params": { "export_as": "news_content" } }
+        ]
+      }
+    },
+    {
+      "id": "summarize-news",
+      "role": "transform",
+      "op": "wisdom:synthesize",
+      "consumes": "news_content",
+      "produces": { "channel": "news_brief", "type": "NewsBrief" },
+      "params": {
+        "instruction": "ニュース記事の内容から、{{keyword}}に関する最新のトピックを3つ選び、それぞれ要点を簡潔にまとめてPPT用のスライド構成データに変換してください。",
+        "context": ["{{news_content}}"]
+      }
+    },
+    {
+      "id": "render-pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "news_brief",
+      "params": {
+        "brief_from": "news_brief",
+        "path": "active/shared/exports/{{keyword}}_ニュースまとめ.pptx"
+      }
+    }
+  ]
+}

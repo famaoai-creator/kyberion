@@ -147,9 +147,21 @@
       "types": "./dist/os-automation.d.ts",
       "default": "./dist/os-automation.js"
     },
+    "./config-fallback-registry": {
+      "types": "./dist/config-fallback-registry.d.ts",
+      "default": "./dist/config-fallback-registry.js"
+    },
     "./path-resolver": {
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
+    },
+    "./unclassified-error-registry": {
+      "types": "./dist/unclassified-error-registry.d.ts",
+      "default": "./dist/unclassified-error-registry.js"
+    },
+    "./unhandled-intent-registry": {
+      "types": "./dist/unhandled-intent-registry.d.ts",
+      "default": "./dist/unhandled-intent-registry.js"
     },
     "./pdf-protocol": {
       "types": "./dist/src/types/pdf-protocol.d.ts",

@@ -3,7 +3,7 @@
 Total Actuators: 28
 Last updated: 2026-05-30
 
-This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/public/orchestration/global_actuator_index.json`.
+This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/product/orchestration/global_actuator_index.json`.
 
 Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.
 
@@ -117,6 +117,6 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 See also:
 
 - Source manifests: `libs/actuators/*/manifest.json`
-- Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
-- [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
-- [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/public/architecture/component-lifecycle-inventory.md)
+- Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/knowledge/product/orchestration/global_actuator_index.json)
+- [legacy_component_index.json](/Users/famao/kyberion/knowledge/product/orchestration/legacy_component_index.json)
+- [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/product/architecture/component-lifecycle-inventory.md)

@@ -13,7 +13,7 @@ For engineers joining a Kyberion deployment. The aim is to get from
 without bypassing the governance the rest of the system depends on.
 
 This is a procedure (not architecture). Architecture lives under
-[`knowledge/public/architecture/`](knowledge/public/architecture).
+[`knowledge/product/architecture/`](knowledge/product/architecture).
 
 ## Day 1 — local environment + first read
 
@@ -35,7 +35,7 @@ This is a procedure (not architecture). Architecture lives under
 2. Read in this order, ≤ 5 minutes each:
    - [`AGENTS.md`](AGENTS.md) — operator rules (especially Rule 7)
    - [`docs/USER_EXPERIENCE_CONTRACT.md`](docs/USER_EXPERIENCE_CONTRACT.md)
-   - [`knowledge/public/architecture/kyberion-canonical-concept-index.md`](knowledge/public/architecture/kyberion-canonical-concept-index.md)
+   - [`knowledge/product/architecture/kyberion-canonical-concept-index.md`](knowledge/product/architecture/kyberion-canonical-concept-index.md)
    - [`docs/INTENT_LOOP_CONCEPT.md`](docs/INTENT_LOOP_CONCEPT.md)
 3. Run baseline:
    ```bash
@@ -62,7 +62,7 @@ This is a procedure (not architecture). Architecture lives under
 
 - Pick something small (a typo fix, a missing test, a tiny new pipeline
   step). Drive it through the full mission lifecycle.
-- Touch the audit chain and see your work land in `knowledge/public/evolution/`
+- Touch the audit chain and see your work land in `knowledge/product/evolution/`
   via `distill`.
 
 ### Steps
@@ -97,7 +97,7 @@ This is a procedure (not architecture). Architecture lives under
 ### Done when
 
 - [ ] Your mission completes the lifecycle end-to-end
-- [ ] `knowledge/public/evolution/distill_msn-dev-onboard-*.md` exists
+- [ ] `knowledge/product/evolution/distill_msn-dev-onboard-*.md` exists
 - [ ] The audit chain shows your mission's create / activate / checkpoint
       / verify / distill events with hash continuity
 - [ ] `pnpm run validate` passes
@@ -117,13 +117,13 @@ This is a procedure (not architecture). Architecture lives under
 Read each doc once, then come back to whichever maps closest to the
 work you actually do.
 
-1. [`kyberion-concept-evaluation-2026-04-26.md`](knowledge/public/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
-2. [`kyberion-intent-catalog.md`](knowledge/public/architecture/kyberion-intent-catalog.md) — what users can ask for
-3. [`kyberion-scenario-coverage-matrix.md`](knowledge/public/architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
-4. [`multi-tenant-operations.md`](knowledge/public/architecture/multi-tenant-operations.md) — multi-tenant operations
-5. [`operator-surface-strategy.md`](knowledge/public/architecture/operator-surface-strategy.md) — UI strategy
-6. [`mission-team-composition-model.md`](knowledge/public/architecture/mission-team-composition-model.md) — how teams form
-7. [`agent-mission-control-model.md`](knowledge/public/architecture/agent-mission-control-model.md) — agent control plane
+1. [`kyberion-concept-evaluation-2026-04-26.md`](knowledge/product/architecture/kyberion-concept-evaluation-2026-04-26.md) — Codex audit of the system
+2. [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md) — what users can ask for
+3. [`kyberion-scenario-coverage-matrix.md`](knowledge/product/architecture/kyberion-scenario-coverage-matrix.md) — what scenarios are covered
+4. [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md) — multi-tenant operations
+5. [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md) — UI strategy
+6. [`mission-team-composition-model.md`](knowledge/product/architecture/mission-team-composition-model.md) — how teams form
+7. [`agent-mission-control-model.md`](knowledge/product/architecture/agent-mission-control-model.md) — agent control plane
 
 ### Anti-patterns to recognize and avoid
 
@@ -145,7 +145,7 @@ work you actually do.
 3. `pnpm watch:tenant-drift` — multi-tenant integrity.
 4. `git log` on a related actuator's `examples/*.json` — learn by
    imitation.
-5. `knowledge/public/evolution/distill_*.md` — distilled lessons from prior
+5. `knowledge/product/evolution/distill_*.md` — distilled lessons from prior
    missions.
 
 If you hit something that should have been caught by validation but

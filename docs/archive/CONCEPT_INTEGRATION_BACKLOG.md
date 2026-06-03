@@ -144,7 +144,7 @@ last_updated: 2026-04-20
 ### P3 — 文書整合と吸収 ✅ 全完了（2026-04-20）
 
 #### P3-1. 判断支援の設計根拠ドキュメント ✅
-- `knowledge/public/architecture/decision-support-design-rationale.md` 新規作成。absorption-plan 形式でなく **design-rationale 形式**。参照文献 7 件、Kyberion 契約対応表、意図ループ配置、可換性、倫理境界を明記。
+- `knowledge/product/architecture/decision-support-design-rationale.md` 新規作成。absorption-plan 形式でなく **design-rationale 形式**。参照文献 7 件、Kyberion 契約対応表、意図ループ配置、可換性、倫理境界を明記。
 
 #### P3-2. Concept Map の更新 ✅
 - `kyberion-concept-map.md` に「Cross-Cutting: The Intent Loop」節を追加。既存 5 層モデルを維持しつつ、6 段のループが層を横切るビューを追加。reading order の先頭に `INTENT_LOOP_CONCEPT.md` を配置。
@@ -194,6 +194,6 @@ P0-1 → P0-2 → (P0-3, P0-4, P0-5 並行) → (P3-1 着手可)
 ## 参照
 
 - `docs/INTENT_LOOP_CONCEPT.md` — 本バックログの拠り所となる概念
-- `knowledge/public/architecture/hardening-backlog.md` — 実行細部担保の既存計画
-- `knowledge/public/architecture/studio-agent-orchestration-absorption-plan.md` — origin/main のオーケストレーション設計思想
-- `knowledge/public/architecture/cli-harness-coordination-model.md` — 可換層の責務分割
+- `knowledge/product/architecture/hardening-backlog.md` — 実行細部担保の既存計画
+- `knowledge/product/architecture/studio-agent-orchestration-absorption-plan.md` — origin/main のオーケストレーション設計思想
+- `knowledge/product/architecture/cli-harness-coordination-model.md` — 可換層の責務分割

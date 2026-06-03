@@ -198,7 +198,7 @@ export function checkDependencies(missionId: string): { ok: boolean; missing: st
 }
 
 export function getActiveMissionSearchDirs(): string[] {
-  const configPath = pathResolver.knowledge('public/governance/mission-management-config.json');
+  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
   if (safeExistsSync(configPath)) {
     try {
       const config = readJsonFile<{ directories?: Record<string, string> }>(configPath);

@@ -33,7 +33,7 @@ Intent → Context → Resolution → Outcome Design → Teaming →
 
 Each step has a corresponding internal concept. The user only sees Intent / Plan / Result; everything else is the engine.
 
-Read once: [`knowledge/public/architecture/organization-work-loop.md`](../../knowledge/public/architecture/organization-work-loop.md).
+Read once: [`knowledge/product/architecture/organization-work-loop.md`](../../knowledge/product/architecture/organization-work-loop.md).
 
 ## 2. The five primitives (15 min)
 
@@ -108,7 +108,7 @@ Concrete walkthrough: a user types `今週の進捗レポートを作って`. Tr
 3. Mission classification picks the right mission shape
    → libs/core/mission-classification.ts
    → libs/core/mission-team-orchestrator.ts
-   → reads knowledge/public/governance/mission-classification-policy.json
+   → reads knowledge/product/governance/mission-classification-policy.json
 
 4. Mission seed → mission creation
    → scripts/refactor/mission-creation.ts
@@ -137,7 +137,7 @@ Concrete walkthrough: a user types `今週の進捗レポートを作って`. Tr
 Cross-cuts:
 - Every state-changing op writes to `active/audit/audit-{date}.jsonl` (audit chain).
 - Every external LLM/HTTP egress goes through `egress-guard` (TODO: stronger redaction in Phase C'-7).
-- Every actuator op is rate-limited / approval-gated per `knowledge/public/governance/`.
+- Every actuator op is rate-limited / approval-gated per `knowledge/product/governance/`.
 
 ## 4. Where to find things (10 min)
 
@@ -238,7 +238,7 @@ If you're going to read 8 files end-to-end, these are the ones:
 
 1. `docs/WHY.md` — the thesis.
 2. `docs/PRODUCTIZATION_ROADMAP.md` — the phasing of where we're going.
-3. `knowledge/public/architecture/organization-work-loop.md` — the core model.
+3. `knowledge/product/architecture/organization-work-loop.md` — the core model.
 4. `libs/core/path-resolver.ts` — every file IO starts here.
 5. `libs/core/secure-io.ts` — the tier-enforcement boundary.
 6. `libs/core/src/pipeline-engine.ts` — the executor.

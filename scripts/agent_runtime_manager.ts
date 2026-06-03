@@ -101,7 +101,7 @@ export async function listRunningAgents() {
 export async function listManifests() {
   const manifests = loadAgentManifests();
   if (manifests.length === 0) {
-    console.log('\nNo agent manifests found in knowledge/agents/.\n');
+    console.log('\nNo agent manifests found in knowledge/product/agents/.\n');
     return;
   }
 

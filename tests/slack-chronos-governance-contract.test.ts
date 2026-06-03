@@ -4,7 +4,7 @@ import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 describe('Slack and Chronos governance contract', () => {
   it('defines shared channel coordination and observability directories', () => {
     const config = JSON.parse(
-      safeReadFile('knowledge/public/governance/mission-management-config.json', { encoding: 'utf8' }) as string
+      safeReadFile('knowledge/product/governance/mission-management-config.json', { encoding: 'utf8' }) as string
     );
 
     expect(config.directories.global_channel_coordination).toBe('active/shared/coordination/channels');
@@ -13,10 +13,10 @@ describe('Slack and Chronos governance contract', () => {
 
   it('grants channel and gateway roles only the expected runtime and coordination scopes', () => {
     const securityPolicy = JSON.parse(
-      safeReadFile('knowledge/public/governance/security-policy.json', { encoding: 'utf8' }) as string
+      safeReadFile('knowledge/product/governance/security-policy.json', { encoding: 'utf8' }) as string
     );
     const roleAccess = JSON.parse(
-      safeReadFile('knowledge/public/governance/role-write-access.json', { encoding: 'utf8' }) as string
+      safeReadFile('knowledge/product/governance/role-write-access.json', { encoding: 'utf8' }) as string
     );
 
     expect(securityPolicy.authority_role_permissions.mission_controller.allow_write).toContain('active/shared/coordination/');
@@ -48,8 +48,8 @@ describe('Slack and Chronos governance contract', () => {
     expect(securityPolicy.authority_role_permissions.chronos_localadmin.allow_write).toContain('active/shared/coordination/orchestration/');
     expect(securityPolicy.authority_role_permissions.chronos_localadmin.allow_write).toContain('active/shared/runtime/');
     expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/runtime/');
-    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('knowledge/public/governance/surfaces/');
-    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('knowledge/public/governance/active-surfaces.json');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('knowledge/product/governance/surfaces/');
+    expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('knowledge/product/governance/active-surfaces.json');
     expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/coordination/channels/imessage/');
     expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/coordination/channels/discord/');
     expect(securityPolicy.authority_role_permissions.surface_runtime.allow_write).toContain('active/shared/coordination/channels/telegram/');
@@ -62,14 +62,14 @@ describe('Slack and Chronos governance contract', () => {
     expect(roleAccess.roles.chronos_operator.allow).toEqual([]);
     expect(roleAccess.roles.chronos_localadmin.allow).toContain('active/shared/coordination/orchestration/');
     expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/runtime/');
-    expect(roleAccess.roles.surface_runtime.allow).toContain('knowledge/public/governance/surfaces/');
-    expect(roleAccess.roles.surface_runtime.allow).toContain('knowledge/public/governance/active-surfaces.json');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('knowledge/product/governance/surfaces/');
+    expect(roleAccess.roles.surface_runtime.allow).toContain('knowledge/product/governance/active-surfaces.json');
     expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/coordination/channels/imessage/');
     expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/coordination/channels/discord/');
     expect(roleAccess.roles.surface_runtime.allow).toContain('active/shared/coordination/channels/telegram/');
   });
 
   it('ships the Slack and Chronos control model architecture reference', () => {
-    expect(safeExistsSync('knowledge/public/architecture/slack-chronos-control-model.md')).toBe(true);
+    expect(safeExistsSync('knowledge/product/architecture/slack-chronos-control-model.md')).toBe(true);
   });
 });

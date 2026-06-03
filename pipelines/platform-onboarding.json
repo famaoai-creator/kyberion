@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "platform-onboarding",
+  "version": "2.0.0",
   "description": "Platform onboarding mission: drive the organization-integration flow end-to-end — discovery transcript → requirements draft → design spec → test plan → task plan → (operator runs execute-task-plan separately). The pipeline itself is a single-shot orchestration of the 4 artifact-producing steps; task execution and deploy run downstream pipelines with their own approval gates.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",
     "project_name": "",
@@ -15,8 +17,9 @@
   "steps": [
     {
       "id": "requirements",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:extract_requirements",
+      "produces": { "channel": "requirements", "type": "RequirementsResult" },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
@@ -24,46 +27,46 @@
         "source_type": "{{source_type}}",
         "language": "{{language}}",
         "customer_name": "{{customer_name}}",
-        "customer_org": "{{customer_org}}",
-        "export_as": "requirements"
+        "customer_org": "{{customer_org}}"
       }
     },
     {
       "id": "design",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:extract_design_spec",
+      "produces": { "channel": "design", "type": "DesignSpec" },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "additional_context": "Kyberion を組織固有環境（CI/CD / STT / 音声エンジン / 承認チャネル / SIEM / シークレット管理）に統合するための design。必ず SpeechToTextBridge / DeploymentAdapter / AuditForwarder / SecretResolver の 4 契約ポイントへの adapter 対応を components に含める。",
-        "export_as": "design"
+        "additional_context": "Kyberion を組織固有環境（CI/CD / STT / 音声エンジン / 承認チャネル / SIEM / シークレット管理）に統合するための design。必ず SpeechToTextBridge / DeploymentAdapter / AuditForwarder / SecretResolver の 4 契約ポイントへの adapter 対応を components に含める。"
       }
     },
     {
       "id": "test_plan",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:extract_test_plan",
+      "produces": { "channel": "test_plan", "type": "TestPlan" },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "app_id": "{{app_id}}",
-        "export_as": "test_plan"
+        "app_id": "{{app_id}}"
       }
     },
     {
       "id": "task_plan",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:decompose_into_tasks",
+      "produces": { "channel": "task_plan", "type": "TaskPlan" },
       "params": {
         "mission_id": "{{mission_id}}",
-        "project_name": "{{project_name}}",
-        "export_as": "task_plan"
+        "project_name": "{{project_name}}"
       }
     },
     {
       "id": "summary",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": ["requirements", "design", "test_plan", "task_plan"],
       "params": {
         "message": "Onboarding artifacts for {{project_name}}: requirements v{{requirements.version}} / design v{{design.version}} / test plan v{{test_plan.version}} / task plan v{{task_plan.version}} ({{task_plan.task_count}} tasks). Next: pnpm pipeline --input pipelines/execute-task-plan.json"
       }

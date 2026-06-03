@@ -1,9 +1,12 @@
 {
   "name": "browser-purchase-checkout",
+  "version": "2.0.0",
   "description": "Deterministic sequence for cart checkout and payment. Includes a high-risk approval gate before final confirmation.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used no roles.",
   "steps": [
     {
       "id": "navigate_to_cart",
+      "role": "sink",
       "op": "browser:goto",
       "params": {
         "url": "{{cart_url}}"
@@ -11,6 +14,7 @@
     },
     {
       "id": "proceed_to_checkout",
+      "role": "sink",
       "op": "browser:click_ref",
       "params": {
         "selector": "{{checkout_button_selector}}"
@@ -18,14 +22,16 @@
     },
     {
       "id": "capture_summary",
+      "role": "source",
       "op": "browser:snapshot",
-      "params": {
-        "export_as": "order_summary"
-      }
+      "produces": { "channel": "order_summary", "type": "SnapshotResult" },
+      "params": {}
     },
     {
       "id": "approval_gate_payment",
+      "role": "sink",
       "op": "approval:request",
+      "consumes": "order_summary",
       "params": {
         "title": "Purchase Confirmation Required",
         "description": "Reviewing order for {{merchant_name}}. Total: {{order_summary.total_price}}. Evidence: {{order_summary.screenshot_url}}",
@@ -34,6 +40,7 @@
     },
     {
       "id": "finalize_payment",
+      "role": "sink",
       "op": "browser:click_ref",
       "params": {
         "selector": "{{confirm_payment_button_selector}}"
@@ -41,14 +48,16 @@
     },
     {
       "id": "capture_receipt",
+      "role": "source",
       "op": "browser:snapshot",
-      "params": {
-        "export_as": "purchase_receipt"
-      }
+      "produces": { "channel": "purchase_receipt", "type": "SnapshotResult" },
+      "params": {}
     },
     {
       "id": "audit_record_purchase",
+      "role": "sink",
       "op": "blockchain:record_event",
+      "consumes": "purchase_receipt",
       "params": {
         "event": "PURCHASE_COMPLETED",
         "merchant": "{{merchant_name}}",

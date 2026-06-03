@@ -4,7 +4,7 @@
   "description": "Compile governed composed-video bundles from a video-composition-adf contract.",
   "anyOf": [
     {
-      "$ref": "../knowledge/public/schemas/video-composition-adf.schema.json"
+      "$ref": "../knowledge/product/schemas/video-composition-adf.schema.json"
     },
     {
       "type": "object",
@@ -38,7 +38,7 @@
           "required": ["narrated_video_brief"],
           "properties": {
             "narrated_video_brief": {
-              "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+              "$ref": "../knowledge/product/schemas/narrated-video-brief.schema.json"
             }
           }
         }
@@ -55,7 +55,7 @@
           "required": ["video_content_brief"],
           "properties": {
             "video_content_brief": {
-              "$ref": "../knowledge/public/schemas/video-content-brief.schema.json"
+              "$ref": "../knowledge/product/schemas/video-content-brief.schema.json"
             }
           }
         }
@@ -72,7 +72,7 @@
           "required": ["video_content_brief", "narration_artifact_ref"],
           "properties": {
             "video_content_brief": {
-              "$ref": "../knowledge/public/schemas/video-content-brief.schema.json"
+              "$ref": "../knowledge/product/schemas/video-content-brief.schema.json"
             },
             "narration_artifact_ref": { "type": "string", "minLength": 1 },
             "job_id": { "type": "string", "minLength": 1 },
@@ -104,7 +104,7 @@
           "required": ["narrated_video_brief"],
           "properties": {
             "narrated_video_brief": {
-              "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+              "$ref": "../knowledge/product/schemas/narrated-video-brief.schema.json"
             },
             "job_id": { "type": "string", "minLength": 1 },
             "bundle_dir": { "type": "string", "minLength": 1 }
@@ -123,7 +123,7 @@
             "type": "object",
             "anyOf": [
               {
-                "$ref": "../knowledge/public/schemas/video-composition-adf.schema.json"
+                "$ref": "../knowledge/product/schemas/video-composition-adf.schema.json"
               },
               {
                 "type": "object",
@@ -157,7 +157,7 @@
                     "required": ["narrated_video_brief"],
                     "properties": {
                       "narrated_video_brief": {
-                        "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+                        "$ref": "../knowledge/product/schemas/narrated-video-brief.schema.json"
                       }
                     }
                   }
@@ -174,7 +174,7 @@
                     "required": ["video_content_brief"],
                     "properties": {
                       "video_content_brief": {
-                        "$ref": "../knowledge/public/schemas/video-content-brief.schema.json"
+                        "$ref": "../knowledge/product/schemas/video-content-brief.schema.json"
                       }
                     }
                   }
@@ -191,7 +191,7 @@
                     "required": ["video_content_brief", "narration_artifact_ref"],
                     "properties": {
                       "video_content_brief": {
-                        "$ref": "../knowledge/public/schemas/video-content-brief.schema.json"
+                        "$ref": "../knowledge/product/schemas/video-content-brief.schema.json"
                       },
                       "narration_artifact_ref": { "type": "string", "minLength": 1 },
                       "job_id": { "type": "string", "minLength": 1 },
@@ -223,7 +223,7 @@
                     "required": ["narrated_video_brief"],
                     "properties": {
                       "narrated_video_brief": {
-                        "$ref": "../knowledge/public/schemas/narrated-video-brief.schema.json"
+                        "$ref": "../knowledge/product/schemas/narrated-video-brief.schema.json"
                       },
                       "job_id": { "type": "string", "minLength": 1 },
                       "bundle_dir": { "type": "string", "minLength": 1 }

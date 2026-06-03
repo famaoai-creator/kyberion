@@ -1,23 +1,26 @@
 {
   "action": "pipeline",
   "name": "memory-distillation-fragment",
+  "version": "2.0.0",
   "description": "Analyzes recent mission traces to extract hints and lessons learned, updating the system's operational memory.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "distill_wisdom",
-      "type": "capture",
+      "role": "source",
       "op": "wisdom:distill",
+      "produces": { "channel": "lessons_learned", "type": "AnalysisResult" },
       "params": {
-        "scope": "recent_missions",
-        "export_as": "lessons_learned"
+        "scope": "recent_missions"
       }
     },
     {
       "id": "persist_hints",
-      "type": "apply",
+      "role": "sink",
       "op": "system:write_artifact",
+      "consumes": "lessons_learned",
       "params": {
-        "path": "knowledge/public/governance/HINTS.md",
+        "path": "knowledge/product/governance/HINTS.md",
         "content": "# Operational Hints\n\n{{lessons_learned}}"
       }
     }

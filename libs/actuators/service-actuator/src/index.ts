@@ -311,6 +311,7 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
       return { status: 'reconciled', active_services: Object.keys(pids) };
 
     case 'STREAM':
+      // Slack streaming ingress belongs to the Slack gateway (satellites/slack-bridge), not the service actuator.
       if ((loadServiceEndpointsCatalog().services[input.service_id]?.allow_stream_ingress ?? true) === false) {
         throw new Error(`Streaming ingress is disabled for ${input.service_id}; use the service gateway instead.`);
       }

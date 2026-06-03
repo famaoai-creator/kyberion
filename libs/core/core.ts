@@ -376,7 +376,7 @@ export const fileUtils = {
       const content = rawReadTextFile(resolved);
       const data = JSON.parse(content);
       if (stat.size < 5 * 1024 * 1024) {
-        const persistCache = resolved.startsWith(pathResolver.knowledge('public/orchestration/'));
+        const persistCache = resolved.startsWith(pathResolver.knowledge('product/orchestration/'));
         _fileCache.set(resolved, { mtimeMs, data }, undefined, persistCache);
       }
       return data;

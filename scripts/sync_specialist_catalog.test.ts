@@ -71,7 +71,7 @@ describe('sync_specialist_catalog', () => {
 
     expect(mocks.safeWriteFile).toHaveBeenCalledTimes(1);
     const [snapshotPath, content] = mocks.safeWriteFile.mock.calls[0];
-    expect(String(snapshotPath)).toContain('knowledge/public/orchestration/specialist-catalog.json');
+    expect(String(snapshotPath)).toContain('knowledge/product/orchestration/specialist-catalog.json');
     const parsed = JSON.parse(String(content));
     expect(parsed.version).toBe('1.0.0');
     expect(Object.keys(parsed.specialists)).toEqual(['document-specialist', 'service-operator']);

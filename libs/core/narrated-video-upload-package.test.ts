@@ -17,7 +17,7 @@ describe('narrated video upload package', () => {
   it('builds a staged upload package from the publish plan', () => {
     const pkg = buildNarratedVideoUploadPackage(
       publishPlan,
-      'knowledge/public/schemas/narrated-video-publish-plan.example.json'
+      'knowledge/product/schemas/narrated-video-publish-plan.example.json'
     );
     expect(pkg.kind).toBe('narrated-video-upload-package');
     expect(pkg.publish_plan_ref).toContain('narrated-video-publish-plan.example.json');

@@ -232,7 +232,7 @@ describe('intent-resolution', () => {
   it('emits packets that satisfy the intent-resolution schema', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = pathResolver.knowledge(
-      'public/schemas/intent-resolution-packet.schema.json'
+      'product/schemas/intent-resolution-packet.schema.json'
     );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const packet = resolveIntentResolutionPacket(

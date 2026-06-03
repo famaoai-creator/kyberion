@@ -15,8 +15,8 @@ function readJson<T>(relPath: string): T {
 describe('harness landscape contract', () => {
   it('keeps the external landscape report tied to the Kyberion absorption plan', () => {
     const report = read('knowledge/public/external-wisdom/harness-landscape-scan-2026-05.md');
-    const plan = read('knowledge/public/architecture/harness-adoption-plan-2026-05.md');
-    const bridge = read('knowledge/public/architecture/provider-native-capability-bridge.md');
+    const plan = read('knowledge/product/architecture/harness-adoption-plan-2026-05.md');
+    const bridge = read('knowledge/product/architecture/provider-native-capability-bridge.md');
 
     expect(report).toContain('OpenClaw');
     expect(report).toContain('Hermes Agent');
@@ -46,10 +46,10 @@ describe('harness landscape contract', () => {
 
   it('registers the new provider-runtime surfaces and adapter profiles', () => {
     const capabilityRegistry = readJson<{ capabilities: Array<{ capability_id: string; status: string; fallback_path?: { target?: string } }> }>(
-      'knowledge/public/governance/harness-capability-registry.json',
+      'knowledge/product/governance/harness-capability-registry.json',
     );
     const adapterRegistry = readJson<{ profiles: Array<{ adapter_id: string; capability_id: string; enabled: boolean }> }>(
-      'knowledge/public/governance/harness-adapter-registry.json',
+      'knowledge/product/governance/harness-adapter-registry.json',
     );
 
     expect(capabilityRegistry.capabilities.map((item) => item.capability_id)).toEqual(

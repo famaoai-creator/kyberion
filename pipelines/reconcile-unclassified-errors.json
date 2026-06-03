@@ -1,0 +1,96 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "reconcile-unclassified-errors",
+  "version": "1.0.0",
+  "name": "Unclassified Error Reconciler",
+  "description": "Reads the unclassified-error registry and writes rule-proposal stubs for each unrecognized error. Optionally invokes reasoning:analyze to suggest category, label, remediation, and patterns for each proposal.",
+  "context": {
+    "registry_path": "active/shared/tmp/unclassified-error-registry.json",
+    "proposals_dir": "active/shared/tmp/unclassified-error-proposals"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "[UNCLASSIFIED-ERROR] Starting reconcile cycle..." }
+    },
+    {
+      "id": "run_reconciler",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "reconcile_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/reconcile_unclassified_errors.js 2>/dev/null || echo '{\"proposals_written\":[],\"skipped\":[],\"total_unreconciled\":0}'"
+      }
+    },
+    {
+      "id": "log_result",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": { "message": "[UNCLASSIFIED-ERROR] Reconcile result: {{reconcile_result}}" }
+    },
+    {
+      "id": "check_proposals",
+      "role": "gate",
+      "op": "core:if",
+      "consumes": "reconcile_result",
+      "params": {
+        "condition": { "from": "reconcile_result.proposals_written.length", "operator": "gt", "value": 0 },
+        "then": [
+          {
+            "id": "analyze_proposals",
+            "role": "source",
+            "op": "reasoning:analyze",
+            "produces": { "channel": "analysis_result", "type": "AnalysisResult" },
+            "params": {
+              "instruction": "Review each .proposal.json in active/shared/tmp/unclassified-error-proposals/. For each proposal, the message_excerpt is an error string that matched no classification rule. Suggest values for: category (must be one of: auth, permission_denied, network, rate_limit, missing_dependency, missing_secret, invalid_input, resource_unavailable, timeout, governance_block, tier_violation, mission_not_found, unknown), label (short display name), remediation (one actionable sentence), patterns (array of regex strings that would match this error). Output a JSON array of {message_excerpt, suggested_rule: {id, category, label, remediation, patterns, repairAction}} for each proposal.",
+              "source_path": "{{proposals_dir}}",
+              "analysis_type": "error_rule_suggestion",
+              "output_path": "active/shared/tmp/unclassified-error-review.json"
+            }
+          },
+          {
+            "id": "log_review",
+            "role": "sink",
+            "op": "system:log",
+            "consumes": "analysis_result",
+            "params": {
+              "message": "[UNCLASSIFIED-ERROR] Rule suggestions written to active/shared/tmp/unclassified-error-review.json. Review and append accepted rules to knowledge/product/governance/error-classifier-rules.json."
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_no_proposals",
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "[UNCLASSIFIED-ERROR] No unclassified errors found. Registry is clean." }
+          }
+        ]
+      }
+    },
+    {
+      "id": "write_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "reconcile_result",
+      "params": {
+        "path": "active/shared/tmp/unclassified-error-last-run.json",
+        "content": {
+          "ran_at": "{{_now}}",
+          "result": "{{reconcile_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": { "message": "[UNCLASSIFIED-ERROR] Done. Proposals: {{reconcile_result.proposals_written.length}}, Skipped: {{reconcile_result.skipped.length}}, Total unreconciled: {{reconcile_result.total_unreconciled}}" }
+    }
+  ]
+}

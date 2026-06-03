@@ -14,8 +14,8 @@ export interface PromotedReportTemplatePolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/promoted-report-template-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/promoted-report-template-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/promoted-report-template-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/promoted-report-template-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: PromotedReportTemplatePolicyCatalog | null = null;

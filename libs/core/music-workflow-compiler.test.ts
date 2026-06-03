@@ -79,7 +79,7 @@ describe('compileMusicGenerationADF', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/music-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/music-generation-adf.schema.json'));
 
     expect(validate({
       kind: 'music-generation-adf',

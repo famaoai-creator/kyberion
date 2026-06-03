@@ -4,7 +4,7 @@ This document is the operational reference for answering a simple question:
 
 > "If this role exists, what does it imply, and what does it not imply?"
 
-Use it as a mental model, not as a source of new permissions. Actual access is enforced by `knowledge/public/governance/security-policy.json` and `knowledge/public/governance/authority-role-index.json`.
+Use it as a mental model, not as a source of new permissions. Actual access is enforced by `knowledge/product/governance/security-policy.json` and `knowledge/product/governance/authority-role-index.json`.
 
 ## Bottom line
 

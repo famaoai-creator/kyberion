@@ -60,7 +60,7 @@ class PolicyEngineImpl {
 
   loadFromFile(filePath?: string): void {
     const root = pathResolver.rootDir();
-    const policyPath = filePath || path.join(root, 'knowledge', 'governance', 'agent-policies.yaml');
+    const policyPath = filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
 
     if (!safeExistsSync(policyPath)) {
       logger.warn(`[POLICY_ENGINE] Policy file not found: ${policyPath}`);

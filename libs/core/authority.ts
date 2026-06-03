@@ -8,6 +8,7 @@ import * as pathResolver from './path-resolver.js';
 import {
   Persona,
   Authority,
+  ExecutionMode,
   IdentityContext,
 } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
@@ -27,26 +28,69 @@ type AuthorityRoleFile = {
 };
 
 const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
-  ecosystem_architect: 'ecosystem_architect',
-  sovereign_concierge: 'sovereign',
-  mission_controller: 'worker',
-  software_developer: 'worker',
-  slack_bridge: 'worker',
-  chronos_gateway: 'worker',
-  chronos_operator: 'worker',
-  chronos_localadmin: 'worker',
-  service_actuator: 'worker',
-  surface_runtime: 'worker',
+  // system roles
+  ecosystem_architect:     'ecosystem_architect',
+  knowledge_steward:       'analyst',
+  solution_architect:      'ecosystem_architect',
+  integration_steward:     'ecosystem_architect',
+  reliability_engineer:    'worker',
   infrastructure_sentinel: 'worker',
-  ruthless_auditor: 'analyst',
-  knowledge_steward: 'analyst',
-  cyber_security: 'analyst',
+  // mission roles
+  sovereign_concierge:     'sovereign',
+  mission_controller:      'worker',
+  software_developer:      'worker',
+  incident_commander:      'worker',
+  performance_engineer:    'worker',
+  // surface/infra authority roles
+  slack_bridge:            'worker',
+  chronos_gateway:         'worker',
+  chronos_operator:        'worker',
+  chronos_localadmin:      'worker',
+  service_actuator:        'worker',
+  surface_runtime:         'worker',
+  // context roles
+  ceo:                     'analyst',
+  business_owner:          'analyst',
+  product_manager:         'analyst',
+  strategic_sales:         'analyst',
+  marketing_growth:        'analyst',
+  customer_success:        'worker',
+  pmo_governance:          'analyst',
+  qa_lead:                 'analyst',
+  legal_strategist:        'analyst',
+  cyber_security:          'analyst',
+  ruthless_auditor:        'analyst',
+  designer:                'worker',
+  executive_assistant:     'worker',
+  finance_controller:      'analyst',
+  talent_culture:          'worker',
+  line_manager:            'worker',
 };
 
 let cachedRolePersonaIndex: RolePersonaIndex | null = null;
 
+type RoleAuthorityMapEntry = { role: string; persona: Persona; execution_mode?: string; authority_role?: string };
+type RoleAuthorityMap = { system_roles?: RoleAuthorityMapEntry[]; mission_roles?: RoleAuthorityMapEntry[]; context_roles?: RoleAuthorityMapEntry[] };
+
+let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
+
+function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
+  if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
+  const filePath = pathResolver.knowledge('product/governance/role-authority-map.json');
+  try {
+    if (!safeExistsSync(filePath)) { cachedRoleAuthorityMap = {}; return cachedRoleAuthorityMap; }
+    const raw = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as RoleAuthorityMap;
+    const result: Record<string, Persona> = {};
+    for (const entry of [...(raw.system_roles ?? []), ...(raw.mission_roles ?? []), ...(raw.context_roles ?? [])]) {
+      if (entry.role && entry.persona) result[entry.role] = entry.persona;
+    }
+    cachedRoleAuthorityMap = result;
+  } catch { cachedRoleAuthorityMap = {}; }
+  return cachedRoleAuthorityMap;
+}
+
 function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
-  const directoryPath = pathResolver.knowledge('public/governance/authority-roles');
+  const directoryPath = pathResolver.knowledge('product/governance/authority-roles');
   if (!safeExistsSync(directoryPath)) {
     return null;
   }
@@ -58,7 +102,7 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
 
   const authority_roles: Record<string, { default_persona?: Persona }> = {};
   for (const file of files) {
-    const filePath = pathResolver.knowledge(`public/governance/authority-roles/${file}`);
+    const filePath = pathResolver.knowledge(`product/governance/authority-roles/${file}`);
     const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as AuthorityRoleFile;
     const role = String(payload.role || '').trim();
     if (!role) {
@@ -83,7 +127,7 @@ function loadRolePersonaIndex(): RolePersonaIndex {
     return cachedRolePersonaIndex;
   }
 
-  const indexPath = pathResolver.knowledge('public/governance/authority-role-index.json');
+  const indexPath = pathResolver.knowledge('product/governance/authority-role-index.json');
   try {
     cachedRolePersonaIndex = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string) as RolePersonaIndex;
   } catch {
@@ -126,7 +170,9 @@ export function inferPersonaFromRole(role?: string): Persona {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
   const fromIndex = loadRolePersonaIndex().authority_roles?.[normalized]?.default_persona;
-  return fromIndex || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
+  if (fromIndex) return fromIndex;
+  const fromMap = loadRoleAuthorityMapPersonas()[normalized];
+  return fromMap || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
 }
 
 export function buildExecutionEnv(
@@ -278,8 +324,14 @@ export function resolveIdentityContext(): IdentityContext {
     authorities.push('SUDO');
   }
 
+  const executionMode: ExecutionMode =
+    persona === 'sovereign'           ? 'sovereign' :
+    persona === 'ecosystem_architect' ? 'system' :
+    'mission';
+
   return {
     persona,
+    executionMode,
     authorities: Array.from(new Set(authorities)),
     missionId,
     role: envRole,

@@ -52,7 +52,7 @@ import * as path from 'node:path';
  * Decision-support operations for Kyberion.
  *
  * Implements the runtime for the protocols in:
- *   knowledge/public/orchestration/{hypothesis-tree,counterfactual-simulation,
+ *   knowledge/product/orchestration/{hypothesis-tree,counterfactual-simulation,
  *   stakeholder-consensus,negotiation,rehearsal,real-time-coaching,
  *   intuition-capture,relationship-graph}-protocol.md
  *
@@ -438,7 +438,7 @@ export async function registerPresentationPreferenceProfileOp(input: RegisterPre
 
 // ---------------------------------------------------------------------------
 // Intuition Capture — records a 3-question heuristic entry under the
-// confidential tier. See knowledge/public/orchestration/intuition-capture-protocol.md.
+// confidential tier. See knowledge/product/orchestration/intuition-capture-protocol.md.
 // No LLM needed; the capture is a structured record of the Sovereign's answers.
 // ---------------------------------------------------------------------------
 

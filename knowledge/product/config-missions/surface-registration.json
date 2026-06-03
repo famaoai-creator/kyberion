@@ -1,0 +1,47 @@
+{
+  "preset_id": "surface-registration",
+  "type": "config_mission",
+  "category": "surface",
+  "description": "Register a new runtime surface in the surface manifest. The surface becomes available to pnpm surfaces:start after applying.",
+  "inputs": {
+    "surface_id": {
+      "type": "string",
+      "description": "Unique surface identifier (kebab-case, e.g. my-bridge).",
+      "required": true
+    },
+    "kind": {
+      "type": "enum",
+      "description": "Surface family.",
+      "values": ["ui", "service", "gateway"],
+      "required": true
+    },
+    "command": {
+      "type": "string",
+      "description": "Executable command to start the surface (e.g. node).",
+      "required": true
+    },
+    "args": {
+      "type": "string",
+      "description": "Space-separated arguments for the command.",
+      "required": true
+    },
+    "port": {
+      "type": "string",
+      "description": "Port the surface listens on. Leave empty for services with no HTTP endpoint.",
+      "required": false
+    },
+    "health_path": {
+      "type": "string",
+      "description": "HTTP path for health checks (e.g. /health). Leave empty if not applicable.",
+      "required": false,
+      "default": "/health"
+    }
+  },
+  "pipeline": "pipelines/config/surface-registration.json",
+  "write_targets": [
+    "knowledge/product/governance/surfaces/{{surface_id}}.json",
+    "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
+  ],
+  "authority_role": "system_configurator",
+  "notes": "After applying, run `pnpm surfaces:reconcile` to start the newly registered surface."
+}

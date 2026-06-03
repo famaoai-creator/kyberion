@@ -49,8 +49,8 @@ export interface ReasoningBackendProviderSnapshot {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const POLICY_PATH = pathResolver.knowledge('public/governance/reasoning-backend-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/reasoning-backend-policy.schema.json');
+const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-backend-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-backend-policy.schema.json');
 
 const FALLBACK_POLICY: ReasoningBackendPolicy = {
   version: '1.0.0',

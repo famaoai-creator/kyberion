@@ -2,7 +2,7 @@
  * Validation Bundle Exporter (IP-13)
  *
  * Assembles the SR-11-7-class evidence bundle described in
- * `knowledge/public/governance/independent-validation-evidence-package.md`.
+ * `knowledge/product/governance/independent-validation-evidence-package.md`.
  *
  * Usage:
  *   node dist/scripts/export_validation_bundle.js <MISSION_ID> [--output <dir>]
@@ -278,10 +278,10 @@ function exportBundle(missionId: string, outputBaseDir: string): string {
 
   // §2.5 governance — copy current versions
   const govFiles = [
-    'knowledge/public/governance/counterfactual-degradation-policy.json',
-    'knowledge/public/governance/mission-classification-policy.json',
-    'knowledge/public/governance/tier-hygiene-policy.json',
-    'knowledge/public/governance/path-scope-policy.json',
+    'knowledge/product/governance/counterfactual-degradation-policy.json',
+    'knowledge/product/governance/mission-classification-policy.json',
+    'knowledge/product/governance/tier-hygiene-policy.json',
+    'knowledge/product/governance/path-scope-policy.json',
     'knowledge/public/procedures/system/rubric-disclosure-template.md',
   ];
   for (const g of govFiles) {

@@ -1,0 +1,95 @@
+{
+  "action": "pipeline",
+  "name": "stakeholder-consensus-orchestrator",
+  "version": "2.0.0",
+  "description": "Sequences pre-proposal 1-on-1 sessions in Power/Interest priority order (FULL sort), runs each session (STUB), extracts dissent signals (STUB), then aggregates into a readiness matrix with recommendation (FULL). Supports cultural variants (nemawashi / round_table / pre_read_memo / bilateral_memo). See knowledge/product/orchestration/stakeholder-consensus-protocol.md.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "proposal_draft": "",
+    "stakeholder_nodes": [],
+    "deadline": "",
+    "variant": "nemawashi"
+  },
+  "steps": [
+    {
+      "id": "order_by_power_interest",
+      "role": "source",
+      "op": "wisdom:stakeholder_grid_sort",
+      "produces": { "channel": "ordered_visits", "type": "OrderedVisits" },
+      "params": {
+        "from": "stakeholder_nodes"
+      }
+    },
+    {
+      "id": "sequential_visits",
+      "role": "gate",
+      "op": "core:while",
+      "consumes": "ordered_visits",
+      "params": {
+        "condition": "ordered_visits.length > 0",
+        "max_iterations": 50,
+        "pipeline": [
+          {
+            "id": "pick",
+            "role": "transform",
+            "op": "core:json_query",
+            "produces": { "channel": "current_visit", "type": "VisitNode" },
+            "params": {
+              "from": "ordered_visits",
+              "path": "0"
+            }
+          },
+          {
+            "id": "run_session",
+            "role": "sink",
+            "op": "wisdom:conduct_1on1",
+            "consumes": "current_visit",
+            "params": {
+              "counterparty_ref": "{{current_visit.person_slug}}",
+              "proposal_draft_ref": "{{proposal_draft}}",
+              "structure": [
+                "context_sharing_3min",
+                "listening_10min",
+                "soft_ask_2min"
+              ],
+              "output_path": "active/missions/{{mission_id}}/evidence/nemawashi/{{current_visit.person_slug}}.raw.json"
+            }
+          },
+          {
+            "id": "extract_signals",
+            "role": "sink",
+            "op": "wisdom:extract_dissent_signals",
+            "params": {
+              "session_log": "active/missions/{{mission_id}}/evidence/nemawashi/{{current_visit.person_slug}}.raw.json",
+              "output_path": "active/missions/{{mission_id}}/evidence/nemawashi/{{current_visit.person_slug}}.json"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "compute_readiness",
+      "role": "transform",
+      "op": "wisdom:compute_readiness_matrix",
+      "produces": { "channel": "readiness", "type": "ReadinessMatrix" },
+      "params": {
+        "visits_dir": "active/missions/{{mission_id}}/evidence/nemawashi/",
+        "proposal_ref": "{{proposal_draft}}",
+        "deadline": "{{deadline}}",
+        "output_path": "active/missions/{{mission_id}}/evidence/readiness-matrix.json"
+      }
+    },
+    {
+      "id": "recommend",
+      "role": "transform",
+      "op": "wisdom:recommend",
+      "consumes": "readiness",
+      "produces": { "channel": "recommendation", "type": "Recommendation" },
+      "params": {
+        "readiness_ref": "active/missions/{{mission_id}}/evidence/readiness-matrix.json",
+        "options": ["proceed", "delay", "redesign"]
+      }
+    }
+  ]
+}

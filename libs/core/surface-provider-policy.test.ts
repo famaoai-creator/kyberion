@@ -183,10 +183,10 @@ describe('surface-provider-policy', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/public/schemas/surface-provider-manifests.schema.json'),
+      path.resolve(root, 'knowledge/product/schemas/surface-provider-manifests.schema.json'),
     );
     const manifests = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/public/governance/surface-provider-manifests.json'), {
+      safeReadFile(path.resolve(root, 'knowledge/product/governance/surface-provider-manifests.json'), {
         encoding: 'utf8',
       }) as string,
     );

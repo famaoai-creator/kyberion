@@ -1,47 +1,53 @@
 {
   "action": "pipeline",
   "pipeline_id": "knowledge-sync",
+  "version": "2.0.0",
   "name": "Knowledge & Documentation Sync",
   "description": "Reads knowledge/governance/knowledge-sync-rules.json and runs each configured sync job via wisdom-actuator. Replaces scripts/run_knowledge_sync.ts.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
+      "role": "sink",
       "op": "system:log",
       "params": { "message": "🔄 [KNOWLEDGE] Starting knowledge sync..." }
     },
     {
       "id": "load-config",
-      "type": "capture",
+      "role": "source",
       "op": "system:read_file",
+      "produces": { "channel": "sync_config", "type": "SyncConfig" },
       "params": {
         "path": "knowledge/governance/knowledge-sync-rules.json",
-        "format": "json",
-        "export_as": "sync_config"
+        "format": "json"
       }
     },
     {
       "id": "run-jobs",
-      "type": "control",
+      "role": "gate",
       "op": "core:foreach",
+      "consumes": "sync_config",
       "params": {
         "items": "{{sync_config.jobs}}",
         "as": "sync_job",
         "do": [
           {
+            "role": "sink",
             "op": "system:log",
             "params": { "message": "🔄 Running knowledge sync job: {{sync_job.action}}" }
           },
           {
-            "type": "apply",
+            "role": "transform",
             "op": "wisdom:knowledge_inject",
+            "produces": { "channel": "sync_job_result", "type": "SyncJobResult" },
             "params": {
               "action": "{{sync_job.action}}",
               "source": "{{sync_job.source}}",
               "target": "{{sync_job.target}}",
-              "options": "{{sync_job.options}}",
-              "export_as": "sync_job_result"
+              "options": "{{sync_job.options}}"
             }
           },
           {
+            "role": "sink",
             "op": "system:log",
             "params": { "message": "✅ Job done: {{sync_job.action}}" }
           }
@@ -49,6 +55,7 @@
       }
     },
     {
+      "role": "sink",
       "op": "system:log",
       "params": { "message": "✅ [KNOWLEDGE] Knowledge sync complete." }
     }

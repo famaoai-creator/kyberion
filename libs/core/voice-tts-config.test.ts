@@ -15,7 +15,7 @@ describe('voice tts config registry', () => {
 
   it('loads the governed japanese profile from the default registry', () => {
     const registry = JSON.parse(
-      safeReadFile(pathResolver.knowledge('public/presence/voice-hub-tts.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(pathResolver.knowledge('product/presence/voice-hub-tts.json'), { encoding: 'utf8' }) as string,
     ) as {
       languages?: Record<string, { voice: string; rate: number }>;
     };

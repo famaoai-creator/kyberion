@@ -1,0 +1,65 @@
+{
+  "action": "pipeline",
+  "name": "Config: Tenant Onboarding",
+  "version": "1.0.0",
+  "description": "Bootstraps a new tenant namespace under knowledge/confidential/{tenant}/ with profile, default structure, and access policy stub.",
+  "steps": [
+    {
+      "id": "preflight_inputs",
+      "role": "gate",
+      "op": "system:assert",
+      "params": {
+        "conditions": [
+          "{{input.tenant}} != ''",
+          "{{input.display_name}} != ''",
+          "{{input.owner_email}} != ''"
+        ],
+        "message": "tenant, display_name, and owner_email are required"
+      }
+    },
+    {
+      "id": "write_tenant_profile",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/profile.json",
+        "content": "{\"tenant\":\"{{input.tenant}}\",\"display_name\":\"{{input.display_name}}\",\"tier\":\"{{input.tier}}\",\"owner_email\":\"{{input.owner_email}}\",\"created_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "write_service_auth_index",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/service-auth/.index",
+        "content": "# Service auth credentials for tenant {{input.tenant}}\n# Each service gets its own JSON file: {service_id}.json\n"
+      }
+    },
+    {
+      "id": "write_config_missions_index",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/config-missions/.index",
+        "content": "# Config mission history for tenant {{input.tenant}}\n# Each mission gets its own directory: {instance_id}/\n"
+      }
+    },
+    {
+      "id": "write_evidence",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/config-missions/{{input.instance_id}}/evidence/result.json",
+        "content": "{\"preset_id\":\"tenant-onboarding\",\"tenant\":\"{{input.tenant}}\",\"tier\":\"{{input.tier}}\",\"applied_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "final_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Tenant '{{input.tenant}}' ({{input.display_name}}) bootstrapped. Run `pnpm surfaces:reconcile` to surface in operator dashboard."
+      }
+    }
+  ]
+}

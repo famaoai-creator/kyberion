@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "description": "Patterns that must NOT appear in public-tier files. The public tier is reusable across organizations — specific company names, customer names, internal URLs, GitHub org slugs, and tenant identifiers belong in knowledge/confidential/{org}/. Allowlisted terms are legitimate industry vocabulary (e.g. 'SBI Model' = Situation-Behavior-Impact feedback framework) or placeholder templates.",
+  "scan_paths": [
+    "knowledge/public/**/*.md",
+    "knowledge/public/**/*.json",
+    "schemas/**/*.json",
+    "docs/**/*.md",
+    "pipelines/**/*.json",
+    "pipelines/**/*.yml",
+    "projects/**/*.md",
+    "projects/**/*.json",
+    "projects/**/*.ts",
+    "projects/**/*.sql",
+    "projects/**/*.sh",
+    "projects/**/*.yml"
+  ],
+  "skip_paths": [
+    "knowledge/public/common/patterns/generated/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "projects/**/node_modules/**",
+    "projects/**/cdk.out/**",
+    "projects/**/dist/**",
+    "knowledge/product/governance/tier-hygiene-policy.json"
+  ],
+  "denied_patterns": [
+    {
+      "name": "internal-atlassian-subdomain",
+      "regex": "\\b[a-z0-9][a-z0-9-]+\\.atlassian\\.net\\b",
+      "rationale": "Org-specific Atlassian (Jira / Confluence) subdomain. Replace with ${ATLASSIAN_BASE_URL} and resolve in confidential/{org}/."
+    },
+    {
+      "name": "internal-tld",
+      "regex": "\\b[a-z0-9][a-z0-9-]+\\.(?:internal|corp|intranet|local|lan)\\b",
+      "rationale": "Internal-only DNS suffix. Replace with a placeholder and resolve in confidential tier."
+    },
+    {
+      "name": "aws-account-id",
+      "regex": "arn:aws:[a-z-]+::(\\d{12}):",
+      "rationale": "AWS account id embedded in an ARN. Move to confidential/{org}/endpoints.json."
+    },
+    {
+      "name": "splunk-hec-url",
+      "regex": "https?://[a-z0-9][a-z0-9-]*\\.splunkcloud\\.com",
+      "rationale": "Splunk Cloud tenant URL. Replace with ${SPLUNK_HEC_URL} and resolve in confidential tier."
+    }
+  ],
+  "denied_substrings": [
+    "sbisecsol",
+    "sbisecuritysolutions"
+  ],
+  "allowlist_patterns": [
+    "\\bSBI\\s+Model\\b",
+    "\\bSituation[-\\s]Behavior[-\\s]Impact\\b",
+    "\\$\\{[A-Z_][A-Z0-9_]*\\}",
+    "<[A-Z_][A-Z0-9_]*>",
+    "\\{\\{[a-zA-Z0-9_]+\\}\\}",
+    "kyberion\\.local",
+    "example\\.(com|org|net)",
+    "localhost",
+    "127\\.0\\.0\\.1",
+    "\\.env\\.(local|development|test|production)"
+  ]
+}

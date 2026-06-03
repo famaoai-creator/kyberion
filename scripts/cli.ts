@@ -138,7 +138,7 @@ interface WebAppProfileIndexRecord {
 
 const rootDir = pathResolver.rootDir();
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
-const vocabularyPath = pathResolver.knowledge('public/orchestration/user-facing-vocabulary.json');
+const vocabularyPath = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
 
 type VocabularyCatalog = {
   default_locale: string;
@@ -532,7 +532,7 @@ function printActuatorExamples(actuator: ActuatorRecord) {
 }
 
 function resolveMobileAppProfileIndexPath(): string {
-  return pathResolver.knowledge('public/orchestration/mobile-app-profiles/index.json');
+  return pathResolver.knowledge('product/orchestration/mobile-app-profiles/index.json');
 }
 
 function loadMobileAppProfiles(): MobileAppProfileRecord[] {
@@ -546,7 +546,7 @@ function loadMobileAppProfiles(): MobileAppProfileRecord[] {
 }
 
 function resolveWebAppProfileIndexPath(): string {
-  return pathResolver.knowledge('public/orchestration/web-app-profiles/index.json');
+  return pathResolver.knowledge('product/orchestration/web-app-profiles/index.json');
 }
 
 function loadWebAppProfiles(): WebAppProfileIndexRecord[] {

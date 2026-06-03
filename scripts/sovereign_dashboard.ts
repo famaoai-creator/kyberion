@@ -84,7 +84,7 @@ function listJsonFiles(dir: string): string[] {
 
 function readConnectionReview() {
   const connectionDir = pathResolver.knowledge('personal/connections');
-  const readinessPath = pathResolver.knowledge('public/governance/service-connection-readiness.json');
+  const readinessPath = pathResolver.knowledge('product/governance/service-connection-readiness.json');
   const readiness = readJsonIfExists<{
     required_services?: Record<string, { required_keys_any?: string[] }>;
   }>(readinessPath);
@@ -284,7 +284,7 @@ function drawSkillLandscape() {
       version?: string;
       capability_count?: number;
     }>;
-  }>(pathResolver.knowledge('public/orchestration/global_skill_index.json'));
+  }>(pathResolver.knowledge('product/orchestration/global_skill_index.json'));
 
   if (!skillIndex || !Array.isArray(skillIndex.s) || skillIndex.s.length === 0) {
     console.log(chalk.dim('  (No governed skill catalog found)'));
@@ -299,7 +299,7 @@ function drawSkillLandscape() {
   console.log(`  ${chalk.gray('•')} Version: ${chalk.white(skillIndex.v || 'unknown')}`);
   console.log(`  ${chalk.gray('•')} Last updated: ${chalk.white(skillIndex.u || 'unknown')}`);
   console.log(`  ${chalk.gray('•')} Skills: ${implemented.length > 0 ? chalk.green(implemented.length) : chalk.dim(0)} implemented / ${skillIndex.s.length}`);
-  console.log(`  ${chalk.gray('•')} Catalog: ${chalk.cyan(pathResolver.knowledge('public/orchestration/global_skill_index.json'))}`);
+  console.log(`  ${chalk.gray('•')} Catalog: ${chalk.cyan(pathResolver.knowledge('product/orchestration/global_skill_index.json'))}`);
 
   if (preview.length > 0) {
     console.log(chalk.dim('  Top skills:'));
@@ -330,7 +330,7 @@ function drawOnboardingHome() {
   const tenantFiles = listJsonFiles(tenantDir);
   const readiness = readJsonIfExists<{
     required_services?: Record<string, { required_keys_any?: string[] }>;
-  }>(pathResolver.knowledge('public/governance/service-connection-readiness.json'));
+  }>(pathResolver.knowledge('product/governance/service-connection-readiness.json'));
 
   const serviceMap = new Map<string, Record<string, unknown>>();
   for (const file of connectionFiles) {
@@ -598,8 +598,8 @@ function drawA2ATraffic() {
 
 function drawRuntimeSurfaces() {
   const statePath = pathResolver.shared('runtime/surfaces/state.json');
-  const snapshotPath = pathResolver.knowledge('public/governance/active-surfaces.json');
-  const surfacesDir = pathResolver.knowledge('public/governance/surfaces');
+  const snapshotPath = pathResolver.knowledge('product/governance/active-surfaces.json');
+  const surfacesDir = pathResolver.knowledge('product/governance/surfaces');
 
   console.log(chalk.bold.blue(' 🛰️ RUNTIME SURFACES'));
 

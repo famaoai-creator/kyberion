@@ -943,7 +943,7 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
       };
     }
     case "knowledge": {
-      const roots = ["knowledge/public", "knowledge/public/architecture", "knowledge/public/governance"];
+      const roots = ["knowledge/public", "knowledge/product/architecture", "knowledge/product/governance"];
       const files = roots.flatMap((root) => {
         const dir = core.pathResolver.rootResolve(root);
         if (!core.safeExistsSync(dir)) return [];

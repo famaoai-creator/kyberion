@@ -1,0 +1,56 @@
+{
+  "action": "pipeline",
+  "name": "Config: New Service Integration",
+  "version": "1.0.0",
+  "description": "Registers a new external service by writing a service preset and storing auth credentials under the tenant's confidential namespace.",
+  "steps": [
+    {
+      "id": "preflight_inputs",
+      "role": "gate",
+      "op": "system:assert",
+      "params": {
+        "conditions": [
+          "{{input.service_id}} != ''",
+          "{{input.tenant}} != ''",
+          "{{input.auth_type}} != ''"
+        ],
+        "message": "service_id, tenant, and auth_type are required"
+      }
+    },
+    {
+      "id": "write_service_preset",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/product/governance/service-presets/{{input.service_id}}.json",
+        "content": "{\"service_id\":\"{{input.service_id}}\",\"label\":\"{{input.service_label}}\",\"auth_type\":\"{{input.auth_type}}\",\"base_url\":\"{{input.base_url}}\",\"registered_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "write_auth_placeholder",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/service-auth/{{input.service_id}}.json",
+        "content": "{\"service_id\":\"{{input.service_id}}\",\"auth_type\":\"{{input.auth_type}}\",\"status\":\"pending_credentials\",\"created_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "write_evidence",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/config-missions/{{input.instance_id}}/evidence/result.json",
+        "content": "{\"preset_id\":\"new-service-integration\",\"service_id\":\"{{input.service_id}}\",\"tenant\":\"{{input.tenant}}\",\"applied_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "final_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Service '{{input.service_id}}' registered for tenant '{{input.tenant}}'. Set credentials at knowledge/confidential/{{input.tenant}}/service-auth/{{input.service_id}}.json"
+      }
+    }
+  ]
+}

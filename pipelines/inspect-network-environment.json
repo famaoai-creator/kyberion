@@ -1,54 +1,57 @@
 {
   "pipeline_id": "inspect-network-environment",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Scan and report on network connectivity and speed.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "action": "pipeline",
   "steps": [
     {
       "id": "get-interface",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "wifi_interface", "type": "ShellResult" },
       "params": {
-        "cmd": "networksetup -listallhardwareports | grep -A 1 'Wi-Fi' | grep 'Device' | awk '{print $2}'",
-        "export_as": "wifi_interface"
+        "cmd": "networksetup -listallhardwareports | grep -A 1 'Wi-Fi' | grep 'Device' | awk '{print $2}'"
       }
     },
     {
       "id": "check-signal",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "network_signal", "type": "ShellResult" },
       "params": {
-        "cmd": "wdutil info | grep -E 'RSSI|Noise|Tx Rate' || echo 'Signal info unavailable'",
-        "export_as": "network_signal"
+        "cmd": "wdutil info | grep -E 'RSSI|Noise|Tx Rate' || echo 'Signal info unavailable'"
       }
     },
     {
       "id": "ping-test",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "ping_results", "type": "ShellResult" },
       "params": {
-        "cmd": "ping -c 3 8.8.8.8 | tail -n 1",
-        "export_as": "ping_results"
+        "cmd": "ping -c 3 8.8.8.8 | tail -n 1"
       }
     },
     {
       "id": "synthesize-network-report",
-      "type": "transform",
+      "role": "transform",
       "op": "reasoning:analyze",
+      "consumes": ["wifi_interface", "network_signal", "ping_results"],
+      "produces": { "channel": "network_report", "type": "AnalysisResult" },
       "params": {
         "instruction": "Analyze the network interface, signal quality, and latency. Determine if the environment is stable for high-bandwidth agent tasks (like video generation or large model downloads).",
         "context": [
           "{{wifi_interface}}",
           "{{network_signal}}",
           "{{ping_results}}"
-        ],
-        "export_as": "network_report"
+        ]
       }
     },
     {
       "id": "log-network-report",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "network_report",
       "params": {
         "message": "🌐 [NETWORK AUDIT]\n{{network_report}}"
       }

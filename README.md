@@ -71,7 +71,7 @@ Plus:
 - **Customer aggregation** — `customer/{slug}/` overlay for FDE / implementation-support engagements without forks.
 - **Trace + audit** — OTel-inspired structured tracing per run, append-only audit chain.
 
-For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/public/architecture/organization-work-loop.md`](./knowledge/public/architecture/organization-work-loop.md).
+For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md).
 
 ---
 
@@ -96,7 +96,7 @@ The strategic positioning is **OSS-first, with paid implementation support / FDE
 | Try it in 5 minutes | [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) |
 | Deploy it for a customer | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md) |
 | Browse what it can automate | [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md) |
-| Understand the architecture | [`knowledge/public/architecture/organization-work-loop.md`](./knowledge/public/architecture/organization-work-loop.md) |
+| Understand the architecture | [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md) |
 | Author a new actuator / pipeline | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) |
 | Customize for a customer | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |
 | Contribute | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |

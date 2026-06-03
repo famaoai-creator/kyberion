@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-db-perf",
+  "name": "Audit Database Schema for Performance Optimization",
+  "version": "3.0.0",
+  "description": "Analyzes database schemas to identify bottlenecks and optimization opportunities.",
+  "_migration_note": "v3: Delegates to reasoning-audit-and-save fragment via core:include.",
+  "variables": {
+    "schema_path": "schemas/database/main_schema.sql",
+    "output_path": "active/shared/tmp/audit-db-perf.json"
+  },
+  "context": {
+    "audit_label": "Database Performance",
+    "source_path": "{{schema_path}}",
+    "output_path": "{{output_path}}",
+    "instruction": "Analyze the database schema for performance issues. Identify missing indexes, inefficient data types, and potential normalization/denormalization trade-offs.",
+    "analysis_type": "performance_audit"
+  },
+  "steps": [
+    {
+      "id": "audit",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/reasoning-audit-and-save.json" }
+    }
+  ]
+}

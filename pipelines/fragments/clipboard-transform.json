@@ -1,40 +1,46 @@
 {
   "action": "pipeline",
   "name": "clipboard-transform-fragment",
+  "version": "2.0.0",
   "description": "Reads the clipboard, transforms the content via LLM, writes the result back, and notifies. Required context var: transform_instruction (e.g. 'Translate to English', 'Summarize in 3 bullets', 'Fix grammar').",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "read_clipboard",
-      "type": "capture",
+      "role": "source",
       "op": "system:clipboard_read",
-      "params": { "export_as": "clipboard_input" }
+      "produces": { "channel": "clipboard_input", "type": "ClipboardContent" },
+      "params": {}
     },
     {
       "id": "guard_empty",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "clipboard_input",
       "params": {
         "condition": "clipboard_input",
         "then": [
           {
             "id": "transform",
-            "type": "capture",
+            "role": "transform",
             "op": "reasoning:analyze",
+            "consumes": "clipboard_input",
+            "produces": { "channel": "clipboard_output", "type": "TextResult" },
             "params": {
               "instruction": "{{transform_instruction}}",
-              "context": ["{{clipboard_input}}"],
-              "export_as": "clipboard_output"
+              "context": ["{{clipboard_input}}"]
             }
           },
           {
             "id": "write_back",
-            "type": "apply",
+            "role": "sink",
             "op": "system:clipboard_write",
+            "consumes": "clipboard_output",
             "params": { "text": "{{clipboard_output}}" }
           },
           {
             "id": "notify_done",
-            "type": "apply",
+            "role": "sink",
             "op": "system:system_notify",
             "params": {
               "title": "Kyberion",
@@ -46,7 +52,7 @@
         "else": [
           {
             "id": "notify_empty",
-            "type": "apply",
+            "role": "sink",
             "op": "system:system_notify",
             "params": {
               "title": "Kyberion",

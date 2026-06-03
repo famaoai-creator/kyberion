@@ -13,8 +13,8 @@ export interface MediaThemeRolePolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-theme-role-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-theme-role-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-theme-role-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-theme-role-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaThemeRolePolicyCatalog | null = null;

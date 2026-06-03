@@ -15,11 +15,11 @@
 ## Contracts
 
 - handoff artifact schema:
-  [`webview-session-handoff.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/webview-session-handoff.schema.json)
+  [`webview-session-handoff.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/webview-session-handoff.schema.json)
 - mobile profile schema:
-  [`mobile-app-profile.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/mobile-app-profile.schema.json)
+  [`mobile-app-profile.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/mobile-app-profile.schema.json)
 - shared mobile profiles:
-  [`mobile-app-profiles/index.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/index.json)
+  [`mobile-app-profiles/index.json`](/Users/famao/kyberion/knowledge/product/orchestration/mobile-app-profiles/index.json)
 
 ## Shared Templates
 

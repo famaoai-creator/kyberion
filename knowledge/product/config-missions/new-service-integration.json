@@ -1,0 +1,42 @@
+{
+  "preset_id": "new-service-integration",
+  "type": "config_mission",
+  "category": "service_integration",
+  "description": "Register a new external service integration. Creates a service preset and stores auth credentials under the tenant's confidential namespace.",
+  "inputs": {
+    "service_id": {
+      "type": "string",
+      "description": "Unique identifier for the service (e.g. notion, slack, github). Used as the preset filename.",
+      "required": true
+    },
+    "service_label": {
+      "type": "string",
+      "description": "Human-readable label for the service.",
+      "required": true
+    },
+    "auth_type": {
+      "type": "enum",
+      "description": "Authentication mechanism this service uses.",
+      "values": ["oauth2", "api_key", "basic", "bearer", "none"],
+      "required": true
+    },
+    "tenant": {
+      "type": "string",
+      "description": "Target tenant slug. Credentials will be stored under knowledge/confidential/{tenant}/.",
+      "required": true
+    },
+    "base_url": {
+      "type": "string",
+      "description": "Base URL for the service API. Leave empty to use the service's default.",
+      "required": false
+    }
+  },
+  "pipeline": "pipelines/config/new-service-integration.json",
+  "write_targets": [
+    "knowledge/product/governance/service-presets/{{service_id}}.json",
+    "knowledge/confidential/{{tenant}}/service-auth/{{service_id}}.json",
+    "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
+  ],
+  "authority_role": "system_configurator",
+  "notes": "After applying, run `pnpm vital` to verify the service appears in the active-services registry."
+}

@@ -24,11 +24,34 @@ export interface StepHook {
   cmd?: string;
 }
 
+export type FlowRole = 'source' | 'transform' | 'sink' | 'gate';
+
+/** Maps legacy type values to Typed Flow roles. */
+export const ROLE_FROM_TYPE: Record<string, FlowRole> = {
+  capture:   'source',
+  transform: 'transform',
+  apply:     'sink',
+  control:   'gate',
+};
+
+export interface FlowChannel {
+  channel: string;
+  /** Optional data type hint for documentation and future validation. */
+  type?: string;
+}
+
 export interface PipelineAdfStep {
   op: string;
   params: Record<string, unknown>;
   id?: string;
+  /** Typed Flow node role. Preferred over `type`. */
+  role?: FlowRole;
+  /** Legacy role alias. Prefer `role`. capture→source, transform→transform, apply→sink, control→gate. */
   type?: 'capture' | 'transform' | 'apply' | 'control';
+  /** Channel this step emits. Preferred over params.export_as. */
+  produces?: string | FlowChannel;
+  /** Channel(s) this step reads from upstream steps. Validated before execution. */
+  consumes?: string | string[];
   on_error?: {
     strategy: 'skip' | 'abort' | 'fallback';
     fallback?: PipelineAdfStep[];
@@ -69,7 +92,7 @@ const Ajv = AjvModule as unknown as new (options?: Record<string, unknown>) => {
 function getPipelineValidator() {
   if (validatePipelineFn) return validatePipelineFn;
 
-  const schemaPath = pathResolver.knowledge('public/schemas/pipeline-adf.schema.json');
+  const schemaPath = pathResolver.knowledge('product/schemas/pipeline-adf.schema.json');
   const schema = JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string);
   const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
   validatePipelineFn = ajv.compile(schema);

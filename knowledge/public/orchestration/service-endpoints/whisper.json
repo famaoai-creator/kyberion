@@ -1,9 +1,0 @@
-{
-  "default_pattern": "https://api.{service_id}.com/v1",
-  "services": {
-    "whisper": {
-      "preset_path": "knowledge/public/orchestration/service-presets/whisper.json",
-      "intent_aliases": ["transcribe-audio", "live-voice"]
-    }
-  }
-}

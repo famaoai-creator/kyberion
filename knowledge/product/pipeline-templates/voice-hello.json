@@ -1,0 +1,95 @@
+{
+  "pipeline_id": "voice-hello",
+  "version": "2.0.0",
+  "description": "Phase A-5 first-win pipeline (tier 0, zero external deps): browser-side Web Speech API for input + OS native TTS for output. The 'Hello Kyberion' demo.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "labels": ["first-win", "voice", "tier-0", "demo"],
+  "inputs": {
+    "USER_NAME": { "required": false, "default": "there" },
+    "INTENT": { "required": false, "description": "Optional pre-set intent. When omitted, the pipeline opens the presence surface and waits for spoken input." }
+  },
+  "expected_outcome": "User hears 'Hello, <name>. What would you like me to do?' from OS TTS, speaks an intent in the browser surface, Kyberion runs it and reads back a result in <= 60s.",
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "system:check_native_tts",
+      "produces": { "channel": "tts_status", "type": "TtsStatus" },
+      "params": {},
+      "on_error": {
+        "strategy": "abort",
+        "remediation": "Native TTS not available. macOS/Windows: built-in. Linux: sudo apt-get install espeak."
+      }
+    },
+    {
+      "id": "open-presence-surface",
+      "role": "sink",
+      "op": "system:open_url",
+      "params": {
+        "url": "http://127.0.0.1:3031/voice-hello"
+      }
+    },
+    {
+      "id": "greet-with-tts",
+      "role": "sink",
+      "op": "system:native_tts_speak",
+      "params": {
+        "text": "Hello, {{USER_NAME}}. I'm Kyberion. What would you like me to do?"
+      }
+    },
+    {
+      "id": "wait-for-spoken-intent",
+      "role": "source",
+      "op": "wait_for",
+      "produces": { "channel": "intent_text", "type": "IntentText" },
+      "params": {
+        "source": "presence-surface",
+        "topic": "voice-hello.user-spoke",
+        "timeout_ms": 60000,
+        "fallback_input": "{{INTENT}}"
+      }
+    },
+    {
+      "id": "resolve-intent",
+      "role": "transform",
+      "op": "wisdom:resolve_intent",
+      "consumes": "intent_text",
+      "produces": { "channel": "resolution", "type": "IntentResolution" },
+      "params": {
+        "text": "{{intent_text}}"
+      }
+    },
+    {
+      "id": "execute",
+      "role": "gate",
+      "op": "ref",
+      "consumes": "resolution",
+      "params": {
+        "ref_from": "{{resolution.pipeline_path}}"
+      },
+      "on_error": {
+        "strategy": "fallback",
+        "fallback": [
+          {
+            "id": "say-cant",
+            "role": "sink",
+            "op": "system:native_tts_speak",
+            "params": {
+              "text": "I tried but couldn't complete that. Check the screen for details."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "speak-result",
+      "role": "sink",
+      "op": "system:native_tts_speak",
+      "consumes": "resolution",
+      "params": {
+        "text": "{{resolution.summary_for_voice}}"
+      }
+    }
+  ]
+}

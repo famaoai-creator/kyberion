@@ -1,3 +1,0 @@
-{
-  "_note": "Deprecated compatibility artifact. Managed runtime services and UI surfaces are declared in knowledge/public/governance/surfaces/*.json, with knowledge/public/governance/active-surfaces.json as the generated compatibility snapshot controlled via scripts/surface_runtime.ts."
-}

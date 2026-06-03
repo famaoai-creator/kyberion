@@ -1,22 +1,25 @@
 {
   "action": "pipeline",
   "name": "gh-issue-list-fragment",
+  "version": "2.0.0",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "repo": "cli/cli",
     "limit": 5
   },
   "steps": [
     {
-      "type": "capture",
+      "role": "source",
       "op": "cli_health_check",
+      "produces": { "channel": "gh_health", "type": "HealthResult" },
       "params": {
-        "command": "gh",
-        "export_as": "gh_health"
+        "command": "gh"
       }
     },
     {
-      "type": "capture",
+      "role": "source",
       "op": "exec",
+      "produces": { "channel": "issues_raw", "type": "ShellResult" },
       "params": {
         "command": "gh",
         "args": [
@@ -28,13 +31,13 @@
           "{{limit}}",
           "--json",
           "number,title,state,updatedAt"
-        ],
-        "export_as": "issues_raw"
+        ]
       }
     },
     {
-      "type": "transform",
+      "role": "sink",
       "op": "log",
+      "consumes": "issues_raw",
       "params": {
         "message": "Found {{issues_raw.stdout.length}} characters of issue data."
       }

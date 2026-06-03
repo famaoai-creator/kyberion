@@ -16,7 +16,7 @@ interface IntentOutcomePatternCatalog {
 }
 
 export function loadIntentOutcomePatterns(): IntentOutcomePattern[] {
-  const filePath = pathResolver.knowledge('public/governance/intent-outcome-patterns.json');
+  const filePath = pathResolver.knowledge('product/governance/intent-outcome-patterns.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentOutcomePatternCatalog;
   return Array.isArray(parsed.patterns) ? parsed.patterns : [];
 }

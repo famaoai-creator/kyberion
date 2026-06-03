@@ -198,8 +198,143 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
   return mergePptxShape(preset || {}, override || {});
 }
 
+let _cachedBzl: any = null;
+function loadBodyZoneLayouts(rootDir: string): any {
+  if (_cachedBzl) return _cachedBzl;
+  const p = path.join(rootDir, 'knowledge/public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json');
+  _cachedBzl = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+  return _cachedBzl;
+}
+
+// Reads PNG dimensions from the image file and returns {w, h} in inches, preserving aspect ratio.
+// targetH: desired display height in inches; maxW: optional cap on width.
+function getPngDisplaySize(logoPath: string, targetH: number, maxW?: number): { w: number; h: number } {
+  try {
+    const buf = safeReadFile(logoPath, { encoding: null }) as Buffer;
+    if (buf && buf.length >= 24 &&
+        buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+      const pxW = buf.readUInt32BE(16);
+      const pxH = buf.readUInt32BE(20);
+      if (pxW > 0 && pxH > 0) {
+        const aspect = pxW / pxH;
+        let h = targetH;
+        let w = Math.round(aspect * h * 1000) / 1000;
+        if (maxW && w > maxW) { w = maxW; h = Math.round((maxW / aspect) * 1000) / 1000; }
+        return { w, h };
+      }
+    }
+  } catch { /* non-PNG or unreadable — fall through */ }
+  return { w: Math.round(targetH * 3 * 1000) / 1000, h: targetH };
+}
+
+function resolveBodyZoneLayout(semanticType: string): string {
+  switch (semanticType) {
+    case 'problem':
+    case 'evidence':
+    case 'roi':         return 'two-column-callout';
+    case 'control':     return 'two-column-risk';
+    case 'plan':
+    case 'roadmap':     return 'timeline';
+    case 'solution':
+    case 'architecture': return 'architecture-panel';
+    case 'decision':
+    case 'cta':         return 'decision-cta';
+    default:            return 'single-column';
+  }
+}
+
+let _cachedLayoutTemplates: any = null;
+function loadLayoutTemplateCatalog(rootDir: string): any {
+  if (_cachedLayoutTemplates) return _cachedLayoutTemplates;
+  try {
+    const p = path.join(rootDir, 'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json');
+    _cachedLayoutTemplates = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+  } catch {
+    _cachedLayoutTemplates = { default: 'corporate-standard', templates: {} };
+  }
+  return _cachedLayoutTemplates;
+}
+
+let _cachedTenantRegistry: any = null;
+
+/** Build entry list from index.json, or fall back to directory-scanning knowledge/confidential/. */
+function loadTenantEntries(rootDir: string): { override_path: string }[] {
+  const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+  try {
+    const registry = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string);
+    if (Array.isArray(registry.tenants) && registry.tenants.length > 0) return registry.tenants;
+  } catch { /* index.json absent or unreadable — fall through to directory scan */ }
+  // Fallback: scan knowledge/confidential/*/design/tenant-override.json
+  try {
+    const confidentialDir = path.join(rootDir, 'knowledge/confidential');
+    const names = safeReaddir(confidentialDir);
+    const slugs = names.filter(name => {
+      try { return safeStat(path.join(confidentialDir, name)).isDirectory(); } catch { return false; }
+    });
+    return slugs.map((s: string) => ({
+      override_path: `knowledge/confidential/${s}/design/tenant-override.json`
+    }));
+  } catch { return []; }
+}
+
+function resolveConfidentialTenantOverride(rootDir: string, brandName: string, designSystemId?: string): any {
+  if (!brandName) return null;
+  try {
+    if (!_cachedTenantRegistry) {
+      _cachedTenantRegistry = { entries: loadTenantEntries(rootDir) };
+    }
+    const key = brandName.toLowerCase();
+    for (const entry of (_cachedTenantRegistry.entries || [])) {
+      const overridePath = path.resolve(rootDir, entry.override_path);
+      try {
+        const override = JSON.parse(safeReadFile(overridePath, { encoding: 'utf8' }) as string);
+        if (designSystemId && override.design_system_id && override.design_system_id !== designSystemId) continue;
+        const matched = Array.isArray(override.matchers) && override.matchers.some((m: string) => key.includes(m.toLowerCase()));
+        if (matched) return override;
+      } catch { /* skip unreadable override */ }
+    }
+  } catch { /* unexpected failure */ }
+  return null;
+}
+
+function resolveLayoutTemplate(rootDir: string, designSystemId: string | undefined, slideData?: any): any {
+  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
+  const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
+  const brandName: string = slideData?.branding?.brand_name || '';
+  const tenantOverride = resolveConfidentialTenantOverride(rootDir, brandName, designSystemId);
+  // Priority 1: tenant override with an explicit confidential catalog path
+  if (tenantOverride?.layout_template_catalog) {
+    try {
+      const catalogPath = path.resolve(rootDir, tenantOverride.layout_template_catalog);
+      const catalog = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+      const templateId = tenantOverride.layout_template_id || catalog.default;
+      const tpl = catalog.templates?.[templateId];
+      if (tpl) return tpl;
+    } catch { /* fall through to public catalog */ }
+  }
+  // Priority 2: template ID resolved from the public catalog
+  const templateId: string | null = tenantOverride?.layout_template_id || system?.layout_template_id || null;
+  if (templateId) {
+    const catalog = loadLayoutTemplateCatalog(rootDir);
+    const tpl = catalog.templates?.[templateId];
+    if (tpl) return tpl;
+  }
+  return loadBodyZoneLayouts(rootDir);
+}
+
+function resolveBodyZoneKey(semanticType: string, designSystemId: string | undefined, rootDir: string): string {
+  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
+  const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
+  const mapped: string | undefined = system?.body_zone_map?.[semanticType];
+  if (mapped) return mapped;
+  return resolveBodyZoneLayout(semanticType).replace(/-/g, '_');
+}
+
 function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) {
   const themeColors = theme?.colors || {};
+  const primaryHex  = (themeColors.primary    || '#3867D6').replace('#', '');
+  const accentHex   = (themeColors.accent     || '#0070C0').replace('#', '');
+  const textHex     = (themeColors.text       || '#000000').replace('#', '');
   const semanticType = data.semantic_type || classifyRenderSemantic(data.layout_key, data.media_kind);
   const semanticTokens = resolveSemanticRenderTokens(rootDir, semanticType, data.design_system_id);
   const pptxTokens = semanticTokens.pptx || {};
@@ -211,80 +346,228 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
     ...(runtimePreset || {}),
     ...(pageLayout?.placeholders || {}),
   };
-  const bodyText = Array.isArray(data.body) ? data.body.join('\n') : (data.subtitle || data.body || '');
+  const bodyLines: string[] = Array.isArray(data.body) ? data.body : (data.body ? [data.body] : []);
+  const bodyText = bodyLines.join('\n');
   const elements: any[] = [];
+
+  // Resolve logo from branding > theme assets
+  const rawLogoPath = data.branding?.logo_url || theme?.assets?.logo_url || null;
+  const logoPath = rawLogoPath ? path.resolve(rootDir, rawLogoPath) : null;
+  const logoExists = logoPath ? safeExistsSync(logoPath) : false;
+  const brandName = data.branding?.brand_name || theme?.name || '';
+
+  const isHero = semanticType === 'hero';
+  const headingFont = theme?.fonts?.heading?.split(',')[0]?.trim() || 'Inter';
+  const bodyFont    = theme?.fonts?.body?.split(',')[0]?.trim() || 'System-ui';
+  const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data);
+  const chr = bzl.chrome;
+  const hro = bzl.hero;
 
   if (Array.isArray(pageLayout?.elements)) {
     elements.push(...cloneJsonValue(pageLayout.elements));
   }
 
-  if (data.title && placeholderConfig.title !== false) {
-    const titleElement = mergePptxShape({
-      type: 'text',
-      placeholderType: 'title',
-      pos: { x: 0.5, y: 0.5, w: 9, h: 1 },
-      text: data.title,
-      style: {
-        fontSize: 32,
-        bold: true,
-        color: (themeColors.text || '#000000').replace('#', ''),
-        fontFamily: theme?.fonts?.heading?.split(',')[0] || 'Inter',
-        align: pptxTokens.title_align || 'center',
-      },
-    }, placeholderConfig.title);
-    titleElement.style = {
-      ...(titleElement.style || {}),
-      align: pptxTokens.title_align || titleElement.style?.align,
-    };
-    titleElement.text = resolveSlideTemplate(titleElement.text, data, data.title);
-    elements.push(titleElement);
-  }
+  if (isHero) {
+    // ── Hero / Cover slide ──────────────────────────────────────────────────
+    // Two-tone: primary-color top + white bottom panel for logo/brand strip
 
-  if (bodyText && placeholderConfig.body !== false) {
-    const bodyElement = mergePptxShape({
-      type: 'text',
-      placeholderType: 'body',
-      pos: { x: 1, y: 1.8, w: 8, h: 2.8 },
-      text: bodyText,
-      style: {
-        fontSize: 18 + Number(pptxTokens.body_font_size_delta || 0),
-        color: resolveThemeHexColor(themeColors, pptxTokens.body_color_role, '#334155').replace('#', ''),
-        fontFamily: theme?.fonts?.body?.split(',')[0] || 'System-ui',
-        align: 'left',
-        valign: 'top',
-      },
-    }, placeholderConfig.body);
-    bodyElement.style = {
-      ...(bodyElement.style || {}),
-      fontSize: 18 + Number(pptxTokens.body_font_size_delta || 0),
-      color: resolveThemeHexColor(themeColors, pptxTokens.body_color_role, '#334155').replace('#', ''),
-    };
-    bodyElement.text = resolveSlideTemplate(bodyElement.text, data, bodyText);
-    elements.push(bodyElement);
-  }
-
-  if (data.visual && placeholderConfig.visual !== false) {
-    const visualElement = mergePptxShape({
+    // White bottom panel (logo sits here on clean white background)
+    elements.push({
       type: 'shape',
       shapeType: 'rect',
-      pos: { x: 1, y: 4.6, w: 8, h: 0.5 },
-      text: `[Visual: ${data.visual}]`,
-      style: {
-        fill: resolveThemeHexColor(themeColors, pptxTokens.visual_fill_role, '#F1F5F9').replace('#', ''),
-        color: resolveThemeHexColor(themeColors, pptxTokens.visual_text_role, '#64748B').replace('#', ''),
-        fontSize: 12,
-        italic: true,
-        align: 'center',
-        valign: 'middle',
-      },
-    }, placeholderConfig.visual);
-    visualElement.style = {
-      ...(visualElement.style || {}),
-      fill: resolveThemeHexColor(themeColors, pptxTokens.visual_fill_role, '#F1F5F9').replace('#', ''),
-      color: resolveThemeHexColor(themeColors, pptxTokens.visual_text_role, '#64748B').replace('#', ''),
-    };
-    visualElement.text = resolveSlideTemplate(visualElement.text, data, `[Visual: ${data.visual}]`);
-    elements.push(visualElement);
+      pos: { x: 0, y: hro.white_panel_y, w: 10, h: hro.white_panel_h },
+      style: { fill: 'FFFFFF', color: 'FFFFFF' },
+      text: '',
+    });
+
+    // Thin accent line separating blue from white
+    elements.push({
+      type: 'shape',
+      shapeType: 'rect',
+      pos: { x: 0, y: hro.separator_y, w: 10, h: hro.separator_h },
+      style: { fill: accentHex, color: accentHex },
+      text: '',
+    });
+
+    // Main title — centered on blue area
+    if (data.title && placeholderConfig.title !== false) {
+      const titleEl = mergePptxShape({
+        type: 'text',
+        placeholderType: 'title',
+        pos: { x: hro.title_x, y: hro.title_y, w: hro.title_w, h: hro.title_h },
+        text: data.title,
+        style: {
+          fontSize: hro.title_font_size,
+          bold: true,
+          color: 'FFFFFF',
+          fontFamily: headingFont,
+          align: 'center',
+          valign: 'middle',
+        },
+      }, placeholderConfig.title);
+      titleEl.text = resolveSlideTemplate(titleEl.text, data, data.title);
+      elements.push(titleEl);
+    }
+
+    // Subtitle — on blue, just above divider
+    if (bodyText && placeholderConfig.body !== false) {
+      const subtitleEl = mergePptxShape({
+        type: 'text',
+        placeholderType: 'body',
+        pos: { x: hro.subtitle_x, y: hro.subtitle_y, w: hro.subtitle_w, h: hro.subtitle_h },
+        text: bodyText,
+        style: {
+          fontSize: hro.subtitle_font_size,
+          color: 'D0E4FF',
+          fontFamily: bodyFont,
+          align: 'center',
+          valign: 'middle',
+        },
+      }, placeholderConfig.body);
+      subtitleEl.text = resolveSlideTemplate(subtitleEl.text, data, bodyText);
+      elements.push(subtitleEl);
+    }
+
+    // Logo on white panel — right-aligned, actual aspect ratio from PNG header
+    if (logoExists) {
+      const ls = getPngDisplaySize(logoPath, hro.logo_display_h, hro.logo_display_max_w);
+      elements.push({
+        type: 'image',
+        imagePath: logoPath,
+        pos: { x: 10 - ls.w - hro.logo_right_margin, y: hro.logo_y, w: ls.w, h: ls.h },
+      });
+    }
+
+    // Brand name on white panel — left-aligned (slide number placeholder style)
+    if (brandName) {
+      elements.push({
+        type: 'shape',
+        shapeType: 'rect',
+        pos: { x: hro.brand_name_x, y: hro.brand_name_y, w: hro.brand_name_w, h: hro.brand_name_h },
+        style: { fill: 'FFFFFF', color: primaryHex, fontSize: hro.brand_name_font_size, align: 'left', valign: 'middle' },
+        text: brandName,
+      });
+    }
+  } else {
+    // ── Standard content slides ─────────────────────────────────────────────
+    // SBISS design: full-height blue header bar with white title text,
+    // white logo box on right side of header, navy separator, body below.
+    const bodyZoneKey = resolveBodyZoneKey(semanticType, data.design_system_id, rootDir);
+    const bodyY = chr.body_y;
+    const bodyH = chr.body_h;
+    const bodyX = chr.body_x;
+    const bodyW = chr.body_w;
+    // Resolve colors from theme; fall back to neutral corporate defaults
+    const navyHex = resolveThemeHexColor(themeColors, 'navy', '#003366').replace('#', '');
+    const azureHex = resolveThemeHexColor(themeColors, 'cta', '#0070C0').replace('#', '');
+    const surfaceBg = resolveThemeHexColor(themeColors, 'surface', '#E9EDF4').replace('#', '');
+    const bodyTextColor = resolveThemeHexColor(themeColors, 'text_primary', '#000000').replace('#', '');
+    const subTextColor = resolveThemeHexColor(themeColors, 'text_secondary', '#595959').replace('#', '');
+
+    // 1. Full-height blue header bar
+    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 10, h: chr.header_h }, style: { fill: primaryHex, color: primaryHex }, text: '' });
+
+    // 2. White logo zone; logo sized from actual PNG dimensions (tenant-agnostic)
+    if (logoExists) {
+      elements.push({ type: 'shape', shapeType: 'rect', pos: { x: chr.logo_zone_x, y: chr.logo_zone_y, w: chr.logo_zone_w, h: chr.logo_zone_h }, style: { fill: 'FFFFFF', color: 'FFFFFF' }, text: '' });
+      const ls = getPngDisplaySize(logoPath, chr.logo_display_h, chr.logo_display_max_w);
+      elements.push({ type: 'image', imagePath: logoPath, pos: { x: chr.logo_zone_x + (chr.logo_zone_w - ls.w) / 2, y: chr.logo_zone_y + (chr.logo_zone_h - ls.h) / 2, w: ls.w, h: ls.h } });
+    }
+
+    // 3. Slide title in blue header — white text, bold
+    if (data.title && placeholderConfig.title !== false) {
+      const titleAlign = (bodyZoneKey === 'decision_cta') ? 'center' : 'left';
+      elements.push({
+        type: 'text', placeholderType: 'title',
+        pos: { x: chr.title_x, y: 0, w: logoExists ? chr.title_w_logo : chr.title_w_no_logo, h: chr.header_h },
+        text: resolveSlideTemplate(data.title, data, data.title),
+        style: { fontSize: chr.title_font_size, bold: true, color: 'FFFFFF', fontFamily: headingFont, align: titleAlign, valign: 'middle', margin: [0, 0, 0, 0.06] },
+      });
+    }
+
+    // 4. Navy separator line below header
+    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: 0, y: chr.header_h, w: 10, h: chr.separator_h }, style: { fill: navyHex, color: navyHex }, text: '' });
+
+    // 5. Left accent strip
+    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: chr.accent_strip_x, y: bodyY, w: chr.accent_strip_w, h: bodyH }, style: { fill: primaryHex, color: primaryHex }, text: '' });
+
+    // 6. Body zone — layout-dispatched
+    if (bodyText && placeholderConfig.body !== false) {
+      if (bodyZoneKey === 'two_column_callout') {
+        const zc = bzl.body_zones.two_column_callout;
+        const splitAt = Math.ceil(bodyLines.length * 0.55);
+        const leftLines = bodyLines.slice(0, splitAt);
+        const rightLines = bodyLines.slice(splitAt);
+        const rightText = rightLines.join('\n') || (data.objective || leftLines[leftLines.length - 1] || '');
+        const calloutLabels = zc.semantic_labels || {};
+        const calloutLabel = calloutLabels[semanticType] ?? calloutLabels['default'] ?? '  根拠データ';
+        if (leftLines.length > 0) {
+          elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH }, text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.left_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.left_line_spacing_pct, margin: zc.left_margin } });
+        }
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h }, style: { fill: primaryHex, color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: calloutLabel });
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h }, style: { fill: surfaceBg, color: navyHex, fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: rightText });
+        if (data.visual) {
+          const vl = zc.visual_label || {};
+          elements.push({ type: 'text', pos: { x: zc.right_x, y: bodyY + bodyH - (vl.y_from_bottom ?? 0.32), w: zc.right_w, h: vl.h ?? 0.28 }, text: data.visual, style: { fill: accentHex, color: 'FFFFFF', fontSize: vl.font_size ?? 9, align: 'left', valign: 'middle', margin: vl.margin ?? [2, 4, 2, 4] } });
+        }
+      }
+      else if (bodyZoneKey === 'two_column_risk') {
+        const zc = bzl.body_zones.two_column_risk;
+        const splitAt = Math.ceil(bodyLines.length * 0.55);
+        const leftLines = bodyLines.slice(0, splitAt);
+        const rightLines = bodyLines.slice(splitAt);
+        const rightText = rightLines.join('\n') || (data.objective || '');
+        if (leftLines.length > 0) {
+          elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH }, text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.left_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.left_line_spacing_pct, margin: zc.left_margin } });
+        }
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h }, style: { fill: zc.panel_header_fill ?? 'C00000', color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: zc.panel_label ?? '  リスク対策' });
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h }, style: { fill: zc.panel_body_fill ?? 'FFF0F0', color: zc.panel_body_color ?? '7F1D1D', fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: rightText });
+      }
+      else if (bodyZoneKey === 'timeline') {
+        const zc = bzl.body_zones.timeline;
+        const tlLabels = zc.semantic_labels || {};
+        const tlLabel = tlLabels[semanticType] ?? tlLabels['default'] ?? '  ロードマップ';
+        elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH }, text: resolveSlideTemplate(bodyText, data, bodyText), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.left_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.left_line_spacing_pct, margin: zc.left_margin } });
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h }, style: { fill: primaryHex, color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: tlLabel });
+        const timelineText = bodyLines.map((line: string) => `▶  ${line}`).join('\n\n');
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h }, style: { fill: surfaceBg, color: navyHex, fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: timelineText });
+        if (data.visual) {
+          const vl = zc.visual_label || {};
+          elements.push({ type: 'text', pos: { x: zc.right_x, y: bodyY + bodyH - (vl.y_from_bottom ?? 0.32), w: zc.right_w, h: vl.h ?? 0.28 }, text: data.visual, style: { fill: vl.fill ?? 'DCFCE7', color: vl.color ?? '166534', fontSize: vl.font_size ?? 9, align: 'left', valign: 'middle', margin: vl.margin ?? [2, 4, 2, 4] } });
+        }
+      }
+      else if (bodyZoneKey === 'architecture_panel') {
+        const zc = bzl.body_zones.architecture_panel;
+        const splitAt = Math.min(3, Math.max(1, bodyLines.length - 1));
+        const descLines = bodyLines.slice(0, splitAt);
+        const archLines = bodyLines.slice(splitAt);
+        elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: bodyW, h: zc.desc_h }, text: resolveSlideTemplate(descLines.join('\n'), data, descLines.join('\n')), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.desc_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.desc_line_spacing_pct, margin: zc.desc_margin } });
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: bodyX, y: bodyY + zc.panel_header_y_offset, w: bodyW, h: zc.panel_header_h }, style: { fill: primaryHex, color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: zc.panel_label ?? '  システム構成概要' });
+        const archText = (archLines.length > 0 ? archLines : bodyLines).join('\n');
+        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: bodyX, y: bodyY + zc.panel_body_y_offset, w: bodyW, h: bodyH - zc.panel_body_y_offset }, style: { fill: surfaceBg, color: navyHex, fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: archText });
+      }
+      else if (bodyZoneKey === 'decision_cta') {
+        const zc = bzl.body_zones.decision_cta;
+        const ctaLine = bodyLines.length > 1 ? bodyLines[bodyLines.length - 1] : '';
+        const msgLines = ctaLine ? bodyLines.slice(0, -1) : bodyLines;
+        const msgText = msgLines.join('\n');
+        if (msgText) {
+          elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY + zc.msg_y_offset, w: bodyW, h: zc.msg_h }, text: resolveSlideTemplate(msgText, data, msgText), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.msg_font_size, color: navyHex, fontFamily: bodyFont, align: 'center', valign: 'middle', lineSpacingPct: zc.msg_line_spacing_pct, margin: zc.msg_margin } });
+        }
+        if (ctaLine) {
+          elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.cta_x, y: bodyY + zc.cta_y_offset, w: zc.cta_w, h: zc.cta_h }, style: { fill: azureHex, color: 'FFFFFF', fontSize: zc.cta_font_size, bold: true, align: 'center', valign: 'middle' }, text: ctaLine });
+        }
+      }
+      else {
+        // single-column (summary / content / execution / signals / appendix)
+        const zc = bzl.body_zones.single_column;
+        const baseFontSize = zc.font_size + Number(pptxTokens.body_font_size_delta || 0);
+        elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: bodyW, h: bodyH }, text: resolveSlideTemplate(bodyText, data, bodyText), style: { ...(placeholderConfig.body?.style || {}), fontSize: baseFontSize, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.line_spacing_pct, margin: zc.margin } });
+      }
+    }
+
+    // 7. Footer bar
+    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: 0, y: chr.footer_y, w: 10, h: chr.footer_h }, style: { fill: 'F0F4FA', color: subTextColor, fontSize: chr.footer_font_size, align: 'right', valign: 'middle' }, text: brandName ? `${brandName}  |  Confidential  ` : '  Confidential  ' });
   }
 
   if (Array.isArray(data.elements)) {
@@ -294,8 +577,10 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
   return {
     id: data.id || `slide${idx + 1}`,
     elements,
-    backgroundFill: data.backgroundFill || pageLayout?.backgroundFill,
-    bgXml: data.bgXml || pageLayout?.bgXml,
+    backgroundFill: isHero
+      ? primaryHex
+      : (data.backgroundFill || pageLayout?.backgroundFill),
+    bgXml: isHero ? undefined : (data.bgXml || pageLayout?.bgXml),
     transitionXml: data.transitionXml || pageLayout?.transitionXml,
     notesXml: data.notesXml,
     extensions: data.extensions || pageLayout?.extensions,
@@ -570,6 +855,38 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const value = resolve(params.value);
       if (key) return { ...ctx, [key]: value };
       return ctx;
+    }
+    case 'layout_template_from_pptx_design': {
+      const fromKey = resolve(params.from) || 'last_pptx_design';
+      const design = ctx[fromKey];
+      if (!design) throw new Error(`layout_template_from_pptx_design: context key not found: ${fromKey}`);
+
+      const geometry = extractChromeGeometryFromPptxDesign(design);
+      const publicCatalog = loadLayoutTemplateCatalog(rootDir);
+      const publicMatch = matchLayoutTemplate(geometry, publicCatalog);
+
+      const tenantSlug: string = resolve(params.tenant_slug) || ctx.tenant_slug || '';
+      let confMatch: { id: string; score: number; catalog?: string } | null = null;
+      if (tenantSlug) {
+        const confPath = `knowledge/confidential/${tenantSlug}/design/layout-templates.json`;
+        try {
+          const confCatalog = JSON.parse(safeReadFile(path.resolve(rootDir, confPath), { encoding: 'utf8' }) as string);
+          const m = matchLayoutTemplate(geometry, confCatalog);
+          if (m) confMatch = { ...m, catalog: confPath };
+        } catch { /* no confidential catalog yet */ }
+      }
+
+      const THRESHOLD = 0.85;
+      const chosen = (confMatch?.score ?? 0) >= (publicMatch?.score ?? 0) ? confMatch : publicMatch;
+      const result: any = {
+        geometry,
+        matched_template_id:   chosen && chosen.score >= THRESHOLD ? chosen.id : null,
+        match_score:           chosen?.score ?? 0,
+        match_catalog:         (chosen as any)?.catalog || 'public',
+        needs_new_template:    !chosen || chosen.score < THRESHOLD,
+        recommended_template_id: chosen?.id || 'corporate-standard',
+      };
+      return { ...ctx, [params.export_as || 'last_layout_geometry']: result };
     }
     case 'theme_from_pptx_design': {
       const fromKey = resolve(params.from) || 'last_pptx_design';
@@ -970,6 +1287,75 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(`✅ [MEDIA] Draw.io document written at: ${outPath} (${stats.size} bytes).`);
       break;
     }
+    case 'save_brand_to_confidential': {
+      // Writes tenant-override.json + layout-templates.json to confidential tier,
+      // then registers the tenant in knowledge/confidential/tenants/index.json.
+      const tenantSlug: string   = resolve(params.tenant_slug) || ctx.tenant_slug;
+      const brandName: string    = resolve(params.brand_name)  || ctx.brand_name  || tenantSlug;
+      const matchers: string[]   = params.matchers ? (Array.isArray(params.matchers) ? params.matchers : [resolve(params.matchers)]) : [brandName.toLowerCase()];
+      const dsId: string         = resolve(params.design_system_id) || ctx.design_system_id || 'executive-standard';
+      const theme: any           = ctx[resolve(params.theme_from) || 'active_theme'] || {};
+      const layoutGeo: any       = ctx[resolve(params.layout_from) || 'last_layout_geometry'] || {};
+
+      if (!tenantSlug) throw new Error('save_brand_to_confidential: tenant_slug is required');
+
+      const confDir = path.resolve(rootDir, `knowledge/confidential/${tenantSlug}/design`);
+      safeMkdir(confDir, { recursive: true });
+
+      // 1. Build and write layout-templates.json
+      const templateId = `${tenantSlug}-extracted`;
+      const needsNewTemplate = layoutGeo.needs_new_template !== false;
+      if (needsNewTemplate && layoutGeo.geometry) {
+        const pubCatalog = loadLayoutTemplateCatalog(rootDir);
+        const baseTemplate = pubCatalog.templates?.[layoutGeo.recommended_template_id || 'corporate-standard'] || {};
+        const newTemplate = {
+          chrome: { ...baseTemplate.chrome, ...layoutGeo.geometry.chrome },
+          hero: baseTemplate.hero || {},
+          body_zones: baseTemplate.body_zones || {},
+          _meta: `Auto-extracted from PPTX for ${brandName}. Review geometry before production use.`,
+        };
+        const layoutCatalog = { version: '1.0.0', default: templateId, templates: { [templateId]: newTemplate } };
+        safeWriteFile(path.join(confDir, 'layout-templates.json'), JSON.stringify(layoutCatalog, null, 2));
+        logger.info(`[BRAND_IMPORT] Wrote confidential layout-templates.json for ${tenantSlug}`);
+      }
+
+      // 2. Build and write tenant-override.json
+      const usedTemplateId = needsNewTemplate ? templateId : (layoutGeo.matched_template_id || templateId);
+      const override: any = {
+        _meta: `Auto-imported brand profile for ${brandName}. Review before production use.`,
+        design_system_id: dsId,
+        matchers,
+        theme: `${tenantSlug}-imported`,
+      };
+      if (needsNewTemplate) {
+        override.layout_template_id = templateId;
+        override.layout_template_catalog = `knowledge/confidential/${tenantSlug}/design/layout-templates.json`;
+      } else {
+        override.layout_template_id = usedTemplateId;
+      }
+      if (theme?.colors || theme?.fonts) {
+        override.extracted_theme = { colors: theme.colors, fonts: theme.fonts };
+      }
+      if (resolve(params.logo_url)) override.branding = { brand_name: brandName, logo_url: resolve(params.logo_url), tone: 'professional-enterprise' };
+      else override.branding = { brand_name: brandName };
+
+      safeWriteFile(path.join(confDir, 'tenant-override.json'), JSON.stringify(override, null, 2));
+      logger.info(`[BRAND_IMPORT] Wrote confidential tenant-override.json for ${tenantSlug}`);
+
+      // 3. Update knowledge/confidential/tenants/index.json
+      const registryPath = path.resolve(rootDir, 'knowledge/confidential/tenants/index.json');
+      let registry: any = { tenants: [] };
+      try { registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string); } catch { /* create new */ }
+      const overridePath = `knowledge/confidential/${tenantSlug}/design/tenant-override.json`;
+      const existing = registry.tenants.findIndex((t: any) => t.id === tenantSlug);
+      if (existing >= 0) registry.tenants[existing] = { id: tenantSlug, override_path: overridePath };
+      else registry.tenants.push({ id: tenantSlug, override_path: overridePath });
+      safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
+      logger.info(`[BRAND_IMPORT] Updated confidential tenant registry for ${tenantSlug}`);
+
+      logger.info(`✅ [BRAND_IMPORT] Brand saved to confidential tier → ${confDir}`);
+      break;
+    }
     case 'log': logger.info(`[MEDIA_LOG] ${resolve(params.message)}`); break;
   }
   return ctx;
@@ -1114,7 +1500,7 @@ function resolveDesignBindingHints(brief: any): {
   branding?: Record<string, any>;
 } {
   const direct = {
-    tenant_id: String(brief?.tenant_id || brief?.payload?.tenant_id || '').trim() || undefined,
+    tenant_id: String(brief?.tenant_id || brief?.payload?.tenant_id || brief?.tenant_slug || brief?.payload?.tenant_slug || '').trim() || undefined,
     client_key: String(brief?.client_key || brief?.payload?.client_key || '').trim() || undefined,
     design_system_id: String(brief?.design_system_id || brief?.payload?.design_system_id || '').trim() || undefined,
     design_reference: String(brief?.design_reference || brief?.payload?.design_reference || '').trim() || undefined,
@@ -1252,17 +1638,12 @@ function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId
   const bindingHints = resolveDesignBindingHints(brief);
   const recommendations = recommendImportedDesignReferences(rootDir, brief);
   const explicit = String(bindingHints.design_system_id || '').trim();
-  const resolveTenantOverride = (system: any) => {
-    const tenantKey = normalizeDesignLookupKey(bindingHints.tenant_id || bindingHints.client_key || brief?.client || brief?.payload?.client);
-    const overrides = system?.tenant_overrides || {};
-    const matched = Object.entries(overrides).find(([overrideId, override]: any) => {
-      if (normalizeDesignLookupKey(overrideId) === tenantKey) return true;
-      return Array.isArray(override?.matchers) && override.matchers.some((matcher: string) => normalizeDesignLookupKey(matcher) === tenantKey);
-    });
-    return matched ? (matched[1] as any) : null;
+  const resolveTenantOverride = (_system: any, designSystemId?: string) => {
+    const clientHint = bindingHints.tenant_id || bindingHints.client_key || brief?.client || brief?.payload?.client || '';
+    return resolveConfidentialTenantOverride(rootDir, String(clientHint), designSystemId);
   };
   const buildResult = (designSystemId: string, system: any) => {
-    const tenantOverride = resolveTenantOverride(system);
+    const tenantOverride = resolveTenantOverride(system, designSystemId);
     const promptGuide = Array.isArray(system?.metadata?.prompt_guide) ? system.metadata.prompt_guide : [];
     return {
       designSystemId,
@@ -1926,6 +2307,16 @@ function resolveThemeHexColor(themeColors: any, role?: string, fallback = '#3341
       return String(themeColors.info || '#DBEAFE');
     case 'muted':
       return String(themeColors.muted || '#F1F5F9');
+    case 'surface':
+      return String(themeColors.surface || themeColors.background_card || '#E9EDF4');
+    case 'navy':
+      return String(themeColors.navy || themeColors.primary_dark || fallback);
+    case 'cta':
+      return String(themeColors.cta || themeColors.azure || themeColors.accent || fallback);
+    case 'text_primary':
+      return String(themeColors.text_primary || themeColors.text || '#000000');
+    case 'text_secondary':
+      return String(themeColors.text_secondary || themeColors.secondary || '#595959');
     default:
       return String(themeColors.secondary || themeColors.text || fallback);
   }
@@ -2018,6 +2409,38 @@ function buildProposalNarrativeOutline(rootDir: string, brief: any): any {
         semantic_type: classifyRenderSemantic(section.layout_key, section.media_kind),
       };
     }), brief.locale);
+
+  // Enrich toc body/title from brief.slides when available (overrides generic narrative fallback)
+  if (Array.isArray(brief.slides) && brief.slides.length > 0) {
+    const SECTION_SEMANTIC_CANDIDATES: Record<string, string[]> = {
+      'cover':            ['hero'],
+      'executive-summary':['summary'],
+      'why-change':       ['problem'],
+      'target-outcome':   ['solution'],
+      'solution-shape':   ['solution', 'architecture', 'plan'],
+      'governance':       ['roi', 'control'],
+      'delivery-plan':    ['roadmap', 'plan'],
+      'decision':         ['cta', 'decision'],
+    };
+    const usedSlideIds = new Set<string>();
+    toc.forEach((entry: any) => {
+      const candidates = SECTION_SEMANTIC_CANDIDATES[entry.section_id] || [entry.section_id];
+      for (const semanticType of candidates) {
+        const match = brief.slides.find((s: any) => {
+          const st = String(s.semantic_type || '').toLowerCase();
+          const sid = String(s.id || s.section_id || st);
+          return st === semanticType && !usedSlideIds.has(sid);
+        });
+        if (match) {
+          const matchId = String(match.id || match.section_id || match.semantic_type);
+          usedSlideIds.add(matchId);
+          if (Array.isArray(match.body) && match.body.length > 0) entry.body = match.body;
+          if (match.title && typeof match.title === 'string') entry.title = match.title;
+          break;
+        }
+      }
+    });
+  }
 
   return {
     kind: 'document-outline-adf',
@@ -6482,6 +6905,76 @@ function awsIconCandidatesForResourceType(resourceType: string): string[] {
 
 function normalizeFontFamily(input: string): string {
   return input.split(',')[0].trim();
+}
+
+// Extracts chrome/body geometry from PptxDesignProtocol master elements (inches).
+function extractChromeGeometryFromPptxDesign(design: any): any {
+  const elements: any[] = design?.master?.elements || [];
+  const canvas = design?.canvas || { w: 10, h: 7.5 };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const SEP = 0.024;
+
+  const titleEl  = elements.find(e => e.placeholderType === 'title' || e.placeholderType === 'ctrTitle');
+  const bodyEl   = elements.find(e => e.placeholderType === 'body'  || e.placeholderType === 'obj');
+  const footerEl = elements.find(e => ['ftr','sldNum','dt'].includes(e.placeholderType));
+  const logoEl   = elements.find(e => e.type === 'image' && e.pos?.x > canvas.w * 0.6 && e.pos?.y < 1.0);
+
+  const bodyY = bodyEl?.pos?.y  ?? (titleEl ? r2(titleEl.pos.y + titleEl.pos.h + SEP) : 0.78);
+  const bodyX = bodyEl?.pos?.x  ?? titleEl?.pos?.x ?? 0.44;
+  const bodyW = bodyEl?.pos?.w  ?? r2(canvas.w - bodyX * 2);
+  const bodyH = bodyEl?.pos?.h  ?? (footerEl ? r2(footerEl.pos.y - bodyY - 0.1) : r2(canvas.h - bodyY - 0.4));
+  const footerY = footerEl?.pos?.y ?? r2(bodyY + bodyH + 0.05);
+  const footerH = footerEl?.pos?.h ?? 0.28;
+  const titleX  = titleEl?.pos?.x ?? bodyX;
+
+  return {
+    canvas,
+    chrome: {
+      header_h:         r2(bodyY - SEP),
+      separator_h:      SEP,
+      footer_y:         r2(footerY),
+      footer_h:         r2(footerH),
+      footer_font_size: 8,
+      body_y:           r2(bodyY),
+      body_x:           r2(bodyX),
+      body_w:           r2(bodyW),
+      body_h:           r2(bodyH),
+      title_x:          r2(titleX),
+      title_font_size:  titleEl?.style?.fontSize ?? 24,
+      title_w_logo:     logoEl ? r2(logoEl.pos.x - titleX - 0.1) : r2(bodyW),
+      title_w_no_logo:  r2(bodyW + (bodyX - titleX)),
+      accent_strip_x:   r2(titleX - 0.14),
+      accent_strip_w:   0.065,
+      logo_zone_x:      logoEl ? r2(logoEl.pos.x)          : r2(canvas.w - 2.5),
+      logo_zone_y:      logoEl ? r2(logoEl.pos.y)          : 0.03,
+      logo_zone_w:      logoEl ? r2(logoEl.pos.w + 0.1)    : 2.27,
+      logo_zone_h:      logoEl ? r2(logoEl.pos.h + 0.1)    : 0.79,
+      logo_display_h:   0.38,
+      logo_display_max_w: logoEl ? r2(logoEl.pos.w)        : 2.1,
+    },
+    _geometry_source: 'pptx_master',
+  };
+}
+
+// Scores a catalog of named templates against extracted geometry; returns best match or null.
+function matchLayoutTemplate(geometry: any, catalog: any): { id: string; score: number } | null {
+  const templates = catalog?.templates as Record<string, any> | undefined;
+  if (!templates) return null;
+  const g = geometry.chrome;
+  let best: { id: string; score: number } | null = null;
+  for (const [id, tpl] of Object.entries(templates)) {
+    const c = (tpl as any).chrome;
+    if (!c) continue;
+    const diffs = [
+      Math.abs((c.header_h ?? 0) - (g.header_h ?? 0)) / 0.5,
+      Math.abs((c.body_y    ?? 0) - (g.body_y    ?? 0)) / 0.5,
+      Math.abs((c.body_x    ?? 0) - (g.body_x    ?? 0)) / 0.5,
+      Math.abs((c.body_w    ?? 0) - (g.body_w    ?? 0)) / 2.0,
+    ];
+    const score = Math.max(0, 1 - diffs.reduce((a, b) => a + b, 0) / diffs.length);
+    if (!best || score > best.score) best = { id, score };
+  }
+  return best;
 }
 
 function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<string, any> {

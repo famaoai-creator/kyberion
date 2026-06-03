@@ -132,15 +132,15 @@ interface ValidationResult<T> {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('public/schemas/task-session.schema.json');
+const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-session.schema.json');
 const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/task-session-policy.schema.json'
+  'product/schemas/task-session-policy.schema.json'
 );
 const TASK_SESSION_POLICY_PATH = pathResolver.knowledge(
-  'public/governance/task-session-policy.json'
+  'product/governance/task-session-policy.json'
 );
 const SERVICE_PID_FILE = pathResolver.shared('services-pids.json');
-const SURFACE_MANIFEST_DIR = pathResolver.knowledge('public/governance/surfaces');
+const SURFACE_MANIFEST_DIR = pathResolver.knowledge('product/governance/surfaces');
 const SURFACE_STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const TASK_SESSION_DIR = pathResolver.shared('runtime/task-sessions');
 
@@ -272,7 +272,7 @@ function loadStartableServiceChoices(): SurfaceStartableChoice[] {
     .flatMap((entry) => {
       try {
         const manifest = JSON.parse(
-          safeReadFile(pathResolver.knowledge(`public/governance/surfaces/${entry}`), {
+          safeReadFile(pathResolver.knowledge(`product/governance/surfaces/${entry}`), {
             encoding: 'utf8',
           }) as string
         ) as { surfaces?: Array<Record<string, unknown>> };
@@ -309,7 +309,7 @@ function resolveSurfaceId(serviceName: string): string | undefined {
   try {
     for (const entry of safeReaddir(SURFACE_MANIFEST_DIR).filter((file) => file.endsWith('.json'))) {
       const manifest = JSON.parse(
-        safeReadFile(pathResolver.knowledge(`public/governance/surfaces/${entry}`), {
+        safeReadFile(pathResolver.knowledge(`product/governance/surfaces/${entry}`), {
           encoding: 'utf8',
         }) as string
       ) as { surfaces?: Array<Record<string, unknown>> };

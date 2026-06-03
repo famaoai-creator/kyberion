@@ -294,7 +294,7 @@ function discoverProviderCliCapabilities(): any[] {
 }
 
 function discoverGovernedSkills(): any[] {
-  const skillIndexPath = pathResolver.knowledge('public/orchestration/global_skill_index.json');
+  const skillIndexPath = pathResolver.knowledge('product/orchestration/global_skill_index.json');
   if (!safeExistsSync(skillIndexPath)) {
     return [];
   }
@@ -368,7 +368,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
  * Strategic Reconciliation
  */
 async function performReconcile(input: CodeAction) {
-  const strategyPath = path.resolve(pathResolver.rootDir(), input.strategy_path || 'knowledge/governance/code-strategy.json');
+  const strategyPath = path.resolve(pathResolver.rootDir(), input.strategy_path || 'knowledge/product/governance/code-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await withRetry(
     async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),

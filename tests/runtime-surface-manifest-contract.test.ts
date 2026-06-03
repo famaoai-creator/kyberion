@@ -9,17 +9,17 @@ const rootDir = process.cwd();
 describe('Runtime surface manifest contract', () => {
   it('validates the canonical per-surface manifests and compatibility snapshot against schema', () => {
     const schema = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/schemas/runtime-surface-manifest.schema.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/schemas/runtime-surface-manifest.schema.json'), { encoding: 'utf8' }) as string,
     );
     const snapshot = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/governance/active-surfaces.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'), { encoding: 'utf8' }) as string,
     );
     const ajv = new Ajv({ allErrors: true });
     const validate = ajv.compile(schema);
     const validSnapshot = validate(snapshot);
     expect(validSnapshot, ajv.errorsText(validate.errors)).toBe(true);
 
-    const surfacesDir = path.join(rootDir, 'knowledge/public/governance/surfaces');
+    const surfacesDir = path.join(rootDir, 'knowledge/product/governance/surfaces');
     expect(safeExistsSync(surfacesDir)).toBe(true);
 
     const files = safeReaddir(surfacesDir).filter((entry) => entry.endsWith('.json')).sort();
@@ -43,7 +43,7 @@ describe('Runtime surface manifest contract', () => {
   });
 
   it('covers standard background surfaces with explicit kinds', () => {
-    const manifest = loadSurfaceManifest(path.join(rootDir, 'knowledge/public/governance/active-surfaces.json'));
+    const manifest = loadSurfaceManifest(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'));
     const ids = new Set(manifest.surfaces.map((entry) => entry.id));
     expect(ids.has('slack-bridge')).toBe(true);
     expect(ids.has('imessage-bridge')).toBe(true);
@@ -55,7 +55,7 @@ describe('Runtime surface manifest contract', () => {
   });
 
   it('normalizes surfaces to explicit runtime metadata', () => {
-    const manifest = loadSurfaceManifest(path.join(rootDir, 'knowledge/public/governance/active-surfaces.json'));
+    const manifest = loadSurfaceManifest(path.join(rootDir, 'knowledge/product/governance/active-surfaces.json'));
     const chronos = normalizeSurfaceDefinition(
       manifest.surfaces.find((entry) => entry.id === 'chronos-mirror-v2')!,
     );

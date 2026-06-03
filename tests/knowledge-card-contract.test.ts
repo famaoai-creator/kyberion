@@ -5,21 +5,21 @@ import { safeReadFile } from '@agent/core';
 import { parseFrontmatter } from '../scripts/context_ranker.js';
 
 const rootDir = process.cwd();
-const schemaPath = path.join(rootDir, 'knowledge/public/schemas/knowledge-card.schema.json');
+const schemaPath = path.join(rootDir, 'knowledge/product/schemas/knowledge-card.schema.json');
 const schema = JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string);
 const ajv = new Ajv({ allErrors: true });
 const validate = ajv.compile(schema);
 
 const representativeDocs = [
-  'knowledge/public/architecture/channel-port-surface-model.md',
+  'knowledge/product/architecture/channel-port-surface-model.md',
   'knowledge/public/standards/aws_fisc_standard.md',
-  'knowledge/public/roles/solution_architect/PROCEDURE.md',
-  'knowledge/public/architecture/knowledge-card-overlay-model.md',
-  'knowledge/public/governance/knowledge-protocol.md',
-  'knowledge/public/orchestration/onboarding-protocol.md',
+  'knowledge/product/roles/solution_architect/PROCEDURE.md',
+  'knowledge/product/architecture/knowledge-card-overlay-model.md',
+  'knowledge/product/governance/knowledge-protocol.md',
+  'knowledge/product/orchestration/onboarding-protocol.md',
   'knowledge/public/procedures/browser/navigate-web.md',
   'knowledge/public/standards/ipa/requirements-checklist.md',
-  'knowledge/public/roles/knowledge_steward/PROCEDURE.md',
+  'knowledge/product/roles/knowledge_steward/PROCEDURE.md',
 ];
 
 describe('Knowledge card contract', () => {

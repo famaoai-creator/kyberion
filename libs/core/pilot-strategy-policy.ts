@@ -21,8 +21,8 @@ export interface PilotStrategyPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/pilot-strategy-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/pilot-strategy-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/pilot-strategy-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/pilot-strategy-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: PilotStrategyPolicyCatalog | null = null;

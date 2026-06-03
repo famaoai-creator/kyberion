@@ -1,49 +1,51 @@
 {
   "action": "pipeline",
   "name": "comfyui-status-check",
+  "version": "2.0.0",
   "description": "Checks the status of the ComfyUI server, active queue, and output history using Service Presets.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "get_stats",
-      "type": "capture",
+      "role": "source",
       "op": "service:preset",
+      "produces": { "channel": "server_stats", "type": "ServiceResult" },
       "params": {
         "service_id": "comfyui",
-        "action": "get_stats",
-        "export_as": "server_stats"
+        "action": "get_stats"
       }
     },
     {
       "id": "get_queue",
-      "type": "capture",
+      "role": "source",
       "op": "service:preset",
+      "produces": { "channel": "queue_status", "type": "ServiceResult" },
       "params": {
         "service_id": "comfyui",
-        "action": "get_queue",
-        "export_as": "queue_status"
+        "action": "get_queue"
       }
     },
     {
       "id": "get_history",
-      "type": "capture",
+      "role": "source",
       "op": "service:preset",
+      "produces": { "channel": "job_history", "type": "ServiceResult" },
       "params": {
         "service_id": "comfyui",
-        "action": "get_history",
-        "export_as": "job_history"
+        "action": "get_history"
       }
     },
     {
       "id": "list_outputs",
-      "type": "capture",
+      "role": "source",
       "op": "service:preset",
+      "produces": { "channel": "recent_outputs", "type": "ServiceResult" },
       "params": {
         "service_id": "comfyui",
         "action": "list_outputs",
         "params": {
           "output_dir": "{{output_dir}}"
-        },
-        "export_as": "recent_outputs"
+        }
       }
     }
   ]

@@ -1,6 +1,8 @@
 {
   "description": "Maintenance pipeline: Opens browser tabs ONLY for active UI surfaces in a single browser instance.",
   "action": "pipeline",
+  "version": "2.0.0",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "options": {
     "headless": false,
     "browser_channel": "chrome",
@@ -10,22 +12,22 @@
   "steps": [
     {
       "id": "get-active-surfaces",
-      "type": "capture",
+      "role": "source",
       "op": "process:list-surfaces",
-      "params": {
-        "export_as": "surfaces"
-      }
+      "produces": { "channel": "surfaces", "type": "SurfaceList" },
+      "params": {}
     },
     {
       "id": "inspect-each-surface",
-      "type": "control",
+      "role": "gate",
       "op": "core:foreach",
+      "consumes": "surfaces",
       "params": {
         "items": "{{surfaces}}",
         "as": "surface",
         "do": [
           {
-            "type": "control",
+            "role": "gate",
             "op": "core:if",
             "params": {
               "condition": {
@@ -42,7 +44,7 @@
               },
               "then": [
                 {
-                  "type": "control",
+                  "role": "sink",
                   "op": "browser:open_tab",
                   "params": {
                     "url": "{{surface.home_url}}",

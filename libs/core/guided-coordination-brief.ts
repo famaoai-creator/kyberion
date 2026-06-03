@@ -7,7 +7,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/guided-coordination-brief.schema.json'
+  'product/schemas/guided-coordination-brief.schema.json'
 );
 
 export interface GuidedCoordinationBriefSeed {

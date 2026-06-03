@@ -22,7 +22,7 @@ The generation boundary is:
 
 Reference:
 
-- [media-document-generation-boundary.md](/Users/famao/kyberion/knowledge/public/architecture/media-document-generation-boundary.md)
+- [media-document-generation-boundary.md](/Users/famao/kyberion/knowledge/product/architecture/media-document-generation-boundary.md)
 
 The preset catalog is stored as directory-scanned knowledge packs at:
 

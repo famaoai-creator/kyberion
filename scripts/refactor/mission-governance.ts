@@ -67,7 +67,7 @@ export function readTrustLedger(): Record<string, any> {
 }
 
 export async function validateMissionQuality(id: string): Promise<{ ok: boolean; reason?: string }> {
-  const policyPath = pathResolver.knowledge('public/governance/security-policy.json');
+  const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
   if (!safeExistsSync(policyPath)) return { ok: true };
 
   const policy = readJsonFile<{ quality_requirements?: Record<string, unknown> }>(policyPath);

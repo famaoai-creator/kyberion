@@ -231,8 +231,8 @@ describe('mission-orchestration-worker', () => {
         status: 'planned',
         assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
         description: 'Attempt disallowed write',
-        target_path: 'knowledge/public/architecture/disallowed.md',
-        deliverable: 'knowledge/public/architecture/disallowed.md',
+        target_path: 'knowledge/product/architecture/disallowed.md',
+        deliverable: 'knowledge/product/architecture/disallowed.md',
       },
     ], null, 2));
     safeWriteFile(`${missionPath}/TASK_BOARD.md`, [

@@ -1,0 +1,53 @@
+{
+  "action": "pipeline",
+  "name": "CEO Strategic Executive Report",
+  "version": "2.0.0",
+  "description": "Aggregates high-level metrics for executive decision making without nested pipeline shell-outs.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "steps": [
+    { "role": "sink", "op": "system:log", "params": { "message": "📊 [CEO COMMAND] Initiating Strategic Reporting..." } },
+    { "role": "source", "op": "system:glob_files", "produces": { "channel": "node_modules_json_files", "type": "FileList" }, "params": { "dir": "node_modules", "ext": ".json" } },
+    { "role": "source", "op": "system:glob_files", "produces": { "channel": "dist_js_files", "type": "FileList" }, "params": { "dir": "dist", "ext": ".js" } },
+    { "role": "source", "op": "system:read_json", "produces": { "channel": "surface_manifest", "type": "JsonData" }, "params": { "path": "knowledge/product/governance/active-surfaces.json" } },
+    { "role": "source", "op": "system:read_json", "produces": { "channel": "surface_state", "type": "JsonData" }, "params": { "path": "active/shared/runtime/surfaces/state.json" } },
+    { "role": "source", "op": "system:probe", "produces": { "channel": "p_identity", "type": "ProbeResult" }, "params": { "path": "knowledge/personal/my-identity.json" } },
+    { "role": "source", "op": "system:probe", "produces": { "channel": "p_vision", "type": "ProbeResult" }, "params": { "path": "knowledge/personal/my-vision.md" } },
+    {
+      "role": "gate",
+      "op": "core:if",
+      "consumes": "p_vision",
+      "params": {
+        "condition": "p_vision.exists",
+        "then": [
+          { "role": "source", "op": "system:read_file", "produces": { "channel": "vision_text", "type": "ReadResult" }, "params": { "path": "knowledge/personal/my-vision.md" } }
+        ]
+      }
+    },
+    { "role": "source", "op": "system:list_missions", "produces": { "channel": "active_missions", "type": "MissionList" }, "params": { "status": "active" } },
+    { "role": "source", "op": "system:glob_files", "produces": { "channel": "libs_ts_files", "type": "FileList" }, "params": { "dir": "libs", "ext": ".ts" } },
+    { "role": "source", "op": "system:glob_files", "produces": { "channel": "src_ts_files", "type": "FileList" }, "params": { "dir": "src", "ext": ".ts" } },
+    { "role": "source", "op": "system:glob_files", "produces": { "channel": "test_dot_test_files", "type": "FileList" }, "params": { "dir": ".", "ext": ".test.ts" } },
+    { "role": "source", "op": "system:glob_files", "produces": { "channel": "test_dot_spec_files", "type": "FileList" }, "params": { "dir": ".", "ext": ".spec.ts" } },
+    { "role": "source", "op": "system:read_file", "produces": { "channel": "orchestrator_log", "type": "ReadResult" }, "params": { "path": "active/shared/runtime/orchestrator.log" } },
+    { "role": "source", "op": "system:read_file", "produces": { "channel": "surface_log", "type": "ReadResult" }, "params": { "path": "active/shared/runtime/surface.log" } },
+    {
+      "role": "transform",
+      "op": "system:run_js",
+      "consumes": ["node_modules_json_files", "dist_js_files", "surface_manifest", "surface_state", "p_identity", "p_vision", "active_missions", "libs_ts_files", "src_ts_files", "test_dot_test_files", "test_dot_spec_files", "orchestrator_log", "surface_log"],
+      "produces": { "channel": "ceo_report", "type": "Report" },
+      "params": {
+        "code": "const sourceCount = ((ctx.libs_ts_files || []).filter((f) => !f.endsWith('.test.ts') && !f.endsWith('.spec.ts')).length + (ctx.src_ts_files || []).length); const testCount = (ctx.test_dot_test_files || []).length + (ctx.test_dot_spec_files || []).length; const recentErrors = String([ctx.orchestrator_log, ctx.surface_log].filter(Boolean).join('\\n\\n')).split(/\\r?\\n/).filter((line) => /ERROR|FATAL|FAIL/i.test(line)).slice(-5).join('\\n') || '(none found)'; const nodeModulesOk = (ctx.node_modules_json_files || []).length > 0 ? 'OK' : 'MISSING'; const distOk = (ctx.dist_js_files || []).length > 0 ? 'OK' : 'MISSING'; const activeMissionCount = typeof ctx.active_missions?.count === 'number' ? ctx.active_missions.count : (Array.isArray(ctx.active_missions) ? ctx.active_missions.length : 0); const surfaceManifestOk = ctx.surface_manifest ? 'OK' : 'MISSING'; const surfaceStateOk = ctx.surface_state ? 'OK' : 'MISSING'; const identityOk = ctx.p_identity?.exists ? 'OK' : 'MISSING'; const visionOk = ctx.p_vision?.exists ? 'OK' : 'MISSING'; const visionText = ctx.vision_text || '(none available)'; const productivityScore = Math.max(0, Math.round((testCount / Math.max(sourceCount, 1)) * 100 - (recentErrors === '(none found)' ? 0 : recentErrors.split(/\\r?\\n/).length))); ctx.ceo_report = `--- KYBERION CEO STRATEGIC REPORT ---\\nDate: ${new Date().toISOString()}\\n\\n## 1. Ecosystem Vitals\\n- node_modules JSON files: ${ctx.node_modules_json_files?.length || 0} (${nodeModulesOk})\\n- dist JS files: ${ctx.dist_js_files?.length || 0} (${distOk})\\n- Surface manifest: ${surfaceManifestOk}\\n- Surface runtime state: ${surfaceStateOk}\\n- Sovereign identity: ${identityOk}\\n- Sovereign vision: ${visionOk}\\n- Active missions: ${activeMissionCount}\\n\\n## 2. Sovereign Vision\\n${visionText}\\n\\n## 3. Development Productivity\\n- Source Files (.ts): ${sourceCount}\\n- Test Files: ${testCount}\\n- Test / source ratio score: ${productivityScore}\\n\\n## 4. Mission Status\\nActive Missions: ${activeMissionCount}\\n\\n## 5. Critical Risk Signals (Recent Errors)\\n${recentErrors}\\n\\n---\\nReport generated by Sovereign Orchestrator.`;"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "code:write_artifact",
+      "consumes": "ceo_report",
+      "params": {
+        "path": "active/shared/tmp/CEO_STRATEGIC_REPORT.md",
+        "content": "{{ceo_report}}"
+      }
+    },
+    { "role": "sink", "op": "system:log", "params": { "message": "✅ CEO Strategic Report is ready: active/shared/tmp/CEO_STRATEGIC_REPORT.md" } }
+  ]
+}

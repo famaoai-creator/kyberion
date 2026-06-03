@@ -3,7 +3,7 @@
  * leaks (internal URLs, tenant subdomains, company / customer identifiers)
  * that belong in knowledge/confidential/{org}/ instead.
  *
- * Policy: knowledge/public/governance/tier-hygiene-policy.json
+ * Policy: knowledge/product/governance/tier-hygiene-policy.json
  * Invoke: pnpm check:tier-hygiene
  */
 
@@ -36,7 +36,7 @@ interface Violation {
   rationale: string;
 }
 
-const POLICY_PATH = 'knowledge/public/governance/tier-hygiene-policy.json';
+const POLICY_PATH = 'knowledge/product/governance/tier-hygiene-policy.json';
 
 async function loadPolicy(): Promise<Policy> {
   const absolute = pathResolver.rootResolve(POLICY_PATH);

@@ -23,19 +23,19 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const REQUEST_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/assistant-compiler-request.schema.json'
+  'product/schemas/assistant-compiler-request.schema.json'
 );
 const RESULT_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/assistant-compiler-result.schema.json'
+  'product/schemas/assistant-compiler-result.schema.json'
 );
 const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/intent-contract.schema.json'
+  'product/schemas/intent-contract.schema.json'
 );
 const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/organization-work-loop.schema.json'
+  'product/schemas/organization-work-loop.schema.json'
 );
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/actuator-execution-brief.schema.json'
+  'product/schemas/actuator-execution-brief.schema.json'
 );
 
 export interface AssistantCompilerRequest {

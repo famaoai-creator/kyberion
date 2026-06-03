@@ -49,7 +49,7 @@ describe('generation scheduler', () => {
   it('emits generation schedule records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/generation-schedule.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/generation-schedule.schema.json'));
 
     expect(
       validate({
@@ -68,7 +68,7 @@ describe('generation scheduler', () => {
   it('rejects invalid generation job records', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/generation-job.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/generation-job.schema.json'));
 
     expect(
       validate({

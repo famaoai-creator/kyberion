@@ -7,7 +7,7 @@ Generate a visual architecture diagram from IaC such as Terraform or CloudFormat
 - **Actuator**: `File-Actuator` or `Code-Actuator` for source discovery and structural extraction
 - **Actuator**: `Modeling-Actuator` when semantic normalization is needed
 - **Actuator**: `Media-Actuator` for Draw.io, Mermaid, or D2 rendering
-- **Schema**: `knowledge/public/schemas/architecture-adf.schema.json`
+- **Schema**: `knowledge/product/schemas/architecture-adf.schema.json`
 
 ## 3. Principle
 Do not render directly from raw Terraform text.

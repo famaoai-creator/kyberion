@@ -31,7 +31,7 @@ export interface DistillCandidateRecord {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/distill-candidate-record.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/distill-candidate-record.schema.json');
 const DISTILL_DIR = pathResolver.shared('runtime/distill-candidates');
 let validateFn: ValidateFunction | null = null;
 

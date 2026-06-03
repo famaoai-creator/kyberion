@@ -43,10 +43,10 @@ interface LegacyRecord {
 }
 
 const ACTUATORS_DIR = pathResolver.rootResolve('libs/actuators');
-const CURRENT_INDEX_PATH = pathResolver.knowledge('public/orchestration/global_actuator_index.json');
-const SKILL_INDEX_PATH = pathResolver.knowledge('public/orchestration/global_skill_index.json');
-const LEGACY_INDEX_PATH = pathResolver.knowledge('public/orchestration/legacy_component_index.json');
-const REPORT_PATH = pathResolver.knowledge('public/architecture/component-lifecycle-inventory.md');
+const CURRENT_INDEX_PATH = pathResolver.knowledge('product/orchestration/global_actuator_index.json');
+const SKILL_INDEX_PATH = pathResolver.knowledge('product/orchestration/global_skill_index.json');
+const LEGACY_INDEX_PATH = pathResolver.knowledge('product/orchestration/legacy_component_index.json');
+const REPORT_PATH = pathResolver.knowledge('product/architecture/component-lifecycle-inventory.md');
 const CAPABILITIES_GUIDE_PATH = pathResolver.rootResolve('CAPABILITIES_GUIDE.md');
 
 const LEGACY_RATIONALES: Record<string, string> = {
@@ -134,7 +134,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(`Total Actuators: ${current.length}`);
   lines.push(`Last updated: ${new Date().toISOString().slice(0, 10)}`);
   lines.push('');
-  lines.push('This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/public/orchestration/global_actuator_index.json`.');
+  lines.push('This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/product/orchestration/global_actuator_index.json`.');
   lines.push('');
   lines.push('Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.');
   lines.push('');

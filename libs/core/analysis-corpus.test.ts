@@ -4,10 +4,10 @@ import { buildAnalysisCorpusSnippets, rankAnalysisRefs } from './analysis-corpus
 describe('analysis-corpus', () => {
   it('builds snippets from governed knowledge refs', () => {
     const snippets = buildAnalysisCorpusSnippets([
-      'knowledge/public/incidents/post-mortem-20260228.md',
+      'knowledge/product/incidents/post-mortem-20260228.md',
     ]);
     expect(snippets.length).toBeGreaterThan(0);
-    expect(snippets[0]?.ref).toContain('knowledge/public/incidents/post-mortem-20260228.md');
+    expect(snippets[0]?.ref).toContain('knowledge/product/incidents/post-mortem-20260228.md');
     expect(snippets[0]?.title.length).toBeGreaterThan(0);
     expect(snippets[0]?.excerpt.length).toBeGreaterThan(0);
   });
@@ -15,7 +15,7 @@ describe('analysis-corpus', () => {
   it('ignores unsupported refs', () => {
     const snippets = buildAnalysisCorpusSnippets([
       'vault/private/secret.md',
-      'knowledge/public/incidents/post-mortem-20260228.md',
+      'knowledge/product/incidents/post-mortem-20260228.md',
     ]);
     expect(snippets.every((item) => !item.ref.startsWith('vault/'))).toBe(true);
   });
@@ -23,8 +23,8 @@ describe('analysis-corpus', () => {
   it('ranks refs toward active target and scope before broad knowledge', () => {
     const ranked = rankAnalysisRefs({
       refs: [
-        'knowledge/public/architecture/general-guidance.md',
-        'knowledge/public/incidents/post-mortem-20260228.md',
+        'knowledge/product/architecture/general-guidance.md',
+        'knowledge/product/incidents/post-mortem-20260228.md',
         'active/projects/PRJ-TEST/tracks/TRK-9/review-target-notes.md',
       ],
       projectId: 'PRJ-TEST',
@@ -33,6 +33,6 @@ describe('analysis-corpus', () => {
       utterance: 'TRK-9 review target',
     });
     expect(ranked[0]).toBe('active/projects/PRJ-TEST/tracks/TRK-9/review-target-notes.md');
-    expect(ranked[1]).toBe('knowledge/public/incidents/post-mortem-20260228.md');
+    expect(ranked[1]).toBe('knowledge/product/incidents/post-mortem-20260228.md');
   });
 });

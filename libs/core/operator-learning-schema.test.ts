@@ -129,7 +129,7 @@ describe('operator learning schemas', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      pathResolver.knowledge('public/schemas/operator-profile.schema.json')
+      pathResolver.knowledge('product/schemas/operator-profile.schema.json')
     );
 
     const valid = validate(profile);
@@ -142,7 +142,7 @@ describe('operator learning schemas', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      pathResolver.knowledge('public/schemas/operator-request-log.schema.json')
+      pathResolver.knowledge('product/schemas/operator-request-log.schema.json')
     );
 
     const valid = validate(requestLog);

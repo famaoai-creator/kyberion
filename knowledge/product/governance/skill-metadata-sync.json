@@ -1,0 +1,19 @@
+{
+  "$schema": "../../schemas/metadata-sync-contract.schema.json",
+  "sync_rules": [
+    {
+      "source": "libs/actuators/*/src/index.ts",
+      "targets": ["knowledge/public/procedures/**"],
+      "mapping": {
+        "manifest": "knowledge_card.arguments"
+      }
+    },
+    {
+      "source": "knowledge/public/procedures/**",
+      "targets": ["knowledge/product/orchestration/global_actuator_index.json"],
+      "mapping": {
+        "knowledge_card.summary": "index.description"
+      }
+    }
+  ]
+}

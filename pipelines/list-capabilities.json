@@ -1,34 +1,37 @@
 {
   "pipeline_id": "list-capabilities",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Provide a comprehensive, user-friendly guide of all available Kyberion intents and automation workflows.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "action": "pipeline",
   "steps": [
     {
       "id": "load-intents",
-      "type": "capture",
+      "role": "source",
       "op": "system:read_json",
+      "produces": { "channel": "raw_intents", "type": "JsonData" },
       "params": {
-        "path": "knowledge/public/governance/standard-intents.json",
-        "export_as": "raw_intents"
+        "path": "knowledge/product/governance/standard-intents.json"
       }
     },
     {
       "id": "generate-guide",
-      "type": "transform",
+      "role": "transform",
       "op": "reasoning:synthesize",
+      "consumes": "raw_intents",
+      "produces": { "channel": "capability_guide", "type": "CapabilityGuide" },
       "params": {
         "instruction": "Based on the provided standard-intents list, generate a beautifully formatted, user-friendly Markdown guide titled 'Kyberion Capability Catalog'. Group the intents into logical categories (e.g., 'Automation & Learning', 'Content Creation', 'Operations', 'System Health'). For each intent, show its primary surface example (how to ask) and what the outcome will be. Highlight the new 'Learn and Automate' capabilities as a premium feature set.",
         "context": [
           "{{raw_intents}}"
-        ],
-        "export_as": "capability_guide"
+        ]
       }
     },
     {
       "id": "display-guide",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "capability_guide",
       "params": {
         "message": "{{capability_guide}}"
       }

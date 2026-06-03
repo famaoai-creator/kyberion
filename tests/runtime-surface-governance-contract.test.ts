@@ -7,7 +7,7 @@ const rootDir = process.cwd();
 describe('Runtime surface governance', () => {
   it('does not duplicate managed surfaces inside active-services', () => {
     const activeServices = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/governance/active-services.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/governance/active-services.json'), { encoding: 'utf8' }) as string,
     ) as Record<string, unknown>;
 
     expect(Object.keys(activeServices)).not.toContain('nexus-daemon');

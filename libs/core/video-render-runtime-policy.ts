@@ -4,7 +4,7 @@ import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import type { VideoRenderRuntimePolicy } from './video-composition-contract.js';
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('public/governance/video-render-runtime-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/video-render-runtime-policy.json');
 
 const FALLBACK_POLICY: VideoRenderRuntimePolicy = {
   version: 'fallback',

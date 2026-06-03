@@ -34,8 +34,8 @@ describe('production evidence register contract', () => {
     expect(register).toContain('EV-FDE-DEPLOY');
     expect(register).toContain('fork なし');
     expect(register).toContain('production-ready');
-    expect(register).toContain('knowledge/public/governance/production-evidence-register.json');
-    expect(read('knowledge/public/schemas/production-evidence-register.schema.json')).toContain('pending_external_evidence');
+    expect(register).toContain('knowledge/product/governance/production-evidence-register.json');
+    expect(read('knowledge/product/schemas/production-evidence-register.schema.json')).toContain('pending_external_evidence');
     expect(register).toContain('../operator/PRODUCTION_EVIDENCE_COLLECTION.md');
     expect(runbook).toContain('EV-30DAY-OPS');
     expect(runbook).toContain('EV-EXT-CONTRIB');

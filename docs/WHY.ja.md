@@ -86,4 +86,4 @@ Kyberion は **OSS、活発に開発中**。直近の焦点（`docs/PRODUCTIZATI
 - Phase C': 1 週間以内に外部 contributor が貢献できる土壌に。
 - Phase D': fork なしで FDE / 導入支援案件が回るように。
 
-ここまで読んで興味を持ったなら、次は [Quickstart](./QUICKSTART.md)。先にアーキテクチャを理解したいなら [`knowledge/public/architecture/organization-work-loop.md`](../knowledge/public/architecture/organization-work-loop.md) から。
+ここまで読んで興味を持ったなら、次は [Quickstart](./QUICKSTART.md)。先にアーキテクチャを理解したいなら [`knowledge/product/architecture/organization-work-loop.md`](../knowledge/product/architecture/organization-work-loop.md) から。

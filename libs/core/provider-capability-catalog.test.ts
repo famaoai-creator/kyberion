@@ -25,7 +25,7 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: { rootResolve: mocks.rootResolve, shared: mocks.shared },
 }));
 
-const CATALOG_PATH = '/repo/knowledge/public/orchestration/provider-capabilities.json';
+const CATALOG_PATH = '/repo/knowledge/product/orchestration/provider-capabilities.json';
 
 function claudeInstalled() {
   mocks.spawnSync.mockImplementation((cmd: string, args: string[]) => {

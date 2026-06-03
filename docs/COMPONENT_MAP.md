@@ -4,18 +4,18 @@ Kyberion is a sovereign-agent ecosystem organized around a small number of high-
 
 For a layer-oriented view of the concepts themselves, read:
 
-- `knowledge/public/architecture/kyberion-canonical-concept-index.md`
+- `knowledge/product/architecture/kyberion-canonical-concept-index.md`
 - `docs/USER_EXPERIENCE_CONTRACT.md`
 - `docs/OPERATOR_UX_GUIDE.md`
-- `knowledge/public/architecture/kyberion-concept-map.md`
-- `knowledge/public/architecture/llm-execution-boundary.md`
-- `knowledge/public/architecture/actuator-contract-map.md`
-- `knowledge/public/architecture/agent-communication-layer-model.md`
-- `knowledge/public/architecture/enterprise-operating-kernel.md`
-- `knowledge/public/architecture/ceo-ux.md`
-- `knowledge/public/architecture/management-control-plane.md`
-- `knowledge/public/architecture/corporate-memory-loop.md`
-- `knowledge/public/architecture/project-mission-artifact-service-model.md`
+- `knowledge/product/architecture/kyberion-concept-map.md`
+- `knowledge/product/architecture/llm-execution-boundary.md`
+- `knowledge/product/architecture/actuator-contract-map.md`
+- `knowledge/product/architecture/agent-communication-layer-model.md`
+- `knowledge/product/architecture/enterprise-operating-kernel.md`
+- `knowledge/product/architecture/ceo-ux.md`
+- `knowledge/product/architecture/management-control-plane.md`
+- `knowledge/product/architecture/corporate-memory-loop.md`
+- `knowledge/product/architecture/project-mission-artifact-service-model.md`
 
 ## System at a glance
 
@@ -102,8 +102,8 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `libs/core/a2a-bridge.ts`
 - `pipelines/vital-check.json`
 - `active/missions/`
-- `knowledge/public/architecture/agent-mission-control-model.md`
-- `knowledge/public/architecture/mission-orchestration-control-plane.md`
+- `knowledge/product/architecture/agent-mission-control-model.md`
+- `knowledge/product/architecture/mission-orchestration-control-plane.md`
 
 This path manages mission lifecycle, mission ownership, task delegation, evidence, and journal/history views.
 The current shape is:
@@ -150,9 +150,9 @@ If temporary artifacts are needed, prefer governed runtime storage under `active
 - `scripts/cli.ts`
 - `scripts/check_esm_integrity.ts`
 - `libs/actuators/*/manifest.json`
-- `knowledge/public/governance/authority-roles/` (compatibility snapshot: `knowledge/public/governance/authority-role-index.json`)
-- `knowledge/public/orchestration/team-roles/` (compatibility snapshot: `knowledge/public/orchestration/team-role-index.json`)
-- `knowledge/public/orchestration/global_actuator_index.json` (compatibility snapshot)
+- `knowledge/product/governance/authority-roles/` (compatibility snapshot: `knowledge/product/governance/authority-role-index.json`)
+- `knowledge/product/orchestration/team-roles/` (compatibility snapshot: `knowledge/product/orchestration/team-role-index.json`)
+- `knowledge/product/orchestration/global_actuator_index.json` (compatibility snapshot)
 - `libs/actuators/*`
 
 This path tells users what is available and lets them run an actuator.
@@ -166,7 +166,7 @@ Runtime/package hygiene for this layer is enforced by `pnpm run check:esm`.
 - `satellites/telegram-bridge/`
 - `presence/bridge/nexus-daemon.ts`
 - `presence/displays/chronos-mirror-v2/`
-- `knowledge/public/architecture/slack-chronos-control-model.md`
+- `knowledge/product/architecture/slack-chronos-control-model.md`
 
 This path covers how external channels are normalized, routed, observed, and answered.
 It also defines channel ports and Surface Agents that sit between human-facing surfaces and the durable mission/execution layer.
@@ -203,7 +203,7 @@ Chronos does not directly own mission state. It delegates to:
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`
 - `libs/actuators/system-actuator/`
-- `knowledge/public/orchestration/service-endpoints/` (compatibility snapshot: `service-endpoints.json`)
+- `knowledge/product/orchestration/service-endpoints/` (compatibility snapshot: `service-endpoints.json`)
 
 This path defines how authenticated external service access is separated from channel delivery and from local OS execution.
 It is the practical boundary between "how we authenticate to a service", "how we deliver to a channel", and "how we run local commands".
@@ -236,7 +236,7 @@ Actuators are the execution layer. Current major groups include:
 - `code-actuator`: code analysis/refactoring helpers
 - `network-actuator`: secure API and A2A transport
 - `wisdom-actuator`: knowledge distillation and evolution
-- `knowledge/public/orchestration/specialists/` (compatibility snapshot: `specialist-catalog.json`)
+- `knowledge/product/orchestration/specialists/` (compatibility snapshot: `specialist-catalog.json`)
 - `media-actuator`: document and diagram generation
 - `browser-actuator`: browser automation
 - `system-actuator`: OS-level operations
@@ -270,7 +270,7 @@ Kyberion uses four separate concepts here:
 This means Slack and Chronos are not part of `system-actuator`.
 They are human-facing gateways. Delivery belongs to `presence-actuator`, and authentication belongs to service binding.
 
-Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/public/governance/surfaces/*.json`, with `knowledge/public/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
+Background surfaces and bridges are not started ad hoc. Their canonical startup manifests are `knowledge/product/governance/surfaces/*.json`, with `knowledge/product/governance/active-surfaces.json` as the generated compatibility snapshot. Lifecycle coordination runs through `scripts/surface_runtime.ts` plus `runtime-supervisor`.
 
 ## Mission control model
 
@@ -286,8 +286,8 @@ Kyberion uses a `single-owner, multi-worker` mission model.
 
 The authoritative architecture reference is:
 
-- `knowledge/public/architecture/agent-mission-control-model.md`
-- `knowledge/public/architecture/mission-orchestration-control-plane.md`
+- `knowledge/product/architecture/agent-mission-control-model.md`
+- `knowledge/product/architecture/mission-orchestration-control-plane.md`
 
 ## Knowledge tiers
 
@@ -307,11 +307,11 @@ The charter assumes strict isolation between these tiers.
   - runtime code uses package imports only
   - white-box source imports in tests must stay explicitly whitelisted
 - `README.md`: current operator-oriented summary of mission controller, orchestration worker, runtime supervisor, Slack, and Chronos
-- `knowledge/public/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
-- `knowledge/public/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
-- `knowledge/public/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
-- `knowledge/public/architecture/slack-chronos-control-model.md`: also defines gateway, service binding, delivery actuator, and system actuator boundaries
-- `knowledge/public/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
+- `knowledge/product/architecture/agent-mission-control-model.md`: mission ownership, leases, coordination store, and explainable observability
+- `knowledge/product/architecture/slack-chronos-control-model.md`: Slack ingress, Chronos control surfaces, channel outboxes, and observability boundaries
+- `knowledge/product/architecture/channel-port-surface-model.md`: channels, ports, Surface Agents, and transport/directionality taxonomy
+- `knowledge/product/architecture/slack-chronos-control-model.md`: also defines gateway, service binding, delivery actuator, and system actuator boundaries
+- `knowledge/product/architecture/browser-actuator-v3.md`: Playwright engine, `snapshot + ref` interaction model, browser session leases, and test-export direction
 - `dependency-graph.mmd`: repo-level dependency visualization
 
 ## Recommended reading order for new contributors

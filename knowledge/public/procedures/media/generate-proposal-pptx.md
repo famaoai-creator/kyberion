@@ -5,7 +5,7 @@ Generate a proposal deck from a canonical `document-brief` and a knowledge-owned
 
 ## 2. Dependencies
 - **Actuator**: `Media-Actuator`
-- **Schema**: `knowledge/public/schemas/document-brief.schema.json`
+- **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 - **Theme Catalog**: `knowledge/public/design-patterns/media-templates/themes/`
 
 ## 3. Principle

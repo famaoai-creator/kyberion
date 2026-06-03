@@ -32,12 +32,12 @@ describe('presentation preference registry', () => {
       ajv,
       path.resolve(
         process.cwd(),
-        'knowledge/public/schemas/presentation-preference-registry.schema.json'
+        'knowledge/product/schemas/presentation-preference-registry.schema.json'
       )
     );
     const registry = JSON.parse(
       safeReadFile(
-        path.resolve(process.cwd(), 'knowledge/public/governance/presentation-preference-registry.json'),
+        path.resolve(process.cwd(), 'knowledge/product/governance/presentation-preference-registry.json'),
         { encoding: 'utf8' }
       ) as string
     );

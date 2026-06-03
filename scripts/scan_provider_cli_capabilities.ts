@@ -52,7 +52,7 @@ function main(): void {
   safeWriteFile(resolvedOutPath, JSON.stringify(summary, null, 2), { encoding: 'utf8' });
 
   // probe -> knowledge loop: optionally merge what was discovered into the knowledge catalog
-  // (knowledge/public/orchestration/provider-capabilities.json), preserving manual edits.
+  // (knowledge/product/orchestration/provider-capabilities.json), preserving manual edits.
   if (process.argv.includes('--write-knowledge')) {
     const probed: Record<string, ProbedProviderCapabilities> = {};
     for (const provider of discoveredProviders.values()) {

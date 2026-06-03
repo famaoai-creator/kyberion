@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     .option('profile-id', { type: 'string', default: 'operator-default-v1' })
     .option('operations-profile', {
       type: 'string',
-      default: 'knowledge/public/schemas/meeting-operations-profile.example.json',
+      default: 'knowledge/product/schemas/meeting-operations-profile.example.json',
     })
     .option('meeting-title', { type: 'string', default: 'Live meeting' })
     .option('purpose', {

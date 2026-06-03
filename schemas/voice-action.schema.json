@@ -4,19 +4,19 @@
   "description": "Single voice request or lightweight voice pipeline envelope.",
   "anyOf": [
     {
-      "$ref": "../knowledge/public/schemas/voice-generation-adf.schema.json"
+      "$ref": "../knowledge/product/schemas/voice-generation-adf.schema.json"
     },
     {
-      "$ref": "../knowledge/public/schemas/voice-profile-registration.schema.json"
+      "$ref": "../knowledge/product/schemas/voice-profile-registration.schema.json"
     },
     {
-      "$ref": "../knowledge/public/schemas/voice-sample-collection.schema.json"
+      "$ref": "../knowledge/product/schemas/voice-sample-collection.schema.json"
     },
     {
-      "$ref": "../knowledge/public/schemas/voice-sample-recording.schema.json"
+      "$ref": "../knowledge/product/schemas/voice-sample-recording.schema.json"
     },
     {
-      "$ref": "../knowledge/public/schemas/voice-sample-collection-registration.schema.json"
+      "$ref": "../knowledge/product/schemas/voice-sample-collection-registration.schema.json"
     },
     {
       "type": "object",
@@ -37,19 +37,19 @@
             "type": "object",
             "anyOf": [
               {
-                "$ref": "../knowledge/public/schemas/voice-generation-adf.schema.json"
+                "$ref": "../knowledge/product/schemas/voice-generation-adf.schema.json"
               },
               {
-                "$ref": "../knowledge/public/schemas/voice-profile-registration.schema.json"
+                "$ref": "../knowledge/product/schemas/voice-profile-registration.schema.json"
               },
               {
-                "$ref": "../knowledge/public/schemas/voice-sample-collection.schema.json"
+                "$ref": "../knowledge/product/schemas/voice-sample-collection.schema.json"
               },
               {
-                "$ref": "../knowledge/public/schemas/voice-sample-recording.schema.json"
+                "$ref": "../knowledge/product/schemas/voice-sample-recording.schema.json"
               },
               {
-                "$ref": "../knowledge/public/schemas/voice-sample-collection-registration.schema.json"
+                "$ref": "../knowledge/product/schemas/voice-sample-collection-registration.schema.json"
               },
               {
                 "type": "object",

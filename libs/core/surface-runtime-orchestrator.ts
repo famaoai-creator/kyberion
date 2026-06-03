@@ -51,7 +51,7 @@ import {
   type SurfaceDelegationReceiver,
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
-import { resolveSurfaceIntent } from './router-contract.js';
+import { resolveSurfaceIntent, resolveDirectIntentCommand } from './router-contract.js';
 import {
   recordIntentContractOutcome,
   selectContractCandidates,
@@ -1387,11 +1387,7 @@ function buildSurfaceDelegationRequest(params: {
 }
 
 function directIntentCommand(intentId?: string): { command: string; args: string[] } | null {
-  const map: Record<string, { command: string; args: string[] }> = {
-    'bootstrap-kyberion-runtime': { command: 'pnpm', args: ['env:bootstrap'] },
-    'verify-actuator-capability': { command: 'pnpm', args: ['capabilities'] },
-  };
-  return intentId && map[intentId] ? map[intentId] : null;
+  return resolveDirectIntentCommand(intentId);
 }
 
 async function handleGovernedExecutionHint(
@@ -1454,7 +1450,10 @@ async function handleGovernedExecutionHint(
   }
 
   if (resolved.pipelineId) {
-    const pipelinePath = `pipelines/${resolved.pipelineId}.json`;
+    // Bare IDs resolve to pipelines/; path-prefixed IDs (containing '/') are used as-is from repo root.
+    const pipelinePath = resolved.pipelineId.includes('/')
+      ? `${resolved.pipelineId}.json`
+      : `pipelines/${resolved.pipelineId}.json`;
     const command = `node dist/scripts/run_pipeline.js --input ${pipelinePath}`;
     let output = '';
     try {

@@ -24,7 +24,7 @@ This is the deliverable of **Phase C'-1** in `docs/PRODUCTIZATION_ROADMAP.md`.
 | File | Reason |
 |---|---|
 | `LEGEND.md` | Project lore / storytelling. Not operational. |
-| `PERFORMANCE_DASHBOARD.md` | Self-declared "historical pre-manifest skill telemetry snapshot". Current telemetry source is `knowledge/public/orchestration/global_actuator_index.json`. |
+| `PERFORMANCE_DASHBOARD.md` | Self-declared "historical pre-manifest skill telemetry snapshot". Current telemetry source is `knowledge/product/orchestration/global_actuator_index.json`. |
 | `CONCEPT_INTEGRATION_BACKLOG.md` | Workflow tracking. Most P0/P1 items completed by 2026-04-20; remaining tracked in `docs/PRODUCTIZATION_ROADMAP.md`. |
 | `sample_design.md`, `sample_req.md` | One-line stubs. Real samples now under `templates/verticals/` and `pipelines/`. |
 
@@ -49,7 +49,7 @@ This is the deliverable of **Phase C'-1** in `docs/PRODUCTIZATION_ROADMAP.md`.
 | `docs/playbooks/creative-whiteboard.md` | `docs/developer/playbooks/creative-whiteboard.md` |
 | `docs/design/CHRONOS_A2UI_SPEC.md` | `docs/developer/design/CHRONOS_A2UI_SPEC.md` |
 
-References updated in: `docs/COMPONENT_MAP.md`, `docs/GLOSSARY.md`, `docs/INTENT_LOOP_CONCEPT.md`, `docs/PRODUCTIZATION_ROADMAP.md`, `docs/developer/README.md`, `knowledge/public/architecture/{decision-support-design-rationale,hardening-backlog,kyberion-concept-evaluation-2026-04-26}.md`, `knowledge/public/governance/pipelines/modeling-graph.json`, `knowledge/public/roles/{performance_engineer,product_manager}/PROCEDURE.md`.
+References updated in: `docs/COMPONENT_MAP.md`, `docs/GLOSSARY.md`, `docs/INTENT_LOOP_CONCEPT.md`, `docs/PRODUCTIZATION_ROADMAP.md`, `docs/developer/README.md`, `knowledge/product/architecture/{decision-support-design-rationale,hardening-backlog,kyberion-concept-evaluation-2026-04-26}.md`, `knowledge/product/governance/pipelines/modeling-graph.json`, `knowledge/product/roles/{performance_engineer,product_manager}/PROCEDURE.md`.
 
 ## 2. Audience classification of root-level `docs/` files
 
@@ -112,7 +112,7 @@ The 700+ files in `knowledge/public/` are **system-referenced** (loaded by Wisdo
 | `templates/` | 56 | Mix of templates and reference docs. |
 | `external-wisdom/` | 39 | Imported from external sources. Treat as read-only library. |
 
-### 3.1 `knowledge/public/architecture/` — candidates for spot-check
+### 3.1 `knowledge/product/architecture/` — candidates for spot-check
 
 Files with names suggesting "snapshot at a point in time" or one-off evaluation:
 
@@ -140,7 +140,7 @@ Files with names suggesting "snapshot at a point in time" or one-off evaluation:
 
 - **Move root-level `docs/*.md` to user/operator/developer/ when reference churn is acceptable.** Move plan: `INITIALIZATION.md` → `operator/`, `USE_CASES.md` → `user/`, `OPERATOR_UX_GUIDE.md` → `operator/`, `COMPONENT_MAP.md` → `developer/`, `GLOSSARY.md` → `developer/`, `INTENT_LOOP_CONCEPT.md` → `developer/`, `PACKAGING_CONTRACT.md` → `developer/`, `USER_EXPERIENCE_CONTRACT.md` → `developer/`, `DOCUMENTATION_LOCALIZATION_POLICY.md` → `developer/`, `ROADMAP_ENGINE_REFINEMENT.md` → `developer/`. Each move requires updating cross-refs.
 - **Keep `USE_CASES.md` canonical and trim the other two scenario docs to audience-specific views.** The new `SCENARIO_CATALOG.md` should be the navigation entry point.
-- **Cut date for `knowledge/public/architecture/`** — pick a date (e.g. 2026-01-01) and archive snapshot-style docs older than that.
+- **Cut date for `knowledge/product/architecture/`** — pick a date (e.g. 2026-01-01) and archive snapshot-style docs older than that.
 - **Test-emitter discipline** — mirror the value-threshold pattern from `promoted-memory.ts` to any other generator that writes into committed `knowledge/public/`.
 
 ## 5. Numbers

@@ -1,0 +1,42 @@
+{
+  "action": "pipeline",
+  "name": "intuition-capture",
+  "version": "2.0.0",
+  "description": "Records a CEO gut decision as a heuristic-entry under knowledge/confidential/heuristics/. Driven by the 3-question Intuition Capture Protocol (anchor, vetoed options, analogy). Pure-logic — no LLM required. See knowledge/product/orchestration/intuition-capture-protocol.md.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "decision": "",
+    "anchor": "",
+    "analogy": "",
+    "vetoed_options": [],
+    "trigger": "explicit_gut_flag",
+    "tags": []
+  },
+  "steps": [
+    {
+      "id": "record_heuristic",
+      "role": "source",
+      "op": "wisdom:capture_intuition",
+      "produces": { "channel": "captured", "type": "HeuristicEntry" },
+      "params": {
+        "decision": "{{decision}}",
+        "anchor": "{{anchor}}",
+        "analogy": "{{analogy}}",
+        "vetoed_options_from": "vetoed_options",
+        "mission_id": "{{mission_id}}",
+        "trigger": "{{trigger}}",
+        "tags_from": "tags"
+      }
+    },
+    {
+      "id": "log_completion",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "captured",
+      "params": {
+        "message": "Heuristic captured: {{captured.id}} at {{captured.written_to}}"
+      }
+    }
+  ]
+}

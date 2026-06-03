@@ -478,7 +478,7 @@ describe('media-generation-actuator', () => {
   it('emits voice-generation-adf requests that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/public/schemas/voice-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/product/schemas/voice-generation-adf.schema.json'));
 
     expect(validate({
       action: 'generate_voice',

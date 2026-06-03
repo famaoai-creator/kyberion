@@ -6,9 +6,9 @@ import { withExecutionContext } from '@agent/core/governance';
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
 
-const SCHEMA_PATH = pathResolver.rootResolve('knowledge/public/schemas/service-endpoints.schema.json');
-const DIRECTORY = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
-const SNAPSHOT_PATH = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints.json');
+const SCHEMA_PATH = pathResolver.rootResolve('knowledge/product/schemas/service-endpoints.schema.json');
+const DIRECTORY = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints');
+const SNAPSHOT_PATH = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints.json');
 
 type ServiceEndpointPayload = {
   default_pattern: string;

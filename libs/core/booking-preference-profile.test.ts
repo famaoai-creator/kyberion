@@ -19,11 +19,11 @@ describe('booking-preference-profile schema', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/public/schemas/booking-preference-profile.schema.json')
+      path.resolve(root, 'knowledge/product/schemas/booking-preference-profile.schema.json')
     );
     const example = JSON.parse(
       safeReadFile(
-        path.resolve(root, 'knowledge/public/schemas/booking-preference-profile.example.json'),
+        path.resolve(root, 'knowledge/product/schemas/booking-preference-profile.example.json'),
         {
           encoding: 'utf8',
         }
@@ -39,7 +39,7 @@ describe('booking-preference-profile schema', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/public/schemas/booking-preference-profile.schema.json')
+      path.resolve(root, 'knowledge/product/schemas/booking-preference-profile.schema.json')
     );
 
     const invalid = {
@@ -60,7 +60,7 @@ describe('booking-preference-profile schema', () => {
     const root = process.cwd();
     const profile = JSON.parse(
       safeReadFile(
-        path.resolve(root, 'knowledge/public/schemas/booking-preference-profile.example.json'),
+        path.resolve(root, 'knowledge/product/schemas/booking-preference-profile.example.json'),
         {
           encoding: 'utf8',
         }

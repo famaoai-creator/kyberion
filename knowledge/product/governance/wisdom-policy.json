@@ -1,0 +1,69 @@
+{
+  "$schema": "https://kyberion.local/schemas/wisdom-policy.schema.json",
+  "version": "2.0.0",
+  "name": "Global Wisdom Distillation Policy",
+  "description": "Rules for automated insight extraction and knowledge evolution.",
+  "llm": {
+    "profiles": {
+      "heavy": {
+        "description": "Deep reasoning — distillation, architectural review",
+        "command": "codex",
+        "adapter": "codex-cli",
+        "args": [],
+        "timeout_ms": 180000,
+        "response_format": "json_envelope"
+      },
+      "standard": {
+        "description": "General purpose — validation, summarization",
+        "command": "gemini",
+        "adapter": "gemini-cli",
+        "args": [],
+        "timeout_ms": 120000,
+        "response_format": "json_envelope"
+      },
+      "light": {
+        "description": "Fast, low-cost — tagging, classification",
+        "command": "codex",
+        "adapter": "codex-cli",
+        "args": [],
+        "timeout_ms": 30000,
+        "response_format": "json_envelope"
+      }
+    },
+    "purpose_map": {
+      "distill":   "heavy",
+      "validate":  "standard",
+      "summarize": "light",
+      "classify":  "light"
+    },
+    "default_profile": "standard"
+  },
+  "rules": [
+    {
+      "id": "RULE-W001",
+      "trigger": "mission_completion",
+      "action": "distill_mission",
+      "target_tier": "confidential",
+      "output_dir": "knowledge/product/evolution"
+    },
+    {
+      "id": "RULE-W002",
+      "trigger": "scheduled_weekly",
+      "action": "distill_ledger",
+      "target_tier": "public",
+      "output_dir": "knowledge/product/evolution"
+    },
+    {
+      "id": "RULE-W003",
+      "trigger": "manual_archive",
+      "action": "distill_archives",
+      "target_tier": "public",
+      "output_dir": "knowledge/operations"
+    }
+  ],
+  "tier_mapping": {
+    "public": "knowledge/product/evolution",
+    "confidential": "knowledge/product/evolution",
+    "personal": "vault/private/wisdom"
+  }
+}

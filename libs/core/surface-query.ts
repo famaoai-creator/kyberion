@@ -45,9 +45,9 @@ export interface SurfaceQueryProviderContext {
 
 export type SurfaceQueryIntent = 'weather' | 'location' | 'web_search' | 'knowledge_search' | null;
 
-const DEFAULT_CONFIG_PATH = pathResolver.knowledge('public/presence/surface-query-providers.json');
+const DEFAULT_CONFIG_PATH = pathResolver.knowledge('product/presence/surface-query-providers.json');
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/presence/surface-query-providers.json');
-const CONFIG_SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-query-providers.schema.json');
+const CONFIG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-query-providers.schema.json');
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });

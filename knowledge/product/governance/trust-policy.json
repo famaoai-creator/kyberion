@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "description": "Trust engine and kill switch parameters. All numeric thresholds and weights are read from here at runtime. Edit this file to tune trust scoring, decay, propagation, and anomaly detection without code changes.",
+  "scoring": {
+    "weights": {
+      "policyCompliance": 0.25,
+      "securityPosture": 0.25,
+      "outputQuality": 0.20,
+      "resourceEfficiency": 0.15,
+      "collaborationHealth": 0.15
+    },
+    "dimension_max": 200
+  },
+  "tier_thresholds": [
+    { "min_score": 900, "tier": "verified" },
+    { "min_score": 700, "tier": "trusted" },
+    { "min_score": 500, "tier": "standard" },
+    { "min_score": 300, "tier": "probationary" },
+    { "min_score": 0,   "tier": "untrusted" }
+  ],
+  "decay": {
+    "rate_per_hour": 2,
+    "floor": 100
+  },
+  "propagation": {
+    "factor": 0.3,
+    "max_depth": 2
+  },
+  "regime_shift": {
+    "threshold": 0.5
+  },
+  "anomaly_detection": {
+    "rapid_fire": {
+      "max_actions": 10,
+      "window_ms": 5000
+    },
+    "policy_violations": {
+      "max_violations": 3,
+      "window_ms": 600000
+    },
+    "trust_degradation": {
+      "min_drop_percent": 15,
+      "window_ms": 3600000
+    }
+  }
+}
