@@ -61,6 +61,8 @@ export interface MeetingActionResult {
   status: 'success' | 'error' | 'denied';
   platform?: string;
   method?: string;
+  /** Internal join backend label, e.g. `meeting-browser-driver`. */
+  join_backend?: string;
   message?: string;
   audit_event_id?: string;
   trace?: unknown;
@@ -301,6 +303,7 @@ function recordMeetingEvent(
         ...(isPartial ? { partial_state: true } : {}),
         ...(result.partial_reason ? { partial_reason: result.partial_reason } : {}),
         ...(result.transcript_path ? { transcript_path: result.transcript_path } : {}),
+        ...(result.join_backend ? { join_backend: result.join_backend } : {}),
       },
     });
     return entry.id;

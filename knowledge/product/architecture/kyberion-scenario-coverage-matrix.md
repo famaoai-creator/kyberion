@@ -103,12 +103,12 @@ the canonical surface(s) involved.
 
 | # | Scenario | Mechanism | Status |
 |---|---|---|---|
-| G1 | Microphone capture | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder` | ✅ |
-| G2 | STT (audio → text) | `SpeechToTextBridge` + `KYBERION_STT_COMMAND` | ✅ |
+| G1 | Microphone capture | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder` (capture boundary) | ✅ |
+| G2 | STT (audio → text) | `SpeechToTextBridge` + `KYBERION_STT_COMMAND` (bridge boundary) | ✅ |
 | G3 | Audio → requirements | `audio-to-requirements` | ✅ |
-| G4 | TTS / synthesis | `voice-engines/*.json` + `voice-engine-registry.json` snapshot + voice-actuator | ✅ |
+| G4 | TTS / synthesis | `voice-engines/*.json` + `voice-engine-registry.json` snapshot + `voice-actuator` + `AudioBus` | ✅ |
 | G5 | Voice profile management / promotion | `voice-profile-registry.json` + `promote-voice-profile.md` | ✅ |
-| G6 | Real-time meeting coaching | `real-time-coaching-protocol.md` + `meeting-actuator` (`join` / `leave` / `speak` / `listen` / `chat` / `status`) + `pipelines/meeting-proxy-workflow.json` | ✅ |
+| G6 | Real-time meeting coaching | `real-time-coaching-protocol.md` + `meeting-actuator` (`join` / `leave` / `speak` / `listen` / `chat` / `status`) + `meeting-browser-driver` + `AudioBus` + `pipelines/meeting-proxy-workflow.json` | ✅ |
 
 ## H. External validation (regulated finance)
 
@@ -154,7 +154,7 @@ the canonical surface(s) involved.
 | K2 | MOS read-only Web | 5 pages + `mos.read` events + tenant scope | ✅ |
 | K3 | Chronos-mirror-v2 (ambient display) | existing presence app | ✅ |
 | K4 | Mobile (handoff target) | iOS / Android WebView | ✅ |
-| K5 | Voice interactive | `a2a_roleplay` / `runRoleplaySession` + `pipelines/voice-recording-session.json` / `voice-learning-setup.json` / `voice-instant-clone.json` + `meeting-proxy-workflow.json` + `knowledge/agents/meeting-proxy.agent.md` template (per-operator instances under `knowledge/personal/agents/`) | ✅ |
+| K5 | Voice interactive | `a2a_roleplay` / `runRoleplaySession` + `pipelines/voice-recording-session.json` / `voice-learning-setup.json` / `voice-instant-clone.json` + `meeting-proxy-workflow.json` + `meeting-browser-driver` + `AudioBus` + `knowledge/product/agents/meeting-proxy.agent.md` template (per-operator instances under `knowledge/personal/agents/`) | ✅ |
 
 ## L. Developer / Platform engineer
 

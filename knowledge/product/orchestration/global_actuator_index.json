@@ -114,7 +114,7 @@
     {
       "n": "media-generation-actuator",
       "path": "libs/actuators/media-generation-actuator",
-      "d": "Generative image, video, music, and screen capture actuator",
+      "d": "Generative image, video, music, and screen-capture boundary",
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 10,
@@ -123,7 +123,7 @@
     {
       "n": "meeting-actuator",
       "path": "libs/actuators/meeting-actuator",
-      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+      "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet); browser join backend lives in meeting-browser-driver",
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 6,
@@ -132,7 +132,7 @@
     {
       "n": "meeting-browser-driver",
       "path": "libs/actuators/meeting-browser-driver",
-      "d": "Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Implements libs/core MeetingJoinDriver and writes captured audio to an AudioBus.",
+      "d": "Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Writes captured audio to an AudioBus.",
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 2
@@ -203,7 +203,7 @@
     {
       "n": "system-actuator",
       "path": "libs/actuators/system-actuator",
-      "d": "OS-level control, diagnostics, and short-lived local execution",
+      "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
       "version": "1.2.0",
       "capability_count": 3,
@@ -229,7 +229,7 @@
     {
       "n": "vision-actuator",
       "path": "libs/actuators/vision-actuator",
-      "d": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
+      "d": "Perception-oriented compatibility facade; inspect_image and ocr_image are the canonical public ops",
       "s": "implemented",
       "version": "1.3.0",
       "capability_count": 2,
@@ -238,7 +238,7 @@
     {
       "n": "voice-actuator",
       "path": "libs/actuators/voice-actuator",
-      "d": "Governed local voice generation actuator with native playback and artifact fallback",
+      "d": "Governed local voice synthesis, playback, and voice-profile workflows",
       "s": "implemented",
       "version": "1.2.0",
       "capability_count": 7,

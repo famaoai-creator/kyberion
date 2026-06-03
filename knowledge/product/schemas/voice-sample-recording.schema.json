@@ -10,7 +10,8 @@
     "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
     "language": { "type": "string", "minLength": 2 },
     "prompt_text": { "type": "string" },
-    "output_path": { "type": "string", "minLength": 1 }
+    "output_path": { "type": "string", "minLength": 1 },
+    "input_device_preference": { "type": "string", "minLength": 1 }
   },
   "required": ["action", "request_id", "sample_id", "duration_sec"]
 }

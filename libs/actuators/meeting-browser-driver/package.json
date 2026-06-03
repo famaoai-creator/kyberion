@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Playwright-based MeetingJoinDriver — drives Meet/Zoom/Teams pre-join UI to acquire a real meeting session, paired with an AudioBus for I/O.",
+  "description": "Internal Playwright MeetingJoinDriver for Meet/Zoom/Teams pre-join UI; exposes the meeting-browser-driver join_backend label and pairs with an AudioBus for I/O.",
   "main": "../../../dist/libs/actuators/meeting-browser-driver/src/index.js",
   "types": "../../../dist/libs/actuators/meeting-browser-driver/src/index.d.ts",
   "scripts": {

@@ -99,6 +99,51 @@ const mocks = vi.hoisted(() => ({
     },
   })),
   splitVoiceTextIntoChunks: vi.fn((text: string) => [text.slice(0, 5), text.slice(5)]),
+  createVirtualDeviceInventoryBridge: vi.fn(() => ({
+    bridge_id: 'virtual-device-inventory-bridge',
+    probe: vi.fn(async () => ({
+      bridge_id: 'virtual-device-inventory-bridge',
+      platform: 'darwin',
+      available: true,
+      inventory: {
+        audio_inputs: [],
+        audio_outputs: [
+          {
+            kind: 'audio-output',
+            name: 'Built-in Output',
+            platform: 'darwin',
+            source: 'system_profiler',
+            available: true,
+          },
+        ],
+        cameras: [],
+        virtual_audio_devices: [],
+        virtual_cameras: [],
+        notes: [],
+      },
+    })),
+  })),
+  createVirtualAudioOutputPlaybackBridge: vi.fn(() => ({
+    bridge_id: 'virtual-audio-output-playback-bridge',
+    probe: vi.fn(async () => ({
+      bridge_id: 'virtual-audio-output-playback-bridge',
+      platform: 'darwin',
+      available: true,
+      outputs: ['Built-in Output'],
+    })),
+    playOnOutputs: vi.fn(async (targets: string[], request?: { source_path?: string }) => ({
+      bridge_id: 'virtual-audio-output-playback-bridge',
+      platform: 'darwin',
+      outputs: (targets || []).map((target) => ({
+        device_name: target,
+        status: 'played',
+        source_path: request?.source_path || '/tmp/voice-playback.wav',
+        tone_path: request?.source_path || '/tmp/voice-playback.wav',
+        selected_backend: 'swift-output-switch',
+        output: 'played',
+      })),
+    })),
+  })),
   collectVoiceSamples: vi.fn((input: any) => ({
     status: 'succeeded',
     action: 'collect_voice_samples',
@@ -159,6 +204,8 @@ vi.mock('@agent/core', async () => {
     getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
     validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
     splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
+    createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
+    createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,
     collectVoiceSamples: mocks.collectVoiceSamples,
     recordVoiceSample: mocks.recordVoiceSample,
     logger: {
@@ -260,8 +307,13 @@ describe('voice actuator', () => {
       voice: 'Kyoko',
       rate: 180,
       resolved_engine_id: 'local_say',
+      mode: 'speaker_verification',
     }));
-    expect(mocks.safeExec).toHaveBeenCalledWith('espeak-ng', ['-v', 'ja', '-s', '260', 'hello world']);
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'espeak-ng',
+      expect.arrayContaining(['-v', 'ja', '-s', '260', '-w', expect.stringContaining('/tmp/voice-generation/'), 'hello world']),
+    );
+    expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
     expect(mocks.withRetry).toHaveBeenCalled();
   });
 
@@ -299,11 +351,20 @@ describe('voice actuator', () => {
       delivery_mode: 'artifact_and_playback',
     }));
     expect(result.artifact_refs).toEqual(['/tmp/voice-generation/req-1.wav']);
+    expect(result.speaker_verification).toEqual([
+      expect.objectContaining({
+        playback_source_path: '/tmp/voice-generation/req-1.wav',
+        verification: expect.objectContaining({
+          playback_source_path: '/tmp/voice-generation/req-1.wav',
+        }),
+      }),
+    ]);
     expect(result.progress_packets.length).toBeGreaterThan(0);
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'espeak-ng',
       ['-v', 'ja', '-s', '260', '-w', '/tmp/voice-generation/req-1.wav', 'hello world'],
     );
+    expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
     expect(mocks.withRetry).toHaveBeenCalled();
   });
 

@@ -30,9 +30,24 @@ export type AudioFormat = {
   channels: 1 | 2;
 };
 
+export type VideoFormat = {
+  /** JPEG by default for still/frame capture in the camera or screen stream bridge. */
+  mime_type: 'image/jpeg' | 'image/png';
+  width?: number;
+  height?: number;
+};
+
 export interface AudioChunk {
   format: AudioFormat;
   /** Raw frame bytes for `encoding`. */
+  payload: Uint8Array;
+  /** Monotonic millisecond timestamp from session start. */
+  ts_ms: number;
+}
+
+export interface VideoFrame {
+  format: VideoFormat;
+  /** Encoded image bytes for the frame. */
   payload: Uint8Array;
   /** Monotonic millisecond timestamp from session start. */
   ts_ms: number;

@@ -24,9 +24,39 @@ last_updated: 2026-03-06
 | **Ear (STT)**   | mlx-audio Whisper (Local) | Apple Silicon 最適化。オフライン高精度日本語認識。 |
 | **Brain (LLM)** | Kyberion Reasoning Backend | `KYBERION_REASONING_BACKEND` で切替（claude-cli / gemini-cli / anthropic）。 |
 | **Mouth (TTS)** | CosyVoice 2 / Fish Speech / Qwen3-TTS (mlx-audio) + macOS `say` fallback | ゼロショットクローン対応。Apache 2.0 ライセンス。Apple Silicon Metal 動作。 |
-| **AudioBus**    | BlackHole 2ch + SwitchAudioSource | TTS 出力 → 仮想マイク入力 → ブラウザ → 会議のルーティング。 |
+| **VirtualDeviceInventoryBridge** | system_profiler / ffmpeg / pactl scan | Scans host-visible audio/camera candidates before the bridge chooses a concrete backend. |
+| **VirtualAudioInputRecordingBridge** | ffmpeg avfoundation / sox default-input capture | Selects a concrete microphone input and records a short sample for voice capture and verification. |
+| **VirtualInputDeviceInventoryBridge** | hidutil / libinput / xinput scan | Scans host-visible keyboard/mouse candidates before OS automation chooses a concrete input route. |
+| **ScreenDisplayInventoryBridge** | system_profiler display scan / xrandr | Scans host-visible display candidates before screenshot and screen-recording choose a concrete display index. |
+| **VirtualAudioDeviceBridge** | BlackHole 2ch + SwitchAudioSource / PulseAudio routing | Owns device hookup / routing and selects the concrete audio bus. |
+| **VirtualAudioOutputPlaybackBridge** | macOS default-output switching + afplay | Temporarily routes a test tone or TTS artifact through each selected speaker so the output path can be verified. |
+| **AudioBus**    | BlackHole 2ch + SwitchAudioSource | PCM transport only. The bridge owns device hookup / routing; the bus moves audio between TTS, browser, and meeting surfaces. |
+| **ScreenCaptureBridge** | screencapture / import / focused-window capture | Owns screenshot and screen-frame capture. It is the screen-side analogue to the camera bridge. |
+| **ScreenRecordingBridge** | screen-frame capture + mp4 archive wrapper | Packages captured screen frames into mp4 without interpreting them. |
+| **VideoFrameBus** | camera / screen frame loopback / transport | Frame transport only. The capture bridge owns device hookup / routing; the bus moves frames to downstream consumers. |
+| **VideoFrameArchive** | ffmpeg mp4 encode/decode | Format boundary only. Converts frame streams to mp4 and back without adding meaning. |
+| **VirtualCameraInjectionBridge** | mp4/frame replay or OS-backed virtual camera sink | Owns the upstream path that accepts mp4 or frame streams and either replays them through the archive boundary or injects them into a concrete virtual camera sink. |
+| **VirtualMediaDeviceControlBridge** | inventory bridge + audio/camera bridge composition | Selects existing devices at runtime and returns host provisioning plans for add/remove flows. |
 
 詳細セットアップ: `knowledge/product/voice/meeting-voice-proxy-setup.md`
+
+Boundary note: microphone capture, voice playback, speaker routing, camera frame
+transport, and meeting entry are separate concerns. `voice-actuator`
+handles synthesis / playback / profiles, `SpeechToTextBridge` handles
+transcription, `AudioBus` handles PCM transport, `VideoFrameBus`
+handles camera/screen-frame transport, `VideoFrameArchive` handles mp4
+format conversion, `ScreenCaptureBridge` owns the downstream screen capture
+boundary, `ScreenRecordingBridge` owns the screen-recording wrapper,
+`VirtualCameraInjectionBridge` owns the upstream camera
+replay/injection boundary, `VirtualAudioDeviceBridge` owns the
+virtual-device hookup / bus selection, `VirtualAudioOutputPlaybackBridge`
+handles the speaker-verification tone path and TTS artifact playback path,
+`VirtualAudioInputRecordingBridge` handles microphone sample capture and
+verification path, `VirtualCameraBridge` owns camera capture / frame
+piping, `ScreenDisplayInventoryBridge` exposes display indices for screen
+capture / recording, and `meeting-browser-driver` handles the web-meeting join
+backend. `meeting-actuator` surfaces that backend as a `join_backend`
+label in its bridge/status payloads.
 
 ## 3. 音声コマンドの拡張
 

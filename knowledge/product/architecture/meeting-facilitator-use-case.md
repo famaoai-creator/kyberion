@@ -98,7 +98,8 @@ After every run, a summary is printed:
 | `wisdom:generate_reminder_message`             | Per-item reminder draft (channel + text)                                                                                                                                                                                          |
 | `wisdom:execute_self_action_items`             | Iterate `operator_self` pending items; dispatch via `delegateTask`; transition to completed / blocked                                                                                                                             |
 | `wisdom:track_pending_action_items`            | Iterate `team_member` pending items; emit reminders; record into the store                                                                                                                                                        |
-| `meeting-actuator` (existing, hardened)        | `join / leave / speak / listen / chat / status` with **voice consent gate** on `speak` and `meeting.<verb>` audit emission                                                                                                        |
+| `meeting-actuator` (existing, hardened)        | `join / leave / speak / listen / chat / status` with **voice consent gate** on `speak`, `meeting.<verb>` audit emission, and `join_backend` tagging for the internal browser backend                                                                                                        |
+| `meeting-browser-driver` (internal)            | Playwright join backend behind `meeting-actuator`; owns web-meeting entry while `AudioBus` carries captured audio                                                                                                               |
 | `pipelines/meeting-facilitation-workflow.json` | Stage 1 wiring                                                                                                                                                                                                                    |
 | `pipelines/action-item-execute-self.json`      | Stage 2 wiring                                                                                                                                                                                                                    |
 | `pipelines/action-item-tracking.json`          | Stage 3 wiring (cron-able)                                                                                                                                                                                                        |
@@ -115,9 +116,10 @@ The use case implies authority that the operator must explicitly delegate:
   the operator's voice. This is the load-bearing check; never bypass.
 - **Participation consent (`meeting:participate`)** — the live
   participation coordinator checks the same `voice-consent.json` before
-  recording/capture starts and re-checks before TTS speech. Missing,
-  revoked, expired, malformed, wrong-mission, or wrong-tenant consent
-  fails closed before audio capture or speech proceeds.
+  capture starts and re-checks before TTS speech. The capture path is
+  the browser join driver plus `AudioBus`; missing, revoked, expired,
+  malformed, wrong-mission, or wrong-tenant consent fails closed before
+  audio capture or speech proceeds.
 - **Dry-run before real meeting** — use
   `pnpm cli preview pipelines/meeting-proxy-workflow.json` and
   `pnpm run test:meeting-dry-run` to validate workflow structure,
@@ -143,7 +145,7 @@ The use case implies authority that the operator must explicitly delegate:
 | Failure                             | Detection                                                                   | Response                                                                          |
 | ----------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Voice consent missing on `speak`    | Returns `status: denied`; emits `meeting.speak_denied`                      | Operator records consent; rerun                                                   |
-| Bridge cannot join the meeting      | Returns `status: error`; emits `meeting.join_failed`                        | Investigate bridge / platform; rerun with `--skip-facilitate` after manual join   |
+| Bridge cannot join the meeting      | Returns `status: error`; emits `meeting.join_failed`                        | Investigate the meeting browser driver / platform; rerun with `--skip-facilitate` after manual join   |
 | LLM extracts zero action items      | `action_item_count = 0` in pipeline ctx; orchestrator summary shows total=0 | Re-run with longer `listen_duration_sec`; verify the transcript file is non-empty |
 | `delegateTask` fails on a self item | Item transitions to `blocked` with the error in `result_summary`            | Operator unblocks manually or re-runs `pipelines/action-item-execute-self.json`   |
 | Reminder dispatch sends duplicates  | `appendReminder` is idempotent on `(sent_at, channel)`                      | No remediation needed                                                             |
@@ -199,5 +201,5 @@ KYBERION_REASONING_BACKEND=claude-cli \
 - [`pipelines/action-item-execute-self.json`](pipelines/action-item-execute-self.json)
 - [`pipelines/action-item-tracking.json`](pipelines/action-item-tracking.json)
 - [`scripts/meeting_orchestrator.ts`](scripts/meeting_orchestrator.ts)
-- [`knowledge/agents/meeting-proxy.agent.md`](knowledge/public/agents/meeting-proxy.agent.md) — agent template
+- [`knowledge/product/agents/meeting-proxy.agent.md`](knowledge/product/agents/meeting-proxy.agent.md) — agent template
 - [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md) §3.6 — adjacent platform-extension intents

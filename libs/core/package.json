@@ -147,6 +147,62 @@
       "types": "./dist/os-automation.d.ts",
       "default": "./dist/os-automation.js"
     },
+    "./os-automation-bridge": {
+      "types": "./dist/os-automation-bridge.d.ts",
+      "default": "./dist/os-automation-bridge.js"
+    },
+    "./virtual-audio-device-bridge": {
+      "types": "./dist/virtual-audio-device-bridge.d.ts",
+      "default": "./dist/virtual-audio-device-bridge.js"
+    },
+    "./virtual-audio-output-playback-bridge": {
+      "types": "./dist/virtual-audio-output-playback-bridge.d.ts",
+      "default": "./dist/virtual-audio-output-playback-bridge.js"
+    },
+    "./virtual-audio-input-recording-bridge": {
+      "types": "./dist/virtual-audio-input-recording-bridge.d.ts",
+      "default": "./dist/virtual-audio-input-recording-bridge.js"
+    },
+    "./video-frame-bus": {
+      "types": "./dist/video-frame-bus.d.ts",
+      "default": "./dist/video-frame-bus.js"
+    },
+    "./video-frame-archive": {
+      "types": "./dist/video-frame-archive.d.ts",
+      "default": "./dist/video-frame-archive.js"
+    },
+    "./screen-capture-bridge": {
+      "types": "./dist/screen-capture-bridge.d.ts",
+      "default": "./dist/screen-capture-bridge.js"
+    },
+    "./screen-recording-bridge": {
+      "types": "./dist/screen-recording-bridge.d.ts",
+      "default": "./dist/screen-recording-bridge.js"
+    },
+    "./screen-display-inventory-bridge": {
+      "types": "./dist/screen-display-inventory-bridge.d.ts",
+      "default": "./dist/screen-display-inventory-bridge.js"
+    },
+    "./virtual-device-inventory-bridge": {
+      "types": "./dist/virtual-device-inventory-bridge.d.ts",
+      "default": "./dist/virtual-device-inventory-bridge.js"
+    },
+    "./virtual-input-device-inventory-bridge": {
+      "types": "./dist/virtual-input-device-inventory-bridge.d.ts",
+      "default": "./dist/virtual-input-device-inventory-bridge.js"
+    },
+    "./virtual-camera-bridge": {
+      "types": "./dist/virtual-camera-bridge.d.ts",
+      "default": "./dist/virtual-camera-bridge.js"
+    },
+    "./virtual-camera-injection-bridge": {
+      "types": "./dist/virtual-camera-injection-bridge.d.ts",
+      "default": "./dist/virtual-camera-injection-bridge.js"
+    },
+    "./virtual-media-device-control-bridge": {
+      "types": "./dist/virtual-media-device-control-bridge.d.ts",
+      "default": "./dist/virtual-media-device-control-bridge.js"
+    },
     "./config-fallback-registry": {
       "types": "./dist/config-fallback-registry.d.ts",
       "default": "./dist/config-fallback-registry.js"

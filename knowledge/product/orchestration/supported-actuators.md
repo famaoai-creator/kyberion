@@ -32,18 +32,18 @@ For day-to-day routing, start with the quick map below. The full catalog stays a
 | Actuator ID / 識別子 | Version / バージョン | Contract Schema / 契約スキーマ | Description (EN) | 説明 (JA) |
 | :--- | :---: | :--- | :--- | :--- |
 | **`agent-actuator`** | 1.0.0 | `agent-action.schema.json` | Meta-Actuator for managing agent lifecycles, sub-agents, and A2A routing. | エージェントのライフサイクル管理、サブエージェントの起動、および A2A 通信制御。 |
-| **`system-actuator`** | 1.2.0 | `system-pipeline.schema.json` | OS-level diagnostics, short-lived executions, clipboards, and screenshots. | OSレベルでのシステム診断、一時コマンド実行、クリップボード、画面キャプチャ。 |
+| **`system-actuator`** | 1.2.0 | `system-pipeline.schema.json` | OS control plane for diagnostics, input toggles, and short-lived OS actions. | OSレベルの制御プレーン。診断、入力切替、一時的な OS 操作を担当。 |
 | **`browser-actuator`** | 1.0.0 | `browser-pipeline.schema.json` | Pipeline-driven Playwright automated browser sessions and scraping. | Playwright を用いた Web ブラウザの自律巡回、データ抽出、およびセッション制御。 |
 | **`terminal-actuator`** | 1.0.0 | `-` | PTY-driven Terminal emulator for highly managed interactive shell operations. | PTY（擬似端末）を介した、安全に監視された対話型シェルセッションの操作。 |
 | **`process-actuator`** | 1.0.0 | `process-action.schema.json` | Background process supervisor, lifecycle hooks, and process management. | ランタイムスーパーバイザの管理下におけるプロセス生存期間の監視・制御。 |
 | **`secret-actuator`** | 1.1.0 | `secret-action.schema.json` | Bridge to OS native credential vaulting (e.g. macOS Keychain). | macOS キーチェーンなどの OS ネイティブなセキュア鍵ストアとのブリッジ。 |
 | **`service-actuator`** | 1.1.0 | `service-action.schema.json` | Unified external SaaS, REST API, and MCP server connectivity gateway. | 外部 SaaS、REST API、および MCP（Model Context Protocol）との中継接続。 |
-| **`voice-actuator`** | 1.2.0 | `voice-action.schema.json` | Text-to-Speech synthesis and cloned-voice generation with native playback. | ローカル音声合成（TTS）およびクローンボイスを用いたナレーション音声生成・再生。 |
+| **`voice-actuator`** | 1.2.0 | `voice-action.schema.json` | Local voice synthesis, playback, and voice-profile workflows. | ローカル音声合成（TTS）、再生、ボイスプロフィール管理。 |
 | **`video-composition-actuator`** | 1.0.0 | `-` | Deterministic video clip composition, slide-to-video, and audio muxing. | 音声ナレーション、画像、字幕テロップを結合した説明用動画の自動編集・作成。 |
-| **`media-generation-actuator`** | 1.1.0 | `media-generation-action.schema.json` | Generative image (DALL-E), music (Suno), video, and screen recording. | 生成AIを利用したメディア（画像・音楽・動画）の自律作成、および画面録画。 |
-| **`media-actuator`** | 1.1.0 | `media-pipeline.schema.json` | Partial slide text updating and asset updates using templates. | PowerPoint スライドやドキュメントテンプレートへの部分更新・差分適用。 |
-| **`meeting-actuator`** | 1.0.0 | `meeting-action.schema.json` | Abstracted online meeting bridge for Zoom, Teams, and Google Meet. | オンライン会議（Meet / Zoom / Teams）への接続、参加時間および制御の抽象化。 |
-| **`meeting-browser-driver`** | 1.0.0 | `-` | Playwright join driver for web meetings with real-time AudioBus capture. | オンライン会議への自動入室、および音声バスを介したリアルタイム会議音の取得。 |
+| **`media-generation-actuator`** | 1.1.0 | `media-generation-action.schema.json` | Generative image, video, music, and screen-capture boundary. | 画像・音楽・動画の生成と画面取得の境界。 |
+| **`media-actuator`** | 1.1.0 | `media-pipeline.schema.json` | Document and asset composition/rendering with template-aware updates. | ドキュメントとアセットの組版・レンダリング、およびテンプレート対応の更新。 |
+| **`meeting-actuator`** | 1.0.0 | `meeting-action.schema.json` | Abstracted online meeting bridge for Zoom, Teams, and Google Meet; browser join backend lives in `meeting-browser-driver`. | オンライン会議（Meet / Zoom / Teams）への接続、参加時間および制御の抽象化。ブラウザ入室は `meeting-browser-driver` に分離。 |
+| **`meeting-browser-driver`** | 1.0.0 | `-` | Internal Playwright join driver for web meetings with real-time AudioBus capture. | オンライン会議への内部ブラウザ入室ドライバと、音声バス経由の会議音取得。 |
 | **`code-actuator`** | 2.1.0 | `code-pipeline.schema.json` | ADF-driven code analysis, refactoring, and code generation parser. | ADF駆動のコードの構文解析、自動リファクタリング、およびコード生成。 |
 | **`modeling-actuator`** | 1.0.0 | `modeling-pipeline.schema.json` | Architectural analysis and ADF translation / conversion engine. | アーキテクチャ構成分析、システム構成図の生成、および ADF 設計図の相互変換。 |
 | **`network-actuator`** | 2.2.0 | `network-pipeline.schema.json` | ADF-driven secure HTTP fetch and signed A2A message transport pipelines. | ADF仕様に基づくセキュアな HTTP 通信および署名付きピア間通信の実行。 |
@@ -57,8 +57,7 @@ For day-to-day routing, start with the quick map below. The full catalog stays a
 | **`android-actuator`** | 1.1.0 | `mobile-device-pipeline.schema.json` | Android device control, ADB commands, UI tree parsing, and testing. | Androidエミュレータ/実機の自動操作、ADB操作、UI構造解析、自律テスト。 |
 | **`ios-actuator`** | 1.1.0 | `mobile-device-pipeline.schema.json` | Xcode simulator (`simctl`) management, iOS UI automated testing. | iOSシミュレータの起動、Xcode `simctl` 連携、iOS上でのUI自動テスト。 |
 | **`blockchain-actuator`** | 1.0.0 | `blockchain-action.schema.json` | Cryptographic evidence anchoring and immutable ledger registration. | 生成された成果物のハッシュ署名をブロックチェーンに書き込む監査証跡システム。 |
-| **`vision-actuator`** | 1.3.0 | `vision-action.schema.json` | Visual perception, OCR, object detection, and layout describe facade. | エージェントの視覚認知（OCR、オブジェクト検出、レイアウト要素解説等）。 |
-| **`calendar-actuator`** | 1.0.0 | `calendar-action.schema.json` | macOS Calendar.app scheduling and coordination via JXA scripts. | macOS「カレンダー.app」の読み書き、イベント調整、およびスケジュール調整。 |
+| **`vision-actuator`** | 1.3.0 | `vision-action.schema.json` | Perception-oriented compatibility facade; inspect_image and ocr_image are the canonical public ops. | 視覚認識向けの互換ファサード。公開 op は inspect_image / ocr_image を中心に維持。 |
 
 ---
 

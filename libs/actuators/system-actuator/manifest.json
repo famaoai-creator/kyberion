@@ -1,7 +1,7 @@
 {
   "actuator_id": "system-actuator",
   "version": "1.2.0",
-  "description": "OS-level control, diagnostics, and short-lived local execution",
+  "description": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
   "contract_schema": "schemas/system-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -18,6 +18,17 @@
   "capabilities": [
     { "op": "pipeline", "schema_ref": "schemas/system-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list_input_devices", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list_media_devices", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "control_media_devices", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_audio_outputs", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_audio_inputs", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_screen_stream", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_screen_mp4_roundtrip", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_camera_stream", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_camera_mp4_roundtrip", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "test_camera_injection", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

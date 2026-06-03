@@ -27,6 +27,7 @@ import {
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
 import { classifyTaskSessionIntent, createTaskSession, saveTaskSession, updateTaskSession, getActiveTaskSession } from './task-session.js';
 import type { TaskSession } from './task-session.js';
+import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
@@ -875,6 +876,64 @@ async function handleTaskSessionRoute(
     (session.task_type === 'browser' ||
       session.task_type === 'report_document' ||
       session.task_type === 'document_generation');
+
+  const shouldExecuteCapturePhotoTask =
+    session.requirements?.missing?.length === 0 && session.task_type === 'capture_photo';
+
+  if (shouldExecuteCapturePhotoTask) {
+    try {
+      const result = await executeCapturePhotoTaskSession({
+        session,
+        queryText,
+      });
+      if (intent.intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intent.intentId,
+          execution_shape: result.session.work_loop?.resolution.execution_shape || 'task_session',
+          contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
+          success: true,
+          context_fingerprint: {
+            execution_shape: result.session.work_loop?.resolution.execution_shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      return emptySurfaceResult(
+        buildTaskSessionReply({
+          session: result.session,
+          status: 'completed',
+          summary: summarizeUserFacingText(result.output) || result.session.artifact?.preview_text || '(no summary available)',
+          outputPath: result.outputPath,
+          intentId: intent.intentId,
+        }),
+      );
+    } catch (error: any) {
+      logger.warn(
+        `[SURFACE] capture_photo task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`,
+      );
+      if (intent.intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intent.intentId,
+          execution_shape: session.work_loop?.resolution.execution_shape || 'task_session',
+          contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: session.work_loop?.resolution.execution_shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      return emptySurfaceResult(
+        buildTaskSessionReply({
+          session,
+          status: 'failed',
+          error: error?.message || String(error),
+          intentId: intent.intentId,
+        }),
+      );
+    }
+  }
 
   if (shouldExecuteClaudeTask) {
     try {

@@ -77,4 +77,16 @@ describe('execution-brief', () => {
     expect(brief.workflow_steps?.[4]?.requires_confirmation).toBe(true);
     expect(brief.readiness_reason).toContain('review pending items');
   });
+
+  it('routes capture_photo briefs through the virtual camera bridge boundary', () => {
+    const brief = buildFallbackExecutionBrief({
+      requestText: '記録用に写真を1枚撮って',
+      taskType: 'capture_photo',
+    });
+
+    expect(brief.archetype_id).toBe('capture_photo-execution');
+    expect(brief.target_actuators).toContain('virtual-camera-bridge');
+    expect(brief.target_actuators).toContain('vision-actuator');
+    expect(brief.target_actuators).toContain('artifact-actuator');
+  });
 });

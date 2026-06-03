@@ -258,7 +258,7 @@ function inferTargetActuators(seed: ExecutionBriefSeed): string[] {
   if (taskType === 'service_operation') return ['task-session-manager', 'service-orchestrator'];
   if (taskType === 'analysis') return ['analysis-engine', 'knowledge-retriever'];
   if (taskType === 'browser') return ['browser-actuator', 'web-retriever'];
-  if (taskType === 'capture_photo') return ['camera-actuator', 'media-ingest'];
+  if (taskType === 'capture_photo') return ['virtual-camera-bridge', 'vision-actuator', 'artifact-actuator'];
   if (taskType === 'workbook_wbs') return ['workbook-builder', 'spreadsheet-actuator'];
   if (isScheduleAgendaRead(seed)) return ['calendar-actuator', 'service-actuator'];
   if (isApprovalWorkflowRequest(seed.requestText)) return ['browser-actuator', 'approval-actuator', 'service-actuator'];
@@ -714,6 +714,11 @@ export function buildExecutionBriefFromGuidedCoordinationBrief(
   if (isProjectBootstrapRequest(seed.requestText)) {
     targetActuators = ['orchestrator-actuator', 'artifact-actuator', 'wisdom-actuator'];
     deliverables = ['project_created'];
+  }
+
+  if (seed.taskType === 'capture_photo') {
+    targetActuators = ['virtual-camera-bridge', 'vision-actuator', 'artifact-actuator'];
+    deliverables = ['artifact:image'];
   }
 
   return {

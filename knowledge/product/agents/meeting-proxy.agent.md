@@ -52,7 +52,7 @@ A concrete instance must declare:
 
 ## Tier placement
 
-- **Template (this file)** lives in `knowledge/agents/`.
+- **Template (this file)** lives in `knowledge/product/agents/`.
 - **Per-operator instance** (`{operator-slug}.agent.md`) lives in
   `knowledge/personal/agents/`.
 - **Per-tenant instance** lives in
@@ -81,4 +81,4 @@ operator's voice and identity are personal data.
 - [`pipelines/voice-recording-session.json`](../../pipelines/voice-recording-session.json)
 - [`pipelines/voice-learning-setup.json`](../../pipelines/voice-learning-setup.json)
 - [`pipelines/voice-instant-clone.json`](../../pipelines/voice-instant-clone.json)
-- [`knowledge/product/governance/voice-profile-registry.json`](../public/governance/voice-profile-registry.json)
+- [`knowledge/product/governance/voice-profile-registry.json`](../governance/voice-profile-registry.json)
