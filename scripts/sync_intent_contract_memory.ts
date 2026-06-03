@@ -7,10 +7,10 @@ const ajv = new AjvCtor({ allErrors: true });
 
 const MEMORY_SCHEMA_PATH =
   process.env.KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH
-  || pathResolver.knowledge('public/schemas/intent-contract-memory.schema.json');
+  || pathResolver.knowledge('product/schemas/intent-contract-memory.schema.json');
 const SEED_PATH =
   process.env.KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH
-  || pathResolver.knowledge('public/governance/intent-contract-memory.json');
+  || pathResolver.knowledge('product/governance/intent-contract-memory.json');
 const RUNTIME_PATH =
   process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH
   || pathResolver.shared('runtime/intent-contract-memory.json');

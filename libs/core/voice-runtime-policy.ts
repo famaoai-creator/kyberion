@@ -30,7 +30,7 @@ export interface VoiceRuntimePolicy {
   };
 }
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('public/governance/voice-runtime-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/voice-runtime-policy.json');
 
 const FALLBACK_POLICY: VoiceRuntimePolicy = {
   version: 'fallback',

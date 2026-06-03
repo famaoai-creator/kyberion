@@ -1,19 +1,20 @@
 {
   "action": "pipeline",
   "name": "System Tool Diagnostics",
+  "version": "2.0.0",
   "description": "Checks for external binary dependencies using system:cli_health_check.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "steps": [
-    { "op": "system:log", "params": { "message": "🔍 Diagnosing External Tool Dependencies..." } },
-    { "op": "system:cli_health_check", "params": { "command": "node", "export_as": "h_node" } },
-    { "op": "system:cli_health_check", "params": { "command": "npm", "export_as": "h_npm" } },
-    { "op": "system:cli_health_check", "params": { "command": "git", "export_as": "h_git" } },
-    { "op": "system:cli_health_check", "params": { "command": "gh", "export_as": "h_gh" } },
-    { "op": "system:cli_health_check", "params": { "command": "python3", "export_as": "h_python" } },
-    
-    { "op": "system:log", "params": { "message": "✅ [FOUND] node: {{h_node.stdout}}" } },
-    { "op": "system:log", "params": { "message": "✅ [FOUND] npm:  {{h_npm.stdout}}" } },
-    { "op": "system:log", "params": { "message": "✅ [FOUND] git:  {{h_git.stdout}}" } },
-    { "op": "system:log", "params": { "message": "✅ [FOUND] gh:   {{h_gh.stdout}}" } },
-    { "op": "system:log", "params": { "message": "✅ [FOUND] python: {{h_python.stdout}}" } }
+    { "role": "sink", "op": "system:log", "params": { "message": "🔍 Diagnosing External Tool Dependencies..." } },
+    { "role": "source", "op": "system:cli_health_check", "produces": { "channel": "h_node", "type": "HealthCheck" }, "params": { "command": "node" } },
+    { "role": "source", "op": "system:cli_health_check", "produces": { "channel": "h_npm", "type": "HealthCheck" }, "params": { "command": "npm" } },
+    { "role": "source", "op": "system:cli_health_check", "produces": { "channel": "h_git", "type": "HealthCheck" }, "params": { "command": "git" } },
+    { "role": "source", "op": "system:cli_health_check", "produces": { "channel": "h_gh", "type": "HealthCheck" }, "params": { "command": "gh" } },
+    { "role": "source", "op": "system:cli_health_check", "produces": { "channel": "h_python", "type": "HealthCheck" }, "params": { "command": "python3" } },
+    { "role": "sink", "op": "system:log", "consumes": "h_node", "params": { "message": "✅ [FOUND] node: {{h_node.stdout}}" } },
+    { "role": "sink", "op": "system:log", "consumes": "h_npm", "params": { "message": "✅ [FOUND] npm:  {{h_npm.stdout}}" } },
+    { "role": "sink", "op": "system:log", "consumes": "h_git", "params": { "message": "✅ [FOUND] git:  {{h_git.stdout}}" } },
+    { "role": "sink", "op": "system:log", "consumes": "h_gh", "params": { "message": "✅ [FOUND] gh:   {{h_gh.stdout}}" } },
+    { "role": "sink", "op": "system:log", "consumes": "h_python", "params": { "message": "✅ [FOUND] python: {{h_python.stdout}}" } }
   ]
 }

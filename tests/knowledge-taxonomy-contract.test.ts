@@ -9,10 +9,10 @@ const rootDir = process.cwd();
 describe('Knowledge taxonomy contract', () => {
   it('validates the knowledge taxonomy manifest against its schema', () => {
     const schema = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/schemas/knowledge-taxonomy.schema.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/schemas/knowledge-taxonomy.schema.json'), { encoding: 'utf8' }) as string,
     );
     const taxonomy = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/governance/knowledge-taxonomy.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/governance/knowledge-taxonomy.json'), { encoding: 'utf8' }) as string,
     );
     const ajv = new Ajv({ allErrors: true });
     const validate = ajv.compile(schema);
@@ -22,19 +22,19 @@ describe('Knowledge taxonomy contract', () => {
 
   it('covers the primary public knowledge categories with taxonomy defaults', () => {
     const taxonomy = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/governance/knowledge-taxonomy.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/governance/knowledge-taxonomy.json'), { encoding: 'utf8' }) as string,
     ) as {
       directory_defaults: Array<{ path_prefix: string; kind: string }>;
     };
 
     const coveredPrefixes = new Set(taxonomy.directory_defaults.map(entry => entry.path_prefix));
-    expect(coveredPrefixes.has('knowledge/public/governance/')).toBe(true);
+    expect(coveredPrefixes.has('knowledge/product/governance/')).toBe(true);
     expect(coveredPrefixes.has('knowledge/public/standards/')).toBe(true);
-    expect(coveredPrefixes.has('knowledge/public/architecture/')).toBe(true);
+    expect(coveredPrefixes.has('knowledge/product/architecture/')).toBe(true);
     expect(coveredPrefixes.has('knowledge/public/procedures/')).toBe(true);
-    expect(coveredPrefixes.has('knowledge/public/roles/')).toBe(true);
-    expect(coveredPrefixes.has('knowledge/public/capability-assets/')).toBe(true);
-    expect(coveredPrefixes.has('knowledge/public/incidents/')).toBe(true);
+    expect(coveredPrefixes.has('knowledge/product/roles/')).toBe(true);
+    expect(coveredPrefixes.has('knowledge/product/capability-assets/')).toBe(true);
+    expect(coveredPrefixes.has('knowledge/product/incidents/')).toBe(true);
   });
 
   it('does not leave legacy skill vocabulary in the active taxonomy and governance path', () => {

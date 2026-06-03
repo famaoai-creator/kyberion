@@ -17,8 +17,8 @@ export interface TrackerSheetPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/tracker-sheet-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/tracker-sheet-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/tracker-sheet-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/tracker-sheet-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: TrackerSheetPolicyCatalog | null = null;

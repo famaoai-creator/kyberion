@@ -71,7 +71,7 @@ interface OrchestratorAction {
   };
 }
 
-const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge('public/orchestration/actuator-request-archetypes.json');
+const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge('product/orchestration/actuator-request-archetypes.json');
 const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/orchestrator-actuator/manifest.json');
 const DEFAULT_ORCHESTRATOR_RETRY = {
   maxRetries: 2,
@@ -936,7 +936,7 @@ function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
           title: 'Collect runtime and integrity status',
           actuator: 'orchestrator-actuator',
           template_path: 'libs/actuators/orchestrator-actuator/examples/request-to-status-report.json',
-          recommended_procedure: 'knowledge/public/orchestration/actuator-intent-normalization.md',
+          recommended_procedure: 'knowledge/product/orchestration/actuator-intent-normalization.md',
           parameter_overrides: {
             'context.request_text': '{{request_text}}',
           },
@@ -968,7 +968,7 @@ function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
           title: 'Generate UI flow and browser execution plan',
           actuator: 'modeling-actuator',
           template_path: 'libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json',
-          recommended_procedure: 'knowledge/public/orchestration/design-clone-delivery-flow.md',
+          recommended_procedure: 'knowledge/product/orchestration/design-clone-delivery-flow.md',
           parameter_overrides: {
             'steps[0].params.path': '{{web_profile_path}}',
             'steps[3].params.handoff_output_path': 'active/shared/tmp/browser/{{delivery_pack_id}}-handoff.json',
@@ -1065,8 +1065,8 @@ function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
           id: 'instantiate-project-os',
           title: 'Instantiate project operating system scaffold',
           actuator: 'orchestrator-actuator',
-          template_path: 'knowledge/public/orchestration/project-operating-system.md',
-          recommended_procedure: 'knowledge/public/orchestration/project-operating-system.md',
+          template_path: 'knowledge/product/orchestration/project-operating-system.md',
+          recommended_procedure: 'knowledge/product/orchestration/project-operating-system.md',
           parameter_overrides: {
             project_name: '{{project_name}}',
           },
@@ -1094,7 +1094,7 @@ function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[] {
           title: 'Normalize request and prepare governed delivery pack',
           actuator: 'artifact-actuator',
           template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
-          recommended_procedure: 'knowledge/public/orchestration/actuator-intent-normalization.md',
+          recommended_procedure: 'knowledge/product/orchestration/actuator-intent-normalization.md',
           parameter_overrides: {
             'params.packId': '{{delivery_pack_id}}',
             'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
@@ -1703,7 +1703,7 @@ async function opApply(op: string, params: any, ctx: any) {
  * Strategic Reconciliation
  */
 async function performReconcile(input: OrchestratorAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/orchestration-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/orchestration-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {

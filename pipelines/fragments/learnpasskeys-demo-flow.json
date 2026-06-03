@@ -1,8 +1,9 @@
 {
-  "pipeline_id": "learnpasskeys-demo-flow",
-  "version": "1.0.0",
-  "description": "Full passkey lifecycle demo on learnpasskeys.io using my-evaluation-profile in headed mode.",
   "action": "pipeline",
+  "name": "learnpasskeys-demo-flow",
+  "version": "2.0.0",
+  "description": "Full passkey lifecycle demo on learnpasskeys.io using my-evaluation-profile in headed mode.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "options": {
     "headless": false,
     "user_data_dir": "active/shared/runtime/browser/profiles/my-evaluation-profile",
@@ -12,10 +13,11 @@
   },
   "steps": [
     {
-      "type": "control",
+      "id": "setup_passkey_authenticator",
+      "role": "source",
       "op": "setup_passkey_authenticator",
+      "produces": { "channel": "passkey_auth", "type": "AuthenticatorResult" },
       "params": {
-        "export_as": "passkey_auth",
         "protocol": "ctap2",
         "transport": "internal",
         "has_resident_key": true,
@@ -23,201 +25,240 @@
       }
     },
     {
-      "type": "apply",
+      "id": "log_create_nav",
+      "role": "sink",
       "op": "log",
       "params": { "message": "ナビゲーション：パスキーの作成ページ" }
     },
     {
-      "type": "capture",
+      "id": "goto_create",
+      "role": "sink",
       "op": "goto",
       "params": { "url": "https://learnpasskeys.io/ja/demo/create" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_create_nav",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 2000 }
     },
     {
-      "type": "capture",
+      "id": "accept_cookies",
+      "role": "sink",
       "op": "evaluate",
       "params": {
         "script": "document.querySelectorAll('button').forEach(b => { if(b.innerText.includes('Accept All')) b.click(); });"
       }
     },
     {
-      "type": "apply",
+      "id": "wait_after_cookies",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1000 }
     },
     {
-      "type": "apply",
+      "id": "click_show_register",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('登録方法を見る')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_show_register",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1000 }
     },
     {
-      "type": "apply",
+      "id": "click_select_data",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('データを選択')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_select_data",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1000 }
     },
     {
-      "type": "apply",
+      "id": "click_gen_register_options",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('登録オプションを生成')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_gen_register_options",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1500 }
     },
     {
-      "type": "apply",
+      "id": "click_use_register_options",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('登録オプションを使用')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_use_register_options",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1500 }
     },
     {
-      "type": "apply",
+      "id": "click_start_credential_creation",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('認証情報の作成を開始')" }
     },
     {
-      "type": "apply",
+      "id": "wait_credential_creation",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 3000 }
     },
     {
-      "type": "apply",
+      "id": "click_send_attestation",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('アテステーション レスポンスを送信')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_attestation",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 2000 }
     },
     {
-      "type": "apply",
+      "id": "log_create_done",
+      "role": "sink",
       "op": "log",
       "params": { "message": "パスキーの作成完了。続いて読み取り（認証）ページへ遷移します。" }
     },
     {
-      "type": "capture",
+      "id": "goto_read",
+      "role": "sink",
       "op": "goto",
       "params": { "url": "https://learnpasskeys.io/ja/demo/read" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_read_nav",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 2000 }
     },
     {
-      "type": "apply",
+      "id": "click_show_auth",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('認証方法を見る')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_show_auth",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1000 }
     },
     {
-      "type": "apply",
+      "id": "click_gen_auth_options",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('認証オプションを生成')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_gen_auth_options",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1500 }
     },
     {
-      "type": "apply",
+      "id": "click_use_auth_options",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('認証オプションを使用')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_use_auth_options",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1500 }
     },
     {
-      "type": "apply",
+      "id": "click_signin_passkey",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('パスキーでサインイン')" }
     },
     {
-      "type": "apply",
+      "id": "wait_signin",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 3000 }
     },
     {
-      "type": "apply",
+      "id": "click_verify_auth_response",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('認証レスポンスを検証')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_verify",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 2000 }
     },
     {
-      "type": "apply",
+      "id": "log_auth_done",
+      "role": "sink",
       "op": "log",
       "params": { "message": "パスキー認証完了。続いてデータ削除ページへ遷移します。" }
     },
     {
-      "type": "capture",
+      "id": "goto_delete",
+      "role": "sink",
       "op": "goto",
       "params": { "url": "https://learnpasskeys.io/ja/demo/delete" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_delete_nav",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 2000 }
     },
     {
-      "type": "capture",
+      "id": "click_show_delete",
+      "role": "sink",
       "op": "evaluate",
       "params": {
         "script": "document.querySelectorAll('button').forEach(b => { if(b.innerText.includes('削除方法を見る')) b.click(); });"
       }
     },
     {
-      "type": "apply",
+      "id": "wait_after_show_delete",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 1000 }
     },
     {
-      "type": "apply",
+      "id": "click_delete_data",
+      "role": "sink",
       "op": "click",
       "params": { "selector": "button:has-text('デモで作成されたデータを今すぐ削除')" }
     },
     {
-      "type": "apply",
+      "id": "wait_after_delete",
+      "role": "sink",
       "op": "wait",
       "params": { "duration": 2000 }
     },
     {
-      "type": "apply",
+      "id": "log_complete",
+      "role": "sink",
       "op": "log",
       "params": { "message": "全プロセスのテストが完了しました。" }
     },
     {
-      "type": "control",
+      "id": "remove_passkey_authenticator",
+      "role": "gate",
       "op": "remove_passkey_authenticator",
       "params": {}
     }

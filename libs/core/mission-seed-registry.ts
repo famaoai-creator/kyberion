@@ -28,7 +28,7 @@ export interface MissionSeedRecord {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const SEED_SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-seed-record.schema.json');
+const SEED_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-seed-record.schema.json');
 const SEED_DIR = pathResolver.shared('runtime/mission-seeds');
 let seedValidateFn: ValidateFunction | null = null;
 

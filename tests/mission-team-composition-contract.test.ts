@@ -19,26 +19,26 @@ function loadJson(filePath: string) {
 }
 
 function loadAgentProfileDirectoryPayloads() {
-  const dir = path.join(rootDir, 'knowledge/public/orchestration/agent-profiles');
+  const dir = path.join(rootDir, 'knowledge/product/orchestration/agent-profiles');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
     .map((entry) => ({
       entry,
-      payload: loadJson(`knowledge/public/orchestration/agent-profiles/${entry}`),
+      payload: loadJson(`knowledge/product/orchestration/agent-profiles/${entry}`),
     }));
 }
 
 function loadTeamRoleDirectoryPayloads() {
-  const dir = path.join(rootDir, 'knowledge/public/orchestration/team-roles');
+  const dir = path.join(rootDir, 'knowledge/product/orchestration/team-roles');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
     .map((entry) => ({
       entry,
-      payload: loadJson(`knowledge/public/orchestration/team-roles/${entry}`),
+      payload: loadJson(`knowledge/product/orchestration/team-roles/${entry}`),
     }));
 }
 
@@ -46,10 +46,10 @@ describe('Mission team composition contract', () => {
   it('validates authority/team/agent indexes against schemas', () => {
     const ajv = new Ajv({ allErrors: true });
     const fixtures: Array<[string, string]> = [
-      ['knowledge/public/governance/authority-role-index.json', 'knowledge/public/schemas/authority-role-index.schema.json'],
-      ['knowledge/public/orchestration/team-role-index.json', 'knowledge/public/schemas/team-role-index.schema.json'],
-      ['knowledge/public/orchestration/agent-profile-index.json', 'knowledge/public/schemas/agent-profile-index.schema.json'],
-      ['knowledge/public/orchestration/mission-team-templates.json', 'knowledge/public/schemas/mission-team-templates.schema.json'],
+      ['knowledge/product/governance/authority-role-index.json', 'knowledge/product/schemas/authority-role-index.schema.json'],
+      ['knowledge/product/orchestration/team-role-index.json', 'knowledge/product/schemas/team-role-index.schema.json'],
+      ['knowledge/product/orchestration/agent-profile-index.json', 'knowledge/product/schemas/agent-profile-index.schema.json'],
+      ['knowledge/product/orchestration/mission-team-templates.json', 'knowledge/product/schemas/mission-team-templates.schema.json'],
     ];
 
     for (const [jsonPath, schemaPath] of fixtures) {
@@ -60,8 +60,8 @@ describe('Mission team composition contract', () => {
   });
 
   it('requires selection hints on all agent and team role records', () => {
-    const agentIndex = loadJson('knowledge/public/orchestration/agent-profile-index.json');
-    const roleIndex = loadJson('knowledge/public/orchestration/team-role-index.json');
+    const agentIndex = loadJson('knowledge/product/orchestration/agent-profile-index.json');
+    const roleIndex = loadJson('knowledge/product/orchestration/team-role-index.json');
 
     for (const [agentId, record] of Object.entries(agentIndex.agents || {})) {
       expect(record.selection_hints?.preferred_provider, `missing provider hint for ${agentId}`).toBeTruthy();
@@ -76,8 +76,8 @@ describe('Mission team composition contract', () => {
 
   it('keeps the canonical agent profile directory in sync with the snapshot', () => {
     const ajv = new Ajv({ allErrors: true });
-    const validate = ajv.compile(loadJson('knowledge/public/schemas/agent-profile-index.schema.json'));
-    const snapshot = loadJson('knowledge/public/orchestration/agent-profile-index.json');
+    const validate = ajv.compile(loadJson('knowledge/product/schemas/agent-profile-index.schema.json'));
+    const snapshot = loadJson('knowledge/product/orchestration/agent-profile-index.json');
     const snapshotAgents = snapshot.agents || {};
     const dirPayloads = loadAgentProfileDirectoryPayloads();
 
@@ -101,8 +101,8 @@ describe('Mission team composition contract', () => {
 
   it('keeps the canonical team role directory in sync with the snapshot', () => {
     const ajv = new Ajv({ allErrors: true });
-    const validate = ajv.compile(loadJson('knowledge/public/schemas/team-role.schema.json'));
-    const snapshot = loadJson('knowledge/public/orchestration/team-role-index.json');
+    const validate = ajv.compile(loadJson('knowledge/product/schemas/team-role.schema.json'));
+    const snapshot = loadJson('knowledge/product/orchestration/team-role-index.json');
     const snapshotRoles = snapshot.team_roles || {};
     const dirPayloads = loadTeamRoleDirectoryPayloads();
 
@@ -153,10 +153,10 @@ describe('Mission team composition contract', () => {
   it('validates the composed team plan against schema', () => {
     const ajv = new Ajv({ allErrors: true });
     ajv.addSchema(
-      loadJson('knowledge/public/schemas/mission-classification.schema.json'),
+      loadJson('knowledge/product/schemas/mission-classification.schema.json'),
       'mission-classification.schema.json',
     );
-    const validate = ajv.compile(loadJson('knowledge/public/schemas/mission-team-plan.schema.json'));
+    const validate = ajv.compile(loadJson('knowledge/product/schemas/mission-team-plan.schema.json'));
     const plan = composeMissionTeamPlan({
       missionId: 'MSN-TEAM-PLAN',
       missionType: 'operations',

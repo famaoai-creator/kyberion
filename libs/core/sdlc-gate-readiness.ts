@@ -55,7 +55,7 @@ export interface TrackNextWorkProposal {
   work_loop: OrganizationWorkLoopSummary;
 }
 
-const GATE_CATALOG_PATH = pathResolver.knowledge('public/governance/sdlc-gate-catalog.json');
+const GATE_CATALOG_PATH = pathResolver.knowledge('product/governance/sdlc-gate-catalog.json');
 
 let cachedCatalog: SdlcGateCatalogRecord | null = null;
 

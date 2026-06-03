@@ -20,8 +20,8 @@ type AuthorityRoleRecord = {
 
 type AuthorityRoleFile = AuthorityRoleRecord & { role: string };
 
-const DIRECTORY = pathResolver.knowledge('public/governance/authority-roles');
-const SNAPSHOT = pathResolver.knowledge('public/governance/authority-role-index.json');
+const DIRECTORY = pathResolver.knowledge('product/governance/authority-roles');
+const SNAPSHOT = pathResolver.knowledge('product/governance/authority-role-index.json');
 
 function readJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;

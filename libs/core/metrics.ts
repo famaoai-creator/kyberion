@@ -215,7 +215,7 @@ export class MetricsCollector {
     const entries = this.loadHistory();
     const bySkill: Record<string, any> = {};
     const sloPathCandidates = [
-      pathResolver.resolve('knowledge/public/orchestration/slo-targets.json'),
+      pathResolver.resolve('knowledge/product/orchestration/slo-targets.json'),
       pathResolver.resolve('knowledge/orchestration/slo-targets.json'),
     ];
     const sloPath = sloPathCandidates.find(candidate => safeExistsSync(candidate));

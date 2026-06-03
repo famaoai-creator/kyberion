@@ -49,7 +49,7 @@ describe('delegation-preflight', () => {
       task: {
         task_id: 'task-2',
         team_role: 'implementer',
-        target_path: 'knowledge/public/architecture/new.md',
+        target_path: 'knowledge/product/architecture/new.md',
       },
       assignment: assignmentWithContract(),
     });

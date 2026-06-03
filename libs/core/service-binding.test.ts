@@ -120,7 +120,7 @@ describe('service-binding', () => {
 
   it('emits service binding records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/service-binding-record.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/service-binding-record.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const binding = {
       binding_id: 'BIND-TEST-SCHEMA',
@@ -145,13 +145,13 @@ describe('service-binding', () => {
     expect(catalog.default_pattern).toBe('https://api.{service_id}.com/v1');
     expect(catalog.services.slack).toMatchObject({
       base_url: 'https://slack.com/api',
-      preset_path: 'knowledge/public/orchestration/service-presets/slack.json',
+      preset_path: 'knowledge/product/orchestration/service-presets/slack.json',
       allow_stream_ingress: false,
     });
 
     expect(getServiceEndpointRecord('github')).toMatchObject({
       base_url: 'https://api.github.com',
-      preset_path: 'knowledge/public/orchestration/service-presets/github.json',
+      preset_path: 'knowledge/product/orchestration/service-presets/github.json',
     });
   });
 
@@ -160,7 +160,7 @@ describe('service-binding', () => {
     expect(resolveServiceIdForIntent('transcribe-audio')).toBe('whisper');
     expect(resolveServiceIdForIntent('live-voice')).toBe('meeting');
     expect(getServiceEndpointRecordForIntent('generate-video')).toMatchObject({
-      preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
+      preset_path: 'knowledge/product/orchestration/service-presets/media-generation.json',
       intent_aliases: expect.arrayContaining(['generate-video']),
     });
   });

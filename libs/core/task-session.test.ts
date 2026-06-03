@@ -413,7 +413,7 @@ describe('task-session', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = path.join(
       pathResolver.rootDir(),
-      'knowledge/public/schemas/task-session.schema.json'
+      'knowledge/product/schemas/task-session.schema.json'
     );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const session = createTaskSession({
@@ -436,14 +436,14 @@ describe('task-session', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = path.join(
       pathResolver.rootDir(),
-      'knowledge/public/schemas/task-session-capture-photo.schema.json'
+      'knowledge/product/schemas/task-session-capture-photo.schema.json'
     );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const example = JSON.parse(
       safeReadFile(
         path.join(
           pathResolver.rootDir(),
-          'knowledge/public/schemas/task-session-capture-photo.example.json'
+          'knowledge/product/schemas/task-session-capture-photo.example.json'
         ),
         {
           encoding: 'utf8',
@@ -458,7 +458,7 @@ describe('task-session', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = path.join(
       pathResolver.rootDir(),
-      'knowledge/public/schemas/task-session-capture-photo.schema.json'
+      'knowledge/product/schemas/task-session-capture-photo.schema.json'
     );
     const validate = compileSchemaFromPath(ajv, schemaPath);
 

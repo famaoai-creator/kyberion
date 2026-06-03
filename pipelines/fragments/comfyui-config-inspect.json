@@ -1,32 +1,34 @@
 {
   "action": "pipeline",
   "name": "comfyui-config-inspect",
+  "version": "2.0.0",
   "description": "Inspects ComfyUI configuration using Service Presets.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "inspect_config",
-      "type": "capture",
+      "role": "source",
       "op": "service:preset",
+      "produces": { "channel": "start_script_content", "type": "ServiceResult" },
       "params": {
         "service_id": "comfyui",
         "action": "inspect_config",
         "params": {
           "start_script": "{{start_script}}"
-        },
-        "export_as": "start_script_content"
+        }
       }
     },
     {
       "id": "list_custom_nodes",
-      "type": "capture",
+      "role": "source",
       "op": "service:preset",
+      "produces": { "channel": "installed_nodes", "type": "ServiceResult" },
       "params": {
         "service_id": "comfyui",
         "action": "list_custom_nodes",
         "params": {
           "custom_nodes_dir": "{{custom_nodes_dir}}"
-        },
-        "export_as": "installed_nodes"
+        }
       }
     }
   ]

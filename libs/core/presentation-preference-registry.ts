@@ -16,10 +16,10 @@ export interface PresentationPreferenceRegistry {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/presentation-preference-registry.schema.json'
+  'product/schemas/presentation-preference-registry.schema.json'
 );
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
-  'public/governance/presentation-preference-registry.json'
+  'product/governance/presentation-preference-registry.json'
 );
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge(
   'personal/orchestration/presentation-preference-registry.json'

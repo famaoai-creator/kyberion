@@ -7,10 +7,10 @@ describe('analysis-findings', () => {
       analysisKind: 'incident_informed_review',
       impactBands: [
         { ref: 'active/projects/demo/tracks/TRK-1/review.md', band: 'green', reason: 'active track' },
-        { ref: 'knowledge/public/incidents/post-mortem-20260228.md', band: 'amber', reason: 'incident' },
+        { ref: 'knowledge/product/incidents/post-mortem-20260228.md', band: 'amber', reason: 'incident' },
       ],
       snippets: [
-        { ref: 'knowledge/public/incidents/post-mortem-20260228.md', title: 'Incident', excerpt: 'Example' },
+        { ref: 'knowledge/product/incidents/post-mortem-20260228.md', title: 'Incident', excerpt: 'Example' },
       ],
       reviewExecutionTarget: {
         target_kind: 'pull_request',

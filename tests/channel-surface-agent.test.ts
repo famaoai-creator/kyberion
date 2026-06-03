@@ -445,7 +445,7 @@ describe.sequential('Channel surface agents', () => {
     expect(routeSpy).toHaveBeenCalled();
     expect(ask).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('[Response from nerve-agent]: delegated answer')
+      expect.stringContaining('- nerve-agent: delegated answer')
     );
 
     spawnSpy.mockRestore();

@@ -216,7 +216,7 @@ class A2ABridgeImpl {
     // Security: Only spawn agents with a known manifest
     const manifest = getAgentManifest(agentId);
     if (!manifest) {
-      throw new Error(`Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/agents/${agentId}.agent.md to allow.`);
+      throw new Error(`Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/product/agents/${agentId}.agent.md to allow.`);
     }
 
     const { provider: resolvedProvider, modelId: resolvedModelId } = resolveAgentSelectionHints(manifest, provider);

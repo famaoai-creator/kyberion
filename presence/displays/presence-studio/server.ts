@@ -757,7 +757,7 @@ app.get('/api/surface-agents', (_req, res) => {
 
 app.get('/api/standard-intents', (_req, res) => {
   try {
-    const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
+    const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
     const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as StandardIntentCatalog;
     const items = Array.isArray(parsed?.intents)
       ? parsed.intents

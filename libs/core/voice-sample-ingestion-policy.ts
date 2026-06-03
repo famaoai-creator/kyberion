@@ -55,7 +55,7 @@ export interface VoiceProfileRegistrationValidationResult {
   };
 }
 
-const DEFAULT_POLICY_PATH = pathResolver.knowledge('public/governance/voice-sample-ingestion-policy.json');
+const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/voice-sample-ingestion-policy.json');
 
 const FALLBACK_POLICY: VoiceSampleIngestionPolicy = {
   version: 'fallback',

@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-report-gdpr",
+  "name": "Audit Compliance Report for GDPR Compliance",
+  "version": "3.0.0",
+  "description": "Audits existing compliance reports to ensure they meet GDPR disclosure standards.",
+  "_migration_note": "v3: Delegates to reasoning-audit-and-save fragment via core:include.",
+  "variables": {
+    "report_path": "docs/compliance/internal_audit_2024.md",
+    "output_path": "active/shared/tmp/audit-report-gdpr.json"
+  },
+  "context": {
+    "audit_label": "Compliance Report GDPR",
+    "source_path": "{{report_path}}",
+    "output_path": "{{output_path}}",
+    "instruction": "Audit the compliance report for GDPR alignment. Verify if data retention policies, user consent mechanisms, and breach notification procedures are accurately described.",
+    "analysis_type": "compliance_audit"
+  },
+  "steps": [
+    {
+      "id": "audit",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/reasoning-audit-and-save.json" }
+    }
+  ]
+}

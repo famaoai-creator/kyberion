@@ -33,7 +33,7 @@ export interface KnowledgeHint {
   source: string;
   confidence: number;
   tags?: string[];
-  tier?: 'public' | 'confidential' | 'personal';
+  tier?: 'public' | 'confidential' | 'personal' | 'product';
   customerId?: string;
 }
 
@@ -54,7 +54,7 @@ export interface KnowledgeQueryOptions {
  */
 export interface KnowledgeScope {
   /** Which tiers to scan. Order is irrelevant; results are merged. */
-  tiers: Array<'public' | 'confidential' | 'personal'>;
+  tiers: Array<'public' | 'confidential' | 'personal' | 'product'>;
   /**
    * Restrict 'confidential' scanning to one customer subdirectory.
    * Also activates customer/ overlay for 'personal' tier.
@@ -214,6 +214,9 @@ export async function buildScopedIndex(
       case 'public':
         _scanPublicTier(knowledgeBase, domains, hints);
         break;
+      case 'product':
+        _scanProductTier(knowledgeBase, domains, hints);
+        break;
       case 'confidential':
         _scanConfidentialTier(knowledgeBase, domains, scope.customerId, hints);
         break;
@@ -313,6 +316,33 @@ function _scanPublicTier(
   }
 }
 
+function _scanProductTier(
+  knowledgeBase: string,
+  domains: string[],
+  hints: KnowledgeHint[],
+): void {
+  const productRoot = path.join(knowledgeBase, 'product');
+  if (!safeExistsSync(productRoot)) return;
+
+  // Structured JSON hints under product/hints if present
+  const hintsDir = path.join(productRoot, 'hints');
+  if (safeExistsSync(hintsDir)) {
+    _loadJsonHints(hintsDir, knowledgeBase, 'product', undefined, hints);
+  }
+
+  // Scan declared domains; fall back to full product root when using TIER1_SUBDIRS default
+  if (domains !== TIER1_SUBDIRS) {
+    for (const domain of domains) {
+      const dir = path.join(productRoot, domain);
+      if (safeExistsSync(dir)) {
+        _scanMarkdownHints(dir, knowledgeBase, 'product', undefined, hints);
+      }
+    }
+  } else {
+    _scanMarkdownHints(productRoot, knowledgeBase, 'product', undefined, hints);
+  }
+}
+
 function _scanConfidentialTier(
   knowledgeBase: string,
   domains: string[],
@@ -398,7 +428,7 @@ function _scanPersonalTier(
 function _loadJsonHints(
   dir: string,
   knowledgeBase: string,
-  tier: 'public' | 'confidential' | 'personal',
+  tier: 'public' | 'confidential' | 'personal' | 'product',
   customerId: string | undefined,
   hints: KnowledgeHint[],
 ): void {
@@ -443,7 +473,7 @@ function _loadJsonHints(
 function _scanMarkdownHints(
   dir: string,
   knowledgeBase: string,
-  tier: 'public' | 'confidential' | 'personal',
+  tier: 'public' | 'confidential' | 'personal' | 'product',
   customerId: string | undefined,
   hints: KnowledgeHint[],
 ): void {

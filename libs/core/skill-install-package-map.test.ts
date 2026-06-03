@@ -21,7 +21,7 @@ describe('skill-install-package-map', () => {
 
   it('emits a map that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/skill-install-package-map.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/skill-install-package-map.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const map = loadSkillInstallPackageMap();
     expect(validate(map), JSON.stringify(validate.errors || [])).toBe(true);

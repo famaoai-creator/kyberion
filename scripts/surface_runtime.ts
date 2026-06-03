@@ -632,7 +632,7 @@ async function enableSurfaceById(surfaceId: string, manifestPath: string) {
     definition.enabled = true;
     saveSurfaceManifest(manifest, manifestPath);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'operator',
+      agentId: process.env.KYBERION_PERSONA || 'worker',
       action: 'surface.enable',
       operation: surfaceId,
       result: 'completed',
@@ -655,7 +655,7 @@ async function disableSurfaceById(surfaceId: string, manifestPath: string) {
     definition.enabled = false;
     saveSurfaceManifest(manifest, manifestPath);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'operator',
+      agentId: process.env.KYBERION_PERSONA || 'worker',
       action: 'surface.disable',
       operation: surfaceId,
       result: 'completed',
@@ -698,7 +698,7 @@ async function registerSurface(params: {
   saveSurfaceManifest(manifest, params.manifestPath);
   
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: process.env.KYBERION_PERSONA || 'worker',
     action: 'surface.register',
     operation: params.id,
     result: 'completed',
@@ -720,7 +720,7 @@ async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
   await stopSurfaceById(surfaceId);
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: process.env.KYBERION_PERSONA || 'worker',
     action: 'surface.unregister',
     operation: surfaceId,
     result: 'completed',

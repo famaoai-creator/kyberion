@@ -1,35 +1,40 @@
 {
   "action": "pipeline",
   "name": "Automated License Header Injection",
+  "version": "2.0.0",
   "description": "Injects a license header into a target file if it's missing.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "context": {
     "target_file": "active/shared/tmp/license-test.ts",
     "header": "// (c) 2026 Kyberion Sovereign Ecosystem. All rights reserved.\n"
   },
   "steps": [
     {
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "init_status", "type": "ShellResult" },
       "params": {
-        "cmd": "echo 'console.log(\"Hello world\");' > active/shared/tmp/license-test.ts",
-        "export_as": "init_status"
+        "cmd": "echo 'console.log(\"Hello world\");' > active/shared/tmp/license-test.ts"
       }
     },
-    { "op": "system:log", "params": { "message": "📄 Processing {{target_file}}..." } },
+    { "role": "sink", "op": "system:log", "params": { "message": "📄 Processing {{target_file}}..." } },
     {
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "inner_status", "type": "ShellResult" },
       "params": {
-        "cmd": "node dist/libs/actuators/code-actuator/src/index.js --input pipelines/license-injection-inner.json",
-        "export_as": "inner_status"
+        "cmd": "node dist/libs/actuators/code-actuator/src/index.js --input pipelines/license-injection-inner.json"
       }
     },
-    { "op": "system:log", "params": { "message": "✅ License injection attempted." } },
+    { "role": "sink", "op": "system:log", "params": { "message": "✅ License injection attempted." } },
     {
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "file_content", "type": "ShellResult" },
       "params": {
-        "cmd": "cat active/shared/tmp/license-test.ts",
-        "export_as": "file_content"
+        "cmd": "cat active/shared/tmp/license-test.ts"
       }
     },
-    { "op": "system:log", "params": { "message": "📝 Resulting content:\n{{file_content}}" } }
+    { "role": "sink", "op": "system:log", "consumes": "file_content", "params": { "message": "📝 Resulting content:\n{{file_content}}" } }
   ]
 }

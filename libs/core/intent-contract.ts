@@ -36,17 +36,17 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/intent-contract.schema.json'
+  'product/schemas/intent-contract.schema.json'
 );
 const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/organization-work-loop.schema.json'
+  'product/schemas/organization-work-loop.schema.json'
 );
 const INTENT_POLICY_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/intent-policy.schema.json'
+  'product/schemas/intent-policy.schema.json'
 );
-const INTENT_POLICY_PATH = pathResolver.knowledge('public/governance/intent-policy.json');
-const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/work-policy.schema.json');
-const WORK_POLICY_PATH = pathResolver.knowledge('public/governance/work-policy.json');
+const INTENT_POLICY_PATH = pathResolver.knowledge('product/governance/intent-policy.json');
+const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
+const WORK_POLICY_PATH = pathResolver.knowledge('product/governance/work-policy.json');
 
 type ExecutionShape = 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
 export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';

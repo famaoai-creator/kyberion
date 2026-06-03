@@ -18,7 +18,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
-  'public/orchestration/android-ui-defaults.json'
+  'product/orchestration/android-ui-defaults.json'
 );
 const ANDROID_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/android-actuator/manifest.json');
 const DEFAULT_ANDROID_RETRY = {

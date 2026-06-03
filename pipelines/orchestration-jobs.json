@@ -2,46 +2,52 @@
   "action": "pipeline",
   "pipeline_id": "orchestration-jobs",
   "name": "Ecosystem Orchestration Jobs",
+  "version": "2.0.0",
   "description": "Reads knowledge/governance/orchestration-config.json and executes each configured job via orchestrator-actuator.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
+      "role": "sink",
       "op": "system:log",
       "params": { "message": "🚀 [ORCHESTRATION] Starting orchestration jobs..." }
     },
     {
       "id": "load-config",
-      "type": "capture",
+      "role": "source",
       "op": "system:read_file",
+      "produces": { "channel": "orchestration_config", "type": "JsonData" },
       "params": {
         "path": "knowledge/governance/orchestration-config.json",
         "format": "json",
-        "fallback_path": "knowledge/public/governance/orchestration-config.json",
-        "export_as": "orchestration_config"
+        "fallback_path": "knowledge/product/governance/orchestration-config.json"
       }
     },
     {
       "id": "run-jobs",
-      "type": "control",
+      "role": "gate",
       "op": "core:foreach",
+      "consumes": "orchestration_config",
       "params": {
         "items": "{{orchestration_config.jobs}}",
         "as": "orch_job",
         "do": [
           {
+            "role": "sink",
             "op": "system:log",
             "params": { "message": "🚀 Running orchestration job: {{orch_job.name}}" }
           },
           {
-            "type": "apply",
+            "role": "source",
             "op": "orchestrator:run_execution_plan_set",
+            "produces": { "channel": "orch_job_result", "type": "OrchestrationResult" },
             "params": {
               "job_id": "{{orch_job.id}}",
               "name": "{{orch_job.name}}",
-              "steps": "{{orch_job.steps}}",
-              "export_as": "orch_job_result"
+              "steps": "{{orch_job.steps}}"
             }
           },
           {
+            "role": "sink",
             "op": "system:log",
             "params": { "message": "✅ Job complete: {{orch_job.name}}" }
           }
@@ -49,6 +55,7 @@
       }
     },
     {
+      "role": "sink",
       "op": "system:log",
       "params": { "message": "✅ [ORCHESTRATION] All jobs complete." }
     }

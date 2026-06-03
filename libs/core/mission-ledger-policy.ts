@@ -21,8 +21,8 @@ export interface MissionLedgerPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/mission-ledger-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-ledger-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-ledger-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-ledger-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MissionLedgerPolicyCatalog | null = null;

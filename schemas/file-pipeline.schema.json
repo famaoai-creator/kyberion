@@ -18,32 +18,48 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["type", "op", "params"],
+        "required": ["op"],
         "properties": {
-          "type": { "enum": ["capture", "transform", "apply", "control"] },
+          "id": { "type": "string" },
+          "role": {
+            "description": "Typed Flow node role. Preferred over 'type'.",
+            "enum": ["source", "transform", "sink", "gate"]
+          },
+          "type": {
+            "description": "Legacy role alias. Prefer 'role'. capture→source, transform→transform, apply→sink, control→gate.",
+            "enum": ["capture", "transform", "apply", "control"]
+          },
           "op": {
             "enum": [
-              "read",
-              "read_file",
-              "list",
-              "stat",
-              "exists",
-              "search",
-              "tail",
-              "regex_replace",
-              "json_parse",
-              "path_join",
-              "write",
-              "append",
-              "delete",
-              "mkdir",
-              "copy",
-              "move",
-              "if",
-              "while"
+              "read", "read_file", "list", "stat", "exists", "search", "tail",
+              "regex_replace", "json_parse", "path_join",
+              "write", "append", "delete", "mkdir", "copy", "move",
+              "if", "while"
             ]
           },
-          "params": { "type": "object" }
+          "params": { "type": "object" },
+          "produces": {
+            "description": "Data channel this step emits. Preferred over params.export_as.",
+            "oneOf": [
+              { "type": "string", "description": "Channel name shorthand." },
+              {
+                "type": "object",
+                "required": ["channel"],
+                "properties": {
+                  "channel": { "type": "string" },
+                  "type": { "type": "string", "description": "Optional data type hint." }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "consumes": {
+            "description": "Channel(s) this step reads from upstream steps.",
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          }
         }
       }
     }

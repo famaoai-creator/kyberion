@@ -31,7 +31,7 @@ export function classifyAnalysisImpactBands(input: {
     if (targetScope && ref.includes(targetScope)) {
       return { ref, band: 'green' as const, reason: 'belongs to the inferred remediation scope' };
     }
-    if (ref.startsWith('knowledge/public/incidents/')) {
+    if (ref.startsWith('knowledge/product/incidents/')) {
       return { ref, band: 'amber' as const, reason: 'incident knowledge should inform review but still requires operator judgment' };
     }
     if (ref.startsWith('knowledge/')) {

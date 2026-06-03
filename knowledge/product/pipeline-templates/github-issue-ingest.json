@@ -1,0 +1,54 @@
+{
+  "action": "pipeline",
+  "name": "GitHub Issue to Mission Ingest",
+  "version": "2.0.0",
+  "description": "Automatically converts GitHub Issues with 'mission' label into active Kyberion missions.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🔍 Scanning GitHub for new mission issues..." }
+    },
+    {
+      "role": "source",
+      "op": "service:cli",
+      "produces": { "channel": "raw_issues", "type": "GitHubIssues" },
+      "params": {
+        "service_id": "gh",
+        "action": "issue",
+        "params": ["list", "--label", "mission", "--json", "number,title,body"]
+      }
+    },
+    {
+      "role": "transform",
+      "op": "system:shell",
+      "consumes": "raw_issues",
+      "produces": { "channel": "parsed_issues", "type": "ParsedIssues" },
+      "params": {
+        "cmd": "echo '{{raw_issues.output}}' | jq -c '.'"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "parsed_issues",
+      "params": { "message": "📦 Found issues: {{parsed_issues}}" }
+    },
+    {
+      "role": "transform",
+      "op": "system:shell",
+      "consumes": "parsed_issues",
+      "produces": { "channel": "ingest_summary", "type": "IngestSummary" },
+      "params": {
+        "cmd": "for row in $(echo '{{parsed_issues}}' | jq -r '.[] | @base64'); do _jq() { echo ${row} | base64 --decode | jq -r ${1}; }; title=$(_jq '.title'); echo \"Starting mission: ${title}\"; node dist/scripts/mission_controller.js start \"${title}\" personal; done"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "ingest_summary",
+      "params": { "message": "✅ Ingest complete: {{ingest_summary}}" }
+    }
+  ]
+}

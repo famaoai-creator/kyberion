@@ -23,8 +23,8 @@ export interface MissionDistillMarkdownPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/mission-distill-markdown-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-distill-markdown-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-distill-markdown-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-distill-markdown-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MissionDistillMarkdownPolicyCatalog | null = null;

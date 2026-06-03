@@ -59,7 +59,7 @@ describe('mission-seed-registry', () => {
 
   it('emits mission seed records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/mission-seed-record.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/mission-seed-record.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const record = {
       seed_id: 'MSD-TEST-SCHEMA',

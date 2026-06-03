@@ -1,9 +1,12 @@
 {
   "name": "browser-point-site-hop",
+  "version": "2.0.0",
   "description": "Fragment for navigating through a loyalty/point site to a target merchant. Handles finding the merchant link and clicking through to ensure point tracking.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used no roles.",
   "steps": [
     {
       "id": "visit_point_site",
+      "role": "sink",
       "op": "browser:goto",
       "params": {
         "url": "{{point_site_url}}"
@@ -11,6 +14,7 @@
     },
     {
       "id": "search_merchant",
+      "role": "sink",
       "op": "browser:fill_ref",
       "params": {
         "selector": "{{point_site_search_input}}",
@@ -19,6 +23,7 @@
     },
     {
       "id": "execute_search",
+      "role": "sink",
       "op": "browser:click_ref",
       "params": {
         "selector": "{{point_site_search_button}}"
@@ -26,6 +31,7 @@
     },
     {
       "id": "click_merchant_link",
+      "role": "sink",
       "op": "browser:click_ref",
       "params": {
         "selector": "{{point_site_merchant_link_selector}}",
@@ -34,10 +40,10 @@
     },
     {
       "id": "verify_merchant_landing",
+      "role": "source",
       "op": "browser:snapshot",
-      "params": {
-        "export_as": "merchant_landing_page"
-      }
+      "produces": { "channel": "merchant_landing_page", "type": "SnapshotResult" },
+      "params": {}
     }
   ]
 }

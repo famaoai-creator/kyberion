@@ -2017,7 +2017,7 @@
       function renderStandardIntents() {
         const items = Array.isArray(standardIntents) ? standardIntents : [];
         if (!items.length) {
-          agentCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No common requests available yet.", "common request はまだありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Add a commonRequests array to the agent's manifest under knowledge/agents/<id>.agent.md to populate this list.", "knowledge/agents/<id>.agent.md の commonRequests に追加すると、ここに表示されます。"))}</span></div>`;
+          agentCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No common requests available yet.", "common request はまだありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Add a commonRequests array to the agent's manifest under knowledge/product/agents/<id>.agent.md to populate this list.", "knowledge/product/agents/<id>.agent.md の commonRequests に追加すると、ここに表示されます。"))}</span></div>`;
           return;
         }
         renderList(agentCatalogEl, items.slice(0, 8), (item) =>

@@ -30,14 +30,14 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 
 ## Architecture
 
-The deep architecture lives in `knowledge/public/architecture/` — 92 docs of historical and current design. The most useful entry points:
+The deep architecture lives in `knowledge/product/architecture/` — 92 docs of historical and current design. The most useful entry points:
 
 | Doc | What it covers |
 |---|---|
-| [`organization-work-loop.md`](../../knowledge/public/architecture/organization-work-loop.md) | The thesis. The model from which everything else derives. |
-| [`agent-mission-control-model.md`](../../knowledge/public/architecture/agent-mission-control-model.md) | How missions / agents / actuators relate. |
-| [`enterprise-operating-kernel.md`](../../knowledge/public/architecture/enterprise-operating-kernel.md) | The kernel layer above missions. |
-| [`ceo-ux.md`](../../knowledge/public/architecture/ceo-ux.md) | The user-facing interaction model. |
+| [`organization-work-loop.md`](../../knowledge/product/architecture/organization-work-loop.md) | The thesis. The model from which everything else derives. |
+| [`agent-mission-control-model.md`](../../knowledge/product/architecture/agent-mission-control-model.md) | How missions / agents / actuators relate. |
+| [`enterprise-operating-kernel.md`](../../knowledge/product/architecture/enterprise-operating-kernel.md) | The kernel layer above missions. |
+| [`ceo-ux.md`](../../knowledge/product/architecture/ceo-ux.md) | The user-facing interaction model. |
 
 Phase C'-1 of `PRODUCTIZATION_ROADMAP.md` will consolidate these 92 docs into a smaller "1 hour to read" tour. Until then, the above 4 are the recommended entry points.
 
@@ -55,4 +55,4 @@ If you're authoring an actuator or a vertical template:
 
 ## Scope
 
-All developer-oriented docs now live under this directory. The legacy `docs/architecture/`, `docs/playbooks/`, `docs/design/` were consolidated here on 2026-05-07 (Phase C'-1). The 92 architecture docs in `knowledge/public/architecture/` remain as system-referenced material; see [`TOUR.md`](./TOUR.md) §5 for the recommended entry points.
+All developer-oriented docs now live under this directory. The legacy `docs/architecture/`, `docs/playbooks/`, `docs/design/` were consolidated here on 2026-05-07 (Phase C'-1). The 92 architecture docs in `knowledge/product/architecture/` remain as system-referenced material; see [`TOUR.md`](./TOUR.md) §5 for the recommended entry points.

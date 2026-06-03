@@ -11,9 +11,9 @@ function read(relPath: string): string {
 describe('Runtime surface operations contract', () => {
   it('exposes surface lifecycle scripts from package.json', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
-    expect(pkg.scripts['surfaces:reconcile']).toBe('node dist/scripts/surface_runtime.js --action reconcile');
-    expect(pkg.scripts['surfaces:status']).toBe('node dist/scripts/surface_runtime.js --action status');
-    expect(pkg.scripts['surfaces:repair']).toBe('node dist/scripts/surface_runtime.js --action repair');
+    expect(pkg.scripts['surfaces:reconcile']).toBe('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js --action reconcile');
+    expect(pkg.scripts['surfaces:status']).toBe('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js --action status');
+    expect(pkg.scripts['surfaces:repair']).toBe('KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js --action repair');
     expect(pkg.scripts['channels:list']).toBe('node dist/scripts/channel_directory.js');
     expect(pkg.scripts.bootstrap).toBe('pnpm build && node dist/scripts/surface_runtime.js --action reconcile');
     expect(pkg.scripts['dashboard:onboarding']).toBe('node dist/scripts/sovereign_dashboard.js --once --focus onboarding');
@@ -23,7 +23,7 @@ describe('Runtime surface operations contract', () => {
     const vital = JSON.parse(read('pipelines/vital-check.json')) as { steps: Array<{ params?: { message?: string; cmd?: string } }> };
     const rendered = JSON.stringify(vital.steps);
     expect(rendered).toContain('active-surfaces.json');
-    expect(rendered).toContain('knowledge/public/governance/surfaces');
+    expect(rendered).toContain('knowledge/product/governance/surfaces');
     expect(rendered).toContain('runtime/surfaces/state.json');
   });
 
@@ -43,7 +43,7 @@ describe('Runtime surface operations contract', () => {
 
   it('includes troubleshooting diagnostics in surface runtime status', () => {
     const surfaceRuntime = read('scripts/surface_runtime.ts');
-    const lifecycleModel = read('knowledge/public/architecture/runtime-surface-lifecycle-model.md');
+    const lifecycleModel = read('knowledge/product/architecture/runtime-surface-lifecycle-model.md');
     expect(surfaceRuntime).toContain("from '@agent/core'");
     expect(surfaceRuntime).toContain('recentLogTail');
     expect(surfaceRuntime).toContain('diagnostics');

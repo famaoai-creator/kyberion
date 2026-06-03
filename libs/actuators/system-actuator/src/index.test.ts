@@ -87,6 +87,7 @@ const dragFrom = vi.fn();
 const runAppleScript = vi.fn((_script: string) => 'applescript-result');
 const getScreenSize = vi.fn(() => ({ width: 1920, height: 1080 }));
 const getWindowList = vi.fn((_app: string) => ['Window 1', 'Window 2']);
+const activateWindowByTitle = vi.fn((_app: string, _windowTitle: string, _matchPolicy?: string) => true);
 const quitApplication = vi.fn();
 const systemNotify = vi.fn();
 const clipboardRead = vi.fn(() => 'clipboard text');
@@ -133,6 +134,405 @@ const closeChromeTabByUrl = vi.fn((url: string) => ({ matched: url === 'docs.exa
 const emptyFinderTrash = vi.fn();
 const revealFinderPath = vi.fn();
 const openFinderPath = vi.fn();
+const createVirtualMediaDeviceControlBridge = vi.fn(() => ({
+  bridge_id: 'virtual-media-device-control-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-media-device-control-bridge',
+    platform: 'darwin',
+    available: true,
+    selection: {
+      inventory: {
+        audio_inputs: [
+          { kind: 'audio-input', name: 'Built-in Microphone', platform: 'darwin', source: 'system_profiler', available: true },
+        ],
+        audio_outputs: [
+          { kind: 'audio-output', name: 'Built-in Output', platform: 'darwin', source: 'system_profiler', available: true },
+        ],
+        cameras: [
+          { kind: 'camera', name: 'FaceTime HD Camera', platform: 'darwin', source: 'system_profiler', available: true },
+        ],
+        virtual_audio_devices: [],
+        virtual_cameras: [],
+        notes: [],
+      },
+      audio: {
+        bridge_id: 'virtual-audio-device-bridge',
+        devices: { input: 'Built-in Microphone', output: 'Built-in Output' },
+        selected_devices: { input: 'Built-in Microphone', output: 'Built-in Output' },
+        available: true,
+      },
+      camera: {
+        bridge_id: 'virtual-camera-bridge',
+        backend: 'stub',
+        available: true,
+        selected_camera: 'FaceTime HD Camera',
+      },
+    },
+    supported_actions: [
+      { action: 'select', scope: 'audio', runtime_supported: true, host_setup_required: false },
+      { action: 'select', scope: 'camera', runtime_supported: true, host_setup_required: false },
+      { action: 'select', scope: 'all', runtime_supported: true, host_setup_required: false },
+      { action: 'add', scope: 'audio', runtime_supported: false, host_setup_required: true },
+      { action: 'add', scope: 'camera', runtime_supported: false, host_setup_required: true },
+      { action: 'add', scope: 'all', runtime_supported: false, host_setup_required: true },
+      { action: 'remove', scope: 'audio', runtime_supported: false, host_setup_required: true },
+      { action: 'remove', scope: 'camera', runtime_supported: false, host_setup_required: true },
+      { action: 'remove', scope: 'all', runtime_supported: false, host_setup_required: true },
+    ],
+  })),
+  control: vi.fn(async (request: { action: string; scope?: string }) => ({
+    bridge_id: 'virtual-media-device-control-bridge',
+    platform: 'darwin',
+    action: request.action,
+    scope: request.scope || 'all',
+    status: request.action === 'select' ? 'succeeded' : 'blocked',
+    selection: {
+      inventory: {
+        audio_inputs: [],
+        audio_outputs: [],
+        cameras: [],
+        virtual_audio_devices: [],
+        virtual_cameras: [],
+        notes: [],
+      },
+      audio: {
+        bridge_id: 'virtual-audio-device-bridge',
+        devices: { input: 'Built-in Microphone', output: 'Built-in Output' },
+        selected_devices: { input: 'Built-in Microphone', output: 'Built-in Output' },
+        available: true,
+      },
+      camera: {
+        bridge_id: 'virtual-camera-bridge',
+        backend: 'stub',
+        available: true,
+        selected_camera: 'FaceTime HD Camera',
+      },
+    },
+    host_plan: request.action === 'select' ? undefined : { notes: ['host setup required'] },
+  })),
+}));
+const createVirtualDeviceInventoryBridge = vi.fn(() => ({
+  bridge_id: 'virtual-device-inventory-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-device-inventory-bridge',
+    platform: 'darwin',
+    available: true,
+    inventory: {
+      audio_inputs: [
+        { kind: 'audio-input', name: 'Built-in Microphone', platform: 'darwin', source: 'system_profiler', available: true },
+      ],
+      audio_outputs: [
+        { kind: 'audio-output', name: 'Built-in Output', platform: 'darwin', source: 'system_profiler', available: true },
+      ],
+      cameras: [
+        { kind: 'camera', name: 'FaceTime HD Camera', platform: 'darwin', source: 'system_profiler', available: true },
+      ],
+      virtual_audio_devices: [],
+      virtual_cameras: [],
+      notes: [],
+    },
+  })),
+}));
+const createVirtualAudioDeviceBridge = vi.fn(() => ({
+  bridge_id: 'virtual-audio-device-bridge',
+  probe: vi.fn(async () => ({
+    bus_id: 'stub',
+    available: true,
+    devices: { input: 'Built-in Microphone', output: 'Built-in Output' },
+    bridge_id: 'virtual-audio-device-bridge',
+    platform: 'darwin',
+    selected_devices: { input: 'Built-in Microphone', output: 'Built-in Output' },
+  })),
+}));
+const createVirtualCameraBridge = vi.fn(() => ({
+  bridge_id: 'virtual-camera-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-camera-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    available: true,
+    selected_camera: 'FaceTime HD Camera',
+    inventory: {
+      audio_inputs: [],
+      audio_outputs: [],
+      cameras: [
+        { kind: 'camera', name: 'FaceTime HD Camera', platform: 'darwin', source: 'system_profiler', available: true },
+      ],
+      virtual_audio_devices: [],
+      virtual_cameras: [],
+      notes: [],
+    },
+  })),
+  pipeTo: vi.fn(async (bus: any, input?: any) => {
+    await bus.writeFrames((async function* () {
+      const frameCount = Math.max(1, Number(input?.max_frames || 2));
+      for (let index = 0; index < frameCount; index += 1) {
+        yield {
+          format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+          payload: new Uint8Array([index + 1, index + 2, index + 3]),
+          ts_ms: index * 33,
+        };
+      }
+    })());
+  }),
+}));
+const createVirtualCameraInjectionBridge = vi.fn(() => ({
+  bridge_id: 'virtual-camera-injection-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-camera-injection-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    available: true,
+    selected_camera: 'FaceTime HD Camera',
+    host_plan: {
+      notes: ['replay-only backend active'],
+      camera: ['Install or enable a virtual camera sink'],
+    },
+  })),
+  injectFromMp4: vi.fn(async (inputPath: string) => ({
+    bridge_id: 'virtual-camera-injection-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    mode: 'replay',
+    status: 'succeeded',
+    source_path: inputPath,
+    output_path: inputPath,
+    selected_camera: 'FaceTime HD Camera',
+    injected_frame_count: 2,
+  })),
+  injectFrames: vi.fn(async () => ({
+    bridge_id: 'virtual-camera-injection-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    mode: 'replay',
+    status: 'succeeded',
+  })),
+  injectBus: vi.fn(async () => ({
+    bridge_id: 'virtual-camera-injection-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    mode: 'replay',
+    status: 'succeeded',
+  })),
+}));
+const createScreenCaptureBridge = vi.fn(() => ({
+  bridge_id: 'screen-capture-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'screen-capture-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    available: true,
+  })),
+  captureScreenshot: vi.fn(async (input?: any) => ({
+    bridge_id: 'screen-capture-bridge',
+    platform: 'darwin',
+    backend: 'stub',
+    save_path: input?.save_path || '/tmp/screen.png',
+    display_index: input?.display_index,
+    capture_mode: input?.capture_mode || 'screen',
+    subject_hint: input?.subject_hint,
+  })),
+  pipeTo: vi.fn(async (bus: any, input?: any) => {
+    await bus.writeFrames((async function* () {
+      const frameCount = Math.max(1, Number(input?.max_frames || 2));
+      for (let index = 0; index < frameCount; index += 1) {
+        yield {
+          format: { mime_type: 'image/png' as const, width: 1920, height: 1080 },
+          payload: new Uint8Array([index + 10, index + 11, index + 12]),
+          ts_ms: index * 250,
+        };
+      }
+    })());
+  }),
+}));
+const createScreenRecordingBridge = vi.fn(() => ({
+  bridge_id: 'screen-recording-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'screen-recording-bridge',
+    available: true,
+    platform: 'darwin',
+    capture_bridge: {
+      bridge_id: 'screen-capture-bridge',
+      platform: 'darwin',
+      backend: 'stub',
+      available: true,
+    },
+  })),
+  recordToMp4: vi.fn(async (outputPath: string, input?: any) => ({
+    output_path: outputPath,
+    frame_count: Math.max(1, Number(input?.max_frames || 2)),
+    fps: input?.fps ?? 30,
+    format: { mime_type: 'image/png' as const, width: 1920, height: 1080 },
+  })),
+}));
+const createScreenDisplayInventoryBridge = vi.fn(() => ({
+  bridge_id: 'screen-display-inventory-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'screen-display-inventory-bridge',
+    platform: 'darwin',
+    available: true,
+    inventory: {
+      displays: [
+        {
+          index: 0,
+          name: 'Built-in Retina Display',
+          platform: 'darwin',
+          source: 'system_profiler',
+          available: true,
+          primary: true,
+          width: 3456,
+          height: 2234,
+        },
+        {
+          index: 1,
+          name: 'DELL U2720Q',
+          platform: 'darwin',
+          source: 'system_profiler',
+          available: true,
+          primary: false,
+          width: 3840,
+          height: 2160,
+        },
+      ],
+      notes: [],
+    },
+  })),
+}));
+const writeVideoFrameBusToMp4 = vi.fn(async (bus: any, outputPath: string) => {
+  const frames: any[] = [];
+  for await (const frame of bus.frameStream()) {
+    frames.push(frame);
+  }
+  return {
+    output_path: outputPath,
+    frame_count: frames.length,
+    fps: 30,
+    format: { mime_type: 'image/jpeg', width: 640, height: 480 },
+  };
+});
+const pipeMp4ToVideoFrameBus = vi.fn(async (_inputPath: string, bus: any) => {
+  await bus.writeFrames((async function* () {
+    yield {
+      format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+      payload: new Uint8Array([9, 8, 7]),
+      ts_ms: 0,
+    };
+    yield {
+      format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+      payload: new Uint8Array([6, 5, 4]),
+      ts_ms: 33,
+    };
+  })());
+});
+const StubVideoFrameBus = vi.fn(function StubVideoFrameBus(this: any) {
+  const queue: Array<any> = [];
+  let closed = false;
+  let resolver: ((frame: any | null) => void) | null = null;
+  this.bus_id = 'stub';
+  this.probe = vi.fn(async () => ({ bus_id: 'stub', available: true, buffered_frames: queue.length }));
+  this.frameStream = vi.fn(async function* () {
+    while (!closed || queue.length > 0) {
+      if (queue.length > 0) {
+        yield queue.shift();
+        continue;
+      }
+      if (closed) return;
+      const frame = await new Promise<any | null>((resolve) => {
+        resolver = resolve;
+      });
+      if (frame === null) return;
+      yield frame;
+    }
+  });
+  this.writeFrames = vi.fn(async (stream: AsyncIterable<any>) => {
+    for await (const frame of stream) {
+      if (resolver) {
+        const resolve = resolver;
+        resolver = null;
+        resolve(frame);
+      } else {
+        queue.push(frame);
+      }
+    }
+  });
+  this.close = vi.fn(async () => {
+    closed = true;
+    if (resolver) {
+      const resolve = resolver;
+      resolver = null;
+      resolve(null);
+    }
+  });
+});
+const createVirtualAudioOutputPlaybackBridge = vi.fn(() => ({
+  bridge_id: 'virtual-audio-output-playback-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-audio-output-playback-bridge',
+    platform: 'darwin',
+    available: true,
+    outputs: ['Built-in Output', 'HDMI'],
+  })),
+  playOnOutputs: vi.fn(async (targets?: string[]) => ({
+    bridge_id: 'virtual-audio-output-playback-bridge',
+    platform: 'darwin',
+    outputs: (targets && targets.length > 0 ? targets : ['Built-in Output', 'HDMI']).map((device_name) => ({
+      device_name,
+      status: 'played',
+      tone_path: '/tmp/kyberion-tone.wav',
+      selected_backend: 'swift-output-switch' as const,
+    })),
+  })),
+}));
+const createVirtualAudioInputRecordingBridge = vi.fn(() => ({
+  bridge_id: 'virtual-audio-input-recording-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-audio-input-recording-bridge',
+    platform: 'darwin',
+    available: true,
+    inputs: ['Built-in Microphone', 'External Mic'],
+  })),
+  recordOnInputs: vi.fn(async (targets?: string[]) => ({
+    bridge_id: 'virtual-audio-input-recording-bridge',
+    platform: 'darwin',
+    recordings: (targets && targets.length > 0 ? targets : ['Built-in Microphone', 'External Mic']).map((device_name) => ({
+      device_name,
+      status: 'recorded',
+      recorded_path: `/tmp/${device_name.replace(/\s+/g, '_').toLowerCase()}.wav`,
+      selected_backend: 'ffmpeg-avfoundation' as const,
+    })),
+  })),
+}));
+const createVirtualInputDeviceInventoryBridge = vi.fn(() => ({
+  bridge_id: 'virtual-input-device-inventory-bridge',
+  probe: vi.fn(async () => ({
+    bridge_id: 'virtual-input-device-inventory-bridge',
+    platform: 'darwin',
+    available: true,
+    inventory: {
+      keyboards: [
+        {
+          kind: 'keyboard',
+          name: 'MINILA-R Convertible',
+          platform: 'darwin',
+          source: 'hidutil',
+          available: true,
+        },
+      ],
+      mice: [
+        {
+          kind: 'mouse',
+          name: 'ERGO M575SP',
+          platform: 'darwin',
+          source: 'hidutil',
+          available: true,
+        },
+      ],
+      pointing_devices: [],
+      virtual_input_devices: [],
+      notes: [],
+    },
+  })),
+}));
 const emitComputerSurfacePatch = vi.fn();
 const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
 const loadApprovalRequest = vi.fn(() => null);
@@ -182,6 +582,20 @@ vi.mock('@agent/core', () => ({
   emptyFinderTrash,
   revealFinderPath,
   openFinderPath,
+  createVirtualMediaDeviceControlBridge,
+  createVirtualAudioOutputPlaybackBridge,
+  createVirtualAudioInputRecordingBridge,
+  createVirtualDeviceInventoryBridge,
+  createVirtualAudioDeviceBridge,
+  createVirtualCameraBridge,
+  createVirtualCameraInjectionBridge,
+  createScreenCaptureBridge,
+  createScreenRecordingBridge,
+  createScreenDisplayInventoryBridge,
+  writeVideoFrameBusToMp4,
+  pipeMp4ToVideoFrameBus,
+  StubVideoFrameBus,
+  createVirtualInputDeviceInventoryBridge,
   createApprovalRequest,
   loadApprovalRequest,
   pathResolver,
@@ -203,6 +617,7 @@ vi.mock('@agent/core/os-automation', () => ({
   runAppleScript,
   getScreenSize,
   getWindowList,
+  activateWindowByTitle,
   quitApplication,
   systemNotify,
   clipboardRead,
@@ -969,6 +1384,8 @@ describe('system-actuator computer_interaction adapter', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.context.screenshot_path).toBeDefined();
+    expect(result.context.screenshot_display_index).toBe(0);
+    expect(result.context.screenshot_display_name).toBe('Built-in Retina Display');
   });
 });
 
@@ -1004,6 +1421,122 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       expect(result.status).toBe('succeeded');
       expect(String(result.context.snap)).toContain('snap.png');
+    });
+
+    it('screenshot: defaults to primary display when display_index is omitted', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'shot' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      const screenFactory = vi.mocked(createScreenCaptureBridge).mock.results.at(-1)?.value;
+      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({ display_index: 0 }));
+      expect(createScreenDisplayInventoryBridge).toHaveBeenCalled();
+    });
+
+    it('screenshot: resolves display_name to a display index', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'shot', display_name: 'DELL U2720Q' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      const screenFactory = vi.mocked(createScreenCaptureBridge).mock.results.at(-1)?.value;
+      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({ display_index: 1 }));
+      expect(createScreenDisplayInventoryBridge).toHaveBeenCalled();
+    });
+
+    it('screenshot: activates application and captures the focused window', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'shot', application: 'Finder' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(activateApplication).toHaveBeenCalledWith('Finder');
+      const screenFactory = vi.mocked(createScreenCaptureBridge).mock.results.at(-1)?.value;
+      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({ capture_mode: 'focused_window' }));
+      expect(result.context.screenshot_application).toBe('Finder');
+    });
+
+    it('screenshot: selects a named application window when window_title is provided', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{
+          type: 'capture',
+          op: 'screenshot',
+          params: { export_as: 'shot', application: 'Finder', window_title: 'Downloads', window_match_policy: 'contains' },
+        }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(activateApplication).toHaveBeenCalledWith('Finder');
+      expect(activateWindowByTitle).toHaveBeenCalledWith('Finder', 'Downloads', 'contains');
+      expect(result.context.screenshot_window_selection_source).toBe('window_title');
+      expect(result.context.screenshot_window_title).toBe('Downloads');
+      expect(result.context.screenshot_window_candidates).toContain('Window 1');
+    });
+
+    it('screen_stream: captures repeated screen frames via bridge', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'test_screen_stream', params: { export_as: 'screen_stream_test', max_frames: 2 } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.screen_stream_test.frame_count).toBe(2);
+      expect(result.context.screen_stream_test.selected_display_index).toBe(0);
+      expect(result.context.screen_stream_test.display_selection_source).toBe('primary');
+    });
+
+    it('screen_stream: resolves display_name to a display index', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'test_screen_stream', params: { export_as: 'screen_stream_test', max_frames: 2, display_name: 'DELL U2720Q' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.screen_stream_test.selected_display_index).toBe(1);
+      expect(result.context.screen_stream_test.selected_display_name).toBe('DELL U2720Q');
+      expect(result.context.screen_stream_test.display_selection_source).toBe('display_name');
+    });
+
+    it('screen_mp4_roundtrip: records and reimports screen frames', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'test_screen_mp4_roundtrip', params: { export_as: 'screen_roundtrip', max_frames: 2 } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.screen_roundtrip.imported_frame_count).toBe(2);
+      expect(result.context.screen_roundtrip.output_path).toContain('screen-roundtrip');
+      expect(result.context.screen_roundtrip.selected_display_index).toBe(0);
+      expect(result.context.screen_roundtrip.display_selection_source).toBe('primary');
     });
 
     it('clipboard_read: returns clipboard content', async () => {
@@ -1043,6 +1576,142 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect((result.context.sz as any).width).toBe(1920);
       expect((result.context.sz as any).height).toBe(1080);
     });
+
+    it('list_input_devices: returns input inventory', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'list_input_devices', params: { export_as: 'inputs' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.inputs as any).keyboards.map((d: any) => d.name)).toContain('MINILA-R Convertible');
+      expect((result.context.inputs as any).mice.map((d: any) => d.name)).toContain('ERGO M575SP');
+      expect(createVirtualInputDeviceInventoryBridge).toHaveBeenCalled();
+    });
+
+    it('list_displays: returns display inventory', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'list_displays', params: { export_as: 'displays' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.displays as any).inventory.displays.map((d: any) => d.name)).toContain('DELL U2720Q');
+      expect((result.context.displays as any).primary_display.name).toBe('Built-in Retina Display');
+      expect((result.context.displays as any).display_count).toBe(2);
+      expect(createScreenDisplayInventoryBridge).toHaveBeenCalled();
+    });
+
+    it('list_media_devices: returns selected audio and camera bridges', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'list_media_devices', params: { export_as: 'media' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.media as any).audio.selected_devices.input).toBe('Built-in Microphone');
+      expect((result.context.media as any).audio.selected_devices.output).toBe('Built-in Output');
+      expect((result.context.media as any).camera.selected_camera).toBe('FaceTime HD Camera');
+      expect((result.context.media as any).supported_actions).toBeTruthy();
+      expect(createVirtualMediaDeviceControlBridge).toHaveBeenCalled();
+    });
+
+    it('control_media_devices: returns host provisioning plan for add/remove', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'control_media_devices', params: { action: 'add', scope: 'audio', export_as: 'control' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.control as any).status).toBe('blocked');
+      expect((result.context.control as any).host_plan.notes).toContain('host setup required');
+    expect(createVirtualMediaDeviceControlBridge).toHaveBeenCalled();
+  });
+
+  it('test_audio_outputs: returns per-output playback results', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'test_audio_outputs', params: { export_as: 'audio_test' } }],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.audio_test as any).outputs.map((entry: any) => entry.device_name)).toContain('Built-in Output');
+    expect(createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
+  });
+
+  it('test_audio_inputs: returns per-input recording results', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'test_audio_inputs', params: { export_as: 'audio_input_test' } }],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.audio_input_test as any).recordings.map((entry: any) => entry.device_name)).toContain('Built-in Microphone');
+    expect(createVirtualAudioInputRecordingBridge).toHaveBeenCalled();
+  });
+
+  it('test_camera_stream: returns camera frames through a video bus', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'test_camera_stream', params: { export_as: 'camera_stream_test', frame_count: 2, frame_interval_ms: 0 } }],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.camera_stream_test as any).bridge_id).toBe('virtual-camera-bridge');
+    expect((result.context.camera_stream_test as any).backend).toBe('stub');
+    expect((result.context.camera_stream_test as any).selected_camera).toBe('FaceTime HD Camera');
+    expect((result.context.camera_stream_test as any).frame_count).toBe(2);
+    expect((result.context.camera_stream_test as any).frames).toHaveLength(2);
+    expect(createVirtualCameraBridge).toHaveBeenCalled();
+    expect(StubVideoFrameBus).toHaveBeenCalled();
+  });
+
+  it('test_camera_mp4_roundtrip: exports and re-imports camera frames through mp4', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'test_camera_mp4_roundtrip', params: { export_as: 'camera_mp4_roundtrip', frame_count: 2, frame_interval_ms: 0 } }],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.camera_mp4_roundtrip as any).bridge_id).toBe('virtual-camera-bridge');
+    expect((result.context.camera_mp4_roundtrip as any).exported_frame_count).toBe(2);
+    expect((result.context.camera_mp4_roundtrip as any).imported_frame_count).toBe(2);
+    expect((result.context.camera_mp4_roundtrip as any).exported_mp4_path).toContain('.mp4');
+    expect(writeVideoFrameBusToMp4).toHaveBeenCalled();
+    expect(pipeMp4ToVideoFrameBus).toHaveBeenCalled();
+  });
+
+  it('test_camera_injection: injects an mp4 through the camera injection bridge', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'test_camera_injection', params: { export_as: 'camera_injection_test', input_mp4_path: 'active/shared/tmp/in.mp4' } }],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.camera_injection_test as any).bridge_id).toBe('virtual-camera-injection-bridge');
+    expect((result.context.camera_injection_test as any).status).toBe('succeeded');
+    expect((result.context.camera_injection_test as any).mode).toBe('replay');
+    expect((result.context.camera_injection_test as any).source_path).toContain('active/shared/tmp/in.mp4');
+    expect(createVirtualCameraInjectionBridge).toHaveBeenCalled();
+  });
 
     it('window_list: returns windows for the given application', async () => {
       const { handleAction } = await import('./index');

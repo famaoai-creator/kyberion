@@ -34,7 +34,7 @@ local test だけでは実証できないため、この監査では「productio
 
 | Backlog | Evidence |
 |---|---|
-| P0-1 doctor / bootstrap | `scripts/run_doctor.ts`, `scripts/environment-doctor.ts`, `knowledge/public/governance/environment-manifests/meeting-participation-runtime.json`, targeted tests, `pnpm run doctor`, `pnpm doctor:meeting --mission ...` |
+| P0-1 doctor / bootstrap | `scripts/run_doctor.ts`, `scripts/environment-doctor.ts`, `knowledge/product/governance/environment-manifests/meeting-participation-runtime.json`, targeted tests, `pnpm run doctor`, `pnpm doctor:meeting --mission ...` |
 | P0-2 trace gaps | `scripts/run_pipeline.ts`, trace/audit regressions, baseline/verify-session traces |
 | P0-3 tenant / group isolation | `libs/core/tier-guard.ts`, `libs/core/tier-guard-tenant.test.ts`, governance tests |
 | P0-4 voice consent / meeting authority | `libs/actuators/meeting-actuator/src/index.ts`, `scripts/voice_consent.ts`, `scripts/meeting_participate.ts`, meeting actuator tests |
@@ -49,7 +49,7 @@ local test だけでは実証できないため、この監査では「productio
 | P1-6 release / migration workflow | `docs/developer/RELEASE_OPERATIONS.md`, `CHANGELOG.md`, `migration/README.md`, release contract tests |
 | P2-1 first-win docs | `README.md`, `docs/QUICKSTART.md`, `docs/WHY.md`, first-win docs contract |
 | P2-2 developer tour alignment | `docs/developer/TOUR.md`, `docs/developer/EXTENSION_POINTS.md`, developer tour contract |
-| P2-3 meeting operator docs | `docs/user/meeting-facilitator.md`, `knowledge/public/architecture/meeting-facilitator-use-case.md` |
+| P2-3 meeting operator docs | `docs/user/meeting-facilitator.md`, `knowledge/product/architecture/meeting-facilitator-use-case.md` |
 | P2-4 good-first-issue decomposition | `docs/developer/GOOD_FIRST_ISSUES.md`, `.github/ISSUE_TEMPLATE/good-first-issue-guide.md`, contributing contract |
 | P3-1 secure-io boundary | `libs/core/provider-discovery.ts`, `libs/core/security-boundary.contract.test.ts` |
 | P3-2 actuator catalog parity | `CAPABILITIES_GUIDE.md`, `schemas/system-pipeline.schema.json`, `libs/actuators/system-actuator/src/op-catalog.test.ts` |
@@ -75,7 +75,7 @@ local test だけでは実証できないため、この監査では「productio
 
 These are roadmap KPI / operational evidence items rather than missing code gates. They are tracked in
 [`PRODUCTION_EVIDENCE_REGISTER.ja.md`](./PRODUCTION_EVIDENCE_REGISTER.ja.md) and the canonical machine-readable register
-`knowledge/public/governance/production-evidence-register.json`:
+`knowledge/product/governance/production-evidence-register.json`:
 collection and review steps are defined in [`../operator/PRODUCTION_EVIDENCE_COLLECTION.md`](../operator/PRODUCTION_EVIDENCE_COLLECTION.md).
 
 - 30 日連続稼働 (`docs/PRODUCTIZATION_ROADMAP.md` D2 / Phase B acceptance) is not proven by a single local validation run.

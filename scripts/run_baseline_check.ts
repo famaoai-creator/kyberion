@@ -26,7 +26,7 @@ function loadConnectionReadinessConfig(): {
   requiredServices: Record<string, ReadinessRule>;
   tenantGuard: { requireZeroDrift: boolean };
 } {
-  const configPath = pathResolver.rootResolve('knowledge/public/governance/service-connection-readiness.json');
+  const configPath = pathResolver.rootResolve('knowledge/product/governance/service-connection-readiness.json');
   if (!safeExistsSync(configPath)) {
     return {
       requiredServices: {},
@@ -123,8 +123,8 @@ async function main() {
 
   // L4: Surface Layer (Background Daemons)
   sentinel.registerLayer('L4', async () => {
-    const surfacesDir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
-    const surfacesSnapshot = pathResolver.rootResolve('knowledge/public/governance/active-surfaces.json');
+    const surfacesDir = pathResolver.rootResolve('knowledge/product/governance/surfaces');
+    const surfacesSnapshot = pathResolver.rootResolve('knowledge/product/governance/active-surfaces.json');
     return safeExistsSync(surfacesDir) && safeExistsSync(surfacesSnapshot);
   });
 

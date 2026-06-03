@@ -42,7 +42,8 @@ export interface KnowledgeEntry {
   tier: string;
   kind: string;
   scope: string;
-  authority: string;
+  /** Document authority level (policy/standard/recipe/reference/advisory). NOT the runtime Authority type. */
+  docAuthority: string;
   phase: string[];
   applies_to: string[];
   owner?: string;
@@ -59,6 +60,7 @@ export interface RankingWeights {
   phase: number;
   scope: number;
   kind: number;
+  /** Weight for docAuthority ranking (policy > standard > recipe > reference > advisory). */
   authority: number;
 }
 
@@ -70,7 +72,7 @@ interface ScoredEntry extends KnowledgeEntry {
     phase: number;
     scope: number;
     kind: number;
-    authority: number;
+    docAuthority: number;
     importance: number;
     recency: number;
   };
@@ -102,7 +104,7 @@ let cachedTaxonomy: TaxonomyManifest | null = null;
 
 function loadTaxonomy(): TaxonomyManifest {
   if (cachedTaxonomy) return cachedTaxonomy;
-  const taxonomyPath = pathResolver.knowledge('public/governance/knowledge-taxonomy.json');
+  const taxonomyPath = pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
   if (!safeExistsSync(taxonomyPath)) {
     cachedTaxonomy = {};
     return cachedTaxonomy;
@@ -136,7 +138,8 @@ function inferScope(frontmatter: Record<string, any>): string {
   return (kind && loadTaxonomy().kinds?.[kind]?.default_scope) || 'global';
 }
 
-function inferAuthority(relativePath: string, frontmatter: Record<string, any>): string {
+function inferDocAuthority(relativePath: string, frontmatter: Record<string, any>): string {
+  if (typeof frontmatter.docAuthority === 'string' && frontmatter.docAuthority.trim()) return frontmatter.docAuthority.trim();
   if (typeof frontmatter.authority === 'string' && frontmatter.authority.trim()) return frontmatter.authority.trim();
   const directoryDefault = resolveDirectoryDefault(relativePath);
   if (directoryDefault?.authority) return directoryDefault.authority;
@@ -198,7 +201,9 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
             ? 'personal'
             : relativePath.startsWith('confidential/')
               ? 'confidential'
-              : 'public';
+              : relativePath.startsWith('product/')
+                ? 'product'
+                : 'public';
 
           entries.push({
             path: relativePath,
@@ -211,7 +216,7 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
             tier,
             kind: inferKind(relativePath, fm),
             scope: inferScope(fm),
-            authority: inferAuthority(relativePath, fm),
+            docAuthority: inferDocAuthority(relativePath, fm),
             phase: normalizeStringArray(fm.phase),
             applies_to: normalizeStringArray(fm.applies_to),
             owner: typeof fm.owner === 'string' ? fm.owner : undefined,
@@ -301,7 +306,7 @@ export function scoreEntry(
     reference: Math.max(1, weights.authority - 4),
     advisory: Math.max(1, weights.authority - 5),
   };
-  const authorityScore = authorityWeights[entry.authority] || 0;
+  const authorityScore = authorityWeights[entry.docAuthority] || 0;
 
   // 3. Importance (normalize to 0-10 scale)
   const importanceScore = entry.importance;
@@ -322,7 +327,7 @@ export function scoreEntry(
       phase: phaseScore,
       scope: scopeScore,
       kind: kindScore,
-      authority: authorityScore,
+      docAuthority: authorityScore,
       importance: importanceScore,
       recency: Math.round(recencyScore * 100) / 100,
     },
@@ -333,7 +338,7 @@ export function scoreEntry(
 // Main
 // ---------------------------------------------------------------------------
 function loadWeights(): RankingWeights {
-  const configPath = pathResolver.knowledge('public/governance/analysis-config.json');
+  const configPath = pathResolver.knowledge('product/governance/analysis-config.json');
   const defaults: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25, phase: 18, scope: 12, kind: 10, authority: 8 };
   if (!safeExistsSync(configPath)) return defaults;
   try {
@@ -385,7 +390,7 @@ async function main() {
     logger.info(`📊 TOP-${limit} Results (${scored.length} matches from ${entries.length} files):`);
     for (let i = 0; i < scored.length; i++) {
       const e = scored[i];
-      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} kind=${e.breakdown.kind} auth=${e.breakdown.authority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
+      const breakdown = `intent=${e.breakdown.intent} role=${e.breakdown.role} phase=${e.breakdown.phase} scope=${e.breakdown.scope} kind=${e.breakdown.kind} auth=${e.breakdown.docAuthority} imp=${e.breakdown.importance} rec=${e.breakdown.recency}`;
       logger.info(`  ${i + 1}. [${e.score.toFixed(1)}] ${e.path} (${breakdown})`);
     }
   }

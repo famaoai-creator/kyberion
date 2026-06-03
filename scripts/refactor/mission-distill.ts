@@ -215,7 +215,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
 
   const context = gatherDistillContext(upperId, state, missionPath);
 
-  const promptTemplatePath = pathResolver.knowledge('public/governance/distill-prompt.md');
+  const promptTemplatePath = pathResolver.knowledge('product/governance/distill-prompt.md');
   const promptTemplate = safeExistsSync(promptTemplatePath)
     ? safeReadFile(promptTemplatePath, { encoding: 'utf8' }) as string
     : '';
@@ -235,7 +235,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     '```',
   ].join('\n');
 
-  const wisdomPolicyPath = pathResolver.knowledge('public/governance/wisdom-policy.json');
+  const wisdomPolicyPath = pathResolver.knowledge('product/governance/wisdom-policy.json');
   let wisdomPolicy: any = {};
   if (safeExistsSync(wisdomPolicyPath)) {
     try {
@@ -269,7 +269,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     wisdom = buildFallbackWisdom(upperId, state);
   }
 
-  const defaultOutputDir = 'knowledge/public/evolution';
+  const defaultOutputDir = 'knowledge/product/evolution';
   const mappedOutputDir = wisdomPolicy.tier_mapping?.[state.tier] || defaultOutputDir;
   const outputDir = /(^|\/)incidents(\/|$)/.test(mappedOutputDir)
     ? defaultOutputDir

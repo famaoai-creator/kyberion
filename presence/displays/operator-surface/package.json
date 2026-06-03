@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Minimum Operator Surface (MOS) — read-only Web operator surface for Kyberion. CLI is the primary interface; this app renders mission state, audit chain, and health from filesystem only. No write API. See knowledge/public/architecture/operator-surface-strategy.md.",
+  "description": "Minimum Operator Surface (MOS) — read-only Web operator surface for Kyberion. CLI is the primary interface; this app renders mission state, audit chain, and health from filesystem only. No write API. See knowledge/product/architecture/operator-surface-strategy.md.",
   "scripts": {
     "dev": "next dev --port 3331",
     "build": "next build",

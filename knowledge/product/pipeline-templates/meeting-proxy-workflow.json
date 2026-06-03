@@ -1,0 +1,79 @@
+{
+  "action": "pipeline",
+  "name": "meeting-proxy-workflow",
+  "version": "2.0.0",
+  "description": "Meeting proxy: join with cloned voice → listen → extract action items. Supports Google Meet, Teams, and Zoom. persona_name / profile_id / display_name control the bot identity.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as without roles.",
+  "context": {
+    "persona_name": "the operator",
+    "profile_id": "operator-default-v1",
+    "meeting_url": "",
+    "platform": "auto",
+    "display_name": "Kyberion Agent",
+    "listen_duration_sec": 1800,
+    "language": "ja",
+    "python_bin": ".venv/bin/python3",
+    "screenshot_path": "active/shared/tmp/meeting-proxy-screenshot.png",
+    "transcript_output": "active/shared/tmp/meeting-proxy-transcript.txt",
+    "action_items_output": "active/shared/tmp/meeting-proxy-action-items.json",
+    "intro_text": "",
+    "voice_out_path": "active/shared/tmp/voice-out/{{profile_id}}/proxy-intro.wav",
+    "preferred_engine": "auto"
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Activating Meeting Proxy ({{persona_name}}, profile={{profile_id}})..."
+      }
+    },
+    {
+      "id": "generate_intro_voice",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "voice_gen_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "if [ -n '{{intro_text}}' ]; then {{python_bin}} libs/actuators/voice-actuator/scripts/voice_learning_bridge.py '{\"action\":\"generate\",\"params\":{\"text\":\"{{intro_text}}\",\"profile_id\":\"{{profile_id}}\",\"output_path\":\"{{voice_out_path}}\",\"language\":\"{{language}}\",\"preferred_engine\":\"{{preferred_engine}}\"}}'  ; else echo '{\"status\":\"skipped\"}'; fi"
+      }
+    },
+    {
+      "id": "join_session",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "join_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs --url '{{meeting_url}}' --name '{{display_name}}' --wait {{listen_duration_sec}} --python '{{python_bin}}' --screenshot '{{screenshot_path}}'"
+      }
+    },
+    {
+      "id": "log_session",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "join_result",
+      "params": {
+        "message": "✅ Session complete: {{join_result}}"
+      }
+    },
+    {
+      "role": "source",
+      "op": "wisdom:extract_requirements",
+      "produces": { "channel": "extraction", "type": "RequirementsResult" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "meeting-proxy",
+        "source_path": "{{transcript_output}}",
+        "source_type": "meeting_notes",
+        "language": "{{language}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "extraction",
+      "params": {
+        "message": "📋 Action items extracted → {{action_items_output}}."
+      }
+    }
+  ]
+}

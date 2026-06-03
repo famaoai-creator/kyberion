@@ -14,7 +14,7 @@ function loadJson(relativePath: string): Record<string, unknown> {
 }
 
 function loadSchema(name: string): Record<string, unknown> {
-  return loadJson(path.join('knowledge/public/schemas', `${name}.schema.json`));
+  return loadJson(path.join('knowledge/product/schemas', `${name}.schema.json`));
 }
 
 function compileSchema(name: string) {
@@ -159,7 +159,7 @@ describe('travel planning contracts', () => {
             merchant: 'rakuten_travel',
             use_points_portal: true,
             clickout_usecase_ref:
-              'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json',
+              'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json',
             preferred_execution_mode: 'simulation',
           },
           { merchant: 'ikyu', use_points_portal: true, min_expected_reward: '1.0%' },
@@ -238,7 +238,7 @@ describe('travel planning contracts', () => {
   it('accepts a governed points portal clickout use case', () => {
     const validate = compileSchema('points-portal-clickout-usecase');
     const usecase = loadJson(
-      'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
+      'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
     );
 
     expect(validate(usecase), JSON.stringify(validate.errors, null, 2)).toBe(true);
@@ -247,7 +247,7 @@ describe('travel planning contracts', () => {
   it('rejects points portal clickout use cases that allow session handoff export', () => {
     const validate = compileSchema('points-portal-clickout-usecase');
     const unsafeUsecase = loadJson(
-      'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
+      'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
     );
     const artifactPolicy = unsafeUsecase.artifact_policy as Record<string, unknown>;
 
@@ -269,7 +269,7 @@ describe('travel planning contracts', () => {
     const ops = collectOps(steps);
 
     expect(bookingRoute.usecase_ref).toBe(
-      'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
+      'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
     );
     expect(successCriteria.landing_url_includes).toBe('travel.rakuten.co.jp');
     expect(successCriteria.handoff_export_absent).toBe(true);
