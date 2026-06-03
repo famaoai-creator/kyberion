@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { recordConfigFallback } from './config-fallback-registry.js';
 
 /**
  * Trust Engine v1.0
@@ -29,27 +30,38 @@ export interface TrustRecord {
   history: { ts: number; score: number; event: string }[];
 }
 
-const WEIGHTS = {
-  policyCompliance: 0.25,
-  securityPosture: 0.25,
-  outputQuality: 0.20,
-  resourceEfficiency: 0.15,
-  collaborationHealth: 0.15,
-};
+interface TrustPolicyFile {
+  scoring: {
+    weights: Record<string, number>;
+    dimension_max?: number;
+  };
+  tier_thresholds: Array<{ min_score: number; tier: TrustTier }>;
+  decay: { rate_per_hour: number; floor: number };
+  propagation: { factor: number; max_depth: number };
+  regime_shift: { threshold: number };
+  anomaly_detection?: unknown;
+}
 
-const TIER_THRESHOLDS: [number, TrustTier][] = [
-  [900, 'verified'],
-  [700, 'trusted'],
-  [500, 'standard'],
-  [300, 'probationary'],
-  [0, 'untrusted'],
-];
+let _cachedTrustPolicy: TrustPolicyFile | null = null;
 
-const DECAY_RATE_PER_HOUR = 2;
-const DECAY_FLOOR = 100;
-const PROPAGATION_FACTOR = 0.3;
-const PROPAGATION_DEPTH = 2;
-const REGIME_SHIFT_THRESHOLD = 0.5;
+function loadTrustPolicy(): TrustPolicyFile {
+  if (_cachedTrustPolicy) return _cachedTrustPolicy;
+  try {
+    const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
+    _cachedTrustPolicy = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TrustPolicyFile;
+  } catch (err) {
+    const defaults: TrustPolicyFile = {
+      scoring: { weights: { policyCompliance: 0.25, securityPosture: 0.25, outputQuality: 0.20, resourceEfficiency: 0.15, collaborationHealth: 0.15 } },
+      tier_thresholds: [{ min_score: 900, tier: 'verified' }, { min_score: 700, tier: 'trusted' }, { min_score: 500, tier: 'standard' }, { min_score: 300, tier: 'probationary' }, { min_score: 0, tier: 'untrusted' }],
+      decay: { rate_per_hour: 2, floor: 100 },
+      propagation: { factor: 0.3, max_depth: 2 },
+      regime_shift: { threshold: 0.5 },
+    };
+    recordConfigFallback({ knowledgePath: 'product/governance/trust-policy.json', error: err, defaults });
+    _cachedTrustPolicy = defaults;
+  }
+  return _cachedTrustPolicy;
+}
 
 class TrustEngineImpl {
   private records: Map<string, TrustRecord> = new Map();
@@ -108,15 +120,16 @@ class TrustEngineImpl {
    * Apply time-based trust decay to all agents.
    */
   applyDecay(): void {
+    const { rate_per_hour, floor } = loadTrustPolicy().decay;
     for (const record of this.records.values()) {
-      if (record.score <= DECAY_FLOOR) continue;
+      if (record.score <= floor) continue;
 
       const hoursSinceUpdate = (Date.now() - record.lastUpdated) / 3600000;
       if (hoursSinceUpdate < 1) continue;
 
-      const decay = Math.floor(hoursSinceUpdate * DECAY_RATE_PER_HOUR);
+      const decay = Math.floor(hoursSinceUpdate * rate_per_hour);
       if (decay > 0) {
-        const newScore = Math.max(DECAY_FLOOR, record.score - decay);
+        const newScore = Math.max(floor, record.score - decay);
         if (newScore !== record.score) {
           record.score = newScore;
           record.tier = this.computeTier(newScore);
@@ -130,16 +143,18 @@ class TrustEngineImpl {
    * Propagate trust penalty to neighboring agents (agents in the same mission).
    */
   propagatePenalty(agentId: string, penalty: number, neighborIds: string[], depth = 0): void {
-    if (depth >= PROPAGATION_DEPTH) return;
+    const { factor: propFactor, max_depth } = loadTrustPolicy().propagation;
+    const { floor } = loadTrustPolicy().decay;
+    if (depth >= max_depth) return;
 
-    const factor = Math.pow(PROPAGATION_FACTOR, depth + 1);
+    const factor = Math.pow(propFactor, depth + 1);
     const propagatedPenalty = Math.round(penalty * factor);
 
     for (const neighborId of neighborIds) {
       if (neighborId === agentId) continue;
       const record = this.records.get(neighborId);
       if (record) {
-        record.score = Math.max(DECAY_FLOOR, record.score - propagatedPenalty);
+        record.score = Math.max(floor, record.score - propagatedPenalty);
         record.tier = this.computeTier(record.score);
         record.history.push({ ts: Date.now(), score: record.score, event: `propagated penalty from ${agentId} (-${propagatedPenalty})` });
         logger.info(`[TRUST_PROPAGATION] ${neighborId}: -${propagatedPenalty} from ${agentId} (depth ${depth + 1})`);
@@ -165,11 +180,12 @@ class TrustEngineImpl {
 
     const divergence = Math.abs(recentMean - baselineMean) / baselineStd;
 
-    if (divergence > REGIME_SHIFT_THRESHOLD) {
-      logger.warn(`[TRUST_REGIME_SHIFT] ${agentId}: divergence=${divergence.toFixed(2)} (threshold=${REGIME_SHIFT_THRESHOLD})`);
+    const { threshold } = loadTrustPolicy().regime_shift;
+    if (divergence > threshold) {
+      logger.warn(`[TRUST_REGIME_SHIFT] ${agentId}: divergence=${divergence.toFixed(2)} (threshold=${threshold})`);
     }
 
-    return { shifted: divergence > REGIME_SHIFT_THRESHOLD, divergence };
+    return { shifted: divergence > threshold, divergence };
   }
 
   /**
@@ -241,18 +257,19 @@ class TrustEngineImpl {
   }
 
   private computeComposite(dim: TrustDimensions): number {
+    const w = loadTrustPolicy().scoring.weights;
     return Math.round(
-      dim.policyCompliance * WEIGHTS.policyCompliance +
-      dim.securityPosture * WEIGHTS.securityPosture +
-      dim.outputQuality * WEIGHTS.outputQuality +
-      dim.resourceEfficiency * WEIGHTS.resourceEfficiency +
-      dim.collaborationHealth * WEIGHTS.collaborationHealth
+      dim.policyCompliance * (w['policyCompliance'] ?? 0.25) +
+      dim.securityPosture * (w['securityPosture'] ?? 0.25) +
+      dim.outputQuality * (w['outputQuality'] ?? 0.20) +
+      dim.resourceEfficiency * (w['resourceEfficiency'] ?? 0.15) +
+      dim.collaborationHealth * (w['collaborationHealth'] ?? 0.15)
     ) * 5; // Scale to 0-1000
   }
 
   private computeTier(score: number): TrustTier {
-    for (const [threshold, tier] of TIER_THRESHOLDS) {
-      if (score >= threshold) return tier;
+    for (const { min_score, tier } of loadTrustPolicy().tier_thresholds) {
+      if (score >= min_score) return tier;
     }
     return 'untrusted';
   }

@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "mission-bootstrap-fragment",
+  "version": "2.0.0",
   "description": "Standardizes the creation of a new Kyberion mission, initializing the evidence directory and Git repository.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "tier": "confidential",
     "tenant_id": "default",
@@ -12,8 +14,9 @@
   "steps": [
     {
       "id": "create_mission",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "bootstrap_raw", "type": "ShellResult" },
       "params": {
         "command": "node",
         "args": [
@@ -24,24 +27,25 @@
           "{{mission_type}}",
           "{{vision_ref}}",
           "{{persona}}"
-        ],
-        "export_as": "bootstrap_raw"
+        ]
       }
     },
     {
       "id": "extract_mission_id",
-      "type": "transform",
+      "role": "transform",
       "op": "system:regex_extract",
+      "consumes": "bootstrap_raw",
+      "produces": { "channel": "mission_id", "type": "TextResult" },
       "params": {
         "from": "bootstrap_raw.stdout",
-        "pattern": "Created evidence directory for mission ([^\\s\\.]*)",
-        "export_as": "mission_id"
+        "pattern": "Created evidence directory for mission ([^\\s\\.]*)"
       }
     },
     {
       "id": "log_mission_id",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "mission_id",
       "params": {
         "message": "Mission bootstrapped successfully. ID: {{mission_id}}"
       }

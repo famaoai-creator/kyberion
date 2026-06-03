@@ -5,7 +5,7 @@
  *
  * Implements CONCEPT_INTEGRATION_BACKLOG P2-6 at the call-site ergonomics
  * layer. The authoritative approval rules live in
- * knowledge/public/governance/approval-policy.json; this module only
+ * knowledge/product/governance/approval-policy.json; this module only
  * adds a minimal dispatcher plus stable op IDs that downstream code can
  * reference from a single place.
  */

@@ -7,7 +7,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readSchema(fileName: string): any {
-  const schemaPath = pathResolver.knowledge(`public/schemas/${fileName}`);
+  const schemaPath = pathResolver.knowledge(`product/schemas/${fileName}`);
   return JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string);
 }
 
@@ -69,7 +69,7 @@ describe('organization discovery report schemas', () => {
     const organizationProfileReportSchema = readSchema('organization-profile-report.schema.json');
     const organizationProfileExample = JSON.parse(
       safeReadFile(
-        pathResolver.knowledge('public/schemas/organization-profile-report.example.json'),
+        pathResolver.knowledge('product/schemas/organization-profile-report.example.json'),
         { encoding: 'utf8' },
       ) as string,
     );
@@ -78,7 +78,7 @@ describe('organization discovery report schemas', () => {
     const organizationProfilesReportSchema = readSchema('organization-profiles-report.schema.json');
     const organizationProfilesExample = JSON.parse(
       safeReadFile(
-        pathResolver.knowledge('public/schemas/organization-profiles-report.example.json'),
+        pathResolver.knowledge('product/schemas/organization-profiles-report.example.json'),
         { encoding: 'utf8' },
       ) as string,
     );
@@ -87,7 +87,7 @@ describe('organization discovery report schemas', () => {
     const organizationCatalogReportSchema = readSchema('organization-catalog-report.schema.json');
     const organizationCatalogExample = JSON.parse(
       safeReadFile(
-        pathResolver.knowledge('public/schemas/organization-catalog-report.example.json'),
+        pathResolver.knowledge('product/schemas/organization-catalog-report.example.json'),
         { encoding: 'utf8' },
       ) as string,
     );
@@ -96,7 +96,7 @@ describe('organization discovery report schemas', () => {
     const organizationDiscoveryReportSchema = readSchema('organization-discovery-report.schema.json');
     const organizationDiscoveryExample = JSON.parse(
       safeReadFile(
-        pathResolver.knowledge('public/schemas/organization-discovery-report.example.json'),
+        pathResolver.knowledge('product/schemas/organization-discovery-report.example.json'),
         { encoding: 'utf8' },
       ) as string,
     );

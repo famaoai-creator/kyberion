@@ -34,7 +34,7 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
   const filePath =
     customerPolicyPath && safeExistsSync(customerPolicyPath)
       ? customerPolicyPath
-      : pathResolver.knowledge('public/governance/approval-policy.json');
+      : pathResolver.knowledge('product/governance/approval-policy.json');
   approvalPolicyCache = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ApprovalPolicyFile;
   return approvalPolicyCache;
 }

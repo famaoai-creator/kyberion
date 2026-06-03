@@ -199,9 +199,9 @@ describe('work-design', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/work-policy.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/work-policy.schema.json'));
     const workPolicy = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/public/governance/work-policy.json'), {
+      safeReadFile(path.resolve(root, 'knowledge/product/governance/work-policy.json'), {
         encoding: 'utf8',
       }) as string,
     );

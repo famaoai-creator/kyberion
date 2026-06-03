@@ -1,0 +1,64 @@
+{
+  "action": "pipeline",
+  "name": "requirements-elicitation",
+  "version": "2.0.0",
+  "description": "Customer-engagement mission: given a transcript (or text notes) from a customer meeting, extract structured requirements, persist them as requirements-draft.json, run the REQUIREMENTS_COMPLETENESS gate, and log the outcome. Customer signoff (CUSTOMER_SIGNOFF gate) is recorded via a separate op after the operator confirms with the customer.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "source_type": "call_transcript",
+    "language": "ja",
+    "customer_name": "",
+    "customer_person_slug": "",
+    "customer_org": "",
+    "prior_draft_ref": ""
+  },
+  "steps": [
+    {
+      "id": "extract",
+      "role": "source",
+      "op": "wisdom:extract_requirements",
+      "produces": { "channel": "extraction", "type": "RequirementsExtraction" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{mission_evidence_dir}}/call-transcript.txt",
+        "source_type": "{{source_type}}",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_person_slug": "{{customer_person_slug}}",
+        "customer_org": "{{customer_org}}",
+        "prior_draft_ref": "{{prior_draft_ref}}"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "extraction",
+      "params": {
+        "message": "Extracted requirements v{{extraction.version}} at {{extraction.draft_path}}"
+      }
+    },
+    {
+      "id": "check_completeness",
+      "role": "transform",
+      "op": "wisdom:evaluate_requirements_completeness",
+      "consumes": "extraction",
+      "produces": { "channel": "completeness", "type": "CompletenessResult" },
+      "params": {
+        "mission_id": "{{mission_id}}"
+      }
+    },
+    {
+      "id": "log_completeness",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "completeness",
+      "params": {
+        "message": "REQUIREMENTS_COMPLETENESS passed={{completeness.passed}} reasons={{completeness.reasons}}"
+      }
+    }
+  ]
+}

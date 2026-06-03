@@ -16,8 +16,8 @@ export interface ChangelogPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/changelog-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/changelog-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/changelog-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/changelog-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: ChangelogPolicyCatalog | null = null;

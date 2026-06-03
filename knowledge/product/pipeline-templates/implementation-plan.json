@@ -1,0 +1,36 @@
+{
+  "action": "pipeline",
+  "name": "implementation-plan",
+  "version": "2.0.0",
+  "description": "SDLC implementation-planning phase: decompose requirements (and design if present) into a task-plan.json with ordered task items, priorities, estimates, and role assignments. Verifies dependency integrity via the task-plan-ready gate.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "requirements_draft_path": "active/missions/{{mission_id}}/evidence/requirements-draft.json",
+    "design_spec_path": "active/missions/{{mission_id}}/evidence/design-spec.json"
+  },
+  "steps": [
+    {
+      "id": "decompose",
+      "role": "source",
+      "op": "wisdom:decompose_into_tasks",
+      "produces": { "channel": "task_extraction", "type": "TaskExtraction" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "requirements_draft_path": "{{requirements_draft_path}}",
+        "design_spec_path": "{{design_spec_path}}"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "task_extraction",
+      "params": {
+        "message": "Task plan v{{task_extraction.version}} ({{task_extraction.task_count}} tasks) produced at {{task_extraction.draft_path}} (ready={{task_extraction.task_plan_ready.passed}})"
+      }
+    }
+  ]
+}

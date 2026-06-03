@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-api-gdpr",
+  "name": "Audit API Documentation for GDPR Compliance",
+  "version": "3.0.0",
+  "description": "Automatically audits API documentation for GDPR compliance, focusing on PII and data processing.",
+  "_migration_note": "v3: Delegates to reasoning-audit-and-save fragment via core:include.",
+  "variables": {
+    "api_doc_path": "docs/api/swagger.json",
+    "output_path": "active/shared/tmp/audit-gdpr.json"
+  },
+  "context": {
+    "audit_label": "GDPR",
+    "source_path": "{{api_doc_path}}",
+    "output_path": "{{output_path}}",
+    "instruction": "Identify PII (Personally Identifiable Information) in the API schema and verify if the data processing purpose is clearly documented according to GDPR requirements.",
+    "analysis_type": "compliance_audit"
+  },
+  "steps": [
+    {
+      "id": "audit",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/reasoning-audit-and-save.json" }
+    }
+  ]
+}

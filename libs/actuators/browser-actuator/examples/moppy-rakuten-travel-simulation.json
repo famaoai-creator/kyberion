@@ -11,7 +11,7 @@
   },
   "context": {
     "booking_route": {
-      "usecase_ref": "knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json",
+      "usecase_ref": "knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json",
       "points_portal": "moppy",
       "merchant": "rakuten_travel",
       "mode": "simulation",

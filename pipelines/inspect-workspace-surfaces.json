@@ -1,44 +1,47 @@
 {
   "pipeline_id": "inspect-workspace-surfaces",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Identify connected displays and active UI surfaces.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "action": "pipeline",
   "steps": [
     {
       "id": "scan-displays",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "display_info", "type": "ShellResult" },
       "params": {
-        "cmd": "system_profiler SPDisplaysDataType | grep -E 'Resolution|Main Display|Mirror' -B 2",
-        "export_as": "display_info"
+        "cmd": "system_profiler SPDisplaysDataType | grep -E 'Resolution|Main Display|Mirror' -B 2"
       }
     },
     {
       "id": "check-surfaces",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "surface_status", "type": "ShellResult" },
       "params": {
-        "cmd": "node dist/scripts/surface_runtime.js --action status",
-        "export_as": "surface_status"
+        "cmd": "node dist/scripts/surface_runtime.js --action status"
       }
     },
     {
       "id": "synthesize-surface-report",
-      "type": "transform",
+      "role": "transform",
       "op": "reasoning:analyze",
+      "consumes": ["display_info", "surface_status"],
+      "produces": { "channel": "surface_report", "type": "AnalysisResult" },
       "params": {
         "instruction": "Summarize the connected monitors and the health of active Kyberion UI surfaces. Identify the 'Main' surface for human interaction.",
         "context": [
           "{{display_info}}",
           "{{surface_status}}"
-        ],
-        "export_as": "surface_report"
+        ]
       }
     },
     {
       "id": "log-surface-report",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "surface_report",
       "params": {
         "message": "🖥️ [WORKSPACE AUDIT]\n{{surface_report}}"
       }

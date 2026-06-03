@@ -6,7 +6,7 @@ import { safeReadFile } from './secure-io.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/intent-execution-profile-registry.schema.json'
+  'product/schemas/intent-execution-profile-registry.schema.json'
 );
 
 export type IntentExecutionProfileStatus = 'active' | 'experimental' | 'conceptual' | 'deprecated';
@@ -83,7 +83,7 @@ function errorsFrom(validate: ValidateFunction): string[] {
 
 export function loadIntentExecutionProfileRegistry(): IntentExecutionProfileRegistryFile {
   if (registryCache) return registryCache;
-  const filePath = pathResolver.knowledge('public/governance/intent-execution-profile-registry.json');
+  const filePath = pathResolver.knowledge('product/governance/intent-execution-profile-registry.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentExecutionProfileRegistryFile;
   const validate = ensureValidator();
   if (!validate(parsed)) {

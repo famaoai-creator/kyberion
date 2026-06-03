@@ -17,6 +17,21 @@ import {
   probeNativeTts,
   classifyError,
   withRetry,
+  createVirtualMediaDeviceControlBridge,
+  createVirtualDeviceInventoryBridge,
+  createVirtualAudioOutputPlaybackBridge,
+  createVirtualAudioInputRecordingBridge,
+  createVirtualInputDeviceInventoryBridge,
+  createVirtualCameraBridge,
+  createVirtualCameraInjectionBridge,
+  createScreenCaptureBridge,
+  createScreenRecordingBridge,
+  createScreenDisplayInventoryBridge,
+  type ScreenDisplayInventory,
+  type ScreenDisplayRecord,
+  StubVideoFrameBus,
+  writeVideoFrameBusToMp4,
+  pipeMp4ToVideoFrameBus,
 } from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -33,14 +48,13 @@ import {
   moveMouse,
   scrollAt,
   dragFrom,
-  runAppleScript,
+  activateWindowByTitle,
   getScreenSize,
   getWindowList,
   quitApplication,
   systemNotify,
   clipboardRead,
   clipboardWrite,
-  takeScreenshot,
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
@@ -53,6 +67,7 @@ import {
   openFinderPath,
   type FocusedInputState,
 } from '@agent/core/os-automation';
+import { osAutomationBridge } from '@agent/core/os-automation-bridge';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -129,6 +144,91 @@ function buildRetryOptions(override?: Record<string, any>) {
         || classification.category === 'timeout'
         || classification.category === 'resource_unavailable';
     },
+  };
+}
+
+interface ResolvedScreenDisplaySelection {
+  inventory: ScreenDisplayInventory;
+  selected_display: ScreenDisplayRecord;
+  display_index: number;
+  display_name: string;
+  selection_source: 'explicit_index' | 'display_name' | 'primary' | 'fallback';
+}
+
+function normalizeDisplayName(value: unknown): string | undefined {
+  const text = String(value ?? '').trim();
+  return text.length > 0 ? text : undefined;
+}
+
+function normalizeApplicationName(value: unknown): string | undefined {
+  return normalizeDisplayName(value);
+}
+
+function normalizeDisplayIndex(value: unknown): number | undefined {
+  const index = Number(value);
+  return Number.isInteger(index) && index >= 0 ? index : undefined;
+}
+
+function selectDisplayFromInventory(
+  inventory: ScreenDisplayInventory,
+  requestedIndex?: number,
+  requestedName?: string,
+): { display: ScreenDisplayRecord; selection_source: ResolvedScreenDisplaySelection['selection_source'] } {
+  const displays = Array.isArray(inventory.displays) ? inventory.displays.filter((display) => display.available !== false) : [];
+  const normalizedRequestedName = requestedName ? requestedName.toLowerCase() : undefined;
+
+  if (typeof requestedIndex === 'number') {
+    const exact = displays.find((display) => display.index === requestedIndex);
+    if (exact) {
+      return { display: exact, selection_source: 'explicit_index' };
+    }
+  }
+
+  if (normalizedRequestedName) {
+    const exact = displays.find((display) => display.name.toLowerCase() === normalizedRequestedName);
+    if (exact) {
+      return { display: exact, selection_source: 'display_name' };
+    }
+    const partial = displays.find((display) => display.name.toLowerCase().includes(normalizedRequestedName));
+    if (partial) {
+      return { display: partial, selection_source: 'display_name' };
+    }
+  }
+
+  const primary = displays.find((display) => display.primary);
+  if (primary) {
+    return { display: primary, selection_source: 'primary' };
+  }
+
+  if (displays.length > 0) {
+    return { display: displays[0], selection_source: 'fallback' };
+  }
+
+  return {
+    display: {
+      index: 0,
+      name: 'Display 1',
+      platform: process.platform,
+      source: 'heuristic',
+      available: true,
+      primary: true,
+    },
+    selection_source: 'fallback',
+  };
+}
+
+async function resolveScreenDisplaySelection(params: Record<string, any>, resolve: (value: any) => any): Promise<ResolvedScreenDisplaySelection> {
+  const inventoryBridge = createScreenDisplayInventoryBridge();
+  const probe = await inventoryBridge.probe();
+  const requestedIndex = normalizeDisplayIndex(resolve(params.display_index));
+  const requestedName = normalizeDisplayName(resolve(params.display_name));
+  const { display, selection_source } = selectDisplayFromInventory(probe.inventory, requestedIndex, requestedName);
+  return {
+    inventory: probe.inventory,
+    selected_display: display,
+    display_index: display.index,
+    display_name: display.name,
+    selection_source,
   };
 }
 
@@ -222,9 +322,16 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'list_incidents',
   'list_knowledge',
   'list_running_apps',
+  'list_input_devices',
+  'list_displays',
+  'list_media_devices',
+  'control_media_devices',
   'collect_artifacts',
   'sample_traces',
   'vision_consult',
+  'test_screen_stream',
+  'test_screen_mp4_roundtrip',
+  'test_camera_injection',
 ] as const;
 
 export const SYSTEM_ACTUATOR_APPLY_OPS = [
@@ -1330,7 +1437,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'list_incidents':
     case 'list_knowledge': {
       // list_knowledge is kept as an alias for backward compatibility; prefer list_incidents
-      const incidentRoot = pathResolver.rootResolve('knowledge/incidents');
+      const incidentRoot = pathResolver.rootResolve('knowledge/product/incidents');
       const { safeReaddir: readIncidentDir } = await import('@agent/core/secure-io');
       const incidents: any[] = [];
       if (safeExistsSync(incidentRoot)) {
@@ -1338,7 +1445,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         for (const entry of entries.filter(e => e.endsWith('.md'))) {
           incidents.push({
             id: entry.replace(/\.md$/, ''),
-            path: path.join('knowledge/incidents', entry)
+            path: path.join('knowledge/product/incidents', entry)
           });
         }
       }
@@ -1445,12 +1552,398 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const apps = await platform.listRunningApps();
       return { ...ctx, [params.export_as || 'running_apps']: apps };
     }
+    case 'list_input_devices': {
+      const bridge = createVirtualInputDeviceInventoryBridge();
+      const probe = await bridge.probe();
+      return {
+        ...ctx,
+        [params.export_as || 'input_devices']: probe.inventory,
+      };
+    }
+    case 'list_displays': {
+      const bridge = createScreenDisplayInventoryBridge();
+      const probe = await bridge.probe();
+      const primarySelection = selectDisplayFromInventory(probe.inventory);
+      return {
+        ...ctx,
+        [params.export_as || 'display_devices']: {
+          inventory: probe.inventory,
+          primary_display: {
+            index: primarySelection.display.index,
+            name: primarySelection.display.name,
+            selection_source: primarySelection.selection_source,
+          },
+          display_count: probe.inventory.displays.length,
+          display_names: probe.inventory.displays.map((display) => display.name),
+        },
+      };
+    }
+    case 'list_media_devices': {
+      const bridge = createVirtualMediaDeviceControlBridge({
+        audio_bridge: {
+          input_device_preference: params.input_device_preference,
+          output_device_preference: params.output_device_preference,
+        },
+        camera_bridge: {
+          preferred_backend: params.preferred_camera_backend,
+          device_preference: params.camera_device_preference || params.device_preference,
+        },
+      });
+      const probe = await bridge.probe();
+      return {
+        ...ctx,
+        [params.export_as || 'media_devices']: {
+          inventory: probe.selection.inventory,
+          audio: probe.selection.audio,
+          camera: probe.selection.camera,
+          supported_actions: probe.supported_actions,
+        },
+      };
+    }
+    case 'control_media_devices': {
+      const bridge = createVirtualMediaDeviceControlBridge({
+        audio_bridge: {
+          input_device_preference: params.input_device_preference,
+          output_device_preference: params.output_device_preference,
+        },
+        camera_bridge: {
+          preferred_backend: params.preferred_camera_backend,
+          device_preference: params.camera_device_preference || params.device_preference,
+        },
+      });
+      const result = await bridge.control({
+        action: String(params.action || 'select') as any,
+        scope: String(params.scope || 'all') as any,
+        input_device_preference: params.input_device_preference,
+        output_device_preference: params.output_device_preference,
+        camera_device_preference: params.camera_device_preference || params.device_preference,
+        preferred_camera_backend: params.preferred_camera_backend,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'media_device_control']: result,
+      };
+    }
+    case 'test_audio_outputs': {
+      const bridge = createVirtualAudioOutputPlaybackBridge({
+        inventory_bridge: createVirtualDeviceInventoryBridge(),
+      });
+      const result = await bridge.playOnOutputs(
+        Array.isArray(params.output_names)
+          ? params.output_names.map((name: unknown) => String(name)).filter(Boolean)
+          : undefined,
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'audio_output_test']: result,
+      };
+    }
+    case 'test_audio_inputs': {
+      const bridge = createVirtualAudioInputRecordingBridge({
+        inventory_bridge: createVirtualDeviceInventoryBridge(),
+      });
+      const result = await bridge.recordOnInputs(
+        Array.isArray(params.input_names)
+          ? params.input_names.map((name: unknown) => String(name)).filter(Boolean)
+          : undefined,
+        {
+          duration_sec: Number(params.duration_sec || 3),
+          output_path: typeof params.output_path === 'string' ? params.output_path : undefined,
+          prompt_text: typeof params.prompt_text === 'string' ? params.prompt_text : undefined,
+        },
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'audio_input_test']: result,
+      };
+    }
+    case 'test_camera_stream': {
+      const bridge = createVirtualCameraBridge({
+        inventory_bridge: createVirtualDeviceInventoryBridge(),
+        device_preference: typeof params.camera_device_preference === 'string'
+          ? params.camera_device_preference
+          : typeof params.device_preference === 'string'
+            ? params.device_preference
+            : undefined,
+        preferred_backend: typeof params.preferred_camera_backend === 'string'
+          ? params.preferred_camera_backend as any
+          : undefined,
+      });
+      const bus = new StubVideoFrameBus();
+      const probe = await bridge.probe();
+      const frameCount = Math.max(1, Number(params.frame_count || 3));
+      const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
+      const frames: Array<{ mime_type: string; bytes: number; ts_ms: number }> = [];
+      const reader = (async () => {
+        for await (const frame of bus.frameStream()) {
+          frames.push({
+            mime_type: frame.format.mime_type,
+            bytes: frame.payload.byteLength,
+            ts_ms: frame.ts_ms,
+          });
+        }
+      })();
+      await bridge.pipeTo(bus, {
+        device_preference: params.camera_device_preference || params.device_preference,
+        max_frames: frameCount,
+        frame_interval_ms: frameIntervalMs,
+        camera_intent: 'record',
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      });
+      await bus.close();
+      await reader;
+      return {
+        ...ctx,
+        [params.export_as || 'camera_stream_test']: {
+          bridge_id: probe.bridge_id,
+          backend: probe.backend,
+          selected_camera: probe.selected_camera,
+          frame_count: frames.length,
+          frames,
+        },
+      };
+    }
+    case 'test_camera_mp4_roundtrip': {
+      const bridge = createVirtualCameraBridge({
+        inventory_bridge: createVirtualDeviceInventoryBridge(),
+        device_preference: typeof params.camera_device_preference === 'string'
+          ? params.camera_device_preference
+          : typeof params.device_preference === 'string'
+            ? params.device_preference
+            : undefined,
+        preferred_backend: typeof params.preferred_camera_backend === 'string'
+          ? params.preferred_camera_backend as any
+          : undefined,
+      });
+      const captureBus = new StubVideoFrameBus();
+      const importBus = new StubVideoFrameBus();
+      const probe = await bridge.probe();
+      const frameCount = Math.max(1, Number(params.frame_count || 3));
+      const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
+      const mp4Path = typeof params.mp4_path === 'string' && params.mp4_path.trim()
+        ? pathResolver.rootResolve(params.mp4_path.trim())
+        : pathResolver.shared(`runtime/computer/video/camera-roundtrip-${Date.now()}.mp4`);
+      const importedFrames: Array<{ mime_type: string; bytes: number; ts_ms: number }> = [];
+      const importReader = (async () => {
+        for await (const frame of importBus.frameStream()) {
+          importedFrames.push({
+            mime_type: frame.format.mime_type,
+            bytes: frame.payload.byteLength,
+            ts_ms: frame.ts_ms,
+          });
+        }
+      })();
+      await bridge.pipeTo(captureBus, {
+        device_preference: params.camera_device_preference || params.device_preference,
+        max_frames: frameCount,
+        frame_interval_ms: frameIntervalMs,
+        camera_intent: 'record',
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      });
+      await captureBus.close();
+      const exportResult = await writeVideoFrameBusToMp4(captureBus, mp4Path, {
+        fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
+      });
+      await pipeMp4ToVideoFrameBus(
+        typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
+          ? pathResolver.rootResolve(params.input_mp4_path.trim())
+          : mp4Path,
+        importBus,
+        { fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))) },
+      );
+      await importBus.close();
+      await importReader;
+      return {
+        ...ctx,
+        [params.export_as || 'camera_mp4_roundtrip']: {
+          bridge_id: probe.bridge_id,
+          backend: probe.backend,
+          selected_camera: probe.selected_camera,
+          exported_mp4_path: exportResult.output_path,
+          exported_frame_count: exportResult.frame_count,
+          imported_frame_count: importedFrames.length,
+          frames: importedFrames,
+        },
+      };
+    }
+    case 'test_camera_injection': {
+      const inventoryBridge = createVirtualDeviceInventoryBridge();
+      const cameraBridge = createVirtualCameraBridge({
+        inventory_bridge: inventoryBridge,
+        device_preference: typeof params.camera_device_preference === 'string'
+          ? params.camera_device_preference
+          : typeof params.device_preference === 'string'
+            ? params.device_preference
+            : undefined,
+        preferred_backend: typeof params.preferred_camera_backend === 'string'
+          ? params.preferred_camera_backend as any
+          : undefined,
+      });
+      const injectionBridge = createVirtualCameraInjectionBridge({
+        inventory_bridge: inventoryBridge,
+        device_preference: typeof params.camera_device_preference === 'string'
+          ? params.camera_device_preference
+          : typeof params.device_preference === 'string'
+            ? params.device_preference
+            : undefined,
+        device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
+      });
+      const frameCount = Math.max(1, Number(params.frame_count || 3));
+      const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
+      const mp4Path = typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
+        ? pathResolver.rootResolve(params.input_mp4_path.trim())
+        : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
+      let sourcePath = mp4Path;
+      if (!(typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim())) {
+        const captureBus = new StubVideoFrameBus();
+        await cameraBridge.pipeTo(captureBus, {
+          device_preference: params.camera_device_preference || params.device_preference,
+          max_frames: frameCount,
+          frame_interval_ms: frameIntervalMs,
+          camera_intent: 'record',
+          subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+        });
+        await captureBus.close();
+        const exportResult = await writeVideoFrameBusToMp4(captureBus, mp4Path, {
+          fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
+        });
+        sourcePath = exportResult.output_path;
+      }
+      const injectionResult = await injectionBridge.injectFromMp4(sourcePath, {
+        source_path: sourcePath,
+        device_preference: typeof params.camera_device_preference === 'string'
+          ? params.camera_device_preference
+          : typeof params.device_preference === 'string'
+            ? params.device_preference
+            : undefined,
+        device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
+        output_path: typeof params.output_path === 'string' ? params.output_path : undefined,
+        fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'camera_injection_test']: injectionResult,
+      };
+    }
     case 'screenshot': {
       const screenshotDir = pathResolver.shared('runtime/computer/screenshots');
       if (!safeExistsSync(screenshotDir)) safeMkdir(screenshotDir, { recursive: true });
       const filename = params.path ? pathResolver.rootResolve(resolve(params.path)) : path.join(screenshotDir, `screenshot-${Date.now()}.png`);
-      const result = await withRetry(async () => takeScreenshot(filename, { displayIndex: params.display_index }), buildRetryOptions(params.retry));
-      return { ...ctx, [params.export_as || 'screenshot_path']: result };
+      const screenBridge = createScreenCaptureBridge();
+      const displaySelection = await resolveScreenDisplaySelection(params, resolve);
+      const application = normalizeApplicationName(resolve(params.application));
+      const windowTitle = normalizeDisplayName(resolve(params.window_title));
+      const windowMatchPolicy = (resolve(params.window_match_policy) === 'strict'
+        || resolve(params.window_match_policy) === 'prefix'
+        || resolve(params.window_match_policy) === 'contains')
+        ? resolve(params.window_match_policy)
+        : 'contains';
+      const captureMode = typeof params.capture_mode === 'string'
+        ? params.capture_mode
+        : application
+          ? 'focused_window'
+          : undefined;
+      const applicationWindows = application ? getWindowList(application) : [];
+      let windowSelectionSource: 'none' | 'window_title' | 'application' = 'none';
+      if (application && process.platform === 'darwin') {
+        activateApplication(application);
+      }
+      if (application && process.platform === 'darwin' && windowTitle) {
+        const activated = activateWindowByTitle(application, windowTitle, windowMatchPolicy as any);
+        windowSelectionSource = activated ? 'window_title' : 'application';
+      } else if (application && process.platform === 'darwin') {
+        windowSelectionSource = 'application';
+      }
+      const result = await withRetry(async () => screenBridge.captureScreenshot({
+        save_path: filename,
+        display_index: displaySelection.display_index,
+        capture_mode: captureMode,
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      }), buildRetryOptions(params.retry));
+      return {
+        ...ctx,
+        screenshot_display_index: displaySelection.display_index,
+        screenshot_display_name: displaySelection.display_name,
+        screenshot_display_selection_source: displaySelection.selection_source,
+        screenshot_application: application,
+        screenshot_window_title: windowTitle,
+        screenshot_window_candidates: applicationWindows,
+        screenshot_window_selection_source: windowSelectionSource,
+        screenshot_window_match_policy: windowMatchPolicy,
+        [params.export_as || 'screenshot_path']: result.save_path,
+      };
+    }
+    case 'test_screen_stream': {
+      const screenBridge = createScreenCaptureBridge();
+      const bus = new StubVideoFrameBus();
+      const displaySelection = await resolveScreenDisplaySelection(params, resolve);
+      const frames: Array<{ ts_ms: number; bytes: number }> = [];
+      const reader = (async () => {
+        for await (const frame of bus.frameStream()) {
+          frames.push({ ts_ms: frame.ts_ms, bytes: frame.payload.byteLength });
+        }
+      })();
+
+      await withRetry(async () => screenBridge.pipeTo(bus, {
+        max_frames: Math.max(1, Number(resolve(params.max_frames || 2))),
+        frame_interval_ms: Math.max(0, Number(resolve(params.frame_interval_ms || 250))),
+        display_index: displaySelection.display_index,
+        capture_mode: typeof params.capture_mode === 'string' ? params.capture_mode : undefined,
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      }), buildRetryOptions(params.retry));
+      await bus.close();
+      await reader;
+
+      return {
+        ...ctx,
+        [params.export_as || 'screen_stream_test']: {
+          bridge_id: screenBridge.bridge_id,
+          selected_display_index: displaySelection.display_index,
+          selected_display_name: displaySelection.display_name,
+          display_selection_source: displaySelection.selection_source,
+          frame_count: frames.length,
+          frames,
+        },
+      };
+    }
+    case 'test_screen_mp4_roundtrip': {
+      const screenBridge = createScreenCaptureBridge();
+      const recordingBridge = createScreenRecordingBridge({ capture_bridge: screenBridge });
+      const screenDir = pathResolver.shared('runtime/computer/video');
+      if (!safeExistsSync(screenDir)) safeMkdir(screenDir, { recursive: true });
+      const mp4Path = params.path
+        ? pathResolver.rootResolve(resolve(params.path))
+        : path.join(screenDir, `screen-roundtrip-${Date.now()}.mp4`);
+      const displaySelection = await resolveScreenDisplaySelection(params, resolve);
+      const recordResult = await withRetry(async () => recordingBridge.recordToMp4(mp4Path, {
+        max_frames: Math.max(1, Number(resolve(params.max_frames || 2))),
+        frame_interval_ms: Math.max(0, Number(resolve(params.frame_interval_ms || 250))),
+        display_index: displaySelection.display_index,
+        capture_mode: typeof params.capture_mode === 'string' ? params.capture_mode : undefined,
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+        fps: params.fps,
+      }), buildRetryOptions(params.retry));
+
+      const importBus = new StubVideoFrameBus();
+      await pipeMp4ToVideoFrameBus(recordResult.output_path, importBus, { fps: recordResult.fps });
+      await importBus.close();
+      const importedFrames: Array<{ ts_ms: number; bytes: number }> = [];
+      for await (const frame of importBus.frameStream()) {
+        importedFrames.push({ ts_ms: frame.ts_ms, bytes: frame.payload.byteLength });
+      }
+
+      return {
+        ...ctx,
+        [params.export_as || 'screen_mp4_roundtrip']: {
+          ...recordResult,
+          selected_display_index: displaySelection.display_index,
+          selected_display_name: displaySelection.display_name,
+          display_selection_source: displaySelection.selection_source,
+          imported_frame_count: importedFrames.length,
+          imported_frames: importedFrames,
+        },
+      };
     }
     case 'clipboard_read': {
       const content = clipboardRead();
@@ -1653,7 +2146,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       assertUnsafeShellAllowed();
       const script = String(resolve(params.script || ''));
       if (!script) throw new Error('run_applescript requires "script" param');
-      const result = await withRetry(async () => runAppleScript(script), buildRetryOptions(params.retry));
+      const result = await withRetry(async () => osAutomationBridge.runAppleScript(script), buildRetryOptions(params.retry));
       ctx = { ...ctx, [params.export_as || 'applescript_result']: result };
       break;
     }
@@ -1718,7 +2211,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
  * Strategic Reconciliation
  */
 async function performReconcile(input: SystemAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/governance/system-strategy.json');
+  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/system-strategy.json');
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {

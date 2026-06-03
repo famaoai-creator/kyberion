@@ -10,8 +10,8 @@ import { compileUserIntentFlow } from './intent-contract.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('japanese-contextual-intent corpus', () => {
-  const corpusPath = pathResolver.knowledge('public/governance/japanese-contextual-intent-corpus.json');
-  const schemaPath = pathResolver.knowledge('public/schemas/japanese-contextual-intent-corpus.schema.json');
+  const corpusPath = pathResolver.knowledge('product/governance/japanese-contextual-intent-corpus.json');
+  const schemaPath = pathResolver.knowledge('product/schemas/japanese-contextual-intent-corpus.schema.json');
   const memoryPath = pathResolver.shared('runtime/test-contextual-intent-memory.json');
 
   it('matches the schema and covers the contextual intent regression set', async () => {

@@ -1,32 +1,36 @@
 {
   "action": "pipeline",
   "name": "screenshot-vision-gate-fragment",
+  "version": "2.0.0",
   "description": "Takes a desktop screenshot, asks the reasoning backend to evaluate a visual condition, and sets vision_gate_passed (yes/no string) in context. Required context var: vision_question. Optional: display_index (integer, 0-based), screenshot_export_path.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "capture_screen",
-      "type": "capture",
+      "role": "source",
       "op": "system:screenshot",
+      "produces": { "channel": "screenshot_path", "type": "ScreenshotResult" },
       "params": {
         "path": "{{screenshot_export_path}}",
-        "display_index": "{{display_index}}",
-        "export_as": "screenshot_path"
+        "display_index": "{{display_index}}"
       }
     },
     {
       "id": "vision_evaluate",
-      "type": "capture",
+      "role": "transform",
       "op": "reasoning:analyze",
+      "consumes": "screenshot_path",
+      "produces": { "channel": "vision_gate_passed", "type": "TextResult" },
       "params": {
         "instruction": "Look at the screenshot at path '{{screenshot_path}}' and answer the following question with ONLY 'yes' or 'no': {{vision_question}}",
-        "context": ["{{screenshot_path}}", "{{vision_question}}"],
-        "export_as": "vision_gate_passed"
+        "context": ["{{screenshot_path}}", "{{vision_question}}"]
       }
     },
     {
       "id": "log_result",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "vision_gate_passed",
       "params": {
         "message": "[VISION GATE] {{vision_question}} → {{vision_gate_passed}}"
       }

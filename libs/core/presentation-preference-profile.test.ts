@@ -20,11 +20,11 @@ describe('presentation-preference-profile schema', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/public/schemas/presentation-preference-profile.schema.json')
+      path.resolve(root, 'knowledge/product/schemas/presentation-preference-profile.schema.json')
     );
     const example = JSON.parse(
       safeReadFile(
-        path.resolve(root, 'knowledge/public/schemas/presentation-preference-profile.example.json'),
+        path.resolve(root, 'knowledge/product/schemas/presentation-preference-profile.example.json'),
         {
           encoding: 'utf8',
         }
@@ -38,7 +38,7 @@ describe('presentation-preference-profile schema', () => {
     const root = process.cwd();
     const profile = JSON.parse(
       safeReadFile(
-        path.resolve(root, 'knowledge/public/schemas/presentation-preference-profile.example.json'),
+        path.resolve(root, 'knowledge/product/schemas/presentation-preference-profile.example.json'),
         {
           encoding: 'utf8',
         }

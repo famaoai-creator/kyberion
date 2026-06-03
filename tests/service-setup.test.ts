@@ -40,11 +40,11 @@ describe('services_setup', () => {
       default_pattern: 'https://api.{service_id}.com/v1',
       services: {
         slack: {
-          preset_path: 'knowledge/public/orchestration/service-presets/slack.json',
+          preset_path: 'knowledge/product/orchestration/service-presets/slack.json',
           auth_strategy: 'bearer',
         },
         github: {
-          preset_path: 'knowledge/public/orchestration/service-presets/github.json',
+          preset_path: 'knowledge/product/orchestration/service-presets/github.json',
           auth_strategy: 'basic',
         },
       },
@@ -53,7 +53,7 @@ describe('services_setup', () => {
       if (serviceId === 'slack') {
         return {
           serviceId,
-          presetPath: 'knowledge/public/orchestration/service-presets/slack.json',
+          presetPath: 'knowledge/product/orchestration/service-presets/slack.json',
           authStrategy: 'bearer',
           valid: false,
           reason: 'Missing token',
@@ -66,7 +66,7 @@ describe('services_setup', () => {
       }
       return {
         serviceId,
-        presetPath: 'knowledge/public/orchestration/service-presets/github.json',
+        presetPath: 'knowledge/product/orchestration/service-presets/github.json',
         authStrategy: 'basic',
         valid: true,
         requiredSecrets: ['GITHUB_CLIENT_ID'],

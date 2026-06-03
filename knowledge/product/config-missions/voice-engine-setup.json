@@ -1,0 +1,44 @@
+{
+  "preset_id": "voice-engine-setup",
+  "type": "config_mission",
+  "category": "voice",
+  "description": "Register a new voice engine or update an existing voice profile for a tenant. Covers both TTS engine registration and operator voice sample ingestion.",
+  "inputs": {
+    "engine_id": {
+      "type": "string",
+      "description": "Unique identifier for the voice engine (e.g. mlx_tts, openai_tts, elevenlabs).",
+      "required": true
+    },
+    "engine_kind": {
+      "type": "enum",
+      "description": "Type of voice engine.",
+      "values": ["native_local", "voice_clone_service", "cloud_tts", "mlx_local"],
+      "required": true
+    },
+    "tenant": {
+      "type": "string",
+      "description": "Target tenant slug.",
+      "required": true
+    },
+    "operator_voice_sample_path": {
+      "type": "string",
+      "description": "Local path to an audio file for voice cloning. Leave empty to skip voice profile learning.",
+      "required": false
+    },
+    "set_as_default": {
+      "type": "boolean",
+      "description": "Set this engine as the default for the tenant.",
+      "default": false,
+      "required": false
+    }
+  },
+  "pipeline": "pipelines/config/voice-engine-setup.json",
+  "write_targets": [
+    "knowledge/product/governance/voice-engine-registry.json",
+    "knowledge/product/governance/voice-engines/{{engine_id}}.json",
+    "knowledge/confidential/{{tenant}}/voice-profile/{{engine_id}}.json",
+    "knowledge/confidential/{{tenant}}/config-missions/{{instance_id}}/evidence/"
+  ],
+  "authority_role": "system_configurator",
+  "notes": "Voice sample ingestion requires the voice-actuator build to be present at dist/libs/actuators/voice-actuator/src/."
+}

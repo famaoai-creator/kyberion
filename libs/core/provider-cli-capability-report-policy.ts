@@ -17,8 +17,8 @@ export interface ProviderCliCapabilityReportPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/provider-cli-capability-report-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/provider-cli-capability-report-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/provider-cli-capability-report-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/provider-cli-capability-report-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: ProviderCliCapabilityReportPolicyCatalog | null = null;

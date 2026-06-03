@@ -56,7 +56,7 @@ export function listChannelDirectoryEntries(): ChannelDirectoryEntry[] {
         directReply: manifest.delivery.directReply,
         status: catalog?.status || 'unknown',
         summary: catalog?.summary,
-        manifestPath: catalog?.manifest_path || pathResolver.knowledge('public/governance/surface-provider-manifests.json'),
+        manifestPath: catalog?.manifest_path || pathResolver.knowledge('product/governance/surface-provider-manifests.json'),
         policyPath: catalog?.policy_path,
         coordinationRoot: coordinationRootFor(manifest.id),
         requestDir: requestDirFor(manifest.id),

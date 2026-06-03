@@ -1,7 +1,7 @@
 {
   "actuator_id": "meeting-browser-driver",
   "version": "1.0.0",
-  "description": "Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Implements libs/core MeetingJoinDriver and writes captured audio to an AudioBus.",
+  "description": "Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus.",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "selector_retry",

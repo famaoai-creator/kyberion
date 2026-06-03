@@ -1,0 +1,71 @@
+{
+  "action": "pipeline",
+  "name": "voice-health-check",
+  "version": "2.0.0",
+  "description": "Verify mlx-audio TTS and mlx-whisper STT are installed and functional. Returns health status for both bridges.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "steps": [
+    {
+      "id": "check_tts",
+      "role": "source",
+      "op": "system:exec",
+      "produces": { "channel": "tts_health_raw", "type": "ShellResult" },
+      "params": {
+        "command": "python3",
+        "args": ["-c", "import sys,json; sys.stdin.close(); import subprocess; r=subprocess.run(['python3','libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'],input='{\"action\":\"health\"}',capture_output=True,text=True); print(r.stdout)"]
+      }
+    },
+    {
+      "id": "check_tts_direct",
+      "role": "source",
+      "op": "system:cli_health_check",
+      "produces": { "channel": "mlx_audio_health", "type": "HealthResult" },
+      "params": {
+        "command": "python3",
+        "args": ["-c", "import mlx_audio; print('ok')"],
+        "timeout_ms": 15000
+      }
+    },
+    {
+      "id": "check_stt",
+      "role": "source",
+      "op": "system:cli_health_check",
+      "produces": { "channel": "mlx_whisper_health", "type": "HealthResult" },
+      "params": {
+        "command": "python3",
+        "args": ["-c", "import mlx_whisper; print('ok')"],
+        "timeout_ms": 15000
+      }
+    },
+    {
+      "id": "check_recorder",
+      "role": "source",
+      "op": "system:cli_health_check",
+      "produces": { "channel": "sox_health", "type": "HealthResult" },
+      "params": {
+        "command": "sox",
+        "args": ["--version"]
+      }
+    },
+    {
+      "id": "log_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["mlx_audio_health", "mlx_whisper_health", "sox_health"],
+      "params": {
+        "message": "[voice-health-check] mlx_audio={{mlx_audio_health.available}}, mlx_whisper={{mlx_whisper_health.available}}, sox={{sox_health.available}}"
+      }
+    },
+    {
+      "id": "notify_health",
+      "role": "sink",
+      "op": "system:system_notify",
+      "consumes": ["mlx_audio_health", "mlx_whisper_health", "sox_health"],
+      "params": {
+        "title": "Voice Health Check",
+        "message": "mlx_audio: {{mlx_audio_health.available}} | mlx_whisper: {{mlx_whisper_health.available}} | sox: {{sox_health.available}}",
+        "subtitle": "voice-health-check"
+      }
+    }
+  ]
+}

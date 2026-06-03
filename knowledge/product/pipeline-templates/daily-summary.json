@@ -1,0 +1,50 @@
+{
+  "action": "pipeline",
+  "name": "Daily Summary for Presence",
+  "version": "2.0.0",
+  "description": "Aggregates daily status and prepares a summary for notification.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🌤️ Preparing Daily Summary..." }
+    },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "total_capabilities", "type": "ShellResult" },
+      "params": {
+        "cmd": "pnpm capabilities | grep '✅' | wc -l"
+      }
+    },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "mission_count", "type": "ShellResult" },
+      "params": {
+        "cmd": "ls active/missions | wc -l"
+      }
+    },
+    {
+      "role": "transform",
+      "op": "system:shell",
+      "consumes": ["total_capabilities", "mission_count"],
+      "produces": { "channel": "presence_payload", "type": "PresencePayload" },
+      "params": {
+        "cmd": "echo '{\"summary\": \"Kyberion Status: {{total_capabilities}} capabilities active across {{mission_count}} missions.\", \"timestamp\": \"{{run_utc_now}}\"}'"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "presence_payload",
+      "params": { "message": "📡 Presence Payload Prepared: {{presence_payload}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ Daily summary complete." }
+    }
+  ]
+}

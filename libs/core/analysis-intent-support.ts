@@ -156,14 +156,14 @@ function resolveReviewExecutionTargetBinding(input: AnalysisIntentSupportInput, 
 }
 
 function listIncidentKnowledgeRefs(limit = 5): string[] {
-  const incidentsDir = pathResolver.knowledge('public/incidents');
+  const incidentsDir = pathResolver.knowledge('product/incidents');
   if (!safeExistsSync(incidentsDir)) return [];
   return safeReaddir(incidentsDir)
     .filter((entry) => entry.endsWith('.md') || entry.endsWith('.json'))
     .sort()
     .reverse()
     .slice(0, limit)
-    .map((entry) => `knowledge/public/incidents/${entry}`);
+    .map((entry) => `knowledge/product/incidents/${entry}`);
 }
 
 function listRelevantDistillRefs(input: {

@@ -23,8 +23,8 @@ export interface OnboardingSummaryPolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/onboarding-summary-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/onboarding-summary-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/onboarding-summary-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/onboarding-summary-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: OnboardingSummaryPolicyCatalog | null = null;

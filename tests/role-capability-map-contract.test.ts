@@ -8,10 +8,10 @@ const rootDir = process.cwd();
 describe('Role capability map contract', () => {
   it('validates the role capability map against its schema', () => {
     const schema = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/schemas/role-capability-map.schema.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/schemas/role-capability-map.schema.json'), { encoding: 'utf8' }) as string,
     );
     const roleMap = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/personalities/roles.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/personalities/roles.json'), { encoding: 'utf8' }) as string,
     );
 
     const ajv = new Ajv({ allErrors: true });
@@ -22,7 +22,7 @@ describe('Role capability map contract', () => {
 
   it('uses capabilities instead of legacy skills arrays', () => {
     const roleMap = JSON.parse(
-      safeReadFile(path.join(rootDir, 'knowledge/public/personalities/roles.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(rootDir, 'knowledge/product/personalities/roles.json'), { encoding: 'utf8' }) as string,
     ) as {
       roles: Record<string, { capabilities?: string[]; skills?: string[] }>;
     };

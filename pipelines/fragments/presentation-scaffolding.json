@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "presentation-scaffolding-fragment",
+  "version": "2.0.0",
   "description": "Creates a structured PPTX configuration for the media-actuator based on mission outcomes.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "context": {
     "title": "Kyberion System Update",
     "subtitle": "Capability Lifecycle & Automation"
@@ -9,7 +11,7 @@
   "steps": [
     {
       "id": "write_pptx_config",
-      "type": "apply",
+      "role": "sink",
       "op": "system:write_artifact",
       "params": {
         "path": "active/shared/tmp/presentation-config.json",
@@ -25,7 +27,7 @@
     },
     {
       "id": "log_pptx",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
       "params": {
         "message": "Presentation scaffolding created at active/shared/tmp/presentation-config.json. Use media-actuator to render."

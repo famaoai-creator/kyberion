@@ -72,7 +72,7 @@ describe('mission-orchestration-events', () => {
     const stored = JSON.parse(safeReadFile(eventPath, { encoding: 'utf8' }) as string);
 
     const ajv = new Ajv({ allErrors: true });
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/public/schemas/mission-orchestration-event.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/product/schemas/mission-orchestration-event.schema.json'));
     const valid = validate(stored);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });

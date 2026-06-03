@@ -64,25 +64,25 @@ Transition by the `status` field in the report:
 
 ### ① Onboarding
 Set up the environment and user identity: `pnpm install` → `pnpm build` → `pnpm surfaces:reconcile` → `pnpm onboard`.
-→ [phases/onboarding.md](./knowledge/public/governance/phases/onboarding.md)
+→ [phases/onboarding.md](./knowledge/product/governance/phases/onboarding.md)
 
 ### ② Recovery
 Resume from interruptions. Restore prior state and continue from the suspension point.
-→ [phases/recovery.md](./knowledge/public/governance/phases/recovery.md)
+→ [phases/recovery.md](./knowledge/product/governance/phases/recovery.md)
 
 ### ③ Alignment
 Interpret user intent and define goals. Do not change code until goals are agreed upon.
-→ [phases/alignment.md](./knowledge/public/governance/phases/alignment.md)
+→ [phases/alignment.md](./knowledge/product/governance/phases/alignment.md)
 
 ### ④ Execution
 Change one thing at a time, test immediately. If a major obstacle arises, return to ③ to re-align.
 The owner controls mission state; workers participate via task contracts.
 (See Rule 4 for ADF preflight requirements.)
-→ [phases/execution.md](./knowledge/public/governance/phases/execution.md)
+→ [phases/execution.md](./knowledge/product/governance/phases/execution.md)
 
 ### ⑤ Review
 Extract learnings from both successes and failures into `knowledge/`. Clean up temp files. Auto-generate hints from execution Traces for future runs (Feedback Loop).
-→ [phases/review.md](./knowledge/public/governance/phases/review.md)
+→ [phases/review.md](./knowledge/product/governance/phases/review.md)
 
 ## 3. References
 
@@ -95,5 +95,5 @@ Extract learnings from both successes and failures into `knowledge/`. Clean up t
 | [CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md) | Actuator catalog |
 | [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md) | Daily operations |
 | [pipelines/README.md](./pipelines/README.md) | Pipeline catalog |
-| [phases/](./knowledge/public/governance/phases/) | Per-phase runbooks |
-| [architecture/agent-mission-control-model.md](./knowledge/public/architecture/agent-mission-control-model.md) | Mission control model |
+| [phases/](./knowledge/product/governance/phases/) | Per-phase runbooks |
+| [architecture/agent-mission-control-model.md](./knowledge/product/architecture/agent-mission-control-model.md) | Mission control model |

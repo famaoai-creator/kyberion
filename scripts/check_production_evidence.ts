@@ -41,7 +41,7 @@ export interface ProductionEvidenceSummary {
   release_decision: string;
 }
 
-const DEFAULT_REGISTER_PATH = 'knowledge/public/governance/production-evidence-register.json';
+const DEFAULT_REGISTER_PATH = 'knowledge/product/governance/production-evidence-register.json';
 const SUPPORTED_REF_SCHEMES = ['http:', 'https:'];
 export const REQUIRED_PRODUCTION_EVIDENCE_IDS = ['EV-30DAY-OPS', 'EV-EXT-CONTRIB', 'EV-FDE-DEPLOY'] as const;
 const SEMVER_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;

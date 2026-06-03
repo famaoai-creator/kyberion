@@ -3,15 +3,15 @@ import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 describe('Channel port and surface-agent contract', () => {
   it('ships the architecture and schema for channel ports and surface agents', () => {
-    expect(safeExistsSync('knowledge/public/architecture/channel-port-surface-model.md')).toBe(true);
-    expect(safeExistsSync('knowledge/public/schemas/channel-port.schema.json')).toBe(true);
-    expect(safeExistsSync('knowledge/agents/slack-surface-agent.agent.md')).toBe(true);
-    expect(safeExistsSync('knowledge/agents/nerve-agent.agent.md')).toBe(true);
+    expect(safeExistsSync('knowledge/product/architecture/channel-port-surface-model.md')).toBe(true);
+    expect(safeExistsSync('knowledge/product/schemas/channel-port.schema.json')).toBe(true);
+    expect(safeExistsSync('knowledge/product/agents/slack-surface-agent.agent.md')).toBe(true);
+    expect(safeExistsSync('knowledge/product/agents/nerve-agent.agent.md')).toBe(true);
   });
 
   it('defines the expected port taxonomy', () => {
     const schema = JSON.parse(
-      safeReadFile('knowledge/public/schemas/channel-port.schema.json', { encoding: 'utf8' }) as string
+      safeReadFile('knowledge/product/schemas/channel-port.schema.json', { encoding: 'utf8' }) as string
     );
 
     expect(schema.properties.role.enum).toEqual([
@@ -39,7 +39,7 @@ describe('Channel port and surface-agent contract', () => {
 
   it('documents Slack and Chronos as surface-agent-backed channels', () => {
     const doc = safeReadFile(
-      'knowledge/public/architecture/channel-port-surface-model.md',
+      'knowledge/product/architecture/channel-port-surface-model.md',
       { encoding: 'utf8' }
     ) as string;
 

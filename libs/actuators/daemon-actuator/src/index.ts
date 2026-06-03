@@ -20,7 +20,7 @@ const DEPRECATION_MESSAGE = [
   'daemon-actuator is retired.',
   'Use surface-runtime for declared long-lived services and process-actuator for managed process ownership.',
   'Reference procedure: knowledge/public/procedures/orchestration/replace-daemon-actuator-with-runtime-supervision.md',
-  'Reference manifest: knowledge/public/governance/active-surfaces.json',
+  'Reference manifest: knowledge/product/governance/active-surfaces.json',
 ].join(' ');
 
 interface LegacyDaemonAction {

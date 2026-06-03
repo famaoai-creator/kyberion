@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const DEPRECATION_MESSAGE = [
   'physical-bridge is retired.',
   'Use direct ADF orchestration over browser-actuator, system-actuator, and media-generation-actuator instead.',
-  'Reference pipeline: knowledge/public/governance/pipelines/physical-browser-system-sequence.json',
+  'Reference pipeline: knowledge/product/governance/pipelines/physical-browser-system-sequence.json',
   'Reference procedure: knowledge/public/procedures/orchestration/replace-physical-bridge-with-adf.md',
 ].join(' ');
 

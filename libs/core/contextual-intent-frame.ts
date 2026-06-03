@@ -6,7 +6,7 @@ import { resolveDefaultScheduleSource, type ScheduleSourceKind } from './context
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const CONTEXTUAL_INTENT_FRAME_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/contextual-intent-frame.schema.json'
+  'product/schemas/contextual-intent-frame.schema.json'
 );
 
 export type ContextualIntentAction = 'read' | 'change' | 'unknown';
@@ -57,7 +57,7 @@ function hasJapaneseChars(text: string): boolean {
 
 function inferAction(text: string): ContextualIntentAction {
   if (
-    /(調整|変更|リスケ|ずら|移動|移して|修正|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|組み直|並べ替え|再編成|再配置|整えて|change|update|resched|reschedule)/i.test(
+    /(調整|変更|リスケ|ずら|移動|移して|修正|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|組み直|並べ替え|再編成|再配置|整えて|代わりに参加|代理参加|change|update|resched|reschedule)/i.test(
       text
     )
   )

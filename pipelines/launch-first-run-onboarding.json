@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "launch-first-run-onboarding",
+  "version": "2.0.0",
   "description": "Create a deterministic first-run onboarding input and apply it through the governed onboarding CLI.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "context": {
     "identity_name": "Kyberion Operator",
     "language": "ja",
@@ -13,7 +15,7 @@
   "steps": [
     {
       "id": "write_identity_input",
-      "type": "apply",
+      "role": "sink",
       "op": "system:write_file",
       "params": {
         "path": "active/shared/tmp/launch-first-run-onboarding-identity.json",
@@ -22,7 +24,7 @@
     },
     {
       "id": "apply_onboarding",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "node dist/scripts/onboarding_apply.js --identity active/shared/tmp/launch-first-run-onboarding-identity.json"

@@ -16,8 +16,8 @@ This procedure is for the common music-video case where the visual story is driv
 - **Actuator**: `media-generation-actuator`
 - **Actuator**: `video-composition-actuator`
 - **Schemas**:
-  - [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/music-generation-adf.schema.json)
-  - [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-composition-adf.schema.json)
+  - [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/music-generation-adf.schema.json)
+  - [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-composition-adf.schema.json)
 - **Procedure**:
   - [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
 

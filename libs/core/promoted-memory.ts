@@ -80,13 +80,13 @@ function withPromotedMemoryExecutionContext<T>(
 function schemaPathForKind(kind: PromotedMemoryRecord['kind']): string {
   switch (kind) {
     case 'pattern':
-      return pathResolver.knowledge('public/schemas/generated-pattern-record.schema.json');
+      return pathResolver.knowledge('product/schemas/generated-pattern-record.schema.json');
     case 'sop_candidate':
-      return pathResolver.knowledge('public/schemas/generated-sop-record.schema.json');
+      return pathResolver.knowledge('product/schemas/generated-sop-record.schema.json');
     case 'knowledge_hint':
-      return pathResolver.knowledge('public/schemas/generated-knowledge-hint-record.schema.json');
+      return pathResolver.knowledge('product/schemas/generated-knowledge-hint-record.schema.json');
     case 'report_template':
-      return pathResolver.knowledge('public/schemas/generated-report-template-record.schema.json');
+      return pathResolver.knowledge('product/schemas/generated-report-template-record.schema.json');
   }
 }
 

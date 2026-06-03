@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
   const updateTaskSession = vi.fn();
   const getActiveTaskSession = vi.fn();
   const surfaceChannelFromAgentId = vi.fn(() => 'presence');
+  const executeCapturePhotoTaskSession = vi.fn();
   return {
     safeExec,
     secureFetch,
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => {
     updateTaskSession,
     getActiveTaskSession,
     surfaceChannelFromAgentId,
+    executeCapturePhotoTaskSession,
   };
 });
 
@@ -70,8 +72,13 @@ vi.mock('./task-session.js', () => ({
   getActiveTaskSession: mocks.getActiveTaskSession,
 }));
 
+vi.mock('./capture-photo-task-session-executor.js', () => ({
+  executeCapturePhotoTaskSession: mocks.executeCapturePhotoTaskSession,
+}));
+
 vi.mock('./router-contract.js', () => ({
   resolveSurfaceIntent: mocks.resolveSurfaceIntent,
+  resolveDirectIntentCommand: () => null,
 }));
 
 vi.mock('./surface-runtime-router.js', () => ({
@@ -185,6 +192,29 @@ describe('surface-runtime-orchestrator fast-path', () => {
       },
     }));
     mocks.saveTaskSession.mockReturnValue(undefined);
+    mocks.executeCapturePhotoTaskSession.mockResolvedValue({
+      output: '写真を取得しました。\n使用カメラ: FaceTime HD Camera\n保存先: /tmp/capture.jpg',
+      outputPath: '/tmp/capture.jpg',
+      session: {
+        session_id: 'TSK-TEST-SESSION',
+        task_type: 'capture_photo',
+        goal: {
+          summary: '記録用の写真を撮る',
+          success_condition: '画像が保存される',
+        },
+        artifact: {
+          kind: 'image',
+          output_path: '/tmp/capture.jpg',
+          preview_text: '写真を取得しました。',
+          storage_class: 'tmp',
+        },
+        work_loop: {
+          resolution: {
+            execution_shape: 'task_session',
+          },
+        },
+      },
+    });
   });
 
   it('executes pipeline hint and emits execution-receipt', async () => {
@@ -508,6 +538,44 @@ describe('surface-runtime-orchestrator fast-path', () => {
       expect.objectContaining({
         session_id: 'TSK-TEST-SESSION',
         task_type: 'analysis',
+      }),
+    );
+  });
+
+  it('executes capture_photo task sessions through the virtual camera bridge path', async () => {
+    mocks.classifyTaskSessionIntent.mockReturnValue({
+      intentId: 'capture-photo',
+      taskType: 'capture_photo',
+      goal: {
+        summary: '記録用の写真を撮る',
+        success_condition: '画像が保存される',
+      },
+      requirements: {
+        missing: [],
+        collected: {
+          camera_intent: 'record',
+        },
+      },
+      payload: {
+        camera_intent: 'record',
+        camera_device_preference: 'FaceTime HD Camera',
+      },
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '記録用に写真を1枚撮って',
+      senderAgentId: 'test-sender',
+    });
+    expect(result.text).toContain('写真を取得しました。');
+    expect(result.text).toContain('使用カメラ: FaceTime HD Camera');
+    expect(result.text).toContain('保存先: /tmp/capture.jpg');
+    expect(mocks.executeCapturePhotoTaskSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          task_type: 'capture_photo',
+        }),
+        queryText: '記録用に写真を1枚撮って',
       }),
     );
   });

@@ -1,0 +1,10 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "vision": {
+      "preset_path": "knowledge/product/orchestration/service-presets/media-generation.json",
+      "alias_of": "media-generation",
+      "intent_aliases": ["generate-image", "generate-video", "generate-music", "capture-screen", "record-screen"]
+    }
+  }
+}

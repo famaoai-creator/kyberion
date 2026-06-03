@@ -14,7 +14,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 function loadScenarioPack() {
   return JSON.parse(
     safeReadFile(
-      pathResolver.knowledge('public/governance/operator-learning-scenario-pack.json'),
+      pathResolver.knowledge('product/governance/operator-learning-scenario-pack.json'),
       { encoding: 'utf8' }
     ) as string
   );
@@ -35,7 +35,7 @@ describe('operator-learning scenario pack', () => {
     const ajv = new Ajv({ allErrors: true });
     const validate = compileSchemaFromPath(
       ajv,
-      pathResolver.knowledge('public/schemas/operator-learning-scenario-pack.schema.json')
+      pathResolver.knowledge('product/schemas/operator-learning-scenario-pack.schema.json')
     );
     const pack = loadScenarioPack();
 

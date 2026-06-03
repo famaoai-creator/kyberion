@@ -5,11 +5,12 @@ import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adap
 import { agentRegistry, AgentRecord, AgentProvider, AgentStatus } from './agent-registry.js';
 import { getAgentManifest, validateRequirements } from './agent-manifest.js';
 import * as crypto from 'node:crypto';
-import { safeExistsSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import * as path from 'node:path';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
+import { recordConfigFallback } from './config-fallback-registry.js';
 
 const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
@@ -78,10 +79,27 @@ export interface AgentRuntimeSnapshot {
   supportsSoftRefresh: boolean;
 }
 
-const PROVIDER_CONFIG: Record<string, { bootCommand: string; bootArgs: string[]; defaultModel: string }> = {
-  gemini: { bootCommand: 'gemini', bootArgs: ['--acp', '-y'], defaultModel: 'gemini-2.5-flash' },
-  copilot: { bootCommand: 'gh', bootArgs: ['copilot', '--', '--acp', '--allow-all'], defaultModel: 'claude-sonnet-4' },
-};
+interface LifecycleEntry { boot_command: string; boot_args: string[]; default_model: string }
+interface ProviderLifecycleFile { lifecycle: Record<string, LifecycleEntry> }
+
+let _cachedLifecycle: Record<string, LifecycleEntry> | null = null;
+
+function loadProviderLifecycle(): Record<string, LifecycleEntry> {
+  if (_cachedLifecycle) return _cachedLifecycle;
+  try {
+    const filePath = pathResolver.knowledge('product/governance/provider-config.json');
+    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ProviderLifecycleFile;
+    _cachedLifecycle = data.lifecycle || {};
+  } catch (err) {
+    const defaults = {
+      gemini: { boot_command: 'gemini', boot_args: ['--acp', '-y'], default_model: 'gemini-2.5-flash' },
+      copilot: { boot_command: 'gh', boot_args: ['copilot', '--', '--acp', '--allow-all'], default_model: 'claude-sonnet-4' },
+    };
+    recordConfigFallback({ knowledgePath: 'product/governance/provider-config.json', error: err, defaults: { lifecycle: defaults } });
+    _cachedLifecycle = defaults;
+  }
+  return _cachedLifecycle;
+}
 
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
@@ -223,13 +241,14 @@ class AgentLifecycleManagerImpl {
       }
     }
 
-    const config = PROVIDER_CONFIG[resolvedOptions.provider];
+    const lifecycleMap = loadProviderLifecycle();
+    const config = lifecycleMap[resolvedOptions.provider];
 
     // Register in registry
     agentRegistry.register({
       agentId,
       provider: resolvedOptions.provider,
-      modelId: resolvedOptions.modelId || config?.defaultModel || resolvedOptions.provider,
+      modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider,
       capabilities: resolvedOptions.capabilities || [],
       trustScore: 5.0,
       sessionId: null,
@@ -297,7 +316,7 @@ class AgentLifecycleManagerImpl {
         ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
-        metadata: { provider: resolvedOptions.provider, modelId: resolvedOptions.modelId || config?.defaultModel || resolvedOptions.provider },
+        metadata: { provider: resolvedOptions.provider, modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider },
         cleanup: async () => this.shutdown(agentId),
       });
       agentRegistry.updateStatus(agentId, 'ready');
@@ -339,14 +358,14 @@ class AgentLifecycleManagerImpl {
     // ACP-based agents (gemini, claude, etc.)
     if (!config) {
       agentRegistry.updateStatus(agentId, 'error');
-      throw new Error(`Unknown provider: ${resolvedOptions.provider}. Supported: ${Object.keys(PROVIDER_CONFIG).join(', ')}, codex`);
+      throw new Error(`Unknown provider: ${resolvedOptions.provider}. Supported: ${Object.keys(lifecycleMap).join(', ')}, codex`);
     }
 
     const mediatorOpts: ACPMediatorOptions = {
       threadId: agentId,
-      bootCommand: config.bootCommand,
-      bootArgs: [...config.bootArgs],
-      modelId: resolvedOptions.modelId || config.defaultModel,
+      bootCommand: config.boot_command,
+      bootArgs: [...config.boot_args],
+      modelId: resolvedOptions.modelId || config.default_model,
       systemPrompt: resolvedOptions.systemPrompt,
       cwd: resolvedOptions.cwd || PROJECT_ROOT,
     };

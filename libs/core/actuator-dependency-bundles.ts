@@ -19,9 +19,9 @@ interface ActuatorDependencyBundles {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_PATH = pathResolver.knowledge('public/governance/actuator-dependency-bundles.json');
+const PUBLIC_PATH = pathResolver.knowledge('product/governance/actuator-dependency-bundles.json');
 const PERSONAL_PATH = pathResolver.knowledge('personal/governance/actuator-dependency-bundles.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/actuator-dependency-bundles.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/actuator-dependency-bundles.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: ActuatorDependencyBundles | null = null;

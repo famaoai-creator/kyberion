@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "executive-report-patrol",
+  "version": "2.0.0",
   "description": "Fragment for Pattern D: Multi-site dashboard data collection. Navigates, captures, and stages data.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "context": {
     "session_path": "active/shared/runtime/browser/session-handoff.json",
     "targets": [],
@@ -10,7 +12,7 @@
   "steps": [
     {
       "id": "init_session",
-      "type": "capture",
+      "role": "sink",
       "op": "browser:import_session_handoff",
       "params": {
         "source": "{{session_path}}"
@@ -18,43 +20,43 @@
     },
     {
       "id": "patrol_loop",
-      "type": "control",
-      "op": "for_each",
+      "role": "gate",
+      "op": "core:foreach",
       "params": {
         "items": "{{targets}}",
         "as": "target",
         "pipeline": [
-        {
-          "id": "visit_site",
-          "type": "apply",
-          "op": "browser:goto",
-          "params": {
-            "url": "{{target.url}}"
+          {
+            "id": "visit_site",
+            "role": "sink",
+            "op": "browser:goto",
+            "params": {
+              "url": "{{target.url}}"
+            }
+          },
+          {
+            "id": "capture_data",
+            "role": "source",
+            "op": "browser:snapshot",
+            "produces": { "channel": "raw_content", "type": "SnapshotResult" },
+            "params": {}
+          },
+          {
+            "id": "stage_data",
+            "role": "sink",
+            "op": "file:write",
+            "consumes": "raw_content",
+            "params": {
+              "path": "active/shared/tmp/{{mission_id}}/{{target.id}}.json",
+              "content": "{{raw_content}}"
+            }
           }
-        },
-        {
-          "id": "capture_data",
-          "type": "capture",
-          "op": "browser:snapshot",
-          "params": {
-            "export_as": "raw_content"
-          }
-        },
-        {
-          "id": "stage_data",
-          "type": "apply",
-          "op": "file:write",
-          "params": {
-            "path": "active/shared/tmp/{{mission_id}}/{{target.id}}.json",
-            "content": "{{raw_content}}"
-          }
-        }
         ]
       }
     },
     {
       "id": "aggregate_data",
-      "type": "transform",
+      "role": "sink",
       "op": "wisdom:knowledge_inject",
       "params": {
         "source_dir": "active/shared/tmp/{{mission_id}}/",

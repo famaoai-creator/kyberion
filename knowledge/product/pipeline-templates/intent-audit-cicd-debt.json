@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-cicd-debt",
+  "name": "Audit CI/CD Pipeline for Technical Debt Reduction",
+  "version": "3.0.0",
+  "description": "Examines CI/CD configurations to find inefficiencies and maintenance burdens.",
+  "_migration_note": "v3: Delegates to reasoning-audit-and-save fragment via core:include.",
+  "variables": {
+    "cicd_path": ".github/workflows/main.yml",
+    "output_path": "active/shared/tmp/audit-cicd-debt.json"
+  },
+  "context": {
+    "audit_label": "CI/CD Technical Debt",
+    "source_path": "{{cicd_path}}",
+    "output_path": "{{output_path}}",
+    "instruction": "Evaluate the CI/CD pipeline configuration for technical debt. Look for redundant steps, slow stages that can be parallelized, and fragile deployment scripts.",
+    "analysis_type": "debt_audit"
+  },
+  "steps": [
+    {
+      "id": "audit",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/reasoning-audit-and-save.json" }
+    }
+  ]
+}

@@ -131,7 +131,7 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
 
   return {
     status: 'ok',
-    catalogPath: 'knowledge/public/orchestration/service-endpoints.json',
+    catalogPath: 'knowledge/product/orchestration/service-endpoints.json',
     rows,
     summary,
   };

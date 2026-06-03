@@ -1,0 +1,67 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "analysis-job",
+  "version": "2.0.0",
+  "name": "Strategic Analysis Job",
+  "description": "Runs the standard analysis sequence (skill co-occurrence + knowledge graph) using the reasoning backend. Replaces scripts/run_analysis_job.ts. Override context vars mission_id and job_id as needed.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🚀 [ANALYSIS] Starting analysis job (mission: {{mission_id}})" }
+    },
+    {
+      "id": "skill-cooccurrence",
+      "role": "source",
+      "op": "reasoning:analyze",
+      "produces": { "channel": "skill_cooccurrence_result", "type": "SkillCooccurrenceResult" },
+      "params": {
+        "instruction": "Analyze skill co-occurrence patterns across the Kyberion agent manifest and knowledge graph. Identify which capabilities are most frequently deployed together in missions.",
+        "context": ["{{mission_id}}", "{{job_id}}"],
+        "analysisType": "skill_cooccurrence"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ Skill co-occurrence analysis complete." }
+    },
+    {
+      "id": "knowledge-graph",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "skill_cooccurrence_result",
+      "produces": { "channel": "knowledge_graph_result", "type": "KnowledgeGraphResult" },
+      "params": {
+        "instruction": "Build a knowledge graph summary from the current mission evidence and agent knowledge base. Identify key concepts, their relationships, and knowledge gaps.",
+        "context": ["{{skill_cooccurrence_result}}", "{{mission_id}}"],
+        "analysisType": "knowledge_graph"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ Knowledge graph analysis complete." }
+    },
+    {
+      "id": "write-results",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["skill_cooccurrence_result", "knowledge_graph_result"],
+      "params": {
+        "path": "active/shared/tmp/analysis-results-{{job_id}}.json",
+        "content": {
+          "skill_cooccurrence": "{{skill_cooccurrence_result}}",
+          "knowledge_graph": "{{knowledge_graph_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ [ANALYSIS] Analysis job complete. Results written to active/shared/tmp/analysis-results-{{job_id}}.json" }
+    }
+  ]
+}

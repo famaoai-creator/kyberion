@@ -92,9 +92,9 @@ type ClassificationPolicy = {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-classification-policy.schema.json');
-const POLICY_PATH = pathResolver.knowledge('public/governance/mission-classification-policy.json');
-const RESULT_SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-classification.schema.json');
+const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-classification-policy.schema.json');
+const POLICY_PATH = pathResolver.knowledge('product/governance/mission-classification-policy.json');
+const RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-classification.schema.json');
 
 let policyValidateFn: ValidateFunction | null = null;
 let resultValidateFn: ValidateFunction | null = null;

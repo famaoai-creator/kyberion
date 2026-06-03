@@ -26,8 +26,8 @@ type TeamRoleRecord = {
 
 type TeamRoleFile = TeamRoleRecord & { role: string };
 
-const DIRECTORY = pathResolver.knowledge('public/orchestration/team-roles');
-const SNAPSHOT = pathResolver.knowledge('public/orchestration/team-role-index.json');
+const DIRECTORY = pathResolver.knowledge('product/orchestration/team-roles');
+const SNAPSHOT = pathResolver.knowledge('product/orchestration/team-role-index.json');
 
 function readJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;

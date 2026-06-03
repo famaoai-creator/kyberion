@@ -262,7 +262,7 @@ export async function main() {
   addFormats(ajv);
   const validateState = compileSchemaFromPath(
     ajv,
-    pathResolver.rootResolve('knowledge/public/schemas/onboarding-state.schema.json'),
+    pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json'),
   );
 
   const now = new Date().toISOString();

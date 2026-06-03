@@ -29,7 +29,7 @@ describe('actuator-dependency-bundles', () => {
 
   it('emits a bundle set that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/actuator-dependency-bundles.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/actuator-dependency-bundles.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const payload = loadActuatorDependencyBundles();
     expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);

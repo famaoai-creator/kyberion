@@ -12,8 +12,8 @@ interface MediaDrawioSecurityGroupOrderCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-drawio-security-group-order.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-drawio-security-group-order.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-drawio-security-group-order.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-drawio-security-group-order.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaDrawioSecurityGroupOrderCatalog | null = null;

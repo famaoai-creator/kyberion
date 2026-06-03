@@ -32,7 +32,7 @@ function basePolicy(overrides: Partial<MeetingFacilitatorPolicy> = {}): MeetingF
     reminder_cc_after_n: 3,
     speaker_fairness_total_threshold: 0.6,
     speaker_fairness_must_threshold: 0.7,
-    restricted_actions_policy_path: 'knowledge/public/governance/restricted-action-kinds-policy.json',
+    restricted_actions_policy_path: 'knowledge/product/governance/restricted-action-kinds-policy.json',
     ...overrides,
   };
 }

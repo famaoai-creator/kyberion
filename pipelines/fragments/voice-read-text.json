@@ -1,10 +1,13 @@
 {
-  "pipeline_id": "voice-read-text",
-  "version": "1.0.0",
-  "description": "Fragment demonstrating how to synthesize and play text-to-speech audio using the local voice actuator.",
   "action": "pipeline",
+  "name": "voice-read-text-fragment",
+  "version": "2.0.0",
+  "description": "Fragment demonstrating how to synthesize and play text-to-speech audio using the local voice actuator.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used action at step level with no op key.",
   "steps": [
     {
+      "id": "speak_text",
+      "role": "sink",
       "action": "speak_local",
       "params": {
         "text": "テキストの音声読み上げテストを完了しました。パスキーパイプラインとともに堅牢化されています。",

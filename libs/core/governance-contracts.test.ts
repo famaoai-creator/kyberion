@@ -33,8 +33,8 @@ function readPayloadsFromDir(relativeDir: string): unknown[] {
 const CASES: GovernanceSchemaCase[] = [
   {
     name: 'intent-policy',
-    schemaPath: 'knowledge/public/schemas/intent-policy.schema.json',
-    dataPath: 'knowledge/public/governance/intent-policy.json',
+    schemaPath: 'knowledge/product/schemas/intent-policy.schema.json',
+    dataPath: 'knowledge/product/governance/intent-policy.json',
     invalidPayload: {
       version: '1.0.0',
       delivery: { rules: [] },
@@ -42,14 +42,14 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'active-surfaces',
-    schemaPath: 'knowledge/public/schemas/runtime-surface-manifest.schema.json',
-    dataPath: 'knowledge/public/governance/active-surfaces.json',
+    schemaPath: 'knowledge/product/schemas/runtime-surface-manifest.schema.json',
+    dataPath: 'knowledge/product/governance/active-surfaces.json',
     invalidPayload: { version: 1 },
   },
   {
     name: 'model-registry',
-    schemaPath: 'knowledge/public/schemas/model-registry.schema.json',
-    dataPath: 'knowledge/public/governance/model-registry.json',
+    schemaPath: 'knowledge/product/schemas/model-registry.schema.json',
+    dataPath: 'knowledge/product/governance/model-registry.json',
     invalidPayload: {
       version: '1.0.0',
       default_model_id: 'openai:gpt-5.4',
@@ -57,120 +57,120 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'model-adaptation-policy',
-    schemaPath: 'knowledge/public/schemas/model-adaptation-policy.schema.json',
-    dataPath: 'knowledge/public/governance/model-adaptation-policy.json',
+    schemaPath: 'knowledge/product/schemas/model-adaptation-policy.schema.json',
+    dataPath: 'knowledge/product/governance/model-adaptation-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'harness-capability-registry',
-    schemaPath: 'knowledge/public/schemas/harness-capability-registry.schema.json',
-    dataPath: 'knowledge/public/governance/harness-capability-registry.json',
+    schemaPath: 'knowledge/product/schemas/harness-capability-registry.schema.json',
+    dataPath: 'knowledge/product/governance/harness-capability-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'capability-bundle-registry',
-    schemaPath: 'knowledge/public/schemas/capability-bundle-registry.schema.json',
-    dataPath: 'knowledge/public/governance/capability-bundle-registry.json',
+    schemaPath: 'knowledge/product/schemas/capability-bundle-registry.schema.json',
+    dataPath: 'knowledge/product/governance/capability-bundle-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'intent-execution-profile-registry',
-    schemaPath: 'knowledge/public/schemas/intent-execution-profile-registry.schema.json',
-    dataPath: 'knowledge/public/governance/intent-execution-profile-registry.json',
+    schemaPath: 'knowledge/product/schemas/intent-execution-profile-registry.schema.json',
+    dataPath: 'knowledge/product/governance/intent-execution-profile-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'execution-receipt-policy',
-    schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
-    dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
+    schemaPath: 'knowledge/product/schemas/execution-receipt-policy.schema.json',
+    dataPath: 'knowledge/product/governance/execution-receipt-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'voice-profile-registry',
-    schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
-    dataPath: 'knowledge/public/governance/voice-profile-registry.json',
+    schemaPath: 'knowledge/product/schemas/voice-profile-registry.schema.json',
+    dataPath: 'knowledge/product/governance/voice-profile-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'voice-profile-directory',
-    schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
-    dataPath: 'knowledge/public/governance/voice-profiles/operator-en-default.json',
+    schemaPath: 'knowledge/product/schemas/voice-profile-registry.schema.json',
+    dataPath: 'knowledge/product/governance/voice-profiles/operator-en-default.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'voice-runtime-policy',
-    schemaPath: 'knowledge/public/schemas/voice-runtime-policy.schema.json',
-    dataPath: 'knowledge/public/governance/voice-runtime-policy.json',
+    schemaPath: 'knowledge/product/schemas/voice-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/voice-runtime-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'voice-engine-registry',
-    schemaPath: 'knowledge/public/schemas/voice-engine-registry.schema.json',
-    dataPath: 'knowledge/public/governance/voice-engine-registry.json',
+    schemaPath: 'knowledge/product/schemas/voice-engine-registry.schema.json',
+    dataPath: 'knowledge/product/governance/voice-engine-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'voice-sample-ingestion-policy',
-    schemaPath: 'knowledge/public/schemas/voice-sample-ingestion-policy.schema.json',
-    dataPath: 'knowledge/public/governance/voice-sample-ingestion-policy.json',
+    schemaPath: 'knowledge/product/schemas/voice-sample-ingestion-policy.schema.json',
+    dataPath: 'knowledge/product/governance/voice-sample-ingestion-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'video-composition-template-registry',
-    schemaPath: 'knowledge/public/schemas/video-composition-template-registry.schema.json',
-    dataPath: 'knowledge/public/governance/video-composition-template-registry.json',
+    schemaPath: 'knowledge/product/schemas/video-composition-template-registry.schema.json',
+    dataPath: 'knowledge/product/governance/video-composition-template-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'video-render-runtime-policy',
-    schemaPath: 'knowledge/public/schemas/video-render-runtime-policy.schema.json',
-    dataPath: 'knowledge/public/governance/video-render-runtime-policy.json',
+    schemaPath: 'knowledge/product/schemas/video-render-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/video-render-runtime-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'mission-classification-policy',
-    schemaPath: 'knowledge/public/schemas/mission-classification-policy.schema.json',
-    dataPath: 'knowledge/public/governance/mission-classification-policy.json',
+    schemaPath: 'knowledge/product/schemas/mission-classification-policy.schema.json',
+    dataPath: 'knowledge/product/governance/mission-classification-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'authority-role-index',
-    schemaPath: 'knowledge/public/schemas/authority-role-index.schema.json',
-    dataPath: 'knowledge/public/governance/authority-role-index.json',
+    schemaPath: 'knowledge/product/schemas/authority-role-index.schema.json',
+    dataPath: 'knowledge/product/governance/authority-role-index.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'authority-role-directory',
-    schemaPath: 'knowledge/public/schemas/authority-role.schema.json',
-    dataPath: 'knowledge/public/governance/authority-roles/mission_controller.json',
+    schemaPath: 'knowledge/product/schemas/authority-role.schema.json',
+    dataPath: 'knowledge/product/governance/authority-roles/mission_controller.json',
     invalidPayload: {
       description: 'Mission lifecycle authority with mission state and observability write access.',
     },
   },
   {
     name: 'team-role-index',
-    schemaPath: 'knowledge/public/schemas/team-role-index.schema.json',
-    dataPath: 'knowledge/public/orchestration/team-role-index.json',
+    schemaPath: 'knowledge/product/schemas/team-role-index.schema.json',
+    dataPath: 'knowledge/product/orchestration/team-role-index.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'team-role-directory',
-    schemaPath: 'knowledge/public/schemas/team-role.schema.json',
-    dataPath: 'knowledge/public/orchestration/team-roles/owner.json',
+    schemaPath: 'knowledge/product/schemas/team-role.schema.json',
+    dataPath: 'knowledge/product/orchestration/team-roles/owner.json',
     invalidPayload: {
       description: 'Mission owner with final accountability, checkpoint, verify, and finish authority.',
     },
   },
   {
     name: 'agent-profile-index',
-    schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
-    dataPath: 'knowledge/public/orchestration/agent-profile-index.json',
+    schemaPath: 'knowledge/product/schemas/agent-profile-index.schema.json',
+    dataPath: 'knowledge/product/orchestration/agent-profile-index.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'organization-profile',
-    schemaPath: 'knowledge/public/schemas/organization-profile.schema.json',
-    dataPath: 'knowledge/public/governance/organization-profile.json',
+    schemaPath: 'knowledge/product/schemas/organization-profile.schema.json',
+    dataPath: 'knowledge/product/governance/organization-profile.json',
     invalidPayload: {
       version: '1.0.0',
       organization_id: 'default',
@@ -178,8 +178,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'organization-team-template-catalog',
-    schemaPath: 'knowledge/public/schemas/organization-team-template-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/organization-team-template-catalogs/demo-org.json',
+    schemaPath: 'knowledge/product/schemas/organization-team-template-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/organization-team-template-catalogs/demo-org.json',
     invalidPayload: {
       version: '1.0.0',
       organization_id: 'demo-org',
@@ -187,8 +187,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'organization-team-template-catalog-ops',
-    schemaPath: 'knowledge/public/schemas/organization-team-template-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/organization-team-template-catalogs/ops-org.json',
+    schemaPath: 'knowledge/product/schemas/organization-team-template-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/organization-team-template-catalogs/ops-org.json',
     invalidPayload: {
       version: '1.0.0',
       organization_id: 'ops-org',
@@ -196,32 +196,32 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'mission-workflow-catalog',
-    schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/mission-workflow-catalog.json',
+    schemaPath: 'knowledge/product/schemas/mission-workflow-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/mission-workflow-catalog.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'mission-review-gate-registry',
-    schemaPath: 'knowledge/public/schemas/mission-review-gate-registry.schema.json',
-    dataPath: 'knowledge/public/governance/mission-review-gate-registry.json',
+    schemaPath: 'knowledge/product/schemas/mission-review-gate-registry.schema.json',
+    dataPath: 'knowledge/product/governance/mission-review-gate-registry.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'path-scope-policy',
-    schemaPath: 'knowledge/public/schemas/path-scope-policy.schema.json',
-    dataPath: 'knowledge/public/governance/path-scope-policy.json',
+    schemaPath: 'knowledge/product/schemas/path-scope-policy.schema.json',
+    dataPath: 'knowledge/product/governance/path-scope-policy.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'mission-orchestration-scenario-pack',
-    schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
-    dataPath: 'knowledge/public/governance/mission-orchestration-scenario-pack.json',
+    schemaPath: 'knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json',
+    dataPath: 'knowledge/product/governance/mission-orchestration-scenario-pack.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'operator-learning-scenario-pack',
-    schemaPath: 'knowledge/public/schemas/operator-learning-scenario-pack.schema.json',
-    dataPath: 'knowledge/public/governance/operator-learning-scenario-pack.json',
+    schemaPath: 'knowledge/product/schemas/operator-learning-scenario-pack.schema.json',
+    dataPath: 'knowledge/product/governance/operator-learning-scenario-pack.json',
     invalidPayload: {
       version: '1.0.0',
       scenarios: [],
@@ -229,8 +229,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'operator-learning-dispatch-registry',
-    schemaPath: 'knowledge/public/schemas/operator-learning-dispatch-registry.schema.json',
-    dataPath: 'knowledge/public/governance/operator-learning-dispatch-registry.json',
+    schemaPath: 'knowledge/product/schemas/operator-learning-dispatch-registry.schema.json',
+    dataPath: 'knowledge/product/governance/operator-learning-dispatch-registry.json',
     invalidPayload: {
       version: '1.0.0',
       rules: [],
@@ -238,8 +238,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'presentation-preference-registry',
-    schemaPath: 'knowledge/public/schemas/presentation-preference-registry.schema.json',
-    dataPath: 'knowledge/public/governance/presentation-preference-registry.json',
+    schemaPath: 'knowledge/product/schemas/presentation-preference-registry.schema.json',
+    dataPath: 'knowledge/product/governance/presentation-preference-registry.json',
     invalidPayload: {
       version: '1.0.0',
       default_profile_id: 'business-deck-default',
@@ -248,18 +248,18 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'surface-query-overlay-catalog',
-    schemaPath: 'knowledge/public/schemas/surface-query-overlay-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/surface-query-overlay-catalog.json',
+    schemaPath: 'knowledge/product/schemas/surface-query-overlay-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/surface-query-overlay-catalog.json',
     invalidPayload: {
       version: '1.0.0',
-      base_config_path: 'public/presence/surface-query-providers.json',
+      base_config_path: 'product/presence/surface-query-providers.json',
       overlays: [{ id: 'missing-path', kind: 'role' }],
     },
   },
   {
     name: 'surface-provider-manifest-catalog',
-    schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/surface-provider-manifest-catalog.json',
+    schemaPath: 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/surface-provider-manifest-catalog.json',
     invalidPayload: {
       version: '1.0.0',
       entries: [{ id: 'slack', channel: 'slack' }],
@@ -267,8 +267,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'surface-provider-manifest-catalog-directory',
-    schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/surface-provider-manifest-catalogs/slack.json',
+    schemaPath: 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/surface-provider-manifest-catalogs/slack.json',
     invalidPayload: {
       version: '1.0.0',
       entries: [{ id: 'slack', channel: 'slack' }],
@@ -276,8 +276,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'service-endpoints',
-    schemaPath: 'knowledge/public/schemas/service-endpoints.schema.json',
-    dataPath: 'knowledge/public/orchestration/service-endpoints.json',
+    schemaPath: 'knowledge/product/schemas/service-endpoints.schema.json',
+    dataPath: 'knowledge/product/orchestration/service-endpoints.json',
     invalidPayload: {
       default_pattern: 'https://api.{service_id}.com/v1',
       services: {
@@ -287,8 +287,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'service-endpoints-directory',
-    schemaPath: 'knowledge/public/schemas/service-endpoints.schema.json',
-    dataPath: 'knowledge/public/orchestration/service-endpoints/slack.json',
+    schemaPath: 'knowledge/product/schemas/service-endpoints.schema.json',
+    dataPath: 'knowledge/product/orchestration/service-endpoints/slack.json',
     invalidPayload: {
       default_pattern: 'https://api.{service_id}.com/v1',
       services: {
@@ -298,8 +298,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'service-bootstrap-catalog',
-    schemaPath: 'knowledge/public/schemas/service-bootstrap-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/service-bootstrap-catalog.json',
+    schemaPath: 'knowledge/product/schemas/service-bootstrap-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/service-bootstrap-catalog.json',
     invalidPayload: {
       version: '1.0.0',
       entries: [
@@ -312,8 +312,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
     {
       name: 'service-onboarding-catalog',
-      schemaPath: 'knowledge/public/schemas/service-onboarding-catalog.schema.json',
-      dataPath: 'knowledge/public/governance/service-onboarding-catalog.json',
+      schemaPath: 'knowledge/product/schemas/service-onboarding-catalog.schema.json',
+      dataPath: 'knowledge/product/governance/service-onboarding-catalog.json',
       invalidPayload: {
         version: '1.0.0',
         services: [{ service_id: 'comfyui' }],
@@ -321,8 +321,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'work-coordination-import-catalog',
-      schemaPath: 'knowledge/public/schemas/work-coordination-import-catalog.schema.json',
-      dataPath: 'knowledge/public/governance/work-coordination-import-catalog.json',
+      schemaPath: 'knowledge/product/schemas/work-coordination-import-catalog.schema.json',
+      dataPath: 'knowledge/product/governance/work-coordination-import-catalog.json',
       invalidPayload: {
         version: '1.0.0',
         imports: [{ id: 'broken', command: 'import-github-issue-file' }],
@@ -330,8 +330,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'service-authority-map',
-      schemaPath: 'knowledge/public/schemas/service-authority-map.schema.json',
-      dataPath: 'knowledge/public/governance/service-authority-map.json',
+      schemaPath: 'knowledge/product/schemas/service-authority-map.schema.json',
+      dataPath: 'knowledge/product/governance/service-authority-map.json',
       invalidPayload: {
         version: '1.0.0',
         services: [{ id: 'broken', service_id: 'github' }],
@@ -339,8 +339,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'actuator-dependency-bundles',
-      schemaPath: 'knowledge/public/schemas/actuator-dependency-bundles.schema.json',
-      dataPath: 'knowledge/public/governance/actuator-dependency-bundles.json',
+      schemaPath: 'knowledge/product/schemas/actuator-dependency-bundles.schema.json',
+      dataPath: 'knowledge/product/governance/actuator-dependency-bundles.json',
       invalidPayload: {
         version: '1.0.0',
         bundles: [{ id: 'broken', actuator: 'voice' }],
@@ -348,8 +348,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'skill-install-package-map',
-      schemaPath: 'knowledge/public/schemas/skill-install-package-map.schema.json',
-      dataPath: 'knowledge/public/governance/skill-install-package-map.json',
+      schemaPath: 'knowledge/product/schemas/skill-install-package-map.schema.json',
+      dataPath: 'knowledge/product/governance/skill-install-package-map.json',
       invalidPayload: {
         version: '1.0.0',
         entries: [{ id: 'broken', patterns: ['whisper'] }],
@@ -357,8 +357,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'surface-coordination-role-map',
-      schemaPath: 'knowledge/public/schemas/surface-coordination-role-map.schema.json',
-      dataPath: 'knowledge/public/governance/surface-coordination-role-map.json',
+      schemaPath: 'knowledge/product/schemas/surface-coordination-role-map.schema.json',
+      dataPath: 'knowledge/product/governance/surface-coordination-role-map.json',
       invalidPayload: {
         version: '1.0.0',
         entries: [{ surface: 'slack' }],
@@ -366,8 +366,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'voice-task-profile-catalog',
-      schemaPath: 'knowledge/public/schemas/voice-task-profile-catalog.schema.json',
-      dataPath: 'knowledge/public/governance/voice-task-profile-catalog.json',
+      schemaPath: 'knowledge/product/schemas/voice-task-profile-catalog.schema.json',
+      dataPath: 'knowledge/product/governance/voice-task-profile-catalog.json',
       invalidPayload: {
         version: '1.0.0',
         profiles: [{ id: 'broken', task_type: 'presentation_deck' }],
@@ -375,8 +375,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-tone-style-map',
-      schemaPath: 'knowledge/public/schemas/media-tone-style-map.schema.json',
-      dataPath: 'knowledge/public/governance/media-tone-style-map.json',
+      schemaPath: 'knowledge/product/schemas/media-tone-style-map.schema.json',
+      dataPath: 'knowledge/product/governance/media-tone-style-map.json',
       invalidPayload: {
         version: '1.0.0',
         tones: [{ tone: 'success' }],
@@ -384,8 +384,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-drawio-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-drawio-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-drawio-policy.json',
       invalidPayload: {
         version: '1.0.0',
         boundary_palettes: [{ boundary: 'account', fill: '#fff' }],
@@ -393,8 +393,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-drawio-boundary-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-boundary-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-drawio-boundary-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-boundary-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-drawio-boundary-policy.json',
       invalidPayload: {
         version: '1.0.0',
         palette_overrides: [{ boundary: 'lane', tier: 'web', fill: '#fff' }],
@@ -402,8 +402,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-drawio-tier-order',
-      schemaPath: 'knowledge/public/schemas/media-drawio-tier-order.schema.json',
-      dataPath: 'knowledge/public/governance/media-drawio-tier-order.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-tier-order.schema.json',
+      dataPath: 'knowledge/product/governance/media-drawio-tier-order.json',
       invalidPayload: {
         version: '1.0.0',
         tier_order: [],
@@ -411,8 +411,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-drawio-sort-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-sort-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-drawio-sort-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-sort-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-drawio-sort-policy.json',
       invalidPayload: {
         version: '1.0.0',
         group_order: [],
@@ -421,8 +421,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-drawio-security-group-order',
-      schemaPath: 'knowledge/public/schemas/media-drawio-security-group-order.schema.json',
-      dataPath: 'knowledge/public/governance/media-drawio-security-group-order.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-security-group-order.schema.json',
+      dataPath: 'knowledge/product/governance/media-drawio-security-group-order.json',
       invalidPayload: {
         version: '1.0.0',
         relation_prefix: '',
@@ -430,8 +430,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'document-inference-policy',
-      schemaPath: 'knowledge/public/schemas/document-inference-policy.schema.json',
-      dataPath: 'knowledge/public/governance/document-inference-policy.json',
+      schemaPath: 'knowledge/product/schemas/document-inference-policy.schema.json',
+      dataPath: 'knowledge/product/governance/document-inference-policy.json',
       invalidPayload: {
         version: '1.0.0',
         type_rules: [{ document_type: 'report' }],
@@ -440,8 +440,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'document-contents-policy',
-      schemaPath: 'knowledge/public/schemas/document-contents-policy.schema.json',
-      dataPath: 'knowledge/public/governance/document-contents-policy.json',
+      schemaPath: 'knowledge/product/schemas/document-contents-policy.schema.json',
+      dataPath: 'knowledge/product/governance/document-contents-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title_by_locale: { ja: '目次' },
@@ -449,8 +449,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'document-outline-label-policy',
-      schemaPath: 'knowledge/public/schemas/document-outline-label-policy.schema.json',
-      dataPath: 'knowledge/public/governance/document-outline-label-policy.json',
+      schemaPath: 'knowledge/product/schemas/document-outline-label-policy.schema.json',
+      dataPath: 'knowledge/product/governance/document-outline-label-policy.json',
       invalidPayload: {
         version: '1.0.0',
         report_summary_title: 'Summary',
@@ -458,8 +458,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'promoted-report-template-policy',
-      schemaPath: 'knowledge/public/schemas/promoted-report-template-policy.schema.json',
-      dataPath: 'knowledge/public/governance/promoted-report-template-policy.json',
+      schemaPath: 'knowledge/product/schemas/promoted-report-template-policy.schema.json',
+      dataPath: 'knowledge/product/governance/promoted-report-template-policy.json',
       invalidPayload: {
         version: '1.0.0',
         template_sections: [],
@@ -467,8 +467,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'onboarding-summary-policy',
-      schemaPath: 'knowledge/public/schemas/onboarding-summary-policy.schema.json',
-      dataPath: 'knowledge/public/governance/onboarding-summary-policy.json',
+      schemaPath: 'knowledge/product/schemas/onboarding-summary-policy.schema.json',
+      dataPath: 'knowledge/product/governance/onboarding-summary-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title: 'Kyberion Onboarding Summary',
@@ -476,8 +476,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'onboarding-flow-policy',
-      schemaPath: 'knowledge/public/schemas/onboarding-flow-policy.schema.json',
-      dataPath: 'knowledge/public/governance/onboarding-flow-policy.json',
+      schemaPath: 'knowledge/product/schemas/onboarding-flow-policy.schema.json',
+      dataPath: 'knowledge/product/governance/onboarding-flow-policy.json',
       invalidPayload: {
         version: '1.0.0',
         phase_titles: {
@@ -487,8 +487,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'mission-distill-markdown-policy',
-      schemaPath: 'knowledge/public/schemas/mission-distill-markdown-policy.schema.json',
-      dataPath: 'knowledge/public/governance/mission-distill-markdown-policy.json',
+      schemaPath: 'knowledge/product/schemas/mission-distill-markdown-policy.schema.json',
+      dataPath: 'knowledge/product/governance/mission-distill-markdown-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title_suffix: 'Completion Summary',
@@ -496,8 +496,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'mission-ledger-policy',
-      schemaPath: 'knowledge/public/schemas/mission-ledger-policy.schema.json',
-      dataPath: 'knowledge/public/governance/mission-ledger-policy.json',
+      schemaPath: 'knowledge/product/schemas/mission-ledger-policy.schema.json',
+      dataPath: 'knowledge/product/governance/mission-ledger-policy.json',
       invalidPayload: {
         version: '1.0.0',
         section_title: 'Mission Ledger',
@@ -505,8 +505,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'provider-cli-capability-report-policy',
-      schemaPath: 'knowledge/public/schemas/provider-cli-capability-report-policy.schema.json',
-      dataPath: 'knowledge/public/governance/provider-cli-capability-report-policy.json',
+      schemaPath: 'knowledge/product/schemas/provider-cli-capability-report-policy.schema.json',
+      dataPath: 'knowledge/product/governance/provider-cli-capability-report-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title: 'Provider CLI Capability Report',
@@ -514,8 +514,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'mission-journal-policy',
-      schemaPath: 'knowledge/public/schemas/mission-journal-policy.schema.json',
-      dataPath: 'knowledge/public/governance/mission-journal-policy.json',
+      schemaPath: 'knowledge/product/schemas/mission-journal-policy.schema.json',
+      dataPath: 'knowledge/product/governance/mission-journal-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title: 'Mission Journal: Ecosystem Evolution',
@@ -523,8 +523,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'pilot-strategy-policy',
-      schemaPath: 'knowledge/public/schemas/pilot-strategy-policy.schema.json',
-      dataPath: 'knowledge/public/governance/pilot-strategy-policy.json',
+      schemaPath: 'knowledge/product/schemas/pilot-strategy-policy.schema.json',
+      dataPath: 'knowledge/product/governance/pilot-strategy-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title: 'Kyberion AI Consulting: Go-to-Market Strategy',
@@ -532,8 +532,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'production-evidence-summary-policy',
-      schemaPath: 'knowledge/public/schemas/production-evidence-summary-policy.schema.json',
-      dataPath: 'knowledge/public/governance/production-evidence-summary-policy.json',
+      schemaPath: 'knowledge/product/schemas/production-evidence-summary-policy.schema.json',
+      dataPath: 'knowledge/product/governance/production-evidence-summary-policy.json',
       invalidPayload: {
         version: '1.0.0',
         title_prefix: 'production evidence',
@@ -541,8 +541,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'changelog-policy',
-      schemaPath: 'knowledge/public/schemas/changelog-policy.schema.json',
-      dataPath: 'knowledge/public/governance/changelog-policy.json',
+      schemaPath: 'knowledge/product/schemas/changelog-policy.schema.json',
+      dataPath: 'knowledge/product/governance/changelog-policy.json',
       invalidPayload: {
         version: '1.0.0',
         breaking_changes_title: '⚠ BREAKING CHANGES',
@@ -550,8 +550,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'spreadsheet-style-policy',
-      schemaPath: 'knowledge/public/schemas/spreadsheet-style-policy.schema.json',
-      dataPath: 'knowledge/public/governance/spreadsheet-style-policy.json',
+      schemaPath: 'knowledge/product/schemas/spreadsheet-style-policy.schema.json',
+      dataPath: 'knowledge/product/governance/spreadsheet-style-policy.json',
       invalidPayload: {
         version: '1.0.0',
         role_indices: {},
@@ -559,8 +559,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'legacy-media-ops',
-      schemaPath: 'knowledge/public/schemas/legacy-media-ops.schema.json',
-      dataPath: 'knowledge/public/governance/legacy-media-ops.json',
+      schemaPath: 'knowledge/product/schemas/legacy-media-ops.schema.json',
+      dataPath: 'knowledge/product/governance/legacy-media-ops.json',
       invalidPayload: {
         version: '1.0.0',
         ops: [],
@@ -568,8 +568,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-drawio-edge-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-edge-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-drawio-edge-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-edge-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-drawio-edge-policy.json',
       invalidPayload: {
         version: '1.0.0',
         edge_labels: [{ label: 'uses' }],
@@ -577,8 +577,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-aws-icon-rules',
-      schemaPath: 'knowledge/public/schemas/media-aws-icon-rules.schema.json',
-      dataPath: 'knowledge/public/governance/media-aws-icon-rules.json',
+      schemaPath: 'knowledge/product/schemas/media-aws-icon-rules.schema.json',
+      dataPath: 'knowledge/product/governance/media-aws-icon-rules.json',
       invalidPayload: {
         version: '1.0.0',
         rules: [{ match_type: 'contains', match_value: 'cloudwatch' }],
@@ -586,8 +586,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-semantic-map',
-      schemaPath: 'knowledge/public/schemas/media-semantic-map.schema.json',
-      dataPath: 'knowledge/public/governance/media-semantic-map.json',
+      schemaPath: 'knowledge/product/schemas/media-semantic-map.schema.json',
+      dataPath: 'knowledge/product/governance/media-semantic-map.json',
       invalidPayload: {
         version: '1.0.0',
         rules: [{ semantic_type: 'hero' }],
@@ -595,8 +595,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-style-policy',
-      schemaPath: 'knowledge/public/schemas/media-style-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-style-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-style-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-style-policy.json',
       invalidPayload: {
         version: '1.0.0',
         signal_tone_ranks: { danger: 0 },
@@ -604,8 +604,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-signal-entry-policy',
-      schemaPath: 'knowledge/public/schemas/media-signal-entry-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-signal-entry-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-signal-entry-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-signal-entry-policy.json',
       invalidPayload: {
         version: '1.0.0',
         entry_types: [{ source_key: 'signals', signal_type: 'signal' }],
@@ -613,8 +613,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'tracker-sheet-policy',
-      schemaPath: 'knowledge/public/schemas/tracker-sheet-policy.schema.json',
-      dataPath: 'knowledge/public/governance/tracker-sheet-policy.json',
+      schemaPath: 'knowledge/product/schemas/tracker-sheet-policy.schema.json',
+      dataPath: 'knowledge/product/governance/tracker-sheet-policy.json',
       invalidPayload: {
         version: '1.0.0',
         sheet_titles: { overview: 'Overview' },
@@ -622,8 +622,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'media-theme-role-policy',
-      schemaPath: 'knowledge/public/schemas/media-theme-role-policy.schema.json',
-      dataPath: 'knowledge/public/governance/media-theme-role-policy.json',
+      schemaPath: 'knowledge/product/schemas/media-theme-role-policy.schema.json',
+      dataPath: 'knowledge/product/governance/media-theme-role-policy.json',
       invalidPayload: {
         version: '1.0.0',
         theme_color_roles: { accent: 'accent' },
@@ -631,8 +631,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'reasoning-backend-policy',
-      schemaPath: 'knowledge/public/schemas/reasoning-backend-policy.schema.json',
-      dataPath: 'knowledge/public/governance/reasoning-backend-policy.json',
+      schemaPath: 'knowledge/product/schemas/reasoning-backend-policy.schema.json',
+      dataPath: 'knowledge/product/governance/reasoning-backend-policy.json',
       invalidPayload: {
         version: '1.0.0',
         allowed_modes: [],
@@ -640,8 +640,8 @@ const CASES: GovernanceSchemaCase[] = [
     },
     {
       name: 'specialist-catalog',
-      schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
-      dataPath: 'knowledge/public/orchestration/specialist-catalog.json',
+      schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
+      dataPath: 'knowledge/product/orchestration/specialist-catalog.json',
       invalidPayload: {
       version: '1.0.0',
       specialists: {
@@ -651,8 +651,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'specialist-catalog-directory',
-    schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
-    dataPath: 'knowledge/public/orchestration/specialists/document-specialist.json',
+    schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
+    dataPath: 'knowledge/product/orchestration/specialists/document-specialist.json',
     invalidPayload: {
       version: '1.0.0',
       specialists: {
@@ -662,8 +662,8 @@ const CASES: GovernanceSchemaCase[] = [
   },
   {
     name: 'tool-actuator-routing-policy',
-    schemaPath: 'knowledge/public/schemas/tool-actuator-routing-policy.schema.json',
-    dataPath: 'knowledge/public/governance/tool-actuator-routing-policy.json',
+    schemaPath: 'knowledge/product/schemas/tool-actuator-routing-policy.schema.json',
+    dataPath: 'knowledge/product/governance/tool-actuator-routing-policy.json',
     invalidPayload: {
       version: '1.0.0',
       defaults: { fallback_actuator: 'orchestrator-actuator' },
@@ -697,7 +697,7 @@ describe('governance contracts', () => {
   }
 
   it('keeps deterministic golden scenarios in the canonical schema-managed catalogs', () => {
-    const governanceDir = path.resolve(process.cwd(), 'knowledge/public/governance');
+    const governanceDir = path.resolve(process.cwd(), 'knowledge/product/governance');
     const unmanagedCatalogs = safeReaddir(governanceDir)
       .filter((entry) => entry.endsWith('.json'))
       .filter((entry) => {
@@ -715,7 +715,7 @@ describe('governance contracts', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json'),
     );
     expect(
       validate({
@@ -740,12 +740,12 @@ describe('governance contracts', () => {
 
     const voiceSchema = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/voice-profile-registry.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/voice-profile-registry.schema.json'),
     );
     const voiceSnapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/governance/voice-profile-registry.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/governance/voice-profile-registry.json'), { encoding: 'utf8' }) as string,
     );
-    const voiceDirPayloads = readPayloadsFromDir('knowledge/public/governance/voice-profiles');
+    const voiceDirPayloads = readPayloadsFromDir('knowledge/product/governance/voice-profiles');
     expect(voiceDirPayloads.length).toBeGreaterThan(0);
     for (const payload of voiceDirPayloads) {
       expect(voiceSchema(payload)).toBe(true);
@@ -756,12 +756,12 @@ describe('governance contracts', () => {
 
     const providerSchema = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json'),
     );
     const providerSnapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/governance/surface-provider-manifest-catalog.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/governance/surface-provider-manifest-catalog.json'), { encoding: 'utf8' }) as string,
     );
-    const providerDirPayloads = readPayloadsFromDir('knowledge/public/governance/surface-provider-manifest-catalogs');
+    const providerDirPayloads = readPayloadsFromDir('knowledge/product/governance/surface-provider-manifest-catalogs');
     expect(providerDirPayloads.length).toBeGreaterThan(0);
     for (const payload of providerDirPayloads) {
       expect(providerSchema(payload)).toBe(true);
@@ -777,12 +777,12 @@ describe('governance contracts', () => {
 
     const authoritySchema = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/authority-role.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/authority-role.schema.json'),
     );
     const authoritySnapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/governance/authority-role-index.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/governance/authority-role-index.json'), { encoding: 'utf8' }) as string,
     ) as { authority_roles?: Record<string, unknown> };
-    const authorityDirPayloads = readPayloadsFromDir('knowledge/public/governance/authority-roles');
+    const authorityDirPayloads = readPayloadsFromDir('knowledge/product/governance/authority-roles');
     expect(authorityDirPayloads.length).toBeGreaterThan(0);
     for (const payload of authorityDirPayloads) {
       expect(authoritySchema(payload)).toBe(true);
@@ -798,12 +798,12 @@ describe('governance contracts', () => {
 
     const endpointSchema = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/service-endpoints.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/service-endpoints.schema.json'),
     );
     const endpointSnapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/orchestration/service-endpoints.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/orchestration/service-endpoints.json'), { encoding: 'utf8' }) as string,
     ) as { default_pattern?: string; services?: Record<string, unknown> };
-    const endpointDirPayloads = readPayloadsFromDir('knowledge/public/orchestration/service-endpoints');
+    const endpointDirPayloads = readPayloadsFromDir('knowledge/product/orchestration/service-endpoints');
     expect(endpointDirPayloads.length).toBeGreaterThan(0);
     for (const payload of endpointDirPayloads) {
       expect(endpointSchema(payload)).toBe(true);
@@ -819,12 +819,12 @@ describe('governance contracts', () => {
 
     const specialistSchema = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/specialist-catalog.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/specialist-catalog.schema.json'),
     );
     const specialistSnapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/orchestration/specialist-catalog.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/orchestration/specialist-catalog.json'), { encoding: 'utf8' }) as string,
     ) as { version?: string; specialists?: Record<string, unknown> };
-    const specialistDirPayloads = readPayloadsFromDir('knowledge/public/orchestration/specialists');
+    const specialistDirPayloads = readPayloadsFromDir('knowledge/product/orchestration/specialists');
     expect(specialistDirPayloads.length).toBeGreaterThan(0);
     for (const payload of specialistDirPayloads) {
       expect(specialistSchema(payload)).toBe(true);
@@ -840,12 +840,12 @@ describe('governance contracts', () => {
 
     const engineSchema = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'knowledge/public/schemas/voice-engine-registry.schema.json'),
+      path.resolve(process.cwd(), 'knowledge/product/schemas/voice-engine-registry.schema.json'),
     );
     const engineSnapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/governance/voice-engine-registry.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/governance/voice-engine-registry.json'), { encoding: 'utf8' }) as string,
     ) as { engines?: Array<{ engine_id?: string }> };
-    const engineDirPayloads = readPayloadsFromDir('knowledge/public/governance/voice-engines');
+    const engineDirPayloads = readPayloadsFromDir('knowledge/product/governance/voice-engines');
     expect(engineDirPayloads.length).toBeGreaterThan(0);
     for (const payload of engineDirPayloads) {
       expect(engineSchema(payload)).toBe(true);
@@ -865,7 +865,7 @@ describe('governance contracts', () => {
     }: Record<string, unknown>) => entry;
     const catalog = loadActuatorManifestCatalog().map(normalizeActuatorEntry);
     const snapshot = JSON.parse(
-      safeReadFile(path.resolve(process.cwd(), 'knowledge/public/orchestration/global_actuator_index.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.resolve(process.cwd(), 'knowledge/product/orchestration/global_actuator_index.json'), { encoding: 'utf8' }) as string,
     ) as { actuators?: Array<Record<string, unknown>> };
 
     expect(catalog.length).toBeGreaterThan(0);

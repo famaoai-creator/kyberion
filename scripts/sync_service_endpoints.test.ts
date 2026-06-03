@@ -65,7 +65,7 @@ describe('sync_service_endpoints', () => {
 
     expect(mocks.safeWriteFile).toHaveBeenCalledTimes(1);
     const [snapshotPath, content] = mocks.safeWriteFile.mock.calls[0];
-    expect(String(snapshotPath)).toContain('knowledge/public/orchestration/service-endpoints.json');
+    expect(String(snapshotPath)).toContain('knowledge/product/orchestration/service-endpoints.json');
     const parsed = JSON.parse(String(content));
     expect(parsed.default_pattern).toBe('https://api.{service_id}.com/v1');
     expect(Object.keys(parsed.services)).toEqual(['github', 'slack']);

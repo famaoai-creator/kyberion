@@ -53,7 +53,7 @@ function writeDiskCache(providers: ProviderInfo[]): void {
 /**
  * Provider/model capability catalog.
  *
- * Capabilities are knowledge-driven (knowledge/public/orchestration/provider-capabilities.json)
+ * Capabilities are knowledge-driven (knowledge/product/orchestration/provider-capabilities.json)
  * rather than hardcoded, so they can evolve — by hand or by dynamic probing — without code
  * changes. FALLBACK_CATALOG below is the conservative built-in baseline used only when the
  * knowledge file is missing or malformed, so discovery still works offline.
@@ -72,7 +72,7 @@ interface ProviderCapabilityCatalog {
   providers: Record<string, ProviderCapabilityEntry>;
 }
 
-const CAPABILITY_CATALOG_PATH = 'knowledge/public/orchestration/provider-capabilities.json';
+const CAPABILITY_CATALOG_PATH = 'knowledge/product/orchestration/provider-capabilities.json';
 
 const FALLBACK_CATALOG: Record<string, ProviderCapabilityEntry> = {
   gemini: {

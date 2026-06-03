@@ -15,48 +15,48 @@ type CatalogCheck = {
 const CHECKS: CatalogCheck[] = [
   {
     id: 'service-endpoints',
-    schemaPath: 'knowledge/public/schemas/service-endpoints.schema.json',
-    dataPath: 'knowledge/public/orchestration/service-endpoints.json',
+    schemaPath: 'knowledge/product/schemas/service-endpoints.schema.json',
+    dataPath: 'knowledge/product/orchestration/service-endpoints.json',
   },
   {
     id: 'browser-passkey-providers',
-    schemaPath: 'knowledge/public/schemas/browser-passkey-providers.schema.json',
-    dataPath: 'knowledge/public/orchestration/browser-passkey-providers.json',
+    schemaPath: 'knowledge/product/schemas/browser-passkey-providers.schema.json',
+    dataPath: 'knowledge/product/orchestration/browser-passkey-providers.json',
   },
   {
     id: 'browser-execution-presets',
-    schemaPath: 'knowledge/public/schemas/browser-execution-presets.schema.json',
-    dataPath: 'knowledge/public/orchestration/browser-execution-presets.json',
+    schemaPath: 'knowledge/product/schemas/browser-execution-presets.schema.json',
+    dataPath: 'knowledge/product/orchestration/browser-execution-presets.json',
   },
   {
     id: 'android-ui-defaults',
-    schemaPath: 'knowledge/public/schemas/android-ui-defaults.schema.json',
-    dataPath: 'knowledge/public/orchestration/android-ui-defaults.json',
+    schemaPath: 'knowledge/product/schemas/android-ui-defaults.schema.json',
+    dataPath: 'knowledge/product/orchestration/android-ui-defaults.json',
   },
   {
     id: 'actuator-request-archetypes',
-    schemaPath: 'knowledge/public/schemas/actuator-request-archetypes.schema.json',
-    dataPath: 'knowledge/public/orchestration/actuator-request-archetypes.json',
+    schemaPath: 'knowledge/product/schemas/actuator-request-archetypes.schema.json',
+    dataPath: 'knowledge/product/orchestration/actuator-request-archetypes.json',
   },
   {
     id: 'mobile-app-profile-index',
-    schemaPath: 'knowledge/public/schemas/mobile-app-profile-index.schema.json',
-    dataPath: 'knowledge/public/orchestration/mobile-app-profiles/index.json',
+    schemaPath: 'knowledge/product/schemas/mobile-app-profile-index.schema.json',
+    dataPath: 'knowledge/product/orchestration/mobile-app-profiles/index.json',
   },
   {
     id: 'web-app-profile-index',
-    schemaPath: 'knowledge/public/schemas/web-app-profile-index.schema.json',
-    dataPath: 'knowledge/public/orchestration/web-app-profiles/index.json',
+    schemaPath: 'knowledge/product/schemas/web-app-profile-index.schema.json',
+    dataPath: 'knowledge/product/orchestration/web-app-profiles/index.json',
   },
   {
     id: 'user-facing-vocabulary',
-    schemaPath: 'knowledge/public/schemas/user-facing-vocabulary.schema.json',
-    dataPath: 'knowledge/public/orchestration/user-facing-vocabulary.json',
+    schemaPath: 'knowledge/product/schemas/user-facing-vocabulary.schema.json',
+    dataPath: 'knowledge/product/orchestration/user-facing-vocabulary.json',
   },
   {
     id: 'specialist-catalog',
-    schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
-    dataPath: 'knowledge/public/orchestration/specialist-catalog.json',
+    schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
+    dataPath: 'knowledge/product/orchestration/specialist-catalog.json',
   },
 ];
 
@@ -83,7 +83,7 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       violations.push('service-endpoints: services must not be empty');
     }
 
-    const directory = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
+    const directory = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints');
     if (!safeExistsSync(directory)) {
       violations.push('service-endpoints: canonical directory is missing');
       return;
@@ -192,7 +192,7 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       violations.push('specialist-catalog: specialists must not be empty');
     }
 
-    const directory = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
+    const directory = pathResolver.rootResolve('knowledge/product/orchestration/specialists');
     if (!safeExistsSync(directory)) {
       violations.push('specialist-catalog: canonical directory is missing');
       return;

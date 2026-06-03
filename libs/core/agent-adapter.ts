@@ -468,7 +468,7 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
   public name = 'GeminiWisdomEnhancer';
 
   public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
-    const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/public/evolution');
+    const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/product/evolution');
     let wisdomContext = '';
 
     try {

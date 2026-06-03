@@ -14,11 +14,11 @@ For single-action scenario execution (`brief -> compile -> prepare`), use:
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
-- **Schema**: [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/video-composition-adf.schema.json)
-- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/narrated-video-brief.schema.json)
+- **Schema**: [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-composition-adf.schema.json)
+- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/narrated-video-brief.schema.json)
 - **Governance**:
-  - [`video-composition-template-registry.json`](/Users/famao/kyberion/knowledge/public/governance/video-composition-template-registry.json)
-  - [`video-render-runtime-policy.json`](/Users/famao/kyberion/knowledge/public/governance/video-render-runtime-policy.json)
+  - [`video-composition-template-registry.json`](/Users/famao/kyberion/knowledge/product/governance/video-composition-template-registry.json)
+  - [`video-render-runtime-policy.json`](/Users/famao/kyberion/knowledge/product/governance/video-render-runtime-policy.json)
 
 ## 3. Contract Shape
 

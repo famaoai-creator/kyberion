@@ -63,4 +63,4 @@ Selector-based steps are still acceptable for deterministic engineering automati
 State changes within the web application, extracted content, or visual evidence (screenshots).
 
 ## 5. Reference
-- `knowledge/public/architecture/browser-actuator-v3.md`
+- `knowledge/product/architecture/browser-actuator-v3.md`

@@ -140,9 +140,9 @@ function buildReport(
 }
 
 function main(): void {
-  const outPath = parseArg('--out', pathResolver.knowledge('public/architecture/provider-cli-capability-report.md'));
+  const outPath = parseArg('--out', pathResolver.knowledge('product/architecture/provider-cli-capability-report.md'));
   const capabilityRegistry = loadCapabilityRegistry();
-  const adapterRegistry = readJson<AdapterRegistry>('knowledge/public/governance/harness-adapter-registry.json');
+  const adapterRegistry = readJson<AdapterRegistry>('knowledge/product/governance/harness-adapter-registry.json');
   const capabilities = capabilityRegistry.capabilities;
   const adapters = adapterRegistry.profiles;
   const providerAvailability = probeProviderAvailability();

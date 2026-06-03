@@ -17,6 +17,7 @@ Contract (input → output):
     Output (always one line of JSON):
         { "status": "success|error|denied",
           "platform": ..., "method": ..., "message": ...,
+          "join_backend": ...,  # internal browser join backend label
           "partial_state": bool, "partial_reason": ...,
           "transcript_path": ..., ... }
 
@@ -40,6 +41,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = _SCRIPT_DIR.parents[2]
 
 PLAYWRIGHT_JOIN = ROOT / "libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs"
+MEETING_JOIN_BACKEND = "meeting-browser-driver"
 VOICE_BRIDGE    = ROOT / "libs/actuators/voice-actuator/scripts/voice_learning_bridge.py"
 BLACKHOLE       = ROOT / "libs/actuators/voice-actuator/scripts/blackhole_audio_router.py"
 
@@ -98,6 +100,9 @@ def _provider_to_platform(provider):
 
 class MeetingBridge:
     """Playwright-backed meeting driver."""
+
+    def _join_backend_label(self) -> str:
+        return MEETING_JOIN_BACKEND if PLAYWRIGHT_JOIN.exists() else "stub"
 
     # ---- join ---------------------------------------------------- #
 
@@ -171,6 +176,7 @@ class MeetingBridge:
                 payload = json.loads(line)
                 if "status" in payload:
                     sys.stderr.write(f"[bridge] join result: {payload}\n")
+                    payload.setdefault("join_backend", self._join_backend_label())
                     if provider:
                         payload.setdefault("provider", provider)
                     if provider_profile_id:
@@ -335,7 +341,7 @@ class MeetingBridge:
             "playwright_driver": str(PLAYWRIGHT_JOIN) if pw_ok else "missing",
             "voice_bridge": str(VOICE_BRIDGE) if VOICE_BRIDGE.exists() else "missing",
             "blackhole_router": str(BLACKHOLE) if bh_ok else "missing",
-            "bridge_mode": "playwright" if pw_ok else "stub",
+            "join_backend": self._join_backend_label(),
         }
 
     def leave(self):

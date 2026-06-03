@@ -19,9 +19,9 @@ export interface SurfaceProviderManifestCatalog {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const CATALOG_PATH = pathResolver.knowledge('public/governance/surface-provider-manifest-catalog.json');
-const CATALOG_DIR = pathResolver.knowledge('public/governance/surface-provider-manifest-catalogs');
-const CATALOG_SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-provider-manifest-catalog.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/surface-provider-manifest-catalog.json');
+const CATALOG_DIR = pathResolver.knowledge('product/governance/surface-provider-manifest-catalogs');
+const CATALOG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-provider-manifest-catalog.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: SurfaceProviderManifestCatalog | null = null;
@@ -63,7 +63,7 @@ function loadCatalogDirectory(): SurfaceProviderManifestCatalog | null {
   const entries: SurfaceProviderManifestCatalogEntry[] = [];
   for (const file of files) {
     const value = validateCatalog(
-      JSON.parse(safeReadFile(pathResolver.knowledge(`public/governance/surface-provider-manifest-catalogs/${file}`), { encoding: 'utf8' }) as string),
+      JSON.parse(safeReadFile(pathResolver.knowledge(`product/governance/surface-provider-manifest-catalogs/${file}`), { encoding: 'utf8' }) as string),
       `${CATALOG_DIR}/${file}`,
     );
     if ((value.entries || []).length !== 1) {

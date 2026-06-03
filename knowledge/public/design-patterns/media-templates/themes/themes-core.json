@@ -86,37 +86,6 @@
         "heading": "Arial, sans-serif",
         "body": "Arial, sans-serif"
       }
-    },
-    "client-a": {
-      "name": "Company A (Corporate Blue)",
-      "colors": {
-        "primary": "#003366",
-        "secondary": "#00509d",
-        "accent": "#ffcc00",
-        "background": "#f8f9fa",
-        "text": "#212529"
-      },
-      "fonts": {
-        "heading": "Roboto, sans-serif",
-        "body": "Open Sans, sans-serif"
-      },
-      "assets": {
-        "logo_url": "/vault/tenants/client-a/logo.png"
-      }
-    },
-    "client-b": {
-      "name": "Company B (Modern Green)",
-      "colors": {
-        "primary": "#064e3b",
-        "secondary": "#065f46",
-        "accent": "#10b981",
-        "background": "#ecfdf5",
-        "text": "#064e3b"
-      },
-      "fonts": {
-        "heading": "Montserrat, sans-serif",
-        "body": "Open Sans, sans-serif"
-      }
     }
   }
 }

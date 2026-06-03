@@ -1,9 +1,0 @@
-{
-  "default_pattern": "https://api.{service_id}.com/v1",
-  "services": {
-    "discord": {
-      "base_url": "https://discord.com/api/v10",
-      "preset_path": "knowledge/public/orchestration/service-presets/discord.json"
-    }
-  }
-}

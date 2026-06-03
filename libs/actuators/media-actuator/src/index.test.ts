@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath, safeExistsSync, safeReadFile, safeRmSync, saveProjectRecord, saveServiceBindingRecord } from '@agent/core';
@@ -20,8 +20,15 @@ vi.mock('tesseract.js', () => ({
 import { handleAction } from './index.js';
 
 describe('media-actuator pdf to pptx bridge', () => {
+  let prevPersona: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    prevPersona = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+  });
+  afterEach(() => {
+    if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
+    else process.env.KYBERION_PERSONA = prevPersona;
   });
 
   it('resolves tenant branding from project and service binding metadata', async () => {
@@ -786,7 +793,7 @@ describe('media-actuator pdf to pptx bridge', () => {
   it('emits proposal storyline adfs that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/proposal-storyline-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/proposal-storyline-adf.schema.json'));
 
     expect(
       validate({
@@ -816,7 +823,7 @@ describe('media-actuator pdf to pptx bridge', () => {
   it('rejects malformed proposal storyline adfs', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/proposal-storyline-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/proposal-storyline-adf.schema.json'));
 
     expect(
       validate({
@@ -1650,7 +1657,7 @@ describe('media-actuator pdf to pptx bridge', () => {
   it('emits document briefs that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/document-brief.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/document-brief.schema.json'));
 
     expect(
       validate({
@@ -1679,7 +1686,7 @@ describe('media-actuator pdf to pptx bridge', () => {
   it('emits proposal briefs that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/public/schemas/proposal-brief.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/proposal-brief.schema.json'));
 
     expect(
       validate({

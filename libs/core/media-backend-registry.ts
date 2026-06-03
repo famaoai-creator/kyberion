@@ -37,7 +37,7 @@ export interface MediaBackendRegistry {
   backends: MediaBackendRecord[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/media-backend-registry.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/media-backend-registry.json');
 
 const FALLBACK_REGISTRY: MediaBackendRegistry = {
   version: 'fallback',

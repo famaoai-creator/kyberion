@@ -20,7 +20,7 @@ export interface MissionState {
    * the active persona to read/write across the listed tenants — but
    * only those — and every access emits a `tenant.broker_access`
    * audit event. The mission must live in the public tier.
-   * See knowledge/public/orchestration/cross-tenant-brokering-protocol.md.
+   * See knowledge/product/orchestration/cross-tenant-brokering-protocol.md.
    */
   cross_tenant_brokerage?: {
     source_tenants: string[];

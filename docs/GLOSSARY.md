@@ -344,8 +344,8 @@ The requirement for explicit sovereign approval before riskier or architectural 
 
 ### Global Actuator Index
 
-`libs/actuators/*/manifest.json`, the canonical registry of runnable actuators. `knowledge/public/orchestration/global_actuator_index.json` is the generated compatibility snapshot used by older tooling.
+`libs/actuators/*/manifest.json`, the canonical registry of runnable actuators. `knowledge/product/orchestration/global_actuator_index.json` is the generated compatibility snapshot used by older tooling.
 
 ### Legacy Component Index
 
-`knowledge/public/orchestration/legacy_component_index.json`, the review queue for non-manifest-backed or compatibility-only components that should not be treated as the current runtime surface.
+`knowledge/product/orchestration/legacy_component_index.json`, the review queue for non-manifest-backed or compatibility-only components that should not be treated as the current runtime surface.

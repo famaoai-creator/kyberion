@@ -1,0 +1,88 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "judgment-job",
+  "name": "AI Judgment Job",
+  "version": "2.0.0",
+  "description": "Runs the standard judgment sequence (judge → ace_consensus → alignment_mirror) using the reasoning backend. Replaces scripts/run_judgment_job.ts. Override context vars mission_id, job_id, and subject as needed.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🚀 [JUDGMENT] Starting judgment job (mission: {{mission_id}})" }
+    },
+    {
+      "id": "judge",
+      "role": "source",
+      "op": "reasoning:analyze",
+      "produces": { "channel": "judgment_result", "type": "JudgmentResult" },
+      "params": {
+        "instruction": "Evaluate the quality, correctness, and alignment of the subject matter against the mission criteria and Kyberion governance standards. Provide a structured judgment with scores and rationale.",
+        "context": ["{{mission_id}}", "{{job_id}}", "{{subject}}"],
+        "judgeType": "primary"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "judgment_result",
+      "params": { "message": "✅ Primary judgment complete." }
+    },
+    {
+      "id": "ace-consensus",
+      "role": "transform",
+      "op": "reasoning:synthesize",
+      "consumes": "judgment_result",
+      "produces": { "channel": "ace_consensus_result", "type": "ConsensusResult" },
+      "params": {
+        "instruction": "Review the primary judgment and produce an ACE (Aggregated Consensus Evaluation) by identifying points of agreement, contention, and the final consensus position.",
+        "context": ["{{judgment_result}}", "{{mission_id}}"],
+        "judgeType": "ace_consensus"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "ace_consensus_result",
+      "params": { "message": "✅ ACE consensus complete." }
+    },
+    {
+      "id": "alignment-mirror",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": ["judgment_result", "ace_consensus_result"],
+      "produces": { "channel": "alignment_mirror_result", "type": "AlignmentResult" },
+      "params": {
+        "instruction": "Reflect on both the primary judgment and the ACE consensus. Identify any misalignments with the sovereign's values and long-term vision, and suggest corrective directions.",
+        "context": ["{{judgment_result}}", "{{ace_consensus_result}}"],
+        "judgeType": "alignment_mirror"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "alignment_mirror_result",
+      "params": { "message": "✅ Alignment mirror complete." }
+    },
+    {
+      "id": "write-results",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["judgment_result", "ace_consensus_result", "alignment_mirror_result"],
+      "params": {
+        "path": "active/shared/tmp/judgment-results-{{job_id}}.json",
+        "content": {
+          "judgment": "{{judgment_result}}",
+          "ace_consensus": "{{ace_consensus_result}}",
+          "alignment_mirror": "{{alignment_mirror_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ [JUDGMENT] Judgment job complete. Results written to active/shared/tmp/judgment-results-{{job_id}}.json" }
+    }
+  ]
+}

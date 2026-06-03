@@ -3618,7 +3618,7 @@ async function executeServiceOperationTask(
     return { outputPath, previewText };
   }
 
-  const manifestPath = pathResolver.knowledge('public/governance/active-surfaces.json');
+  const manifestPath = pathResolver.knowledge('product/governance/active-surfaces.json');
   if (operation === 'restart') {
     safeExec(
       'node',

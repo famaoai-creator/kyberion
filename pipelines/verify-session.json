@@ -1,7 +1,8 @@
 {
   "pipeline_id": "verify-session",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Clean first-win browser smoke: open a local data URL and capture a screenshot artifact under active/shared/tmp/ without requiring an existing login session.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "action": "pipeline",
   "labels": ["first-win", "browser", "screenshot", "clean-env"],
   "fallback_pipeline": "pipelines/verify-session-fallback.json",
@@ -23,7 +24,7 @@
   "steps": [
     {
       "id": "open-first-win-page",
-      "type": "apply",
+      "role": "sink",
       "op": "browser:goto",
       "params": {
         "url": "{{TARGET_URL}}"
@@ -31,25 +32,25 @@
     },
     {
       "id": "check-state",
-      "type": "capture",
+      "role": "source",
       "op": "browser:evaluate",
+      "produces": { "channel": "session_state", "type": "BrowserEvaluateResult" },
       "params": {
-        "script": "({ title: document.title, url: location.href, bodyText: document.body.innerText.slice(0, 80) })",
-        "export_as": "session_state"
+        "script": "({ title: document.title, url: location.href, bodyText: document.body.innerText.slice(0, 80) })"
       }
     },
     {
       "id": "screenshot-verify",
-      "type": "capture",
+      "role": "source",
       "op": "browser:screenshot",
+      "produces": { "channel": "first_win_screenshot", "type": "ScreenshotResult" },
       "params": {
-        "path": "active/shared/tmp/first-win-session.png",
-        "export_as": "first_win_screenshot"
+        "path": "active/shared/tmp/first-win-session.png"
       }
     },
     {
       "id": "close-first-win-session",
-      "type": "control",
+      "role": "gate",
       "op": "browser:close_session",
       "params": {}
     }

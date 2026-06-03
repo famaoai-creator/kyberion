@@ -22,7 +22,7 @@ describe('service-onboarding-catalog', () => {
 
   it('emits a catalog that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/service-onboarding-catalog.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/service-onboarding-catalog.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const catalog = loadServiceOnboardingCatalog();
     expect(validate(catalog), JSON.stringify(validate.errors || [])).toBe(true);

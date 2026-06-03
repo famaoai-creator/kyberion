@@ -19,9 +19,9 @@ interface ServiceAuthorityMap {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_MAP_PATH = pathResolver.knowledge('public/governance/service-authority-map.json');
+const PUBLIC_MAP_PATH = pathResolver.knowledge('product/governance/service-authority-map.json');
 const PERSONAL_MAP_PATH = pathResolver.knowledge('personal/governance/service-authority-map.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/service-authority-map.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-authority-map.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedMap: ServiceAuthorityMap | null = null;

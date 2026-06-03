@@ -44,25 +44,25 @@ describe('executeServicePreset', () => {
         'test-service': { preset_path: 'mock/path.json', base_url: 'https://api.test.com' },
         slack: { preset_path: 'slack.json', base_url: 'https://api.example.com' },
         backlog: {
-          preset_path: 'knowledge/public/orchestration/service-presets/backlog.json',
+          preset_path: 'knowledge/product/orchestration/service-presets/backlog.json',
           base_url: 'https://{{space}}.backlog.com/api/v2',
           credential_suffixes: {
             accessToken: ['API_KEY'],
           },
         },
         'media-generation': {
-          preset_path: 'knowledge/public/orchestration/service-presets/media-generation.json',
+          preset_path: 'knowledge/product/orchestration/service-presets/media-generation.json',
           base_url: 'http://127.0.0.1:8188',
         },
-        vision: { preset_path: 'knowledge/public/orchestration/service-presets/vision.json' },
-        voice: { preset_path: 'knowledge/public/orchestration/service-presets/voice.json' },
+        vision: { preset_path: 'knowledge/product/orchestration/service-presets/vision.json' },
+        voice: { preset_path: 'knowledge/product/orchestration/service-presets/voice.json' },
         'google-workspace': {
-          preset_path: 'knowledge/public/orchestration/service-presets/google-workspace.json',
+          preset_path: 'knowledge/product/orchestration/service-presets/google-workspace.json',
           allow_unsafe_cli: true,
         },
         notion: { preset_path: 'p.json', base_url: 'https://api.notion.com/v1' },
         canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
-        youtube: { preset_path: 'knowledge/public/orchestration/service-presets/youtube.json' },
+        youtube: { preset_path: 'knowledge/product/orchestration/service-presets/youtube.json' },
       },
     });
   });
@@ -505,7 +505,7 @@ describe('executeServicePreset', () => {
 
     await expect(
       executeServicePreset('youtube', 'prepare_upload_package', {
-        publish_plan_path: 'knowledge/public/schemas/narrated-video-publish-plan.example.json',
+        publish_plan_path: 'knowledge/product/schemas/narrated-video-publish-plan.example.json',
         output_path: 'active/shared/runtime/youtube/upload-packages/kyberion.json',
       })
     ).resolves.toEqual({
@@ -515,7 +515,7 @@ describe('executeServicePreset', () => {
 
     expect(mocks.safeExec).toHaveBeenCalledWith('node', [
       'dist/scripts/stage_youtube_upload_package.js',
-      'knowledge/public/schemas/narrated-video-publish-plan.example.json',
+      'knowledge/product/schemas/narrated-video-publish-plan.example.json',
       'active/shared/runtime/youtube/upload-packages/kyberion.json',
     ]);
   });

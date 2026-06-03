@@ -16,7 +16,7 @@ For people **deploying / running** Kyberion in service. If you're using it, see 
 
 ## Scope
 
-Operational documentation: install, deploy, monitor, upgrade, decommission. Phase C'-1 of `docs/PRODUCTIZATION_ROADMAP.md` will consolidate / dedupe with `knowledge/public/operations/` over time.
+Operational documentation: install, deploy, monitor, upgrade, decommission. Phase C'-1 of `docs/PRODUCTIZATION_ROADMAP.md` will consolidate / dedupe with `knowledge/product/operations/` over time.
 
 Current state:
 
@@ -25,7 +25,7 @@ Current state:
 - ✅ `docs/INITIALIZATION.md`
 - ✅ `docs/OPERATOR_UX_GUIDE.md`
 - ✅ `docs/PRIVACY.md`
-- ⏳ Runbooks consolidation from `knowledge/public/operations/runbooks/` (TODO).
+- ⏳ Runbooks consolidation from `knowledge/product/operations/runbooks/` (TODO).
 - ⏳ SLO / observability guide (Phase B-1 / B-2 follow-up).
 - ⏳ Backup / DR playbook (TODO).
 

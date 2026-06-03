@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "governed-voice-narration",
+  "version": "2.0.0",
   "description": "Fragment for adding narrated voice-overs to presentations using the Governed Voice Stack.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "pptx_path": "active/shared/tmp/input.pptx",
     "voice_profile_id": "default",
@@ -10,17 +12,18 @@
   "steps": [
     {
       "id": "extract_script",
-      "type": "capture",
+      "role": "source",
       "op": "media:pptx_slide_text",
+      "produces": { "channel": "slide_scripts", "type": "PptxSlides" },
       "params": {
-        "source": "{{pptx_path}}",
-        "export_as": "slide_scripts"
+        "source": "{{pptx_path}}"
       }
     },
     {
       "id": "generate_narration",
-      "type": "apply",
+      "role": "sink",
       "op": "voice:generate_narration_bulk",
+      "consumes": "slide_scripts",
       "params": {
         "scripts": "{{slide_scripts}}",
         "voice_profile": "{{voice_profile_id}}",
@@ -29,18 +32,19 @@
     },
     {
       "id": "compile_video_brief",
-      "type": "transform",
+      "role": "source",
       "op": "media:narrated-video-brief-compiler",
+      "produces": { "channel": "video_brief", "type": "VideoBrief" },
       "params": {
         "pptx_path": "{{pptx_path}}",
-        "audio_dir": "active/shared/tmp/{{mission_id}}/audio/",
-        "export_as": "video_brief"
+        "audio_dir": "active/shared/tmp/{{mission_id}}/audio/"
       }
     },
     {
       "id": "render_preview",
-      "type": "apply",
+      "role": "sink",
       "op": "video:render_preview",
+      "consumes": "video_brief",
       "params": {
         "brief": "{{video_brief}}",
         "export_path": "active/shared/artifacts/{{mission_id}}/preview.mp4"

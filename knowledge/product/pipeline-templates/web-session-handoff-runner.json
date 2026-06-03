@@ -1,0 +1,36 @@
+{
+  "action": "pipeline",
+  "name": "web-session-handoff-runner",
+  "version": "2.0.0",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Web runtime session handoff export template を実行します"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Web runtime session handoff import template を実行します"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json"
+      }
+    }
+  ]
+}

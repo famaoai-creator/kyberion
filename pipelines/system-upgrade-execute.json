@@ -1,59 +1,55 @@
 {
   "action": "pipeline",
   "name": "Sovereign System Upgrade Execution",
+  "version": "2.0.0",
   "description": "Performs the actual upgrade: pull, build, test, and merge.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "steps": [
-    { "op": "system:log", "params": { "message": "🛠️ Step 2: Executing System Upgrade..." } },
+    { "role": "sink", "op": "system:log", "params": { "message": "🛠️ Step 2: Executing System Upgrade..." } },
     {
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "pull_result", "type": "ShellResult" },
       "params": {
         "cmd": "git checkout main && git pull origin main",
-        "export_as": "pull_result",
         "retry": { "maxRetries": 2 }
       }
     },
+    { "role": "sink", "op": "system:log", "params": { "message": "📦 Step 3: Rebuilding physical foundation..." } },
     {
-      "op": "system:log",
-      "params": { "message": "📦 Step 3: Rebuilding physical foundation..." }
-    },
-    {
+      "role": "source",
       "op": "system:shell",
-      "params": {
-        "cmd": "pnpm install && npm run build",
-        "export_as": "build_result"
-      }
+      "produces": { "channel": "build_result", "type": "ShellResult" },
+      "params": { "cmd": "pnpm install && npm run build" }
     },
+    { "role": "sink", "op": "system:log", "params": { "message": "🧪 Step 4: Running comprehensive validation..." } },
     {
-      "op": "system:log",
-      "params": { "message": "🧪 Step 4: Running comprehensive validation..." }
-    },
-    {
+      "role": "source",
       "op": "system:shell",
-      "params": {
-        "cmd": "pnpm test",
-        "export_as": "test_result"
-      }
+      "produces": { "channel": "test_result", "type": "ShellResult" },
+      "params": { "cmd": "pnpm test" }
     },
     {
+      "role": "gate",
       "op": "core:if",
+      "consumes": "test_result",
       "params": {
         "condition": {
           "from": "test_result",
           "operator": "not_empty"
         },
         "then": [
-          { "op": "system:log", "params": { "message": "✅ Validation passed. Finalizing upgrade..." } },
+          { "role": "sink", "op": "system:log", "params": { "message": "✅ Validation passed. Finalizing upgrade..." } },
           {
+            "role": "source",
             "op": "system:shell",
-            "params": {
-              "cmd": "pnpm vital",
-              "export_as": "final_vital"
-            }
+            "produces": { "channel": "final_vital", "type": "ShellResult" },
+            "params": { "cmd": "pnpm vital" }
           },
-          { "op": "system:log", "params": { "message": "🚀 System successfully upgraded to the latest version." } }
+          { "role": "sink", "op": "system:log", "params": { "message": "🚀 System successfully upgraded to the latest version." } }
         ],
         "else": [
-          { "op": "system:log", "params": { "message": "❌ Validation failed! Human intervention required for rollback." } }
+          { "role": "sink", "op": "system:log", "params": { "message": "❌ Validation failed! Human intervention required for rollback." } }
         ]
       }
     }

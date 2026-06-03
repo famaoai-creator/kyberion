@@ -1,0 +1,96 @@
+{
+  "pipeline_id": "strategic-impact-simulator",
+  "version": "2.0.0",
+  "description": "Simulate second-order effects of strategic decisions.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-inputs-and-tier",
+      "role": "gate",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+          {
+            "id": "guard-decision-input",
+            "role": "gate",
+            "op": "if",
+            "params": {
+              "condition": {
+                "from": "user_input_decision",
+                "operator": "exists"
+              },
+              "then": [
+                {
+                  "id": "load-roadmaps",
+                  "role": "source",
+                  "op": "wisdom:knowledge_search",
+                  "produces": { "channel": "current_roadmaps", "type": "KnowledgeSearchResult" },
+                  "params": {
+                    "query": "project roadmap",
+                    "tier": "confidential"
+                  }
+                },
+                {
+                  "id": "simulate-branches",
+                  "role": "source",
+                  "op": "wisdom:simulate_all",
+                  "produces": { "channel": "simulation_result", "type": "SimulationResult" },
+                  "params": {
+                    "goal": "{{user_input_decision}}",
+                    "output_dir": "{{mission_evidence_dir}}/simulation"
+                  }
+                },
+                {
+                  "id": "impact-mapping",
+                  "role": "transform",
+                  "op": "reasoning:analyze",
+                  "consumes": "simulation_result",
+                  "produces": { "channel": "impact_report", "type": "AnalysisResult" },
+                  "params": {
+                    "instruction": "Analyze the simulated outcomes from {{simulation_result.written_to}}. Map to second-order impacts. Identify 'poison pills' and 'golden paths'."
+                  }
+                },
+                {
+                  "id": "emit-plan",
+                  "role": "sink",
+                  "op": "wisdom:write_file",
+                  "consumes": "impact_report",
+                  "params": {
+                    "path": "{{mission_evidence_dir}}/strategic-impact-simulation.md",
+                    "content": "{{impact_report}}"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "id": "reject-missing-decision",
+                  "role": "sink",
+                  "op": "system:log",
+                  "params": {
+                    "message": "strategic-impact-simulator requires user_input_decision before execution."
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "strategic-impact-simulator requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

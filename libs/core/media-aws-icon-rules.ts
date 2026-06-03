@@ -19,8 +19,8 @@ interface MediaAwsIconRuleCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-aws-icon-rules.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-aws-icon-rules.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-aws-icon-rules.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-aws-icon-rules.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaAwsIconRuleCatalog | null = null;

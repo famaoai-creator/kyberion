@@ -5,7 +5,7 @@ describe('analysis-impact-bands', () => {
   it('classifies project-bound and incident refs into impact bands', () => {
     const items = classifyAnalysisImpactBands({
       refs: [
-        'knowledge/public/incidents/post-mortem-20260228.md',
+        'knowledge/product/incidents/post-mortem-20260228.md',
         'knowledge/public/common/patterns/generated/DSC-TEST.md',
         'active/projects/demo/tracks/TRK-1/requirements.md',
       ],

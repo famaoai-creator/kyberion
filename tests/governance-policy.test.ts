@@ -98,7 +98,7 @@ describe('Read Permission Control (validateReadPermission)', () => {
   });
 
   it('public knowledge is always readable', () => {
-    const file = pathResolver.knowledge('public/governance/security-policy.json');
+    const file = pathResolver.knowledge('product/governance/security-policy.json');
     process.env.MISSION_ROLE = 'any_role';
     process.env.KYBERION_PERSONA = 'unknown';
     const result = validateReadPermission(file);

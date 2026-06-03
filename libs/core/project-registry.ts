@@ -41,7 +41,7 @@ export interface ProjectBootstrapWorkItem {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const PROJECT_SCHEMA_PATH = pathResolver.knowledge('public/schemas/project-record.schema.json');
+const PROJECT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/project-record.schema.json');
 const PROJECT_DIR = pathResolver.shared('runtime/projects');
 let projectValidateFn: ValidateFunction | null = null;
 

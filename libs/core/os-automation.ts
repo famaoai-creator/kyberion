@@ -15,6 +15,7 @@ export {
   runAppleScript,
   getScreenSize,
   getWindowList,
+  activateWindowByTitle,
   quitApplication,
   systemNotify,
   clipboardRead,

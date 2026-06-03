@@ -88,5 +88,5 @@ When investigating local residue:
 
 ### Surface validation failed
 
-- Confirm `knowledge/public/governance/active-surfaces.json` is valid
+- Confirm `knowledge/product/governance/active-surfaces.json` is valid
 - Confirm `node dist/scripts/surface_runtime.js --action status` succeeds locally

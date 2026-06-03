@@ -12,15 +12,15 @@ This plan tracks catalog/index splits that should move from centralized JSON blo
 
 | ID | Registry | Status | Scope |
 |---|---|---|---|
-| RSP-1 | Agent profile index | completed | Split `knowledge/public/orchestration/agent-profile-index.json` into `knowledge/public/orchestration/agent-profiles/*.json`. |
-| RSP-2 | Voice profile registry | completed | Split `knowledge/public/governance/voice-profile-registry.json` into `knowledge/public/governance/voice-profiles/*.json`. |
-| RSP-3 | Global actuator index | completed | Split `knowledge/public/orchestration/global_actuator_index.json` into the per-actuator package manifests under `libs/actuators/*/manifest.json`. |
-| RSP-4 | Surface provider catalog | completed | Split `knowledge/public/governance/surface-provider-manifest-catalog.json` into `knowledge/public/governance/surface-provider-manifest-catalogs/*.json`. |
-| RSP-5 | Voice engine registry | completed | Split `knowledge/public/governance/voice-engine-registry.json` into `knowledge/public/governance/voice-engines/*.json`. |
-| RSP-6 | Service endpoints catalog | completed | Split `knowledge/public/orchestration/service-endpoints.json` into `knowledge/public/orchestration/service-endpoints/*.json`. |
-| RSP-7 | Specialist catalog | completed | Split `knowledge/public/orchestration/specialist-catalog.json` into `knowledge/public/orchestration/specialists/*.json`. |
-| RSP-8 | Authority role index | completed | Split `knowledge/public/governance/authority-role-index.json` into `knowledge/public/governance/authority-roles/*.json`. |
-| RSP-9 | Team role index | in_progress | Split `knowledge/public/orchestration/team-role-index.json` into `knowledge/public/orchestration/team-roles/*.json`. |
+| RSP-1 | Agent profile index | completed | Split `knowledge/product/orchestration/agent-profile-index.json` into `knowledge/product/orchestration/agent-profiles/*.json`. |
+| RSP-2 | Voice profile registry | completed | Split `knowledge/product/governance/voice-profile-registry.json` into `knowledge/product/governance/voice-profiles/*.json`. |
+| RSP-3 | Global actuator index | completed | Split `knowledge/product/orchestration/global_actuator_index.json` into the per-actuator package manifests under `libs/actuators/*/manifest.json`. |
+| RSP-4 | Surface provider catalog | completed | Split `knowledge/product/governance/surface-provider-manifest-catalog.json` into `knowledge/product/governance/surface-provider-manifest-catalogs/*.json`. |
+| RSP-5 | Voice engine registry | completed | Split `knowledge/product/governance/voice-engine-registry.json` into `knowledge/product/governance/voice-engines/*.json`. |
+| RSP-6 | Service endpoints catalog | completed | Split `knowledge/product/orchestration/service-endpoints.json` into `knowledge/product/orchestration/service-endpoints/*.json`. |
+| RSP-7 | Specialist catalog | completed | Split `knowledge/product/orchestration/specialist-catalog.json` into `knowledge/product/orchestration/specialists/*.json`. |
+| RSP-8 | Authority role index | completed | Split `knowledge/product/governance/authority-role-index.json` into `knowledge/product/governance/authority-roles/*.json`. |
+| RSP-9 | Team role index | in_progress | Split `knowledge/product/orchestration/team-role-index.json` into `knowledge/product/orchestration/team-roles/*.json`. |
 
 ## Current migration rules
 

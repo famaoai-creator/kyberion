@@ -1,0 +1,185 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "customer-discovery-workflow",
+  "version": "2.0.0",
+  "name": "Customer Discovery Workflow",
+  "description": "顧客ヒアリング議事録から要件定義・解決策提案・プロダクトロードマップを一気通貫で生成する product_discovery Track 用パイプライン。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1.1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "language": "ja",
+    "customer_name": "",
+    "customer_person_slug": "",
+    "customer_org": "",
+    "solution_personas": [
+      "lean-mvp-advocate",
+      "enterprise-architect",
+      "ux-researcher"
+    ]
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🔍 [DISCOVERY] Starting customer discovery workflow (mission: {{mission_id}}, customer: {{customer_org}})"
+      }
+    },
+    {
+      "id": "read_transcript",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "transcript_text", "type": "TranscriptText" },
+      "params": {
+        "path": "{{mission_evidence_dir}}/call-transcript.txt"
+      }
+    },
+    {
+      "id": "log_transcript",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📄 Transcript loaded ({{mission_evidence_dir}}/call-transcript.txt)"
+      }
+    },
+    {
+      "id": "extract_requirements",
+      "role": "source",
+      "op": "wisdom:extract_requirements",
+      "produces": { "channel": "extraction", "type": "RequirementsExtraction" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{mission_evidence_dir}}/call-transcript.txt",
+        "source_type": "call_transcript",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_person_slug": "{{customer_person_slug}}",
+        "customer_org": "{{customer_org}}"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "extraction",
+      "params": {
+        "message": "✅ Requirements extracted v{{extraction.version}} → {{extraction.draft_path}}"
+      }
+    },
+    {
+      "id": "check_completeness",
+      "role": "transform",
+      "op": "wisdom:evaluate_requirements_completeness",
+      "consumes": "extraction",
+      "produces": { "channel": "completeness", "type": "CompletenessResult" },
+      "params": {
+        "mission_id": "{{mission_id}}"
+      }
+    },
+    {
+      "id": "log_completeness",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "completeness",
+      "params": {
+        "message": "🔎 REQUIREMENTS_COMPLETENESS gate: passed={{completeness.passed}}"
+      }
+    },
+    {
+      "id": "solution_fanout",
+      "role": "sink",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas": "{{solution_personas}}",
+        "min_hypotheses_per_persona": 2,
+        "topic": "{{project_name}}: 顧客課題の解決策を提案する。要件ドラフト={{extraction.draft_path}}",
+        "output_path": "{{mission_evidence_dir}}/solution-proposals-raw.json"
+      }
+    },
+    {
+      "id": "log_fanout",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🧠 Solution fanout complete"
+      }
+    },
+    {
+      "id": "cross_critique",
+      "role": "sink",
+      "op": "wisdom:cross_critique",
+      "params": {
+        "input": "{{mission_evidence_dir}}/solution-proposals-raw.json",
+        "personas": "{{solution_personas}}",
+        "output_path": "{{mission_evidence_dir}}/solution-critique.json"
+      }
+    },
+    {
+      "id": "log_critique",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "⚖️ Cross-critique complete → {{mission_evidence_dir}}/solution-critique.json"
+      }
+    },
+    {
+      "id": "generate_roadmap",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "extraction",
+      "produces": { "channel": "roadmap_content", "type": "RoadmapContent" },
+      "params": {
+        "instruction": "以下の情報を統合して、プロダクトロードマップをMarkdown形式で作成してください。\n\n# 入力情報\n## 顧客: {{customer_org}} / {{customer_name}}\n## プロジェクト: {{project_name}}\n## 要件ドラフトパス: {{extraction.draft_path}}\n## クロスクリティーク結果パス: {{mission_evidence_dir}}/solution-critique.json\n\n# 出力形式\n- ## 背景・課題\n- ## ゴール\n- ## Phase 1 — MVP（推奨アプローチ・根拠）\n- ## Phase 2 — チーム展開\n- ## Phase 3 — 拡張・自動化\n- ## 技術方針\n- ## KPI\n- ## リスクと対策\n- ## 次のアクション（顧客サインオフ後）",
+        "context": ["{{mission_id}}", "{{project_name}}", "{{customer_org}}"]
+      }
+    },
+    {
+      "id": "write_roadmap",
+      "role": "sink",
+      "op": "code:write_artifact",
+      "consumes": "roadmap_content",
+      "params": {
+        "path": "{{mission_evidence_dir}}/product-roadmap.md",
+        "content": "{{roadmap_content}}"
+      }
+    },
+    {
+      "id": "log_roadmap",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📋 Product roadmap written → {{mission_evidence_dir}}/product-roadmap.md"
+      }
+    },
+    {
+      "id": "record_signoff_gate",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/customer-signoff-gate.json",
+        "content": {
+          "gate": "CUSTOMER_SIGNOFF",
+          "status": "pending_operator_confirmation",
+          "artifacts": [
+            "{{mission_evidence_dir}}/requirements-draft.json",
+            "{{mission_evidence_dir}}/product-roadmap.md"
+          ],
+          "instructions": "顧客（{{customer_name}} / {{customer_org}}）に要件ドラフトとロードマップを提示し、合意を得た後にこのファイルの status を 'approved' に更新し、mission checkpoint を記録してください。",
+          "created_at": "{{$now}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎯 [DISCOVERY] Pipeline complete. Artifacts in {{mission_evidence_dir}}. Next: present roadmap to customer → checkpoint mission."
+      }
+    }
+  ]
+}

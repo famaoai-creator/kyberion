@@ -134,7 +134,7 @@ describe('project and artifact registries', () => {
 
   it('emits project records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/project-record.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/project-record.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const project = {
       project_id: 'PRJ-TEST-SCHEMA',

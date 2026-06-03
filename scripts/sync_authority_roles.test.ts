@@ -10,20 +10,20 @@ function readJson<T>(filePath: string): T {
 
 describe('sync_authority_roles', () => {
   it('keeps the snapshot aligned with the canonical directory', () => {
-    const dir = path.join(rootDir, 'knowledge/public/governance/authority-roles');
+    const dir = path.join(rootDir, 'knowledge/product/governance/authority-roles');
     expect(safeExistsSync(dir)).toBe(true);
     const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
     expect(files.length).toBeGreaterThan(0);
 
     const snapshot = readJson<{ authority_roles?: Record<string, unknown> }>(
-      'knowledge/public/governance/authority-role-index.json',
+      'knowledge/product/governance/authority-role-index.json',
     );
     const snapshotRoles = snapshot.authority_roles || {};
     expect(Object.keys(snapshotRoles).sort()).toEqual(files.map((file) => file.replace(/\.json$/i, '')).sort());
 
     for (const file of files) {
       const payload = readJson<{ role?: string; [key: string]: unknown }>(
-        `knowledge/public/governance/authority-roles/${file}`,
+        `knowledge/product/governance/authority-roles/${file}`,
       );
       expect(payload.role).toBe(file.replace(/\.json$/i, ''));
       expect(snapshotRoles[payload.role!]).toBeDefined();

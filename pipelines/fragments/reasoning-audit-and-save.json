@@ -1,0 +1,46 @@
+{
+  "action": "pipeline",
+  "name": "reasoning-audit-and-save-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: run a reasoning:analyze audit on a source artifact and persist the result to a file. Required context vars: audit_label, source_path, output_path, instruction. Optional: analysis_type (default compliance_audit).",
+  "steps": [
+    {
+      "id": "log_audit_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🚀 Starting {{audit_label}} Audit for {{source_path}}"
+      }
+    },
+    {
+      "id": "run_audit",
+      "role": "source",
+      "op": "reasoning:analyze",
+      "produces": { "channel": "audit_result", "type": "AuditResult" },
+      "params": {
+        "instruction": "{{instruction}}",
+        "context": ["{{source_path}}"],
+        "analysisType": "{{analysis_type|compliance_audit}}"
+      }
+    },
+    {
+      "id": "save_audit_result",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "audit_result",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{audit_result}}",
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_audit_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ {{audit_label}} Audit complete. Results saved to {{output_path}}"
+      }
+    }
+  ]
+}

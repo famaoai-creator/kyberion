@@ -1,0 +1,74 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "import-brand-from-pptx",
+  "version": "2.0.0",
+  "name": "PPTX からブランドテーマ・レイアウトを抽出して confidential tier に登録",
+  "description": "既存 PPTX からテーマカラー・フォント・スライドジオメトリを抽出し、knowledge/confidential/{tenant_slug}/design/ へ書き込む。テナントレジストリも更新する。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "knowledge_scope": { "tiers": ["public", "confidential"] },
+  "env": { "KYBERION_PERSONA": "sovereign", "MISSION_ROLE": "mission_controller" },
+  "inputs": {
+    "source_file_path":  "抽出元 PPTX ファイルパス（例: active/missions/confidential/MSN-XXX/evidence/template.pptx）",
+    "tenant_slug":       "テナントスラグ（例: sbiss）",
+    "brand_name":        "表示用ブランド名（例: SBIセキュリティソリューションズ株式会社）",
+    "matchers":          "マッチャー文字列配列（例: [\"sbiss\", \"sbi security\"]）",
+    "design_system_id":  "使用デザインシステム（省略時: executive-standard）",
+    "logo_url":          "ロゴファイルパス（省略可）"
+  },
+  "steps": [
+    {
+      "id": "extract_pptx",
+      "role": "source",
+      "op": "media:pptx_extract",
+      "produces": { "channel": "source_pptx_design", "type": "PptxDesign" },
+      "params": {
+        "path": "{{source_file_path}}"
+      }
+    },
+    {
+      "id": "derive_theme",
+      "role": "transform",
+      "op": "media:theme_from_pptx_design",
+      "consumes": "source_pptx_design",
+      "produces": { "channel": "active_theme", "type": "Theme" },
+      "params": {
+        "from": "source_pptx_design",
+        "name": "{{tenant_slug}}-imported"
+      }
+    },
+    {
+      "id": "derive_layout",
+      "role": "transform",
+      "op": "media:layout_template_from_pptx_design",
+      "consumes": "source_pptx_design",
+      "produces": { "channel": "last_layout_geometry", "type": "LayoutGeometry" },
+      "params": {
+        "from": "source_pptx_design",
+        "tenant_slug": "{{tenant_slug}}"
+      }
+    },
+    {
+      "id": "save_brand",
+      "role": "sink",
+      "op": "media:save_brand_to_confidential",
+      "consumes": ["active_theme", "last_layout_geometry"],
+      "params": {
+        "tenant_slug":       "{{tenant_slug}}",
+        "brand_name":        "{{brand_name}}",
+        "matchers":          "{{matchers}}",
+        "design_system_id":  "{{design_system_id}}",
+        "theme_from":        "active_theme",
+        "layout_from":       "last_layout_geometry",
+        "logo_url":          "{{logo_url}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ ブランドインポート完了 → knowledge/confidential/{{tenant_slug}}/design/"
+      }
+    }
+  ]
+}

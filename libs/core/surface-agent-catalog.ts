@@ -96,7 +96,7 @@ function isSurfaceAgent(manifest: AgentManifest, profile?: AgentProfileIndexEntr
 }
 
 function loadAgentBody(agentId: string): string {
-  const filePath = path.join(pathResolver.knowledge('agents'), `${agentId}.agent.md`);
+  const filePath = path.join(pathResolver.knowledge('product/agents'), `${agentId}.agent.md`);
   if (!safeExistsSync(filePath)) return '';
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
   return parseFrontmatterBody(raw);

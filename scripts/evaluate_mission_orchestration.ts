@@ -47,7 +47,7 @@ function main() {
   }
 
   const report = buildMissionOrchestrationEvaluationReport(runs);
-  const reportSchemaPath = pathResolver.knowledge('public/schemas/mission-orchestration-evaluation-report.schema.json');
+  const reportSchemaPath = pathResolver.knowledge('product/schemas/mission-orchestration-evaluation-report.schema.json');
   const validate = compileSchema(reportSchemaPath);
   if (!validate(report)) {
     const errors = (validate.errors || []).map((error: any) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');

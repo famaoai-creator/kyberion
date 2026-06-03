@@ -1,0 +1,41 @@
+{
+  "action": "pipeline",
+  "name": "email-triage-and-reply-draft",
+  "version": "2.0.0",
+  "description": "Summarizes unread Gmail items, writes a paste-ready reply draft, and keeps the inbox response loop in one local artifact.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "reply_tone": "clear and concise",
+    "output_path": "active/shared/tmp/email-inbox-triage.md"
+  },
+  "steps": [
+    {
+      "id": "triage_inbox",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "gmail_triage", "type": "GmailTriage" },
+      "params": {
+        "service_id": "google-workspace",
+        "action": "gmail_triage"
+      }
+    },
+    {
+      "id": "write_reply_draft",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "gmail_triage",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "# Gmail Inbox Triage\n\nGenerated: {{run_utc_now}}\nTone: {{reply_tone}}\n\n## Triage Output\n\n{{gmail_triage}}\n\n## Suggested Reply Draft\n\nUse the triage above to write a short reply with these parts:\n- Acknowledge receipt\n- Confirm the requested action or next step\n- Mention any blocker or missing detail\n- Close with the next date or action owner\n\n### Paste-Ready Template\n\nHi,\n\nThanks for the update. I reviewed the items below:\n\n{{gmail_triage}}\n\nMy current response is:\n- \n\nNext step:\n- \n\nBest,\nKyberion\n"
+      }
+    },
+    {
+      "id": "log_result",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📧 Email triage draft written to {{output_path}}"
+      }
+    }
+  ]
+}

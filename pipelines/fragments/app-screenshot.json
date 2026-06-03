@@ -1,0 +1,24 @@
+{
+  "action": "pipeline",
+  "name": "app-screenshot-fragment",
+  "version": "2.0.0",
+  "description": "Captures the focused window of a named application. Required context var: application. Optional: screenshot_export_path, display_index, display_name, window_title.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "steps": [
+    {
+      "id": "capture_app_screenshot",
+      "role": "source",
+      "op": "system:screenshot",
+      "produces": { "channel": "screenshot_path", "type": "ScreenshotResult" },
+      "params": {
+        "application": "{{application}}",
+        "window_title": "{{window_title}}",
+        "window_match_policy": "{{window_match_policy}}",
+        "capture_mode": "focused_window",
+        "display_index": "{{display_index}}",
+        "display_name": "{{display_name}}",
+        "path": "{{screenshot_export_path}}"
+      }
+    }
+  ]
+}

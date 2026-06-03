@@ -1,14 +1,28 @@
 {
+  "version": "2.0.0",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
-    { "id": "check-login", "type": "capture", "op": "evaluate", "params": { "script": "(() => document.querySelector(\"input[name='_account']\") ? 'need_login' : 'already_logged_in')()", "export_as": "login_status" } },
-    { "id": "login-if-needed", "type": "control", "op": "if", "params": {
-      "condition": { "from": "login_status", "operator": "eq", "value": "need_login" },
-      "then": [
-        { "type": "apply", "op": "fill", "params": { "selector": "input[name='_account']", "text": "{{login_user}}" } },
-        { "type": "apply", "op": "fill", "params": { "selector": "input[name='_password']", "text": "{{login_password}}" } },
-        { "type": "apply", "op": "click", "params": { "selector": "input.login-button, input[type='submit']" } },
-        { "type": "apply", "op": "wait", "params": { "duration": 3000 } }
-      ]
-    }}
+    {
+      "id": "check-login",
+      "role": "source",
+      "op": "evaluate",
+      "produces": { "channel": "login_status", "type": "EvalResult" },
+      "params": { "script": "(() => document.querySelector(\"input[name='_account']\") ? 'need_login' : 'already_logged_in')()" }
+    },
+    {
+      "id": "login-if-needed",
+      "role": "gate",
+      "op": "if",
+      "consumes": "login_status",
+      "params": {
+        "condition": { "from": "login_status", "operator": "eq", "value": "need_login" },
+        "then": [
+          { "role": "sink", "op": "fill", "params": { "selector": "input[name='_account']", "text": "{{login_user}}" } },
+          { "role": "sink", "op": "fill", "params": { "selector": "input[name='_password']", "text": "{{login_password}}" } },
+          { "role": "sink", "op": "click", "params": { "selector": "input.login-button, input[type='submit']" } },
+          { "role": "sink", "op": "wait", "params": { "duration": 3000 } }
+        ]
+      }
+    }
   ]
 }

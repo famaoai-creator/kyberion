@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "description": "Maps the 28 knowledge roles to execution mode, persona, and authority_role. system_roles maintain Kyberion itself; mission_roles execute user work; context_roles are knowledge-only (no runtime authority).",
+  "system_roles": [
+    { "role": "ecosystem_architect",    "authority_role": "ecosystem_architect", "persona": "ecosystem_architect", "execution_mode": "system"   },
+    { "role": "knowledge_steward",      "authority_role": "knowledge_steward",   "persona": "analyst",             "execution_mode": "system"   },
+    { "role": "solution_architect",     "authority_role": "ecosystem_architect", "persona": "ecosystem_architect", "execution_mode": "system"   },
+    { "role": "integration_steward",    "authority_role": "ecosystem_architect", "persona": "ecosystem_architect", "execution_mode": "system"   },
+    { "role": "reliability_engineer",   "authority_role": "surface_runtime",     "persona": "worker",              "execution_mode": "system"   },
+    { "role": "infrastructure_sentinel","authority_role": "surface_runtime",     "persona": "worker",              "execution_mode": "system"   }
+  ],
+  "mission_roles": [
+    { "role": "mission_controller",     "authority_role": "mission_controller",  "persona": "worker",              "execution_mode": "mission"  },
+    { "role": "software_developer",     "authority_role": "software_developer",  "persona": "worker",              "execution_mode": "mission"  },
+    { "role": "sovereign_concierge",    "authority_role": "sovereign_concierge", "persona": "sovereign",           "execution_mode": "sovereign"},
+    { "role": "incident_commander",     "authority_role": "mission_controller",  "persona": "worker",              "execution_mode": "mission"  },
+    { "role": "performance_engineer",   "authority_role": "software_developer",  "persona": "worker",              "execution_mode": "mission"  }
+  ],
+  "context_roles": [
+    { "role": "ceo",                    "persona": "analyst", "execution_mode": "mission" },
+    { "role": "business_owner",         "persona": "analyst", "execution_mode": "mission" },
+    { "role": "product_manager",        "persona": "analyst", "execution_mode": "mission" },
+    { "role": "strategic_sales",        "persona": "analyst", "execution_mode": "mission" },
+    { "role": "marketing_growth",       "persona": "analyst", "execution_mode": "mission" },
+    { "role": "customer_success",       "persona": "worker",  "execution_mode": "mission" },
+    { "role": "pmo_governance",         "persona": "analyst", "execution_mode": "mission" },
+    { "role": "qa_lead",                "persona": "analyst", "execution_mode": "mission" },
+    { "role": "legal_strategist",       "persona": "analyst", "execution_mode": "mission" },
+    { "role": "cyber_security",         "persona": "analyst", "execution_mode": "mission" },
+    { "role": "ruthless_auditor",       "persona": "analyst", "execution_mode": "mission" },
+    { "role": "designer",               "persona": "worker",  "execution_mode": "mission" },
+    { "role": "executive_assistant",    "persona": "worker",  "execution_mode": "mission" },
+    { "role": "finance_controller",     "persona": "analyst", "execution_mode": "mission" },
+    { "role": "talent_culture",         "persona": "worker",  "execution_mode": "mission" },
+    { "role": "line_manager",           "persona": "worker",  "execution_mode": "mission" }
+  ]
+}

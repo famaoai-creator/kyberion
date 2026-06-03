@@ -13,178 +13,178 @@ type GovernanceRuleCheck = {
   dataPath: string;
 };
 
-const GOVERNANCE_DIR = 'knowledge/public/governance';
+const GOVERNANCE_DIR = 'knowledge/product/governance';
 
 const CHECKS: GovernanceRuleCheck[] = [
   {
     id: 'intent-policy',
-    schemaPath: 'knowledge/public/schemas/intent-policy.schema.json',
-    dataPath: 'knowledge/public/governance/intent-policy.json',
+    schemaPath: 'knowledge/product/schemas/intent-policy.schema.json',
+    dataPath: 'knowledge/product/governance/intent-policy.json',
   },
   {
     id: 'intent-resolution-policy',
-    schemaPath: 'knowledge/public/schemas/intent-resolution-policy.schema.json',
-    dataPath: 'knowledge/public/governance/intent-resolution-policy.json',
+    schemaPath: 'knowledge/product/schemas/intent-resolution-policy.schema.json',
+    dataPath: 'knowledge/product/governance/intent-resolution-policy.json',
   },
   {
     id: 'task-session-policy',
-    schemaPath: 'knowledge/public/schemas/task-session-policy.schema.json',
-    dataPath: 'knowledge/public/governance/task-session-policy.json',
+    schemaPath: 'knowledge/product/schemas/task-session-policy.schema.json',
+    dataPath: 'knowledge/product/governance/task-session-policy.json',
   },
   {
     id: 'work-policy',
-    schemaPath: 'knowledge/public/schemas/work-policy.schema.json',
-    dataPath: 'knowledge/public/governance/work-policy.json',
+    schemaPath: 'knowledge/product/schemas/work-policy.schema.json',
+    dataPath: 'knowledge/product/governance/work-policy.json',
   },
   {
     id: 'surface-policy',
-    schemaPath: 'knowledge/public/schemas/surface-policy.schema.json',
-    dataPath: 'knowledge/public/governance/surface-policy.json',
+    schemaPath: 'knowledge/product/schemas/surface-policy.schema.json',
+    dataPath: 'knowledge/product/governance/surface-policy.json',
   },
   {
     id: 'standard-intents',
-    schemaPath: 'knowledge/public/schemas/standard-intents.schema.json',
-    dataPath: 'knowledge/public/governance/standard-intents.json',
+    schemaPath: 'knowledge/product/schemas/standard-intents.schema.json',
+    dataPath: 'knowledge/product/governance/standard-intents.json',
   },
   {
     id: 'intent-domain-ontology',
-    schemaPath: 'knowledge/public/schemas/intent-domain-ontology.schema.json',
-    dataPath: 'knowledge/public/governance/intent-domain-ontology.json',
+    schemaPath: 'knowledge/product/schemas/intent-domain-ontology.schema.json',
+    dataPath: 'knowledge/product/governance/intent-domain-ontology.json',
   },
   {
     id: 'intent-contract-memory',
-    schemaPath: 'knowledge/public/schemas/intent-contract-memory.schema.json',
-    dataPath: 'knowledge/public/governance/intent-contract-memory.json',
+    schemaPath: 'knowledge/product/schemas/intent-contract-memory.schema.json',
+    dataPath: 'knowledge/product/governance/intent-contract-memory.json',
   },
   {
     id: 'intent-contract-selection-policy',
-    schemaPath: 'knowledge/public/schemas/intent-contract-selection-policy.schema.json',
-    dataPath: 'knowledge/public/governance/intent-contract-selection-policy.json',
+    schemaPath: 'knowledge/product/schemas/intent-contract-selection-policy.schema.json',
+    dataPath: 'knowledge/product/governance/intent-contract-selection-policy.json',
   },
   {
     id: 'tool-actuator-routing-policy',
-    schemaPath: 'knowledge/public/schemas/tool-actuator-routing-policy.schema.json',
-    dataPath: 'knowledge/public/governance/tool-actuator-routing-policy.json',
+    schemaPath: 'knowledge/product/schemas/tool-actuator-routing-policy.schema.json',
+    dataPath: 'knowledge/product/governance/tool-actuator-routing-policy.json',
   },
   {
     id: 'active-surfaces',
-    schemaPath: 'knowledge/public/schemas/runtime-surface-manifest.schema.json',
-    dataPath: 'knowledge/public/governance/active-surfaces.json',
+    schemaPath: 'knowledge/product/schemas/runtime-surface-manifest.schema.json',
+    dataPath: 'knowledge/product/governance/active-surfaces.json',
   },
   {
     id: 'surface-provider-manifests',
-    schemaPath: 'knowledge/public/schemas/surface-provider-manifests.schema.json',
-    dataPath: 'knowledge/public/governance/surface-provider-manifests.json',
+    schemaPath: 'knowledge/product/schemas/surface-provider-manifests.schema.json',
+    dataPath: 'knowledge/product/governance/surface-provider-manifests.json',
   },
   {
     id: 'surface-provider-manifest-catalog',
-    schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/surface-provider-manifest-catalog.json',
+    schemaPath: 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/surface-provider-manifest-catalog.json',
   },
   {
     id: 'model-registry',
-    schemaPath: 'knowledge/public/schemas/model-registry.schema.json',
-    dataPath: 'knowledge/public/governance/model-registry.json',
+    schemaPath: 'knowledge/product/schemas/model-registry.schema.json',
+    dataPath: 'knowledge/product/governance/model-registry.json',
   },
   {
     id: 'model-adaptation-policy',
-    schemaPath: 'knowledge/public/schemas/model-adaptation-policy.schema.json',
-    dataPath: 'knowledge/public/governance/model-adaptation-policy.json',
+    schemaPath: 'knowledge/product/schemas/model-adaptation-policy.schema.json',
+    dataPath: 'knowledge/product/governance/model-adaptation-policy.json',
   },
   {
     id: 'harness-capability-registry',
-    schemaPath: 'knowledge/public/schemas/harness-capability-registry.schema.json',
-    dataPath: 'knowledge/public/governance/harness-capability-registry.json',
+    schemaPath: 'knowledge/product/schemas/harness-capability-registry.schema.json',
+    dataPath: 'knowledge/product/governance/harness-capability-registry.json',
   },
   {
     id: 'harness-adapter-registry',
-    schemaPath: 'knowledge/public/schemas/harness-adapter-registry.schema.json',
-    dataPath: 'knowledge/public/governance/harness-adapter-registry.json',
+    schemaPath: 'knowledge/product/schemas/harness-adapter-registry.schema.json',
+    dataPath: 'knowledge/product/governance/harness-adapter-registry.json',
   },
   {
     id: 'provider-capability-scan-policy',
-    schemaPath: 'knowledge/public/schemas/provider-capability-scan-policy.schema.json',
-    dataPath: 'knowledge/public/governance/provider-capability-scan-policy.json',
+    schemaPath: 'knowledge/product/schemas/provider-capability-scan-policy.schema.json',
+    dataPath: 'knowledge/product/governance/provider-capability-scan-policy.json',
   },
   {
     id: 'capability-lifecycle-procedure',
-    schemaPath: 'knowledge/public/schemas/capability-lifecycle-procedure.schema.json',
-    dataPath: 'knowledge/public/governance/capability-lifecycle-procedure.json',
+    schemaPath: 'knowledge/product/schemas/capability-lifecycle-procedure.schema.json',
+    dataPath: 'knowledge/product/governance/capability-lifecycle-procedure.json',
   },
   {
     id: 'execution-receipt-policy',
-    schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
-    dataPath: 'knowledge/public/governance/execution-receipt-policy.json',
+    schemaPath: 'knowledge/product/schemas/execution-receipt-policy.schema.json',
+    dataPath: 'knowledge/product/governance/execution-receipt-policy.json',
   },
   {
     id: 'voice-profile-registry',
-    schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
-    dataPath: 'knowledge/public/governance/voice-profile-registry.json',
+    schemaPath: 'knowledge/product/schemas/voice-profile-registry.schema.json',
+    dataPath: 'knowledge/product/governance/voice-profile-registry.json',
   },
   {
     id: 'voice-runtime-policy',
-    schemaPath: 'knowledge/public/schemas/voice-runtime-policy.schema.json',
-    dataPath: 'knowledge/public/governance/voice-runtime-policy.json',
+    schemaPath: 'knowledge/product/schemas/voice-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/voice-runtime-policy.json',
   },
   {
     id: 'voice-engine-registry',
-    schemaPath: 'knowledge/public/schemas/voice-engine-registry.schema.json',
-    dataPath: 'knowledge/public/governance/voice-engine-registry.json',
+    schemaPath: 'knowledge/product/schemas/voice-engine-registry.schema.json',
+    dataPath: 'knowledge/product/governance/voice-engine-registry.json',
   },
   {
     id: 'voice-sample-ingestion-policy',
-    schemaPath: 'knowledge/public/schemas/voice-sample-ingestion-policy.schema.json',
-    dataPath: 'knowledge/public/governance/voice-sample-ingestion-policy.json',
+    schemaPath: 'knowledge/product/schemas/voice-sample-ingestion-policy.schema.json',
+    dataPath: 'knowledge/product/governance/voice-sample-ingestion-policy.json',
   },
   {
     id: 'video-composition-template-registry',
-    schemaPath: 'knowledge/public/schemas/video-composition-template-registry.schema.json',
-    dataPath: 'knowledge/public/governance/video-composition-template-registry.json',
+    schemaPath: 'knowledge/product/schemas/video-composition-template-registry.schema.json',
+    dataPath: 'knowledge/product/governance/video-composition-template-registry.json',
   },
   {
     id: 'video-render-runtime-policy',
-    schemaPath: 'knowledge/public/schemas/video-render-runtime-policy.schema.json',
-    dataPath: 'knowledge/public/governance/video-render-runtime-policy.json',
+    schemaPath: 'knowledge/product/schemas/video-render-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/video-render-runtime-policy.json',
   },
   {
     id: 'mission-classification-policy',
-    schemaPath: 'knowledge/public/schemas/mission-classification-policy.schema.json',
-    dataPath: 'knowledge/public/governance/mission-classification-policy.json',
+    schemaPath: 'knowledge/product/schemas/mission-classification-policy.schema.json',
+    dataPath: 'knowledge/product/governance/mission-classification-policy.json',
   },
   {
     id: 'authority-role-index',
-    schemaPath: 'knowledge/public/schemas/authority-role-index.schema.json',
-    dataPath: 'knowledge/public/governance/authority-role-index.json',
+    schemaPath: 'knowledge/product/schemas/authority-role-index.schema.json',
+    dataPath: 'knowledge/product/governance/authority-role-index.json',
   },
   {
     id: 'team-role-index',
-    schemaPath: 'knowledge/public/schemas/team-role-index.schema.json',
-    dataPath: 'knowledge/public/orchestration/team-role-index.json',
+    schemaPath: 'knowledge/product/schemas/team-role-index.schema.json',
+    dataPath: 'knowledge/product/orchestration/team-role-index.json',
   },
   {
     id: 'agent-profile-index',
-    schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
-    dataPath: 'knowledge/public/orchestration/agent-profile-index.json',
+    schemaPath: 'knowledge/product/schemas/agent-profile-index.schema.json',
+    dataPath: 'knowledge/product/orchestration/agent-profile-index.json',
   },
   {
     id: 'mission-workflow-catalog',
-    schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
-    dataPath: 'knowledge/public/governance/mission-workflow-catalog.json',
+    schemaPath: 'knowledge/product/schemas/mission-workflow-catalog.schema.json',
+    dataPath: 'knowledge/product/governance/mission-workflow-catalog.json',
   },
   {
     id: 'mission-review-gate-registry',
-    schemaPath: 'knowledge/public/schemas/mission-review-gate-registry.schema.json',
-    dataPath: 'knowledge/public/governance/mission-review-gate-registry.json',
+    schemaPath: 'knowledge/product/schemas/mission-review-gate-registry.schema.json',
+    dataPath: 'knowledge/product/governance/mission-review-gate-registry.json',
   },
   {
     id: 'path-scope-policy',
-    schemaPath: 'knowledge/public/schemas/path-scope-policy.schema.json',
-    dataPath: 'knowledge/public/governance/path-scope-policy.json',
+    schemaPath: 'knowledge/product/schemas/path-scope-policy.schema.json',
+    dataPath: 'knowledge/product/governance/path-scope-policy.json',
   },
   {
     id: 'mission-orchestration-scenario-pack',
-    schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
-    dataPath: 'knowledge/public/governance/mission-orchestration-scenario-pack.json',
+    schemaPath: 'knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json',
+    dataPath: 'knowledge/product/governance/mission-orchestration-scenario-pack.json',
   },
 ];
 
@@ -201,27 +201,27 @@ function readJson<T>(relativePath: string): T {
 }
 
 function validateAgentProfileDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/orchestration/agent-profiles');
+  const directory = pathResolver.rootResolve('knowledge/product/orchestration/agent-profiles');
   if (!safeExistsSync(directory)) {
-    violations.push('agent-profile-index: knowledge/public/orchestration/agent-profiles directory is missing');
+    violations.push('agent-profile-index: knowledge/product/orchestration/agent-profiles directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('agent-profile-index: knowledge/public/orchestration/agent-profiles directory is empty');
+    violations.push('agent-profile-index: knowledge/product/orchestration/agent-profiles directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/agent-profile-index.schema.json';
+  const schemaPath = 'knowledge/product/schemas/agent-profile-index.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ agents?: Record<string, unknown> }>('knowledge/public/orchestration/agent-profile-index.json');
+  const snapshot = readJson<{ agents?: Record<string, unknown> }>('knowledge/product/orchestration/agent-profile-index.json');
   const snapshotAgents = snapshot.agents || {};
   const seenAgentIds = new Set<string>();
 
   for (const file of files) {
-    const relativePath = `knowledge/public/orchestration/agent-profiles/${file}`;
+    const relativePath = `knowledge/product/orchestration/agent-profiles/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -258,30 +258,30 @@ function validateAgentProfileDirectoryConsistency(violations: string[]) {
 }
 
 function validateVoiceProfileDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/governance/voice-profiles');
+  const directory = pathResolver.rootResolve('knowledge/product/governance/voice-profiles');
   if (!safeExistsSync(directory)) {
-    violations.push('voice-profile-registry: knowledge/public/governance/voice-profiles directory is missing');
+    violations.push('voice-profile-registry: knowledge/product/governance/voice-profiles directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('voice-profile-registry: knowledge/public/governance/voice-profiles directory is empty');
+    violations.push('voice-profile-registry: knowledge/product/governance/voice-profiles directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/voice-profile-registry.schema.json';
+  const schemaPath = 'knowledge/product/schemas/voice-profile-registry.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
   const snapshot = readJson<{ default_profile_id?: string; profiles?: Array<{ profile_id?: string }> }>(
-    'knowledge/public/governance/voice-profile-registry.json',
+    'knowledge/product/governance/voice-profile-registry.json',
   );
   const snapshotProfiles = snapshot.profiles || [];
   const snapshotIds = new Set(snapshotProfiles.map((profile) => String(profile.profile_id || '')));
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/public/governance/voice-profiles/${file}`;
+    const relativePath = `knowledge/product/governance/voice-profiles/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -318,29 +318,29 @@ function validateVoiceProfileDirectoryConsistency(violations: string[]) {
 }
 
 function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/governance/authority-roles');
+  const directory = pathResolver.rootResolve('knowledge/product/governance/authority-roles');
   if (!safeExistsSync(directory)) {
-    violations.push('authority-role-index: knowledge/public/governance/authority-roles directory is missing');
+    violations.push('authority-role-index: knowledge/product/governance/authority-roles directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('authority-role-index: knowledge/public/governance/authority-roles directory is empty');
+    violations.push('authority-role-index: knowledge/product/governance/authority-roles directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/authority-role.schema.json';
+  const schemaPath = 'knowledge/product/schemas/authority-role.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
   const snapshot = readJson<{ authority_roles?: Record<string, unknown> }>(
-    'knowledge/public/governance/authority-role-index.json',
+    'knowledge/product/governance/authority-role-index.json',
   );
   const snapshotRoles = snapshot.authority_roles || {};
   const seenRoleIds = new Set<string>();
 
   for (const file of files) {
-    const relativePath = `knowledge/public/governance/authority-roles/${file}`;
+    const relativePath = `knowledge/product/governance/authority-roles/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -379,27 +379,27 @@ function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
 }
 
 function validateTeamRoleDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/orchestration/team-roles');
+  const directory = pathResolver.rootResolve('knowledge/product/orchestration/team-roles');
   if (!safeExistsSync(directory)) {
-    violations.push('team-role-index: knowledge/public/orchestration/team-roles directory is missing');
+    violations.push('team-role-index: knowledge/product/orchestration/team-roles directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('team-role-index: knowledge/public/orchestration/team-roles directory is empty');
+    violations.push('team-role-index: knowledge/product/orchestration/team-roles directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/team-role.schema.json';
+  const schemaPath = 'knowledge/product/schemas/team-role.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ team_roles?: Record<string, unknown> }>('knowledge/public/orchestration/team-role-index.json');
+  const snapshot = readJson<{ team_roles?: Record<string, unknown> }>('knowledge/product/orchestration/team-role-index.json');
   const snapshotRoles = snapshot.team_roles || {};
   const seenRoleIds = new Set<string>();
 
   for (const file of files) {
-    const relativePath = `knowledge/public/orchestration/team-roles/${file}`;
+    const relativePath = `knowledge/product/orchestration/team-roles/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -438,27 +438,27 @@ function validateTeamRoleDirectoryConsistency(violations: string[]) {
 }
 
 function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifest-catalogs');
+  const directory = pathResolver.rootResolve('knowledge/product/governance/surface-provider-manifest-catalogs');
   if (!safeExistsSync(directory)) {
-    violations.push('surface-provider-manifest-catalog: knowledge/public/governance/surface-provider-manifest-catalogs directory is missing');
+    violations.push('surface-provider-manifest-catalog: knowledge/product/governance/surface-provider-manifest-catalogs directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('surface-provider-manifest-catalog: knowledge/public/governance/surface-provider-manifest-catalogs directory is empty');
+    violations.push('surface-provider-manifest-catalog: knowledge/product/governance/surface-provider-manifest-catalogs directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json';
+  const schemaPath = 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ entries?: Array<{ id?: string }> }>('knowledge/public/governance/surface-provider-manifest-catalog.json');
+  const snapshot = readJson<{ entries?: Array<{ id?: string }> }>('knowledge/product/governance/surface-provider-manifest-catalog.json');
   const snapshotIds = new Set((snapshot.entries || []).map((entry) => String(entry.id || '')));
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/public/governance/surface-provider-manifest-catalogs/${file}`;
+    const relativePath = `knowledge/product/governance/surface-provider-manifest-catalogs/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -489,27 +489,27 @@ function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]
 }
 
 function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
+  const directory = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints');
   if (!safeExistsSync(directory)) {
-    violations.push('service-endpoints: knowledge/public/orchestration/service-endpoints directory is missing');
+    violations.push('service-endpoints: knowledge/product/orchestration/service-endpoints directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('service-endpoints: knowledge/public/orchestration/service-endpoints directory is empty');
+    violations.push('service-endpoints: knowledge/product/orchestration/service-endpoints directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/service-endpoints.schema.json';
+  const schemaPath = 'knowledge/product/schemas/service-endpoints.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ default_pattern?: string; services?: Record<string, { intent_aliases?: string[] }> }>('knowledge/public/orchestration/service-endpoints.json');
+  const snapshot = readJson<{ default_pattern?: string; services?: Record<string, { intent_aliases?: string[] }> }>('knowledge/product/orchestration/service-endpoints.json');
   const snapshotIds = new Set(Object.keys(snapshot.services || {}).map((entry) => String(entry || '')));
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/public/orchestration/service-endpoints/${file}`;
+    const relativePath = `knowledge/product/orchestration/service-endpoints/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -549,27 +549,27 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
 }
 
 function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
+  const directory = pathResolver.rootResolve('knowledge/product/orchestration/specialists');
   if (!safeExistsSync(directory)) {
-    violations.push('specialist-catalog: knowledge/public/orchestration/specialists directory is missing');
+    violations.push('specialist-catalog: knowledge/product/orchestration/specialists directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('specialist-catalog: knowledge/public/orchestration/specialists directory is empty');
+    violations.push('specialist-catalog: knowledge/product/orchestration/specialists directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/specialist-catalog.schema.json';
+  const schemaPath = 'knowledge/product/schemas/specialist-catalog.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>('knowledge/public/orchestration/specialist-catalog.json');
+  const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>('knowledge/product/orchestration/specialist-catalog.json');
   const snapshotIds = new Set(Object.keys(snapshot.specialists || {}).map((entry) => String(entry || '')));
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/public/orchestration/specialists/${file}`;
+    const relativePath = `knowledge/product/orchestration/specialists/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -604,30 +604,30 @@ function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
 }
 
 function validateVoiceEngineDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/public/governance/voice-engines');
+  const directory = pathResolver.rootResolve('knowledge/product/governance/voice-engines');
   if (!safeExistsSync(directory)) {
-    violations.push('voice-engine-registry: knowledge/public/governance/voice-engines directory is missing');
+    violations.push('voice-engine-registry: knowledge/product/governance/voice-engines directory is missing');
     return;
   }
 
   const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
   if (!files.length) {
-    violations.push('voice-engine-registry: knowledge/public/governance/voice-engines directory is empty');
+    violations.push('voice-engine-registry: knowledge/product/governance/voice-engines directory is empty');
     return;
   }
 
-  const schemaPath = 'knowledge/public/schemas/voice-engine-registry.schema.json';
+  const schemaPath = 'knowledge/product/schemas/voice-engine-registry.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
   const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
   const snapshot = readJson<{ default_engine_id?: string; engines?: Array<{ engine_id?: string }> }>(
-    'knowledge/public/governance/voice-engine-registry.json',
+    'knowledge/product/governance/voice-engine-registry.json',
   );
   const snapshotEngines = snapshot.engines || [];
   const snapshotIds = new Set(snapshotEngines.map((engine) => String(engine.engine_id || '')));
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/public/governance/voice-engines/${file}`;
+    const relativePath = `knowledge/product/governance/voice-engines/${file}`;
     const data = readJson<Record<string, unknown>>(relativePath);
     const ok = validate(data);
     if (!ok) {
@@ -677,7 +677,7 @@ function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
       capability_count?: number;
       contract_schema?: string;
     }>;
-  }>('knowledge/public/orchestration/global_actuator_index.json');
+  }>('knowledge/product/orchestration/global_actuator_index.json');
   const snapshotById = new Map((snapshot.actuators || []).map((entry) => [String(entry.n || ''), entry]));
   const catalogById = new Map(catalog.map((entry) => [entry.n, entry]));
 
@@ -1030,11 +1030,11 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if (!(typed.surfaces || []).some((surface) => surface.enabled !== false)) {
       violations.push('active-surfaces: at least one surface must be enabled');
     }
-    const surfacesDir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
+    const surfacesDir = pathResolver.rootResolve('knowledge/product/governance/surfaces');
     if (safeExistsSync(surfacesDir)) {
       const directorySurfaces: Array<{ id?: string; enabled?: boolean }> = [];
       for (const entry of safeReaddir(surfacesDir).filter((name) => name.endsWith('.json')).sort()) {
-        const surfaceManifest = readJson<{ version?: number; surfaces?: Array<{ id?: string; enabled?: boolean }> }>(path.join('knowledge/public/governance/surfaces', entry));
+        const surfaceManifest = readJson<{ version?: number; surfaces?: Array<{ id?: string; enabled?: boolean }> }>(path.join('knowledge/product/governance/surfaces', entry));
         if (!validate(surfaceManifest)) {
           for (const error of validate.errors || []) {
             violations.push(`active-surfaces:${entry}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
@@ -1059,7 +1059,7 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       const snapshotIds = JSON.stringify(sortById(typed.surfaces || []));
       const directoryIds = JSON.stringify(sortById(directorySurfaces));
       if (snapshotIds !== directoryIds) {
-        violations.push('active-surfaces: compatibility snapshot must match knowledge/public/governance/surfaces/*.json');
+        violations.push('active-surfaces: compatibility snapshot must match knowledge/product/governance/surfaces/*.json');
       }
     }
   }
@@ -1353,7 +1353,7 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     }
 
     const engineRegistry = readJson<{ engines?: Array<{ engine_id?: string }> }>(
-      'knowledge/public/governance/voice-engine-registry.json'
+      'knowledge/product/governance/voice-engine-registry.json'
     );
     const engineIds = new Set((engineRegistry.engines || []).map((engine) => String(engine.engine_id || '')));
     for (const profile of typed.profiles || []) {

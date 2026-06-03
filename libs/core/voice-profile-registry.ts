@@ -22,8 +22,8 @@ export interface VoiceProfileRegistry {
   profiles: VoiceProfileRecord[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/voice-profile-registry.json');
-const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('public/governance/voice-profiles');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/voice-profile-registry.json');
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/voice-profiles');
 const DEFAULT_CUSTOMER_OVERLAY_PATH = 'voice/profile-registry.json';
 const DEFAULT_PERSONAL_OVERLAY_PATH = pathResolver.knowledge('personal/voice/profile-registry.json');
 

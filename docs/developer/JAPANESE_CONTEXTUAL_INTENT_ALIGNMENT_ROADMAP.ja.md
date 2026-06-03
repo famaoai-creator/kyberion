@@ -34,13 +34,13 @@ Kyberion には、今回の強化で再利用すべき土台がある。
 
 | 領域 | 現状 | 再利用方針 |
 |---|---|---|
-| Intent catalog | `knowledge/public/governance/standard-intents.json` が surface intent を定義している | 新しい intent や intake requirement は catalog 側に追加する |
+| Intent catalog | `knowledge/product/governance/standard-intents.json` が surface intent を定義している | 新しい intent や intake requirement は catalog 側に追加する |
 | Intent resolver | `libs/core/intent-resolution.ts` が trigger / example / policy で候補を選ぶ | 入口はここに寄せ、TypeScript の個別 if を増やしすぎない |
 | Task session | `libs/core/task-session.ts` が `schedule-coordination` などを task session に変換する | schedule 系の missing input と payload shaping を拡張する |
 | User-facing reply | `libs/core/surface-runtime-orchestrator.ts` が missing inputs を人間向けに返す | 内部 enum ではなく、短い日本語の確認文にする |
 | Clarification packet | `libs/core/intent-contract.ts` が clarification packet を生成する | 「何を聞くべきか」をここへ集約する |
 | Learning memory | `libs/core/intent-contract-learning.ts` が成功率ベースで contract 選択を記録する | contract 成否だけでなく、補完・確認・source binding の学習に拡張する |
-| Operator learning | `knowledge/public/architecture/operator-intent-learning-simulation-2026-04-29.md` が operator preference と tiering を定義している | 個人設定・好み・確認閾値の保存先として接続する |
+| Operator learning | `knowledge/product/architecture/operator-intent-learning-simulation-2026-04-29.md` が operator preference と tiering を定義している | 個人設定・好み・確認閾値の保存先として接続する |
 
 ### 1.2 現状の主なギャップ
 
@@ -154,8 +154,8 @@ surface utterance
 
 | ID | タスク | 対象 | 受入条件 |
 |---|---|---|---|
-| JA-INTENT-00 | 日本語省略発話の golden corpus を追加 | `knowledge/public/governance/japanese-contextual-intent-corpus.json` | 50件以上の発話、期待 frame、期待 route、確認要否がある |
-| JA-INTENT-01 | corpus schema と contract test を追加 | `knowledge/public/schemas/japanese-contextual-intent-corpus.schema.json`, `libs/core/*test.ts` | schema validation と代表ケース test が通る |
+| JA-INTENT-00 | 日本語省略発話の golden corpus を追加 | `knowledge/product/governance/japanese-contextual-intent-corpus.json` | 50件以上の発話、期待 frame、期待 route、確認要否がある |
+| JA-INTENT-01 | corpus schema と contract test を追加 | `knowledge/product/schemas/japanese-contextual-intent-corpus.schema.json`, `libs/core/*test.ts` | schema validation と代表ケース test が通る |
 
 最初の corpus には次を必ず含める。
 
@@ -174,7 +174,7 @@ surface utterance
 
 | ID | タスク | 対象 | 受入条件 |
 |---|---|---|---|
-| JA-INTENT-10 | frame 型と schema を追加 | `libs/core/contextual-intent-frame.ts`, `knowledge/public/schemas/contextual-intent-frame.schema.json` | frame の validate / normalize / confidence aggregation がテストされる |
+| JA-INTENT-10 | frame 型と schema を追加 | `libs/core/contextual-intent-frame.ts`, `knowledge/product/schemas/contextual-intent-frame.schema.json` | frame の validate / normalize / confidence aggregation がテストされる |
 | JA-INTENT-11 | 日本語時間表現の最小 resolver を追加 | `libs/core/contextual-intent-frame.ts` | `今日`, `明日`, `今週`, `来週`, `来月`, `月曜` を timezone 付きで正規化できる |
 | JA-INTENT-12 | utterance frame compiler を追加 | `libs/core/contextual-intent-frame.ts` | corpus の schedule / availability 系が expected frame に一致する |
 | JA-INTENT-13 | `resolveIntentResolutionPacket` の入力 context に frame を渡す | `libs/core/intent-resolution.ts`, `libs/core/intent-contract.ts` | 既存 intent resolution test が壊れず、frame 由来の candidate reason が出る |
@@ -191,9 +191,9 @@ surface utterance
 
 | ID | タスク | 対象 | 受入条件 |
 |---|---|---|---|
-| JA-INTENT-20 | `schedule-read-agenda` intent を追加 | `knowledge/public/governance/standard-intents.json` | read-only の `来週の予定教えて` が `direct_reply` または read-only service operation に解決される |
-| JA-INTENT-21 | outcome pattern を追加 | `knowledge/public/governance/intent-outcome-patterns.json`, `knowledge/public/architecture/intent-outcome-patterns.md` | read agenda の done 条件が明記される |
-| JA-INTENT-22 | `schedule-coordination` は change / reschedule に寄せる | `knowledge/public/governance/standard-intents.json`, `libs/core/task-session.ts` | `リスケ`, `調整`, `変更` は approval-required のまま |
+| JA-INTENT-20 | `schedule-read-agenda` intent を追加 | `knowledge/product/governance/standard-intents.json` | read-only の `来週の予定教えて` が `direct_reply` または read-only service operation に解決される |
+| JA-INTENT-21 | outcome pattern を追加 | `knowledge/product/governance/intent-outcome-patterns.json`, `knowledge/product/architecture/intent-outcome-patterns.md` | read agenda の done 条件が明記される |
+| JA-INTENT-22 | `schedule-coordination` は change / reschedule に寄せる | `knowledge/product/governance/standard-intents.json`, `libs/core/task-session.ts` | `リスケ`, `調整`, `変更` は approval-required のまま |
 | JA-INTENT-23 | task-session reply を action 別に自然化 | `libs/core/surface-runtime-orchestrator.ts` | read-only は `予定を確認します`、change は `変更範囲を確認します` と返る |
 
 ### Phase 3: source binding resolver を追加する
@@ -219,7 +219,7 @@ surface utterance
 
 | ID | タスク | 対象 | 受入条件 |
 |---|---|---|---|
-| JA-INTENT-40 | ambiguity budget policy を追加 | `knowledge/public/governance/contextual-intent-clarification-policy.json` | read-only / side-effect / external audience ごとの閾値が定義される |
+| JA-INTENT-40 | ambiguity budget policy を追加 | `knowledge/product/governance/contextual-intent-clarification-policy.json` | read-only / side-effect / external audience ごとの閾値が定義される |
 | JA-INTENT-41 | confidence scoring を frame に統合 | `libs/core/contextual-intent-frame.ts` | subject / action / object / source / timeframe の confidence が算出される |
 | JA-INTENT-42 | single-question clarification formatter を追加 | `libs/core/intent-contract.ts` | missing が複数でも最初の blocking question だけを出せる |
 | JA-INTENT-43 | 進める場合の assumption disclosure を追加 | `libs/core/surface-runtime-orchestrator.ts` | `本人の既定カレンダーとして確認します` のように短く仮定を出す |
@@ -230,7 +230,7 @@ surface utterance
 
 | ID | タスク | 対象 | 受入条件 |
 |---|---|---|---|
-| JA-INTENT-50 | contextual learning record を追加 | `knowledge/public/schemas/contextual-intent-learning.schema.json` | 補完内容、確認結果、scope、tier、expires_at を保存できる |
+| JA-INTENT-50 | contextual learning record を追加 | `knowledge/product/schemas/contextual-intent-learning.schema.json` | 補完内容、確認結果、scope、tier、expires_at を保存できる |
 | JA-INTENT-51 | `recordIntentContractOutcome` と分離した補完学習 API を追加 | `libs/core/contextual-intent-learning.ts` | contract 成否とは別に source / subject / response shape を記録できる |
 | JA-INTENT-52 | confirmation 後だけ学習する | `libs/core/surface-runtime-orchestrator.ts` | `はい、それで` などの確認後に candidate が promotion 対象になる |
 | JA-INTENT-53 | memory provider 連携 hook を設計 | `libs/core/contextual-intent-learning.ts` | 将来の external memory provider に依存せず prefetch / sync 相当の境界を持つ |

@@ -10,7 +10,7 @@ function read(relPath: string): string {
 
 describe('Runtime surface boundary', () => {
   it('declares surface lifecycle through the active surfaces manifest', () => {
-    const manifest = read('knowledge/public/governance/active-surfaces.json');
+    const manifest = read('knowledge/product/governance/active-surfaces.json');
     expect(manifest).toContain('"id": "slack-bridge"');
     expect(manifest).toContain('"id": "imessage-bridge"');
     expect(manifest).toContain('"id": "discord-bridge"');
@@ -28,13 +28,13 @@ describe('Runtime surface boundary', () => {
 
   it('documents the canonical surface lifecycle controller', () => {
     const componentMap = read('docs/COMPONENT_MAP.md');
-    const slackChronosModel = read('knowledge/public/architecture/slack-chronos-control-model.md');
-    const lifecycleModel = read('knowledge/public/architecture/runtime-surface-lifecycle-model.md');
+    const slackChronosModel = read('knowledge/product/architecture/slack-chronos-control-model.md');
+    const lifecycleModel = read('knowledge/product/architecture/runtime-surface-lifecycle-model.md');
 
     expect(componentMap).toContain('scripts/surface_runtime.ts');
     expect(slackChronosModel).toContain('active-surfaces.json');
     expect(slackChronosModel).toContain('surface_runtime.ts');
-    expect(lifecycleModel).toContain('knowledge/public/governance/surfaces/*.json');
+    expect(lifecycleModel).toContain('knowledge/product/governance/surfaces/*.json');
     expect(lifecycleModel).toContain('active-surfaces.json');
   });
 });

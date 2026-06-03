@@ -26,7 +26,63 @@ import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { markRouterActive, markRouterInactive, resetRouterSync } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import { derivePipelineStatus, type PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { derivePipelineStatus, type PipelineAdfStep, ROLE_FROM_TYPE } from '@agent/core/pipeline-contract';
+
+/** Resolve the effective step type from role/type. role takes precedence. */
+function resolveStepType(step: PipelineAdfStep): string {
+  if (step.role) {
+    if (step.role === 'source')    return 'capture';
+    if (step.role === 'transform') return 'transform';
+    if (step.role === 'sink')      return 'apply';
+    if (step.role === 'gate')      return 'control';
+  }
+  return step.type ?? 'apply';
+}
+
+/** Resolve the export key from produces / params.export_as. produces takes precedence. */
+function resolveExportKey(step: PipelineAdfStep, defaultKey: string): string {
+  if (step.produces) {
+    return typeof step.produces === 'string' ? step.produces : step.produces.channel;
+  }
+  return String(step.params?.export_as ?? defaultKey);
+}
+
+export interface FlowValidationError {
+  stepId: string;
+  missing: string[];
+}
+
+/**
+ * Pre-execution validation: checks that every channel listed in `consumes`
+ * was produced by a preceding step (or is present in the initial context).
+ * Returns an array of errors (empty = valid).
+ */
+export function validateFlow(
+  steps: PipelineAdfStep[],
+  initialCtx: Record<string, unknown> = {},
+): FlowValidationError[] {
+  const available = new Set<string>(Object.keys(initialCtx));
+  const errors: FlowValidationError[] = [];
+
+  for (const step of steps) {
+    const id = step.id ?? step.op;
+    const consumed = step.consumes
+      ? (Array.isArray(step.consumes) ? step.consumes : [step.consumes])
+      : [];
+    const missing = consumed.filter(ch => !available.has(ch));
+    if (missing.length > 0) errors.push({ stepId: id, missing });
+
+    // Register what this step produces for downstream steps
+    if (step.produces) {
+      const ch = typeof step.produces === 'string' ? step.produces : step.produces.channel;
+      available.add(ch);
+    } else if (step.params?.export_as && typeof step.params.export_as === 'string') {
+      available.add(step.params.export_as);
+    }
+    // Gate steps don't block channel availability — nested steps are handled separately
+  }
+  return errors;
+}
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -276,8 +332,10 @@ for (const step of steps) {
     step_index: results.length,
     step_id: step.id || step.op,
     op: step.op,
-    ...(step.type ? { step_type: step.type } : {}),
+    ...(step.role ? { step_role: step.role } : step.type ? { step_type: step.type } : {}),
   };
+  // Normalize: role → effective type for downstream dispatch
+  const effectiveType = resolveStepType(step);
   opts.trace?.startSpan(step.op, {
     ...stepTraceBase,
   });
@@ -324,7 +382,15 @@ for (const step of steps) {
     const normalizedOp = normalizePipelineOp(step.op);
     currentNormalizedOp = normalizedOp;
     const [domain, action] = normalizedOp.split(':');
-    const params = (step.params || {}) as Record<string, unknown>;
+    // Bridge produces.channel → params.export_as so actuators (which read params.export_as)
+    // write to the correct ctx key when a step uses the v2 Typed Flow format.
+    const rawParams = (step.params || {}) as Record<string, unknown>;
+    const _producedChannel = step.produces
+      ? (typeof step.produces === 'string' ? step.produces : step.produces.channel)
+      : undefined;
+    const params = (_producedChannel && !rawParams.export_as)
+      ? { ...rawParams, export_as: _producedChannel }
+      : rawParams;
     try {
       if (domain === 'system' && action === 'log') {
         logger.info(resolveLogMessage(params, ctx));
@@ -449,28 +515,25 @@ for (const step of steps) {
           };
           vm.createContext(sandbox);
           const result = await new vm.Script(wrappedScript).runInContext(sandbox);
-          if (params.export_as && typeof params.export_as === 'string') {
-            ctx = { ...ctx, [params.export_as]: result };
-          } else {
-            ctx.last_transform = result;
-          }
+          const transformKey = resolveExportKey(step, 'last_transform');
+          ctx = { ...ctx, [transformKey]: result };
         } else {
           const dispatch = await loadActuatorDispatch(domain);
-          const result = await dispatch(action, params, ctx, step.type);
+          const result = await dispatch(action, params, ctx, effectiveType);
           if (!result.handled) {
             throw new Error(`Unsupported pipeline op: ${step.op}`);
           }
-          
-          // CRITICAL: Safety check for capture ops. 
-          // Use the correct export key based on params, falling back to system defaults.
-          if (step.type === 'capture') {
-             const exportKey = String(params.export_as || 'last_capture');
-             const actualCtx = (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx) 
+
+          // CRITICAL: Safety check for source (capture) ops.
+          // Resolve export key via produces > params.export_as > default.
+          if (effectiveType === 'capture') {
+             const exportKey = resolveExportKey(step, 'last_capture');
+             const actualCtx = (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx)
                                ? (result.ctx as any).context : result.ctx;
              const data = actualCtx[exportKey];
              if (data === undefined) {
-                logger.warn(`  [SYS_PIPELINE] Capture operation ${step.op} returned no data for key: ${exportKey}.`);
-                throw new Error(`Capture operation ${step.op} returned no data for key "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`);
+                logger.warn(`  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`);
+                throw new Error(`Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`);
              }
           }
 
@@ -681,8 +744,16 @@ export async function main() {
   trace.addArtifact('file', String(argv.input), 'Pipeline ADF input');
 
   try {
+    const stepsToRun = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
+    // Typed Flow: validate channel integrity before execution
+    const flowErrors = validateFlow(stepsToRun, mergedContext);
+    if (flowErrors.length > 0) {
+      for (const e of flowErrors) {
+        logger.warn(`[FLOW_VALIDATION] Step "${e.stepId}" consumes unknown channel(s): ${e.missing.join(', ')} — ensure a preceding step produces them.`);
+      }
+    }
     const result = await runSteps(
-      (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} })),
+      stepsToRun,
       mergedContext,
       { trace, pipelinePath: argv.input as string },
     );

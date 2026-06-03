@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "config-mission-preset.schema.json",
+  "title": "ConfigMissionPreset",
+  "description": "Template definition for a Kyberion configuration mission. Each preset documents one configurable capability and serves as both documentation and execution template.",
+  "type": "object",
+  "required": ["preset_id", "type", "category", "description", "inputs", "pipeline", "write_targets", "authority_role"],
+  "additionalProperties": false,
+  "properties": {
+    "preset_id":    { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
+    "type":         { "type": "string", "const": "config_mission" },
+    "category":     { "type": "string", "enum": ["service_integration", "voice", "tenant", "surface", "security"] },
+    "description":  { "type": "string" },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type":        { "type": "string", "enum": ["string", "enum", "boolean", "secret"] },
+          "description": { "type": "string" },
+          "required":    { "type": "boolean", "default": true },
+          "values":      { "type": "array", "items": { "type": "string" } },
+          "default":     {}
+        }
+      }
+    },
+    "pipeline":       { "type": "string" },
+    "write_targets":  { "type": "array", "items": { "type": "string" } },
+    "authority_role": { "type": "string" },
+    "notes":          { "type": "string" }
+  }
+}

@@ -5,7 +5,7 @@ Generate a DOCX or PDF report from the canonical `document-brief` contract.
 
 ## 2. Dependencies
 - **Actuator**: `Media-Actuator`
-- **Schema**: `knowledge/public/schemas/document-brief.schema.json`
+- **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 
 ## 3. Principle
 Separate the report into:

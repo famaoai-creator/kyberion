@@ -15,7 +15,7 @@ interface VoiceTtsConfigRegistry {
   languages?: Record<string, VoiceTtsLanguageConfig>;
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/presence/voice-hub-tts.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/presence/voice-hub-tts.json');
 
 const FALLBACK_REGISTRY: { defaultLanguage: string; languages: Record<string, VoiceTtsLanguageConfig> } = {
   defaultLanguage: 'en',

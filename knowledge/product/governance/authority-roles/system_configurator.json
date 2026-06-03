@@ -1,0 +1,27 @@
+{
+  "role": "system_configurator",
+  "description": "Configuration authority for intentional, governed changes to Kyberion's own capabilities. Covers service integration setup, voice engine registration, and tenant bootstrapping. Changes under this role are always executed via a config mission — not ad-hoc.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "knowledge/product/governance/service-presets/",
+    "knowledge/product/governance/voice-engine-registry.json",
+    "knowledge/product/governance/voice-engines/",
+    "knowledge/confidential/",
+    "active/audit/",
+    "active/shared/logs/"
+  ],
+  "scope_classes": [
+    "capability_registration",
+    "tenant_configuration",
+    "audit"
+  ],
+  "allowed_actuators": [
+    "service-actuator",
+    "voice-actuator",
+    "file-actuator"
+  ],
+  "tier_access": [
+    "public",
+    "confidential"
+  ]
+}

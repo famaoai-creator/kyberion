@@ -20,7 +20,7 @@ describe('operator-learning dispatch registry', () => {
     const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
     const defaultRegistry = JSON.parse(
       safeReadFile(
-        pathResolver.knowledge('public/governance/operator-learning-dispatch-registry.json'),
+        pathResolver.knowledge('product/governance/operator-learning-dispatch-registry.json'),
         { encoding: 'utf8' }
       ) as string
     );

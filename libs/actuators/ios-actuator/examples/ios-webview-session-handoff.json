@@ -25,7 +25,7 @@
       "type": "capture",
       "op": "read_json",
       "params": {
-        "path": "knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
+        "path": "knowledge/product/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
         "export_as": "app_profile",
         "validate_as": "mobile-app-profile"
       }

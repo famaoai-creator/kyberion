@@ -1,0 +1,45 @@
+{
+  "action": "pipeline",
+  "name": "Automated Artifact Collector",
+  "version": "2.0.0",
+  "description": "Collects pipeline definitions and generates a manifest.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "📦 Collecting artifacts..." }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "params": { "cmd": "mkdir -p active/shared/tmp/artifacts" }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "params": { "cmd": "cp pipelines/*.json active/shared/tmp/artifacts/" }
+    },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "manifest_json", "type": "ManifestJson" },
+      "params": {
+        "cmd": "ls active/shared/tmp/artifacts/*.json | xargs -n 1 basename | jq -R . | jq -s '{\"artifacts\": .}'"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "consumes": "manifest_json",
+      "params": {
+        "cmd": "echo '{{manifest_json}}' > active/shared/tmp/artifacts/MANIFEST.json"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ Artifacts collected and MANIFEST.json generated in active/shared/tmp/artifacts/" }
+    }
+  ]
+}

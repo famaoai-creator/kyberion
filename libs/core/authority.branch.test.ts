@@ -19,6 +19,11 @@ vi.mock('./path-resolver.js', () => ({
   active: mocks.active,
   knowledge: mocks.knowledge,
   findMissionPath: mocks.findMissionPath,
+  pathResolver: {
+    active: mocks.active,
+    knowledge: mocks.knowledge,
+    findMissionPath: mocks.findMissionPath,
+  },
 }));
 
 describe('authority branch coverage', () => {

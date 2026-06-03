@@ -66,6 +66,8 @@ type PlaywrightPage = {
 };
 
 const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/meeting-browser-driver/manifest.json');
+export const MEETING_BROWSER_DRIVER_ID = 'browser-playwright' as const;
+export const MEETING_BROWSER_DRIVER_ROLE = 'internal-join-backend' as const;
 const DEFAULT_MEETING_BROWSER_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -138,7 +140,7 @@ async function loadPlaywright(): Promise<any> {
 }
 
 class BrowserMeetingJoinDriver implements MeetingJoinDriver {
-  readonly driver_id = 'browser-playwright';
+  readonly driver_id = MEETING_BROWSER_DRIVER_ID;
   readonly supported_platforms = ['meet', 'zoom', 'teams', 'auto'] as const;
 
   constructor(private readonly opts: BrowserDriverOptions = {}) {}
@@ -282,18 +284,23 @@ async function trySelectors(
   return false;
 }
 
-export {
-  BrowserMeetingJoinDriver,
-  MEET_SELECTORS,
-  TEAMS_SELECTORS,
-  ZOOM_SELECTORS,
-};
+export { BrowserMeetingJoinDriver, MEET_SELECTORS, TEAMS_SELECTORS, ZOOM_SELECTORS };
 export type { MeetingPreJoinSelectors };
 
 /**
  * Convenience: register the driver with the core registry on import.
- * Pass options via `installBrowserMeetingJoinDriver(...)`.
+ * Pass options via `installBrowserMeetingJoinDriver(...)` or build a
+ * standalone driver with `createBrowserMeetingJoinDriver(...)`.
  */
 export function installBrowserMeetingJoinDriver(opts: BrowserDriverOptions = {}): void {
-  registerMeetingJoinDriver(new BrowserMeetingJoinDriver(opts));
+  registerMeetingJoinDriver(createBrowserMeetingJoinDriver(opts));
+}
+
+/**
+ * Create the internal Playwright join backend without registering it.
+ * This keeps the browser join driver usable as an explicit backend in
+ * coordinators that want to own the registry step themselves.
+ */
+export function createBrowserMeetingJoinDriver(opts: BrowserDriverOptions = {}): BrowserMeetingJoinDriver {
+  return new BrowserMeetingJoinDriver(opts);
 }

@@ -19,7 +19,7 @@ debug scheme または internal simulator build で、authenticated WebView stat
 
 ## Profile Alignment
 
-- [`example-ios-login-passkey.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-ios-login-passkey.json)
+- [`example-ios-login-passkey.json`](/Users/famao/kyberion/knowledge/product/orchestration/mobile-app-profiles/example-ios-login-passkey.json)
 
 ## Orchestration
 

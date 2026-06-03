@@ -1,0 +1,98 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "reconcile-unhandled-intents",
+  "version": "1.0.0",
+  "name": "Unhandled Intent Reconciler",
+  "description": "Reads the unhandled-intent registry (unrouted + unrecognized) and writes proposal stubs. Invokes reasoning:analyze to suggest routing entries (for unrouted) or new intent definitions (for unrecognized).",
+  "context": {
+    "registry_path": "active/shared/tmp/unhandled-intent-registry.json",
+    "proposals_dir": "active/shared/tmp/unhandled-intent-proposals",
+    "routing_map": "knowledge/product/governance/intent-routing-map.json",
+    "intent_catalog": "knowledge/product/governance/standard-intents.json"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "[UNHANDLED-INTENT] Starting reconcile cycle..." }
+    },
+    {
+      "id": "run_reconciler",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "reconcile_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/reconcile_unhandled_intents.js 2>/dev/null || echo '{\"proposals_written\":[],\"skipped\":[],\"total_unreconciled\":0}'"
+      }
+    },
+    {
+      "id": "log_result",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": { "message": "[UNHANDLED-INTENT] Reconcile result: {{reconcile_result}}" }
+    },
+    {
+      "id": "check_proposals",
+      "role": "gate",
+      "op": "core:if",
+      "consumes": "reconcile_result",
+      "params": {
+        "condition": { "from": "reconcile_result.proposals_written.length", "operator": "gt", "value": 0 },
+        "then": [
+          {
+            "id": "analyze_unrouted",
+            "role": "source",
+            "op": "reasoning:analyze",
+            "produces": { "channel": "analysis_result", "type": "AnalysisResult" },
+            "params": {
+              "instruction": "Review each .proposal.json in active/shared/tmp/unhandled-intent-proposals/. For 'unrouted' proposals: look up the intent_id in knowledge/product/governance/standard-intents.json to understand what it does, then look at the existing entries in knowledge/product/governance/intent-routing-map.json and scan pipelines/ for a matching pipeline filename. Suggest the pipeline_intent_map or mission_intent_action_map entry value. For 'unrecognized' proposals: examine the utterance_samples to understand what capability the user wanted. Suggest either (a) a new intent definition to add to standard-intents.json or (b) the id of an existing intent whose surface_examples/trigger_keywords should be extended. Output a JSON array of {miss_type, intent_id_or_sample, recommendation} for each proposal.",
+              "source_path": "{{proposals_dir}}",
+              "analysis_type": "intent_routing_suggestion",
+              "output_path": "active/shared/tmp/unhandled-intent-review.json"
+            }
+          },
+          {
+            "id": "log_review",
+            "role": "sink",
+            "op": "system:log",
+            "consumes": "analysis_result",
+            "params": {
+              "message": "[UNHANDLED-INTENT] Suggestions written to active/shared/tmp/unhandled-intent-review.json. Review and apply to intent-routing-map.json or standard-intents.json."
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_none",
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "[UNHANDLED-INTENT] No unhandled intents found. Registry is clean." }
+          }
+        ]
+      }
+    },
+    {
+      "id": "write_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "reconcile_result",
+      "params": {
+        "path": "active/shared/tmp/unhandled-intent-last-run.json",
+        "content": {
+          "ran_at": "{{_now}}",
+          "result": "{{reconcile_result}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_result",
+      "params": { "message": "[UNHANDLED-INTENT] Done. Proposals: {{reconcile_result.proposals_written.length}}, Skipped: {{reconcile_result.skipped.length}}, Total unreconciled: {{reconcile_result.total_unreconciled}}" }
+    }
+  ]
+}

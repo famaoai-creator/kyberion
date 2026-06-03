@@ -1,0 +1,12 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "paper2any": {
+      "base_url": "{{paper2any_base_url}}",
+      "preset_path": "knowledge/product/orchestration/service-presets/paper2any.json",
+      "credential_suffixes": {
+        "baseUrl": ["PAPER2ANY_BASE_URL"]
+      }
+    }
+  }
+}

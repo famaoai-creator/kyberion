@@ -20,9 +20,9 @@ interface SkillInstallPackageMap {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const MAP_PATH = pathResolver.knowledge('public/governance/skill-install-package-map.json');
+const MAP_PATH = pathResolver.knowledge('product/governance/skill-install-package-map.json');
 const PERSONAL_MAP_PATH = pathResolver.knowledge('personal/governance/skill-install-package-map.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/skill-install-package-map.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/skill-install-package-map.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedMap: SkillInstallPackageMap | null = null;

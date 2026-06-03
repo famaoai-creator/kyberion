@@ -20,7 +20,7 @@ describe('analysis-execution-contract', () => {
           severity: 'high',
           action_type: 'review',
           rationale: 'Example',
-          refs: ['knowledge/public/incidents/post-mortem-20260228.md'],
+          refs: ['knowledge/product/incidents/post-mortem-20260228.md'],
         },
       ],
     });

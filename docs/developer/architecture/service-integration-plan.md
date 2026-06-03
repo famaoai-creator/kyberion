@@ -14,7 +14,7 @@ Transition machine-dependent tool configurations (hardcoded paths, local bin ref
 ## 3. Integration Architecture
 For each service, we implement:
 1.  **Connection Metadata** (`customer/{slug}/connections/{service}.json` when `KYBERION_CUSTOMER` is set, otherwise `knowledge/personal/connections/{service}.json`): Stores machine-specific paths, URLs, and secrets.
-2.  **Service Preset** (`knowledge/public/orchestration/service-presets/{service}.json`): Defines standardized operations (CLI/API) using placeholders.
+2.  **Service Preset** (`knowledge/product/orchestration/service-presets/{service}.json`): Defines standardized operations (CLI/API) using placeholders.
 3.  **Dynamic Resolvers**: Kyberion's `Service Engine` resolves placeholders at runtime using the connection metadata.
 
 ## 4. Implementation Roadmap

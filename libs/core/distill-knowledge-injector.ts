@@ -5,8 +5,8 @@
  * context to new decision-support / hypothesis-tree runs.
  *
  * The `distill` command produces YAML-frontmatter + markdown files in
- * `knowledge/public/evolution/distill_<mission-id>_<date>.md`. Legacy
- * mission distills may still exist under `knowledge/incidents/`; those are
+ * `knowledge/product/evolution/distill_<mission-id>_<date>.md`. Legacy
+ * mission distills may still exist under `knowledge/product/incidents/`; those are
  * treated as read-only compatibility inputs.
  *
  * Each frontmatter
@@ -38,12 +38,12 @@ import {
   reciprocalRankFusion,
 } from './embedding-backend.js';
 
-const CURRENT_DISTILL_DIR = 'knowledge/public/evolution';
-const LEGACY_DISTILL_DIRS = ['knowledge/incidents', 'knowledge/evolution'];
+const CURRENT_DISTILL_DIR = 'knowledge/product/evolution';
+const LEGACY_DISTILL_DIRS = ['knowledge/product/incidents', 'knowledge/product/evolution'];
 const DISTILL_FILE_RE = /^distill_.+\.md$/;
 
 export interface DistilledKnowledgeEntry {
-  /** Relative path from project root, e.g. knowledge/public/evolution/distill_msn-foo_2026-04-27.md */
+  /** Relative path from project root, e.g. knowledge/product/evolution/distill_msn-foo_2026-04-27.md */
   path: string;
   /** Frontmatter `title` */
   title: string;

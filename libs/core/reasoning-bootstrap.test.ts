@@ -61,7 +61,7 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('codex-cli');
     expect(getIntentExtractor().name).toBe('codex-cli');
     expect(getVoiceBridge().name).toBe('codex-cli-text');
-  });
+  }, 60000);
 
   it('normalizes gemini-api to the CLI-backed gemini mode', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');

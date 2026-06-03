@@ -8,10 +8,10 @@ import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/contextual-intent-clarification-policy.schema.json'
+  'product/schemas/contextual-intent-clarification-policy.schema.json'
 );
 const POLICY_PATH = pathResolver.knowledge(
-  'public/governance/contextual-intent-clarification-policy.json'
+  'product/governance/contextual-intent-clarification-policy.json'
 );
 
 export type ContextualClarificationExecutionShape =

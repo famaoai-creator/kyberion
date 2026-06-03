@@ -1,28 +1,33 @@
 {
   "action": "pipeline",
+  "version": "2.0.0",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "target_file": "active/shared/tmp/license-test.ts",
     "header": "// (c) 2026 Kyberion Sovereign Ecosystem. All rights reserved.\n"
   },
   "steps": [
     {
-      "type": "capture",
+      "role": "source",
       "op": "read_file",
+      "produces": { "channel": "content", "type": "ReadResult" },
       "params": {
-        "path": "{{target_file}}",
-        "export_as": "content"
+        "path": "{{target_file}}"
       }
     },
     {
-      "type": "transform",
+      "role": "transform",
       "op": "run_js",
+      "consumes": "content",
+      "produces": { "channel": "new_content", "type": "TransformResult" },
       "params": {
         "code": "if (!ctx.content.includes('(c) 2026 Kyberion')) { ctx.new_content = ctx.header + ctx.content; } else { ctx.new_content = ctx.content; }"
       }
     },
     {
-      "type": "apply",
+      "role": "sink",
       "op": "write_file",
+      "consumes": "new_content",
       "params": {
         "path": "{{target_file}}",
         "from": "new_content"

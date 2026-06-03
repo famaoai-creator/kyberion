@@ -6,7 +6,7 @@ Generate a governed music artifact from a human-readable `music-generation-adf` 
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with ACE-Step models available
-- **Schema**: [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/music-generation-adf.schema.json)
+- **Schema**: [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/music-generation-adf.schema.json)
 
 ## 3. Contract Shape
 `music-generation-adf` is the stable public interface.

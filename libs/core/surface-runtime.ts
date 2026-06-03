@@ -8,7 +8,7 @@ import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-super
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge('public/schemas/runtime-surface-manifest.schema.json');
+const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge('product/schemas/runtime-surface-manifest.schema.json');
 
 export type SurfaceRuntimeKind = Extract<RuntimeResourceKind, 'gateway' | 'ui' | 'service'>;
 
@@ -72,8 +72,8 @@ export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
     .slice(-maxLines);
 }
 
-const DEFAULT_MANIFEST_PATH = 'knowledge/public/governance/active-surfaces.json';
-const DEFAULT_MANIFEST_DIR = 'knowledge/public/governance/surfaces';
+const DEFAULT_MANIFEST_PATH = 'knowledge/product/governance/active-surfaces.json';
+const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/surfaces';
 const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const LOG_DIR = pathResolver.shared('logs/surfaces');
 let surfaceManifestValidateFn: ValidateFunction | null = null;
@@ -240,7 +240,7 @@ function validateSurfaceDefinition(d: SurfaceRuntimeDefinition): void {
   if (d.kind === 'ui' && (typeof d.port !== 'number' || d.port <= 0)) {
     throw new Error(
       `[SURFACE_MANIFEST] UI surface "${d.id}" has no valid port. ` +
-      `Add "port": <number> to knowledge/public/governance/surfaces/${d.id}.json, or change kind to "service" if it has no listening socket.`,
+      `Add "port": <number> to knowledge/product/governance/surfaces/${d.id}.json, or change kind to "service" if it has no listening socket.`,
     );
   }
   if (typeof d.port === 'number' && d.port > 0 && !d.healthPath) {

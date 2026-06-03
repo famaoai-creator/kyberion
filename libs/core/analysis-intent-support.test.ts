@@ -174,6 +174,6 @@ describe('analysis-intent-support', () => {
 
     expect(support.suggested_refs.length).toBeGreaterThan(0);
     const firstRef = support.suggested_refs[0] || '';
-    expect(firstRef.includes('TRK-42') || firstRef.startsWith('knowledge/public/incidents/')).toBe(true);
+    expect(firstRef.includes('TRK-42') || firstRef.startsWith('knowledge/product/incidents/')).toBe(true);
   });
 });

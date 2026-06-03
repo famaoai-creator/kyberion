@@ -13,9 +13,9 @@ describe('surface-policy schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/surface-policy.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/surface-policy.schema.json'));
     const policy = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/public/governance/surface-policy.json'), {
+      safeReadFile(path.resolve(root, 'knowledge/product/governance/surface-policy.json'), {
         encoding: 'utf8',
       }) as string,
     );
@@ -27,7 +27,7 @@ describe('surface-policy schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/surface-policy.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/surface-policy.schema.json'));
 
     const invalid = {
       version: '1.0.0',

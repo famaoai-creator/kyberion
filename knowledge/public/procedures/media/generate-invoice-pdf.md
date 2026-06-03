@@ -5,7 +5,7 @@ Generate an invoice PDF from a canonical `document-brief` and a knowledge-owned 
 
 ## 2. Dependencies
 - **Actuator**: `Media-Actuator`
-- **Schema**: `knowledge/public/schemas/document-brief.schema.json`
+- **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 - **Layout Catalog**: `knowledge/public/design-patterns/media-templates/document-layouts.json`
 - **Profile Catalog**: `knowledge/public/design-patterns/media-templates/document-composition-presets/` and `knowledge/public/design-patterns/media-templates/artifact-library/`
 

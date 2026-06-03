@@ -58,7 +58,7 @@ describe('mobile-profile-validators', () => {
         id: 'example-mobile-login-passkey',
         platform: 'android',
         title: 'Example Mobile Login + Passkey',
-        path: 'knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json',
+        path: 'knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json',
         description: 'Example Android app profile covering launch, login form selectors, and passkey trigger selectors.',
         tags: ['android', 'login', 'passkey', 'example'],
       },
@@ -73,7 +73,7 @@ describe('mobile-profile-validators', () => {
   it('accepts the canonical mobile app profile schema example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/public/schemas/mobile-app-profile.schema.json');
+    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/mobile-app-profile.schema.json');
 
     expect(validate(validProfile)).toBe(true);
   });
@@ -105,7 +105,7 @@ describe('mobile-profile-validators', () => {
   it('accepts the canonical mobile app profile index example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/public/schemas/mobile-app-profile-index.schema.json');
+    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/mobile-app-profile-index.schema.json');
 
     expect(validate(validIndex)).toBe(true);
   });
@@ -158,7 +158,7 @@ describe('mobile-profile-validators', () => {
   it('accepts the canonical web app profile schema example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/public/schemas/web-app-profile.schema.json');
+    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/web-app-profile.schema.json');
 
     const canonicalProfile = {
       app_id: 'example-web-login-guarded',
@@ -198,7 +198,7 @@ describe('mobile-profile-validators', () => {
   it('accepts a valid webview session handoff contract', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/public/schemas/webview-session-handoff.schema.json');
+    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/webview-session-handoff.schema.json');
 
     const handoff = {
       kind: 'webview-session-handoff',
@@ -218,7 +218,7 @@ describe('mobile-profile-validators', () => {
   it('rejects an invalid webview session handoff contract', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/public/schemas/webview-session-handoff.schema.json');
+    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/webview-session-handoff.schema.json');
 
     const handoff = {
       kind: 'webview-session-handoff',
@@ -258,7 +258,7 @@ describe('mobile-profile-validators', () => {
           id: 'example-web-login-guarded',
           platform: 'browser',
           title: 'Example Web Login + Guarded Routes',
-          path: 'knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json',
+          path: 'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json',
           description: 'Example Web app profile covering login, guarded routes, and debug session export.',
           tags: ['browser', 'session-handoff'],
         },
@@ -272,7 +272,7 @@ describe('mobile-profile-validators', () => {
   it('accepts the canonical web app profile index example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/public/schemas/web-app-profile-index.schema.json');
+    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/web-app-profile-index.schema.json');
 
     expect(validate({
       profiles: [
@@ -280,7 +280,7 @@ describe('mobile-profile-validators', () => {
           id: 'example-web-login-guarded',
           platform: 'browser',
           title: 'Example Web Login + Guarded Routes',
-          path: 'knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json',
+          path: 'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json',
           description: 'Shared profile for a Web app with login, guarded routes, and a debug-only session export route.',
           tags: ['browser', 'session-handoff', 'login', 'guarded-routes', 'example'],
         },

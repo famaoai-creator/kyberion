@@ -1,7 +1,8 @@
 {
   "pipeline_id": "browser-session-start",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Fragment demonstrating how to start a browser session with a specific managed profile and optional native chrome profile directory.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "action": "pipeline",
   "options": {
     "headless": false,
@@ -12,14 +13,14 @@
   },
   "steps": [
     {
-      "type": "apply",
+      "role": "sink",
       "op": "log",
       "params": {
         "message": "Browser started with dedicated profile."
       }
     },
     {
-      "type": "capture",
+      "role": "sink",
       "op": "goto",
       "params": {
         "url": "about:blank"

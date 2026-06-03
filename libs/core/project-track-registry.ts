@@ -22,7 +22,7 @@ export interface ProjectTrackRecord {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const TRACK_SCHEMA_PATH = pathResolver.knowledge('public/schemas/project-track-record.schema.json');
+const TRACK_SCHEMA_PATH = pathResolver.knowledge('product/schemas/project-track-record.schema.json');
 const TRACK_DIR = pathResolver.shared('runtime/project-tracks');
 let trackValidateFn: ValidateFunction | null = null;
 

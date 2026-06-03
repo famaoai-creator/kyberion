@@ -19,8 +19,8 @@ interface ServiceOnboardingCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/service-onboarding-catalog.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/service-onboarding-catalog.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/service-onboarding-catalog.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-onboarding-catalog.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: ServiceOnboardingCatalog | null = null;
