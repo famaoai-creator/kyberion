@@ -1,6 +1,6 @@
 {
   "service_id": "voice",
-  "name": "Kyberion Voice Generation Unified Presets",
+  "name": "Kyberion Voice Synthesis and Playback Unified Presets",
   "operations": {
     "speak_local": {
       "type": "auto",

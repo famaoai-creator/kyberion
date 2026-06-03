@@ -1,6 +1,7 @@
 {
   "service_id": "vision",
-  "name": "Kyberion Visual Generation and Capture Unified Presets",
+  "name": "Kyberion Visual Generation and Capture Compatibility Alias",
+  "alias_of": "media-generation",
   "operations": {
     "generate_image": {
       "type": "auto",

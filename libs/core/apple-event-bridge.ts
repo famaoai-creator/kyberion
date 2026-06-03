@@ -211,6 +211,48 @@ export function getWindowList(appName: string): string[] {
   }
 }
 
+export function activateWindowByTitle(appName: string, windowTitle: string, matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains') {
+  if (!isDarwin()) return false;
+  const script = [
+    'tell application "System Events"',
+    `tell process "${toAppleScriptString(appName)}"`,
+    'set frontmost to true',
+    'try',
+    'set targetWindow to missing value',
+    'set windowNames to name of every window',
+    'repeat with w in windowNames',
+    `if ${matchPolicy === 'strict'
+      ? 'w is "' + toAppleScriptString(windowTitle) + '"'
+      : matchPolicy === 'prefix'
+        ? '(w as string) starts with "' + toAppleScriptString(windowTitle) + '"'
+        : '(w as string) contains "' + toAppleScriptString(windowTitle) + '"'} then`,
+    'set targetWindow to (first window whose name is w)',
+    'exit repeat',
+    'end if',
+    'end repeat',
+    'if targetWindow is not missing value then',
+    'try',
+    'perform action "AXRaise" of targetWindow',
+    'end try',
+    'try',
+    'set index of targetWindow to 1',
+    'end try',
+    'return "true"',
+    'end if',
+    'return "false"',
+    'on error',
+    'return "false"',
+    'end try',
+    'end tell',
+    'end tell',
+  ].join('\n');
+  try {
+    return runAppleScript(script).trim().toLowerCase() === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export function quitApplication(appName: string) {
   if (!isDarwin()) return;
   safeExec('osascript', ['-e', `tell application "${toAppleScriptString(appName)}" to quit`]);

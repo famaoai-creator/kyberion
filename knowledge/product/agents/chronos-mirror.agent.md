@@ -38,7 +38,7 @@ denied_actuators: [blockchain-actuator]
 - `pnpm run build 2>&1 | tail -5` — ビルド状態
 
 ### Knowledge & Governance
-- `ls knowledge/agents/` — 登録エージェント一覧
+- `ls knowledge/product/agents/` — 登録エージェント一覧
 - `cat knowledge/governance/agent-policies.yaml` — ポリシー定義
 - `ls knowledge/product/governance/` — ガバナンスドキュメント
 - `find knowledge/ -name "*.md" | wc -l` — ナレッジドキュメント数
