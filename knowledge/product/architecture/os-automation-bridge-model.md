@@ -10,6 +10,7 @@ This model defines a two-layer split for OS automation:
 - `L0: OS Automation Bridge`
   - Executes platform-specific primitives such as Apple Events, accessibility queries, and low-level input synthesis.
   - Owns script templating, escaping, and environment adaptation.
+  - Current implementation entrypoint: `@agent/core/os-automation-bridge`.
 - `L1: Intent Actuators`
   - Expose human-meaningful actions such as `activate_application`, `detect_focused_input`, or `empty_trash`.
   - Apply governance, approval, and mission-local policy.

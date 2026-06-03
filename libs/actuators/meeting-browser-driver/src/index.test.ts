@@ -9,7 +9,10 @@ import {
 } from '@agent/core';
 import {
   installBrowserMeetingJoinDriver,
+  createBrowserMeetingJoinDriver,
   BrowserMeetingJoinDriver,
+  MEETING_BROWSER_DRIVER_ID,
+  MEETING_BROWSER_DRIVER_ROLE,
   MEET_SELECTORS,
   TEAMS_SELECTORS,
   ZOOM_SELECTORS,
@@ -46,7 +49,7 @@ describe('BrowserMeetingJoinDriver registration', () => {
     installBrowserMeetingJoinDriver();
     const driver = getMeetingJoinDriver('browser-playwright');
     expect(driver).toBeDefined();
-    expect(driver?.driver_id).toBe('browser-playwright');
+    expect(driver?.driver_id).toBe(MEETING_BROWSER_DRIVER_ID);
   });
 
   it('claims meet, zoom, teams', () => {
@@ -94,11 +97,19 @@ describe('BrowserMeetingJoinDriver registration', () => {
 
   it('has correct driver_id and supported_platforms', () => {
     const driver = new BrowserMeetingJoinDriver();
-    expect(driver.driver_id).toBe('browser-playwright');
+    expect(driver.driver_id).toBe(MEETING_BROWSER_DRIVER_ID);
     expect(driver.supported_platforms).toContain('meet');
     expect(driver.supported_platforms).toContain('zoom');
     expect(driver.supported_platforms).toContain('teams');
     expect(driver.supported_platforms).toContain('auto');
+  });
+
+  it('createBrowserMeetingJoinDriver returns an unregistered driver instance', () => {
+    const driver = createBrowserMeetingJoinDriver({
+      account_slug: 'factory-account',
+    });
+    expect(driver.driver_id).toBe(MEETING_BROWSER_DRIVER_ID);
+    expect(driver.supported_platforms).toContain('meet');
   });
 
   it('accepts custom options', () => {
@@ -107,7 +118,13 @@ describe('BrowserMeetingJoinDriver registration', () => {
       account_slug: 'test-account',
       step_timeout_ms: 5000,
     });
-    expect(driver.driver_id).toBe('browser-playwright');
+    expect(driver.driver_id).toBe(MEETING_BROWSER_DRIVER_ID);
+  });
+});
+
+describe('BrowserMeetingJoinDriver boundary metadata', () => {
+  it('exposes the internal join backend role constant', () => {
+    expect(MEETING_BROWSER_DRIVER_ROLE).toBe('internal-join-backend');
   });
 });
 

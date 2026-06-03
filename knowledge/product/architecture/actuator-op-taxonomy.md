@@ -38,6 +38,12 @@ Examples:
 
 These belong in actuators that own the physical boundary.
 
+For camera, microphone, and virtual-device flows, prefer the streaming
+boundary model in `actuator-contract-map.md` so that capture, bus, bridge,
+and coordinator responsibilities stay explicit. Screen capture is still a
+physical primitive, but it should not be described as generic media
+generation policy.
+
 ### B. Semantic transforms
 
 These convert one governed representation into another.
@@ -103,13 +109,13 @@ If an actuator exists only to preserve older call sites, its manifest should exp
 - `file-actuator`
   - file CRUD and discovery
 - `system-actuator`
-  - OS control and short-lived local execution
+  - OS control plane for diagnostics, input toggles, and short-lived OS actions
 - `terminal-actuator`
   - PTY lifecycle
 - `browser-actuator`
   - pipeline-driven browser execution and session artifacts
 - `media-generation-actuator`
-  - generative media and screen capture/recording
+  - generative media and screen-capture boundary
 - `vision-actuator`
   - perception-oriented compatibility surface only
 - `orchestrator-actuator`
