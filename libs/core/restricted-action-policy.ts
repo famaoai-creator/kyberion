@@ -8,7 +8,7 @@
  * them until an operator explicitly approves.
  *
  * The policy file lives at
- * `knowledge/public/governance/restricted-action-kinds-policy.json`
+ * `knowledge/product/governance/restricted-action-kinds-policy.json`
  * and is reloaded on each call (small file, infrequent calls — simpler
  * than a cache + invalidation story). Operators can override the path
  * via `KYBERION_RESTRICTED_ACTIONS_POLICY` for tenant-scoped tightening.
@@ -33,7 +33,7 @@ export interface RestrictedActionMatch {
   pattern_index: number;
 }
 
-const DEFAULT_POLICY_PATH = 'knowledge/public/governance/restricted-action-kinds-policy.json';
+const DEFAULT_POLICY_PATH = 'knowledge/product/governance/restricted-action-kinds-policy.json';
 
 export function loadRestrictedActionRules(opts?: {
   path?: string;

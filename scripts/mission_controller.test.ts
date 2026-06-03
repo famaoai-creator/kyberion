@@ -1,4 +1,3 @@
-import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -356,10 +355,10 @@ describe('mission_controller argument parsing', () => {
     const help = buildHelpText();
 
     expect(help).toContain('Organization Selection:');
-    expect(help).toContain('knowledge/public/orchestration/organization-selection-guide.md');
+    expect(help).toContain('knowledge/product/orchestration/organization-selection-guide.md');
     expect(help).toContain('Organization Discovery:');
-    expect(help).toContain('knowledge/public/orchestration/organization-discovery.md');
-    expect(help).toContain('knowledge/public/orchestration/organization-discovery-reports.md');
+    expect(help).toContain('knowledge/product/orchestration/organization-discovery.md');
+    expect(help).toContain('knowledge/product/orchestration/organization-discovery-reports.md');
     expect(help).toContain('--organization-id <ORG>');
     expect(help).toContain('--org <ORG>');
     expect(help).toContain('--summary');
@@ -473,16 +472,16 @@ describe('mission_controller argument parsing', () => {
         'Organization Catalog Example',
       ]);
       expect(payload.examples.map((example: any) => example.path)).toEqual([
-        'knowledge/public/schemas/organization-discovery-report.example.json',
-        'knowledge/public/schemas/organization-profile-report.example.json',
-        'knowledge/public/schemas/organization-profiles-report.example.json',
-        'knowledge/public/schemas/organization-catalog-report.example.json',
+        'knowledge/product/schemas/organization-discovery-report.example.json',
+        'knowledge/product/schemas/organization-profile-report.example.json',
+        'knowledge/product/schemas/organization-profiles-report.example.json',
+        'knowledge/product/schemas/organization-catalog-report.example.json',
       ]);
       expect(payload.examples.map((example: any) => example.schema)).toEqual([
-        'knowledge/public/schemas/organization-discovery-report.schema.json',
-        'knowledge/public/schemas/organization-profile-report.schema.json',
-        'knowledge/public/schemas/organization-profiles-report.schema.json',
-        'knowledge/public/schemas/organization-catalog-report.schema.json',
+        'knowledge/product/schemas/organization-discovery-report.schema.json',
+        'knowledge/product/schemas/organization-profile-report.schema.json',
+        'knowledge/product/schemas/organization-profiles-report.schema.json',
+        'knowledge/product/schemas/organization-catalog-report.schema.json',
       ]);
     } finally {
       process.argv = originalArgv;
@@ -532,7 +531,7 @@ describe('mission_controller argument parsing', () => {
       addFormats(ajv);
       const profileSchema = JSON.parse(
         safeReadFile(
-          path.resolve(process.cwd(), 'knowledge/public/schemas/organization-profile.schema.json'),
+          pathResolver.knowledge('product/schemas/organization-profile.schema.json'),
           { encoding: 'utf8' },
         ) as string,
       );
@@ -540,7 +539,7 @@ describe('mission_controller argument parsing', () => {
       const validate = ajv.compile(
         JSON.parse(
           safeReadFile(
-            path.resolve(process.cwd(), 'knowledge/public/schemas/organization-profile-report.schema.json'),
+            pathResolver.knowledge('product/schemas/organization-profile-report.schema.json'),
             { encoding: 'utf8' },
           ) as string,
         ),
@@ -572,7 +571,7 @@ describe('mission_controller argument parsing', () => {
       const validate = ajv.compile(
         JSON.parse(
           safeReadFile(
-            path.resolve(process.cwd(), 'knowledge/public/schemas/organization-catalog-report.schema.json'),
+            pathResolver.knowledge('product/schemas/organization-catalog-report.schema.json'),
             { encoding: 'utf8' },
           ) as string,
         ),
@@ -620,15 +619,15 @@ describe('mission_controller argument parsing', () => {
       'Organization Discovery Copy/Paste',
     ]);
     expect(report.documents.map((doc) => doc.path)).toEqual([
-      'knowledge/public/orchestration/organization-selection-guide.md',
-      'knowledge/public/orchestration/organization-discovery-reports.md',
-      'knowledge/public/orchestration/README.md',
+      'knowledge/product/orchestration/organization-selection-guide.md',
+      'knowledge/product/orchestration/organization-discovery-reports.md',
+      'knowledge/product/orchestration/README.md',
     ]);
     expect(report.examples.map((example) => example.schema)).toEqual([
-      'knowledge/public/schemas/organization-discovery-report.schema.json',
-      'knowledge/public/schemas/organization-profile-report.schema.json',
-      'knowledge/public/schemas/organization-profiles-report.schema.json',
-      'knowledge/public/schemas/organization-catalog-report.schema.json',
+      'knowledge/product/schemas/organization-discovery-report.schema.json',
+      'knowledge/product/schemas/organization-profile-report.schema.json',
+      'knowledge/product/schemas/organization-profiles-report.schema.json',
+      'knowledge/product/schemas/organization-catalog-report.schema.json',
     ]);
     expect(report.examples.map((example) => example.name)).toEqual([
       'Organization Discovery Example',
@@ -637,10 +636,10 @@ describe('mission_controller argument parsing', () => {
       'Organization Catalog Example',
     ]);
     expect(report.examples.map((example) => example.path)).toEqual([
-      'knowledge/public/schemas/organization-discovery-report.example.json',
-      'knowledge/public/schemas/organization-profile-report.example.json',
-      'knowledge/public/schemas/organization-profiles-report.example.json',
-      'knowledge/public/schemas/organization-catalog-report.example.json',
+      'knowledge/product/schemas/organization-discovery-report.example.json',
+      'knowledge/product/schemas/organization-profile-report.example.json',
+      'knowledge/product/schemas/organization-profiles-report.example.json',
+      'knowledge/product/schemas/organization-catalog-report.example.json',
     ]);
     expect(report.common_questions).toHaveLength(4);
     expect(report.common_questions.map((item) => item.question)).toEqual([
@@ -657,7 +656,7 @@ describe('mission_controller argument parsing', () => {
     const validate = ajv.compile(
       JSON.parse(
         safeReadFile(
-          path.resolve(process.cwd(), 'knowledge/public/schemas/organization-discovery-report.schema.json'),
+          pathResolver.knowledge('product/schemas/organization-discovery-report.schema.json'),
           { encoding: 'utf8' },
         ) as string,
       ),
@@ -672,14 +671,14 @@ describe('mission_controller argument parsing', () => {
     const validate = ajv.compile(
       JSON.parse(
         safeReadFile(
-          path.resolve(process.cwd(), 'knowledge/public/schemas/organization-discovery-report.schema.json'),
+          pathResolver.knowledge('product/schemas/organization-discovery-report.schema.json'),
           { encoding: 'utf8' },
         ) as string,
       ),
     );
     const example = JSON.parse(
       safeReadFile(
-        path.resolve(process.cwd(), 'knowledge/public/schemas/organization-discovery-report.example.json'),
+        pathResolver.knowledge('product/schemas/organization-discovery-report.example.json'),
         { encoding: 'utf8' },
       ) as string,
     );
@@ -778,10 +777,10 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('--summary');
     expect(help).toContain('organization-profile');
     expect(help).toContain('organization-catalogs');
-    expect(help).toContain('knowledge/public/schemas/organization-discovery-report.example.json');
-    expect(help).toContain('knowledge/public/schemas/organization-profile-report.example.json');
-    expect(help).toContain('knowledge/public/schemas/organization-profiles-report.example.json');
-    expect(help).toContain('knowledge/public/schemas/organization-catalog-report.example.json');
+    expect(help).toContain('knowledge/product/schemas/organization-discovery-report.example.json');
+    expect(help).toContain('knowledge/product/schemas/organization-profile-report.example.json');
+    expect(help).toContain('knowledge/product/schemas/organization-profiles-report.example.json');
+    expect(help).toContain('knowledge/product/schemas/organization-catalog-report.example.json');
   });
 
   it('resolves normalized ledger targets for linked missions', () => {

@@ -86,7 +86,7 @@ video-content-brief
 
 追加:
 
-- `knowledge/public/schemas/video-content-brief.schema.json`
+- `knowledge/product/schemas/video-content-brief.schema.json`
 - `libs/core/video-content-brief-contract.ts`
 - `libs/core/video-content-brief-compiler.ts`
 
@@ -136,7 +136,7 @@ video-content-brief
 
 既存:
 
-- `knowledge/public/schemas/video-storyboard.schema.json`
+- `knowledge/product/schemas/video-storyboard.schema.json`
 
 拡張:
 
@@ -276,7 +276,7 @@ semantic 初期セット:
 変更対象:
 
 - `libs/core/video-composition-compiler.ts`
-- `knowledge/public/governance/video-composition-template-registry.json`
+- `knowledge/product/governance/video-composition-template-registry.json`
 
 追加 content fields:
 

@@ -46,7 +46,7 @@ Major areas:
 
 - Actuator framework (`libs/actuators/`, schemas).
 - Mission lifecycle (`scripts/mission_controller.ts`, `scripts/refactor/mission-*`).
-- Knowledge / governance (`knowledge/public/governance/`, tier-guard).
+- Knowledge / governance (`knowledge/product/governance/`, tier-guard).
 - Voice / surfaces (`presence/`, `satellites/voice-hub/`).
 - Build / release / CI (`package.json`, `.github/workflows/`).
 

@@ -1,9 +1,12 @@
 {
   "name": "browser-travel-search-select",
+  "version": "2.0.0",
   "description": "Fragment for searching flights or hotels and selecting the best option based on provided criteria.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used no roles.",
   "steps": [
     {
       "id": "input_search_criteria",
+      "role": "sink",
       "op": "browser:fill_bulk",
       "params": {
         "inputs": [
@@ -15,6 +18,7 @@
     },
     {
       "id": "trigger_search",
+      "role": "sink",
       "op": "browser:click_ref",
       "params": {
         "selector": "{{search_button_selector}}"
@@ -22,23 +26,27 @@
     },
     {
       "id": "extract_options",
+      "role": "source",
       "op": "browser:snapshot",
-      "params": {
-        "export_as": "travel_options"
-      }
+      "produces": { "channel": "travel_options", "type": "SnapshotResult" },
+      "params": {}
     },
     {
       "id": "select_best_option",
+      "role": "transform",
       "op": "wisdom:recommend",
+      "consumes": "travel_options",
+      "produces": { "channel": "selected_option", "type": "RecommendationResult" },
       "params": {
         "options": "{{travel_options}}",
-        "criteria": "{{selection_criteria}}",
-        "export_as": "selected_option"
+        "criteria": "{{selection_criteria}}"
       }
     },
     {
       "id": "click_selection",
+      "role": "sink",
       "op": "browser:click_ref",
+      "consumes": "selected_option",
       "params": {
         "selector": "{{selected_option.selector}}"
       }

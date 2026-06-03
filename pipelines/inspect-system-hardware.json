@@ -1,54 +1,57 @@
 {
   "pipeline_id": "inspect-system-hardware",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Scans and reports on connected physical hardware and peripherals (USB, Audio, Camera).",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "action": "pipeline",
   "steps": [
     {
       "id": "scan-usb",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "usb_devices", "type": "ShellResult" },
       "params": {
-        "cmd": "system_profiler SPUSBDataType | grep -E 'Product ID|Vendor ID|Manufacturer' -B 2 | head -n 20",
-        "export_as": "usb_devices"
+        "cmd": "system_profiler SPUSBDataType | grep -E 'Product ID|Vendor ID|Manufacturer' -B 2 | head -n 20"
       }
     },
     {
       "id": "scan-audio",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "audio_devices", "type": "ShellResult" },
       "params": {
-        "cmd": "system_profiler SPAudioDataType | grep -E 'Input:|Output:' -A 5 | head -n 20",
-        "export_as": "audio_devices"
+        "cmd": "system_profiler SPAudioDataType | grep -E 'Input:|Output:' -A 5 | head -n 20"
       }
     },
     {
       "id": "scan-camera",
-      "type": "capture",
+      "role": "source",
       "op": "system:shell",
+      "produces": { "channel": "camera_info", "type": "ShellResult" },
       "params": {
-        "cmd": "system_profiler SPCameraDataType | grep 'Model ID' -B 2 || echo 'No cameras detected'",
-        "export_as": "camera_info"
+        "cmd": "system_profiler SPCameraDataType | grep 'Model ID' -B 2 || echo 'No cameras detected'"
       }
     },
     {
       "id": "synthesize-report",
-      "type": "transform",
+      "role": "transform",
       "op": "reasoning:analyze",
+      "consumes": ["usb_devices", "audio_devices", "camera_info"],
+      "produces": { "channel": "hardware_report", "type": "AnalysisResult" },
       "params": {
         "instruction": "Based on the raw system profiler data, provide a user-friendly summary of the connected peripherals. Identify if essential hardware for Kyberion (Microphone for voice, Camera for vision) is available.",
         "context": [
           "{{usb_devices}}",
           "{{audio_devices}}",
           "{{camera_info}}"
-        ],
-        "export_as": "hardware_report"
+        ]
       }
     },
     {
       "id": "log-report",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "hardware_report",
       "params": {
         "message": "🖥️ [HARDWARE AUDIT]\n{{hardware_report}}"
       }

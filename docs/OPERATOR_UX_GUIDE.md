@@ -10,10 +10,10 @@ This guide explains how to operate Kyberion without forcing people to think in r
 
 For enterprise role separation above the operator layer, also read:
 
-- `knowledge/public/architecture/enterprise-operating-kernel.md`
-- `knowledge/public/architecture/ceo-ux.md`
-- `knowledge/public/architecture/management-control-plane.md`
-- `knowledge/public/architecture/surface-responsibility-model.md`
+- `knowledge/product/architecture/enterprise-operating-kernel.md`
+- `knowledge/product/architecture/ceo-ux.md`
+- `knowledge/product/architecture/management-control-plane.md`
+- `knowledge/product/architecture/surface-responsibility-model.md`
 
 ## 1. The Core UX Contract
 
@@ -180,7 +180,7 @@ Use this when you want the shortest path from inbox triage to a sent reply.
 - Web and CLI both use the same email workflow core.
 - Sending should always happen after a visible confirmation step.
 
-The lifecycle details live in [`knowledge/public/architecture/runtime-surface-lifecycle-model.md`](../knowledge/public/architecture/runtime-surface-lifecycle-model.md).
+The lifecycle details live in [`knowledge/product/architecture/runtime-surface-lifecycle-model.md`](../knowledge/product/architecture/runtime-surface-lifecycle-model.md).
 
 ### CEO UX
 
@@ -282,7 +282,7 @@ Examples:
 
 For distillation and other structured reasoning tasks, see:
 
-- [`knowledge/public/governance/wisdom-policy-guide.md`](knowledge/public/governance/wisdom-policy-guide.md)
+- [`knowledge/product/governance/wisdom-policy-guide.md`](knowledge/product/governance/wisdom-policy-guide.md)
 
 Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
 
@@ -396,7 +396,7 @@ They are not the primary UX you should teach first.
 ### Reasoning policy
 
 ```bash
-cat knowledge/public/governance/wisdom-policy.json
+cat knowledge/product/governance/wisdom-policy.json
 ```
 
 Use this when you need to inspect or update which backend profile and adapter is used for distillation.

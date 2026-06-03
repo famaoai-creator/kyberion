@@ -30,8 +30,8 @@ interface MediaSemanticMapCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-semantic-map.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-semantic-map.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-semantic-map.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-semantic-map.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaSemanticMapCatalog | null = null;

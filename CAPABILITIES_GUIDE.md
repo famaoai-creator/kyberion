@@ -3,9 +3,14 @@
 Total Actuators: 28
 Last updated: 2026-05-30
 
-This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/public/orchestration/global_actuator_index.json`.
+This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/product/orchestration/global_actuator_index.json`.
 
 Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.
+
+For camera, microphone, virtual-device, and live-streaming boundaries, use
+[`knowledge/product/architecture/actuator-contract-map.md`](knowledge/product/architecture/actuator-contract-map.md)
+as the source of truth for `capture` / `perception` / `generation` /
+`composition` / `bridge` / `bus` / `coordinator`.
 
 | Actuator | Description | Version | Ops | Contract Schema | Path |
 | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -20,10 +25,10 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `email-actuator` | Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer | 1.0.0 | 3 | `libs/actuators/email-actuator/schemas/email-action.schema.json` | `libs/actuators/email-actuator` |
 | `file-actuator` | Generic File-Actuator for Kyberion | 1.1.0 | 1 | `schemas/file-pipeline.schema.json` | `libs/actuators/file-actuator` |
 | `ios-actuator` | simctl-driven iOS Simulator Actuator | 1.1.0 | 1 | `schemas/mobile-device-pipeline.schema.json` | `libs/actuators/ios-actuator` |
-| `media-actuator` | Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. | 1.1.0 | 1 | `schemas/media-pipeline.schema.json` | `libs/actuators/media-actuator` |
-| `media-generation-actuator` | Generative image, video, music, and screen capture actuator | 1.1.0 | 10 | `schemas/media-generation-action.schema.json` | `libs/actuators/media-generation-actuator` |
-| `meeting-actuator` | Abstracted online meeting bridge (Zoom, Teams, Google Meet) | 1.0.0 | 6 | `schemas/meeting-action.schema.json` | `libs/actuators/meeting-actuator` |
-| `meeting-browser-driver` | Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Implements libs/core MeetingJoinDriver and writes captured audio to an AudioBus. | 1.0.0 | 2 | `-` | `libs/actuators/meeting-browser-driver` |
+| `media-actuator` | Document and asset composition/rendering engine. Higher-level composition policy lives in knowledge catalogs. | 1.1.0 | 1 | `schemas/media-pipeline.schema.json` | `libs/actuators/media-actuator` |
+| `media-generation-actuator` | Generative image, video, music, and screen-capture boundary | 1.1.0 | 10 | `schemas/media-generation-action.schema.json` | `libs/actuators/media-generation-actuator` |
+| `meeting-actuator` | Abstracted online meeting bridge (Zoom, Teams, Google Meet); browser join backend lives in `meeting-browser-driver` | 1.0.0 | 6 | `schemas/meeting-action.schema.json` | `libs/actuators/meeting-actuator` |
+| `meeting-browser-driver` | Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Writes captured audio to an AudioBus. | 1.0.0 | 2 | `-` | `libs/actuators/meeting-browser-driver` |
 | `modeling-actuator` | Architectural Analysis and ADF Transformation Engine | 1.0.0 | 2 | `schemas/modeling-pipeline.schema.json` | `libs/actuators/modeling-actuator` |
 | `network-actuator` | ADF-driven secure fetch and A2A transport pipeline engine | 2.2.0 | 1 | `schemas/network-pipeline.schema.json` | `libs/actuators/network-actuator` |
 | `orchestrator-actuator` | Mission/control-plane transformation and execution-plan orchestration actuator | 1.0.0 | 2 | `schemas/orchestrator-pipeline.schema.json` | `libs/actuators/orchestrator-actuator` |
@@ -31,11 +36,11 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `process-actuator` | Managed process lifecycle actuator backed by the runtime supervisor | 1.0.0 | 4 | `schemas/process-action.schema.json` | `libs/actuators/process-actuator` |
 | `secret-actuator` | OS Native Secret Manager Bridge | 1.1.0 | 4 | `schemas/secret-action.schema.json` | `libs/actuators/secret-actuator` |
 | `service-actuator` | Unified External SaaS/API/MCP Reachability Layer | 1.1.0 | 7 | `schemas/service-action.schema.json` | `libs/actuators/service-actuator` |
-| `system-actuator` | OS-level control, diagnostics, and short-lived local execution | 1.2.0 | 3 | `schemas/system-pipeline.schema.json` | `libs/actuators/system-actuator` |
+| `system-actuator` | OS-level control plane for diagnostics, input toggles, and short-lived OS actions | 1.2.0 | 3 | `schemas/system-pipeline.schema.json` | `libs/actuators/system-actuator` |
 | `terminal-actuator` | PTY-driven Terminal Actuator | 1.0.0 | 5 | `schemas/terminal-action.schema.json` | `libs/actuators/terminal-actuator` |
 | `video-composition-actuator` | Governed deterministic composed-video bundle preparation actuator | 1.0.0 | 6 | `-` | `libs/actuators/video-composition-actuator` |
-| `vision-actuator` | Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator | 1.3.0 | 2 | `schemas/vision-action.schema.json` | `libs/actuators/vision-actuator` |
-| `voice-actuator` | Governed local voice generation actuator with native playback and artifact fallback | 1.2.0 | 7 | `schemas/voice-action.schema.json` | `libs/actuators/voice-actuator` |
+| `vision-actuator` | Perception-oriented compatibility facade; inspect_image and ocr_image are the canonical public ops | 1.3.0 | 2 | `schemas/vision-action.schema.json` | `libs/actuators/vision-actuator` |
+| `voice-actuator` | Governed local voice synthesis, playback, and voice-profile actuator | 1.2.0 | 7 | `schemas/voice-action.schema.json` | `libs/actuators/voice-actuator` |
 | `wisdom-actuator` | Knowledge-tier search, injection, import/export, and decision-support operations | 1.2.1 | 33 | `schemas/wisdom-action.schema.json` | `libs/actuators/wisdom-actuator` |
 
 ### Capture ops (type: capture)
@@ -63,9 +68,16 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `list_incidents` | system-actuator capture op |
 | `list_knowledge` | system-actuator capture op |
 | `list_running_apps` | system-actuator capture op |
+| `list_input_devices` | system-actuator capture op |
+| `list_displays` | system-actuator capture op |
+| `list_media_devices` | system-actuator capture op |
+| `control_media_devices` | system-actuator capture op |
 | `collect_artifacts` | system-actuator capture op |
 | `sample_traces` | system-actuator capture op |
 | `vision_consult` | system-actuator capture op |
+| `test_screen_stream` | system-actuator capture op |
+| `test_screen_mp4_roundtrip` | system-actuator capture op |
+| `test_camera_injection` | system-actuator capture op |
 
 ### Transform ops (type: transform)
 
@@ -117,6 +129,6 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 See also:
 
 - Source manifests: `libs/actuators/*/manifest.json`
-- Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/knowledge/public/orchestration/global_actuator_index.json)
-- [legacy_component_index.json](/Users/famao/kyberion/knowledge/public/orchestration/legacy_component_index.json)
-- [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/public/architecture/component-lifecycle-inventory.md)
+- Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/knowledge/product/orchestration/global_actuator_index.json)
+- [legacy_component_index.json](/Users/famao/kyberion/knowledge/product/orchestration/legacy_component_index.json)
+- [component-lifecycle-inventory.md](/Users/famao/kyberion/knowledge/product/architecture/component-lifecycle-inventory.md)

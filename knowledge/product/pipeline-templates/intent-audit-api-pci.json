@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "intent-audit-api-pci",
+  "name": "Audit API Documentation for PCI-DSS Compliance",
+  "version": "3.0.0",
+  "description": "Automatically audits API documentation against PCI-DSS standards. Parameterized for path and version.",
+  "_migration_note": "v3: Delegates to reasoning-audit-and-save fragment via core:include.",
+  "variables": {
+    "api_doc_path": "docs/api/swagger.json",
+    "pci_version": "4.0",
+    "output_path": "active/shared/tmp/audit-pci-{{pci_version}}.json"
+  },
+  "context": {
+    "audit_label": "PCI-DSS {{pci_version}}",
+    "source_path": "{{api_doc_path}}",
+    "output_path": "{{output_path}}",
+    "instruction": "Audit the following API documentation for PCI-DSS {{pci_version}} compliance. Check for sensitive data exposure, improper authentication, and lack of encryption in transit.",
+    "analysis_type": "compliance_audit"
+  },
+  "steps": [
+    {
+      "id": "audit",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/reasoning-audit-and-save.json" }
+    }
+  ]
+}

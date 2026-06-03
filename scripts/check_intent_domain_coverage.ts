@@ -40,16 +40,16 @@ function pushIfMissing<T>(collection: Set<T>, value: T, message: string, violati
 }
 
 function main(): void {
-  const standardIntents = readJson<{ intents: StandardIntent[] }>('knowledge/public/governance/standard-intents.json');
-  const ontology = readJson<{ intents: IntentDomainEntry[] }>('knowledge/public/governance/intent-domain-ontology.json');
+  const standardIntents = readJson<{ intents: StandardIntent[] }>('knowledge/product/governance/standard-intents.json');
+  const ontology = readJson<{ intents: IntentDomainEntry[] }>('knowledge/product/governance/intent-domain-ontology.json');
   const missionClassification = readJson<{
     defaults: { mission_class: string };
     mission_class_rules: Array<{ mission_class?: string }>;
-  }>('knowledge/public/governance/mission-classification-policy.json');
-  const workflowCatalog = readJson<{ templates: Array<{ id?: string }> }>('knowledge/public/governance/mission-workflow-catalog.json');
-  const teamTemplates = readJson<{ templates: Record<string, unknown> }>('knowledge/public/orchestration/mission-team-templates.json');
-  const outcomeCatalog = readJson<{ outcomes: Record<string, unknown> }>('knowledge/public/governance/outcome-catalog.json');
-  const manifests = pathResolver.rootResolve('knowledge/public/governance/environment-manifests');
+  }>('knowledge/product/governance/mission-classification-policy.json');
+  const workflowCatalog = readJson<{ templates: Array<{ id?: string }> }>('knowledge/product/governance/mission-workflow-catalog.json');
+  const teamTemplates = readJson<{ templates: Record<string, unknown> }>('knowledge/product/orchestration/mission-team-templates.json');
+  const outcomeCatalog = readJson<{ outcomes: Record<string, unknown> }>('knowledge/product/governance/outcome-catalog.json');
+  const manifests = pathResolver.rootResolve('knowledge/product/governance/environment-manifests');
 
   const readinessManifestIds = new Set(
     safeReaddir(manifests)

@@ -67,7 +67,7 @@ describe('Context Ranker — scoreEntry', () => {
   const now = new Date('2025-06-01').getTime();
 
   const baseEntry: KnowledgeEntry = {
-    path: 'public/governance/mission-lifecycle.md',
+    path: 'product/governance/mission-lifecycle.md',
     title: 'Mission Lifecycle',
     tags: ['governance', 'mission'],
     importance: 5,
@@ -77,7 +77,7 @@ describe('Context Ranker — scoreEntry', () => {
     tier: 'public',
     kind: 'governance',
     scope: 'repository',
-    authority: 'policy',
+    docAuthority: 'policy',
     phase: ['alignment', 'execution'],
     applies_to: ['missions'],
   };
@@ -103,7 +103,7 @@ describe('Context Ranker — scoreEntry', () => {
     expect(scored.breakdown.phase).toBeGreaterThan(0);
     expect(scored.breakdown.scope).toBeGreaterThan(0);
     expect(scored.breakdown.kind).toBeGreaterThan(0);
-    expect(scored.breakdown.authority).toBeGreaterThan(0);
+    expect(scored.breakdown.docAuthority).toBeGreaterThan(0);
   });
 
   it('recency score decreases with age', () => {

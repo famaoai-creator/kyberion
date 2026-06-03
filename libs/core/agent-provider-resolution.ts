@@ -1,4 +1,7 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import { recordConfigFallback } from './config-fallback-registry.js';
 
 export interface ResolveAgentProviderOptions {
   preferredProvider: string;
@@ -15,14 +18,28 @@ export interface ResolvedAgentProviderTarget {
   availableProviders: string[];
 }
 
-const DEFAULT_PROVIDER_PRIORITY = ['gemini', 'claude', 'codex', 'copilot'];
+interface ProviderConfigFile {
+  default_priority: string[];
+  default_models: Record<string, string>;
+}
 
-const DEFAULT_MODELS: Record<string, string> = {
-  gemini: 'gemini-2.5-flash',
-  claude: 'sonnet',
-  codex: 'codex',
-  copilot: 'gpt-5.4',
-};
+let _cachedProviderConfig: ProviderConfigFile | null = null;
+
+function loadProviderConfig(): ProviderConfigFile {
+  if (_cachedProviderConfig) return _cachedProviderConfig;
+  try {
+    const filePath = pathResolver.knowledge('product/governance/provider-config.json');
+    _cachedProviderConfig = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ProviderConfigFile;
+  } catch (err) {
+    const defaults: ProviderConfigFile = {
+      default_priority: ['gemini', 'claude', 'codex', 'copilot'],
+      default_models: { gemini: 'gemini-2.5-flash', claude: 'sonnet', codex: 'codex', copilot: 'gpt-5.4' },
+    };
+    recordConfigFallback({ knowledgePath: 'product/governance/provider-config.json', error: err, defaults });
+    _cachedProviderConfig = defaults;
+  }
+  return _cachedProviderConfig;
+}
 
 function normalizeSet(values?: string[]): Set<string> {
   return new Set((values || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean));
@@ -62,7 +79,7 @@ function modelCapabilities(providerInfo: ProviderInfo | undefined, modelId: stri
 
 function defaultModelFor(provider: string, providerInfo?: ProviderInfo): string {
   if (providerInfo?.models?.length) return providerInfo.models[0]!;
-  return DEFAULT_MODELS[provider] || provider;
+  return loadProviderConfig().default_models[provider] || provider;
 }
 
 function scoreModelCandidate(
@@ -104,7 +121,7 @@ function resolvePriority(preferredProvider: string): string[] {
     .split(',')
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
-  return Array.from(new Set([preferredProvider, ...envPriority, ...DEFAULT_PROVIDER_PRIORITY]));
+  return Array.from(new Set([preferredProvider, ...envPriority, ...loadProviderConfig().default_priority]));
 }
 
 export function resolveAgentProviderTarget(
@@ -275,8 +292,8 @@ export function resolveCapabilityTarget(
   const availableProviders = installed.map((entry) => entry.provider);
 
   const unresolved = (rationale: string): CapabilityResolution => ({
-    provider: options.preferredProvider || DEFAULT_PROVIDER_PRIORITY[0]!,
-    modelId: options.preferredModelId || defaultModelFor(options.preferredProvider || DEFAULT_PROVIDER_PRIORITY[0]!),
+    provider: options.preferredProvider || loadProviderConfig().default_priority[0]!,
+    modelId: options.preferredModelId || defaultModelFor(options.preferredProvider || loadProviderConfig().default_priority[0]!),
     strategy: 'unresolved',
     availableProviders,
     requiredCapabilities,
@@ -309,7 +326,7 @@ export function resolveCapabilityTarget(
     }
   }
 
-  const priority = resolvePriority(options.preferredProvider || DEFAULT_PROVIDER_PRIORITY[0]!);
+  const priority = resolvePriority(options.preferredProvider || loadProviderConfig().default_priority[0]!);
   const scoreOf = (entry: ProviderInfo): number => {
     const covers = capabilityCoverage(providerCapabilities(entry), requiredCapabilities) ? 1000 : 0;
     const matched = capabilityScore(providerCapabilities(entry), requiredCapabilities);

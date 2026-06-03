@@ -30,7 +30,7 @@ import {
 } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
-const POLICY_PATH = 'knowledge/public/governance/tenant-rate-limit-policy.json';
+const POLICY_PATH = 'knowledge/product/governance/tenant-rate-limit-policy.json';
 const STATE_PATH = 'active/shared/runtime/tenant-rate-limit-state.json';
 const LOCK_PATH = `${STATE_PATH}.lock`;
 const LOCK_TIMEOUT_MS = 5000;

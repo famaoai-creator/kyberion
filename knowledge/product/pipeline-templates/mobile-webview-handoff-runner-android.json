@@ -1,0 +1,36 @@
+{
+  "action": "pipeline",
+  "name": "mobile-webview-handoff-runner-android",
+  "version": "2.0.0",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Android handoff capture template を実行します"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run android-actuator -- --input libs/actuators/android-actuator/examples/android-runtime-webview-handoff-template.json"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Browser handoff import template を実行します"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:shell",
+      "params": {
+        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/android-runtime-session-handoff-import.json"
+      }
+    }
+  ]
+}

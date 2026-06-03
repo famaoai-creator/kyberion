@@ -8,8 +8,9 @@ import type { AgentProvider } from './agent-registry.js';
 /**
  * Agent Manifest Loader v1.0
  *
- * Reads declarative agent definitions from knowledge/agents/*.agent.md
- * Each file has YAML frontmatter (config) + Markdown body (system prompt).
+ * Reads declarative agent definitions from knowledge/product/agents/*.agent.md.
+ * The manifest files are canonical agent definitions; provider/model selection
+ * hints are merged from the product agent-profile index as a policy overlay.
  */
 
 export interface AgentRequirements {
@@ -87,6 +88,14 @@ function parseValue(raw: string): any {
   return raw;
 }
 
+/**
+ * Load agent selection-hint overlays from
+ * knowledge/product/orchestration/agent-profiles/.
+ *
+ * This is intentionally separate from the manifest files themselves so the
+ * execution contract stays in the agent manifest while provider/model policy
+ * can evolve independently.
+ */
 function loadAgentProfileSelectionHints(rootDir: string): Record<string, AgentSelectionHints> {
   try {
     const profiles = loadAgentProfileIndex(rootDir);
@@ -153,7 +162,9 @@ function readDirMtime(dir: string): number {
 }
 
 /**
- * Load all agent manifests from knowledge/agents/.
+ * Load all agent manifests from knowledge/product/agents/ and merge the
+ * selection-hint overlay from knowledge/product/orchestration/agent-profiles/.
+ *
  * Cached for {@link MANIFEST_CACHE_TTL_MS} ms per rootDir, invalidated when the
  * agents directory mtime changes. Without this cache, every API call in a
  * surface re-parses every manifest and emits a duplicate `[AGENT_MANIFEST]
@@ -161,7 +172,7 @@ function readDirMtime(dir: string): number {
  */
 export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   const root = rootDir || findProjectRoot();
-  const agentsDir = path.join(root, 'knowledge', 'agents');
+  const agentsDir = path.join(root, 'knowledge', 'product', 'agents');
 
   const cached = manifestCache.get(agentsDir);
   const now = Date.now();

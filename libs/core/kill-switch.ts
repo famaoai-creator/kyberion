@@ -4,24 +4,56 @@ import { stopAgentRuntime } from './agent-runtime-supervisor.js';
 import { shutdownAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
 import { trustEngine } from './trust-engine.js';
 import { auditChain } from './audit-chain.js';
-
-/**
- * Kill Switch & Anomaly Detection v1.0
- *
- * Detects rogue agents and provides graduated response:
- * warn → isolate (Ring 3) → terminate.
- */
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import { recordConfigFallback } from './config-fallback-registry.js';
 
 export interface AnomalyIndicator {
   type: 'rapid-fire' | 'frequency-spike' | 'trust-degradation' | 'action-drift' | 'policy-violations';
   threshold: string;
 }
 
-const ANOMALY_CONFIG: AnomalyIndicator[] = [
-  { type: 'rapid-fire', threshold: '>10 actions / 5s' },
-  { type: 'trust-degradation', threshold: '>=15% drop in 1h' },
-  { type: 'policy-violations', threshold: '>=3 violations in 10min' },
-];
+interface TrustPolicyAnomalyDetection {
+  rapid_fire: { max_actions: number; window_ms: number };
+  policy_violations: { max_violations: number; window_ms: number };
+  trust_degradation: { min_drop_percent: number; window_ms: number };
+}
+
+let _cachedAnomalyConfig: TrustPolicyAnomalyDetection | null = null;
+
+function loadAnomalyConfig(): TrustPolicyAnomalyDetection {
+  if (_cachedAnomalyConfig) return _cachedAnomalyConfig;
+  try {
+    const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
+    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { anomaly_detection?: TrustPolicyAnomalyDetection };
+    _cachedAnomalyConfig = data.anomaly_detection ?? null;
+  } catch (err) {
+    const defaults: TrustPolicyAnomalyDetection = {
+      rapid_fire: { max_actions: 10, window_ms: 5000 },
+      policy_violations: { max_violations: 3, window_ms: 600000 },
+      trust_degradation: { min_drop_percent: 15, window_ms: 3600000 },
+    };
+    recordConfigFallback({ knowledgePath: 'product/governance/trust-policy.json', error: err, defaults: { anomaly_detection: defaults } });
+    _cachedAnomalyConfig = defaults;
+  }
+  if (!_cachedAnomalyConfig) {
+    _cachedAnomalyConfig = {
+      rapid_fire: { max_actions: 10, window_ms: 5000 },
+      policy_violations: { max_violations: 3, window_ms: 600000 },
+      trust_degradation: { min_drop_percent: 15, window_ms: 3600000 },
+    };
+  }
+  return _cachedAnomalyConfig;
+}
+
+export function getAnomalyConfig(): AnomalyIndicator[] {
+  const cfg = loadAnomalyConfig();
+  return [
+    { type: 'rapid-fire', threshold: `>${cfg.rapid_fire.max_actions} actions / ${cfg.rapid_fire.window_ms / 1000}s` },
+    { type: 'trust-degradation', threshold: `>=${cfg.trust_degradation.min_drop_percent}% drop in ${cfg.trust_degradation.window_ms / 3600000}h` },
+    { type: 'policy-violations', threshold: `>=${cfg.policy_violations.max_violations} violations in ${cfg.policy_violations.window_ms / 60000}min` },
+  ];
+}
 
 interface ActionLog {
   ts: number;
@@ -54,28 +86,30 @@ class KillSwitchImpl {
       const anomalies: string[] = [];
       const now = Date.now();
 
-      // Rapid-fire: >10 actions in 5 seconds
-      const recentActions = logs.filter(l => (now - l.ts) < 5000);
-      if (recentActions.length > 10) {
-        anomalies.push(`rapid-fire: ${recentActions.length} actions in 5s`);
+      const anomalyCfg = loadAnomalyConfig();
+
+      // Rapid-fire
+      const recentActions = logs.filter(l => (now - l.ts) < anomalyCfg.rapid_fire.window_ms);
+      if (recentActions.length > anomalyCfg.rapid_fire.max_actions) {
+        anomalies.push(`rapid-fire: ${recentActions.length} actions in ${anomalyCfg.rapid_fire.window_ms / 1000}s`);
       }
 
-      // Policy violations: >=3 in 10 minutes
-      const recentViolations = logs.filter(l => l.policyViolation && (now - l.ts) < 600000);
-      if (recentViolations.length >= 3) {
-        anomalies.push(`policy-violations: ${recentViolations.length} in 10min`);
+      // Policy violations
+      const recentViolations = logs.filter(l => l.policyViolation && (now - l.ts) < anomalyCfg.policy_violations.window_ms);
+      if (recentViolations.length >= anomalyCfg.policy_violations.max_violations) {
+        anomalies.push(`policy-violations: ${recentViolations.length} in ${anomalyCfg.policy_violations.window_ms / 60000}min`);
       }
 
-      // Trust degradation: >=15% drop
+      // Trust degradation
       const trustRecord = trustEngine.getScore(agentId);
       if (trustRecord && trustRecord.history.length >= 2) {
-        const hourAgo = trustRecord.history.filter(h => (now - h.ts) < 3600000);
+        const hourAgo = trustRecord.history.filter(h => (now - h.ts) < anomalyCfg.trust_degradation.window_ms);
         if (hourAgo.length >= 2) {
           const oldest = hourAgo[0].score;
           const newest = hourAgo[hourAgo.length - 1].score;
           const dropPercent = oldest > 0 ? ((oldest - newest) / oldest) * 100 : 0;
-          if (dropPercent >= 15) {
-            anomalies.push(`trust-degradation: ${dropPercent.toFixed(1)}% drop in 1h`);
+          if (dropPercent >= anomalyCfg.trust_degradation.min_drop_percent) {
+            anomalies.push(`trust-degradation: ${dropPercent.toFixed(1)}% drop in ${anomalyCfg.trust_degradation.window_ms / 3600000}h`);
           }
         }
       }

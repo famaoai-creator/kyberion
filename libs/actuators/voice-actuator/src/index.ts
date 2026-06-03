@@ -28,6 +28,8 @@ import {
   splitVoiceTextIntoChunks,
   createActuatorTrace,
   finalizeActuatorTrace,
+  createVirtualAudioOutputPlaybackBridge,
+  createVirtualDeviceInventoryBridge,
   resolveVoiceBackend,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -389,10 +391,10 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
   const engine = resolveVoiceEngineForPlatform(requestedEngineId);
   const backend = resolveVoiceBackend(requestedEngineId);
 
-  await performPlayback(text, { language, voice, rate, engineId: engine.engine_id });
+  const playback = await performPlayback(text, { language, voice, rate, engineId: engine.engine_id });
   return {
     status: 'succeeded',
-    mode: 'playback',
+    mode: 'speaker_verification',
     engine: engine.kind,
     engine_id: requestedEngineId,
     resolved_engine_id: engine.engine_id,
@@ -402,6 +404,7 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
     language,
     voice,
     rate,
+    speaker_verification: playback,
   };
 }
 
@@ -444,6 +447,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   }
   const runtime = new VoiceGenerationRuntime(policy);
   const progress_packets: any[] = [];
+  const speaker_verification: any[] = [];
   runtime.subscribe((packet) => {
     progress_packets.push(packet);
   });
@@ -485,6 +489,19 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
       });
 
       if (deliveryMode === 'playback' || deliveryMode === 'artifact_and_playback') {
+        if (deliveryMode === 'artifact_and_playback' && artifactRefs.length > 0) {
+          const verification = await performPlayback(String(input.text || ''), {
+            language,
+            voice: defaults.voice,
+            rate: defaults.rate,
+            engineId: engine.engine_id,
+            profile,
+          }, artifactRefs[0]);
+          speaker_verification.push({
+            playback_source_path: artifactRefs[0],
+            verification,
+          });
+        } else {
         for (let index = 0; index < chunks.length; index += 1) {
           if (api.isCancelled()) return { artifactRefs };
           api.report({
@@ -498,13 +515,19 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             message: `rendering chunk ${index + 1}/${chunks.length}`,
             artifact_refs: artifactRefs,
           });
-          await performPlayback(chunks[index], {
+          const verification = await performPlayback(chunks[index], {
             language,
             voice: defaults.voice,
             rate: defaults.rate,
             engineId: engine.engine_id,
             profile,
           });
+          speaker_verification.push({
+            chunk_index: index,
+            playback_source_path: verification?.playback_source_path,
+            verification,
+          });
+        }
         }
       }
 
@@ -514,7 +537,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
         message: 'voice generation runtime completed',
         artifact_refs: artifactRefs,
       });
-      return { artifactRefs };
+      return { artifactRefs, speaker_verification };
     },
   });
 
@@ -532,6 +555,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
     chunks: chunks.length,
     progress_packets,
     artifact_refs: finalPacket.artifact_refs || [],
+    speaker_verification,
     delivery_mode: deliveryMode,
     format: requestedFormat,
   };
@@ -684,39 +708,57 @@ async function transcribeVoiceSample(input: {
 async function performPlayback(
   text: string,
   options: { language: string; voice: string; rate: number; engineId: string; profile?: any },
-): Promise<void> {
+  playbackSourcePath?: string,
+): Promise<{
+  bridge_id?: string;
+  platform?: NodeJS.Platform;
+  playback_source_path?: string;
+  outputs?: any[];
+}> {
   const engine = resolveVoiceEngineForPlatform(options.engineId);
   if (!engine.supports.playback) {
     throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
   }
 
-  if (engine.engine_id === 'mlx_audio_qwen3') {
-    const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
+  if (engine.engine_id === 'mlx_audio_qwen3' && process.platform !== 'darwin') {
+    const tmpPath = playbackSourcePath || pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
     await withRetry(async () => {
-      await runMlxAudioGenerate(text, tmpPath, options.profile);
+      if (!playbackSourcePath) {
+        await runMlxAudioGenerate(text, tmpPath, options.profile);
+      }
       safeExec('open', [tmpPath]);
     }, buildRetryOptions());
-    return;
+    return {
+      playback_source_path: tmpPath,
+      outputs: [],
+    };
   }
 
   if (process.platform === 'darwin') {
-    await withRetry(async () => {
-      if (hasEspeakNg()) {
-        safeExec(
-          'espeak-ng',
-          ['-v', resolveEspeakLanguage(options.language), '-s', String(resolveEspeakRate(options.language, options.rate)), text],
-        );
-        return;
-      }
-      safeExec('say', ['-v', options.voice, '-r', String(options.rate), text]);
-    }, buildRetryOptions());
-    return;
+    const playbackSource = playbackSourcePath || await renderVoicePlaybackSource(text, options);
+    const bridge = createVirtualAudioOutputPlaybackBridge({
+      inventory_bridge: createVirtualDeviceInventoryBridge(),
+    });
+    const probe = await bridge.probe();
+    if (!probe.available) {
+      throw new Error(`[VOICE] virtual audio output bridge unavailable: ${probe.reason || 'unknown reason'}`);
+    }
+    const outputs = await withRetry(async () => bridge.playOnOutputs(probe.outputs, { source_path: playbackSource }), buildRetryOptions());
+    return {
+      bridge_id: outputs.bridge_id,
+      platform: outputs.platform,
+      playback_source_path: playbackSource,
+      outputs: outputs.outputs,
+    };
   }
   if (process.platform === 'linux') {
     await withRetry(async () => {
       safeExec('espeak', ['-s', String(options.rate), text]);
     }, buildRetryOptions());
-    return;
+    return {
+      playback_source_path: undefined,
+      outputs: [],
+    };
   }
   if (process.platform === 'win32') {
     const escaped = text.replace(/'/g, "''");
@@ -726,9 +768,32 @@ async function performPlayback(
         `Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = 0; $s.Speak('${escaped}')`,
       ]);
     }, buildRetryOptions());
-    return;
+    return {
+      playback_source_path: undefined,
+      outputs: [],
+    };
   }
   throw new Error(`Unsupported voice playback platform: ${process.platform}`);
+}
+
+async function renderVoicePlaybackSource(
+  text: string,
+  options: { language: string; voice: string; rate: number; engineId: string; profile?: any },
+): Promise<string> {
+  const playbackRequestId = `${randomUUID()}-playback`;
+  const playbackFormat: VoiceArtifactFormat = process.platform === 'darwin'
+    ? (hasEspeakNg() ? 'wav' : 'aiff')
+    : 'wav';
+  return renderNativeArtifact(text, {
+    requestId: playbackRequestId,
+    voice: options.voice,
+    rate: options.rate,
+    language: options.language,
+    format: playbackFormat,
+    engineId: options.engineId,
+    supportsFormats: resolveVoiceEngineForPlatform(options.engineId).supports.artifact_formats,
+    profile: options.profile,
+  });
 }
 
 async function runMlxAudioGenerate(text: string, outputPath: string, profile?: any): Promise<void> {

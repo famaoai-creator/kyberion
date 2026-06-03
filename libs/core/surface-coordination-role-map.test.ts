@@ -20,10 +20,10 @@ describe('surface-coordination-role-map', () => {
 
   it('emits a map that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/public/schemas/surface-coordination-role-map.schema.json');
+    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/surface-coordination-role-map.schema.json');
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const payload = JSON.parse(
-      safeReadFile(path.join(pathResolver.rootDir(), 'knowledge/public/governance/surface-coordination-role-map.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(path.join(pathResolver.rootDir(), 'knowledge/product/governance/surface-coordination-role-map.json'), { encoding: 'utf8' }) as string,
     );
     expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
   });

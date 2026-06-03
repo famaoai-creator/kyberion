@@ -6,9 +6,9 @@ import { withExecutionContext } from '@agent/core/governance';
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
 
-const SCHEMA_PATH = pathResolver.rootResolve('knowledge/public/schemas/specialist-catalog.schema.json');
-const DIRECTORY = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
-const SNAPSHOT_PATH = pathResolver.rootResolve('knowledge/public/orchestration/specialist-catalog.json');
+const SCHEMA_PATH = pathResolver.rootResolve('knowledge/product/schemas/specialist-catalog.schema.json');
+const DIRECTORY = pathResolver.rootResolve('knowledge/product/orchestration/specialists');
+const SNAPSHOT_PATH = pathResolver.rootResolve('knowledge/product/orchestration/specialist-catalog.json');
 
 type SpecialistCatalogPayload = {
   version?: string;

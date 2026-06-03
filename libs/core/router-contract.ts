@@ -1,5 +1,9 @@
 import { classifySurfaceQueryIntent, extractSurfaceKnowledgeQuery, extractSurfaceWebSearchQuery } from './surface-query.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
+import { recordConfigFallback } from './config-fallback-registry.js';
+import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 
 export interface SurfaceIntentResolution {
   intentId?: string;
@@ -10,6 +14,27 @@ export interface SurfaceIntentResolution {
   browserCommandKind?: 'open_site' | 'browser_step';
   pipelineId?: string;
   missionAction?: 'create' | 'classify' | 'workflow' | 'compose_team' | 'prewarm_team' | 'delegate_task' | 'review_output' | 'handoff' | 'distill' | 'close' | 'inspect_state';
+}
+
+interface IntentRoutingMap {
+  pipeline_intent_map: Record<string, string>;
+  mission_intent_action_map: Record<string, NonNullable<SurfaceIntentResolution['missionAction']>>;
+  direct_intent_commands: Record<string, { command: string; args: string[] }>;
+}
+
+let _cachedRoutingMap: IntentRoutingMap | null = null;
+
+function loadIntentRoutingMap(): IntentRoutingMap {
+  if (_cachedRoutingMap) return _cachedRoutingMap;
+  try {
+    const filePath = pathResolver.knowledge('product/governance/intent-routing-map.json');
+    _cachedRoutingMap = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentRoutingMap;
+  } catch (err) {
+    const defaults = { pipeline_intent_map: {}, mission_intent_action_map: {}, direct_intent_commands: {} };
+    recordConfigFallback({ knowledgePath: 'product/governance/intent-routing-map.json', error: err, defaults });
+    _cachedRoutingMap = defaults;
+  }
+  return _cachedRoutingMap;
 }
 
 function routeFamilyForIntent(intentId?: string, shape?: string): SurfaceIntentResolution['routeFamily'] {
@@ -23,34 +48,20 @@ function routeFamilyForIntent(intentId?: string, shape?: string): SurfaceIntentR
   return undefined;
 }
 
-const PIPELINE_INTENT_MAP: Record<string, string> = {
-  'check-kyberion-baseline': 'baseline-check',
-  'check-kyberion-vital': 'vital-check',
-  'diagnose-kyberion-system': 'system-diagnostics',
-  'run-system-upgrade-check': 'system-upgrade-check',
-  'verify-environment-readiness': 'baseline-check',
-  'inspect-environment-readiness': 'baseline-check',
-  'inspect-runtime-supervisor': 'system-diagnostics',
-  'verify-audit-chain': 'system-diagnostics',
-};
-
-const MISSION_INTENT_ACTION_MAP: Record<string, NonNullable<SurfaceIntentResolution['missionAction']>> = {
-  'create-mission': 'create',
-  'classify-mission': 'classify',
-  'select-mission-workflow': 'workflow',
-  'compose-mission-team': 'compose_team',
-  'prewarm-mission-team': 'prewarm_team',
-  'delegate-mission-task': 'delegate_task',
-  'review-worker-output': 'review_output',
-  'handoff-mission': 'handoff',
-  'distill-mission': 'distill',
-  'close-mission': 'close',
-  'inspect-mission-state': 'inspect_state',
-};
+export function resolveDirectIntentCommand(intentId?: string): { command: string; args: string[] } | null {
+  if (!intentId) return null;
+  const { direct_intent_commands } = loadIntentRoutingMap();
+  return direct_intent_commands[intentId] ?? null;
+}
 
 export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution {
   const packet = resolveIntentResolutionPacket(utterance);
   const selectedIntentId = packet.selected_intent_id;
+  const { pipeline_intent_map, mission_intent_action_map } = loadIntentRoutingMap();
+
+  if (!selectedIntentId) {
+    recordUnhandledIntent({ missType: 'unrecognized', utterance });
+  }
 
   if (selectedIntentId === 'knowledge-query' || selectedIntentId === 'query-knowledge') {
     return {
@@ -95,27 +106,35 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     };
   }
 
-  if (selectedIntentId && PIPELINE_INTENT_MAP[selectedIntentId]) {
+  if (selectedIntentId && pipeline_intent_map[selectedIntentId]) {
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
       routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'pipeline'),
-      pipelineId: PIPELINE_INTENT_MAP[selectedIntentId],
+      pipelineId: pipeline_intent_map[selectedIntentId],
     };
   }
 
-  if (selectedIntentId && MISSION_INTENT_ACTION_MAP[selectedIntentId]) {
+  if (selectedIntentId && mission_intent_action_map[selectedIntentId]) {
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
       routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'mission'),
-      missionAction: MISSION_INTENT_ACTION_MAP[selectedIntentId],
+      missionAction: mission_intent_action_map[selectedIntentId],
     };
+  }
+
+  const shape = packet.selected_resolution?.shape;
+  const routeFamily = routeFamilyForIntent(selectedIntentId, shape);
+
+  // 'direct_reply'-routed intents are handled by the orchestrator without a pipeline/mission entry — not a gap.
+  if (selectedIntentId && routeFamily !== 'direct_reply') {
+    recordUnhandledIntent({ missType: 'unrouted', intentId: selectedIntentId, shape, utterance });
   }
 
   return {
     intentId: selectedIntentId,
-    shape: packet.selected_resolution?.shape,
-    routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape),
+    shape,
+    routeFamily,
   };
 }

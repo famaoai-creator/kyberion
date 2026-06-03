@@ -66,9 +66,9 @@ type ReviewGateRegistry = {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const REGISTRY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/mission-review-gate-registry.schema.json');
-const REGISTRY_PATH = pathResolver.knowledge('public/governance/mission-review-gate-registry.json');
-const RESULT_SCHEMA_PATH = pathResolver.knowledge('public/schemas/review-gate-result.schema.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-review-gate-registry.schema.json');
+const REGISTRY_PATH = pathResolver.knowledge('product/governance/mission-review-gate-registry.json');
+const RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/review-gate-result.schema.json');
 
 let registryValidateFn: ValidateFunction | null = null;
 let resultValidateFn: ValidateFunction | null = null;

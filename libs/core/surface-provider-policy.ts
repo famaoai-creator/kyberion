@@ -10,8 +10,8 @@ import type { UserIntentFlow } from './intent-contract.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH = pathResolver.knowledge('public/schemas/surface-provider-manifests.schema.json');
-const SURFACE_PROVIDER_MANIFESTS_PATH = pathResolver.knowledge('public/governance/surface-provider-manifests.json');
+const SURFACE_PROVIDER_MANIFESTS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/surface-provider-manifests.schema.json');
+const SURFACE_PROVIDER_MANIFESTS_PATH = pathResolver.knowledge('product/governance/surface-provider-manifests.json');
 
 export type SurfaceDelegationReceiver = 'chronos-mirror' | 'nerve-agent';
 

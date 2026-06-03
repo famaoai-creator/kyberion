@@ -1,0 +1,71 @@
+{
+  "title": "Organization Discovery",
+  "summary": "Operator entrypoint for organization selection, inventory, and template overlay inspection.",
+  "documents": [
+    {
+      "name": "Organization Selection Guide",
+      "path": "knowledge/product/orchestration/organization-selection-guide.md",
+      "purpose": "Select or switch the active organization context",
+      "text_command": "node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --summary",
+      "json_command": "node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --json --summary"
+    },
+    {
+      "name": "Organization Discovery Reports",
+      "path": "knowledge/product/orchestration/organization-discovery-reports.md",
+      "purpose": "Inspect inventory, readiness, and template overlays",
+      "text_command": "node dist/scripts/mission_controller.js organization-profiles --summary",
+      "json_command": "node dist/scripts/mission_controller.js organization-profiles --json --summary"
+    },
+    {
+      "name": "Organization Discovery Copy/Paste",
+      "path": "knowledge/product/orchestration/README.md",
+      "purpose": "Copy the most common organization discovery commands",
+      "text_command": "node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary",
+      "json_command": "node dist/scripts/mission_controller.js organization-catalogs --json --selected-only --summary"
+    }
+  ],
+  "examples": [
+    {
+      "name": "Organization Discovery Example",
+      "path": "knowledge/product/schemas/organization-discovery-report.example.json",
+      "schema": "knowledge/product/schemas/organization-discovery-report.schema.json",
+      "purpose": "Validate the discovery overview contract and operator entrypoints"
+    },
+    {
+      "name": "Organization Profile Example",
+      "path": "knowledge/product/schemas/organization-profile-report.example.json",
+      "schema": "knowledge/product/schemas/organization-profile-report.schema.json",
+      "purpose": "Validate the resolved organization profile contract"
+    },
+    {
+      "name": "Organization Profiles Example",
+      "path": "knowledge/product/schemas/organization-profiles-report.example.json",
+      "schema": "knowledge/product/schemas/organization-profiles-report.schema.json",
+      "purpose": "Validate the organization roster and readiness inventory contract"
+    },
+    {
+      "name": "Organization Catalog Example",
+      "path": "knowledge/product/schemas/organization-catalog-report.example.json",
+      "schema": "knowledge/product/schemas/organization-catalog-report.schema.json",
+      "purpose": "Validate the selected template overlay contract"
+    }
+  ],
+  "common_questions": [
+    {
+      "question": "What organization is selected right now?",
+      "command": "node dist/scripts/mission_controller.js organization-profile --summary"
+    },
+    {
+      "question": "Which customer orgs are missing a profile?",
+      "command": "node dist/scripts/mission_controller.js organization-profiles --missing-only --summary"
+    },
+    {
+      "question": "Which team template overlays are active for this org?",
+      "command": "node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary"
+    },
+    {
+      "question": "Which organization profiles are ready to use?",
+      "command": "node dist/scripts/mission_controller.js organization-profiles --ready-only --summary"
+    }
+  ]
+}

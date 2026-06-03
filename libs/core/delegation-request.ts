@@ -9,7 +9,7 @@ import type { OperatorInteractionPacket } from './src/types/operator-interaction
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const DELEGATION_REQUEST_SCHEMA_PATH = pathResolver.knowledge('public/schemas/assistant-delegation-request.schema.json');
+const DELEGATION_REQUEST_SCHEMA_PATH = pathResolver.knowledge('product/schemas/assistant-delegation-request.schema.json');
 
 export type AssistantDelegationMode = 'plan_only' | 'investigate' | 'implement';
 export type AssistantDelegationOutputContract = 'planning_packet' | 'organization-work-loop' | 'pipeline-adf' | 'report';

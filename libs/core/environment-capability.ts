@@ -557,7 +557,7 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
  * Manifest loading                                                    *
  * ------------------------------------------------------------------ */
 
-const DEFAULT_MANIFEST_DIR = 'knowledge/public/governance/environment-manifests';
+const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 
 /**
  * Enumerate the manifest ids present under the canonical manifest

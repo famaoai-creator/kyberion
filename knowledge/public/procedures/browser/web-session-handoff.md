@@ -14,9 +14,9 @@ Web アプリが debug-only hook を使って browser session を export し、B
 
 ## Contracts
 
-- [`webview-session-handoff.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/webview-session-handoff.schema.json)
-- [`web-app-profile.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/web-app-profile.schema.json)
-- [`example-web-login-guarded.json`](/Users/famao/kyberion/knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json)
+- [`webview-session-handoff.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/webview-session-handoff.schema.json)
+- [`web-app-profile.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/web-app-profile.schema.json)
+- [`example-web-login-guarded.json`](/Users/famao/kyberion/knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json)
 
 ## Shared Templates
 
@@ -40,9 +40,9 @@ Web アプリが debug-only hook を使って browser session を export し、B
 - execution plan example:
   [`web-profile-to-browser-plan.json`](/Users/famao/kyberion/libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json)
 - UI flow schema:
-  [`ui-flow-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/ui-flow-adf.schema.json)
+  [`ui-flow-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/ui-flow-adf.schema.json)
 - test inventory schema:
-  [`test-case-adf.schema.json`](/Users/famao/kyberion/knowledge/public/schemas/test-case-adf.schema.json)
+  [`test-case-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/test-case-adf.schema.json)
 
 ## Notes
 

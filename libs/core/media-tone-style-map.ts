@@ -17,8 +17,8 @@ interface MediaToneStyleMapCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-tone-style-map.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-tone-style-map.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-tone-style-map.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-tone-style-map.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaToneStyleMapCatalog | null = null;

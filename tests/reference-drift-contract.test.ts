@@ -14,7 +14,7 @@ describe('reference drift contract', () => {
     '.github/workflows/pr-validation.yml',
     '.github/workflows/README.md',
     'package.json',
-    'knowledge/public/governance/phases/onboarding.md',
+    'knowledge/product/governance/phases/onboarding.md',
     'docs/developer/LOCAL_DEV.md',
     'docs/PRODUCTIZATION_ROADMAP.md',
     'pipelines/fragments/capability-docs-sync.json',

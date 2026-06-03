@@ -29,4 +29,4 @@ adb shell am broadcast \
 - mirrored:
   `/sdcard/kyberion/example-mobile-login-passkey/webview-session.json`
 
-これは [`example-mobile-login-passkey.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json) と揃っています。
+これは [`example-mobile-login-passkey.json`](/Users/famao/kyberion/knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json) と揃っています。

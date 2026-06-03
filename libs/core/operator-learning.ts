@@ -275,7 +275,7 @@ function ensureOperatorProfileValidator(): ValidateFunction {
   if (operatorProfileValidateFn) return operatorProfileValidateFn;
   operatorProfileValidateFn = compileSchemaFromPath(
     createAjv(),
-    pathResolver.knowledge('public/schemas/operator-profile.schema.json')
+    pathResolver.knowledge('product/schemas/operator-profile.schema.json')
   );
   return operatorProfileValidateFn;
 }
@@ -284,7 +284,7 @@ function ensureOperatorRequestLogValidator(): ValidateFunction {
   if (operatorRequestLogValidateFn) return operatorRequestLogValidateFn;
   operatorRequestLogValidateFn = compileSchemaFromPath(
     createAjv(),
-    pathResolver.knowledge('public/schemas/operator-request-log.schema.json')
+    pathResolver.knowledge('product/schemas/operator-request-log.schema.json')
   );
   return operatorRequestLogValidateFn;
 }
@@ -293,13 +293,13 @@ function ensureOperatorLearningDispatchRegistryValidator(): ValidateFunction {
   if (operatorLearningDispatchRegistryValidateFn) return operatorLearningDispatchRegistryValidateFn;
   operatorLearningDispatchRegistryValidateFn = compileSchemaFromPath(
     createAjv(),
-    pathResolver.knowledge('public/schemas/operator-learning-dispatch-registry.schema.json')
+    pathResolver.knowledge('product/schemas/operator-learning-dispatch-registry.schema.json')
   );
   return operatorLearningDispatchRegistryValidateFn;
 }
 
 const DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.knowledge(
-  'public/governance/operator-learning-dispatch-registry.json'
+  'product/governance/operator-learning-dispatch-registry.json'
 );
 const DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.knowledge(
   'personal/governance/operator-learning-dispatch-registry.json'

@@ -1,18 +1,20 @@
 {
   "action": "pipeline",
   "name": "focused-form-fill-fragment",
+  "version": "2.0.0",
   "description": "Checks if the currently focused UI element is editable, pastes fill_text into it, and optionally submits. Required context var: fill_text. Optional: auto_submit (boolean string 'true'/'false', default false), application (activates the app before checking focus).",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "activate_app",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
       "params": {
         "condition": "application",
         "then": [
           {
             "id": "activate",
-            "type": "apply",
+            "role": "sink",
             "op": "system:activate_application",
             "params": { "application": "{{application}}" }
           }
@@ -21,39 +23,41 @@
     },
     {
       "id": "check_focus",
-      "type": "capture",
+      "role": "source",
       "op": "system:get_focused_input",
-      "params": { "export_as": "focused_input" }
+      "produces": { "channel": "focused_input", "type": "FocusedInputResult" },
+      "params": {}
     },
     {
       "id": "fill_or_warn",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "focused_input",
       "params": {
         "condition": { "from": "focused_input.editable", "operator": "equals", "value": true },
         "then": [
           {
             "id": "stage_clipboard",
-            "type": "apply",
+            "role": "sink",
             "op": "system:clipboard_write",
             "params": { "text": "{{fill_text}}" }
           },
           {
             "id": "paste",
-            "type": "apply",
+            "role": "sink",
             "op": "system:paste_text",
             "params": { "text": "{{fill_text}}" }
           },
           {
             "id": "maybe_submit",
-            "type": "apply",
+            "role": "gate",
             "op": "core:if",
             "params": {
               "condition": { "from": "auto_submit", "operator": "equals", "value": "true" },
               "then": [
                 {
                   "id": "submit",
-                  "type": "apply",
+                  "role": "sink",
                   "op": "system:press_key",
                   "params": { "key": "enter" }
                 }
@@ -62,8 +66,9 @@
           },
           {
             "id": "notify_success",
-            "type": "apply",
+            "role": "sink",
             "op": "system:system_notify",
+            "consumes": "focused_input",
             "params": {
               "title": "Kyberion",
               "message": "入力しました",
@@ -74,8 +79,9 @@
         "else": [
           {
             "id": "notify_not_editable",
-            "type": "apply",
+            "role": "sink",
             "op": "system:system_notify",
+            "consumes": "focused_input",
             "params": {
               "title": "Kyberion",
               "message": "入力フォームにフォーカスがありません",

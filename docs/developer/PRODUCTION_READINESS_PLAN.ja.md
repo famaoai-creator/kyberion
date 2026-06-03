@@ -37,12 +37,12 @@ last_updated: 2026-05-30
 
 | ID | 改善項目 | 目的 | 主な対象 | 受入条件 |
 |---|---|---|---|---|
-| P0-1 | `doctor` / bootstrap の一本化 | ユーザーが runtime 不足で詰まらないようにする | `scripts/bootstrap_environment.ts`, `knowledge/public/governance/environment-manifests/*.json`, `package.json` | `pnpm doctor` または同等コマンドが must / should / nice を出し、meeting / voice / browser の不足を分類できる |
+| P0-1 | `doctor` / bootstrap の一本化 | ユーザーが runtime 不足で詰まらないようにする | `scripts/bootstrap_environment.ts`, `knowledge/product/governance/environment-manifests/*.json`, `package.json` | `pnpm doctor` または同等コマンドが must / should / nice を出し、meeting / voice / browser の不足を分類できる |
 | P0-2 | Trace の欠落経路を塞ぐ | 遅い、落ちる、何も残らないを防ぐ | `libs/core/src/trace.ts`, `scripts/run_pipeline.ts`, actuators | pipeline step、actuator call、consent denial、capability failure が trace / audit のどちらかに必ず残る |
 | P0-3 | Tenant / group isolation の regression 固定 | default tenant と confidential shared group の漏洩を防ぐ | `libs/core/tier-guard.ts`, `libs/core/tenant-registry.ts`, `schemas/tenant-group.schema.json` | member tenant の shared group access は許可、non-member は拒否、public への逆流が拒否される |
 | P0-4 | Voice consent と meeting authority の e2e 固定 | AI meeting runtime が危険動作しないことを保証する | `libs/actuators/meeting-actuator`, `scripts/voice_consent.ts`, `scripts/meeting_participate.ts` | consent なし speak は拒否、consent あり speak は audit 付き、join/listen/leave は最小権限で動く |
 | P0-5 | Pipeline JSON の shell 非依存化 | macOS/Linux/Docker で同じ contract を動かす | `pipelines/*.json`, `scripts/run_pipeline.ts` | process substitution、host-specific shell trick、暗黙 temp path を使う pipeline がない |
-| P0-6 | Golden scenario catalog の schema 管理 | 未追跡 deterministic catalog が腐るのを防ぐ | `knowledge/public/governance/mission-orchestration-scenario-pack.json`, `knowledge/public/governance/mission-workflow-catalog.json`, `scripts/check_contract_schemas.ts` | canonical catalog に統合済みの内容だけが残り、未追跡 schema-mismatched catalog は削除または migration 済み |
+| P0-6 | Golden scenario catalog の schema 管理 | 未追跡 deterministic catalog が腐るのを防ぐ | `knowledge/product/governance/mission-orchestration-scenario-pack.json`, `knowledge/product/governance/mission-workflow-catalog.json`, `scripts/check_contract_schemas.ts` | canonical catalog に統合済みの内容だけが残り、未追跡 schema-mismatched catalog は削除または migration 済み |
 | P0-7 | First-win smoke の固定 | OSS ユーザーが最初に成功する体験を守る | `README.md`, `docs/user/`, `pipelines/voice-hello.json`, `pipelines/verify-session.json` | clean environment で 5 分以内に 1 つの成果物が生成される手順が通る |
 
 ### P1: Production hardening
@@ -50,7 +50,7 @@ last_updated: 2026-05-30
 | ID | 改善項目 | 目的 | 主な対象 | 受入条件 |
 |---|---|---|---|---|
 | P1-1 | Error classifier の適用範囲拡大 | unknown error を減らす | `libs/core/error-classifier.ts`, CLI scripts | provider timeout、capability missing、policy violation、schema invalid が分類される |
-| P1-2 | Runtime capability receipts | bootstrap 結果を後続実行が信頼できるようにする | `libs/core/environment-capability.ts`, `knowledge/public/governance/environment-manifests/` | receipt の期限、環境 fingerprint、missing capability が検証される |
+| P1-2 | Runtime capability receipts | bootstrap 結果を後続実行が信頼できるようにする | `libs/core/environment-capability.ts`, `knowledge/product/governance/environment-manifests/` | receipt の期限、環境 fingerprint、missing capability が検証される |
 | P1-3 | Action item lifecycle の整合性 | meeting 後の follow-up を実用にする | `libs/core/action-item-store.ts`, `pipelines/action-item-*.json` | duplicate reminder、status transition、blocked reason、owner kind がテストされる |
 | P1-4 | Browser participation runtime の安全性 | Zoom/browser 操作を誤作動させない | `libs/actuators/meeting-browser-driver`, `scripts/meeting_participate.ts` | join target redaction、domain allowlist、recording/voice の consent gate がある |
 | P1-5 | Cross-OS CI の代表シナリオ化 | Mac 固有の成功を防ぐ | `.github/workflows/cross-os.yml`, `tests/golden/` | Ubuntu / macOS で schema、core test、pipeline preview、meeting dry-run が通る |
@@ -62,7 +62,7 @@ last_updated: 2026-05-30
 |---|---|---|---|---|
 | P2-1 | README の first-win 導線強化 | 試す理由と手順を明確にする | `README.md`, `docs/WHY.md`, `docs/QUICKSTART.md` | 30 秒で価値、5 分で実行、15 分で構造が分かる |
 | P2-2 | Developer tour の実コード追従 | contributor の迷子を減らす | `docs/developer/TOUR.md`, `docs/developer/EXTENSION_POINTS.md` | actuator / pipeline / skill / tenant の入口が現在の構造と一致する |
-| P2-3 | Meeting use-case の operator doc 化 | デモ価値を外部に伝える | `docs/user/`, `knowledge/public/architecture/meeting-facilitator-use-case.md` | consent、安全境界、dry-run、real meeting の違いが明記される |
+| P2-3 | Meeting use-case の operator doc 化 | デモ価値を外部に伝える | `docs/user/`, `knowledge/product/architecture/meeting-facilitator-use-case.md` | consent、安全境界、dry-run、real meeting の違いが明記される |
 | P2-4 | Good-first-issue 分解 | 外部 contributor を受け入れる | `.github/ISSUE_TEMPLATE`, `CONTRIBUTING.md` | P1/P2 の一部が file cluster、validation command、out-of-scope 付きの 1-2h タスクとして切り出せる |
 
 ### P3: Level-up backlog
@@ -296,14 +296,14 @@ Kyberion の docs/developer/PRODUCTION_READINESS_PLAN.ja.md を読み、P0-<id> 
 - P1-6 は release prep の完了条件を `CHANGELOG.md` の `Migration required` 明記、必要な `migration/<id>.ts` と dry-run、actuator surface 変更時の `scripts/contract-baseline.json` rebaseline にする。`tests/release-operations-contract.test.ts` は release runbook / migration README / changelog section がこの契約を維持することを固定する。
 - P2-1 は README / Quickstart / WHY の first-win ladder を 30秒 value boundary (`pnpm doctor`)、5分 browser artifact (`pipelines/verify-session.json`)、15分 structure map (`pipelines/verify-session.json` / `CAPABILITIES_GUIDE.md` / `docs/developer/EXTENSION_POINTS.md`) に揃える。`tests/first-win-docs-contract.test.ts` で古い voice-first / enterprise-login 導線へ戻らないよう固定する。
 - P2-2 は `docs/developer/TOUR.md` と `docs/developer/EXTENSION_POINTS.md` を現在の meeting participation / consent / release-migration / first-win pipeline 境界へ追従させる。`tests/developer-tour-contract.test.ts` は actuator、pipeline、skill/plugin、tenant overlay、meeting runtime dry-run、release helper の入口が drift しないことを固定する。
-- P2-3 は `docs/user/meeting-facilitator.md` と `knowledge/public/architecture/meeting-facilitator-use-case.md` に dry-run / real meeting の違い、mission-scoped consent、recording/capture と TTS speech の fail-closed gate、doctor/bootstrap、URL redaction を明記する。`tests/user-meeting-use-case-contract.test.ts` で operator-facing safety boundary を固定する。
+- P2-3 は `docs/user/meeting-facilitator.md` と `knowledge/product/architecture/meeting-facilitator-use-case.md` に dry-run / real meeting の違い、mission-scoped consent、recording/capture と TTS speech の fail-closed gate、doctor/bootstrap、URL redaction を明記する。`tests/user-meeting-use-case-contract.test.ts` で operator-facing safety boundary を固定する。
 - P3-1 は `provider-discovery` の disk cache を `~/.kyberion` 直書きから `active/shared/runtime/provider-cache.json` へ移し、`safeReadFile` / `safeWriteFile` / `safeMkdir` / `safeUnlinkSync` 経由にする。`libs/core/security-boundary.contract.test.ts` は production TS の raw `node:fs` import を `secure-io` / `fs-primitives` などレビュー済み low-level boundary に限定する。
 - P3-2 は `system-actuator` の public op catalog を capture / transform / apply / control に分け、`CAPABILITIES_GUIDE.md`、`schemas/system-pipeline.schema.json`、`scripts/sync_component_inventory.ts`、`op-catalog.test.ts` が同じ exported op arrays を参照する状態にする。説明だけ存在する op と実装だけ存在する op の両方を contract test で検出する。
 - P3-3 は `agent_runtime_manager` の spawn 失敗を `classifyError` で分類し、`agent.manual_spawn` の failed audit を残してから rethrow する。`scripts/agent_runtime_manager.test.ts`、`scripts/vital_check.test.ts`、`scripts/onboarding_apply.test.ts`、`libs/core/voice-bridge.test.ts` で runtime bridge の入出力・失敗時挙動・権限エラーの代表経路を固定する。
 - P3-4 は `pipelines/ui-voice-browser-smoke.json` と `pnpm run test:ui-voice-browser-smoke` を追加し、presence-studio の health / voice UI、`voice-hello`、`verify-session`、meeting consent gate を 1 つの smoke slice として固定する。
 - P3-5 は `tests/reference-drift-contract.test.ts` を `check:reference-drift` として `pnpm run validate` に組み込み、削除済み script / op / path 名が workflow、docs、runbook に戻った場合に CI-style gate で検出する。
 - `vault/update.patch` 由来の差分は広い。実装担当は unrelated file を整形しない。
-- `knowledge/public/governance/*-deterministic.json` のような schema 外 catalog は、そのまま増やさず canonical catalog に統合する。
+- `knowledge/product/governance/*-deterministic.json` のような schema 外 catalog は、そのまま増やさず canonical catalog に統合する。
 - meeting / voice / browser runtime は機能の魅力が強い分、consent と audit が弱いと OSS 公開時の信用を落とす。P0-4 は demo より優先する。
 - trace は「便利機能」ではなく、production readiness の中核。遅延、timeout、provider throttling、policy denial を説明できない状態では production とみなさない。
 - default tenant と confidential group sharing は、便利さより漏洩防止を優先する。曖昧な場合は deny by default にする。

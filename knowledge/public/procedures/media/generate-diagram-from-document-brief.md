@@ -5,7 +5,7 @@ Generate Mermaid, D2, or Draw.io artifacts from the canonical `document-brief` c
 
 ## 2. Dependencies
 - **Actuator**: `Media-Actuator`
-- **Schema**: `knowledge/public/schemas/document-brief.schema.json`
+- **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 
 ## 3. Principle
 Separate the diagram into:

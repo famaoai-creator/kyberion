@@ -54,4 +54,4 @@ The route only sends `data:` events when the JSON payload changes from the prior
 
 ## Health probing
 
-`/api/agents` is the canonical healthPath for `chronos-mirror-v2` in `knowledge/public/governance/active-surfaces.json`. A 200 response (even empty `agents: []`) marks the surface as `already_healthy` during reconcile.
+`/api/agents` is the canonical healthPath for `chronos-mirror-v2` in `knowledge/product/governance/active-surfaces.json`. A 200 response (even empty `agents: []`) marks the surface as `already_healthy` during reconcile.

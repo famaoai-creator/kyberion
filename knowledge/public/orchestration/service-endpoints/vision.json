@@ -1,8 +1,0 @@
-{
-  "default_pattern": "https://api.{service_id}.com/v1",
-  "services": {
-    "vision": {
-      "preset_path": "knowledge/public/orchestration/service-presets/media-generation.json"
-    }
-  }
-}

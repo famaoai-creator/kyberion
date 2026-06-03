@@ -4,7 +4,7 @@ import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import type { VideoCompositionTemplateRecord, VideoCompositionTemplateRegistry, VideoTemplateStatus } from './video-composition-contract.js';
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('public/governance/video-composition-template-registry.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/video-composition-template-registry.json');
 
 const FALLBACK_REGISTRY: VideoCompositionTemplateRegistry = {
   version: 'fallback',

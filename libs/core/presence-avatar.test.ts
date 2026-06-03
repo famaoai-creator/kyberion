@@ -15,7 +15,7 @@ describe('presence-avatar registry', () => {
 
   it('loads profiles from the governed default registry', () => {
     const registry = JSON.parse(
-      safeReadFile(pathResolver.knowledge('public/presence/avatar-profiles.json'), { encoding: 'utf8' }) as string,
+      safeReadFile(pathResolver.knowledge('product/presence/avatar-profiles.json'), { encoding: 'utf8' }) as string,
     ) as {
       aliases?: Record<string, string>;
       profiles?: Array<{ agentId: string; displayName: string; defaultAvatarAssetPath: string }>;

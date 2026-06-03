@@ -70,7 +70,7 @@ function scoreRef(ref: string, input: Omit<AnalysisRefRankingInput, 'refs'>): nu
   if (projectId && lowerRef.includes(projectId)) score += 60;
   if (targetScope && lowerRef.includes(targetScope.toLowerCase())) score += 50;
   if (lowerRef.startsWith('active/projects/')) score += 25;
-  if (lowerRef.startsWith('knowledge/public/incidents/')) score += 20;
+  if (lowerRef.startsWith('knowledge/product/incidents/')) score += 20;
   if (lowerRef.startsWith('knowledge/')) score += 10;
 
   const tokens = tokenizeFreeText(input.utterance);

@@ -65,7 +65,7 @@ For a given config sub-path (e.g. `connections/slack.json`):
 
 1. **Customer overlay**: `customer/{slug}/connections/slack.json` if it exists.
 2. **Legacy personal fallback**: `knowledge/personal/connections/slack.json` if it exists.
-3. **Public default**: for policy files, `knowledge/public/governance/slack.json` etc.
+3. **Public default**: for policy files, `knowledge/product/governance/slack.json` etc.
 
 The resolver returns the first existing path. For writes, when a customer is active, writes go to the customer overlay path.
 

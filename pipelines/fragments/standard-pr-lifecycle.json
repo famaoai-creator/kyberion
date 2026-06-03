@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "standard-pr-lifecycle-fragment",
+  "version": "2.0.0",
   "description": "A reusable pipeline fragment that automates the standard Git workflow: create a branch, commit changes, push, create a pull request, and optionally merge it.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "branch_name": "feature/default-branch",
     "commit_message": "feat: default commit message",
@@ -12,7 +14,7 @@
   "steps": [
     {
       "id": "create_branch",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "git checkout -b {{branch_name}}"
@@ -20,7 +22,7 @@
     },
     {
       "id": "stage_changes",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "git add ."
@@ -28,7 +30,7 @@
     },
     {
       "id": "commit_changes",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "git commit -m \"{{commit_message}}\"",
@@ -37,7 +39,7 @@
     },
     {
       "id": "push_branch",
-      "type": "apply",
+      "role": "sink",
       "op": "system:shell",
       "params": {
         "cmd": "git push -u origin {{branch_name}}"
@@ -45,34 +47,37 @@
     },
     {
       "id": "create_pr",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "pr_creation_result", "type": "ShellResult" },
       "params": {
         "command": "gh",
         "args": [
           "pr", "create",
           "--title", "{{pr_title}}",
           "--body", "{{pr_body}}"
-        ],
-        "export_as": "pr_creation_result"
+        ]
       }
     },
     {
       "id": "log_pr_url",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
+      "consumes": "pr_creation_result",
       "params": {
         "message": "Pull Request created successfully! URL: {{pr_creation_result.stdout}}"
       }
     },
     {
       "id": "conditional_merge",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "pr_creation_result",
       "params": {
         "condition": { "from": "auto_merge", "operator": "equals", "value": true },
         "then": [
           {
+            "role": "sink",
             "op": "system:exec",
             "params": {
               "command": "gh",
@@ -82,16 +87,18 @@
                 "--merge",
                 "--delete-branch"
               ],
-              "allow_error": true 
+              "allow_error": true
             }
           },
           {
+            "role": "sink",
             "op": "system:shell",
             "params": {
               "cmd": "git checkout main && git pull origin main"
             }
           },
           {
+            "role": "sink",
             "op": "system:log",
             "params": {
               "message": "Pull Request automatically merged and branch deleted."
@@ -100,6 +107,7 @@
         ],
         "else": [
           {
+            "role": "sink",
             "op": "system:log",
             "params": {
               "message": "Auto-merge is disabled. The PR is ready for human review."

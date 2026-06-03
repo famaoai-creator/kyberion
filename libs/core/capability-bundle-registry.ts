@@ -6,7 +6,7 @@ import { safeReadFile } from './secure-io.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/capability-bundle-registry.schema.json'
+  'product/schemas/capability-bundle-registry.schema.json'
 );
 
 export type CapabilityBundleStatus = 'active' | 'experimental' | 'conceptual' | 'deprecated';
@@ -42,7 +42,7 @@ function ensureCapabilityBundleRegistryValidator(): ValidateFunction {
 
 export function loadCapabilityBundleRegistry(): CapabilityBundleRegistryFile {
   if (capabilityBundleRegistryCache) return capabilityBundleRegistryCache;
-  const filePath = pathResolver.knowledge('public/governance/capability-bundle-registry.json');
+  const filePath = pathResolver.knowledge('product/governance/capability-bundle-registry.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as CapabilityBundleRegistryFile;
   const validate = ensureCapabilityBundleRegistryValidator();
   if (!validate(parsed)) {

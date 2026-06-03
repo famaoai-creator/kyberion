@@ -18,8 +18,8 @@ interface MediaStylePolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-style-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-style-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-style-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-style-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaStylePolicyCatalog | null = null;

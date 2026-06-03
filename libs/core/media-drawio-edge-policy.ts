@@ -24,8 +24,8 @@ interface MediaDrawioEdgePolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/media-drawio-edge-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/media-drawio-edge-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/media-drawio-edge-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-drawio-edge-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: MediaDrawioEdgePolicyCatalog | null = null;

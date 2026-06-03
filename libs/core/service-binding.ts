@@ -45,8 +45,8 @@ function resolveServiceSecret(serviceId: string, suffixes: string[]): string | n
   return null;
 }
 
-const DEFAULT_SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('public/orchestration/service-endpoints.json');
-const DEFAULT_SERVICE_ENDPOINTS_DIR = pathResolver.knowledge('public/orchestration/service-endpoints');
+const DEFAULT_SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('product/orchestration/service-endpoints.json');
+const DEFAULT_SERVICE_ENDPOINTS_DIR = pathResolver.knowledge('product/orchestration/service-endpoints');
 const FALLBACK_SERVICE_ENDPOINTS: ServiceEndpointsCatalog = {
   version: 'fallback',
   default_pattern: 'https://api.{service_id}.com/v1',

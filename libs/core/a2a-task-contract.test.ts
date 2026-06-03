@@ -12,7 +12,7 @@ describe('a2a-task-contract schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/a2a-task-contract.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/a2a-task-contract.schema.json'));
 
     const valid = {
       intent: 'request_mission_work',
@@ -32,7 +32,7 @@ describe('a2a-task-contract schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/a2a-task-contract.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/a2a-task-contract.schema.json'));
 
     const invalid = {
       intent: 'request_mission_work',
