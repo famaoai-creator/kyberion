@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   inspectServiceAuth: vi.fn(),
   spawnManagedProcess: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warn: vi.fn() },
-  surfaceManifestDirectoryPath: vi.fn(() => '/tmp/kyberion/knowledge/public/governance/surfaces'),
-  surfaceManifestPath: vi.fn(() => '/tmp/kyberion/knowledge/public/governance/active-surfaces.json'),
+  surfaceManifestDirectoryPath: vi.fn(() => '/tmp/kyberion/knowledge/product/governance/surfaces'),
+  surfaceManifestPath: vi.fn(() => '/tmp/kyberion/knowledge/product/governance/active-surfaces.json'),
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {

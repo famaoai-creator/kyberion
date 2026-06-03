@@ -1,0 +1,104 @@
+{
+  "pipeline_id": "extract-brand-theme",
+  "version": "3.0.0",
+  "description": "Extract brand design tokens from a PPTX file or Website URL and register in the confidential tenant tier.",
+  "action": "pipeline",
+  "_migration_note": "v3: Typed Flow format (role/produces/consumes). v2 used export_as; v1 used reasoning:synthesize + code:write_artifact.",
+  "steps": [
+    {
+      "id": "detect-source",
+      "role": "gate",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "source_url", "operator": "exists" },
+        "then": [
+          {
+            "id": "open_tab",
+            "role": "gate",
+            "op": "browser:open_tab",
+            "params": { "url": "{{source_url}}", "keep_alive": true, "select": true, "waitUntil": "domcontentloaded" }
+          },
+          {
+            "id": "snapshot",
+            "role": "source",
+            "op": "browser:snapshot",
+            "produces": { "channel": "web_snapshot", "type": "WebSnapshot" },
+            "params": {}
+          },
+          {
+            "id": "synthesize_theme_web",
+            "role": "transform",
+            "op": "reasoning:synthesize",
+            "consumes": "web_snapshot",
+            "produces": { "channel": "active_theme", "type": "Theme" },
+            "params": {
+              "instruction": "以下のDOM/CSSスナップショットからブランドカラーとフォントを特定してください。必ず次のJSON形式のみで出力してください:\n{\"colors\":{\"primary\":\"#XXXXXX\",\"secondary\":\"#XXXXXX\",\"accent\":\"#XXXXXX\",\"background\":\"#XXXXXX\",\"text\":\"#XXXXXX\"},\"fonts\":{\"heading\":\"フォント名\",\"body\":\"フォント名\"}}",
+              "context": ["{{web_snapshot}}"]
+            }
+          },
+          {
+            "id": "save_brand_web",
+            "role": "sink",
+            "op": "media:save_brand_to_confidential",
+            "consumes": "active_theme",
+            "params": {
+              "tenant_slug":      "{{tenant_slug}}",
+              "brand_name":       "{{brand_name}}",
+              "matchers":         "{{matchers}}",
+              "design_system_id": "{{design_system_id}}",
+              "theme_from":       "active_theme"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "extract_pptx",
+            "role": "source",
+            "op": "media:pptx_extract",
+            "produces": { "channel": "source_pptx_design", "type": "PptxDesign" },
+            "params": { "path": "{{source_file_path}}" }
+          },
+          {
+            "id": "derive_theme",
+            "role": "transform",
+            "op": "media:theme_from_pptx_design",
+            "consumes": "source_pptx_design",
+            "produces": { "channel": "active_theme", "type": "Theme" },
+            "params": { "from": "source_pptx_design", "name": "{{tenant_slug}}-imported" }
+          },
+          {
+            "id": "derive_layout",
+            "role": "transform",
+            "op": "media:layout_template_from_pptx_design",
+            "consumes": "source_pptx_design",
+            "produces": { "channel": "last_layout_geometry", "type": "LayoutGeometry" },
+            "params": { "from": "source_pptx_design", "tenant_slug": "{{tenant_slug}}" }
+          },
+          {
+            "id": "save_brand_pptx",
+            "role": "sink",
+            "op": "media:save_brand_to_confidential",
+            "consumes": ["active_theme", "last_layout_geometry"],
+            "params": {
+              "tenant_slug":      "{{tenant_slug}}",
+              "brand_name":       "{{brand_name}}",
+              "matchers":         "{{matchers}}",
+              "design_system_id": "{{design_system_id}}",
+              "theme_from":       "active_theme",
+              "layout_from":      "last_layout_geometry",
+              "logo_url":         "{{logo_url}}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ ブランド抽出・登録完了 → knowledge/confidential/{{tenant_slug}}/design/"
+      }
+    }
+  ]
+}

@@ -204,13 +204,13 @@ interface ValidationResult<T> {
 }
 
 const SESSION_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/browser-conversation-session.schema.json'
+  'product/schemas/browser-conversation-session.schema.json'
 );
 const COMMAND_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/browser-conversation-command.schema.json'
+  'product/schemas/browser-conversation-command.schema.json'
 );
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/browser-conversation-feedback.schema.json'
+  'product/schemas/browser-conversation-feedback.schema.json'
 );
 const SESSION_DIR = pathResolver.shared('runtime/browser/conversation-sessions');
 const BROWSER_SESSION_DIR = pathResolver.shared('runtime/browser/sessions');

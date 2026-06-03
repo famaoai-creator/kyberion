@@ -222,11 +222,29 @@ export type { MissionContract } from './src/types/mission-contract.js';
 // Identity & Authority (Refined Governance)
 // ---------------------------------------------------------------------------
 
-/** Logical identity personality. */
+/**
+ * Execution identity — 6 fixed values that determine runtime access scope.
+ * Distinct from PerspectiveDefinition (27 thinking styles in persona-loader.ts).
+ *
+ * system mode  → ecosystem_architect
+ * mission mode → worker | mission_owner | analyst
+ * admin mode   → sovereign
+ */
 export type Persona = 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
 
+/**
+ * Derived execution mode — which operational domain the process is in.
+ *
+ * system   : Kyberion self-maintenance (libs/, scripts/, knowledge/product/)
+ *            Cannot write active/missions/, customer/, personal, confidential.
+ * mission  : Task/mission execution (active/missions/, projects/, customer/)
+ *            Cannot write knowledge/product/ core, libs/, scripts/.
+ * sovereign: Emergency / full-access (all writes logged to audit).
+ */
+export type ExecutionMode = 'system' | 'mission' | 'sovereign';
+
 /** Discrete permissions granted to a process or mission. */
-export type Authority = 
+export type Authority =
   | 'SUDO'               // Full system access
   | 'GIT_WRITE'          // Repository modification
   | 'SECRET_READ'        // Reading sensitive keys (scoped)
@@ -237,6 +255,8 @@ export type Authority =
 /** Unified context for the current execution thread. */
 export interface IdentityContext {
   persona: Persona;
+  /** Derived from persona — which operational domain this process is in. */
+  executionMode: ExecutionMode;
   authorities: Authority[];
   missionId?: string;
   role?: string; // Functional role within a specific mission

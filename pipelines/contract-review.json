@@ -1,70 +1,44 @@
 {
   "action": "pipeline",
-  "name": "contract-review",
-  "description": "Contract / document review pipeline. Converts a PDF/DOCX/XLSX/PPTX contract to markdown via protocol-to-markdown, then hands the markdown to the wisdom actuator's cross-critique op so multiple personas (legal-conservative / ops-focused / red-team) flag risks in parallel. The surviving risks land in dissent-log.json for human review.",
-  "context": {
-    "mission_id": "",
-    "source_document": "active/shared/tmp/contract-input/contract.pdf",
-    "markdown_output": "active/missions/{{mission_id}}/evidence/contract.md",
-    "hypotheses_output": "active/missions/{{mission_id}}/evidence/contract-risks-raw.json",
-    "critique_output": "active/missions/{{mission_id}}/evidence/contract-risks.json",
-    "dissent_output": "active/missions/{{mission_id}}/evidence/dissent-log.json",
-    "personas": [
-      "Legal Conservative",
-      "Ops Focused",
-      "Red Team Adversary"
-    ]
-  },
+  "name": "Contract Review",
+  "version": "1.0.0",
+  "description": "Multi-perspective contract review: digest extraction, multi-agent critique, dissent logging, and written output.",
   "steps": [
+    { "role": "sink", "op": "system:log", "params": { "message": "📄 Contract Review Pipeline — starting..." } },
     {
-      "id": "convert_to_markdown",
-      "type": "capture",
+      "role": "source",
       "op": "media:document_digest",
-      "params": {
-        "path": "{{source_document}}",
-        "export_as": "markdown_ref"
-      }
+      "produces": { "channel": "contract_digest", "type": "DocumentDigest" },
+      "params": { "path": "{{input.contract_path}}", "extract": ["clauses", "obligations", "risks"] }
     },
     {
-      "id": "persist_markdown",
-      "type": "apply",
-      "op": "media:write_file",
-      "params": {
-        "path": "{{markdown_output}}",
-        "from": "markdown_ref"
-      }
-    },
-    {
-      "id": "diverge_risks",
-      "type": "apply",
+      "role": "transform",
       "op": "wisdom:a2a_fanout",
+      "consumes": "contract_digest",
+      "produces": { "channel": "review_perspectives", "type": "FanoutResult" },
       "params": {
-        "personas_from": "personas",
-        "min_hypotheses_per_persona": 2,
-        "topic": "Identify material risks in the contract at {{markdown_output}}",
-        "output_path": "{{hypotheses_output}}"
+        "personas": ["legal_strategist", "finance_controller", "cyber_security"],
+        "prompt_template": "Review this contract from the {{persona}} perspective: {{contract_digest}}"
       }
     },
     {
-      "id": "critique_risks",
-      "type": "apply",
+      "role": "transform",
       "op": "wisdom:cross_critique",
-      "params": {
-        "input": "{{hypotheses_output}}",
-        "personas_from": "personas",
-        "output_path": "{{critique_output}}"
-      }
+      "consumes": "review_perspectives",
+      "produces": { "channel": "critique_result", "type": "CrossCritiqueResult" },
+      "params": {}
     },
     {
-      "id": "record_dissent",
-      "type": "apply",
+      "role": "sink",
       "op": "wisdom:emit_dissent_log",
-      "params": {
-        "source": "{{critique_output}}",
-        "output_path": "{{dissent_output}}",
-        "mission_id": "{{mission_id}}",
-        "topic": "contract-review"
-      }
+      "consumes": "critique_result",
+      "params": { "output_path": "active/audit/contract-review-dissent.jsonl" }
+    },
+    {
+      "role": "sink",
+      "op": "media:write_file",
+      "consumes": "critique_result",
+      "params": { "output_path": "{{input.output_path | default: 'active/shared/tmp/contract-review.md'}}" }
     }
   ]
 }

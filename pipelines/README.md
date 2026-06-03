@@ -1,18 +1,38 @@
 # Pipelines
 
-実運用または共通オーケストレーション向けの JSON ADF pipeline を配置するディレクトリです。Execute via the built pipeline runner:
+## Directory Layout
 
-```bash
-node dist/scripts/run_pipeline.js --input pipelines/<name>.json
+```
+pipelines/
+  *.json          ← Kyberion system operation pipelines (self-ops only)
+  *.yml           ← Legacy YAML skill-chain files (system scope)
+  fragments/      ← Reusable step groups (core:include targets)
+
+knowledge/product/pipeline-templates/
+                  ← Canonical user-facing pipeline patterns (parameterized, no personal data)
+                    Tenants instantiate these into their own namespace before running.
 ```
 
-Actuator 固有のサンプルや検証用 pipeline はここに置かず、各 actuator 配下の `examples/` へ配置します。
+**Scope rule:**
+- `pipelines/` contains only pipelines that operate Kyberion itself — health checks, self-repair, onboarding, capability assimilation, chaos tests.
+- User-facing workflows (voice, meeting, sales, content, etc.) live as **templates** in `knowledge/product/pipeline-templates/`.
+- Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/` or `knowledge/personal/pipelines/`.
 
-- Browser-Actuator examples: `libs/actuators/browser-actuator/examples/`
+**Running a system pipeline:**
+```bash
+node dist/scripts/run_pipeline.js --input pipelines/<name>.json
+# or shortcut:
+pnpm pipeline --input pipelines/<name>.json
+```
 
-## Available Pipelines
+**Running a template directly (dev/testing only):**
+```bash
+node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/<name>.json
+```
 
-> Only pipelines with a corresponding `.json` file in this directory are listed. Run `ls pipelines/*.json` to see all files.
+---
+
+## System Pipelines
 
 ### Health & Diagnostics
 
@@ -22,118 +42,108 @@ Actuator 固有のサンプルや検証用 pipeline はここに置かず、各 
 | `vital-check` | `pnpm vital` | Core liveness check |
 | `system-diagnostics` | `pnpm diagnose` | Detailed system-level diagnostic report |
 | `full-health-report` | — | Aggregated health across all surfaces |
+| `monitor-service-health` | — | Continuous service health monitor |
 | `system-upgrade-check` | `pnpm system:upgrade:check` | Detect available system + dependency upgrades |
 | `system-upgrade-execute` | `pnpm system:upgrade:execute` | Apply upgrades interactively |
+| `inspect-system-hardware` | — | Hardware and resource inventory |
+| `inspect-network-environment` | — | Network topology and connectivity check |
+| `inspect-workspace-surfaces` | — | Active surface and channel inventory |
+| `agent-provider-check` | — | Verify AI provider availability |
 
-### Knowledge & Governance
+### Feedback Loop (Self-Repair)
+
+| Pipeline | Description |
+|---|---|
+| `reconcile-config-fallbacks` | Auto-repair missing knowledge JSON files recorded during config loader fallbacks |
+| `reconcile-unclassified-errors` | Write rule-proposal stubs for errors that matched no classification rule |
+| `reconcile-unhandled-intents` | Write routing proposals for unrouted or unrecognized surface intents |
+
+### Onboarding & Provisioning
+
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `kyberion-autonomous-onboarding` | `pnpm onboard` | Full autonomous onboarding (install → surfaces → alignment) |
+| `kyberion-config-provisioner` | — | Provision operator config from canonical defaults |
+| `launch-first-run-onboarding` | — | Interactive first-run setup wizard |
+| `platform-onboarding` | — | Platform-level dependency bootstrap |
+
+### Capability & Knowledge
 
 | Pipeline | pnpm shortcut | Description |
 |---|---|---|
 | `knowledge-sync` | `pnpm knowledge:sync` | Sync knowledge artifacts to public tier |
-| `orchestration-jobs` | `pnpm orchestration:jobs` | Run scheduled orchestration batch |
-| `analysis-job` | `pnpm analysis:job` | Generic analysis task runner |
-| `judgment-job` | `pnpm judgment:job` | Governance judgment evaluation |
-| `kyberion-autonomous-onboarding` | `pnpm onboard` | Full autonomous onboarding (install → surfaces → alignment) |
-| `kyberion-config-provisioner` | — | Provision operator config from canonical defaults |
-| `intent-audit-api-gdpr` | — | GDPR intent audit over API surface |
-| `intent-audit-api-pci` | — | PCI intent audit over API surface |
-| `intent-audit-report-gdpr` | — | GDPR compliance report |
-| `culture-governance-guardrail` | — | Culture and governance policy gate |
+| `list-capabilities` | — | Enumerate installed actuators and their ops |
+| `assimilate-gateway-capability` | — | Ingest an external gateway into the capability registry |
+| `assimilate-gateway-capability-test` | — | Smoke test for gateway assimilation |
+| `assimilate-harness-capability` | — | Ingest a harness-style capability bundle |
+| `license-injection-inner` | — | Inner stage of license key injection |
+| `license-injection-outer` | — | Outer stage of license key injection |
 
-### Voice
-
-| Pipeline | pnpm shortcut | Description |
-|---|---|---|
-| `voice-learning-setup` | `pnpm voice:setup` | One-time voice profile setup (clone + register) |
-| `voice-health-check` | `pnpm voice:health` | Verify voice engine availability |
-| `clone-my-voice` | `pnpm voice:clone` | Generate a voice clone from recordings |
-| `speak-with-my-voice` | `pnpm voice:speak` | TTS playback with cloned voice |
-| `voice-hello` | — | Smoke test for voice output |
-| `voice-instant-clone` | — | Quick single-sample voice clone |
-| `voice-recording-session` | — | Guided recording session for voice training |
-
-### Meeting
-
-| Pipeline | pnpm shortcut | Description |
-|---|---|---|
-| `meeting-facilitation-workflow` | — | Full meeting facilitation (join → transcribe → summarize) |
-| `meeting-facilitation-postprocess` | — | Post-meeting processing (transcript → action items) |
-| `meeting-proxy-workflow` | — | Voice-proxy meeting attendance |
-| `meet-join-with-cloned-voice` | — | Google Meet join with cloned voice |
-| `zoom-join-with-cloned-voice` | — | Zoom join with cloned voice |
-| `teams-join-with-cloned-voice` | — | Microsoft Teams join with cloned voice |
-
-### Delivery & Code
-
-| Pipeline | pnpm shortcut | Description |
-|---|---|---|
-| `project-kickstart` | — | Autonomous project lifecycle starter (Concept → Req → Design → Tasks → Repo) |
-| `code-review-cycle` | — | AI-assisted code review with wisdom ops |
-| `deploy-release` | — | Release preparation (changelog + tag + PR) |
-| `incident-post-mortem` | — | Structured post-mortem report generation |
-| `daily-summary` | — | Daily activity and task summary |
-| `schedule-summary-and-coordination` | — | Weekly schedule synthesis and coordination |
-
-### Mobile & Web Handoff
-
-| Pipeline | pnpm shortcut | Description |
-|---|---|---|
-| `mobile-webview-handoff-runner-android` | — | Android runtime handoff capture → browser import orchestration |
-| `mobile-webview-handoff-runner-ios` | — | iOS runtime handoff capture → browser import orchestration |
-| `web-session-handoff-runner` | — | Web runtime handoff export → import orchestration |
-
-### Chaos & Resilience Tests
+### Verification
 
 | Pipeline | Description |
 |---|---|
-| `chaos-actuator-down` | Simulates actuator failure; validates fallback behaviour |
-| `chaos-network-partition` | Simulates network partition; validates retry/circuit-breaker |
-| `chaos-repair-test` | Validates self-repair after injected fault |
-| `chaos-secret-missing` | Simulates missing secret; validates secret-guard error path |
+| `verify-discovery-ops` | Verify provider discovery and op registry |
+| `verify-session` | Verify surface session lifecycle |
+| `verify-session-fallback` | Verify session fallback behaviour |
+| `service-lifecycle-smoke` | Service start/stop/health smoke test |
+| `orchestration-jobs` | Run scheduled orchestration batch |
 
-## Creating Custom Pipelines
+### Chaos & Resilience
 
-Canonical runtime pipelines use the JSON ADF shape:
+| Pipeline | Description |
+|---|---|
+| `chaos-actuator-down` | Simulate actuator failure; validate fallback |
+| `chaos-network-partition` | Simulate network partition; validate retry/circuit-breaker |
+| `chaos-repair-test` | Validate self-repair after injected fault |
+| `chaos-secret-missing` | Simulate missing secret; validate secret-guard error path |
+
+---
+
+## Fragments (`pipelines/fragments/`)
+
+Step-group building blocks consumed via `core:include`. Fragments contain no personal data and are safe to compose into any pipeline or template.
 
 ```json
-{
-  "action": "pipeline",
-  "name": "Pipeline Name",
-  "steps": [
-    { "op": "system:log", "params": { "message": "hello" } }
-  ]
-}
+{ "op": "core:include", "params": { "path": "pipelines/fragments/common/log-lifecycle.json" } }
 ```
 
-Legacy `.yml` skill-chaining files may still exist as historical artifacts, but they are not the primary runtime contract.
+See `pipelines/fragments/` for the full catalog.
+
+---
+
+## Pipeline Templates (`knowledge/product/pipeline-templates/`)
+
+Canonical user-facing pipeline patterns. These are parameterized (use `{{params.*}}` placeholders) and contain no hardcoded personal data.
+
+**Instantiate a template for your tenant:**
+1. Copy the template to `knowledge/confidential/{tenant}/pipelines/{name}.json`
+2. Fill in tenant-specific params (endpoints, persona, credentials via `secret:`)
+3. Run from the tenant path
+
+Templates cover: voice setup, meeting facilitation, sales workflows, content generation, code review, deployment, analysis, and more. See `knowledge/product/pipeline-templates/` for the full list.
+
+---
 
 ## Op Syntax Reference
 
-Every step `op` in a top-level pipeline must use the **`domain:action`** format. The `domain` is the actuator name minus the `-actuator` suffix.
+Every step `op` uses **`domain:action`** format:
 
 ```json
-{ "op": "media:pptx_render" }     // → media-actuator, op=pptx_render
-{ "op": "wisdom:knowledge_search" } // → wisdom-actuator, op=knowledge_search
-{ "op": "system:shell" }           // → built-in runner
-{ "op": "core:if" }                // → built-in control flow
+{ "op": "media:pptx_render" }       // media-actuator
+{ "op": "wisdom:knowledge_search" } // wisdom-actuator
+{ "op": "system:shell" }            // built-in runner
+{ "op": "core:if" }                 // built-in control flow
+{ "op": "reasoning:analyze" }       // reasoning backend
 ```
 
-Bare names (no `:`) are normalized to `system:<op>`. This means `{ "op": "log" }` silently routes to the system actuator — not the actuator you likely intended.
+### Pipeline ID Resolution
 
-### media-actuator: two invocation contexts
-
-`media-actuator` is unique: it exposes a sub-pipeline interpreter with its own op set (`set`, `merge_content`, `apply_theme`, `pptx_render`, etc.). These ops use **bare names inside the media-actuator's own step loop**, but require the `media:` prefix when called from a top-level pipeline.
-
-| Where written | Required syntax | Why |
-|---------------|----------------|-----|
-| Top-level pipeline JSON | `"op": "media:set"` | Runner does `domain:action` split to load the actuator |
-| `examples/` inside `media-actuator/` | `"op": "set"` | Consumed directly by `executePipeline`, no domain resolution needed |
-
-When in doubt, use `media:` — the runner wraps your step into a single-step sub-pipeline and passes it to `media-actuator` transparently.
+In `intent-routing-map.json`:
+- **Bare ID** (e.g. `"baseline-check"`) → runner prepends `pipelines/`
+- **Path ID** (e.g. `"knowledge/product/pipeline-templates/speak-with-my-voice"`) → runner appends `.json` and uses the path as-is
 
 ### service-actuator: preset calls
-
-Service presets keep auth and endpoint details inside the preset catalog. Use `service:preset` at the top level, then pass the service call inside `params`.
 
 ```json
 {
@@ -142,19 +152,15 @@ Service presets keep auth and endpoint details inside the preset catalog. Use `s
     "service_id": "backlog",
     "operation": "get_issues",
     "auth": "secret-guard",
-    "params": {
-      "space": "your-space",
-      "query": { "projectId[]": [12345], "count": 50 }
-    }
+    "params": { "space": "your-space", "query": { "projectId[]": [12345], "count": 50 } }
   }
 }
 ```
 
-Backlog uses `auth_strategy: "api_key_query"` with `BACKLOG_API_KEY` stored via `secret:set`.
-Pipeline-level `retry` overrides are merged with the actuator manifest and the preset `recovery_policy`.
+---
 
 ## Path Security
 
-Output paths must be within the project root. Use `active/shared/tmp/` or `active/shared/exports/` as staging areas; copy files externally with a `system:shell` step after rendering.
+Output paths must be within the project root. Use `active/shared/tmp/` or `active/shared/exports/` as staging areas.
 
-`[ROLE_VIOLATION]` errors mean the active persona/role does not have access to the requested path. Check the policy at `knowledge/public/governance/security-policy.json`.
+`[ROLE_VIOLATION]` errors mean the active persona/role does not have access to the requested path. Check `knowledge/product/governance/security-policy.json`.

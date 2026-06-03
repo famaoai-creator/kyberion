@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "name": "test-plan-from-requirements",
+  "version": "2.0.0",
+  "description": "SDLC test-planning phase: derive a test-plan.json (test-case-adf compatible) from requirements-draft.json and optional design-spec.json, then evaluate the QA_READY coverage gate against must-have FR ids.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "app_id": "",
+    "requirements_draft_path": "active/missions/{{mission_id}}/evidence/requirements-draft.json",
+    "design_spec_path": "active/missions/{{mission_id}}/evidence/design-spec.json"
+  },
+  "steps": [
+    {
+      "id": "extract",
+      "role": "source",
+      "op": "wisdom:extract_test_plan",
+      "produces": { "channel": "test_extraction", "type": "TestPlanResult" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "app_id": "{{app_id}}",
+        "requirements_draft_path": "{{requirements_draft_path}}",
+        "design_spec_path": "{{design_spec_path}}"
+      }
+    },
+    {
+      "id": "log_extraction",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "test_extraction",
+      "params": {
+        "message": "Test plan v{{test_extraction.version}} produced at {{test_extraction.draft_path}} (QA_READY passed={{test_extraction.qa_ready.passed}})"
+      }
+    }
+  ]
+}

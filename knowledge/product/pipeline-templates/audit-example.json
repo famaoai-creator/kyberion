@@ -1,0 +1,62 @@
+{
+  "action": "pipeline",
+  "name": "Sovereign Security & Quality Audit",
+  "version": "2.0.0",
+  "description": "Performs a quick security and quality audit of the workspace.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
+  "steps": [
+    { "role": "sink", "op": "system:log", "params": { "message": "🛡️ Starting Sovereign Audit..." } },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "env_file_count", "type": "ShellResult" },
+      "params": {
+        "cmd": "find . -name '.env*' -not -path '*/node_modules/*' | wc -l"
+      }
+    },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "todo_count", "type": "ShellResult" },
+      "params": {
+        "cmd": "grep -r 'TODO' libs src 2>/dev/null | wc -l"
+      }
+    },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "has_kyberion_in_readme", "type": "ShellResult" },
+      "params": {
+        "cmd": "grep -i 'Kyberion' README.md > /dev/null && echo 'YES' || echo 'NO'"
+      }
+    },
+    { "role": "sink", "op": "system:log", "params": { "message": "📊 Audit Results:" } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "env_file_count",
+      "params": { "message": "  - .env files found: {{env_file_count}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "todo_count",
+      "params": { "message": "  - TODO comments: {{todo_count}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "has_kyberion_in_readme",
+      "params": { "message": "  - Kyberion in README: {{has_kyberion_in_readme}}" }
+    },
+    {
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "report_save_status", "type": "ShellResult" },
+      "params": {
+        "cmd": "mkdir -p active/shared/tmp && echo '{\"env_files\": \"{{env_file_count}}\", \"todos\": \"{{todo_count}}\", \"readme_ok\": \"{{has_kyberion_in_readme}}\"}' > active/shared/tmp/audit-report.json"
+      }
+    },
+    { "role": "sink", "op": "system:log", "params": { "message": "✅ Audit report saved to active/shared/tmp/audit-report.json" } }
+  ]
+}

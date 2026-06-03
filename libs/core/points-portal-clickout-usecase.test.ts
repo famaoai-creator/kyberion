@@ -12,9 +12,9 @@ describe('points-portal-clickout-usecase schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/points-portal-clickout-usecase.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json'));
     const example = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'), {
+      safeReadFile(path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'), {
         encoding: 'utf8',
       }) as string,
     );
@@ -26,7 +26,7 @@ describe('points-portal-clickout-usecase schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/points-portal-clickout-usecase.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json'));
 
     const invalid = {
       kind: 'points-portal-clickout-usecase',

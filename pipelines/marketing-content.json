@@ -1,55 +1,45 @@
 {
-  "pipeline_id": "marketing-content-creation",
-  "version": "1.0.0",
-  "description": "Generate visual assets and PPTX for general users",
   "action": "pipeline",
-  "context": {
-    "mission_id": "KYBERION-MARKETING-EXPANSION",
-    "theme": "A futuristic but reliable AI Operating System called Kyberion. Blue and silver tones, clean and professional.",
-    "output_image": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/hero_visual.png",
-    "output_pptx": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/kyberion_intro.pptx"
-  },
+  "name": "Marketing Content Generation",
+  "version": "1.0.0",
+  "description": "Generates brand-aligned marketing materials: diagrams, themed PPTX slides, and merged content output.",
   "steps": [
+    { "role": "sink", "op": "system:log", "params": { "message": "📣 Marketing Content Pipeline — starting..." } },
     {
-      "id": "gen-hero-image",
-      "type": "apply",
+      "role": "source",
       "op": "media:document_diagram_asset_from_brief",
+      "produces": { "channel": "diagram_asset", "type": "DiagramAsset" },
       "params": {
-        "brief": "A concept visual for Kyberion: A glowing brain with structured gear wheels, representing disciplined AI. Theme: {{theme}}",
-        "output_path": "{{output_image}}"
+        "brief": "{{input.brief}}",
+        "diagram_type": "flow"
       }
     },
     {
-      "id": "apply-theme",
-      "type": "transform",
+      "role": "transform",
       "op": "media:apply_theme",
-      "params": {
-        "theme": "kyberion-sovereign"
-      }
+      "consumes": "diagram_asset",
+      "produces": { "channel": "themed_asset", "type": "ThemedAsset" },
+      "params": { "theme": "{{input.theme | default: 'kyberion-standard'}}" }
     },
     {
-      "id": "apply-pattern",
-      "type": "transform",
+      "role": "transform",
       "op": "media:apply_pattern",
-      "params": {
-        "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json"
-      }
+      "consumes": "themed_asset",
+      "produces": { "channel": "patterned_asset", "type": "PatternedAsset" },
+      "params": { "pattern": "{{input.pattern | default: 'corporate-grid'}}" }
     },
     {
-      "id": "merge-pptx-content",
-      "type": "transform",
+      "role": "transform",
       "op": "media:merge_content",
-      "params": {
-        "output_format": "pptx"
-      }
+      "consumes": "patterned_asset",
+      "produces": { "channel": "merged_deck", "type": "MergedDeck" },
+      "params": { "slides": "{{input.slides}}" }
     },
     {
-      "id": "render-pptx",
-      "type": "apply",
+      "role": "sink",
       "op": "media:pptx_render",
-      "params": {
-        "output_path": "{{output_pptx}}"
-      }
+      "consumes": "merged_deck",
+      "params": { "output_path": "{{input.output_path | default: 'active/shared/tmp/marketing-output.pptx'}}" }
     }
   ]
 }

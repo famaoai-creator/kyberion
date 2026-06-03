@@ -1,9 +1,0 @@
-{
-  "default_pattern": "https://api.{service_id}.com/v1",
-  "services": {
-    "meeting": {
-      "preset_path": "knowledge/public/orchestration/service-presets/meeting.json",
-      "intent_aliases": ["meeting-operations", "live-voice"]
-    }
-  }
-}

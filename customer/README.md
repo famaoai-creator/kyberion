@@ -70,7 +70,7 @@ When `KYBERION_CUSTOMER` is set, Kyberion overlays `customer/{slug}/` on top of 
 |---|---|
 | `customer/{slug}/identity.json` → `knowledge/personal/my-identity.json` | overlay → fallback |
 | `customer/{slug}/connections/*.json` → `knowledge/personal/connections/*.json` | overlay → fallback |
-| `customer/{slug}/policy/*.json` → `knowledge/public/governance/*.json` | overlay → fallback (public is the base policy) |
+| `customer/{slug}/policy/*.json` → `knowledge/product/governance/*.json` | overlay → fallback (public is the base policy) |
 | `customer/{slug}/mission-seeds/*.json` | additive (customer-specific seeds; not a fallback) |
 
 ## Slug rules

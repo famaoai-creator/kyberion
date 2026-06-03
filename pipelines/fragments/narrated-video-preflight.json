@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "name": "narrated-video-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify that ffmpeg, ffprobe, say, voice-actuator, and video-composition-actuator are all available before starting a narrated video production pipeline.",
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "preflight_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && command -v say >/dev/null && test -f dist/libs/actuators/voice-actuator/src/index.js && test -f dist/libs/actuators/video-composition-actuator/src/index.js && echo ok"
+      }
+    }
+  ]
+}

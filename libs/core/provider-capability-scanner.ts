@@ -81,13 +81,13 @@ function readJson<T>(relativePath: string): T {
 }
 
 export function loadCapabilityRegistry(
-  relativePath = 'knowledge/public/governance/harness-capability-registry.json',
+  relativePath = 'knowledge/product/governance/harness-capability-registry.json',
 ): CapabilityRegistry {
   return readJson<CapabilityRegistry>(relativePath);
 }
 
 export function loadProviderCapabilityScanPolicy(
-  relativePath = 'knowledge/public/governance/provider-capability-scan-policy.json',
+  relativePath = 'knowledge/product/governance/provider-capability-scan-policy.json',
 ): ProviderScanPolicy {
   return readJson<ProviderScanPolicy>(relativePath);
 }

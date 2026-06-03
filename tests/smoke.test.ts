@@ -4,7 +4,7 @@ import { safeExistsSync, safeReadFile } from '@agent/core';
 import { main as runCli } from '../scripts/cli.js';
 
 const rootDir = process.cwd();
-const indexPath = path.join(rootDir, 'knowledge/public/orchestration/global_actuator_index.json');
+const indexPath = path.join(rootDir, 'knowledge/product/orchestration/global_actuator_index.json');
 const cliScriptPath = path.join(rootDir, 'dist/scripts/cli.js');
 
 describe('Ecosystem Smoke Tests', () => {

@@ -11,9 +11,9 @@ function read(relPath: string): string {
 describe('Telegram bridge contract', () => {
   it('registers telegram as a governed surface provider and runtime surface', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
-    const manifests = read('knowledge/public/governance/surface-provider-manifests.json');
-    const activeSurfaces = read('knowledge/public/governance/active-surfaces.json');
-    const lifecycleModel = read('knowledge/public/architecture/runtime-surface-lifecycle-model.md');
+    const manifests = read('knowledge/product/governance/surface-provider-manifests.json');
+    const activeSurfaces = read('knowledge/product/governance/active-surfaces.json');
+    const lifecycleModel = read('knowledge/product/architecture/runtime-surface-lifecycle-model.md');
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
 
     expect(pkg.scripts['telegram:bridge']).toBe('node dist/satellites/telegram-bridge/src/index.js');

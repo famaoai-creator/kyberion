@@ -12,8 +12,8 @@ interface SpreadsheetStylePolicyCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/spreadsheet-style-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/spreadsheet-style-policy.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/spreadsheet-style-policy.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/spreadsheet-style-policy.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: SpreadsheetStylePolicyCatalog | null = null;

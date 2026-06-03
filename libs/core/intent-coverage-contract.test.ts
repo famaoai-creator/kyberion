@@ -33,19 +33,19 @@ type IntentOutcomePattern = {
 };
 
 function loadCoverageRecords(): CoverageRecord[] {
-  const filePath = pathResolver.knowledge('public/governance/intent-coverage-matrix.json');
+  const filePath = pathResolver.knowledge('product/governance/intent-coverage-matrix.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: CoverageRecord[] };
   return Array.isArray(parsed.intents) ? parsed.intents : [];
 }
 
 function loadStandardIntents(): StandardIntent[] {
-  const filePath = pathResolver.knowledge('public/governance/standard-intents.json');
+  const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntent[] };
   return Array.isArray(parsed.intents) ? parsed.intents : [];
 }
 
 function loadIntentOutcomePatterns(): IntentOutcomePattern[] {
-  const filePath = pathResolver.knowledge('public/governance/intent-outcome-patterns.json');
+  const filePath = pathResolver.knowledge('product/governance/intent-outcome-patterns.json');
   const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { patterns?: IntentOutcomePattern[] };
   return Array.isArray(parsed.patterns) ? parsed.patterns : [];
 }

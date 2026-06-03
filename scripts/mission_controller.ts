@@ -325,7 +325,7 @@ function acceptRubricOverride(
       hypothesis_or_branch_id: hypothesisOrBranchId,
       severity: sev,
       mission_id: missionId || undefined,
-      policy_ref: 'knowledge/public/governance/counterfactual-degradation-policy.json',
+      policy_ref: 'knowledge/product/governance/counterfactual-degradation-policy.json',
     },
     compliance: {
       framework: 'counterfactual-degradation-policy.json',
@@ -934,21 +934,21 @@ export function buildOrganizationDiscoveryReport() {
   const documents = [
     {
       name: 'Organization Selection Guide',
-      path: 'knowledge/public/orchestration/organization-selection-guide.md',
+      path: 'knowledge/product/orchestration/organization-selection-guide.md',
       purpose: 'Select or switch the active organization context',
       text_command: 'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --summary',
       json_command: 'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --json --summary',
     },
     {
       name: 'Organization Discovery Reports',
-      path: 'knowledge/public/orchestration/organization-discovery-reports.md',
+      path: 'knowledge/product/orchestration/organization-discovery-reports.md',
       purpose: 'Inspect inventory, readiness, and template overlays',
       text_command: 'node dist/scripts/mission_controller.js organization-profiles --summary',
       json_command: 'node dist/scripts/mission_controller.js organization-profiles --json --summary',
     },
     {
       name: 'Organization Discovery Copy/Paste',
-      path: 'knowledge/public/orchestration/README.md',
+      path: 'knowledge/product/orchestration/README.md',
       purpose: 'Copy the most common organization discovery commands',
       text_command: 'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
       json_command: 'node dist/scripts/mission_controller.js organization-catalogs --json --selected-only --summary',
@@ -958,26 +958,26 @@ export function buildOrganizationDiscoveryReport() {
   const examples = [
     {
       name: 'Organization Discovery Example',
-      path: 'knowledge/public/schemas/organization-discovery-report.example.json',
-      schema: 'knowledge/public/schemas/organization-discovery-report.schema.json',
+      path: 'knowledge/product/schemas/organization-discovery-report.example.json',
+      schema: 'knowledge/product/schemas/organization-discovery-report.schema.json',
       purpose: 'Validate the discovery overview contract and operator entrypoints',
     },
     {
       name: 'Organization Profile Example',
-      path: 'knowledge/public/schemas/organization-profile-report.example.json',
-      schema: 'knowledge/public/schemas/organization-profile-report.schema.json',
+      path: 'knowledge/product/schemas/organization-profile-report.example.json',
+      schema: 'knowledge/product/schemas/organization-profile-report.schema.json',
       purpose: 'Validate the resolved organization profile contract',
     },
     {
       name: 'Organization Profiles Example',
-      path: 'knowledge/public/schemas/organization-profiles-report.example.json',
-      schema: 'knowledge/public/schemas/organization-profiles-report.schema.json',
+      path: 'knowledge/product/schemas/organization-profiles-report.example.json',
+      schema: 'knowledge/product/schemas/organization-profiles-report.schema.json',
       purpose: 'Validate the organization roster and readiness inventory contract',
     },
     {
       name: 'Organization Catalog Example',
-      path: 'knowledge/public/schemas/organization-catalog-report.example.json',
-      schema: 'knowledge/public/schemas/organization-catalog-report.schema.json',
+      path: 'knowledge/product/schemas/organization-catalog-report.example.json',
+      schema: 'knowledge/product/schemas/organization-catalog-report.schema.json',
       purpose: 'Validate the selected template overlay contract',
     },
   ];
@@ -1206,11 +1206,11 @@ Maintenance Commands:
                                  Show the resolved organization profile and defaults
   organization-discovery [--json] [--summary]
                                  Show the discovery overview and common paths
-                                 Guide: knowledge/public/orchestration/organization-discovery.md
-                                 Examples: knowledge/public/schemas/organization-discovery-report.example.json
-                                           knowledge/public/schemas/organization-profile-report.example.json
-                                           knowledge/public/schemas/organization-profiles-report.example.json
-                                           knowledge/public/schemas/organization-catalog-report.example.json
+                                 Guide: knowledge/product/orchestration/organization-discovery.md
+                                 Examples: knowledge/product/schemas/organization-discovery-report.example.json
+                                           knowledge/product/schemas/organization-profile-report.example.json
+                                           knowledge/product/schemas/organization-profiles-report.example.json
+                                           knowledge/product/schemas/organization-catalog-report.example.json
 
   Typical Workflow:
   start → checkpoint (repeat) → verify → distill → finish
@@ -1240,7 +1240,7 @@ Organization Selection:
   --ready-only                   Filter organization-profiles to ready profiles only
   --missing-only                 Filter organization-profiles to missing profiles only
   --source <customer|public>     Filter organization-profiles by source
-  Guide: knowledge/public/orchestration/organization-selection-guide.md
+  Guide: knowledge/product/orchestration/organization-selection-guide.md
 
 Organization Discovery:
   organization-profiles --json --summary
@@ -1249,11 +1249,11 @@ Organization Discovery:
                                  Inspect one resolved organization profile as JSON
   organization-catalogs --json --selected-only --summary
                                  Inspect the selected team template overlay as JSON
-  Reports: knowledge/public/orchestration/organization-discovery-reports.md
-  Examples: knowledge/public/schemas/organization-discovery-report.example.json
-            knowledge/public/schemas/organization-profile-report.example.json
-            knowledge/public/schemas/organization-profiles-report.example.json
-            knowledge/public/schemas/organization-catalog-report.example.json
+  Reports: knowledge/product/orchestration/organization-discovery-reports.md
+  Examples: knowledge/product/schemas/organization-discovery-report.example.json
+            knowledge/product/schemas/organization-profile-report.example.json
+            knowledge/product/schemas/organization-profiles-report.example.json
+            knowledge/product/schemas/organization-catalog-report.example.json
 
   Validation:
     Linked project missions must point to a project_path whose 04_control ledger

@@ -1,0 +1,79 @@
+{
+  "pipeline_id": "mission-portfolio-auditor",
+  "version": "2.0.0",
+  "description": "Holistic view of all active missions and bottleneck detection.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "guard-confidential-tier",
+      "role": "gate",
+      "op": "if",
+      "params": {
+        "condition": {
+          "from": "mission_tier",
+          "operator": "eq",
+          "value": "confidential"
+        },
+        "then": [
+          {
+            "id": "list-active",
+            "role": "source",
+            "op": "system:list_missions",
+            "produces": { "channel": "active_mission_list", "type": "MissionList" },
+            "params": {
+              "status": "active"
+            }
+          },
+          {
+            "id": "collect-boards",
+            "role": "transform",
+            "op": "system:collect_artifacts",
+            "consumes": "active_mission_list",
+            "produces": { "channel": "portfolio_evidence", "type": "ArtifactCollection" },
+            "params": {
+              "mission_ids": "{{active_mission_list}}",
+              "patterns": [
+                "TASK_BOARD.md",
+                "trace.json"
+              ]
+            }
+          },
+          {
+            "id": "portfolio-analysis",
+            "role": "transform",
+            "op": "reasoning:analyze",
+            "consumes": "portfolio_evidence",
+            "produces": { "channel": "portfolio_summary", "type": "AnalysisResult" },
+            "params": {
+              "instruction": "Analyze all active missions. Identify stall points, resource overlaps, and strategic misalignments. Rank interventions needed by the CEO.",
+              "context": [
+                "{{portfolio_evidence}}"
+              ]
+            }
+          },
+          {
+            "id": "update-dashboard",
+            "role": "sink",
+            "op": "wisdom:write_file",
+            "consumes": "portfolio_summary",
+            "params": {
+              "path": "knowledge/confidential/governance/portfolio-status.md",
+              "content": "{{portfolio_summary}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "reject-public-run",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "mission-portfolio-auditor requires mission_tier=confidential."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

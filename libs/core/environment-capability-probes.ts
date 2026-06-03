@@ -60,6 +60,15 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
     if (localProbe.available) return { available: true };
   }
+  if (binaryAvailable('gemini', ['--version'])) {
+    return { available: true };
+  }
+  if (binaryAvailable('codex', ['--version'])) {
+    return { available: true };
+  }
+  if (binaryAvailable('agy', ['--version'])) {
+    return { available: true };
+  }
   return {
     available: false,
     reason:

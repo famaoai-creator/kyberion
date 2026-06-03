@@ -27,7 +27,7 @@ const GOLDEN_SCENARIO_CATALOG_ALLOWLIST = new Set([
 ]);
 
 function findUnmanagedGoldenScenarioCatalogs(): string[] {
-  const dir = pathResolver.rootResolve('knowledge/public/governance');
+  const dir = pathResolver.rootResolve('knowledge/product/governance');
   if (!safeExistsSync(dir)) return [];
 
   return safeReaddir(dir)
@@ -40,80 +40,80 @@ function findUnmanagedGoldenScenarioCatalogs(): string[] {
         entry.includes('workflow-catalog');
       return isGoldenScenarioCatalog && !GOLDEN_SCENARIO_CATALOG_ALLOWLIST.has(entry);
     })
-    .map((entry) => `knowledge/public/governance/${entry}`)
+    .map((entry) => `knowledge/product/governance/${entry}`)
     .sort();
 }
 
 function readSurfaceManifestPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/governance/surfaces');
+  const dir = pathResolver.rootResolve('knowledge/product/governance/surfaces');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/governance/surfaces/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/governance/surfaces/${entry}`));
 }
 
 function readSurfaceProviderCatalogPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifest-catalogs');
+  const dir = pathResolver.rootResolve('knowledge/product/governance/surface-provider-manifest-catalogs');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/governance/surface-provider-manifest-catalogs/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/governance/surface-provider-manifest-catalogs/${entry}`));
 }
 
 function readServiceEndpointPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/orchestration/service-endpoints');
+  const dir = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/service-endpoints/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/service-endpoints/${entry}`));
 }
 
 function readAgentProfilePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/orchestration/agent-profiles');
+  const dir = pathResolver.rootResolve('knowledge/product/orchestration/agent-profiles');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/agent-profiles/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/agent-profiles/${entry}`));
 }
 
 function readVoiceProfilePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/governance/voice-profiles');
+  const dir = pathResolver.rootResolve('knowledge/product/governance/voice-profiles');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/governance/voice-profiles/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/governance/voice-profiles/${entry}`));
 }
 
 function readSpecialistPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/orchestration/specialists');
+  const dir = pathResolver.rootResolve('knowledge/product/orchestration/specialists');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/specialists/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/specialists/${entry}`));
 }
 
 function readAuthorityRolePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/governance/authority-roles');
+  const dir = pathResolver.rootResolve('knowledge/product/governance/authority-roles');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/governance/authority-roles/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/governance/authority-roles/${entry}`));
 }
 
 function readTeamRolePayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/public/orchestration/team-roles');
+  const dir = pathResolver.rootResolve('knowledge/product/orchestration/team-roles');
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/public/orchestration/team-roles/${entry}`));
+    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/team-roles/${entry}`));
 }
 
 type ContractCheck = {
@@ -124,11 +124,11 @@ type ContractCheck = {
 };
 
 function createChecks(): ContractCheck[] {
-  const workPolicy = readJsonFile(pathResolver.rootResolve('knowledge/public/governance/work-policy.json'));
+  const workPolicy = readJsonFile(pathResolver.rootResolve('knowledge/product/governance/work-policy.json'));
   const surfaceProviderManifests = readJsonFile(
-    pathResolver.rootResolve('knowledge/public/governance/surface-provider-manifests.json')
+    pathResolver.rootResolve('knowledge/product/governance/surface-provider-manifests.json')
   );
-  const surfacePolicy = readJsonFile(pathResolver.rootResolve('knowledge/public/governance/surface-policy.json'));
+  const surfacePolicy = readJsonFile(pathResolver.rootResolve('knowledge/product/governance/surface-policy.json'));
 
   const promotedPattern = buildPromotedMemoryRecord(
     createDistillCandidateRecord({
@@ -192,8 +192,8 @@ function createChecks(): ContractCheck[] {
   const additionalGovernanceChecks: ContractCheck[] = [
     {
       id: 'intent-policy',
-      schemaPath: 'knowledge/public/schemas/intent-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/intent-policy.json')],
+      schemaPath: 'knowledge/product/schemas/intent-policy.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/intent-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -203,8 +203,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'production-evidence-register',
-      schemaPath: 'knowledge/public/schemas/production-evidence-register.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/production-evidence-register.json')],
+      schemaPath: 'knowledge/product/schemas/production-evidence-register.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/production-evidence-register.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -419,7 +419,7 @@ function createChecks(): ContractCheck[] {
           ],
         },
         (() => {
-          const payload = readGovernanceJson('knowledge/public/governance/production-evidence-register.json') as {
+          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
             items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
           };
           payload.items[0] = {
@@ -431,7 +431,7 @@ function createChecks(): ContractCheck[] {
           return payload;
         })(),
         (() => {
-          const payload = readGovernanceJson('knowledge/public/governance/production-evidence-register.json') as {
+          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
             items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
           };
           payload.items[1] = {
@@ -448,7 +448,7 @@ function createChecks(): ContractCheck[] {
           return payload;
         })(),
         (() => {
-          const payload = readGovernanceJson('knowledge/public/governance/production-evidence-register.json') as {
+          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
             items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
           };
           payload.items[1] = {
@@ -465,7 +465,7 @@ function createChecks(): ContractCheck[] {
           return payload;
         })(),
         (() => {
-          const payload = readGovernanceJson('knowledge/public/governance/production-evidence-register.json') as {
+          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
             items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
           };
           payload.items[2] = {
@@ -478,10 +478,10 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'active-surfaces',
-      schemaPath: 'knowledge/public/schemas/runtime-surface-manifest.schema.json',
+      schemaPath: 'knowledge/product/schemas/runtime-surface-manifest.schema.json',
       validPayloads: [
         ...readSurfaceManifestPayloads(),
-        readGovernanceJson('knowledge/public/governance/active-surfaces.json'),
+        readGovernanceJson('knowledge/product/governance/active-surfaces.json'),
       ],
       invalidPayloads: [
         {
@@ -491,8 +491,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'model-registry',
-      schemaPath: 'knowledge/public/schemas/model-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/model-registry.json')],
+      schemaPath: 'knowledge/product/schemas/model-registry.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/model-registry.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -502,9 +502,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'model-adaptation-policy',
-      schemaPath: 'knowledge/public/schemas/model-adaptation-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/model-adaptation-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/model-adaptation-policy.json'),
+        readGovernanceJson('knowledge/product/governance/model-adaptation-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -514,9 +514,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'harness-capability-registry',
-      schemaPath: 'knowledge/public/schemas/harness-capability-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/harness-capability-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/harness-capability-registry.json'),
+        readGovernanceJson('knowledge/product/governance/harness-capability-registry.json'),
       ],
       invalidPayloads: [
         {
@@ -526,9 +526,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'harness-adapter-registry',
-      schemaPath: 'knowledge/public/schemas/harness-adapter-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/harness-adapter-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/harness-adapter-registry.json'),
+        readGovernanceJson('knowledge/product/governance/harness-adapter-registry.json'),
       ],
       invalidPayloads: [
         {
@@ -538,9 +538,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'provider-capability-scan-policy',
-      schemaPath: 'knowledge/public/schemas/provider-capability-scan-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/provider-capability-scan-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/provider-capability-scan-policy.json'),
+        readGovernanceJson('knowledge/product/governance/provider-capability-scan-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -551,9 +551,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'capability-lifecycle-procedure',
-      schemaPath: 'knowledge/public/schemas/capability-lifecycle-procedure.schema.json',
+      schemaPath: 'knowledge/product/schemas/capability-lifecycle-procedure.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/capability-lifecycle-procedure.json'),
+        readGovernanceJson('knowledge/product/governance/capability-lifecycle-procedure.json'),
       ],
       invalidPayloads: [
         {
@@ -564,9 +564,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'capability-bundle-registry',
-      schemaPath: 'knowledge/public/schemas/capability-bundle-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/capability-bundle-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/capability-bundle-registry.json'),
+        readGovernanceJson('knowledge/product/governance/capability-bundle-registry.json'),
       ],
       invalidPayloads: [
         {
@@ -577,9 +577,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'intent-execution-profile-registry',
-      schemaPath: 'knowledge/public/schemas/intent-execution-profile-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/intent-execution-profile-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/intent-execution-profile-registry.json'),
+        readGovernanceJson('knowledge/product/governance/intent-execution-profile-registry.json'),
       ],
       invalidPayloads: [
         {
@@ -590,9 +590,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'execution-receipt-policy',
-      schemaPath: 'knowledge/public/schemas/execution-receipt-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/execution-receipt-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/execution-receipt-policy.json'),
+        readGovernanceJson('knowledge/product/governance/execution-receipt-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -602,9 +602,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-profile-registry',
-      schemaPath: 'knowledge/public/schemas/voice-profile-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/voice-profile-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/voice-profile-registry.json'),
+        readGovernanceJson('knowledge/product/governance/voice-profile-registry.json'),
         ...readVoiceProfilePayloads(),
       ],
       invalidPayloads: [
@@ -615,8 +615,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-runtime-policy',
-      schemaPath: 'knowledge/public/schemas/voice-runtime-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/voice-runtime-policy.json')],
+      schemaPath: 'knowledge/product/schemas/voice-runtime-policy.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/voice-runtime-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -625,8 +625,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-engine-registry',
-      schemaPath: 'knowledge/public/schemas/voice-engine-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/voice-engine-registry.json')],
+      schemaPath: 'knowledge/product/schemas/voice-engine-registry.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/voice-engine-registry.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -635,9 +635,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-sample-ingestion-policy',
-      schemaPath: 'knowledge/public/schemas/voice-sample-ingestion-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/voice-sample-ingestion-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/voice-sample-ingestion-policy.json'),
+        readGovernanceJson('knowledge/product/governance/voice-sample-ingestion-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -647,9 +647,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'video-composition-template-registry',
-      schemaPath: 'knowledge/public/schemas/video-composition-template-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/video-composition-template-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/video-composition-template-registry.json'),
+        readGovernanceJson('knowledge/product/governance/video-composition-template-registry.json'),
       ],
       invalidPayloads: [
         {
@@ -659,9 +659,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'video-render-runtime-policy',
-      schemaPath: 'knowledge/public/schemas/video-render-runtime-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/video-render-runtime-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/video-render-runtime-policy.json'),
+        readGovernanceJson('knowledge/product/governance/video-render-runtime-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -671,9 +671,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-classification-policy',
-      schemaPath: 'knowledge/public/schemas/mission-classification-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-classification-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-classification-policy.json'),
+        readGovernanceJson('knowledge/product/governance/mission-classification-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -683,8 +683,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'authority-role-index',
-      schemaPath: 'knowledge/public/schemas/authority-role-index.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/authority-role-index.json')],
+      schemaPath: 'knowledge/product/schemas/authority-role-index.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/authority-role-index.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -693,7 +693,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'authority-role-directory',
-      schemaPath: 'knowledge/public/schemas/authority-role.schema.json',
+      schemaPath: 'knowledge/product/schemas/authority-role.schema.json',
       validPayloads: readAuthorityRolePayloads(),
       invalidPayloads: [
         {
@@ -703,8 +703,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'team-role-index',
-      schemaPath: 'knowledge/public/schemas/team-role-index.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/orchestration/team-role-index.json')],
+      schemaPath: 'knowledge/product/schemas/team-role-index.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/orchestration/team-role-index.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -713,7 +713,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'team-role-directory',
-      schemaPath: 'knowledge/public/schemas/team-role.schema.json',
+      schemaPath: 'knowledge/product/schemas/team-role.schema.json',
       validPayloads: readTeamRolePayloads(),
       invalidPayloads: [
         {
@@ -723,9 +723,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'agent-profile-index',
-      schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
+      schemaPath: 'knowledge/product/schemas/agent-profile-index.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/orchestration/agent-profile-index.json'),
+        readGovernanceJson('knowledge/product/orchestration/agent-profile-index.json'),
       ],
       invalidPayloads: [
         {
@@ -735,7 +735,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'agent-profile-directory',
-      schemaPath: 'knowledge/public/schemas/agent-profile-index.schema.json',
+      schemaPath: 'knowledge/product/schemas/agent-profile-index.schema.json',
       validPayloads: readAgentProfilePayloads(),
       invalidPayloads: [
         {
@@ -745,9 +745,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-workflow-catalog',
-      schemaPath: 'knowledge/public/schemas/mission-workflow-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-workflow-catalog.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-workflow-catalog.json'),
+        readGovernanceJson('knowledge/product/governance/mission-workflow-catalog.json'),
       ],
       invalidPayloads: [
         {
@@ -757,9 +757,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-review-gate-registry',
-      schemaPath: 'knowledge/public/schemas/mission-review-gate-registry.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-review-gate-registry.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-review-gate-registry.json'),
+        readGovernanceJson('knowledge/product/governance/mission-review-gate-registry.json'),
       ],
       invalidPayloads: [
         {
@@ -769,8 +769,8 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'path-scope-policy',
-      schemaPath: 'knowledge/public/schemas/path-scope-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/public/governance/path-scope-policy.json')],
+      schemaPath: 'knowledge/product/schemas/path-scope-policy.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/path-scope-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -779,7 +779,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-connection-readiness',
-      schemaPath: 'knowledge/public/schemas/service-connection-readiness.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-connection-readiness.schema.json',
       validPayloads: [
         {
           version: '1.0.0',
@@ -807,7 +807,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'onboarding-state',
-      schemaPath: 'knowledge/public/schemas/onboarding-state.schema.json',
+      schemaPath: 'knowledge/product/schemas/onboarding-state.schema.json',
       validPayloads: [
         {
           version: '1.0.0',
@@ -868,9 +868,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-orchestration-scenario-pack',
-      schemaPath: 'knowledge/public/schemas/mission-orchestration-scenario-pack.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-orchestration-scenario-pack.json'),
+        readGovernanceJson('knowledge/product/governance/mission-orchestration-scenario-pack.json'),
       ],
       invalidPayloads: [
         {
@@ -899,7 +899,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'intent-resolution-packet',
-      schemaPath: 'knowledge/public/schemas/intent-resolution-packet.schema.json',
+      schemaPath: 'knowledge/product/schemas/intent-resolution-packet.schema.json',
       validPayloads: [
         {
           kind: 'intent_resolution_packet',
@@ -1042,7 +1042,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'project-record',
-      schemaPath: 'knowledge/public/schemas/project-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/project-record.schema.json',
       validPayloads: [
         {
           project_id: 'PRJ-schema-1',
@@ -1078,7 +1078,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-binding-record',
-      schemaPath: 'knowledge/public/schemas/service-binding-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-binding-record.schema.json',
       validPayloads: [
         {
           binding_id: 'BIND-schema-1',
@@ -1135,7 +1135,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-orchestration-event',
-      schemaPath: 'knowledge/public/schemas/mission-orchestration-event.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-orchestration-event.schema.json',
       validPayloads: [
         {
           event_id: 'ME-schema-1',
@@ -1541,7 +1541,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-generation-adf',
-      schemaPath: 'knowledge/public/schemas/voice-generation-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/voice-generation-adf.schema.json',
       validPayloads: [
         {
           action: 'generate_voice',
@@ -1597,7 +1597,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'music-generation-adf',
-      schemaPath: 'knowledge/public/schemas/music-generation-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/music-generation-adf.schema.json',
       validPayloads: [
         {
           kind: 'music-generation-adf',
@@ -1683,7 +1683,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'image-generation-adf',
-      schemaPath: 'knowledge/public/schemas/image-generation-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/image-generation-adf.schema.json',
       validPayloads: [
         {
           kind: 'image-generation-adf',
@@ -1707,7 +1707,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'video-generation-adf',
-      schemaPath: 'knowledge/public/schemas/video-generation-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/video-generation-adf.schema.json',
       validPayloads: [
         {
           kind: 'video-generation-adf',
@@ -1972,7 +1972,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'generation-schedule',
-      schemaPath: 'knowledge/public/schemas/generation-schedule.schema.json',
+      schemaPath: 'knowledge/product/schemas/generation-schedule.schema.json',
       validPayloads: [
         {
           kind: 'generation-schedule',
@@ -1997,7 +1997,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'generation-job',
-      schemaPath: 'knowledge/public/schemas/generation-job.schema.json',
+      schemaPath: 'knowledge/product/schemas/generation-job.schema.json',
       validPayloads: [
         {
           kind: 'generation-job',
@@ -2022,7 +2022,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'test-case-adf',
-      schemaPath: 'knowledge/public/schemas/test-case-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/test-case-adf.schema.json',
       validPayloads: [
         {
           kind: 'test-case-adf',
@@ -2049,7 +2049,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'document-brief',
-      schemaPath: 'knowledge/public/schemas/document-brief.schema.json',
+      schemaPath: 'knowledge/product/schemas/document-brief.schema.json',
       validPayloads: [
         {
           kind: 'document-brief',
@@ -2083,7 +2083,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'proposal-brief',
-      schemaPath: 'knowledge/public/schemas/proposal-brief.schema.json',
+      schemaPath: 'knowledge/product/schemas/proposal-brief.schema.json',
       validPayloads: [
         {
           kind: 'proposal-brief',
@@ -2119,7 +2119,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'proposal-storyline-adf',
-      schemaPath: 'knowledge/public/schemas/proposal-storyline-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/proposal-storyline-adf.schema.json',
       validPayloads: [
         {
           kind: 'proposal-storyline-adf',
@@ -2152,7 +2152,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'webview-session-handoff',
-      schemaPath: 'knowledge/public/schemas/webview-session-handoff.schema.json',
+      schemaPath: 'knowledge/product/schemas/webview-session-handoff.schema.json',
       validPayloads: [
         {
           kind: 'webview-session-handoff',
@@ -2178,7 +2178,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mobile-app-profile',
-      schemaPath: 'knowledge/public/schemas/mobile-app-profile.schema.json',
+      schemaPath: 'knowledge/product/schemas/mobile-app-profile.schema.json',
       validPayloads: [
         {
           app_id: 'example-mobile-login-passkey',
@@ -2242,7 +2242,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'web-app-profile',
-      schemaPath: 'knowledge/public/schemas/web-app-profile.schema.json',
+      schemaPath: 'knowledge/product/schemas/web-app-profile.schema.json',
       validPayloads: [
         {
           app_id: 'example-web-login-guarded',
@@ -2290,7 +2290,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'ui-flow-adf',
-      schemaPath: 'knowledge/public/schemas/ui-flow-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/ui-flow-adf.schema.json',
       validPayloads: [
         {
           kind: 'ui-flow-adf',
@@ -2358,7 +2358,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-seed-record',
-      schemaPath: 'knowledge/public/schemas/mission-seed-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-seed-record.schema.json',
       validPayloads: [
         {
           seed_id: 'MSD-schema-1',
@@ -2383,7 +2383,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'booking-preference-profile',
-      schemaPath: 'knowledge/public/schemas/booking-preference-profile.schema.json',
+      schemaPath: 'knowledge/product/schemas/booking-preference-profile.schema.json',
       validPayloads: [
         {
           kind: 'booking-preference-profile',
@@ -2540,7 +2540,7 @@ function createChecks(): ContractCheck[] {
                 merchant: 'rakuten_travel',
                 use_points_portal: true,
                 clickout_usecase_ref:
-                  'knowledge/public/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json',
+                  'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json',
                 preferred_execution_mode: 'simulation',
               },
             ],
@@ -2581,9 +2581,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'presentation-preference-profile',
-      schemaPath: 'knowledge/public/schemas/presentation-preference-profile.schema.json',
+      schemaPath: 'knowledge/product/schemas/presentation-preference-profile.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/schemas/presentation-preference-profile.example.json'),
+        readGovernanceJson('knowledge/product/schemas/presentation-preference-profile.example.json'),
       ],
       invalidPayloads: [
         {
@@ -2596,10 +2596,10 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'narrated-video-preference-profile',
-      schemaPath: 'knowledge/public/schemas/narrated-video-preference-profile.schema.json',
+      schemaPath: 'knowledge/product/schemas/narrated-video-preference-profile.schema.json',
       validPayloads: [
         readGovernanceJson(
-          'knowledge/public/schemas/narrated-video-preference-profile.example.json'
+          'knowledge/product/schemas/narrated-video-preference-profile.example.json'
         ),
       ],
       invalidPayloads: [
@@ -2618,9 +2618,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'narrated-video-publish-plan',
-      schemaPath: 'knowledge/public/schemas/narrated-video-publish-plan.schema.json',
+      schemaPath: 'knowledge/product/schemas/narrated-video-publish-plan.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/schemas/narrated-video-publish-plan.example.json'),
+        readGovernanceJson('knowledge/product/schemas/narrated-video-publish-plan.example.json'),
       ],
       invalidPayloads: [
         {
@@ -2636,9 +2636,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'narrated-video-upload-package',
-      schemaPath: 'knowledge/public/schemas/narrated-video-upload-package.schema.json',
+      schemaPath: 'knowledge/product/schemas/narrated-video-upload-package.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/schemas/narrated-video-upload-package.example.json'),
+        readGovernanceJson('knowledge/product/schemas/narrated-video-upload-package.example.json'),
       ],
       invalidPayloads: [
         {
@@ -2655,9 +2655,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'meeting-operations-profile',
-      schemaPath: 'knowledge/public/schemas/meeting-operations-profile.schema.json',
+      schemaPath: 'knowledge/product/schemas/meeting-operations-profile.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/schemas/meeting-operations-profile.example.json'),
+        readGovernanceJson('knowledge/product/schemas/meeting-operations-profile.example.json'),
       ],
       invalidPayloads: [
         {
@@ -2683,9 +2683,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'meeting-operations-brief',
-      schemaPath: 'knowledge/public/schemas/meeting-operations-brief.schema.json',
+      schemaPath: 'knowledge/product/schemas/meeting-operations-brief.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/schemas/meeting-operations-brief.example.json'),
+        readGovernanceJson('knowledge/product/schemas/meeting-operations-brief.example.json'),
       ],
       invalidPayloads: [
         {
@@ -2704,7 +2704,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mobile-app-profile-index',
-      schemaPath: 'knowledge/public/schemas/mobile-app-profile-index.schema.json',
+      schemaPath: 'knowledge/product/schemas/mobile-app-profile-index.schema.json',
       validPayloads: [
         {
           version: '1.0.0',
@@ -2713,7 +2713,7 @@ function createChecks(): ContractCheck[] {
               id: 'example-mobile-login-passkey',
               platform: 'android',
               title: 'Example Mobile Login + Passkey',
-              path: 'knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json',
+              path: 'knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json',
               description:
                 'Example Android app profile covering launch, login form selectors, and passkey trigger selectors.',
               tags: ['android', 'login', 'passkey', 'example'],
@@ -2738,7 +2738,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'web-app-profile-index',
-      schemaPath: 'knowledge/public/schemas/web-app-profile-index.schema.json',
+      schemaPath: 'knowledge/product/schemas/web-app-profile-index.schema.json',
       validPayloads: [
         {
           profiles: [
@@ -2746,7 +2746,7 @@ function createChecks(): ContractCheck[] {
               id: 'example-web-login-guarded',
               platform: 'browser',
               title: 'Example Web Login + Guarded Routes',
-              path: 'knowledge/public/orchestration/web-app-profiles/example-web-login-guarded.json',
+              path: 'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json',
               description:
                 'Shared profile for a Web app with login, guarded routes, and a debug-only session export route.',
               tags: ['browser', 'session-handoff', 'login', 'guarded-routes', 'example'],
@@ -2771,7 +2771,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'browser-passkey-providers',
-      schemaPath: 'knowledge/public/schemas/browser-passkey-providers.schema.json',
+      schemaPath: 'knowledge/product/schemas/browser-passkey-providers.schema.json',
       validPayloads: [
         {
           default_provider: 'webauthn.io',
@@ -2800,7 +2800,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'browser-execution-presets',
-      schemaPath: 'knowledge/public/schemas/browser-execution-presets.schema.json',
+      schemaPath: 'knowledge/product/schemas/browser-execution-presets.schema.json',
       validPayloads: [
         {
           default_preset: 'standard-web-auth',
@@ -2826,7 +2826,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-endpoints',
-      schemaPath: 'knowledge/public/schemas/service-endpoints.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-endpoints.schema.json',
       validPayloads: [
         {
           default_pattern: 'https://api.{service_id}.com/v1',
@@ -2836,11 +2836,11 @@ function createChecks(): ContractCheck[] {
             },
             slack: {
               base_url: 'https://slack.com/api',
-              preset_path: 'knowledge/public/orchestration/service-presets/slack.json',
+              preset_path: 'knowledge/product/orchestration/service-presets/slack.json',
             },
             github: {
               base_url: 'https://api.github.com',
-              preset_path: 'knowledge/public/orchestration/service-presets/github.json',
+              preset_path: 'knowledge/product/orchestration/service-presets/github.json',
             },
           },
         },
@@ -2857,9 +2857,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-bootstrap-catalog',
-      schemaPath: 'knowledge/public/schemas/service-bootstrap-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-bootstrap-catalog.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/service-bootstrap-catalog.json'),
+        readGovernanceJson('knowledge/product/governance/service-bootstrap-catalog.json'),
       ],
       invalidPayloads: [
         {
@@ -2875,9 +2875,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-onboarding-catalog',
-      schemaPath: 'knowledge/public/schemas/service-onboarding-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-onboarding-catalog.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/service-onboarding-catalog.json'),
+        readGovernanceJson('knowledge/product/governance/service-onboarding-catalog.json'),
       ],
       invalidPayloads: [
         {
@@ -2888,9 +2888,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'work-coordination-import-catalog',
-      schemaPath: 'knowledge/public/schemas/work-coordination-import-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/work-coordination-import-catalog.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/work-coordination-import-catalog.json'),
+        readGovernanceJson('knowledge/product/governance/work-coordination-import-catalog.json'),
       ],
       invalidPayloads: [
         {
@@ -2901,9 +2901,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-authority-map',
-      schemaPath: 'knowledge/public/schemas/service-authority-map.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-authority-map.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/service-authority-map.json'),
+        readGovernanceJson('knowledge/product/governance/service-authority-map.json'),
       ],
       invalidPayloads: [
         {
@@ -2914,9 +2914,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'actuator-dependency-bundles',
-      schemaPath: 'knowledge/public/schemas/actuator-dependency-bundles.schema.json',
+      schemaPath: 'knowledge/product/schemas/actuator-dependency-bundles.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/actuator-dependency-bundles.json'),
+        readGovernanceJson('knowledge/product/governance/actuator-dependency-bundles.json'),
       ],
       invalidPayloads: [
         {
@@ -2927,9 +2927,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'skill-install-package-map',
-      schemaPath: 'knowledge/public/schemas/skill-install-package-map.schema.json',
+      schemaPath: 'knowledge/product/schemas/skill-install-package-map.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/skill-install-package-map.json'),
+        readGovernanceJson('knowledge/product/governance/skill-install-package-map.json'),
       ],
       invalidPayloads: [
         {
@@ -2940,9 +2940,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'surface-coordination-role-map',
-      schemaPath: 'knowledge/public/schemas/surface-coordination-role-map.schema.json',
+      schemaPath: 'knowledge/product/schemas/surface-coordination-role-map.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/surface-coordination-role-map.json'),
+        readGovernanceJson('knowledge/product/governance/surface-coordination-role-map.json'),
       ],
       invalidPayloads: [
         {
@@ -2953,9 +2953,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-task-profile-catalog',
-      schemaPath: 'knowledge/public/schemas/voice-task-profile-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/voice-task-profile-catalog.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/voice-task-profile-catalog.json'),
+        readGovernanceJson('knowledge/product/governance/voice-task-profile-catalog.json'),
       ],
       invalidPayloads: [
         {
@@ -2966,9 +2966,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-tone-style-map',
-      schemaPath: 'knowledge/public/schemas/media-tone-style-map.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-tone-style-map.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-tone-style-map.json'),
+        readGovernanceJson('knowledge/product/governance/media-tone-style-map.json'),
       ],
       invalidPayloads: [
         {
@@ -2979,9 +2979,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-drawio-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-drawio-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-drawio-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -2992,9 +2992,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-drawio-boundary-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-boundary-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-boundary-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-drawio-boundary-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-drawio-boundary-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3005,9 +3005,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-drawio-tier-order',
-      schemaPath: 'knowledge/public/schemas/media-drawio-tier-order.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-tier-order.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-drawio-tier-order.json'),
+        readGovernanceJson('knowledge/product/governance/media-drawio-tier-order.json'),
       ],
       invalidPayloads: [
         {
@@ -3018,9 +3018,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-drawio-sort-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-sort-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-sort-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-drawio-sort-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-drawio-sort-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3032,9 +3032,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-drawio-security-group-order',
-      schemaPath: 'knowledge/public/schemas/media-drawio-security-group-order.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-security-group-order.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-drawio-security-group-order.json'),
+        readGovernanceJson('knowledge/product/governance/media-drawio-security-group-order.json'),
       ],
       invalidPayloads: [
         {
@@ -3045,9 +3045,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'document-inference-policy',
-      schemaPath: 'knowledge/public/schemas/document-inference-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/document-inference-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/document-inference-policy.json'),
+        readGovernanceJson('knowledge/product/governance/document-inference-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3059,9 +3059,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'document-contents-policy',
-      schemaPath: 'knowledge/public/schemas/document-contents-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/document-contents-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/document-contents-policy.json'),
+        readGovernanceJson('knowledge/product/governance/document-contents-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3072,9 +3072,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'document-outline-label-policy',
-      schemaPath: 'knowledge/public/schemas/document-outline-label-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/document-outline-label-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/document-outline-label-policy.json'),
+        readGovernanceJson('knowledge/product/governance/document-outline-label-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3085,9 +3085,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'promoted-report-template-policy',
-      schemaPath: 'knowledge/public/schemas/promoted-report-template-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/promoted-report-template-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/promoted-report-template-policy.json'),
+        readGovernanceJson('knowledge/product/governance/promoted-report-template-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3098,9 +3098,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'onboarding-summary-policy',
-      schemaPath: 'knowledge/public/schemas/onboarding-summary-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/onboarding-summary-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/onboarding-summary-policy.json'),
+        readGovernanceJson('knowledge/product/governance/onboarding-summary-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3111,9 +3111,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'onboarding-flow-policy',
-      schemaPath: 'knowledge/public/schemas/onboarding-flow-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/onboarding-flow-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/onboarding-flow-policy.json'),
+        readGovernanceJson('knowledge/product/governance/onboarding-flow-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3126,9 +3126,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-distill-markdown-policy',
-      schemaPath: 'knowledge/public/schemas/mission-distill-markdown-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-distill-markdown-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-distill-markdown-policy.json'),
+        readGovernanceJson('knowledge/product/governance/mission-distill-markdown-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3139,9 +3139,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-ledger-policy',
-      schemaPath: 'knowledge/public/schemas/mission-ledger-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-ledger-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-ledger-policy.json'),
+        readGovernanceJson('knowledge/product/governance/mission-ledger-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3152,9 +3152,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'provider-cli-capability-report-policy',
-      schemaPath: 'knowledge/public/schemas/provider-cli-capability-report-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/provider-cli-capability-report-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/provider-cli-capability-report-policy.json'),
+        readGovernanceJson('knowledge/product/governance/provider-cli-capability-report-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3165,9 +3165,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-journal-policy',
-      schemaPath: 'knowledge/public/schemas/mission-journal-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-journal-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/mission-journal-policy.json'),
+        readGovernanceJson('knowledge/product/governance/mission-journal-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3178,9 +3178,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'pilot-strategy-policy',
-      schemaPath: 'knowledge/public/schemas/pilot-strategy-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/pilot-strategy-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/pilot-strategy-policy.json'),
+        readGovernanceJson('knowledge/product/governance/pilot-strategy-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3191,9 +3191,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'production-evidence-summary-policy',
-      schemaPath: 'knowledge/public/schemas/production-evidence-summary-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/production-evidence-summary-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/production-evidence-summary-policy.json'),
+        readGovernanceJson('knowledge/product/governance/production-evidence-summary-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3204,9 +3204,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'changelog-policy',
-      schemaPath: 'knowledge/public/schemas/changelog-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/changelog-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/changelog-policy.json'),
+        readGovernanceJson('knowledge/product/governance/changelog-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3217,9 +3217,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'spreadsheet-style-policy',
-      schemaPath: 'knowledge/public/schemas/spreadsheet-style-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/spreadsheet-style-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/spreadsheet-style-policy.json'),
+        readGovernanceJson('knowledge/product/governance/spreadsheet-style-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3230,9 +3230,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'legacy-media-ops',
-      schemaPath: 'knowledge/public/schemas/legacy-media-ops.schema.json',
+      schemaPath: 'knowledge/product/schemas/legacy-media-ops.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/legacy-media-ops.json'),
+        readGovernanceJson('knowledge/product/governance/legacy-media-ops.json'),
       ],
       invalidPayloads: [
         {
@@ -3243,9 +3243,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-drawio-edge-policy',
-      schemaPath: 'knowledge/public/schemas/media-drawio-edge-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-drawio-edge-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-drawio-edge-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-drawio-edge-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3256,9 +3256,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-aws-icon-rules',
-      schemaPath: 'knowledge/public/schemas/media-aws-icon-rules.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-aws-icon-rules.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-aws-icon-rules.json'),
+        readGovernanceJson('knowledge/product/governance/media-aws-icon-rules.json'),
       ],
       invalidPayloads: [
         {
@@ -3269,9 +3269,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-semantic-map',
-      schemaPath: 'knowledge/public/schemas/media-semantic-map.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-semantic-map.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-semantic-map.json'),
+        readGovernanceJson('knowledge/product/governance/media-semantic-map.json'),
       ],
       invalidPayloads: [
         {
@@ -3282,9 +3282,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-style-policy',
-      schemaPath: 'knowledge/public/schemas/media-style-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-style-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-style-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-style-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3295,9 +3295,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-signal-entry-policy',
-      schemaPath: 'knowledge/public/schemas/media-signal-entry-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-signal-entry-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-signal-entry-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-signal-entry-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3308,9 +3308,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'tracker-sheet-policy',
-      schemaPath: 'knowledge/public/schemas/tracker-sheet-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/tracker-sheet-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/tracker-sheet-policy.json'),
+        readGovernanceJson('knowledge/product/governance/tracker-sheet-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3321,9 +3321,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-theme-role-policy',
-      schemaPath: 'knowledge/public/schemas/media-theme-role-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-theme-role-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/media-theme-role-policy.json'),
+        readGovernanceJson('knowledge/product/governance/media-theme-role-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3334,9 +3334,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'reasoning-backend-policy',
-      schemaPath: 'knowledge/public/schemas/reasoning-backend-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/reasoning-backend-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/reasoning-backend-policy.json'),
+        readGovernanceJson('knowledge/product/governance/reasoning-backend-policy.json'),
       ],
       invalidPayloads: [
         {
@@ -3347,7 +3347,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'specialist-catalog',
-      schemaPath: 'knowledge/public/schemas/specialist-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
       validPayloads: [
         {
           version: '1.0.0',
@@ -3374,7 +3374,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'actuator-request-archetypes',
-      schemaPath: 'knowledge/public/schemas/actuator-request-archetypes.schema.json',
+      schemaPath: 'knowledge/product/schemas/actuator-request-archetypes.schema.json',
       validPayloads: [
         {
           default_archetype: 'structured-delivery',
@@ -3444,7 +3444,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'points-portal-clickout-usecase',
-      schemaPath: 'knowledge/public/schemas/points-portal-clickout-usecase.schema.json',
+      schemaPath: 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json',
       validPayloads: [
         {
           kind: 'points-portal-clickout-usecase',
@@ -3649,7 +3649,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'task-session',
-      schemaPath: 'knowledge/public/schemas/task-session.schema.json',
+      schemaPath: 'knowledge/product/schemas/task-session.schema.json',
       validPayloads: [
         createTaskSession({
           sessionId: 'TSK-schema-1',
@@ -3678,7 +3678,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'task-session-capture-photo',
-      schemaPath: 'knowledge/public/schemas/task-session-capture-photo.schema.json',
+      schemaPath: 'knowledge/product/schemas/task-session-capture-photo.schema.json',
       validPayloads: [
         {
           camera_intent: 'record',
@@ -3697,7 +3697,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'work-policy',
-      schemaPath: 'knowledge/public/schemas/work-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/work-policy.schema.json',
       validPayloads: [workPolicy],
       invalidPayloads: [
         {
@@ -3722,7 +3722,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'surface-provider-manifests',
-      schemaPath: 'knowledge/public/schemas/surface-provider-manifests.schema.json',
+      schemaPath: 'knowledge/product/schemas/surface-provider-manifests.schema.json',
       validPayloads: [surfaceProviderManifests],
       invalidPayloads: [
         {
@@ -3735,9 +3735,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'surface-provider-manifest-catalog',
-      schemaPath: 'knowledge/public/schemas/surface-provider-manifest-catalog.schema.json',
+      schemaPath: 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/surface-provider-manifest-catalog.json'),
+        readGovernanceJson('knowledge/product/governance/surface-provider-manifest-catalog.json'),
         ...readSurfaceProviderCatalogPayloads(),
       ],
       invalidPayloads: [
@@ -3749,7 +3749,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'surface-policy',
-      schemaPath: 'knowledge/public/schemas/surface-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/surface-policy.schema.json',
       validPayloads: [surfacePolicy],
       invalidPayloads: [
         {
@@ -3766,7 +3766,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'standard-intents',
-      schemaPath: 'knowledge/public/schemas/standard-intents.schema.json',
+      schemaPath: 'knowledge/product/schemas/standard-intents.schema.json',
       validPayloads: [
         {
           version: '2.0.0',
@@ -3814,9 +3814,9 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'intent-domain-ontology',
-      schemaPath: 'knowledge/public/schemas/intent-domain-ontology.schema.json',
+      schemaPath: 'knowledge/product/schemas/intent-domain-ontology.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/public/governance/intent-domain-ontology.json'),
+        readGovernanceJson('knowledge/product/governance/intent-domain-ontology.json'),
       ],
       invalidPayloads: [
         {
@@ -3846,7 +3846,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'a2a-task-contract',
-      schemaPath: 'knowledge/public/schemas/a2a-task-contract.schema.json',
+      schemaPath: 'knowledge/product/schemas/a2a-task-contract.schema.json',
       validPayloads: [
         {
           intent: 'request_mission_work',
@@ -3871,7 +3871,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'intent-resolution-policy',
-      schemaPath: 'knowledge/public/schemas/intent-resolution-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/intent-resolution-policy.schema.json',
       validPayloads: [
         {
           version: '1.0.0',
@@ -3934,7 +3934,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'task-session-policy',
-      schemaPath: 'knowledge/public/schemas/task-session-policy.schema.json',
+      schemaPath: 'knowledge/product/schemas/task-session-policy.schema.json',
       validPayloads: [
         {
           version: '1.0.0',
@@ -4018,7 +4018,7 @@ function createChecks(): ContractCheck[] {
     ...additionalGovernanceChecks,
     {
       id: 'intent-contract',
-      schemaPath: 'knowledge/public/schemas/intent-contract.schema.json',
+      schemaPath: 'knowledge/product/schemas/intent-contract.schema.json',
       validPayloads: [
         {
           kind: 'intent-contract',
@@ -4070,7 +4070,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'agent-routing-decision',
-      schemaPath: 'knowledge/public/schemas/agent-routing-decision.schema.json',
+      schemaPath: 'knowledge/product/schemas/agent-routing-decision.schema.json',
       validPayloads: [
         {
           kind: 'agent-routing-decision',
@@ -4110,7 +4110,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'pipeline-adf',
-      schemaPath: 'knowledge/public/schemas/pipeline-adf.schema.json',
+      schemaPath: 'knowledge/product/schemas/pipeline-adf.schema.json',
       validPayloads: [
         {
           action: 'pipeline',
@@ -4129,7 +4129,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'distill-candidate-record',
-      schemaPath: 'knowledge/public/schemas/distill-candidate-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/distill-candidate-record.schema.json',
       validPayloads: [
         createDistillCandidateRecord({
           source_type: 'task_session',
@@ -4153,7 +4153,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'promoted-pattern-record',
-      schemaPath: 'knowledge/public/schemas/generated-pattern-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/generated-pattern-record.schema.json',
       validPayloads: [promotedPattern],
       invalidPayloads: [
         {
@@ -4169,7 +4169,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'promoted-sop-record',
-      schemaPath: 'knowledge/public/schemas/generated-sop-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/generated-sop-record.schema.json',
       validPayloads: [promotedSop],
       invalidPayloads: [
         {
@@ -4185,7 +4185,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'promoted-knowledge-hint-record',
-      schemaPath: 'knowledge/public/schemas/generated-knowledge-hint-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/generated-knowledge-hint-record.schema.json',
       validPayloads: [promotedHint],
       invalidPayloads: [
         {
@@ -4201,7 +4201,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'promoted-report-template-record',
-      schemaPath: 'knowledge/public/schemas/generated-report-template-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/generated-report-template-record.schema.json',
       validPayloads: [promotedTemplate],
       invalidPayloads: [
         {

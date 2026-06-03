@@ -1,27 +1,29 @@
 {
   "action": "pipeline",
   "name": "executive-report-gen-fragment",
+  "version": "2.0.0",
   "description": "Generates a high-level executive report based on mission progress and state.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "output_file": "active/shared/tmp/mission-report.md"
   },
   "steps": [
     {
       "id": "gen_report",
-      "type": "capture",
+      "role": "source",
       "op": "system:exec",
+      "produces": { "channel": "report_result", "type": "ShellResult" },
       "params": {
         "command": "node",
         "args": [
           "dist/scripts/report_generator.js",
           "--output", "{{output_file}}"
-        ],
-        "export_as": "report_result"
+        ]
       }
     },
     {
       "id": "log_report",
-      "type": "apply",
+      "role": "sink",
       "op": "system:log",
       "params": {
         "message": "Executive report generated at {{output_file}}."

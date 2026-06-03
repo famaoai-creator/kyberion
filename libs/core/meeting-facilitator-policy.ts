@@ -15,7 +15,7 @@
  */
 
 const DEFAULT_RESTRICTED_POLICY_PATH =
-  'knowledge/public/governance/restricted-action-kinds-policy.json';
+  'knowledge/product/governance/restricted-action-kinds-policy.json';
 
 export interface MeetingFacilitatorPolicy {
   /**

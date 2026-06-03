@@ -1,9 +1,0 @@
-{
-  "default_pattern": "https://api.{service_id}.com/v1",
-  "services": {
-    "linear": {
-      "base_url": "https://api.linear.app/graphql",
-      "preset_path": "knowledge/public/orchestration/service-presets/linear.json"
-    }
-  }
-}

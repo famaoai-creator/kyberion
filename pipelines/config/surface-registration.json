@@ -1,0 +1,47 @@
+{
+  "action": "pipeline",
+  "name": "Config: Surface Registration",
+  "version": "1.0.0",
+  "description": "Registers a new runtime surface in the surface governance manifest. Run `pnpm surfaces:reconcile` after applying.",
+  "steps": [
+    {
+      "id": "preflight_inputs",
+      "role": "gate",
+      "op": "system:assert",
+      "params": {
+        "conditions": [
+          "{{input.surface_id}} != ''",
+          "{{input.kind}} != ''",
+          "{{input.command}} != ''"
+        ],
+        "message": "surface_id, kind, and command are required"
+      }
+    },
+    {
+      "id": "write_surface_manifest",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/product/governance/surfaces/{{input.surface_id}}.json",
+        "content": "{\"version\":1,\"surfaces\":[{\"id\":\"{{input.surface_id}}\",\"kind\":\"{{input.kind}}\",\"command\":\"{{input.command}}\",\"args\":\"{{input.args}}\",\"port\":{{input.port}},\"healthPath\":\"{{input.health_path}}\",\"enabled\":true,\"registered_at\":\"{{now}}\"}]}"
+      }
+    },
+    {
+      "id": "write_evidence",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "knowledge/confidential/{{input.tenant}}/config-missions/{{input.instance_id}}/evidence/result.json",
+        "content": "{\"preset_id\":\"surface-registration\",\"surface_id\":\"{{input.surface_id}}\",\"tenant\":\"{{input.tenant}}\",\"applied_at\":\"{{now}}\"}"
+      }
+    },
+    {
+      "id": "final_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Surface '{{input.surface_id}}' registered. Run `pnpm surfaces:reconcile` to start it."
+      }
+    }
+  ]
+}

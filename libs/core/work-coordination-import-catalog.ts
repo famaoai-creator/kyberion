@@ -21,9 +21,9 @@ interface WorkCoordinationImportCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const PUBLIC_CATALOG_PATH = pathResolver.knowledge('public/governance/work-coordination-import-catalog.json');
+const PUBLIC_CATALOG_PATH = pathResolver.knowledge('product/governance/work-coordination-import-catalog.json');
 const PERSONAL_CATALOG_PATH = pathResolver.knowledge('personal/governance/work-coordination-import-catalog.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/work-coordination-import-catalog.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-coordination-import-catalog.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: WorkCoordinationImportCatalog | null = null;

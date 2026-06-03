@@ -12,9 +12,9 @@ import { resolveMissionReviewDesign } from './mission-review-gates.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('public/schemas/work-policy.schema.json');
-const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge('public/orchestration/specialist-catalog.json');
-const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('public/orchestration/specialists');
+const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
+const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge('product/orchestration/specialist-catalog.json');
+const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('product/orchestration/specialists');
 
 export interface OutcomeDefinition {
   id: string;
@@ -303,7 +303,7 @@ function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile 
 }
 
 export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
-  const parsed = loadJson<OutcomeCatalogFile>(pathResolver.knowledge('public/governance/outcome-catalog.json'));
+  const parsed = loadJson<OutcomeCatalogFile>(pathResolver.knowledge('product/governance/outcome-catalog.json'));
   const entries = parsed.outcomes || {};
   return Object.fromEntries(
     Object.entries(entries).map(([id, value]) => [id, { id, ...value }]),
@@ -321,17 +321,17 @@ export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
 }
 
 function loadExecutionBoundaryProfiles(): Record<string, OrganizationWorkLoopSummary['execution_boundary']> {
-  const parsed = loadJson<BoundaryProfileFile>(pathResolver.knowledge('public/governance/execution-boundary-profiles.json'));
+  const parsed = loadJson<BoundaryProfileFile>(pathResolver.knowledge('product/governance/execution-boundary-profiles.json'));
   return parsed.profiles || {};
 }
 
 function loadRuntimeDesignProfiles(): Record<string, OrganizationWorkLoopSummary['runtime_design']> {
-  const parsed = loadJson<RuntimeDesignProfileFile>(pathResolver.knowledge('public/governance/runtime-design-profiles.json'));
+  const parsed = loadJson<RuntimeDesignProfileFile>(pathResolver.knowledge('product/governance/runtime-design-profiles.json'));
   return parsed.profiles || {};
 }
 
 function loadWorkPolicy(): WorkPolicyFile {
-  const value = loadJson<WorkPolicyFile>(pathResolver.knowledge('public/governance/work-policy.json'));
+  const value = loadJson<WorkPolicyFile>(pathResolver.knowledge('product/governance/work-policy.json'));
   const validate = ensureWorkPolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');

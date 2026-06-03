@@ -6,7 +6,7 @@ Turn a Terraform root directory into an editable Draw.io architecture diagram us
 ## 2. Dependencies
 - **Actuator**: `Modeling-Actuator`
 - **Actuator**: `Media-Actuator`
-- **Schema**: `knowledge/public/schemas/architecture-adf.schema.json`
+- **Schema**: `knowledge/product/schemas/architecture-adf.schema.json`
 
 ## 3. Principle
 Use a two-step contract:

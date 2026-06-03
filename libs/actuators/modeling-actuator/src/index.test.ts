@@ -247,7 +247,7 @@ describe('modeling-actuator web_profile_to_ui_flow_adf', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/ui-flow-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/ui-flow-adf.schema.json'));
 
     const result = await handleAction({
       action: 'pipeline',

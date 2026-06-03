@@ -1,0 +1,69 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "import-brand-from-html",
+  "version": "2.0.0",
+  "name": "Web サイト / HTML からブランドテーマを抽出して confidential tier に登録",
+  "description": "指定URLのCSSカラー・フォントを取得し、knowledge/confidential/{tenant_slug}/design/ へ書き込む。レイアウトは PPTX から別途取得推奨。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "knowledge_scope": { "tiers": ["public", "confidential"] },
+  "env": { "KYBERION_PERSONA": "sovereign", "MISSION_ROLE": "mission_controller" },
+  "inputs": {
+    "source_url":       "抽出元 URL（例: https://example.com）",
+    "tenant_slug":      "テナントスラグ（例: client-a）",
+    "brand_name":       "表示用ブランド名",
+    "matchers":         "マッチャー文字列配列",
+    "design_system_id": "使用デザインシステム（省略時: executive-standard）"
+  },
+  "steps": [
+    {
+      "id": "open_tab",
+      "role": "gate",
+      "op": "browser:open_tab",
+      "params": {
+        "url": "{{source_url}}",
+        "keep_alive": true,
+        "select": true,
+        "waitUntil": "domcontentloaded"
+      }
+    },
+    {
+      "id": "snapshot",
+      "role": "source",
+      "op": "browser:snapshot",
+      "produces": { "channel": "web_snapshot", "type": "WebSnapshot" },
+      "params": {}
+    },
+    {
+      "id": "synthesize_theme",
+      "role": "transform",
+      "op": "reasoning:synthesize",
+      "consumes": "web_snapshot",
+      "produces": { "channel": "active_theme", "type": "Theme" },
+      "params": {
+        "instruction": "以下の DOM / CSS スナップショットから、ブランドカラー（primary, secondary, accent, background, text）とフォント（heading, body）を特定してください。必ず次のJSON形式のみで出力してください（他のテキスト不要）:\n{\"colors\":{\"primary\":\"#XXXXXX\",\"secondary\":\"#XXXXXX\",\"accent\":\"#XXXXXX\",\"background\":\"#XXXXXX\",\"text\":\"#XXXXXX\"},\"fonts\":{\"heading\":\"フォント名\",\"body\":\"フォント名\"}}",
+        "context": ["{{web_snapshot}}"]
+      }
+    },
+    {
+      "id": "save_brand",
+      "role": "sink",
+      "op": "media:save_brand_to_confidential",
+      "consumes": "active_theme",
+      "params": {
+        "tenant_slug":      "{{tenant_slug}}",
+        "brand_name":       "{{brand_name}}",
+        "matchers":         "{{matchers}}",
+        "design_system_id": "{{design_system_id}}",
+        "theme_from":       "active_theme"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Web ブランドインポート完了 → knowledge/confidential/{{tenant_slug}}/design/（注意: レイアウトジオメトリは import-brand-from-pptx で別途追加してください）"
+      }
+    }
+  ]
+}

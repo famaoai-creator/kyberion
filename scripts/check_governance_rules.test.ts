@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeUnlinkSync, safeWriteFile } from '@agent/core';
 import { findDeterministicCatalogViolations } from './check_governance_rules.js';
 
-const GOVERNANCE_DIR = pathResolver.rootResolve('knowledge/public/governance');
+const GOVERNANCE_DIR = pathResolver.rootResolve('knowledge/product/governance');
 const TEST_FILE = path.join(GOVERNANCE_DIR, 'test-governance-deterministic.json');
 
 describe('check_governance_rules', () => {
@@ -32,6 +32,6 @@ describe('check_governance_rules', () => {
 
     const violations = findDeterministicCatalogViolations();
 
-    expect(violations).toContain('knowledge/public/governance/test-governance-deterministic.json');
+    expect(violations).toContain('knowledge/product/governance/test-governance-deterministic.json');
   });
 });

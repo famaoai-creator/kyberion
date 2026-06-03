@@ -19,7 +19,7 @@ debug build または internal QA build で、authenticated WebView state を `w
 
 ## Profile Alignment
 
-- [`example-mobile-login-passkey.json`](/Users/famao/kyberion/knowledge/public/orchestration/mobile-app-profiles/example-mobile-login-passkey.json)
+- [`example-mobile-login-passkey.json`](/Users/famao/kyberion/knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json)
 
 ## Orchestration
 

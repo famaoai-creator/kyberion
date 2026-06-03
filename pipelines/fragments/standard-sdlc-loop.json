@@ -1,7 +1,9 @@
 {
   "action": "pipeline",
   "name": "standard-sdlc-loop",
+  "version": "2.0.0",
   "description": "Reusable SDLC skeleton: requirements extraction → design synthesis → test planning → task decomposition → summary.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",
     "project_name": "",
@@ -16,8 +18,9 @@
   "steps": [
     {
       "id": "extract_requirements",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:extract_requirements",
+      "produces": { "channel": "requirements", "type": "RequirementsResult" },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
@@ -25,44 +28,45 @@
         "source_type": "{{source_type}}",
         "language": "{{language}}",
         "customer_name": "{{customer_name}}",
-        "customer_org": "{{customer_org}}",
-        "export_as": "requirements"
+        "customer_org": "{{customer_org}}"
       }
     },
     {
       "id": "synthesize_design",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:extract_design_spec",
+      "produces": { "channel": "design", "type": "DesignSpec" },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "additional_context": "{{additional_context}}",
-        "export_as": "design"
+        "additional_context": "{{additional_context}}"
       }
     },
     {
       "id": "derive_test_plan",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:extract_test_plan",
+      "produces": { "channel": "test_plan", "type": "TestPlan" },
       "params": {
         "mission_id": "{{mission_id}}",
-        "project_name": "{{project_name}}",
-        "export_as": "test_plan"
+        "project_name": "{{project_name}}"
       }
     },
     {
       "id": "decompose_tasks",
-      "type": "apply",
+      "role": "source",
       "op": "wisdom:decompose_into_tasks",
+      "produces": { "channel": "task_plan", "type": "TaskPlan" },
       "params": {
         "mission_id": "{{mission_id}}",
-        "project_name": "{{project_name}}",
-        "export_as": "task_plan"
+        "project_name": "{{project_name}}"
       }
     },
     {
       "id": "emit_summary",
+      "role": "sink",
       "op": "system:log",
+      "consumes": ["requirements", "design", "test_plan", "task_plan"],
       "params": {
         "message": "SDLC fragment complete for {{project_name}}: requirements v{{requirements.version}} / design v{{design.version}} / test plan v{{test_plan.version}} / task plan v{{task_plan.version}}."
       }

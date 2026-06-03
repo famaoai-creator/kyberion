@@ -13,7 +13,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/actuator-execution-brief.schema.json'
+  'product/schemas/actuator-execution-brief.schema.json'
 );
 
 export interface ExecutionBriefSeed {
@@ -87,7 +87,7 @@ function isScheduleReadAgendaRequest(text: string): boolean {
       text
     ) &&
     /(教えて|見せて|確認|見る|空き|agenda|available|availability|今週|来週|今日|明日)/i.test(text) &&
-    !/(調整|変更|リスケ|ずら|移動|修正|update|change|resched|reschedule|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し)/i.test(
+    !/(調整|変更|リスケ|ずら|移動|修正|update|change|resched|reschedule|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|整え|進め方|facilitate|preparation|準備)/i.test(
       text
     )
   );

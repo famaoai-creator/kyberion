@@ -8,9 +8,9 @@ import { safeExistsSync, safeReadFile } from './secure-io.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const ORGANIZATION_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
-  'public/schemas/organization-profile.schema.json'
+  'product/schemas/organization-profile.schema.json'
 );
-const ORGANIZATION_PROFILE_PATH = pathResolver.knowledge('public/governance/organization-profile.json');
+const ORGANIZATION_PROFILE_PATH = pathResolver.knowledge('product/governance/organization-profile.json');
 
 let organizationProfileValidateFn: ValidateFunction | null = null;
 

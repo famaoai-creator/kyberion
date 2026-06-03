@@ -1,0 +1,56 @@
+{
+  "pipeline_id": "marketing-content-creation",
+  "version": "2.0.0",
+  "description": "Generate visual assets and PPTX for general users",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "action": "pipeline",
+  "context": {
+    "mission_id": "KYBERION-MARKETING-EXPANSION",
+    "theme": "A futuristic but reliable AI Operating System called Kyberion. Blue and silver tones, clean and professional.",
+    "output_image": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/hero_visual.png",
+    "output_pptx": "active/missions/public/KYBERION-MARKETING-EXPANSION/evidence/kyberion_intro.pptx"
+  },
+  "steps": [
+    {
+      "id": "gen-hero-image",
+      "role": "sink",
+      "op": "media:document_diagram_asset_from_brief",
+      "params": {
+        "brief": "A concept visual for Kyberion: A glowing brain with structured gear wheels, representing disciplined AI. Theme: {{theme}}",
+        "output_path": "{{output_image}}"
+      }
+    },
+    {
+      "id": "apply-theme",
+      "role": "sink",
+      "op": "media:apply_theme",
+      "params": {
+        "theme": "kyberion-sovereign"
+      }
+    },
+    {
+      "id": "apply-pattern",
+      "role": "sink",
+      "op": "media:apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json"
+      }
+    },
+    {
+      "id": "merge-pptx-content",
+      "role": "sink",
+      "op": "media:merge_content",
+      "params": {
+        "output_format": "pptx"
+      }
+    },
+    {
+      "id": "render-pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "params": {
+        "output_path": "{{output_pptx}}"
+      }
+    }
+  ]
+}

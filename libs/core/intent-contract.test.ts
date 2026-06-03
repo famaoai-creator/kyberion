@@ -710,7 +710,7 @@ describe('intent-contract compiler', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json')
+      path.resolve(root, 'knowledge/product/schemas/intent-contract.schema.json')
     );
 
     expect(
@@ -745,7 +745,7 @@ describe('intent-contract compiler', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/public/schemas/intent-contract.schema.json')
+      path.resolve(root, 'knowledge/product/schemas/intent-contract.schema.json')
     );
 
     expect(

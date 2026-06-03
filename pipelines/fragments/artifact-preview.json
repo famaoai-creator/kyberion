@@ -1,33 +1,36 @@
 {
   "action": "pipeline",
   "name": "artifact-preview-fragment",
+  "version": "2.0.0",
   "description": "Opens a generated artifact in the OS default handler and sends a desktop notification. Append after any write_artifact step. Required context var: artifact_path (relative to repo root). Optional: notify_title, notify_message.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
       "id": "probe_artifact",
-      "type": "capture",
+      "role": "source",
       "op": "system:probe",
+      "produces": { "channel": "artifact_probe", "type": "ProbeResult" },
       "params": {
-        "path": "{{artifact_path}}",
-        "export_as": "artifact_probe"
+        "path": "{{artifact_path}}"
       }
     },
     {
       "id": "open_or_warn",
-      "type": "apply",
+      "role": "gate",
       "op": "core:if",
+      "consumes": "artifact_probe",
       "params": {
         "condition": { "from": "artifact_probe.exists", "operator": "equals", "value": true },
         "then": [
           {
             "id": "open_artifact",
-            "type": "apply",
+            "role": "sink",
             "op": "system:open_file",
             "params": { "path": "{{artifact_path}}" }
           },
           {
             "id": "notify_opened",
-            "type": "apply",
+            "role": "sink",
             "op": "system:system_notify",
             "params": {
               "title": "{{notify_title|Artifact Ready}}",
@@ -39,7 +42,7 @@
         "else": [
           {
             "id": "warn_missing",
-            "type": "apply",
+            "role": "sink",
             "op": "system:log",
             "params": {
               "message": "[ARTIFACT PREVIEW] File not found: {{artifact_path}}"

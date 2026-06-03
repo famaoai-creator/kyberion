@@ -22,7 +22,7 @@ async function main() {
   }
 
   // Determine target directory based on tier
-  const tierDir = argv.tier === 'public' ? 'knowledge/public/governance' : `knowledge/${argv.tier}/governance`;
+  const tierDir = argv.tier === 'public' ? 'knowledge/product/governance' : `knowledge/${argv.tier}/governance`;
   const registryPath = `${tierDir}/${argv.type}-capability-registry.json`;
   const absRegistryPath = pathResolver.rootResolve(registryPath);
   const absTierDir = pathResolver.rootResolve(tierDir);

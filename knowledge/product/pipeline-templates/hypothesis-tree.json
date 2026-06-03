@@ -1,0 +1,74 @@
+{
+  "action": "pipeline",
+  "name": "hypothesis-tree",
+  "version": "2.0.0",
+  "description": "Divergence-before-convergence decision pipeline. Runs at least 3 conflicting personas in isolation (STUB), forces cross-critique (STUB), then preserves rejected hypotheses in dissent-log.json (FULL). See knowledge/product/orchestration/hypothesis-tree-protocol.md.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "context": {
+    "mission_id": "",
+    "topic": "",
+    "evidence_refs": [],
+    "personas": [
+      "Visionary Inventor",
+      "Ruthless Auditor",
+      "red-team-adversary"
+    ],
+    "min_hypotheses_per_persona": 2,
+    "prior_knowledge_tags": []
+  },
+  "steps": [
+    {
+      "id": "inject_prior_knowledge",
+      "role": "sink",
+      "op": "wisdom:inject_prior_knowledge",
+      "params": {
+        "topic": "{{topic}}",
+        "tags": "{{prior_knowledge_tags}}",
+        "limit": 5,
+        "output_path": "{{mission_evidence_dir}}/prior-knowledge.json"
+      }
+    },
+    {
+      "id": "diverge",
+      "role": "sink",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas": "{{personas}}",
+        "min_hypotheses_per_persona": "{{min_hypotheses_per_persona}}",
+        "topic": "{{topic}}",
+        "output_path": "{{mission_evidence_dir}}/hypothesis-tree-raw.json"
+      }
+    },
+    {
+      "id": "critique",
+      "role": "sink",
+      "op": "wisdom:cross_critique",
+      "params": {
+        "input": "{{mission_evidence_dir}}/hypothesis-tree-raw.json",
+        "personas": "{{personas}}",
+        "output_path": "{{mission_evidence_dir}}/hypothesis-tree.json"
+      }
+    },
+    {
+      "id": "record_dissent",
+      "role": "sink",
+      "op": "wisdom:emit_dissent_log",
+      "params": {
+        "source": "{{mission_evidence_dir}}/hypothesis-tree.json",
+        "output_path": "{{mission_evidence_dir}}/dissent-log.json",
+        "mission_id": "{{mission_id}}",
+        "topic": "{{topic}}"
+      }
+    },
+    {
+      "id": "render_report",
+      "role": "sink",
+      "op": "wisdom:render_hypothesis_report",
+      "params": {
+        "source": "{{mission_evidence_dir}}/hypothesis-tree.json",
+        "output_path": "{{mission_evidence_dir}}/hypothesis-tree-report.md",
+        "title": "Hypothesis Tree — {{topic}}"
+      }
+    }
+  ]
+}

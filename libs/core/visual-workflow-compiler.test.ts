@@ -32,7 +32,7 @@ describe('visual workflow compiler', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/image-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/image-generation-adf.schema.json'));
 
     expect(validate({
       kind: 'image-generation-adf',
@@ -75,7 +75,7 @@ describe('visual workflow compiler', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/public/schemas/video-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/video-generation-adf.schema.json'));
 
     expect(validate({
       kind: 'video-generation-adf',

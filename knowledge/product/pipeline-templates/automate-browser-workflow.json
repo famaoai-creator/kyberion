@@ -1,0 +1,68 @@
+{
+  "pipeline_id": "automate-browser-workflow",
+  "version": "2.0.0",
+  "description": "Execute a browser task while recording, then distill the recorded trace into a reusable automation pipeline (ADF).",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "init-session",
+      "role": "sink",
+      "op": "browser:open_tab",
+      "params": {
+        "url": "{{target_url}}",
+        "record_trace": true,
+        "keep_alive": true
+      }
+    },
+    {
+      "id": "execute-task",
+      "role": "sink",
+      "op": "browser:pipeline",
+      "params": {
+        "steps": "{{interaction_steps}}"
+      }
+    },
+    {
+      "id": "capture-final-state",
+      "role": "source",
+      "op": "browser:snapshot",
+      "produces": { "channel": "final_snapshot", "type": "BrowserSnapshot" },
+      "params": {}
+    },
+    {
+      "id": "close-and-export",
+      "role": "source",
+      "op": "browser:close_session",
+      "produces": { "channel": "interaction_trace", "type": "BrowserTrace" },
+      "params": {
+        "export_trace_as": "interaction_trace"
+      }
+    },
+    {
+      "id": "distill-to-pipeline",
+      "role": "transform",
+      "op": "reasoning:synthesize",
+      "consumes": ["final_snapshot", "interaction_trace"],
+      "produces": { "channel": "generated_adf", "type": "PipelineAdf" },
+      "params": {
+        "instruction": "Convert the recorded browser interaction history (action_trail) and DOM snapshot into a reusable Kyberion Pipeline ADF (JSON). The output should be a single, complete JSON ADF including pipeline_id, description, and steps. Parameterize the inputs (like URLs, credentials, or search terms) using {{handlebars}} syntax to make the pipeline generic and reusable.",
+        "context": [
+          "{{action_trail}}",
+          "{{final_snapshot}}",
+          "{{interaction_steps}}"
+        ]
+      }
+    },
+    {
+      "id": "save-artifact",
+      "role": "sink",
+      "op": "code:write_artifact",
+      "consumes": "generated_adf",
+      "params": {
+        "path": "pipelines/custom/{{pipeline_id_slug}}.json",
+        "content": "{{generated_adf}}"
+      }
+    }
+  ]
+}

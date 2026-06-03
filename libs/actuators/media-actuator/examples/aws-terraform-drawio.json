@@ -12,7 +12,7 @@
       "type": "transform",
       "op": "drawio_from_graph",
       "params": {
-        "input_path": "knowledge/public/schemas/architecture-adf.example.json"
+        "input_path": "knowledge/product/schemas/architecture-adf.example.json"
       }
     },
     {

@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge/product/schemas/contextual-intent-clarification-policy.schema.json",
+  "title": "Contextual Intent Clarification Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults", "intent_rules"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_missing_inputs_without_clarification", "min_confidence_to_skip", "always_ask_for"],
+      "properties": {
+        "max_missing_inputs_without_clarification": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_confidence_to_skip": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "always_ask_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "intent_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/intentRule"
+      }
+    }
+  },
+  "$defs": {
+    "intentRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "intent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shapes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+          }
+        },
+        "max_missing_inputs_without_clarification": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_confidence_to_skip": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "always_ask_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "force_clarification_patterns": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "enum": ["contains", "regex"] },
+                  "value": { "type": "string", "minLength": 1 }
+                },
+                "required": ["type", "value"]
+              }
+            ]
+          }
+        },
+        "never_ask_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": ["intent_id"]
+    }
+  }
+}

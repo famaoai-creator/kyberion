@@ -25,7 +25,7 @@ export interface DynamicPolicy {
 class DynamicPermissionGuard {
   private static instance: DynamicPermissionGuard;
   private policies: DynamicPolicy[] = [];
-  private readonly POLICY_PATH = pathResolver.resolve('knowledge/governance/dynamic-policies.json');
+  private readonly POLICY_PATH = pathResolver.resolve('knowledge/product/governance/dynamic-policies.json');
 
   private constructor() {
     this.loadPolicies();

@@ -70,7 +70,18 @@
       "panel_body_font_size": 12,
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
-      "panel_body_margin": [0.12, 0.12, 0.12, 0.15]
+      "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
+      "semantic_labels": {
+        "roi": "  投資対効果",
+        "problem": "  課題のポイント",
+        "default": "  根拠データ"
+      },
+      "visual_label": {
+        "h": 0.28,
+        "y_from_bottom": 0.32,
+        "font_size": 9,
+        "margin": [2, 4, 2, 4]
+      }
     },
     "two_column_risk": {
       "left_w": 4.45,
@@ -84,7 +95,11 @@
       "panel_body_font_size": 12,
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
-      "panel_body_margin": [0.12, 0.12, 0.12, 0.15]
+      "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
+      "panel_label": "  リスク対策",
+      "panel_header_fill": "C00000",
+      "panel_body_fill": "FFF0F0",
+      "panel_body_color": "7F1D1D"
     },
     "timeline": {
       "left_w": 2.9,
@@ -98,7 +113,19 @@
       "panel_body_font_size": 12,
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
-      "panel_body_margin": [0.12, 0.12, 0.12, 0.15]
+      "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
+      "semantic_labels": {
+        "plan": "  実施計画",
+        "default": "  ロードマップ"
+      },
+      "visual_label": {
+        "fill": "DCFCE7",
+        "color": "166534",
+        "h": 0.28,
+        "y_from_bottom": 0.32,
+        "font_size": 9,
+        "margin": [2, 4, 2, 4]
+      }
     },
     "architecture_panel": {
       "desc_h": 1.7,
@@ -112,7 +139,8 @@
       "panel_body_font_size": 12,
       "panel_body_line_spacing_pct": 150,
       "panel_header_margin": [0, 0, 0, 0.12],
-      "panel_body_margin": [0.12, 0.12, 0.12, 0.15]
+      "panel_body_margin": [0.12, 0.12, 0.12, 0.15],
+      "panel_label": "  システム構成概要"
     },
     "decision_cta": {
       "msg_y_offset": 0.15,

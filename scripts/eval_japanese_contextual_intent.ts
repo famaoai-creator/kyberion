@@ -55,8 +55,8 @@ function compareExpectedFrame(
 }
 
 async function main(): Promise<void> {
-  const corpusPath = pathResolver.knowledge('public/governance/japanese-contextual-intent-corpus.json');
-  const schemaPath = pathResolver.knowledge('public/schemas/japanese-contextual-intent-corpus.schema.json');
+  const corpusPath = pathResolver.knowledge('product/governance/japanese-contextual-intent-corpus.json');
+  const schemaPath = pathResolver.knowledge('product/schemas/japanese-contextual-intent-corpus.schema.json');
   const corpus = readJsonFile<CorpusFile>(corpusPath);
   const validate = compileSchemaFromPath(ajv, schemaPath);
 

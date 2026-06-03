@@ -1,4 +1,4 @@
-import vocabularyCatalog from "../../../../../knowledge/public/orchestration/user-facing-vocabulary.json";
+import vocabularyCatalog from "../../../../../knowledge/product/orchestration/user-facing-vocabulary.json";
 
 export type SupportedLocale = "en" | "ja";
 

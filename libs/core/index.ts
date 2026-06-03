@@ -1210,6 +1210,27 @@ export * from './trust-engine.js';
 export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
+export {
+  recordConfigFallback,
+  listFallbacks,
+  markResolved,
+  pruneResolved,
+} from './config-fallback-registry.js';
+export type { ConfigFallbackEntry, ConfigFallbackReason } from './config-fallback-registry.js';
+export {
+  recordUnclassifiedError,
+  listUnclassifiedErrors,
+  markReconciled as markUnclassifiedReconciled,
+  pruneReconciled as pruneUnclassifiedReconciled,
+} from './unclassified-error-registry.js';
+export type { UnclassifiedErrorEntry } from './unclassified-error-registry.js';
+export {
+  recordUnhandledIntent,
+  listUnhandledIntents,
+  markIntentsReconciled,
+  pruneReconciledIntents,
+} from './unhandled-intent-registry.js';
+export type { UnhandledIntentEntry, IntentMissType } from './unhandled-intent-registry.js';
 
 // Shared Business Types
 export * from './shared-business-types.js';

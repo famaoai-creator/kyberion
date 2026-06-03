@@ -43,8 +43,8 @@ interface VoiceTaskProfileCatalog {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const CATALOG_PATH = pathResolver.knowledge('public/governance/voice-task-profile-catalog.json');
-const SCHEMA_PATH = pathResolver.knowledge('public/schemas/voice-task-profile-catalog.schema.json');
+const CATALOG_PATH = pathResolver.knowledge('product/governance/voice-task-profile-catalog.json');
+const SCHEMA_PATH = pathResolver.knowledge('product/schemas/voice-task-profile-catalog.schema.json');
 
 let validateFn: ValidateFunction | null = null;
 let cachedCatalog: VoiceTaskProfileCatalog | null = null;

@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "name": "execute-task-plan",
+  "version": "2.0.0",
+  "description": "SDLC implementation execution: read task-plan.json, topologically order tasks, then spawn a Claude Code sub-agent per task with full `claude_code` tool preset. Each task runs to completion (or failure); downstream tasks skip when dependencies fail. Every task's outcome lands in task-execution-log.jsonl under mission evidence.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "",
+    "model": "opus",
+    "cwd": "",
+    "max_tasks": 0,
+    "halt_on_failure": false
+  },
+  "steps": [
+    {
+      "id": "execute",
+      "role": "source",
+      "op": "wisdom:execute_task_plan",
+      "produces": { "channel": "execution", "type": "TaskPlanExecution" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "model": "{{model}}",
+        "cwd": "{{cwd}}",
+        "max_tasks": "{{max_tasks}}",
+        "halt_on_failure": "{{halt_on_failure}}"
+      }
+    },
+    {
+      "id": "log_execution",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "execution",
+      "params": {
+        "message": "Task plan {{execution.plan_version}} executed: {{execution.succeeded}}/{{execution.total_tasks}} succeeded, {{execution.failed}} failed, {{execution.skipped}} skipped. Log: {{execution.log_path}}"
+      }
+    }
+  ]
+}
