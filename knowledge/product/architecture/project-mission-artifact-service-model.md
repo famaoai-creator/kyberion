@@ -59,6 +59,8 @@ It holds:
 - vault references
 - active missions
 - related task sessions
+- live operational state under `active/projects/<tier>/<tenant_or_shared>/<project_id>/state/`
+- instantiated project OS docs under `active/projects/<tier>/<tenant_or_shared>/<project_id>/project-os/`
 
 Examples:
 
@@ -255,6 +257,8 @@ In short:
 - `Service Binding` clarifies external system contracts
 - `Mission` remains the durable execution container
 - `Task Session` remains the conversational work container
+- `active/projects/.../state/` holds the operational truth of the project
+- `knowledge/product/evolution/` and `knowledge/product/incidents/` hold distilled reusable memory
 
 ## 9. Observability
 

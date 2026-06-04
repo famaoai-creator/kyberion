@@ -290,6 +290,11 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   logger.info(`📝 Wisdom written to ${path.relative(rootDir, wisdomFilePath)}`);
 
   state.status = transitionStatus(state.status, 'completed');
+  state.context = {
+    ...(state.context || {}),
+    distill_output_path: pathResolver.rootResolve(path.join(outputDir, wisdomFileName)),
+    distill_output_dir: outputDir,
+  } as any;
   state.history.push({
     ts: new Date().toISOString(),
     event: 'DISTILL',

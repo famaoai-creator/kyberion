@@ -129,6 +129,28 @@ describe('service-actuator handleAction', () => {
     expect(result).toEqual({ output: 'cli-output' });
   });
 
+  it('delegates CLI mode to service presets when a matching preset exists', async () => {
+    process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
+    mocks.executeServicePreset.mockResolvedValue({ ok: true, delegated: true });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      service_id: 'voice',
+      mode: 'CLI',
+      action: 'speak_local',
+      params: { text: 'hello' },
+    });
+
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'voice',
+      'speak_local',
+      { text: 'hello' },
+      'none',
+    );
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, delegated: true });
+  });
+
   it('executes MCP mode when unsafe CLI is enabled', async () => {
     process.env.KYBERION_ALLOW_UNSAFE_CLI = 'true';
     mocks.executeMcp.mockResolvedValue({ tools: [] });

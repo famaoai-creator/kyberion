@@ -1,6 +1,7 @@
 import {
   pathResolver,
   transitionStatus,
+  syncProjectOperationalStateFromMission,
 } from '@agent/core';
 import { getCurrentBranch, getGitHash } from './mission-git.js';
 import {
@@ -28,8 +29,31 @@ import {
 } from './mission-project-ledger.js';
 import { prewarmMissionTeam as _prewarmMissionTeam, showMissionTeam as _showMissionTeam, staffMissionTeam as _staffMissionTeam } from './mission-runtime.js';
 import { distillMission as _distillMission } from './mission-distill.js';
+import { dispatchMissionTickets as _dispatchMissionTickets } from './mission-ticket-dispatch.js';
+import { dispatchMissionWorkItems as _dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import { sealMission as _sealMission } from './mission-seal.js';
 import { loadState, saveState, readFocusedMissionId, writeFocusedMissionId } from './mission-state.js';
+
+async function syncProjectOperationalStateIfLinked(missionId: string): Promise<void> {
+  const state = loadState(missionId.toUpperCase());
+  if (!state?.relationships?.project?.project_id) return;
+  try {
+    syncProjectOperationalStateFromMission({
+      mission_id: state.mission_id,
+      mission_type: state.mission_type,
+      tier: state.tier,
+      status: state.status,
+      tenant_slug: state.tenant_slug,
+      tenant_id: state.tenant_id,
+      relationships: state.relationships,
+      assigned_persona: state.assigned_persona,
+      context: state.context,
+      outcome_contract: state.outcome_contract,
+    });
+  } catch (err: any) {
+    console.warn(`[project-state] sync skipped for ${state.mission_id}: ${err?.message || err}`);
+  }
+}
 
 export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
   const missionFocusPath = pathResolver.shared('runtime/current_mission_focus.json');
@@ -51,11 +75,11 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       tenantId: string = 'default',
       missionType: string = 'development',
       visionRef?: string,
-      persona: string = 'Ecosystem Architect',
+      persona: string = 'worker',
       relationships: any = {},
       tenantSlug?: string,
     ) {
-      return _createMission({
+      const result = await _createMission({
         id,
         tier,
         tenantId,
@@ -66,11 +90,13 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         relationships,
         rootDir,
       });
+      await syncProjectOperationalStateIfLinked(id);
+      return result;
     },
     async start(
       id: string,
       tier: 'personal' | 'confidential' | 'public' = 'confidential',
-      persona: string = 'Ecosystem Architect',
+      persona: string = 'worker',
       tenantId: string = 'default',
       missionType: string = 'development',
       visionRef?: string,
@@ -88,15 +114,19 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         relationships,
         rootDir,
       });
+      await syncProjectOperationalStateIfLinked(id);
     },
     delegateMission(id: string, agentId: string, a2aMessageId: string) {
-      return _delegateMission(id, agentId, a2aMessageId, syncProjectLedgerIfLinkedInternal);
+      return _delegateMission(id, agentId, a2aMessageId, syncProjectLedgerIfLinkedInternal)
+        .then(() => syncProjectOperationalStateIfLinked(id));
     },
     importMission(id: string, remoteUrl: string) {
-      return _importMission(id, remoteUrl, transitionStatus as any, syncProjectLedgerIfLinkedInternal);
+      return _importMission(id, remoteUrl, transitionStatus as any, syncProjectLedgerIfLinkedInternal)
+        .then(() => syncProjectOperationalStateIfLinked(id));
     },
     verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
-      return _verifyMission(id, result, note, transitionStatus as any, syncProjectLedgerIfLinkedInternal);
+      return _verifyMission(id, result, note, transitionStatus as any, syncProjectLedgerIfLinkedInternal)
+        .then(() => syncProjectOperationalStateIfLinked(id));
     },
     finishMission(id: string, seal = false) {
       return _finishMission(id, seal, {
@@ -106,7 +136,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         sealMission: _sealMission,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
         transitionStatus: transitionStatus as any,
-      });
+      }).then(() => syncProjectOperationalStateIfLinked(id));
     },
     createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
       return _createCheckpoint({
@@ -117,7 +147,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         writeFocusedMissionId: writeFocusedMissionIdBound,
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
-      });
+      }).then(() => (explicitMissionId ? syncProjectOperationalStateIfLinked(explicitMissionId) : undefined));
     },
     resumeMission(id?: string) {
       return _resumeMission(id, {
@@ -125,10 +155,11 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         writeFocusedMissionId: writeFocusedMissionIdBound,
         getCurrentBranch,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
-      });
+      }).then(() => (id ? syncProjectOperationalStateIfLinked(id) : Promise.resolve()));
     },
     recordTask(missionId: string, description: string, details: any = {}) {
-      return _recordTask(missionId, description, details);
+      return _recordTask(missionId, description, details)
+        .then(() => syncProjectOperationalStateIfLinked(missionId));
     },
     recordEvidence(
       missionId: string,
@@ -149,7 +180,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         actorType,
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
-      });
+      }).then(() => syncProjectOperationalStateIfLinked(missionId));
     },
     purgeMissions(dryRun = false) {
       return _purgeMissions(rootDir, dryRun);
@@ -158,7 +189,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       return _showMissionTeam(id, refresh, rootDir);
     },
     staffMissionTeam(id: string) {
-      return _staffMissionTeam(id, rootDir);
+      return _staffMissionTeam(id, rootDir).then(() => syncProjectOperationalStateIfLinked(id));
     },
     prewarmMissionTeam(id: string, teamRolesArg?: string) {
       return _prewarmMissionTeam(id, teamRolesArg);
@@ -170,7 +201,38 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       return _grantMissionSudo(missionId, on, ttl);
     },
     distillMission(id: string) {
-      return _distillMission(id, rootDir);
+      return _distillMission(id, rootDir).then(() => syncProjectOperationalStateIfLinked(id));
+    },
+    dispatchMissionTickets(
+      id: string,
+      options?: {
+        targets?: Array<'workitem' | 'github' | 'jira'>;
+        liveTargets?: Array<'workitem' | 'github' | 'jira'>;
+        github?: { owner?: string; repo?: string };
+        jira?: { domain?: string; projectKey?: string };
+      },
+    ) {
+      const state = loadState(id.toUpperCase());
+      if (!state) {
+        throw new Error(`Mission ${id.toUpperCase()} not found.`);
+      }
+      return _dispatchMissionTickets(state, options);
+    },
+    dispatchMissionWorkItems(
+      id: string,
+      options?: {
+        mode?: 'auto' | 'agent' | 'subagent';
+        limit?: number;
+        statuses?: Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>;
+        sources?: Array<'local' | 'github' | 'jira' | 'peer'>;
+        finalStatus?: 'review' | 'done';
+      },
+    ) {
+      const state = loadState(id.toUpperCase());
+      if (!state) {
+        throw new Error(`Mission ${id.toUpperCase()} not found.`);
+      }
+      return _dispatchMissionWorkItems(state, options);
     },
     sealMission(id: string) {
       return _sealMission(id);

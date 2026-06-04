@@ -1,4 +1,4 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, executeMcp, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog, classifyError } from '@agent/core';
+import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, executeMcp, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog, classifyError, getServicePresetRecord } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -337,6 +337,23 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
 
     case 'CLI':
       assertUnsafeCliAllowed();
+      const serviceConfig = loadServiceEndpointsCatalog().services[input.service_id];
+      const servicePreset = serviceConfig?.preset_path
+        ? getServicePresetRecord(input.service_id, serviceConfig.preset_path)
+        : null;
+      if (servicePreset?.operations?.[input.action]) {
+        try {
+          const presetResult = await executeServicePreset(
+            input.service_id,
+            input.action,
+            input.params,
+            input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+          );
+          return presetResult;
+        } catch (error) {
+          logger.info(`  - CLI preset delegation failed for ${input.service_id}:${input.action}; falling back to raw CLI.`);
+        }
+      }
       const cliBin = `${input.service_id}`; 
       const args = [input.action, ...Object.values(input.params)];
       logger.info(`⌨️  [CLI] Executing: ${cliBin} ${args.join(' ')}`);

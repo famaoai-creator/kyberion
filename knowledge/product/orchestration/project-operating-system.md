@@ -408,3 +408,26 @@ CLI scaffold:
 pnpm project-os:init --name "Sample Project"
 pnpm project-os:init --name "Sample Project" --out active/projects/sample-project/project-os
 ```
+
+## Operational State Store
+
+`project-os/` は文書 scaffold です。実際に動いているプロジェクトの一次情報は、同じ project workspace の `state/` に置きます。
+
+推奨レイアウト:
+
+```text
+active/projects/<tier>/<tenant_or_shared>/<project_id>/
+  project-os/
+  state/
+    project-state.json
+    tracks/<track_id>/track-state.json
+    missions/<mission_id>/mission-link.json
+    task-sessions/<session_id>/session-link.json
+    evidence/
+    distill/
+```
+
+この `state/` は、実行中の状況、現在の track / mission の関係、一次証跡を保持するための場所です。
+Knowledge tier には直接書かず、レビュー・checkpoint・distill を経て `knowledge/product/evolution/` や `knowledge/product/incidents/` に要約して移します。
+
+See also: [`project-operational-state-store.md`](/Users/famao/kyberion/knowledge/product/architecture/project-operational-state-store.md)

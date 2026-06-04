@@ -70,7 +70,7 @@ export async function createMission(
     tenantSlug: rawTenantSlug,
     missionType = 'development',
     visionRef,
-    persona = 'Ecosystem Architect',
+    persona = 'worker',
     relationships = {},
     rootDir,
   } = args;
@@ -204,7 +204,7 @@ export async function startMission(
   const {
     id,
     tier = 'confidential',
-    persona = 'Ecosystem Architect',
+    persona = 'worker',
     tenantId = 'default',
     tenantSlug,
     missionType = 'development',

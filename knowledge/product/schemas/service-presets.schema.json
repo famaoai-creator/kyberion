@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Service Preset",
+  "description": "Canonical operation template for a single service endpoint.",
+  "type": "object",
+  "required": ["service_id", "operations"],
+  "properties": {
+    "service_id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "auth_strategy": { "type": "string" },
+    "setup_hint": { "type": "string" },
+    "allow_unsafe_cli": { "type": "boolean" },
+    "allow_local_network": { "type": "boolean" },
+    "fallback_strategy": { "type": "string" },
+    "operations": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

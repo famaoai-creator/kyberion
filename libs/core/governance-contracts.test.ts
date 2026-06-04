@@ -320,6 +320,14 @@ const CASES: GovernanceSchemaCase[] = [
       },
     },
   },
+    {
+      name: 'service-presets-directory',
+      schemaPath: 'knowledge/product/schemas/service-presets.schema.json',
+      dataPath: 'knowledge/product/orchestration/service-presets/slack.json',
+      invalidPayload: {
+        service_id: 'slack',
+      },
+    },
   {
     name: 'service-bootstrap-catalog',
     schemaPath: 'knowledge/product/schemas/service-bootstrap-catalog.schema.json',
@@ -835,6 +843,24 @@ describe('governance contracts', () => {
     expect(
       endpointDirPayloads.map((payload) => Object.keys((payload as { services?: Record<string, unknown> }).services || {})[0]).sort(),
     ).toEqual(Object.keys(endpointSnapshot.services || {}).sort());
+  });
+
+  it('keeps the canonical service presets directory valid', () => {
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+
+    const presetSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/service-presets.schema.json'),
+    );
+    const presetDirPayloads = readPayloadsFromDir('knowledge/product/orchestration/service-presets');
+    expect(presetDirPayloads.length).toBeGreaterThan(0);
+    for (const payload of presetDirPayloads) {
+      expect(presetSchema(payload)).toBe(true);
+    }
+    expect(
+      presetDirPayloads.map((payload) => (payload as { service_id?: string }).service_id).sort(),
+    ).toContain('slack');
   });
 
   it('keeps the canonical specialist catalog directory aligned with the snapshot', () => {
