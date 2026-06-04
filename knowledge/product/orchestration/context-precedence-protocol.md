@@ -27,6 +27,11 @@ When assembling an execution prompt or operator-facing response, prefer:
 - surface context third
 - transient request text last
 
+The compiled `mission context pack` is the concrete artifact that packages
+mission, project, task, and role-scoped knowledge for delivery to an agent.
+It should be assembled from the higher-precedence layers above, not treated as
+an independent source of truth.
+
 If two sources disagree, the higher-precedence source wins.
 
 ## What Counts As Each Layer

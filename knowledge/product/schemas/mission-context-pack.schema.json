@@ -1,0 +1,284 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-context-pack.schema.json",
+  "title": "Mission Context Pack",
+  "type": "object",
+  "required": [
+    "context_pack_id",
+    "version",
+    "generated_at",
+    "summary",
+    "scope",
+    "recipient",
+    "mission",
+    "sources",
+    "redactions",
+    "delivery"
+  ],
+  "properties": {
+    "context_pack_id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "required": ["tier", "mission_id"],
+      "properties": {
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "track_id": { "type": "string", "minLength": 1 },
+        "task_session_id": { "type": "string", "minLength": 1 },
+        "work_item_id": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "recipient": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["agent", "subagent", "reviewer", "operator", "planner", "tester"] },
+        "team_role": { "type": "string", "minLength": 1 },
+        "agent_id": { "type": "string", "minLength": 1 },
+        "authority_role": { "type": "string", "minLength": 1 },
+        "provider": { "type": ["string", "null"] },
+        "modelId": { "type": ["string", "null"] },
+        "delegation_contract": { "type": ["object", "null"] },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "mission": {
+      "type": "object",
+      "required": ["mission_id", "tier", "status", "assigned_persona"],
+      "properties": {
+        "mission_id": { "type": "string", "minLength": 1 },
+        "mission_type": { "type": "string" },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "status": { "type": "string", "minLength": 1 },
+        "assigned_persona": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "vision_ref": { "type": "string" },
+        "execution_mode": { "type": "string" },
+        "priority": { "type": "number" },
+        "confidence_score": { "type": "number" },
+        "relationships": { "type": "object" },
+        "context": { "type": "object" },
+        "outcome_contract": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "project": {
+      "type": "object",
+      "required": ["project_id", "name", "summary", "status", "tier"],
+      "properties": {
+        "project_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["draft", "active", "paused", "archived"] },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "project_path": { "type": "string", "minLength": 1 },
+        "current_phase": {
+          "type": "string",
+          "enum": ["initiate", "define", "design", "build", "validate", "transfer_run", "run", "unknown"]
+        },
+        "active_track_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "active_mission_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "active_task_session_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "distill_targets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "knowledge_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "last_distilled_at": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "track": {
+      "type": "object",
+      "required": ["track_id", "project_id", "name", "summary", "status", "track_type", "lifecycle_model", "tier"],
+      "properties": {
+        "track_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "active", "paused", "completed", "archived"]
+        },
+        "track_type": {
+          "type": "string",
+          "enum": ["delivery", "change", "release", "incident", "compliance", "operations", "research"]
+        },
+        "lifecycle_model": {
+          "type": "string",
+          "enum": ["sdlc", "continuous_delivery", "incident_response", "continuous_operations", "research_cycle"]
+        },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "primary_locale": { "type": "string" },
+        "release_id": { "type": "string" },
+        "change_scope": { "type": "string" },
+        "gate_profile_id": { "type": "string" },
+        "active_mission_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_artifacts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "task_session": {
+      "type": "object",
+      "required": ["session_id", "surface", "task_type", "status", "mode", "goal", "updated_at"],
+      "properties": {
+        "session_id": { "type": "string", "minLength": 1 },
+        "surface": { "type": "string", "minLength": 1 },
+        "task_type": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "mode": { "type": "string", "minLength": 1 },
+        "goal": {
+          "type": "object",
+          "required": ["summary", "success_condition"],
+          "properties": {
+            "summary": { "type": "string", "minLength": 1 },
+            "success_condition": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": true
+        },
+        "project_context": { "type": "object" },
+        "requirements": { "type": "object" },
+        "artifact": { "type": "object" },
+        "control": { "type": "object" },
+        "outcome_contract": { "type": "object" },
+        "updated_at": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "work_item": {
+      "type": "object",
+      "required": ["item_id", "title", "description", "status", "priority", "source", "source_ref", "project_id"],
+      "properties": {
+        "item_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["backlog", "ready", "in_progress", "blocked", "review", "done", "archived"]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "urgent"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["local", "github", "jira", "peer"]
+        },
+        "source_ref": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "assignee_peer_id": { "type": "string" },
+        "assignee_user_id": { "type": "string" },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "knowledge_hints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "title", "excerpt", "tags"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "excerpt": { "type": "string", "minLength": 1 },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "score": { "type": "number" },
+          "category": { "type": "string" },
+          "source_mission": { "type": "string" },
+          "last_updated": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "mission_state",
+              "mission_team",
+              "project_state",
+              "project_track",
+              "task_session",
+              "work_item",
+              "knowledge_hint",
+              "other"
+            ]
+          },
+          "ref": { "type": "string", "minLength": 1 },
+          "path": { "type": "string" },
+          "summary": { "type": "string" },
+          "captured_at": { "type": "string" },
+          "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+          "tenant_slug": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "redactions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "delivery": {
+      "type": "object",
+      "required": ["mode", "summary"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["prompt", "artifact"] },
+        "summary": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "context_pack_path": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

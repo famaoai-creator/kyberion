@@ -15,6 +15,9 @@ import {
   safeExistsSync,
   listWorkItems,
   updateWorkItem,
+  renderMissionContextPack,
+  resolveMissionContextPack,
+  saveMissionContextPack,
   type A2AMessage,
   type WorkItem,
   type WorkItemSource,
@@ -48,6 +51,8 @@ export interface MissionWorkItemDispatchRecord {
   title: string;
   team_role?: string;
   assignee_peer_id?: string;
+  context_pack_id?: string;
+  context_pack_path?: string;
   execution_mode: MissionWorkItemDispatchMode | 'agent' | 'subagent';
   status: 'created' | 'updated' | 'skipped' | 'failed';
   work_item_status_before?: WorkItemStatus;
@@ -192,6 +197,8 @@ function buildTicketReflectionBody(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  contextPackId?: string;
+  contextPackPath?: string;
   ticketState: 'done' | 'review' | 'blocked';
   responseText: string;
   responsePath: string;
@@ -203,6 +210,8 @@ function buildTicketReflectionBody(input: {
     `Work item: ${input.item.item_id}`,
     input.teamRole ? `Team role: ${input.teamRole}` : '',
     input.assigneePeerId ? `Assignee agent: ${input.assigneePeerId}` : '',
+    input.contextPackId ? `Context pack: ${input.contextPackId}` : '',
+    input.contextPackPath ? `Context pack path: ${input.contextPackPath}` : '',
     `Result state: ${input.ticketState}`,
     `Response path: ${input.responsePath}`,
     '',
@@ -259,6 +268,8 @@ async function reflectTicketOutcome(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  contextPackId?: string;
+  contextPackPath?: string;
   finalStatus: MissionWorkItemDispatchFinalStatus;
   responseText: string;
   responsePath: string;
@@ -287,6 +298,8 @@ async function reflectTicketOutcome(input: {
     item: input.item,
     teamRole: input.teamRole,
     assigneePeerId: input.assigneePeerId,
+    contextPackId: input.contextPackId,
+    contextPackPath: input.contextPackPath,
     ticketState,
     responseText: input.responseText,
       responsePath: input.responsePath,
@@ -299,6 +312,8 @@ async function reflectTicketOutcome(input: {
     work_item_id: input.item.item_id,
     team_role: input.teamRole,
     assignee_peer_id: input.assigneePeerId,
+    context_pack_id: input.contextPackId,
+    context_pack_path: input.contextPackPath,
     execution_mode: input.executionMode,
     ticket_state: ticketState,
     response_path: input.responsePath,
@@ -318,17 +333,19 @@ async function reflectTicketOutcome(input: {
     record.notes = Array.from(new Set([...(Array.isArray(record.notes) ? record.notes as string[] : []), ...notes]));
   }, ticketState);
 
-  updateNextTasksReflection(input.missionPath, taskId, {
-    reflected_at: new Date().toISOString(),
-    ticket_state: ticketState,
-    ticket_reply_path: reflectionPath,
-    response_path: input.responsePath,
-    response_excerpt: input.responseExcerpt,
-    result_status: ticketState,
-    review_required: ticketState === 'review',
-    blocked: ticketState === 'blocked',
-    work_item_status_after: input.finalStatus,
-  });
+    updateNextTasksReflection(input.missionPath, taskId, {
+      reflected_at: new Date().toISOString(),
+      ticket_state: ticketState,
+      ticket_reply_path: reflectionPath,
+      response_path: input.responsePath,
+      response_excerpt: input.responseExcerpt,
+      context_pack_id: input.contextPackId,
+      context_pack_path: input.contextPackPath,
+      result_status: ticketState,
+      review_required: ticketState === 'review',
+      blocked: ticketState === 'blocked',
+      work_item_status_after: input.finalStatus,
+    });
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
   if (safeExistsSync(githubPath)) {
@@ -444,28 +461,6 @@ async function reflectTicketOutcome(input: {
   };
 }
 
-function buildPrompt(input: {
-  missionId: string;
-  item: WorkItem;
-  teamRole?: string;
-  assigneePeerId?: string;
-}): string {
-  const metadata = (input.item.metadata || {}) as Record<string, unknown>;
-  const lines = [
-    `Execute work item ${input.item.item_id} for mission ${input.missionId}.`,
-    input.teamRole ? `Assigned team role: ${input.teamRole}` : '',
-    input.assigneePeerId ? `Assigned agent: ${input.assigneePeerId}` : '',
-    `Title: ${input.item.title}`,
-    `Description: ${input.item.description}`,
-    metadata.deliverable ? `Deliverable: ${String(metadata.deliverable)}` : '',
-    metadata.target_path ? `Target path: ${String(metadata.target_path)}` : '',
-    metadata.assignee_label ? `Assignee label: ${String(metadata.assignee_label)}` : '',
-    '',
-    'Return a concrete completion note, include any artifact paths written, and call out blockers explicitly.',
-  ].filter(Boolean);
-  return lines.join('\n');
-}
-
 function validateWorkItemGranularity(item: WorkItem, assigneePeerId?: string): { ok: boolean; notes: string[] } {
   const notes: string[] = [];
   const description = String(item.description || '').trim();
@@ -518,6 +513,8 @@ function buildDispatchResponseArtifact(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  contextPackId?: string;
+  contextPackPath?: string;
   executionMode: MissionWorkItemDispatchMode | 'agent' | 'subagent';
   responseText: string;
   prompt: string;
@@ -528,6 +525,8 @@ function buildDispatchResponseArtifact(input: {
     item_id: input.item.item_id,
     team_role: input.teamRole,
     assignee_peer_id: input.assigneePeerId,
+    context_pack_id: input.contextPackId,
+    context_pack_path: input.contextPackPath,
     execution_mode: input.executionMode,
     prompt: input.prompt,
     response_text: input.responseText,
@@ -537,20 +536,80 @@ function buildDispatchResponseArtifact(input: {
   return { filePath, payload };
 }
 
+function buildWorkItemPromptBody(input: {
+  missionId: string;
+  item: WorkItem;
+  teamRole?: string;
+  assigneePeerId?: string;
+}): string {
+  const metadata = (input.item.metadata || {}) as Record<string, unknown>;
+  const lines = [
+    `Execute work item ${input.item.item_id} for mission ${input.missionId}.`,
+    input.teamRole ? `Assigned team role: ${input.teamRole}` : '',
+    input.assigneePeerId ? `Assigned agent: ${input.assigneePeerId}` : '',
+    `Title: ${input.item.title}`,
+    `Description: ${input.item.description}`,
+    metadata.deliverable ? `Deliverable: ${String(metadata.deliverable)}` : '',
+    metadata.target_path ? `Target path: ${String(metadata.target_path)}` : '',
+    metadata.assignee_label ? `Assignee label: ${String(metadata.assignee_label)}` : '',
+    '',
+    'Return a concrete completion note, include any artifact paths written, and call out blockers explicitly.',
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+async function buildWorkItemDispatchContext(input: {
+  missionPath: string;
+  missionId: string;
+  missionState: MissionState;
+  item: WorkItem;
+  teamRole?: string;
+  assigneePeerId?: string;
+}): Promise<{ prompt: string; contextPackId: string; contextPackPath: string }> {
+  const contextPack = await resolveMissionContextPack({
+    missionId: input.missionId,
+    tier: input.missionState.tier,
+    tenantSlug: input.missionState.tenant_slug,
+    recipientKind: input.assigneePeerId ? 'agent' : 'subagent',
+    teamRole: input.teamRole,
+    assigneePeerId: input.assigneePeerId,
+    workItemId: input.item.item_id,
+    projectId: input.missionState.relationships?.project?.project_id || input.item.project_id,
+    trackId: input.missionState.relationships?.track?.track_id,
+    workItem: input.item,
+    missionState: input.missionState,
+  });
+  if (!contextPack) {
+    throw new Error(`Unable to resolve mission context pack for ${input.missionId}`);
+  }
+  const contextPackPath = saveMissionContextPack(input.missionPath, contextPack);
+  const prompt = [
+    renderMissionContextPack(contextPack),
+    '',
+    buildWorkItemPromptBody({
+      missionId: input.missionId,
+      item: input.item,
+      teamRole: input.teamRole,
+      assigneePeerId: input.assigneePeerId,
+    }),
+  ].join('\n');
+  return {
+    prompt,
+    contextPackId: contextPack.context_pack_id,
+    contextPackPath,
+  };
+}
+
 async function routeToAgentOrSubagent(input: {
   missionId: string;
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  prompt: string;
   mode: MissionWorkItemDispatchMode;
   adapters: WorkItemDispatchAdapters;
 }): Promise<{ executionMode: 'agent' | 'subagent'; responseText: string; notes: string[] }> {
-  const prompt = buildPrompt({
-    missionId: input.missionId,
-    item: input.item,
-    teamRole: input.teamRole,
-    assigneePeerId: input.assigneePeerId,
-  });
+  const prompt = input.prompt;
 
   const notes: string[] = [];
   if (input.mode === 'subagent' || (!input.assigneePeerId && input.mode === 'auto')) {
@@ -669,11 +728,21 @@ export async function dispatchMissionWorkItems(
       continue;
     }
 
+    const dispatchContext = await buildWorkItemDispatchContext({
+      missionPath,
+      missionId,
+      missionState: state,
+      item,
+      teamRole,
+      assigneePeerId,
+    });
+
     const response = await routeToAgentOrSubagent({
       missionId,
       item,
       teamRole,
       assigneePeerId,
+      prompt: dispatchContext.prompt,
       mode,
       adapters,
     });
@@ -686,18 +755,17 @@ export async function dispatchMissionWorkItems(
       item,
       teamRole,
       assigneePeerId,
+      contextPackId: dispatchContext.contextPackId,
+      contextPackPath: dispatchContext.contextPackPath,
       executionMode: response.executionMode,
       responseText: response.responseText,
-      prompt: buildPrompt({
-        missionId,
-        item,
-        teamRole,
-        assigneePeerId,
-      }),
+      prompt: dispatchContext.prompt,
     });
     writeDispatchArtifact(artifact.filePath, artifact.payload);
     record.response_path = artifact.filePath;
     record.response_excerpt = response.responseText.slice(0, 400);
+    record.context_pack_id = dispatchContext.contextPackId;
+    record.context_pack_path = dispatchContext.contextPackPath;
 
     updateWorkItem({
       itemId: item.item_id,
@@ -710,6 +778,8 @@ export async function dispatchMissionWorkItems(
         last_dispatch_mission_id: missionId,
         last_dispatch_response_path: artifact.filePath,
         last_dispatch_response_excerpt: record.response_excerpt,
+        last_context_pack_id: dispatchContext.contextPackId,
+        last_context_pack_path: dispatchContext.contextPackPath,
       },
     });
 
@@ -719,6 +789,8 @@ export async function dispatchMissionWorkItems(
       item,
       teamRole,
       assigneePeerId,
+      contextPackId: dispatchContext.contextPackId,
+      contextPackPath: dispatchContext.contextPackPath,
       finalStatus,
       responseText: response.responseText,
       responsePath: artifact.filePath,
@@ -746,6 +818,8 @@ export async function dispatchMissionWorkItems(
       status_after: finalStatus,
       ticket_state_after: reflection.ticketState,
       ticket_reflection_path: reflection.reflectionPath || undefined,
+      context_pack_id: dispatchContext.contextPackId,
+      context_pack_path: dispatchContext.contextPackPath,
     });
     record.status = 'updated';
     record.work_item_status_after = finalStatus;
