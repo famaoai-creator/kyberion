@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tool-runtime-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "managed_roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tool_runtime_root": { "type": "string", "minLength": 1 },
+        "cache_root": { "type": "string", "minLength": 1 }
+      },
+      "required": ["tool_runtime_root", "cache_root"]
+    },
+    "mode_preference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "python": { "type": "string", "enum": ["trial_first", "installed_first", "installed_only"] },
+        "node": { "type": "string", "enum": ["trial_first", "installed_first", "installed_only"] },
+        "system": { "type": "string", "enum": ["trial_first", "installed_first", "installed_only"] }
+      },
+      "required": ["python", "node", "system"]
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "install_requires_approval": { "type": "boolean" },
+        "pin_requires_approval": { "type": "boolean" }
+      },
+      "required": ["install_requires_approval", "pin_requires_approval"]
+    }
+  },
+  "required": ["version", "managed_roots", "mode_preference", "approval"]
+}

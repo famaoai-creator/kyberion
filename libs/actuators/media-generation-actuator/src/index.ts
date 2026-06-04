@@ -207,6 +207,29 @@ function maybeCopyArtifact(sourcePath: string, targetPath?: string): string | un
   return targetPath;
 }
 
+function resolveImageArtifactFormat(sourcePath: string): string {
+  const ext = path.extname(sourcePath).toLowerCase().replace(/^\./, '');
+  return ext || 'jpg';
+}
+
+function resolveImageProviderPreference(params: any): string[] | undefined {
+  const explicitBackendId = String(
+    params?.backend_id
+    || params?.image_adf?.engine?.backend_id
+    || '',
+  ).trim();
+  if (explicitBackendId) {
+    const backendTokens = explicitBackendId.split('.').filter(Boolean);
+    const tail = backendTokens[backendTokens.length - 1] || explicitBackendId;
+    if (tail === 'local_flux' || explicitBackendId === 'local_flux') return ['local_flux'];
+    if (tail === 'comfyui' || explicitBackendId === 'media-generation.comfyui') return ['comfyui'];
+    if (tail === 'llm_api') return ['llm_api'];
+  }
+
+  const preference = params?.provider_preference || params?.providerPreference;
+  return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
+}
+
 function preparePromptBasedGeneration(action: string, params: any): PromptGenerationRequest {
   const compiled =
     action === 'generate_music' && params.music_adf ? compileMusicGenerationADF(params.music_adf) :
@@ -319,6 +342,35 @@ async function handlePromptBasedGeneration(action: string, params: any) {
   });
   let result: any = null;
   try {
+    if (action === 'generate_image' && !params.workflow && !params.workflow_path && !params.image_adf) {
+      const { generateImage } = await import('@agent/core');
+      const bridgeRes = await generateImage({
+        prompt: params.prompt || '',
+        aspectRatio: params.aspect_ratio || params.aspectRatio,
+        mode: params.mode,
+        providerPreference: resolveImageProviderPreference(params),
+        targetPath: params.target_path || params.targetPath,
+        awaitCompletion: params.await_completion ?? true,
+      });
+
+      if (bridgeRes.status === 'failed') {
+        throw new Error(bridgeRes.error || 'generation_failed');
+      }
+
+      result = {
+        status: 'succeeded',
+        action,
+        prompt_id: bridgeRes.promptId || 'direct_api',
+        artifacts: bridgeRes.path ? [{ id: 'primary', format: resolveImageArtifactFormat(bridgeRes.path), path: bridgeRes.path }] : [],
+        artifact: bridgeRes.path ? { id: 'primary', format: resolveImageArtifactFormat(bridgeRes.path), path: bridgeRes.path } : null,
+        copied_to: bridgeRes.path,
+        backend_id: bridgeRes.provider,
+      };
+
+      traceCtx.endSpan('ok');
+      return { ...result, ...finalizeActuatorTrace(traceCtx) };
+    }
+
     const { compiled, workflow } = preparePromptBasedGeneration(action, params);
     result = await executeServicePreset('media-generation', action, {
       ...params,

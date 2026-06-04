@@ -90,7 +90,11 @@ describe('vision-actuator legacy facade', () => {
 
     const result = await handleAction({
       action: 'ocr_image',
-      params: { path: 'active/shared/tmp/example.png', language: 'eng' },
+      params: {
+        path: 'active/shared/tmp/example.png',
+        language: 'eng',
+        provider_preference: ['tesseract'],
+      },
     });
 
     expect(result).toEqual({
@@ -99,6 +103,8 @@ describe('vision-actuator legacy facade', () => {
       language: 'eng',
       text: 'hello world',
       confidence: 93,
+      lines: undefined,
+      provider: 'tesseract',
     });
   });
 });

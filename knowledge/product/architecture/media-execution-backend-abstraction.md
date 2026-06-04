@@ -22,6 +22,7 @@ Kyberion treats image, voice, music, and video as separate modalities, but they 
 ## What Is Modal-Specific
 
 - image generation can resolve to API or CLI-backed service presets
+- image generation can also resolve to Apple Silicon local FLUX via `mflux` when `local_flux` is available
 - voice generation can resolve to local TTS or clone-capable engines
 - video rendering can resolve to HyperFrames/ffmpeg-style render backends
 
@@ -43,6 +44,21 @@ It provides a small, governed list of backends for:
 - `voice`
 - `video`
 - `music`
+
+For local FLUX image generation, use the governed image backend `media-generation.local_flux` and the environment policy defined in `libs/core/image-generation-policy.ts`:
+
+- `KYBERION_MFLUX_PACKAGE`
+- `KYBERION_MFLUX_MODEL`
+- `KYBERION_MFLUX_STEPS`
+- `KYBERION_MFLUX_QUANTIZE`
+- `KYBERION_MFLUX_TIMEOUT_MS`
+
+The backend launch command itself is now resolved through the governed tool runtime abstraction:
+
+- `libs/core/tool-runtime-policy.ts`
+- `libs/core/tool-runtime-registry.ts`
+- `knowledge/product/governance/tool-runtime-policy.json`
+- `knowledge/product/governance/tool-runtime-registry.json`
 
 ## Design Rule
 

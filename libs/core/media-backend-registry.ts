@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
+import { getToolRuntimeRecord } from './tool-runtime-registry.js';
 import { getVoiceEngineRegistry, resolveVoiceEngineForPlatform, type VoiceEngineRecord } from './voice-engine-registry.js';
 
 export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
@@ -38,6 +39,7 @@ export interface MediaBackendRegistry {
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/media-backend-registry.json');
+const LOCAL_FLUX_TOOL_BACKEND = getToolRuntimeRecord('mflux').trial_backend;
 
 const FALLBACK_REGISTRY: MediaBackendRegistry = {
   version: 'fallback',
@@ -59,6 +61,20 @@ const FALLBACK_REGISTRY: MediaBackendRegistry = {
       supports: { artifact_formats: ['png', 'jpg', 'jpeg', 'webp'], async: true },
       service_id: 'media-generation',
       action: 'generate_image',
+    },
+    {
+      backend_id: 'media-generation.local_flux',
+      modality: 'image',
+      display_name: 'Local FLUX Image Generation',
+      kind: 'cli',
+      provider: 'mflux',
+      status: 'active',
+      platforms: ['darwin'],
+      supports: { artifact_formats: ['png', 'jpg', 'jpeg', 'webp'], async: false },
+      command: LOCAL_FLUX_TOOL_BACKEND.command,
+      args: LOCAL_FLUX_TOOL_BACKEND.args,
+      fallback_backend_id: 'media-generation.comfyui',
+      notes: 'Apple Silicon local FLUX generation via the governed tool runtime registry.',
     },
     {
       backend_id: 'voice.local_say',
@@ -189,14 +205,18 @@ export function getMediaBackendRecord(
   const registry = getRegistry();
   const defaultBackendId = modality ? registry.default_backend_ids[modality] : undefined;
   const resolvedId = backendId || defaultBackendId || registry.default_backend_ids.image;
+  const aliasId =
+    modality === 'image' && resolvedId === 'local_flux'
+      ? 'media-generation.local_flux'
+      : resolvedId;
 
-  const voiceBackendMatch = resolvedId.startsWith('voice.') && !registry.backends.find((backend) => backend.backend_id === resolvedId);
+  const voiceBackendMatch = aliasId.startsWith('voice.') && !registry.backends.find((backend) => backend.backend_id === aliasId);
   if (voiceBackendMatch || modality === 'voice') {
-    return resolveVoiceBackendRecord(resolvedId);
+    return resolveVoiceBackendRecord(aliasId);
   }
 
   return (
-    registry.backends.find((backend) => backend.backend_id === resolvedId)
+    registry.backends.find((backend) => backend.backend_id === aliasId)
     || registry.backends.find((backend) => modality ? backend.modality === modality && backend.backend_id === defaultBackendId : false)
     || registry.backends[0]
     || FALLBACK_REGISTRY.backends[0]

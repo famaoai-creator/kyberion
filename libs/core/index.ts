@@ -415,6 +415,26 @@ export * as docxUtils from './src/docx-utils.js';
 // Voice & Presentation
 export { say, speak } from './voice-synth.js';
 export * from './voice-stt.js';
+export * from './native-speech-listen-bridge.js';
+export {
+  AppleVisionOcrProvider,
+  LlmApiOcrProvider,
+  LocalVlmOcrProvider,
+  TesseractOcrProvider,
+  ocrImage,
+  ocrImageWithRouter,
+  AdaptivePolicyRouter as OcrAdaptivePolicyRouter,
+} from './ocr-bridge.js';
+export * from './ocr-types.js';
+export * from './secret-bridge.js';
+export * from './secret-types.js';
+export * from './email-bridge.js';
+export * from './email-types.js';
+export * from './image-generation-bridge.js';
+export * from './image-generation-types.js';
+export * from './image-generation-policy.js';
+export * from './tool-runtime-policy.js';
+export * from './tool-runtime-registry.js';
 export * from './voice-tts-config.js';
 export * from './voice-runtime-policy.js';
 export * from './voice-profile-registry.js';
