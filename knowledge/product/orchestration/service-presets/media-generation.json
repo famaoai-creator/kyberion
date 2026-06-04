@@ -1,6 +1,7 @@
 {
   "service_id": "media-generation",
   "name": "Kyberion Generative Media and Capture Unified Presets",
+  "notes": "Apple Silicon local FLUX image generation is available via media-generation.local_flux with KYBERION_MFLUX_* policy.",
   "recovery_policy": {
     "fallback_strategy": "service_then_cli",
     "retry": {
