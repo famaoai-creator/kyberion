@@ -27,6 +27,7 @@ import {
   createScreenCaptureBridge,
   createScreenRecordingBridge,
   createScreenDisplayInventoryBridge,
+  listToolRuntimeInventory,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
   StubVideoFrameBus,
@@ -325,6 +326,7 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'list_input_devices',
   'list_displays',
   'list_media_devices',
+  'list_tool_runtimes',
   'control_media_devices',
   'collect_artifacts',
   'sample_traces',
@@ -1597,6 +1599,35 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           audio: probe.selection.audio,
           camera: probe.selection.camera,
           supported_actions: probe.supported_actions,
+        },
+      };
+    }
+    case 'list_tool_runtimes': {
+      const inventory = listToolRuntimeInventory(
+        typeof params.requested_mode === 'string'
+          ? params.requested_mode as any
+          : 'trial',
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'tool_runtimes']: {
+          version: inventory.version,
+          platform: inventory.platform,
+          requested_mode: inventory.requested_mode,
+          default_tool_id: inventory.default_tool_id,
+          tools: inventory.items.map((item) => ({
+            tool_id: item.tool.tool_id,
+            display_name: item.tool.display_name,
+            ecosystem: item.tool.ecosystem,
+            lifecycle_stage: item.lifecycle_stage,
+            selected_action: item.selected_action,
+            selected_backend: item.selected_backend,
+            installed: item.installed,
+            requires_install: item.requires_install,
+            managed_env_path: item.managed_env_path,
+            available_commands: item.available_commands,
+            reason: item.reason,
+          })),
         },
       };
     }

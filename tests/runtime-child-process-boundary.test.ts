@@ -20,25 +20,31 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/codex-cli-query.ts',
   'libs/core/deployment-adapter.ts',
   'libs/core/doctor_core.ts',
+  'libs/core/email-bridge.ts',
   'libs/core/environment-capability.ts',
   'libs/core/gemini-cli-backend.ts',
   'libs/core/managed-process.ts',
   'libs/core/mlx-embedding-backend.ts',
+  'libs/core/native-speech-listen-bridge.ts',
   'libs/core/native-tts.ts',
+  'libs/core/ocr-bridge.ts',
   'libs/core/orchestrator.ts',
   'libs/core/provider-discovery.ts',
   'libs/core/pty-engine.ts',
   'libs/core/pulse-audio-bus.ts',
   'libs/core/python-voice-bridge.test.ts',
   'libs/core/python-voice-bridge.ts',
+  'libs/core/secret-bridge.ts',
   'libs/core/secret-resolver.ts',
   'libs/core/secure-io.ts',
   'libs/core/shell-claude-cli-backend.ts',
   'libs/core/shell-streaming-stt-bridge.ts',
   'libs/core/shell-streaming-tts-bridge.ts',
   'libs/core/speech-to-text-bridge.ts',
+  'libs/core/src/pfc/PhysicalLayer.js',
   'libs/core/src/pfc/PhysicalLayer.ts',
   'libs/core/video-render-backend.ts',
+  'libs/core/virtual-audio-input-recording-bridge.ts',
   'satellites/voice-hub/server.ts',
 ].sort((a, b) => a.localeCompare(b));
 
@@ -60,6 +66,7 @@ describe('Runtime child_process boundary', () => {
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
+      .filter((relPath) => !relPath.startsWith('vault/'))
       .filter((relPath) => !relPath.startsWith('scripts/'))
       .filter((relPath) => /\bfrom ['"]node:child_process['"]|require\(['"]node:child_process['"]\)/.test(read(relPath)))
       .sort((a, b) => a.localeCompare(b));

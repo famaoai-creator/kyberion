@@ -634,6 +634,26 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'tool-runtime-policy',
+      schemaPath: 'knowledge/product/schemas/tool-runtime-policy.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/tool-runtime-policy.json')],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+        },
+      ],
+    },
+    {
+      id: 'tool-runtime-registry',
+      schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/tool-runtime-registry.json')],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+        },
+      ],
+    },
+    {
       id: 'voice-sample-ingestion-policy',
       schemaPath: 'knowledge/product/schemas/voice-sample-ingestion-policy.schema.json',
       validPayloads: [

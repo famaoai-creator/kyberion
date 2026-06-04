@@ -1,0 +1,146 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "mflux",
+      "display_name": "mflux Local FLUX Image Generator",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "uvx",
+        "command": "uvx",
+        "args": ["--from", "mflux", "mflux-generate"],
+        "description": "Temporary local FLUX execution without a managed install."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "install", "mflux"],
+        "description": "Install mflux into the managed Python tool environment."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "run", "mflux-generate"],
+        "description": "Run mflux from the managed Python tool environment."
+      },
+      "managed_env_subpath": "tool-runtimes/mflux",
+      "notes": "Apple Silicon FLUX entrypoint. Trial via uvx; promote to installed state after approval."
+    },
+    {
+      "tool_id": "playwright",
+      "display_name": "Playwright Chromium Runtime",
+      "ecosystem": "node",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "npx",
+        "command": "npx",
+        "args": ["playwright", "--version"],
+        "description": "Probe Playwright availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "pnpm",
+        "command": "pnpm",
+        "args": ["exec", "playwright", "install", "chromium"],
+        "description": "Install the Chromium browser binary used by Playwright flows."
+      },
+      "installed_backend": {
+        "kind": "pnpm",
+        "command": "pnpm",
+        "args": ["exec", "playwright", "--version"],
+        "description": "Re-check the Playwright runtime after browser bootstrap."
+      },
+      "managed_env_subpath": "tool-runtimes/playwright",
+      "notes": "Node runtime example: trial via npx, managed browser bootstrap via pnpm exec playwright install chromium."
+    },
+    {
+      "tool_id": "ffmpeg",
+      "display_name": "FFmpeg Media Toolkit",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "ffmpeg",
+        "args": ["-version"],
+        "description": "Probe FFmpeg availability without any install step."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "ffmpeg"],
+        "description": "Install FFmpeg through Homebrew on macOS."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "ffmpeg",
+        "args": ["-version"],
+        "description": "Re-check the installed FFmpeg binary."
+      },
+      "managed_env_subpath": "tool-runtimes/ffmpeg",
+      "notes": "System media example for capture and composition flows."
+    },
+    {
+      "tool_id": "sox",
+      "display_name": "SoX Audio Toolkit",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "sox",
+        "args": ["--version"],
+        "description": "Probe SoX availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "sox"],
+        "description": "Install SoX through Homebrew on macOS."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "sox",
+        "args": ["--version"],
+        "description": "Re-check the installed SoX binary."
+      },
+      "managed_env_subpath": "tool-runtimes/sox",
+      "notes": "Audio capture fallback used by the voice sample recorder."
+    },
+    {
+      "tool_id": "tesseract",
+      "display_name": "Tesseract OCR Toolkit",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "tesseract",
+        "args": ["--version"],
+        "description": "Probe Tesseract availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "tesseract"],
+        "description": "Install Tesseract through Homebrew on macOS."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "tesseract",
+        "args": ["--version"],
+        "description": "Re-check the installed Tesseract binary."
+      },
+      "managed_env_subpath": "tool-runtimes/tesseract",
+      "notes": "OCR fallback example for image and screen recognition flows."
+    }
+  ]
+}

@@ -163,6 +163,54 @@
       "types": "./dist/virtual-audio-input-recording-bridge.d.ts",
       "default": "./dist/virtual-audio-input-recording-bridge.js"
     },
+    "./native-speech-listen-bridge": {
+      "types": "./dist/native-speech-listen-bridge.d.ts",
+      "default": "./dist/native-speech-listen-bridge.js"
+    },
+    "./ocr-bridge": {
+      "types": "./dist/ocr-bridge.d.ts",
+      "default": "./dist/ocr-bridge.js"
+    },
+    "./ocr-types": {
+      "types": "./dist/ocr-types.d.ts",
+      "default": "./dist/ocr-types.js"
+    },
+    "./secret-bridge": {
+      "types": "./dist/secret-bridge.d.ts",
+      "default": "./dist/secret-bridge.js"
+    },
+    "./secret-types": {
+      "types": "./dist/secret-types.d.ts",
+      "default": "./dist/secret-types.js"
+    },
+    "./email-bridge": {
+      "types": "./dist/email-bridge.d.ts",
+      "default": "./dist/email-bridge.js"
+    },
+    "./email-types": {
+      "types": "./dist/email-types.d.ts",
+      "default": "./dist/email-types.js"
+    },
+    "./image-generation-bridge": {
+      "types": "./dist/image-generation-bridge.d.ts",
+      "default": "./dist/image-generation-bridge.js"
+    },
+    "./image-generation-types": {
+      "types": "./dist/image-generation-types.d.ts",
+      "default": "./dist/image-generation-types.js"
+    },
+    "./image-generation-policy": {
+      "types": "./dist/image-generation-policy.d.ts",
+      "default": "./dist/image-generation-policy.js"
+    },
+    "./tool-runtime-policy": {
+      "types": "./dist/tool-runtime-policy.d.ts",
+      "default": "./dist/tool-runtime-policy.js"
+    },
+    "./tool-runtime-registry": {
+      "types": "./dist/tool-runtime-registry.d.ts",
+      "default": "./dist/tool-runtime-registry.js"
+    },
     "./video-frame-bus": {
       "types": "./dist/video-frame-bus.d.ts",
       "default": "./dist/video-frame-bus.js"
@@ -482,6 +530,10 @@
     "./openai-embedding-backend": {
       "types": "./dist/openai-embedding-backend.d.ts",
       "default": "./dist/openai-embedding-backend.js"
+    },
+    "./work-coordination-peer": {
+      "types": "./dist/work-coordination-peer.d.ts",
+      "default": "./dist/work-coordination-peer.js"
     }
   },
   "dependencies": {

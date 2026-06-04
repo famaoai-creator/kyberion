@@ -82,4 +82,35 @@ describe('work coordination peer bridge', () => {
     expect(updateResult.status).toBe(200);
     expect((updateResult.body as any).response.result.item.status).toBe('review');
   });
+
+  it('rejects commands from untrusted peers not in the whitelist', async () => {
+    const item = createWorkItem({
+      title: 'Untrusted peer item',
+      description: 'Verify rejection of untrusted peers',
+      projectId: 'PRJ-UNTRUSTED',
+    });
+
+    const server = createPeerMessagingServer({
+      peerId: 'peer-a',
+      sharedSecret: SHARED_SECRET,
+      responder: createWorkCoordinationPeerResponder(),
+    });
+
+    const untrustedEnvelope = buildWorkCoordinationPeerCommandEnvelope({
+      senderPeerId: 'untrusted-peer',
+      recipientPeerId: 'peer-a',
+      sharedSecret: SHARED_SECRET,
+      command: {
+        command_type: 'claim_request',
+        command_id: 'cmd-claim-untrusted',
+        item_id: item.item_id,
+        actor_peer_id: 'untrusted-peer',
+        purpose: 'implementation',
+        expected_version: 1,
+        idempotency_key: 'idem-claim-untrusted',
+      },
+    });
+
+    await expect(server.processEnvelope(untrustedEnvelope)).rejects.toThrow('untrusted_peer:untrusted-peer');
+  });
 });
