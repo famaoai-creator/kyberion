@@ -223,6 +223,10 @@
       "types": "./dist/service-preset-registry.d.ts",
       "default": "./dist/service-preset-registry.js"
     },
+    "./service-preset-policy": {
+      "types": "./dist/service-preset-policy.d.ts",
+      "default": "./dist/service-preset-policy.js"
+    },
     "./video-frame-bus": {
       "types": "./dist/video-frame-bus.d.ts",
       "default": "./dist/video-frame-bus.js"

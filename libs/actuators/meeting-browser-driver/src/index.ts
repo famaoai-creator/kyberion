@@ -76,7 +76,7 @@ const DEFAULT_MEETING_BROWSER_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
+let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 export interface BrowserDriverOptions {
   /** When true, run a visible Chromium (debugging). Default: false (headed=false). */
@@ -100,10 +100,10 @@ function loadRecoveryPolicy(): Record<string, any> {
   try {
     const manifest = JSON.parse(safeReadFile(MEETING_BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
+    return cachedRecoveryPolicy ?? {};
   } catch (_) {
     cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
+    return cachedRecoveryPolicy ?? {};
   }
 }
 

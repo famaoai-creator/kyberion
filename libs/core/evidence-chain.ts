@@ -74,7 +74,7 @@ export const evidenceChain = {
 
   getLineage: (evidenceId: string) => {
     const registry = evidenceChain._loadRegistry();
-    const lineage = [];
+    const lineage: EvidenceEntry[] = [];
     let currentId: string | null = evidenceId;
 
     while (currentId) {

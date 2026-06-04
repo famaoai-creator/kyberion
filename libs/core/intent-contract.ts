@@ -670,31 +670,32 @@ function buildFallbackIntentContract(
     contextualFrame,
   });
   const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
+  const resolvedExecutionBrief = executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(input));
 
   return attachExecutionProfile(attachCapabilityBundle({
     kind: 'intent-contract',
     source_text: input.text,
-    intent_id: executionBrief?.archetype_id || 'general_request',
+    intent_id: resolvedExecutionBrief.archetype_id || 'general_request',
     goal: {
-      summary: executionBrief?.summary || 'Clarify and respond to the current request',
+      summary: resolvedExecutionBrief.summary || 'Clarify and respond to the current request',
       success_condition:
         'The request is either clarified or answered without violating governance constraints.',
     },
     required_inputs: effectiveRequiredInputs,
     resolution: {
       execution_shape: selectedShape,
-      task_type: executionBrief?.target_actuators?.includes('pptx-generator')
+      task_type: resolvedExecutionBrief.target_actuators?.includes('pptx-generator')
         ? 'presentation_deck'
         : undefined,
     },
-    outcome_ids: executionBrief?.deliverables || [],
+    outcome_ids: resolvedExecutionBrief.deliverables || [],
     approval: {
       requires_approval: false,
     },
     delivery_mode: inferGovernedDeliveryMode(input.text, selectedShape, effectiveRequiredInputs),
     clarification_needed: clarificationAssessment.shouldClarify,
     confidence: 0.25,
-    why: executionBrief
+    why: resolvedExecutionBrief
       ? clarificationAssessment.shouldClarify
         ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
         : `Fallback execution brief was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
@@ -1364,20 +1365,21 @@ export async function compileUserIntentFlow(
 
   if (!intentContract) {
     source = 'fallback';
-    intentContract = buildFallbackIntentContract(resolvedInput, executionBrief);
+    intentContract = buildFallbackIntentContract(resolvedInput, executionBrief ?? undefined);
   }
   if (!workLoop) {
     source = 'fallback';
     workLoop = buildFallbackWorkLoop(resolvedInput, intentContract);
   }
   const routingDecision = deriveAgentRoutingDecision(intentContract, workLoop, resolvedInput.text);
+  const finalExecutionBrief = executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
 
   return {
-    executionBrief,
+    executionBrief: finalExecutionBrief,
     intentContract,
     workLoop,
     routingDecision,
-    clarificationPacket: buildClarificationPacket(intentContract, workLoop, executionBrief),
+    clarificationPacket: buildClarificationPacket(intentContract, workLoop, finalExecutionBrief),
     source,
   };
 }

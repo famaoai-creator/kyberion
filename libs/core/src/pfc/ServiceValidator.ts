@@ -1,6 +1,11 @@
 import { createRequire } from 'node:module';
 import { validatePhysicalDependencies } from './PhysicalLayer.js';
 import { loadServiceEndpointsCatalog } from '../../service-binding.js';
+import {
+  collectServicePresetCliFallbacks,
+  getServicePresetOperationMap,
+  getServicePresetPolicy,
+} from '../../service-preset-policy.js';
 import { safeReadFile, safeExistsSync, safeExec } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
 import { secretGuard } from '../../secret-guard.js';
@@ -127,9 +132,10 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
   try {
     const presetRaw = safeReadFile(resolvedPresetPath, { encoding: 'utf8' }) as string;
     const preset = JSON.parse(presetRaw);
-    const strategy = (preset.auth_strategy || 'none').toLowerCase();
-    const presetSetupHint = typeof preset.setup_hint === 'string' && preset.setup_hint.trim().length > 0
-      ? preset.setup_hint.trim()
+    const presetPolicy = getServicePresetPolicy(preset);
+    const strategy = (presetPolicy.auth_strategy || 'none').toLowerCase();
+    const presetSetupHint = typeof presetPolicy.setup_hint === 'string' && presetPolicy.setup_hint.trim().length > 0
+      ? presetPolicy.setup_hint.trim()
       : undefined;
     const endpoint = loadServiceEndpointsCatalog().services[serviceId];
     const suffixes = endpoint?.credential_suffixes || {};
@@ -155,7 +161,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
     ).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
     const foundSecrets = requiredSecretNames.filter((envName) => Boolean(secretGuard.getSecret(envName)));
     const missingSecrets = requiredSecretNames.filter((envName) => !foundSecrets.includes(envName));
-    const cliFallbacks = collectCliFallbacks(preset);
+    const cliFallbacks = collectServicePresetCliFallbacks(preset);
 
     if (strategy === 'none') {
       return {
@@ -189,11 +195,16 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
     }
 
     // 2. CLI Auth fallback check via health_check commands
-    const alternatives = (preset.alternatives || []).filter((a: any) => a.type === 'cli');
-    for (const alt of alternatives) {
-      if (alt.health_check) {
+    for (const op of Object.values(getServicePresetOperationMap(preset))) {
+      const record = op as Record<string, unknown>;
+      const alternatives = Array.isArray(record.alternatives)
+        ? record.alternatives
+        : [{ ...record, type: record.type || 'api' }];
+      for (const alt of alternatives) {
+        const alternative = alt as Record<string, unknown>;
+        if (alternative.type !== 'cli' || !alternative.health_check) continue;
         try {
-          const parts = alt.health_check.trim().split(/\s+/);
+          const parts = String(alternative.health_check).trim().split(/\s+/);
           const bin = parts[0];
           const args = parts.slice(1);
           safeExec(bin, args);
@@ -240,19 +251,6 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       setupHint: 'Check the preset path and service endpoint catalog.',
     };
   }
-}
-
-function collectCliFallbacks(preset: any): string[] {
-  const commands = new Set<string>();
-  for (const op of Object.values(preset.operations || {})) {
-    const alternatives = Array.isArray((op as any).alternatives) ? (op as any).alternatives : [{ ...(op as any), type: (op as any).type || 'api' }];
-    for (const alt of alternatives) {
-      if ((alt as any).type === 'cli' && (alt as any).command) {
-        commands.add(String((alt as any).command));
-      }
-    }
-  }
-  return Array.from(commands).sort();
 }
 
 function unique(values: string[]): string[] {

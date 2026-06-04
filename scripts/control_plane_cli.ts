@@ -293,7 +293,7 @@ export function buildChronosNextActions(input: {
   missionSeeds: any[];
   memoryCandidates: any[];
 }): Array<ReturnType<typeof createNextActionContract>> {
-  const actions = [];
+  const actions: Array<ReturnType<typeof createNextActionContract>> = [];
   if (input.pendingApprovals > 0) {
     actions.push(
       createNextActionContract({
