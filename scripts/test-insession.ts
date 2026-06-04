@@ -17,8 +17,9 @@ async function test() {
     const result = await backend.delegateTask('「こんにちは」と返事をしてください。他の言葉は不要です。');
     logger.info('\n--- Sub-agent Result ---');
     console.log(result);
-  } catch (err) {
-    logger.error(`Error during delegation: ${err.message}`);
+  } catch (err: unknown) {
+    const error = err as { message?: string };
+    logger.error(`Error during delegation: ${error.message || String(err)}`);
   }
 }
 

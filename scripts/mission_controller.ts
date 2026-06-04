@@ -70,6 +70,7 @@ import {
 } from './refactor/mission-queue.js';
 import { buildMissionStatusView, listMissionSummaries } from './refactor/mission-read-model.js';
 import { missionSystem } from './refactor/mission-system.js';
+import { runMissionControllerAction } from './refactor/mission-controller-router.js';
 
 // Re-export public API for backward compatibility (tests import these directly)
 export {
@@ -203,16 +204,16 @@ function writeFocusedMissionId(missionId: string): void {
 }
 
 // ─── Project ledger helpers (bind ROOT_DIR) ───────────────────────────────────
-async function syncProjectLedger(id: string): Promise<void> {
+async function syncProjectLedger(id: string): Promise<unknown> {
   return missionSystem.syncProjectLedger(id);
 }
 
-async function syncProjectLedgerIfLinked(id: string): Promise<void> {
+async function syncProjectLedgerIfLinked(id: string): Promise<unknown> {
   return missionSystem.syncProjectLedgerIfLinked(id);
 }
 
 // ─── Mission seal / distill wrappers ─────────────────────────────────────────
-async function sealMission(id: string): Promise<string | undefined> {
+async function sealMission(id: string): Promise<unknown> {
   return missionSystem.sealMission(id);
 }
 
@@ -1540,271 +1541,66 @@ export async function main() {
 
   const hasRefresh = process.argv.includes('--refresh');
   const hasDryRun = process.argv.includes('--dry-run');
-
-  switch (action) {
-    case 'create': {
-      const input = validateMissionStartCreateInput('create', arg1);
-      const routingDecision = parseRoutingDecision(input.routingDecision);
-      if (hasDryRun) {
-        console.log(
-          JSON.stringify(
-            {
-              action: 'create',
-              mission_id: arg1,
-              input,
-              routingDecision,
-            },
-            null,
-            2
-          )
-        );
-        break;
-      }
-      await createMission(
-        arg1,
-        input.tier as any,
-        input.tenantId,
-        input.missionType,
-        input.visionRef,
-        input.persona,
-        input.relationships,
-        input.tenantSlug,
-        input.organizationId,
-      );
-      await recordRoutingDecisionInMissionState(arg1, routingDecision, 'CREATE');
-      if (routingDecision) {
-        auditChain.record({
-          agentId: process.env.KYBERION_PERSONA || 'mission_controller',
-          action: 'mission.routing_decision_recorded',
-          operation: `create:${arg1}`,
-          result: 'completed',
-          metadata: {
-            mission_id: arg1.toUpperCase(),
-            routing_decision: routingDecision,
-          },
-        });
-      }
-      break;
-    }
-    case 'start': {
-      const input = validateMissionStartCreateInput('start', arg1);
-      const routingDecision = parseRoutingDecision(input.routingDecision);
-      if (hasDryRun) {
-        console.log(
-          JSON.stringify(
-            {
-              action: 'start',
-              mission_id: arg1,
-              input,
-              routingDecision,
-            },
-            null,
-            2
-          )
-        );
-        break;
-      }
-      await startMission(
-        arg1,
-        input.tier as any,
-        input.persona,
-        input.tenantId,
-        input.missionType,
-        input.visionRef,
-        input.relationships,
-        input.tenantSlug,
-        input.organizationId,
-      );
-      await recordRoutingDecisionInMissionState(arg1, routingDecision, 'START');
-      if (routingDecision) {
-        auditChain.record({
-          agentId: process.env.KYBERION_PERSONA || 'mission_controller',
-          action: 'mission.routing_decision_recorded',
-          operation: `start:${arg1}`,
-          result: 'completed',
-          metadata: {
-            mission_id: arg1.toUpperCase(),
-            routing_decision: routingDecision,
-          },
-        });
-      }
-      break;
-    }
-    case 'grant':
-      await grantMissionAccess(arg1, arg2, arg3 ? parseInt(arg3) : undefined);
-      break;
-    case 'sudo':
-      await grantMissionSudo(arg1, arg2 !== 'OFF', arg3 ? parseInt(arg3) : undefined);
-      break;
-    case 'checkpoint':
-      {
-        const explicitMissionId = getOptionValue('--mission-id') || getOptionValue('--mission');
-        if (explicitMissionId) {
-          await createCheckpoint(arg1 || 'manual', arg2 || 'progress update', explicitMissionId);
-        } else if (arg3) {
-          await createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
-        } else {
-          await createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
-        }
-      }
-      break;
-    case 'delegate':
-      await delegateMission(arg1, arg2, arg3);
-      break;
-    case 'import':
-      await importMission(arg1, arg2);
-      break;
-    case 'verify':
-      await verifyMission(arg1, arg2 as any, arg3);
-      break;
-    case 'distill':
-      await distillMission(arg1);
-      break;
-    case 'dispatch-tickets':
-      await dispatchMissionTickets(arg1);
-      break;
-    case 'dispatch-workitems':
-      await dispatchMissionWorkItems(arg1);
-      break;
-    case 'seal':
-      await sealMission(arg1);
-      break;
-    case 'enqueue':
-      await enqueueMission(arg1, arg2!, parseInt(arg3 || '5'), arg4 ? arg4.split(',') : []);
-      break;
-    case 'dispatch':
-      await dispatchNextMission();
-      break;
-    case 'accept-with-override':
-      acceptRubricOverride(
-        arg1,
-        getOptionValue('--reason'),
-        getOptionValue('--severity'),
-      );
-      break;
-    case 'memory-queue':
-      listMemoryQueue(arg1 as any);
-      break;
-    case 'memory-approve':
-      approveMemoryCandidate(arg1, getOptionValue('--note'));
-      break;
-    case 'memory-reject':
-      rejectMemoryCandidate(arg1, getOptionValue('--note'));
-      break;
-    case 'memory-promote':
-      promoteMemoryCandidate(
-        arg1,
-        (getOptionValue('--execution-role') as 'mission_controller' | 'chronos_gateway') ||
-          'mission_controller',
-        getOptionValue('--note'),
-      );
-      break;
-    case 'memory-promote-pending':
-      promotePendingMemoryCandidates({
-        executionRole:
-          (getOptionValue('--execution-role') as 'mission_controller' | 'chronos_gateway') ||
-          'mission_controller',
-        note: getOptionValue('--note'),
-        dryRun: process.argv.includes('--dry-run'),
-      });
-      break;
-    case 'finish':
-      await finishMission(arg1, process.argv.includes('--seal'));
-      break;
-    case 'resume':
-      await resumeMission(arg1);
-      break;
-    case 'record-task':
-      await recordTask(arg1, arg2, JSON.parse(positionalArgs[3] || '{}'));
-      break;
-    case 'record-evidence':
-      await recordEvidence(
-        arg1,
-        arg2 || 'manual',
-        arg3 || 'evidence recorded',
-        parseCsvOption('--evidence'),
-        getOptionValue('--team-role'),
-        getOptionValue('--actor-id'),
-        getOptionValue('--actor-type') as any
-      );
-      break;
-    case 'purge':
-      await purgeMissions(!process.argv.includes('--execute'));
-      break;
-    case 'list':
-      listMissions(arg1);
-      break;
-    case 'organization-catalogs':
-      listOrganizationCatalogs(
-        getOptionValue('--organization-id') || getOptionValue('--org'),
-        process.argv.includes('--json'),
-      );
-      break;
-    case 'organization-profiles':
-      listOrganizationProfiles(getOptionValue('--organization-id') || getOptionValue('--org'));
-      break;
-    case 'organization-profile':
-      showOrganizationProfile(
-        getOptionValue('--organization-id') || getOptionValue('--org'),
-        process.argv.includes('--summary') || process.argv.includes('--compact'),
-        process.argv.includes('--json'),
-      );
-      break;
-    case 'organization-discovery':
-      showOrganizationDiscovery(
-        process.argv.includes('--json'),
-        process.argv.includes('--summary') || process.argv.includes('--compact'),
-      );
-      break;
-    case 'status':
-      showMissionStatus(arg1);
-      showReasoningBackendStatus();
-      break;
-    case 'sync-project-ledger':
-      await syncProjectLedger(arg1);
-      break;
-    case 'team':
-      showMissionTeam(arg1, hasRefresh, getOptionValue('--organization-id') || getOptionValue('--org'));
-      break;
-    case 'staff':
-      await staffMissionTeam(arg1, getOptionValue('--organization-id') || getOptionValue('--org'));
-      break;
-    case 'prewarm':
-      await prewarmMissionTeam(arg1, arg2, getOptionValue('--organization-id') || getOptionValue('--org'));
-      break;
-    case 'classify':
-      await classifyMission(arg1, arg2, arg3);
-      break;
-    case 'workflow-select':
-      await selectMissionWorkflow(arg1, arg2, arg3);
-      break;
-    case 'review-worker-output':
-      await reviewWorkerOutput(
-        arg1,
-        (arg2 as 'verified' | 'rejected') || 'verified',
-        arg3,
-      );
-      break;
-    case 'handoff':
-      await handoffMission(arg1, arg2, arg3);
-      break;
-    case 'gate-pass':
-      await gatePass(arg1, arg2, getOptionValue('--note'));
-      break;
-    case 'gate-fail':
-      await gateFail(arg1, arg2, getOptionValue('--note'));
-      break;
-    case 'sync':
-      logger.info('Syncing mission registry...');
-      break;
-    case 'help':
-    case '--help':
-    case '-h':
-      showHelp();
-      break;
-    default:
-      showHelp();
-  }
+  await runMissionControllerAction({
+    argv: process.argv,
+    action,
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    arg5,
+    arg6,
+    arg7,
+    hasRefresh,
+    hasDryRun,
+    getOptionValue,
+    parseCsvOption,
+    validateMissionStartCreateInput,
+    createMission,
+    startMission,
+    recordRoutingDecisionInMissionState,
+    grantMissionAccess,
+    grantMissionSudo,
+    createCheckpoint,
+    delegateMission,
+    importMission,
+    verifyMission,
+    distillMission,
+    dispatchMissionTickets,
+    dispatchMissionWorkItems,
+    sealMission,
+    enqueueMission,
+    dispatchNextMission,
+    acceptRubricOverride,
+    listMemoryQueue,
+    approveMemoryCandidate,
+    rejectMemoryCandidate,
+    promoteMemoryCandidate,
+    promotePendingMemoryCandidates,
+    finishMission,
+    resumeMission,
+    recordTask,
+    recordEvidence,
+    purgeMissions,
+    listMissions,
+    listOrganizationCatalogs,
+    listOrganizationProfiles,
+    showOrganizationProfile,
+    showOrganizationDiscovery,
+    showMissionStatus,
+    showReasoningBackendStatus,
+    syncProjectLedger,
+    showMissionTeam,
+    staffMissionTeam,
+    prewarmMissionTeam,
+    classifyMission,
+    selectMissionWorkflow,
+    reviewWorkerOutput,
+    handoffMission,
+    gatePass,
+    gateFail,
+    showHelp,
+  });
 }
 
 main().catch((err) => {

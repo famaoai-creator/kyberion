@@ -28,8 +28,8 @@ export interface ContextualIntentLearningEntry {
   action: ContextualIntentFrame['action'];
   object: ContextualIntentFrame['object'];
   subject: ContextualIntentFrame['subject'];
-  date_range?: ContextualIntentFrame['date_range']['value'];
-  source_binding?: ContextualIntentFrame['source_binding']['selected'];
+  date_range?: NonNullable<ContextualIntentFrame['date_range']>['value'];
+  source_binding?: NonNullable<ContextualIntentFrame['source_binding']>['selected'];
   clarification_needed: boolean;
   confirmed: boolean;
   tier: 'personal' | 'confidential' | 'public';

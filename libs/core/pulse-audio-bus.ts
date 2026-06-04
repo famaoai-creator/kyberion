@@ -17,7 +17,7 @@
  * monitor and write to the source, and tears them down on `close`.
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from './core.js';
 import { safeExec } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
@@ -44,8 +44,8 @@ export class PulseAudioBus implements AudioBus {
   private readonly sink: string;
   private readonly ffmpegBin: string;
   private readonly pactlBin: string;
-  private inputProc: ChildProcessWithoutNullStreams | null = null;
-  private outputProc: ChildProcessWithoutNullStreams | null = null;
+  private inputProc: ChildProcess | null = null;
+  private outputProc: ChildProcess | null = null;
   private moduleIds: number[] = [];
   private opened = false;
   private closed = false;
@@ -132,7 +132,7 @@ export class PulseAudioBus implements AudioBus {
       ],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
-    this.inputProc.stdout.on('data', (buf: Buffer) => this.handleInbound(buf));
+    this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
     this.inputProc.on('exit', (code) => {
       logger.info(`[pulse-audio-bus] input ffmpeg exited with code ${code}`);
       this.flushInboundDone();
@@ -165,7 +165,7 @@ export class PulseAudioBus implements AudioBus {
     this.closed = true;
     try {
       this.inputProc?.kill('SIGTERM');
-      this.outputProc?.stdin.end();
+      this.outputProc?.stdin?.end();
       this.outputProc?.kill('SIGTERM');
     } catch {
       /* ignore */
@@ -202,7 +202,7 @@ export class PulseAudioBus implements AudioBus {
     }
     for await (const chunk of stream) {
       if (this.closed) return;
-      this.outputProc.stdin.write(Buffer.from(chunk.payload));
+      this.outputProc.stdin?.write(Buffer.from(chunk.payload));
     }
   }
 

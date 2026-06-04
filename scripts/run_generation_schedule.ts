@@ -154,7 +154,7 @@ export async function runGenerationScheduleAction(argv: { action: string; input?
         const schedules = argv.schedule
           ? [readGenerationSchedule(`active/shared/runtime/media-generation/schedules/${normalizeScheduleId(String(argv.schedule))}.json`)]
           : listGenerationSchedules();
-        const results = [];
+        const results: Array<Awaited<ReturnType<typeof tickSchedule>>> = [];
         for (const schedule of schedules) {
           results.push(await tickSchedule(schedule));
         }

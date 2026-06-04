@@ -93,7 +93,7 @@ const DEFAULT_SYSTEM_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
+let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
@@ -116,10 +116,10 @@ function loadRecoveryPolicy(): Record<string, any> {
   try {
     const manifest = JSON.parse(safeReadFile(SYSTEM_MANIFEST_PATH, { encoding: 'utf8' }) as string);
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
+    return cachedRecoveryPolicy ?? {};
   } catch (_) {
     cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
+    return cachedRecoveryPolicy ?? {};
   }
 }
 
@@ -1178,7 +1178,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
 
   const resolve = (val: any) => resolveVars(val, ctx);
 
-  const results = [];
+    const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
   for (const step of steps) {
     state.stepCount++;
     if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
@@ -1199,9 +1199,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
         throw new Error(`Unknown step type: ${step.type}`);
       }
       results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [SYS_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(`  [SYS_PIPELINE] Step failed (${step.op}): ${error.message}`);
+      results.push({ op: step.op, status: 'failed', error: error.message });
       break;
     }
   }

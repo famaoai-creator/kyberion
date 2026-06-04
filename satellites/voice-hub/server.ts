@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import * as path from 'node:path';
 import {
   buildPresenceAssistantReplyTimeline,
@@ -526,7 +526,7 @@ const recentResponses = new Map<string, VoiceHubResponseRecord>();
 const inflightResponses = new Map<string, Promise<VoiceHubResponseRecord>>();
 const conversationMemory = new Map<string, ConversationTurn[]>();
 const activeTaskExecutions = new Set<string>();
-let activeSpeechProcess: ChildProcessWithoutNullStreams | null = null;
+let activeSpeechProcess: ChildProcess | null = null;
 let activeSpeechState: SpeechPlaybackState = { status: 'idle' };
 let recentSpeechGuardState: RecentSpeechGuardState = {};
 

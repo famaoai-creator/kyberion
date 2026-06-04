@@ -16,6 +16,10 @@ type FetchLocationProvider = (options: {
   url: string;
 }) => Promise<LocationSummaryData>;
 
+function compactStrings(values: Array<string | undefined>): string[] {
+  return values.filter((value): value is string => Boolean(value));
+}
+
 export async function resolveFallbackLocationSummary(
   fetchLocation: FetchLocationProvider = secureFetch as FetchLocationProvider
 ): Promise<string> {
@@ -24,13 +28,13 @@ export async function resolveFallbackLocationSummary(
 
   for (const provider of providers) {
     try {
-      const data = await fetchLocation({ method: 'GET', url: provider.url });
+      const url = String(provider.url || '').trim();
+      if (!url) continue;
+      const data = await fetchLocation({ method: 'GET', url });
       const parts =
         provider.provider === 'ipwho'
-          ? [data?.city, data?.region, data?.country || data?.country_name].filter(Boolean)
-          : [data?.city, data?.region || data?.region_code, data?.country_name || data?.country].filter(
-              Boolean
-            );
+          ? compactStrings([data?.city, data?.region, data?.country || data?.country_name])
+          : compactStrings([data?.city, data?.region || data?.region_code, data?.country_name || data?.country]);
       if (parts.length > 0) return parts.join(', ');
     } catch {
       // Try the next location provider.
@@ -48,21 +52,23 @@ export async function resolveFallbackLocationCoordinates(
 
   for (const provider of providers) {
     try {
-      const data = await fetchLocation({ method: 'GET', url: provider.url });
+      const url = String(provider.url || '').trim();
+      if (!url) continue;
+      const data = await fetchLocation({ method: 'GET', url });
       const resolved =
         provider.provider === 'ipwho'
           ? {
               latitude: data?.latitude,
               longitude: data?.longitude,
               label: data?.city
-                ? [data.city, data.region, data.country].filter(Boolean).join(', ')
+                ? compactStrings([data.city, data.region, data.country]).join(', ')
                 : 'current location',
             }
           : {
               latitude: data?.latitude,
               longitude: data?.longitude,
               label: data?.city
-                ? [data.city, data.region, data.country_name].filter(Boolean).join(', ')
+                ? compactStrings([data.city, data.region, data.country_name]).join(', ')
                 : 'current location',
             };
       if (resolved.latitude !== undefined && resolved.longitude !== undefined) {

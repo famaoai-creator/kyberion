@@ -30,7 +30,7 @@ function ensureValidator(): ValidateFunction {
   if (trackValidateFn) return trackValidateFn;
   const raw = safeReadFile(TRACK_SCHEMA_PATH, { encoding: 'utf8' }) as string;
   trackValidateFn = ajv.compile(JSON.parse(raw));
-  return trackValidateFn;
+  return trackValidateFn!;
 }
 
 function trackPath(trackId: string): string {

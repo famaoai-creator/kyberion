@@ -22,7 +22,7 @@
  * substitute a `StubAudioBus`.
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from './core.js';
 import { safeExec } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
@@ -43,8 +43,8 @@ const DEFAULT_DEVICE_LABEL = 'BlackHole 2ch';
 
 export class BlackHoleAudioBus implements AudioBus {
   readonly bus_id = 'blackhole' as const;
-  private inputProc: ChildProcessWithoutNullStreams | null = null;
-  private outputProc: ChildProcessWithoutNullStreams | null = null;
+  private inputProc: ChildProcess | null = null;
+  private outputProc: ChildProcess | null = null;
   private inboundQueue: AudioChunk[] = [];
   private inboundResolvers: Array<(chunk: AudioChunk | null) => void> = [];
   private opened = false;
@@ -131,8 +131,8 @@ export class BlackHoleAudioBus implements AudioBus {
       ],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
-    this.inputProc.stdout.on('data', (buf: Buffer) => this.handleInbound(buf));
-    this.inputProc.stderr.on('data', (buf: Buffer) =>
+    this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
+    this.inputProc.stderr?.on('data', (buf: Buffer) =>
       logger._log('debug', `[blackhole input] ${buf.toString('utf8').trim()}`),
     );
     this.inputProc.on('exit', (code) => {
@@ -155,7 +155,7 @@ export class BlackHoleAudioBus implements AudioBus {
       ],
       { stdio: ['pipe', 'ignore', 'pipe'] },
     );
-    this.outputProc.stderr.on('data', (buf: Buffer) =>
+    this.outputProc.stderr?.on('data', (buf: Buffer) =>
       logger._log('debug', `[blackhole output] ${buf.toString('utf8').trim()}`),
     );
     this.outputProc.on('exit', (code) => {
@@ -170,7 +170,7 @@ export class BlackHoleAudioBus implements AudioBus {
     this.closed = true;
     try {
       this.inputProc?.kill('SIGTERM');
-      this.outputProc?.stdin.end();
+      this.outputProc?.stdin?.end();
       this.outputProc?.kill('SIGTERM');
     } catch {
       /* ignore */
@@ -199,7 +199,7 @@ export class BlackHoleAudioBus implements AudioBus {
     }
     for await (const chunk of stream) {
       if (this.closed) return;
-      this.outputProc.stdin.write(Buffer.from(chunk.payload));
+      this.outputProc.stdin?.write(Buffer.from(chunk.payload));
     }
   }
 

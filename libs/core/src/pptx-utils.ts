@@ -166,7 +166,7 @@ function extractTopLevelShapes(xml: string): string[] {
   let currentIndex = 0;
 
   while (currentIndex < xml.length) {
-    let firstTagMatch = null;
+    let firstTagMatch: string | null = null;
     let firstTagIndex = -1;
 
     for (const tag of tags) {
@@ -188,14 +188,15 @@ function extractTopLevelShapes(xml: string): string[] {
     }
 
     if (!firstTagMatch || firstTagIndex === -1) break;
+    const tagName = firstTagMatch;
 
-    const closeTag = `</${firstTagMatch}>`;
+    const closeTag = `</${tagName}>`;
     let depth = 0;
     let searchIndex = firstTagIndex;
     let nextClose = -1;
     
     while (searchIndex < xml.length) {
-      const nextOpen = xml.indexOf(`<${firstTagMatch}`, searchIndex + 1);
+      const nextOpen = xml.indexOf(`<${tagName}`, searchIndex + 1);
       nextClose = xml.indexOf(closeTag, searchIndex + 1);
 
       if (nextClose === -1) break;
@@ -203,7 +204,7 @@ function extractTopLevelShapes(xml: string): string[] {
       // Validate nextOpen
       let isValidOpen = false;
       if (nextOpen !== -1 && nextOpen < nextClose) {
-        const charAfter = xml[nextOpen + firstTagMatch.length + 1];
+        const charAfter = xml[nextOpen + tagName.length + 1];
         if (charAfter === '>' || charAfter === ' ' || charAfter === '/') {
           isValidOpen = true;
         } else {
