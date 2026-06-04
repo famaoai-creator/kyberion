@@ -19,10 +19,10 @@ vi.mock('./secure-io.js', async () => {
   return {
     ...actual,
     safeExecResult: vi.fn((command: string, args: string[] = []) => {
-      if (command === 'which' && ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract'].includes(args[0] || '')) {
+      if (command === 'which' && ['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(args[0] || '')) {
         return { status: 0, stdout: `/mock/${args[0]}\n`, stderr: '', error: null };
       }
-      if (['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract'].includes(command)) {
+      if (['uvx', 'uv', 'npx', 'pnpm', 'brew', 'ffmpeg', 'sox', 'tesseract', 'python3'].includes(command)) {
         return { status: 0, stdout: `/mock/${command}`, stderr: '', error: null };
       }
       return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
@@ -197,6 +197,56 @@ describe('tool runtime registry', () => {
               managed_env_subpath: 'tool-runtimes/tesseract',
               notes: 'test fixture',
             },
+            {
+              tool_id: 'mlx_audio',
+              display_name: 'mlx-audio TTS Runtime',
+              ecosystem: 'python',
+              status: 'active',
+              platforms: ['darwin'],
+              supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+              trial_backend: {
+                kind: 'system',
+                command: 'python3',
+                args: ['-c', 'import mlx_audio; print("ok")'],
+              },
+              install_backend: {
+                kind: 'uv',
+                command: 'uv',
+                args: ['pip', 'install', 'mlx-audio'],
+              },
+              installed_backend: {
+                kind: 'system',
+                command: 'python3',
+                args: ['-c', 'import mlx_audio; print("ok")'],
+              },
+              managed_env_subpath: 'tool-runtimes/mlx-audio',
+              notes: 'test fixture',
+            },
+            {
+              tool_id: 'mlx_whisper',
+              display_name: 'mlx-whisper STT Runtime',
+              ecosystem: 'python',
+              status: 'active',
+              platforms: ['darwin'],
+              supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+              trial_backend: {
+                kind: 'system',
+                command: 'python3',
+                args: ['-c', 'import mlx_whisper; print("ok")'],
+              },
+              install_backend: {
+                kind: 'uv',
+                command: 'uv',
+                args: ['pip', 'install', 'mlx-whisper'],
+              },
+              installed_backend: {
+                kind: 'system',
+                command: 'python3',
+                args: ['-c', 'import mlx_whisper; print("ok")'],
+              },
+              managed_env_subpath: 'tool-runtimes/mlx-whisper',
+              notes: 'test fixture',
+            },
           ],
         },
         null,
@@ -224,6 +274,7 @@ describe('tool runtime registry', () => {
     expect(getToolRuntimeRecord('mflux').trial_backend.command).toBe('uvx');
     expect(getToolRuntimeRecord('playwright').trial_backend.command).toBe('npx');
     expect(getToolRuntimeRecord('ffmpeg').install_backend?.command).toBe('brew');
+    expect(getToolRuntimeRecord('mlx_audio').install_backend?.command).toBe('uv');
   });
 
   it('prefers trial execution when no install state exists', () => {
@@ -249,10 +300,11 @@ describe('tool runtime registry', () => {
   it('lists inventory items with lifecycle stages', () => {
     const inventory = listToolRuntimeInventory('trial', 'darwin');
     expect(inventory.default_tool_id).toBe('mflux');
-    expect(inventory.items).toHaveLength(5);
-    expect(inventory.items.map((item) => item.tool.tool_id)).toEqual(['mflux', 'playwright', 'ffmpeg', 'sox', 'tesseract']);
+    expect(inventory.items).toHaveLength(7);
+    expect(inventory.items.map((item) => item.tool.tool_id)).toEqual(['mflux', 'playwright', 'ffmpeg', 'sox', 'tesseract', 'mlx_audio', 'mlx_whisper']);
     expect(inventory.items.find((item) => item.tool.tool_id === 'playwright')?.lifecycle_stage).toBe('trial');
     expect(inventory.items.find((item) => item.tool.tool_id === 'ffmpeg')?.selected_action).toBe('run_trial');
+    expect(inventory.items.find((item) => item.tool.tool_id === 'mlx_audio')?.selected_backend?.command).toBe('python3');
 
     const installed = getToolRuntimeInventoryItem('mflux', 'installed', 'darwin');
     expect(installed.tool.tool_id).toBe('mflux');
@@ -283,5 +335,17 @@ describe('tool runtime registry', () => {
     expect(resolution.selected_action).toBe('run_installed');
     expect(resolution.selected_backend?.command).toBe('sox');
     expect(resolution.tool.tool_id).toBe('sox');
+  });
+
+  it('probes mlx-audio and mlx-whisper as managed python runtimes', () => {
+    const tts = probeToolRuntime('mlx_audio', 'trial', 'darwin');
+    expect(tts.selected_action).toBe('run_trial');
+    expect(tts.selected_backend?.command).toBe('python3');
+    expect(tts.managed_env_path).toContain('tool-runtimes/mlx-audio');
+
+    const stt = probeToolRuntime('mlx_whisper', 'approved_install', 'darwin');
+    expect(stt.selected_action).toBe('install');
+    expect(stt.selected_backend?.command).toBe('uv');
+    expect(stt.managed_env_path).toContain('tool-runtimes/mlx-whisper');
   });
 });

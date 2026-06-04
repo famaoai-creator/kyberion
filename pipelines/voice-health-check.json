@@ -2,9 +2,16 @@
   "action": "pipeline",
   "name": "Voice Health Check",
   "version": "1.0.0",
-  "description": "Verifies the voice pipeline toolchain: mlx_audio_tts_bridge.py, native TTS, and STT bridge availability.",
+  "description": "Verifies the governed voice toolchain: tool runtime inventory, mlx_audio_tts_bridge.py, native TTS, and STT bridge availability.",
   "steps": [
     { "role": "sink", "op": "system:log", "params": { "message": "🎙️ Voice Health Check — starting..." } },
+    {
+      "id": "list_tool_runtimes",
+      "role": "source",
+      "op": "system:list_tool_runtimes",
+      "produces": { "channel": "tool_runtimes", "type": "ToolRuntimeInventory" },
+      "params": { "requested_mode": "trial" }
+    },
     {
       "id": "check_tts_bridge",
       "role": "source",
@@ -14,7 +21,7 @@
     },
     {
       "id": "check_native_tts",
-      "role": "source",
+      "role": "apply",
       "op": "system:check_native_tts",
       "produces": { "channel": "native_tts", "type": "ProbeResult" },
       "params": {}
@@ -23,9 +30,9 @@
       "id": "notify",
       "role": "sink",
       "op": "system:system_notify",
-      "consumes": ["tts_bridge", "native_tts"],
+      "consumes": ["tool_runtimes", "tts_bridge", "native_tts"],
       "params": {
-        "message": "Voice Health Check: TTS bridge={{tts_bridge.exists}} native={{native_tts.ready}}"
+        "message": "Voice Health Check: runtimes={{tool_runtimes.default_tool_id}}/{{tool_runtimes.tools.length}} | TTS bridge={{tts_bridge.exists}} native={{native_tts.ready}}"
       }
     }
   ]

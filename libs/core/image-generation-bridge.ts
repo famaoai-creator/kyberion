@@ -5,6 +5,7 @@ import { safeExecResult, safeExistsSync, safeMkdir, safeWriteFile } from './secu
 import { executeServicePreset } from './service-engine.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
+import { probeServiceRuntime } from './service-runtime-registry.js';
 import {
   ImageGenerationRequest,
   ImageGenerationResult,
@@ -144,8 +145,8 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'comfyui';
 
   async isAvailable(): Promise<boolean> {
-    // Check if ComfyUI service endpoint is defined or fallback is always true as default preset
-    return true;
+    const resolution = await probeServiceRuntime('comfyui', 'trial');
+    return resolution.available;
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
