@@ -1287,6 +1287,7 @@ export * from './delegation-preflight.js';
 export * from './mission-orchestration-evaluator.js';
 export * from './mission-coordination-bus.js';
 export * from './mission-team-plan-composer.js';
+export * from './mission-context-pack.js';
 export * from './mission-team-binding.js';
 export * from './mission-team-orchestrator.js';
 export * from './agent-runtime-supervisor.js';

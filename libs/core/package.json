@@ -135,6 +135,10 @@
       "types": "./dist/mission-team-plan-composer.d.ts",
       "default": "./dist/mission-team-plan-composer.js"
     },
+    "./mission-context-pack": {
+      "types": "./dist/mission-context-pack.d.ts",
+      "default": "./dist/mission-context-pack.js"
+    },
     "./mission-team-orchestrator": {
       "types": "./dist/mission-team-orchestrator.d.ts",
       "default": "./dist/mission-team-orchestrator.js"
