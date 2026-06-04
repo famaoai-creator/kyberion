@@ -427,6 +427,35 @@ const listToolRuntimeInventory = vi.fn(() => ({
     },
   ],
 }));
+const listServiceRuntimeInventory = vi.fn(() => ({
+  version: '1.0.0',
+  platform: 'darwin',
+  requested_mode: 'trial',
+  default_service_id: 'comfyui',
+  items: [
+    {
+      service: {
+        service_id: 'comfyui',
+        display_name: 'ComfyUI Local Service Runtime',
+        kind: 'local_service',
+      },
+      state: null,
+      requested_mode: 'trial',
+      lifecycle_stage: 'trial',
+      selected_action: 'probe',
+      selected_probe: { kind: 'http', method: 'GET', path: 'system_stats' },
+      selected_plan: { kind: 'service_preset', preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json' },
+      available: true,
+      installed: true,
+      requires_install: false,
+      managed_service_path: '/tmp/kyberion/active/shared/runtime/service-runtimes/comfyui',
+      state_path: '/tmp/kyberion/active/shared/runtime/service-runtimes/comfyui/state.json',
+      base_url: 'http://127.0.0.1:8188',
+      probe_url: 'http://127.0.0.1:8188/system_stats',
+      reason: 'probe_succeeded',
+    },
+  ],
+}));
 const writeVideoFrameBusToMp4 = vi.fn(async (bus: any, outputPath: string) => {
   const frames: any[] = [];
   for await (const frame of bus.frameStream()) {
@@ -622,6 +651,7 @@ vi.mock('@agent/core', () => ({
   createScreenRecordingBridge,
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
+  listServiceRuntimeInventory,
   writeVideoFrameBusToMp4,
   pipeMp4ToVideoFrameBus,
   StubVideoFrameBus,
@@ -1665,6 +1695,21 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect((result.context.tool_runtimes as any).tools.map((tool: any) => tool.tool_id)).toContain('mflux');
       expect((result.context.tool_runtimes as any).tools[0].lifecycle_stage).toBe('trial');
       expect(listToolRuntimeInventory).toHaveBeenCalledWith('trial');
+    });
+
+    it('list_service_runtimes: returns governed service runtime inventory', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'list_service_runtimes', params: { export_as: 'service_runtimes' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.service_runtimes as any).default_service_id).toBe('comfyui');
+      expect((result.context.service_runtimes as any).services.map((service: any) => service.service_id)).toContain('comfyui');
+      expect((result.context.service_runtimes as any).services[0].lifecycle_stage).toBe('trial');
+      expect(listServiceRuntimeInventory).toHaveBeenCalledWith('trial');
     });
 
     it('control_media_devices: returns host provisioning plan for add/remove', async () => {

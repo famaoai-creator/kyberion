@@ -2907,6 +2907,33 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'service-runtime-policy',
+      schemaPath: 'knowledge/product/schemas/service-runtime-policy.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/service-runtime-policy.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          managed_roots: { service_runtime_root: 'active/shared/runtime' },
+        },
+      ],
+    },
+    {
+      id: 'service-runtime-registry',
+      schemaPath: 'knowledge/product/schemas/service-runtime-registry.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/service-runtime-registry.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          default_service_id: 'comfyui',
+          services: [{ service_id: 'comfyui' }],
+        },
+      ],
+    },
+    {
       id: 'work-coordination-import-catalog',
       schemaPath: 'knowledge/product/schemas/work-coordination-import-catalog.schema.json',
       validPayloads: [

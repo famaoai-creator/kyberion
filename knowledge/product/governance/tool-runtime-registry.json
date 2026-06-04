@@ -141,6 +141,62 @@
       },
       "managed_env_subpath": "tool-runtimes/tesseract",
       "notes": "OCR fallback example for image and screen recognition flows."
+    },
+    {
+      "tool_id": "mlx_audio",
+      "display_name": "mlx-audio TTS Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_audio; print(\"ok\")"],
+        "description": "Probe mlx-audio availability through an import check."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "mlx-audio"],
+        "description": "Install mlx-audio into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_audio; print(\"ok\")"],
+        "description": "Re-check the installed mlx-audio runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/mlx-audio",
+      "notes": "Runtime dependency for the Qwen3-TTS voice engine bridge."
+    },
+    {
+      "tool_id": "mlx_whisper",
+      "display_name": "mlx-whisper STT Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_whisper; print(\"ok\")"],
+        "description": "Probe mlx-whisper availability through an import check."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "mlx-whisper"],
+        "description": "Install mlx-whisper into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_whisper; print(\"ok\")"],
+        "description": "Re-check the installed mlx-whisper runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/mlx-whisper",
+      "notes": "Runtime dependency for the Qwen3-STT bridge used by voice capture flows."
     }
   ]
 }

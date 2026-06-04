@@ -23,7 +23,7 @@ last_updated: 2026-03-06
 | :-------------- | :----------------------- | :---------------------------------------------- |
 | **Ear (STT)**   | mlx-audio Whisper (Local) | Apple Silicon 最適化。オフライン高精度日本語認識。 |
 | **Brain (LLM)** | Kyberion Reasoning Backend | `KYBERION_REASONING_BACKEND` で切替（claude-cli / gemini-cli / anthropic）。 |
-| **Mouth (TTS)** | CosyVoice 2 / Fish Speech / Qwen3-TTS (mlx-audio) + macOS `say` fallback | ゼロショットクローン対応。Apache 2.0 ライセンス。Apple Silicon Metal 動作。 |
+| **Mouth (TTS)** | CosyVoice 2 / Fish Speech / Qwen3-TTS (mlx-audio) + macOS `say` fallback | ゼロショットクローン対応。Apache 2.0 ライセンス。Apple Silicon Metal 動作。`mlx_audio` / `mlx_whisper` の runtime 依存は tool-runtime で管理する。 |
 | **VirtualDeviceInventoryBridge** | system_profiler / ffmpeg / pactl scan | Scans host-visible audio/camera candidates before the bridge chooses a concrete backend. |
 | **VirtualAudioInputRecordingBridge** | ffmpeg avfoundation / sox default-input capture | Selects a concrete microphone input and records a short sample for voice capture and verification. |
 | **VirtualInputDeviceInventoryBridge** | hidutil / libinput / xinput scan | Scans host-visible keyboard/mouse candidates before OS automation chooses a concrete input route. |

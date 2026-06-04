@@ -16,6 +16,7 @@
     "retryable_categories": ["network", "timeout", "resource_unavailable"]
   },
   "capabilities": [
+    { "op": "health", "platforms": ["darwin", "linux", "win32"] },
     { "op": "speak_local", "platforms": ["darwin", "linux"] },
     { "op": "list_voices", "platforms": ["darwin", "linux"] },
     { "op": "generate_voice", "platforms": ["darwin", "linux"] },

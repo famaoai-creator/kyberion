@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "managed_roots": {
+    "service_runtime_root": "active/shared/runtime",
+    "cache_root": "active/shared/tmp/service-runtime-cache"
+  },
+  "mode_preference": {
+    "local_service": "trial_first",
+    "remote_service": "installed_first"
+  },
+  "approval": {
+    "provision_requires_approval": true,
+    "pin_requires_approval": true
+  }
+}

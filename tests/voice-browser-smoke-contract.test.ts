@@ -66,6 +66,7 @@ describe('voice and browser smoke contract', () => {
     expect(browserCatalog).toContain('operator-pause-template');
 
     expect(voiceHealth).toContain('mlx_audio_tts_bridge.py');
+    expect(voiceHealth).toContain('list_tool_runtimes');
     expect(voiceHealth).toContain('system:system_notify');
     expect(voiceHealth).toContain('Voice Health Check');
 
