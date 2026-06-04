@@ -46,6 +46,14 @@
       "method": "GET",
       "description": "Get issue details."
     },
+    "get_transitions": {
+      "path": "issue/{{issue_key}}/transitions",
+      "method": "GET",
+      "description": "Get available transitions for an issue.",
+      "parameters": {
+        "issue_key": { "required": true, "type": "string" }
+      }
+    },
     "create_issue": {
       "path": "issue",
       "method": "POST",

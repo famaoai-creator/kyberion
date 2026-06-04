@@ -120,23 +120,18 @@ Disallowed target behavior:
 
 ## Recommended Flow
 
-1. Surface receives sovereign intent.
-2. Nerve returns either:
-   - direct reply
-   - `team_role` proposal
-   - `mission_proposal`
-3. Confirmation emits `mission_issue_requested`.
-4. Orchestration worker issues mission through `mission_controller`.
-5. Worker emits `mission_team_prewarm_requested`.
-6. `agent-runtime-supervisor` prewarms required team roles.
-7. Worker emits `mission_kickoff_requested`.
-8. Planner receives A2A kickoff request.
-9. Planner writes initial artifacts.
-10. Worker emits `mission_followup_requested`.
-11. Follow-up worker prewarms the required worker roles.
-12. `NEXT_TASKS.json` tasks are delegated through A2A.
-13. Mission state and task board reconcile from artifacts/events.
-14. Owner summary is emitted to surface outboxes and control-plane observability.
+For the stable mission lifecycle and record-keeping contract, see:
+
+- [`mission-lifecycle-and-record-keeping.md`](./mission-lifecycle-and-record-keeping.md)
+
+The short canonical sequence is:
+
+1. Surface receives intent.
+2. Mission is created and started through `mission_controller`.
+3. Team composition and runtime staffing are resolved.
+4. Task intent is recorded before delegation.
+5. Work is tracked on the board and delegated through A2A or short transport.
+6. Checkpoints, verification, distillation, and completion close the loop.
 
 ## Why This Shape
 

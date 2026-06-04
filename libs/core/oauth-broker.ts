@@ -13,6 +13,7 @@ import {
 import { loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
 import { loadConnectionDocument, storeConnectionDocument } from './secret-guard.js';
+import { getServicePresetRecord } from './service-preset-registry.js';
 
 const OAUTH_SESSION_ROOT = pathResolver.sharedTmp('oauth');
 
@@ -41,10 +42,11 @@ interface PendingOAuthSession {
 function loadServicePreset(serviceId: string): any {
   const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services?.[serviceId];
-  if (!serviceConfig?.preset_path) {
+  const preset = getServicePresetRecord(serviceId, serviceConfig?.preset_path);
+  if (!preset) {
     throw new Error(`No preset path defined for service: ${serviceId}`);
   }
-  return JSON.parse(safeReadFile(pathResolver.rootResolve(serviceConfig.preset_path), { encoding: 'utf8' }) as string);
+  return preset;
 }
 
 function serviceSessionDir(serviceId: string): string {

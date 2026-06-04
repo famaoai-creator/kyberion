@@ -219,6 +219,10 @@
       "types": "./dist/service-runtime-registry.d.ts",
       "default": "./dist/service-runtime-registry.js"
     },
+    "./service-preset-registry": {
+      "types": "./dist/service-preset-registry.d.ts",
+      "default": "./dist/service-preset-registry.js"
+    },
     "./video-frame-bus": {
       "types": "./dist/video-frame-bus.d.ts",
       "default": "./dist/video-frame-bus.js"
@@ -266,6 +270,10 @@
     "./path-resolver": {
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
+    },
+    "./project-operational-state-registry": {
+      "types": "./dist/project-operational-state-registry.d.ts",
+      "default": "./dist/project-operational-state-registry.js"
     },
     "./unclassified-error-registry": {
       "types": "./dist/unclassified-error-registry.d.ts",

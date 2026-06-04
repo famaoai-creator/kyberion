@@ -130,6 +130,7 @@ If you need the inventory contracts, open the discovery reports.
 2. [Organization Discovery Reports](organization-discovery-reports.md)
 3. [Supported Actuators](supported-actuators.md)
 4. [Intent Scenario Catalog](intent-scenario-catalog.md)
+5. [Mission Lifecycle and Record Keeping](../architecture/mission-lifecycle-and-record-keeping.md)
 
 ## Inventory fragments
 

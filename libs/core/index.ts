@@ -80,6 +80,9 @@ export {
   capabilityDir,
   skillDir,
   missionDir,
+  projectWorkspaceDir,
+  projectOsDir,
+  projectStateDir,
   tenantMissionDir,
   missionEvidenceDir,
   findMissionPath,
@@ -380,6 +383,7 @@ export { transform, getValueByPath } from './transformer.js';
 
 export * as serviceEngine from './service-engine.js';
 export { executeServicePreset, executeMcp } from './service-engine.js';
+export * from './service-preset-registry.js';
 export {
   getServiceEndpointRecord,
   loadServiceEndpointsCatalog,
@@ -1350,6 +1354,7 @@ export * from './work-design.js';
 export * from './booking-preference-profile.js';
 export * from './presentation-preference-profile.js';
 export * from './project-registry.js';
+export * from './project-operational-state-registry.js';
 export * from './project-track-registry.js';
 export * from './sdlc-gate-readiness.js';
 export * from './service-binding-registry.js';
