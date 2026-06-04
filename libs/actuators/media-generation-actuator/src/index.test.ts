@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   compileMusicGenerationADF: vi.fn(),
   compileImageGenerationADF: vi.fn(),
   compileVideoGenerationADF: vi.fn(),
+  generateImage: vi.fn(),
   secureFetch: vi.fn(),
   withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
   safeCopyFileSync: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('@agent/core', async () => {
     compileMusicGenerationADF: mocks.compileMusicGenerationADF,
     compileImageGenerationADF: mocks.compileImageGenerationADF,
     compileVideoGenerationADF: mocks.compileVideoGenerationADF,
+    generateImage: mocks.generateImage,
     secureFetch: mocks.secureFetch,
     withRetry: mocks.withRetry,
     safeCopyFileSync: mocks.safeCopyFileSync,
@@ -136,6 +138,41 @@ describe('media-generation-actuator', () => {
         spans: expect.any(Number),
       }),
     }));
+  });
+
+  it('uses the direct image bridge path and preserves the artifact format from the output path', async () => {
+    mocks.generateImage.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'comfyui',
+      path: 'active/shared/exports/country-cover.png',
+      elapsedMs: 42,
+      promptId: 'bridge-prompt-1',
+    });
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'generate_image',
+      params: {
+        prompt: 'country road',
+        target_path: 'active/shared/exports/country-cover.png',
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      prompt_id: 'bridge-prompt-1',
+      artifact: expect.objectContaining({
+        format: 'png',
+        path: 'active/shared/exports/country-cover.png',
+      }),
+      artifacts: expect.arrayContaining([
+        expect.objectContaining({ format: 'png' }),
+      ]),
+      backend_id: 'comfyui',
+    }));
+    expect(mocks.generateImage).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'country road',
+      targetPath: 'active/shared/exports/country-cover.png',
+    }));
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
 
   it('can await image generation completion and return the generated artifact', async () => {

@@ -19,6 +19,7 @@ async function loadChronosCore() {
     pipelineContract,
     agentManifest,
     orchestrationEvents,
+    toolRuntimeRegistry,
   ] = await Promise.all([
     import("@agent/core/core"),
     import("@agent/core/path-resolver"),
@@ -30,6 +31,7 @@ async function loadChronosCore() {
     import("@agent/core/pipeline-contract"),
     import("@agent/core/agent-manifest"),
     import("@agent/core/mission-orchestration-events"),
+    import("@agent/core/tool-runtime-registry"),
   ]);
 
   return {
@@ -59,6 +61,7 @@ async function loadChronosCore() {
     validatePipelineAdf: pipelineContract.validatePipelineAdf,
     getAgentManifest: agentManifest.getAgentManifest,
     loadAgentManifests: agentManifest.loadAgentManifests,
+    listToolRuntimeInventory: toolRuntimeRegistry.listToolRuntimeInventory,
     safeExec: secureIo.safeExec,
     safeExecResult: secureIo.safeExecResult,
     emitMissionOrchestrationObservation: orchestrationEvents.emitMissionOrchestrationObservation,
@@ -755,6 +758,8 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
     case "diagnostics": {
       const runtimes = core.listAgentRuntimeSnapshots();
       const problematic = runtimes.filter((entry: any) => entry.agent.status !== "ready");
+      const toolRuntimes = core.listToolRuntimeInventory();
+      const readyToolRuntimes = toolRuntimes.items.filter((item: any) => item.lifecycle_stage === "installed" || item.lifecycle_stage === "pinned");
       const recentFiles = [
         core.pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
         core.pathResolver.shared("observability/channels/slack/missions.jsonl"),
@@ -765,13 +770,13 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
       }).slice(-10);
       return {
         status: "ok",
-        response: l(locale, `Diagnostics loaded. ${problematic.length} non-ready runtimes detected.`, `diagnostics を読み込みました。non-ready runtime は ${problematic.length} 件です。`),
+        response: l(locale, `Diagnostics loaded. ${problematic.length} non-ready agent runtimes and ${readyToolRuntimes.length}/${toolRuntimes.items.length} governed tool runtimes ready.`, `diagnostics を読み込みました。non-ready agent runtime は ${problematic.length} 件、tool runtime は ${readyToolRuntimes.length}/${toolRuntimes.items.length} ready です。`),
         a2ui: [
           {
             type: "display:section",
             props: {
               title: "Runtime Diagnostics",
-              description: "Non-ready runtime entries and recent control-plane events.",
+              description: "Non-ready runtime entries, governed tool runtime inventory, and recent control-plane events.",
               items: [
                 {
                   type: "display:table",
@@ -786,6 +791,22 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
                           entry.agent.ownerType || "-",
                         ])
                       : [["none", "ready", "-", "-"]],
+                  },
+                },
+                {
+                  type: "display:table",
+                  props: {
+                    title: "Governed Tool Runtimes",
+                    headers: ["Tool", "Lifecycle", "Action", "Backend", "Managed Path"],
+                    rows: toolRuntimes.items.length > 0
+                      ? toolRuntimes.items.map((item: any) => [
+                          item.tool.display_name || item.tool.tool_id,
+                          item.lifecycle_stage,
+                          item.selected_action,
+                          item.selected_backend?.kind || item.selected_backend?.command || "-",
+                          item.managed_env_path,
+                        ])
+                      : [["none", "trial", "-", "-", "-"]],
                   },
                 },
                 {

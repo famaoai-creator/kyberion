@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, createStandardYargs, pathResolver, ledger, classifyError, withRetry, safeExistsSync, safeMkdir } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeExec, createStandardYargs, pathResolver, ledger, classifyError, withRetry, safeExistsSync, safeMkdir, fetchSecret, storeSecret, removeSecret, listSecrets as coreListSecrets } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -180,61 +180,42 @@ async function handleAction(input: SecretAction) {
 }
 
 async function getSecret(params: any, platform: string) {
-  if (platform === 'darwin') {
-    try {
-      // macOS Keychain: security find-generic-password -a <account> -s <service> -w
-      const result = await withRetry(async () => safeExec('security', ['find-generic-password', '-a', params.account, '-s', params.service, '-w']).trim(), buildRetryOptions());
-      return { status: 'success', [params.export_as || 'secret_value']: result };
-    } catch (err: any) {
-      return { status: 'failed', error: 'Secret not found or access denied.' };
+  try {
+    const value = await withRetry(async () => fetchSecret(params.service, params.account), buildRetryOptions());
+    if (value === null) {
+      return { status: 'failed', error: 'Secret not found.' };
     }
+    return { status: 'success', [params.export_as || 'secret_value']: value };
+  } catch (err: any) {
+    return { status: 'failed', error: err.message || 'Secret not found.' };
   }
-  throw new Error(`Platform ${platform} not supported for 'get' secret yet.`);
 }
 
 async function setSecret(params: any, platform: string) {
   if (!params.value) throw new Error('Value is required for "set" action.');
   if (!params.account) throw new Error('Account is required for "set" action.');
 
-  if (platform === 'darwin') {
-    try {
-      // First try to delete existing to avoid duplicates/errors
-      try {
-        await withRetry(async () => safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]), buildRetryOptions());
-      } catch(_) {}
-
-      // macOS Keychain: security add-generic-password -a <account> -s <service> -w <value>
-      await withRetry(async () => safeExec('security', ['add-generic-password', '-a', params.account, '-s', params.service, '-w', params.value]), buildRetryOptions());
-      registryAdd(params.service, params.account);
-      return { status: 'success', message: 'Secret stored in macOS Keychain.' };
-    } catch (err: any) {
-      return { status: 'failed', error: err.message };
-    }
+  try {
+    await withRetry(async () => storeSecret(params.service, params.account, params.value), buildRetryOptions());
+    return { status: 'success', message: 'Secret stored.' };
+  } catch (err: any) {
+    return { status: 'failed', error: err.message };
   }
-  throw new Error(`Platform ${platform} not supported for 'set' secret yet.`);
 }
 
 async function deleteSecret(params: any, platform: string) {
   if (!params.account) throw new Error('Account is required for "delete" action.');
 
-  if (platform === 'darwin') {
-    try {
-      await withRetry(async () => safeExec('security', ['delete-generic-password', '-a', params.account, '-s', params.service]), buildRetryOptions());
-      registryRemove(params.service, params.account);
-      return { status: 'success', message: 'Secret deleted from macOS Keychain.' };
-    } catch (err: any) {
-      return { status: 'failed', error: err.message };
-    }
+  try {
+    await withRetry(async () => removeSecret(params.service, params.account), buildRetryOptions());
+    return { status: 'success', message: 'Secret deleted.' };
+  } catch (err: any) {
+    return { status: 'failed', error: err.message };
   }
-  throw new Error(`Platform ${platform} not supported for 'delete' secret yet.`);
 }
 
 function listSecrets(params: { service: string }): { status: string; entries: RegistryEntry[] } {
-  const registry = loadRegistry();
-  const entries = params.service
-    ? registry.entries.filter(e => e.service === params.service)
-    : registry.entries;
-  return { status: 'success', entries };
+  return coreListSecrets(params.service);
 }
 
 const main = async () => {

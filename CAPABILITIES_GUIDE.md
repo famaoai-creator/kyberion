@@ -71,6 +71,7 @@ as the source of truth for `capture` / `perception` / `generation` /
 | `list_input_devices` | system-actuator capture op |
 | `list_displays` | system-actuator capture op |
 | `list_media_devices` | system-actuator capture op |
+| `list_tool_runtimes` | system-actuator capture op |
 | `control_media_devices` | system-actuator capture op |
 | `collect_artifacts` | system-actuator capture op |
 | `sample_traces` | system-actuator capture op |
