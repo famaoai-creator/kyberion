@@ -398,6 +398,35 @@ const createScreenDisplayInventoryBridge = vi.fn(() => ({
     },
   })),
 }));
+const listToolRuntimeInventory = vi.fn(() => ({
+  version: '1.0.0',
+  platform: 'darwin',
+  requested_mode: 'trial',
+  default_tool_id: 'mflux',
+  items: [
+    {
+      tool: {
+        tool_id: 'mflux',
+        display_name: 'mflux Local FLUX Image Generator',
+        ecosystem: 'python',
+      },
+      state: null,
+      requested_mode: 'trial',
+      lifecycle_stage: 'trial',
+      selected_action: 'run_trial',
+      selected_backend: { kind: 'uvx', command: 'uvx', args: ['--from', 'mflux', 'mflux-generate'] },
+      trial_backend: { kind: 'uvx', command: 'uvx', args: ['--from', 'mflux', 'mflux-generate'] },
+      install_backend: { kind: 'uv', command: 'uv', args: ['tool', 'install', 'mflux'] },
+      installed_backend: { kind: 'uv', command: 'uv', args: ['tool', 'run', 'mflux-generate'] },
+      installed: false,
+      requires_install: false,
+      managed_env_path: '/tmp/kyberion/active/shared/runtime/tool-runtimes/mflux',
+      state_path: '/tmp/kyberion/active/shared/runtime/tool-runtimes/mflux/state.json',
+      available_commands: ['uvx', 'uv'],
+      reason: 'using trial backend for mflux',
+    },
+  ],
+}));
 const writeVideoFrameBusToMp4 = vi.fn(async (bus: any, outputPath: string) => {
   const frames: any[] = [];
   for await (const frame of bus.frameStream()) {
@@ -592,6 +621,7 @@ vi.mock('@agent/core', () => ({
   createScreenCaptureBridge,
   createScreenRecordingBridge,
   createScreenDisplayInventoryBridge,
+  listToolRuntimeInventory,
   writeVideoFrameBusToMp4,
   pipeMp4ToVideoFrameBus,
   StubVideoFrameBus,
@@ -1620,6 +1650,21 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect((result.context.media as any).camera.selected_camera).toBe('FaceTime HD Camera');
       expect((result.context.media as any).supported_actions).toBeTruthy();
       expect(createVirtualMediaDeviceControlBridge).toHaveBeenCalled();
+    });
+
+    it('list_tool_runtimes: returns governed runtime inventory', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'list_tool_runtimes', params: { export_as: 'tool_runtimes' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect((result.context.tool_runtimes as any).default_tool_id).toBe('mflux');
+      expect((result.context.tool_runtimes as any).tools.map((tool: any) => tool.tool_id)).toContain('mflux');
+      expect((result.context.tool_runtimes as any).tools[0].lifecycle_stage).toBe('trial');
+      expect(listToolRuntimeInventory).toHaveBeenCalledWith('trial');
     });
 
     it('control_media_devices: returns host provisioning plan for add/remove', async () => {

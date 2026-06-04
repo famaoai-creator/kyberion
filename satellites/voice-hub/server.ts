@@ -41,6 +41,7 @@ import {
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getSurfaceQueryProviderConfig,
+  createVirtualDeviceInventoryBridge,
   extractSurfaceKnowledgeQuery,
   extractSurfaceWebSearchQuery,
   listAgentRuntimeSnapshots,
@@ -93,8 +94,10 @@ import {
   formatClarificationPacket,
   resolveFallbackLocationCoordinates,
   resolveFallbackLocationSummary,
+  listenNativeSpeech,
   resolveVoiceTaskDistillTargetKind,
   resolveVoiceTaskProfile,
+  recordVoiceSample,
   type TaskSession,
 } from '@agent/core';
 
@@ -504,7 +507,6 @@ const app = express();
 const server = createServer(app);
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const NATIVE_STT_SCRIPT = pathResolver.resolve('satellites/voice-hub/native-stt.swift');
 const WHISPER_CPP_DIR = pathResolver.resolve('active/shared/tmp/whisper.cpp');
 const WHISPER_CLI_PATH = pathResolver.resolve(
   'active/shared/tmp/whisper.cpp/build/bin/whisper-cli'
@@ -843,125 +845,33 @@ function pruneRecentResponses(now = Date.now()): void {
   }
 }
 
-async function listNativeInputDevices(): Promise<{
+const voiceInputInventoryBridge = createVirtualDeviceInventoryBridge();
+
+async function listVoiceInputDevices(): Promise<{
   ok: boolean;
   devices: Array<{ id: number; uid: string; name: string; isDefault: boolean }>;
   defaultDeviceUID?: string;
   error?: string;
 }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('swift', [NATIVE_STT_SCRIPT, '--list-devices'], {
-      cwd: pathResolver.rootDir(),
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      const raw = stdout.trim();
-      if (!raw) return reject(new Error(stderr.trim() || `native_device_list_failed_${code}`));
-      try {
-        resolve(JSON.parse(raw));
-      } catch (error: any) {
-        reject(new Error(`native_device_list_invalid_json: ${error?.message || error}: ${raw}`));
-      }
-    });
-  });
-}
-
-async function runNativeStt(
-  locale: string,
-  timeoutSeconds: number,
-  deviceId?: string
-): Promise<{ ok: boolean; text?: string; error?: string; isFinal?: boolean; locale: string }> {
-  return new Promise((resolve, reject) => {
-    const args = [NATIVE_STT_SCRIPT, '--locale', locale, '--timeout', String(timeoutSeconds)];
-    if (deviceId) {
-      args.push('--device-id', deviceId);
-    }
-    const child = spawn('swift', args, {
-      cwd: pathResolver.rootDir(),
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      const raw = stdout.trim();
-      if (!raw) {
-        return reject(new Error(stderr.trim() || `native_stt_failed_${code}`));
-      }
-      try {
-        const parsed = JSON.parse(raw);
-        resolve(parsed);
-      } catch (error: any) {
-        reject(new Error(`native_stt_invalid_json: ${error?.message || error}: ${raw}`));
-      }
-    });
-  });
-}
-
-async function recordNativeWav(
-  locale: string,
-  timeoutSeconds: number,
-  deviceId: string | undefined,
-  outputPath: string
-): Promise<{ ok: boolean; outputPath: string; error?: string; elapsedMs?: number }> {
-  return new Promise((resolve, reject) => {
-    const args = [
-      NATIVE_STT_SCRIPT,
-      '--record-wav',
-      '--locale',
-      locale,
-      '--timeout',
-      String(timeoutSeconds),
-      '--output',
-      outputPath,
-    ];
-    if (deviceId) {
-      args.push('--device-id', deviceId);
-    }
-    const child = spawn('swift', args, {
-      cwd: pathResolver.rootDir(),
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      const raw = stdout.trim();
-      if (!raw) return reject(new Error(stderr.trim() || `native_record_failed_${code}`));
-      try {
-        resolve(JSON.parse(raw));
-      } catch (error: any) {
-        reject(new Error(`native_record_invalid_json: ${error?.message || error}: ${raw}`));
-      }
-    });
-  });
+  const probe = await voiceInputInventoryBridge.probe();
+  const inputs = probe.inventory.audio_inputs;
+  if (inputs.length === 0) {
+    return {
+      ok: false,
+      devices: [],
+      error: probe.reason || 'no audio inputs found',
+    };
+  }
+  return {
+    ok: true,
+    defaultDeviceUID: inputs[0]?.name,
+    devices: inputs.map((device, index) => ({
+      id: index,
+      uid: device.name,
+      name: device.name,
+      isDefault: index === 0,
+    })),
+  };
 }
 
 async function convertWavForWhisper(inputPath: string, outputPath: string): Promise<void> {
@@ -1102,7 +1012,7 @@ function getAvailableSttBackends() {
   return {
     server: resolveVoiceSttServerConfig(process.env) !== null,
     whisperCpp: safeExistsSync(WHISPER_CLI_PATH) && safeExistsSync(WHISPER_MODEL_PATH),
-    nativeSpeech: safeExistsSync(NATIVE_STT_SCRIPT),
+    nativeSpeech: safeExistsSync(pathResolver.resolve('satellites/voice-hub/native-stt.swift')),
   };
 }
 
@@ -4464,7 +4374,11 @@ app.post('/api/listen-once', async (req, res) => {
 
   try {
     if (backendOrder[0] === 'native_speech') {
-      const stt = await runNativeStt(locale, timeoutSeconds, deviceId);
+      const stt = await listenNativeSpeech({
+        locale,
+        timeoutSeconds,
+        deviceId,
+      });
       if (!stt.ok || !stt.text?.trim()) {
         return res.status(422).json({
           ok: false,
@@ -4504,10 +4418,17 @@ app.post('/api/listen-once', async (req, res) => {
     const rawWavPath = `${requestBase}.wav`;
     const normalizedWavPath = `${requestBase}.16k.wav`;
 
-    const record = await recordNativeWav(locale, timeoutSeconds, deviceId, rawWavPath);
-    if (!record.ok) {
+    const record = await recordVoiceSample({
+      action: 'record_voice_sample',
+      request_id: requestId,
+      sample_id: `listen-once-${requestId}`,
+      duration_sec: timeoutSeconds,
+      output_path: rawWavPath,
+      input_device_preference: deviceId,
+    });
+    if (record.status !== 'succeeded' || !record.output_path) {
       logger.info(
-        `[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=record_error error=${record.error || 'record_failed'} elapsed_ms=${Date.now() - startedAt}`
+        `[voice-hub] native STT end request=${requestId} device=${deviceId || 'default'} status=record_error error=${record.reason || 'record_failed'} elapsed_ms=${Date.now() - startedAt}`
       );
       return res.status(422).json({
         ok: false,
@@ -4515,7 +4436,7 @@ app.post('/api/listen-once', async (req, res) => {
         locale,
         device_id: deviceId,
         elapsed_ms: Date.now() - startedAt,
-        error: record.error || 'record_failed',
+        error: record.reason || 'record_failed',
       });
     }
 
@@ -4598,7 +4519,7 @@ app.get('/api/stt/backends', (_req, res) => {
 
 app.get('/api/input-devices', async (_req, res) => {
   try {
-    const devices = await listNativeInputDevices();
+    const devices = await listVoiceInputDevices();
     return res.json(devices);
   } catch (error: any) {
     logger.warn(`[voice-hub] input device listing failed: ${error?.message || error}`);

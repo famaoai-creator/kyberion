@@ -14,12 +14,13 @@
 import * as path from 'node:path';
 import {
   logger,
-  safeExec,
   safeReadFile,
   safeExistsSync,
   pathResolver,
   withRetry,
   resolveVars,
+  sendEmail,
+  createDraft,
 } from '@agent/core';
 
 const PLATFORMS_DARWIN = process.platform === 'darwin';
@@ -49,88 +50,7 @@ function resolveBodyFromFile(filePath: string): string {
   return String(safeReadFile(absPath, { encoding: 'utf8' })).trim();
 }
 
-function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): string {
-  const to = (params.to ?? '').replace(/"/g, '\\"');
-  const cc = (params.cc ?? '').replace(/"/g, '\\"');
-  const subject = (params.subject ?? '(no subject)').replace(/"/g, '\\"');
-  const body = (params.body ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-  const fromAddr = (params.from ?? process.env.KYBERION_EMAIL_FROM ?? '').replace(/"/g, '\\"');
 
-  const sendLine = op === 'send' ? 'msg.send()' : '// draft only';
-
-  return `
-ObjC.import('stdlib');
-const Mail = Application('Mail');
-Mail.activate();
-const msg = Mail.OutgoingMessage({
-  toRecipients: [Mail.Recipient({ address: "${to}" })],
-  ${cc ? `ccRecipients: [Mail.Recipient({ address: "${cc}" })],` : ''}
-  subject: "${subject}",
-  content: "${body}",
-  ${fromAddr ? `sender: "${fromAddr}",` : ''}
-  visible: false
-});
-Mail.outgoingMessages.push(msg);
-${sendLine}
-"ok"
-`.trim();
-}
-
-async function sendViaMail(op: 'create_draft' | 'send', params: EmailParams): Promise<string> {
-  if (!PLATFORMS_DARWIN) {
-    throw new Error('email-actuator: Mail.app mode requires macOS. Set KYBERION_SMTP_* env vars for SMTP mode.');
-  }
-  const script = buildJxaScript(op, params);
-  const result = safeExec('osascript', ['-l', 'JavaScript', '-e', script], {
-    cwd: pathResolver.rootDir(),
-  });
-  return result.trim();
-}
-
-async function sendViaSmtp(params: EmailParams): Promise<string> {
-  const host = process.env.KYBERION_SMTP_HOST;
-  const user = process.env.KYBERION_SMTP_USER;
-  const pass = process.env.KYBERION_SMTP_PASS;
-  const port = parseInt(process.env.KYBERION_SMTP_PORT ?? '587', 10);
-  const from = params.from ?? process.env.KYBERION_EMAIL_FROM ?? user ?? '';
-  const to = params.to ?? '';
-  const subject = params.subject ?? '(no subject)';
-  const body = params.body ?? '';
-
-  if (!host || !user || !pass) {
-    throw new Error(
-      'email-actuator: SMTP mode requires KYBERION_SMTP_HOST, KYBERION_SMTP_USER, KYBERION_SMTP_PASS',
-    );
-  }
-
-  // Use Python's smtplib (available on all platforms without extra packages)
-  const pythonScript = `
-import smtplib, ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-msg = MIMEMultipart()
-msg['From'] = ${JSON.stringify(from)}
-msg['To'] = ${JSON.stringify(to)}
-msg['Subject'] = ${JSON.stringify(subject)}
-msg.attach(MIMEText(${JSON.stringify(body)}, 'plain', 'utf-8'))
-
-ctx = ssl.create_default_context()
-with smtplib.SMTP(${JSON.stringify(host)}, ${port}) as server:
-    server.ehlo()
-    server.starttls(context=ctx)
-    server.login(${JSON.stringify(user)}, ${JSON.stringify(pass)})
-    server.sendmail(${JSON.stringify(from)}, ${JSON.stringify(to)}, msg.as_string())
-print("ok")
-`.trim();
-
-  const result = safeExec('python3', ['-c', pythonScript], { cwd: pathResolver.rootDir() });
-  return result.trim();
-}
-
-function isSmtpConfigured(): boolean {
-  return !!(process.env.KYBERION_SMTP_HOST && process.env.KYBERION_SMTP_USER && process.env.KYBERION_SMTP_PASS);
-}
 
 function resolveEmailParams(raw: EmailParams, ctx: Record<string, unknown>): EmailParams {
   return {
@@ -164,26 +84,29 @@ async function executePipeline(
     switch (step.op) {
       case 'create_draft': {
         logger.info(`[EMAIL] Creating draft → To: ${params.to}, Subject: ${params.subject}`);
-        const result = await withRetry(() => sendViaMail('create_draft', params), {
+        const result = await withRetry(() => createDraft(params), {
           maxRetries: 2,
           initialDelayMs: 1000,
           maxDelayMs: 8000,
           factor: 2,
           jitter: true,
         });
-        logger.success(`[EMAIL] Draft created in Mail.app`);
-        if (params.export_as) ctx = { ...ctx, [params.export_as]: result };
+        logger.success(`[EMAIL] Draft created`);
+        if (params.export_as) ctx = { ...ctx, [params.export_as]: result.message || 'success' };
         break;
       }
       case 'send':
       case 'send_from_file': {
         logger.info(`[EMAIL] Sending → To: ${params.to ?? ''}, Subject: ${params.subject ?? ''}`);
-        const result = await withRetry(
-          () => isSmtpConfigured() ? sendViaSmtp(params) : sendViaMail('send', params),
-          { maxRetries: 2, initialDelayMs: 1000, maxDelayMs: 8000, factor: 2, jitter: true },
-        );
+        const result = await withRetry(() => sendEmail(params), {
+          maxRetries: 2,
+          initialDelayMs: 1000,
+          maxDelayMs: 8000,
+          factor: 2,
+          jitter: true,
+        });
         logger.success(`[EMAIL] Sent → To: ${params.to}, Subject: ${params.subject}`);
-        if (params.export_as) ctx = { ...ctx, [params.export_as]: result };
+        if (params.export_as) ctx = { ...ctx, [params.export_as]: result.message || 'success' };
         break;
       }
       default:

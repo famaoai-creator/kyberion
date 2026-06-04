@@ -1,4 +1,4 @@
-import { logger, safeReadFile, executeServicePreset, pathResolver, classifyError, withRetry } from '@agent/core';
+import { logger, safeReadFile, executeServicePreset, pathResolver, classifyError, withRetry, ocrImage as coreOcrImage } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 
@@ -91,18 +91,23 @@ async function inspectImage(params: any) {
 async function ocrImage(params: any) {
   const logicalPath = String(params.path || '');
   if (!logicalPath) throw new Error('ocr_image requires params.path');
-  
-  const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker(params.language || 'eng');
-  const result = await worker.recognize(pathResolver.rootResolve(logicalPath));
-  await worker.terminate();
+
+  const result = await coreOcrImage({
+    path: logicalPath,
+    language: params.language,
+    mode: params.mode,
+    providerPreference: params.provider_preference || params.providerPreference,
+    extractStructure: params.extract_structure || params.extractStructure,
+  });
 
   return {
-    status: 'succeeded',
+    status: result.status,
     path: logicalPath,
     language: params.language || 'eng',
-    text: result.data.text,
-    confidence: result.data.confidence,
+    text: result.text,
+    confidence: result.confidence,
+    lines: result.lines,
+    provider: result.provider,
   };
 }
 

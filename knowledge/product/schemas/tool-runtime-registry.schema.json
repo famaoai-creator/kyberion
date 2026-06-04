@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tool-runtime-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default_tool_id": { "type": "string", "minLength": 1 },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tool_id": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
+          "ecosystem": { "type": "string", "enum": ["python", "node", "system"] },
+          "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["any", "darwin", "linux", "win32"] }
+          },
+          "supported_modes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["trial", "approved_install", "installed", "pinned"] }
+          },
+          "trial_backend": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "system"] },
+              "command": { "type": "string", "minLength": 1 },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "description": { "type": "string" }
+            },
+            "required": ["kind", "command", "args"]
+          },
+          "install_backend": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "system"] },
+              "command": { "type": "string", "minLength": 1 },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "description": { "type": "string" }
+            },
+            "required": ["kind", "command", "args"]
+          },
+          "installed_backend": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["uvx", "uv", "pipx", "npx", "npm", "pnpm", "brew", "system"] },
+              "command": { "type": "string", "minLength": 1 },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "description": { "type": "string" }
+            },
+            "required": ["kind", "command", "args"]
+          },
+          "fallback_tool_id": { "type": "string", "minLength": 1 },
+          "managed_env_subpath": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        },
+        "required": ["tool_id", "display_name", "ecosystem", "status", "platforms", "supported_modes", "trial_backend"]
+      }
+    }
+  },
+  "required": ["version", "default_tool_id", "tools"]
+}
