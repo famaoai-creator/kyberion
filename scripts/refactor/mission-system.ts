@@ -1,7 +1,6 @@
 import {
   pathResolver,
   transitionStatus,
-  syncProjectOperationalStateFromMission,
 } from '@agent/core';
 import { getCurrentBranch, getGitHash } from './mission-git.js';
 import {
@@ -33,27 +32,7 @@ import { dispatchMissionTickets as _dispatchMissionTickets } from './mission-tic
 import { dispatchMissionWorkItems as _dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import { sealMission as _sealMission } from './mission-seal.js';
 import { loadState, saveState, readFocusedMissionId, writeFocusedMissionId } from './mission-state.js';
-
-async function syncProjectOperationalStateIfLinked(missionId: string): Promise<void> {
-  const state = loadState(missionId.toUpperCase());
-  if (!state?.relationships?.project?.project_id) return;
-  try {
-    syncProjectOperationalStateFromMission({
-      mission_id: state.mission_id,
-      mission_type: state.mission_type,
-      tier: state.tier,
-      status: state.status,
-      tenant_slug: state.tenant_slug,
-      tenant_id: state.tenant_id,
-      relationships: state.relationships,
-      assigned_persona: state.assigned_persona,
-      context: state.context,
-      outcome_contract: state.outcome_contract,
-    });
-  } catch (err: any) {
-    console.warn(`[project-state] sync skipped for ${state.mission_id}: ${err?.message || err}`);
-  }
-}
+import { syncProjectOperationalStateIfLinked } from './project-state-sync.js';
 
 export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
   const missionFocusPath = pathResolver.shared('runtime/current_mission_focus.json');

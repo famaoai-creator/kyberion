@@ -31,9 +31,9 @@ export type BrowserConversationCommandType = 'task_command' | 'step_command' | '
 
 export interface BrowserConversationCommandResolution {
   commandType: BrowserConversationCommandType;
-  action?: BrowserConversationCommand['resolution']['action'];
+  action?: NonNullable<BrowserConversationCommand['resolution']>['action'];
   inputText?: string;
-  targetHint?: BrowserConversationCommand['resolution']['target_hint'];
+  targetHint?: NonNullable<BrowserConversationCommand['resolution']>['target_hint'];
 }
 
 export interface BrowserConversationCandidateBounds {

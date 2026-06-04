@@ -203,18 +203,22 @@ abstract class BaseACPAdapter implements AgentAdapter {
       const lines = guestBuffer.split('\n');
       guestBuffer = lines.pop() || '';
       for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('{')) {
-          sdkInput.write(trimmed + '\n');
-          touchManagedProcess(this.runtimeResourceId);
+          const trimmed = line.trim();
+          if (trimmed.startsWith('{')) {
+            sdkInput.write(trimmed + '\n');
+            if (this.runtimeResourceId) {
+              touchManagedProcess(this.runtimeResourceId);
+            }
+          }
         }
-      }
-    });
+      });
 
     sdkOutput.on('data', (data) => {
       const msg = data.toString();
       if (this.child?.stdin?.writable) this.child.stdin.write(msg);
-      touchManagedProcess(this.runtimeResourceId);
+      if (this.runtimeResourceId) {
+        touchManagedProcess(this.runtimeResourceId);
+      }
     });
 
     const { ClientSideConnection, ndJsonStream } = await getACPSdk();
@@ -343,7 +347,9 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
   public async shutdown(): Promise<void> {
     if (this.child) {
-      stopManagedProcess(this.runtimeResourceId, this.child);
+      if (this.runtimeResourceId) {
+        stopManagedProcess(this.runtimeResourceId, this.child);
+      }
       this.child = null;
     }
     this.runtimeResourceId = null;

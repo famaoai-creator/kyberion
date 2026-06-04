@@ -41,7 +41,7 @@ function emitTeamSummary(plan: {
 
 function emitRuntimeSummary(plan: {
   organization_profile?: { name: string; organization_id: string; default_team_template?: string; team_template_catalog_id?: string };
-  assignments: Array<{ runtime_status: string; team_role: string; agent_id?: string; error?: string }>;
+  assignments: Array<{ runtime_status: string; team_role: string; agent_id?: string | null; error?: string }>;
 }): void {
   const counts = {
     spawned: 0,

@@ -1,309 +1,17 @@
-import { logger, safeReadFile, platform, transform, secureFetch, safeExec, withRetry, resolveServiceBinding, secretGuard, loadServiceEndpointsCatalog, classifyError, fetchWithVaultCache } from './index.js';
-import { tryRepairJson } from './json-repair.js';
-import * as path from 'node:path';
-import * as customerResolver from './customer-resolver.js';
-import { pathResolver } from './path-resolver.js';
-import { withExecutionContext } from './authority.js';
+import { logger, loadServiceEndpointsCatalog, fetchWithVaultCache } from './index.js';
+import { resolveServiceBinding } from './service-binding.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
+import {
+  loadConnectionWithFallback,
+  mergeParamsWithConnection,
+  isPlainObject,
+  resolveRequestEnvelope,
+} from './service-engine-helpers.js';
+import {
+  executeServicePresetAlternative,
+} from './service-engine-execution.js';
 
-/**
- * Shared Service Execution Engine v1.2.0
- * Allows any Actuator to leverage Adaptive Presets (API/CLI/MCP).
- */
-
-export async function executeMcp(command: string, args: string[], actionRequest: { action: string; name?: string; arguments?: any }) {
-  // Dynamic import to avoid heavy SDK load during normal boots
-  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
-  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
-
-  const transport = new StdioClientTransport({ command, args, stderr: "inherit" });
-  const client = new Client({ name: "Kyberion-Service-Engine", version: "1.0.0" }, { capabilities: {} });
-
-  try {
-    await client.connect(transport);
-    if (actionRequest.action === 'list_tools') return await client.listTools();
-    if (actionRequest.action === 'call_tool') {
-      if (!actionRequest.name) throw new Error("Tool name is required for MCP call_tool");
-      return await client.callTool({ name: actionRequest.name, arguments: actionRequest.arguments || {} });
-    }
-    throw new Error(`Unsupported MCP action: ${actionRequest.action}`);
-  } finally {
-    try { await transport.close(); } catch (_) {}
-  }
-}
-
-function loadConnectionWithFallback(serviceId: string): Record<string, any> {
-  const connectionPath = customerResolver.resolveOverlay(`connections/${serviceId}.json`);
-  if (connectionPath) {
-    try {
-      const primary = withExecutionContext('service_actuator', () =>
-        JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string)
-      );
-      if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
-    } catch (_) {}
-  }
-  try {
-    return withExecutionContext('service_actuator', () => {
-      const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
-      return JSON.parse(safeReadFile(fallbackPath, { encoding: 'utf8' }) as string);
-    });
-  } catch (_) {
-    const primary = withExecutionContext('service_actuator', () => secretGuard.loadConnectionDocument(serviceId));
-    if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
-    return {};
-  }
-}
-
-function isUnresolvedTemplateString(value: unknown): value is string {
-  return typeof value === 'string' && /^\{\{\s*[^}]+\s*\}\}$/.test(value.trim());
-}
-
-function mergeParamsWithConnection(connection: Record<string, any>, params: Record<string, any>): Record<string, any> {
-  const merged: Record<string, any> = { ...connection };
-  for (const [key, value] of Object.entries(params || {})) {
-    if (isUnresolvedTemplateString(value) && merged[key] !== undefined) continue;
-    merged[key] = value;
-  }
-  return merged;
-}
-
-function resolveVars(input: string | undefined, vars: Record<string, any>): string {
-  if (!input) return '';
-  return input.replace(/{{(.*?)}}/g, (_, key) => {
-    const value = vars[key.trim()];
-    return value !== undefined ? String(value) : `{{${key}}}`;
-  });
-}
-
-function resolveTemplateValue(input: any, vars: Record<string, any>): any {
-  if (typeof input === 'string') {
-    const trimmed = input.trim();
-    const wholeVarMatch = trimmed.match(/^{{\s*([^}]+)\s*}}$/);
-    if (wholeVarMatch) {
-      const value = vars[wholeVarMatch[1].trim()];
-      return value !== undefined ? value : input;
-    }
-    return resolveVars(input, vars);
-  }
-  if (Array.isArray(input)) {
-    return input.map((item) => resolveTemplateValue(item, vars));
-  }
-  if (input && typeof input === 'object') {
-    return Object.fromEntries(
-      Object.entries(input).map(([key, value]) => [key, resolveTemplateValue(value, vars)]),
-    );
-  }
-  return input;
-}
-
-function normalizePresetResult(output: any, outputMapping?: Record<string, string>): any {
-  if (!outputMapping || Object.keys(outputMapping).length === 0) return output;
-  return transform(output, { type: 'json_map', mapping: outputMapping });
-}
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function resolveRecoveryPolicy(source: Record<string, any> | undefined): Record<string, any> {
-  return isPlainObject(source?.recovery_policy) ? source.recovery_policy : {};
-}
-
-function resolveRetryPolicy(...sources: Array<Record<string, any> | undefined>): RetryPolicy {
-  const merged: RetryPolicy = {};
-  for (const source of sources) {
-    const policy = resolveRecoveryPolicy(source);
-    const retry = policy.retry || policy.default_retry || source?.retry_policy || source?.retry || {};
-    if (isPlainObject(retry)) {
-      Object.assign(merged, retry);
-    }
-  }
-  return merged;
-}
-
-function buildRetryOptions(
-  serviceConfig: Record<string, any>,
-  preset: Record<string, any>,
-  operation: Record<string, any>,
-): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
-  const retryableCategories = new Set<string>();
-  for (const source of [serviceConfig, preset, operation]) {
-    const policy = resolveRecoveryPolicy(source);
-    const categories = Array.isArray(policy.retryable_categories) ? policy.retryable_categories : [];
-    for (const category of categories) retryableCategories.add(String(category));
-  }
-
-  const resolvedRetry = {
-    ...DEFAULT_RETRY_POLICY,
-    ...resolveRetryPolicy(serviceConfig, preset, operation),
-  };
-
-  const shouldRetry = (error: Error) => {
-    const classification = classifyError(error);
-    if (retryableCategories.size > 0) {
-      return retryableCategories.has(classification.category);
-    }
-    return (
-      classification.category === 'network' ||
-      classification.category === 'rate_limit' ||
-      classification.category === 'timeout' ||
-      classification.category === 'resource_unavailable'
-    );
-  };
-
-  return { ...resolvedRetry, shouldRetry };
-}
-
-function resolveRequestEnvelope(params: any): {
-  templateVars: Record<string, any>;
-  query?: Record<string, any>;
-  body?: any;
-  hasBody: boolean;
-} {
-  const templateVars: Record<string, any> = isPlainObject(params) ? { ...params } : {};
-  let query: Record<string, any> | undefined;
-  let body: any;
-  let hasBody = false;
-
-  if (isPlainObject(templateVars.vars)) {
-    Object.assign(templateVars, templateVars.vars);
-  }
-  if (isPlainObject(templateVars.query)) {
-    query = { ...templateVars.query };
-  }
-  if (Object.prototype.hasOwnProperty.call(templateVars, 'body')) {
-    body = templateVars.body;
-    hasBody = true;
-  }
-
-  return { templateVars, query, body, hasBody };
-}
-
-function buildApiKeyQueryAuth(
-  authStrategy: string | undefined,
-  authParams: Record<string, any> | undefined,
-  binding: ReturnType<typeof resolveServiceBinding>,
-  templateVars: Record<string, any>,
-): Record<string, string> {
-  if (!authStrategy || authStrategy.toLowerCase() !== 'api_key_query') return {};
-
-  const key = String(authParams?.key || 'apiKey').trim();
-  if (!key) {
-    throw new Error(`api_key_query auth requires a query key for service "${binding.serviceId}"`);
-  }
-
-  const resolvedValue = resolveTemplateValue(authParams?.value ?? '{{accessToken}}', {
-    ...templateVars,
-    ...binding,
-  });
-  const value = typeof resolvedValue === 'string' ? resolvedValue : String(resolvedValue ?? '');
-  if (!value) {
-    throw new Error(`api_key_query auth requires an access token for service "${binding.serviceId}"`);
-  }
-
-  return { [key]: value };
-}
-
-function buildAuthHeaders(
-  authStrategy: string | undefined,
-  binding: ReturnType<typeof resolveServiceBinding>,
-): Record<string, string> {
-  if (!authStrategy || authStrategy.toLowerCase() === 'none') return {};
-
-  if (authStrategy.toLowerCase() === 'bearer') {
-    if (!binding.accessToken) {
-      throw new Error(`Bearer auth requires an access token for service "${binding.serviceId}"`);
-    }
-    return { Authorization: `Bearer ${binding.accessToken}` };
-  }
-
-  if (authStrategy.toLowerCase() === 'basic') {
-    if (binding.clientId && binding.clientSecret) {
-      const credentials = Buffer.from(`${binding.clientId}:${binding.clientSecret}`, 'utf8').toString('base64');
-      return { Authorization: `Basic ${credentials}` };
-    }
-    if (binding.accessToken) {
-      return { Authorization: `Basic ${binding.accessToken}` };
-    }
-    throw new Error(`Basic auth requires client credentials or a pre-encoded token for service "${binding.serviceId}"`);
-  }
-
-  return {};
-}
-
-function encodeFormBody(payload: Record<string, any>): string {
-  const searchParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(payload)) {
-    if (value === undefined || value === null) continue;
-    if (Array.isArray(value)) {
-      for (const item of value) searchParams.append(key, String(item));
-      continue;
-    }
-    searchParams.append(key, String(value));
-  }
-  return searchParams.toString();
-}
-
-function stripUnresolvedTemplateValues(input: any): any {
-  if (typeof input === 'string') {
-    return /^{{\s*[^}]+\s*}}$/.test(input.trim()) ? undefined : input;
-  }
-  if (Array.isArray(input)) {
-    return input
-      .map((item) => stripUnresolvedTemplateValues(item))
-      .filter((item) => item !== undefined);
-  }
-  if (input && typeof input === 'object') {
-    return Object.fromEntries(
-      Object.entries(input)
-        .map(([key, value]) => [key, stripUnresolvedTemplateValues(value)])
-        .filter(([, value]) => value !== undefined),
-    );
-  }
-  return input;
-}
-
-function prepareRequestBody(payload: any, headers: Record<string, any>): any {
-  const normalizedPayload = stripUnresolvedTemplateValues(payload);
-  const contentType = String(headers['Content-Type'] || headers['content-type'] || '').toLowerCase();
-  if (contentType.includes('application/x-www-form-urlencoded') && normalizedPayload && typeof normalizedPayload === 'object' && !Array.isArray(normalizedPayload)) {
-    return encodeFormBody(normalizedPayload);
-  }
-  return normalizedPayload;
-}
-
-function isUnsafeCliAllowed(): boolean {
-  return process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true';
-}
-
-type RetryPolicy = {
-  maxRetries?: number;
-  initialDelayMs?: number;
-  maxDelayMs?: number;
-  factor?: number;
-  jitter?: boolean;
-};
-
-const DEFAULT_RETRY_POLICY: Required<RetryPolicy> = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
-
-function isCliAllowedForOperation(
-  serviceConfig: Record<string, any>,
-  preset: Record<string, any>,
-  operation: Record<string, any>,
-): boolean {
-  if (isUnsafeCliAllowed()) return true;
-  return (
-    Boolean(operation.allow_unsafe_cli) ||
-    Boolean(preset.allow_unsafe_cli) ||
-    Boolean(serviceConfig.allow_unsafe_cli)
-  );
-}
+export { executeMcp } from './service-engine-execution.js';
 
 export interface ServicePresetCacheOptions {
   /** When set, the result is cached in the Data Vault for this many milliseconds. */
@@ -320,7 +28,7 @@ export async function executeServicePreset(
   params: any,
   auth: 'none' | 'secret-guard' = 'none',
   cacheOpts?: ServicePresetCacheOptions,
-) {
+): Promise<any> {
   const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services[serviceId];
   if (!serviceConfig || !serviceConfig.preset_path) {
@@ -353,95 +61,18 @@ export async function executeServicePreset(
   const binding = resolveServiceBinding(serviceId, auth);
   for (const alt of alternatives) {
     try {
-      if (alt.type === 'cli') {
-        const bin = resolveVars(alt.command, mergedParams);
-        if (!(await platform.checkBinary(bin))) continue;
-        if (!isCliAllowedForOperation(serviceConfig, preset, alt)) throw new Error('CLI execution disabled.');
-
-        const rawOutput = await withRetry(async () => {
-          const args = (alt.args || []).map((a: any) => {
-            const resolved = resolveTemplateValue(a, mergedParams);
-            return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
-          });
-          logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
-          return safeExec(bin, args);
-        }, buildRetryOptions(serviceConfig, preset, alt));
-        let parsed: unknown = rawOutput;
-        try { parsed = JSON.parse(rawOutput); } catch (_) {
-          const repaired = tryRepairJson(rawOutput);
-          if (repaired !== null) parsed = repaired;
-        }
-        return normalizePresetResult(parsed, alt.output_mapping);
-      }
-
-      if (alt.type === 'mcp') {
-        const bin = resolveVars(alt.command, mergedParams);
-        const args = (alt.args || []).map((a: any) => resolveVars(String(a), mergedParams));
-        if (!(await platform.checkBinary(bin))) continue;
-        if (!isCliAllowedForOperation(serviceConfig, preset, alt)) {
-          throw new Error('CLI execution disabled.');
-        }
-        
-        const mcpResult = await withRetry(async () => {
-          logger.info(`🚀 [ENGINE:MCP] Executing ${bin} for ${action}`);
-          return await executeMcp(bin, args, {
-            action: alt.mcp_action || 'call_tool',
-            name: resolveVars(alt.tool_name || action, mergedParams),
-            arguments: alt.payload_template 
-              ? resolveTemplateValue(alt.payload_template, mergedParams)
-              : params
-          });
-        }, buildRetryOptions(serviceConfig, preset, alt));
-        return normalizePresetResult(mcpResult, alt.output_mapping);
-      }
-
-      if (alt.type === 'api') {
-          const result = await withRetry(async () => {
-          const baseUrl = resolveVars(
-            alt.base_url || preset.base_url || serviceConfig.base_url || connection.base_url,
-            mergedParams,
-          );
-          if (!baseUrl) {
-            throw new Error(`No base_url resolved for service "${serviceId}"`);
-          }
-          const apiPath = resolveVars(alt.path, mergedParams);
-          const method = alt.method || 'GET';
-          const authQuery = buildApiKeyQueryAuth(alt.auth_strategy || preset.auth_strategy, alt.auth_params || preset.auth_params, binding, mergedParams);
-          const rawQuery = envelope.query ?? (method === 'GET' ? params : undefined);
-          const rawPayload = alt.payload_template
-            ? resolveTemplateValue(alt.payload_template, mergedParams)
-            : (envelope.hasBody ? envelope.body : params);
-          const headers = {
-            ...(preset.headers || {}),
-            ...(alt.headers || {}),
-            ...buildAuthHeaders(alt.auth_strategy || preset.auth_strategy, binding),
-          };
-          const payload = prepareRequestBody(rawPayload, headers);
-          const requestParams = isPlainObject(rawQuery)
-            ? {
-                ...resolveTemplateValue(rawQuery, mergedParams),
-                ...authQuery,
-              }
-            : Object.keys(authQuery).length > 0
-              ? authQuery
-              : undefined;
-
-          logger.info(`🚀 [ENGINE:API] Executing ${serviceId}:${action}`);
-          return await secureFetch({
-            method: method as any,
-            url: `${baseUrl}/${apiPath}`,
-            headers,
-            data: method !== 'GET' ? payload : undefined,
-            params: requestParams ?? (method === 'GET' ? payload : undefined),
-            authenticateRequest: Object.keys(authQuery).length > 0,
-            kyberion_allow_local_network:
-              Boolean(alt.allow_local_network) ||
-              Boolean(preset.allow_local_network) ||
-              Boolean(serviceConfig.allow_local_network),
-          });
-        }, buildRetryOptions(serviceConfig, preset, alt));
-        return normalizePresetResult(result, alt.output_mapping);
-      }
+      const resolved = await executeServicePresetAlternative({
+        serviceId,
+        action,
+        alt,
+        serviceConfig,
+        preset,
+        params,
+        envelope,
+        mergedParams,
+        binding,
+      });
+      if (resolved) return resolved.result;
     } catch (err: any) {
       logger.error(`  [ENGINE] Alternative failed: ${err.message}`);
     }

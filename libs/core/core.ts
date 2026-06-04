@@ -130,7 +130,12 @@ export const ui = {
 export const sre = {
   analyzeRootCause: (errorMessage: string) => {
     const sigPath = pathResolver.knowledge('orchestration/error-signatures.json');
-    const results = [];
+    const results: Array<{
+      cause: string;
+      impact: string;
+      recommendation: string;
+      action: string;
+    }> = [];
     
     if (rawExistsSync(sigPath)) {
       try {

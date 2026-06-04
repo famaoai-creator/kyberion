@@ -1,21 +1,17 @@
-import * as crypto from 'node:crypto';
-import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import {
-  safeReadFile,
-  safeWriteFile,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeUnlinkSync,
-  safeFsyncFile,
-} from './secure-io.js';
 import { loadServiceEndpointsCatalog, resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
 import { loadConnectionDocument, storeConnectionDocument } from './secret-guard.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
-
-const OAUTH_SESSION_ROOT = pathResolver.sharedTmp('oauth');
+import {
+  buildCodeChallenge,
+  clearPendingOAuthSession,
+  findPendingOAuthSessionByState,
+  loadPendingOAuthSession,
+  normalizeScopes,
+  randomUrlSafe,
+  savePendingOAuthSession,
+  type PendingOAuthSession,
+} from './oauth-session-store.js';
 
 export interface ServiceOAuthProfile {
   authorize_url: string;
@@ -30,15 +26,6 @@ export interface ServiceOAuthProfile {
   extra_authorize_params?: Record<string, string>;
 }
 
-interface PendingOAuthSession {
-  serviceId: string;
-  state: string;
-  codeVerifier?: string;
-  redirectUri?: string;
-  scopes: string[];
-  createdAt: string;
-}
-
 function loadServicePreset(serviceId: string): any {
   const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services?.[serviceId];
@@ -49,98 +36,12 @@ function loadServicePreset(serviceId: string): any {
   return preset;
 }
 
-function serviceSessionDir(serviceId: string): string {
-  return path.join(OAUTH_SESSION_ROOT, serviceId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-'));
-}
-
-function serviceSessionPath(serviceId: string, state: string): string {
-  return path.join(serviceSessionDir(serviceId), `${state}.json`);
-}
-
-function randomUrlSafe(length = 48): string {
-  return crypto.randomBytes(length).toString('base64url');
-}
-
-function buildCodeChallenge(codeVerifier: string): string {
-  return crypto.createHash('sha256').update(codeVerifier).digest('base64url');
-}
-
-function savePendingOAuthSession(session: PendingOAuthSession) {
-  const dir = serviceSessionDir(session.serviceId);
-  if (!safeExistsSync(dir)) {
-    safeMkdir(dir, { recursive: true });
-  }
-  const filePath = serviceSessionPath(session.serviceId, session.state);
-  safeWriteFile(filePath, JSON.stringify(session, null, 2) + '\n');
-  try { safeFsyncFile(filePath); } catch (_) {}
-}
-
-function loadPendingOAuthSession(serviceId: string, state?: string): PendingOAuthSession | null {
-  const dir = serviceSessionDir(serviceId);
-  if (!safeExistsSync(dir)) return null;
-
-  if (state) {
-    const filePath = serviceSessionPath(serviceId, state);
-    if (!safeExistsSync(filePath)) return null;
-    try {
-      return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  try {
-    const files = safeReaddir(dir).filter((file) => file.endsWith('.json')).sort().reverse();
-    if (files.length === 0) return null;
-    return JSON.parse(safeReadFile(path.join(dir, files[0]), { encoding: 'utf8' }) as string);
-  } catch (_) {
-    return null;
-  }
-}
-
-function clearPendingOAuthSession(serviceId: string, state: string) {
-  const filePath = serviceSessionPath(serviceId, state);
-  if (safeExistsSync(filePath)) {
-    safeUnlinkSync(filePath);
-  }
-}
-
-function listPendingOAuthSessions(): PendingOAuthSession[] {
-  if (!safeExistsSync(OAUTH_SESSION_ROOT)) return [];
-  const sessions: PendingOAuthSession[] = [];
-  try {
-    for (const serviceDir of safeReaddir(OAUTH_SESSION_ROOT)) {
-      const fullDir = path.join(OAUTH_SESSION_ROOT, serviceDir);
-      if (!safeExistsSync(fullDir)) continue;
-      for (const fileName of safeReaddir(fullDir)) {
-        if (!fileName.endsWith('.json')) continue;
-        try {
-          const session = JSON.parse(safeReadFile(path.join(fullDir, fileName), { encoding: 'utf8' }) as string) as PendingOAuthSession;
-          sessions.push(session);
-        } catch (_) {}
-      }
-    }
-  } catch (_) {}
-  return sessions;
-}
-
-function normalizeScopes(scopes?: string[] | string): string[] {
-  if (!scopes) return [];
-  if (Array.isArray(scopes)) return scopes.filter(Boolean);
-  return scopes.split(/[ ,]+/).map((value) => value.trim()).filter(Boolean);
-}
-
 export function loadServiceOAuthProfile(serviceId: string): ServiceOAuthProfile {
   const preset = loadServicePreset(serviceId);
   if (!preset?.oauth?.authorize_url) {
     throw new Error(`Service "${serviceId}" does not define an oauth profile`);
   }
   return preset.oauth as ServiceOAuthProfile;
-}
-
-export function findPendingOAuthSessionByState(state: string): PendingOAuthSession | null {
-  if (!state) return null;
-  return listPendingOAuthSessions().find((session) => session.state === state) || null;
 }
 
 export function beginServiceOAuth(

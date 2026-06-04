@@ -12,12 +12,7 @@ import {
   logger,
   pathResolver,
   resolveMissionTeamReceiver,
-  withExecutionContext,
-  safeAppendFileSync,
   safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
   listWorkItems,
   updateWorkItem,
   type A2AMessage,
@@ -27,6 +22,15 @@ import {
 } from '@agent/core';
 import { findMissionPath } from '@agent/core';
 import type { MissionState } from './mission-types.js';
+import {
+  countWords as countWordsFromDispatchIO,
+  readJsonFile as readJsonFileFromDispatchIO,
+  writeJsonFile as writeJsonFileFromDispatchIO,
+} from './mission-dispatch-io.js';
+import {
+  appendDispatchEvent,
+  writeDispatchArtifact,
+} from './mission-dispatch-lifecycle.js';
 
 export type MissionWorkItemDispatchMode = 'auto' | 'agent' | 'subagent';
 export type MissionWorkItemDispatchFinalStatus = 'review' | 'done';
@@ -106,55 +110,15 @@ function missionNextTasksPath(missionPath: string): string {
   return nodePath.join(missionPath, 'NEXT_TASKS.json');
 }
 
-function ensureDispatchDirs(missionPath: string): void {
-  withExecutionContext('mission_controller', () => {
-    safeMkdir(nodePath.dirname(dispatchEventPath(missionPath)), { recursive: true });
-  }, 'worker');
-}
-
-function writeEvent(missionPath: string, entry: Record<string, unknown>): void {
-  withExecutionContext('mission_controller', () => {
-    safeAppendFileSync(dispatchEventPath(missionPath), `${JSON.stringify({ ...entry, ts: new Date().toISOString() })}\n`, 'utf8');
-  }, 'worker');
-}
-
 function readManifest(missionPath: string): MissionWorkItemDispatchManifest | null {
   const path = manifestPath(missionPath);
   if (!safeExistsSync(path)) return null;
   try {
-    const parsed = JSON.parse(safeReadFile(path, { encoding: 'utf8' }) as string) as MissionWorkItemDispatchManifest;
+    const parsed = readJsonFileFromDispatchIO<MissionWorkItemDispatchManifest>(path);
     return parsed && typeof parsed === 'object' ? parsed : null;
   } catch (_) {
     return null;
   }
-}
-
-function writeArtifact(filePath: string, payload: unknown): void {
-  const dir = nodePath.dirname(filePath);
-  withExecutionContext('mission_controller', () => {
-    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(filePath, JSON.stringify(payload, null, 2));
-  }, 'worker');
-}
-
-function readJsonFile<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-  } catch (_) {
-    return null;
-  }
-}
-
-function writeJsonFile(filePath: string, payload: unknown): void {
-  writeArtifact(filePath, payload);
-}
-
-function countWords(value: string): number {
-  return String(value || '')
-    .trim()
-    .split(/\s+/u)
-    .filter(Boolean).length;
 }
 
 function getMissionLabel(item: WorkItem): string | undefined {
@@ -258,17 +222,17 @@ function deriveTicketState(
 
 function updateTicketManifest(missionPath: string, taskId: string, updater: (record: Record<string, unknown>, ticketState: 'done' | 'review' | 'blocked') => void, ticketState: 'done' | 'review' | 'blocked'): void {
   const manifestFile = ticketManifestPath(missionPath);
-  const manifest = readJsonFile<{ records?: Array<Record<string, unknown>> }>(manifestFile);
+  const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(manifestFile);
   if (!manifest?.records) return;
   const index = manifest.records.findIndex((record) => String(record.task_id || '') === taskId);
   if (index < 0) return;
   updater(manifest.records[index], ticketState);
-  writeJsonFile(manifestFile, manifest);
+  writeJsonFileFromDispatchIO(manifestFile, manifest);
 }
 
 function updateNextTasksReflection(missionPath: string, taskId: string, payload: Record<string, unknown>): void {
   const nextTasksFile = missionNextTasksPath(missionPath);
-  const tasks = readJsonFile<Array<Record<string, unknown>>>(nextTasksFile);
+  const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(nextTasksFile);
   if (!tasks) return;
   const index = tasks.findIndex((task) => String(task.task_id || '') === taskId);
   if (index < 0) return;
@@ -280,7 +244,7 @@ function updateNextTasksReflection(missionPath: string, taskId: string, payload:
       ...payload,
     },
   };
-  writeJsonFile(nextTasksFile, tasks);
+  writeJsonFileFromDispatchIO(nextTasksFile, tasks);
 }
 
 function appendComment(existing: unknown, comment: Record<string, unknown>): Record<string, unknown>[] {
@@ -315,7 +279,7 @@ async function reflectTicketOutcome(input: {
 
   const ticketState = deriveTicketState(input.finalStatus, notes);
   const reflectionPath = ticketReplyPath(input.missionPath, taskId);
-  const manifest = readJsonFile<{ records?: Array<Record<string, unknown>> }>(ticketManifestPath(input.missionPath));
+  const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(ticketManifestPath(input.missionPath));
   const manifestRecord = manifest?.records?.find((record) => String(record.task_id || '') === taskId);
   const liveResults = (manifestRecord?.live_results as Record<string, unknown> | undefined) || {};
   const reflectionBody = buildTicketReflectionBody({
@@ -343,7 +307,7 @@ async function reflectTicketOutcome(input: {
     body: reflectionBody,
     reflected_at: new Date().toISOString(),
   };
-  writeArtifact(reflectionPath, reflectionPayload);
+  writeDispatchArtifact(reflectionPath, reflectionPayload);
 
   updateTicketManifest(input.missionPath, taskId, (record, state) => {
     record.reflection_status = ticketState;
@@ -368,7 +332,7 @@ async function reflectTicketOutcome(input: {
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
   if (safeExistsSync(githubPath)) {
-    const githubIssue = readJsonFile<Record<string, unknown>>(githubPath);
+      const githubIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(githubPath);
     if (githubIssue) {
       const issueNumber = extractGitHubIssueNumber(liveResults.github) || extractGitHubIssueNumber(githubIssue);
       const repoInfo = extractGitHubRepoInfo(githubIssue);
@@ -386,7 +350,7 @@ async function reflectTicketOutcome(input: {
         response_path: input.responsePath,
         response_excerpt: input.responseExcerpt,
       };
-      writeJsonFile(githubPath, githubIssue);
+      writeJsonFileFromDispatchIO(githubPath, githubIssue);
 
       if (repoInfo.owner && repoInfo.repo && issueNumber) {
         try {
@@ -412,7 +376,7 @@ async function reflectTicketOutcome(input: {
 
   const jiraPath = nodePath.join(ticketRoot(input.missionPath), 'jira', `${taskId}.json`);
   if (safeExistsSync(jiraPath)) {
-    const jiraIssue = readJsonFile<Record<string, unknown>>(jiraPath);
+      const jiraIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(jiraPath);
     if (jiraIssue) {
       const issueKey = extractJiraIssueKey(liveResults.jira) || extractJiraIssueKey(jiraIssue);
       const jiraInfo = {
@@ -436,7 +400,7 @@ async function reflectTicketOutcome(input: {
         response_path: input.responsePath,
         response_excerpt: input.responseExcerpt,
       };
-      writeJsonFile(jiraPath, jiraIssue);
+      writeJsonFileFromDispatchIO(jiraPath, jiraIssue);
 
       if (issueKey && jiraInfo.domain) {
         try {
@@ -511,7 +475,7 @@ function validateWorkItemGranularity(item: WorkItem, assigneePeerId?: string): {
   }
   if (!description) {
     notes.push('missing description');
-  } else if (countWords(description) < 6) {
+  } else if (countWordsFromDispatchIO(description) < 6) {
     notes.push('description too short');
   }
   if (!metadata.deliverable && !metadata.target_path) {
@@ -671,8 +635,6 @@ export async function dispatchMissionWorkItems(
   }
 
   const workItems = selectWorkItems(missionId, options);
-  ensureDispatchDirs(missionPath);
-
   const existingManifest = readManifest(missionPath);
   const records: MissionWorkItemDispatchRecord[] = [];
   const finalStatus = options.finalStatus || 'review';
@@ -696,7 +658,7 @@ export async function dispatchMissionWorkItems(
 
     if (!validation.ok) {
       records.push(record);
-      writeEvent(missionPath, {
+      appendDispatchEvent(dispatchEventPath(missionPath), {
         event_type: 'workitem_dispatch_failed',
         mission_id: missionId,
         item_id: item.item_id,
@@ -733,7 +695,7 @@ export async function dispatchMissionWorkItems(
         assigneePeerId,
       }),
     });
-    writeArtifact(artifact.filePath, artifact.payload);
+    writeDispatchArtifact(artifact.filePath, artifact.payload);
     record.response_path = artifact.filePath;
     record.response_excerpt = response.responseText.slice(0, 400);
 
@@ -773,7 +735,7 @@ export async function dispatchMissionWorkItems(
     record.ticket_state_after = reflection.ticketState;
     record.notes.push(...reflection.notes);
 
-    writeEvent(missionPath, {
+    appendDispatchEvent(dispatchEventPath(missionPath), {
       event_type: 'workitem_dispatched',
       mission_id: missionId,
       item_id: item.item_id,
@@ -806,9 +768,7 @@ export async function dispatchMissionWorkItems(
   const manifestFilePath = manifestPath(missionPath);
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = dispatchEventPath(missionPath);
-  withExecutionContext('mission_controller', () => {
-    safeWriteFile(manifestFilePath, JSON.stringify(manifest, null, 2));
-  }, 'worker');
+  writeJsonFileFromDispatchIO(manifestFilePath, manifest);
 
   ledger.record('MISSION_WORKITEMS_DISPATCHED', {
     mission_id: missionId,

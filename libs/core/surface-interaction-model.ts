@@ -507,17 +507,22 @@ export function buildSurfaceConversationInputFromMessage(
 }
 
 export function createSurfaceMessageFromConversationInput(input: SurfaceConversationMessageInput): SurfaceMessage {
+  const channel = input.channel?.trim() || 'unknown';
+  const threadTs = input.threadTs?.trim() || input.receivedAt || new Date().toISOString();
+  const correlationId = input.correlationId || randomUUID();
+  const messageId = input.messageId || randomUUID();
+  const receivedAt = input.receivedAt || new Date().toISOString();
   if (input.surface === 'slack') {
     return createSlackSurfaceMessage({
       user: input.metadata?.user || input.actorId,
       text: input.text,
-      channel: input.channel,
-      ts: input.receivedAt,
-      threadTs: input.threadTs,
-      team: input.metadata?.team,
-      channelType: input.metadata?.channelType,
-      correlationId: input.correlationId,
-      messageId: input.messageId,
+      channel,
+      ts: receivedAt || threadTs,
+      threadTs,
+      ...(input.metadata?.team ? { team: input.metadata.team } : {}),
+      ...(input.metadata?.channelType ? { channelType: input.metadata.channelType } : {}),
+      correlationId,
+      messageId,
     });
   }
   if (input.surface === 'chronos') {
@@ -525,20 +530,20 @@ export function createSurfaceMessageFromConversationInput(input: SurfaceConversa
       text: input.text,
       sessionId: input.threadTs,
       requesterId: input.actorId,
-      correlationId: input.correlationId,
-      messageId: input.messageId,
-      receivedAt: input.receivedAt,
+      correlationId,
+      messageId,
+      receivedAt,
     });
   }
   return createSurfaceMessage({
     text: input.text,
-    channel: input.channel,
-    threadTs: input.threadTs,
+    channel,
+    threadTs,
     surface: input.surface,
     actorId: input.actorId,
-    correlationId: input.correlationId,
-    messageId: input.messageId,
-    receivedAt: input.receivedAt,
+    correlationId,
+    messageId,
+    receivedAt,
   });
 }
 

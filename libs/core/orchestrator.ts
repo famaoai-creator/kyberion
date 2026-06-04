@@ -127,7 +127,7 @@ export function runStep(script: string, args: string, step: any = {}) {
 }
 
 export function runPipeline(steps: any[], initialData = {}) {
-  const results = [];
+  const results: Array<{ skill: string; [key: string]: unknown }> = [];
   let prevOutput = initialData;
   const startTime = Date.now();
 
@@ -167,7 +167,7 @@ export function runParallel(steps: any[]): Promise<any> {
     const timeout = step.timeout || 60000;
     const capabilityDir = path.dirname(path.dirname(script));
 
-    return new Promise((resolve) => {
+      return new Promise<{ skill: string; [key: string]: unknown }>((resolve) => {
       exec(
         `node "${script}" ${args}`,
         {

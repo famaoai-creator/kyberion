@@ -49,7 +49,7 @@ function ensureValidator(): ValidateFunction {
   if (projectValidateFn) return projectValidateFn;
   const raw = safeReadFile(PROJECT_SCHEMA_PATH, { encoding: 'utf8' }) as string;
   projectValidateFn = ajv.compile(JSON.parse(raw));
-  return projectValidateFn;
+  return projectValidateFn!;
 }
 
 function projectPath(projectId: string): string {

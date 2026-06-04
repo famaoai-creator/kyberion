@@ -35,6 +35,14 @@ vi.mock('./customer-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
 
+vi.mock('./service-binding.js', async () => {
+  const actual = await vi.importActual('./service-binding.js') as any;
+  return {
+    ...actual,
+    resolveServiceBinding: mocks.resolveServiceBinding,
+  };
+});
+
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual('./secure-io.js') as any;
   return {

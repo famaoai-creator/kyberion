@@ -41,7 +41,7 @@ const DEFAULT_MEDIA_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
+let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 type GeneratedArtifact = {
   kind: string;
@@ -87,10 +87,10 @@ function loadRecoveryPolicy(): Record<string, any> {
   try {
     const manifest = JSON.parse(safeReadFile(MEDIA_GENERATION_MANIFEST_PATH, { encoding: 'utf8' }) as string);
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
+    return cachedRecoveryPolicy ?? {};
   } catch (_) {
     cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
+    return cachedRecoveryPolicy ?? {};
   }
 }
 
@@ -683,7 +683,7 @@ export async function handleAction(input: any) {
   traceCtx.startSpan(`media-generation:${String(input?.action || 'unknown')}`);
   if (input.action === 'pipeline') {
     try {
-      const results = [];
+      const results: Array<Record<string, unknown>> = [];
       for (const step of input.steps) {
         traceCtx.startSpan(`media-generation:${String(step?.action || 'step')}`);
         try {
@@ -694,9 +694,10 @@ export async function handleAction(input: any) {
           } else {
             traceCtx.endSpan('ok');
           }
-        } catch (err: any) {
-          traceCtx.endSpan('error', err?.message ?? String(err));
-          throw err;
+        } catch (err: unknown) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          traceCtx.endSpan('error', error.message);
+          throw error;
         }
       }
       traceCtx.endSpan('ok');
@@ -710,18 +711,20 @@ export async function handleAction(input: any) {
         results,
         ...finalizeActuatorTrace(traceCtx),
       };
-    } catch (err: any) {
-      traceCtx.endSpan('error', err?.message ?? String(err));
-      return { status: 'failed', message: err?.message ?? String(err), ...finalizeActuatorTrace(traceCtx) };
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      traceCtx.endSpan('error', error.message);
+      return { status: 'failed', message: error.message, ...finalizeActuatorTrace(traceCtx) };
     }
   }
   try {
     const result = await handleSingleAction(input);
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
-  } catch (err: any) {
-    traceCtx.endSpan('error', err?.message ?? String(err));
-    return { status: 'failed', message: err?.message ?? String(err), ...finalizeActuatorTrace(traceCtx) };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    traceCtx.endSpan('error', error.message);
+    return { status: 'failed', message: error.message, ...finalizeActuatorTrace(traceCtx) };
   }
 }
 

@@ -21,7 +21,7 @@ export function generationSchedulePath(scheduleId: string): string {
   return path.join(GENERATION_SCHEDULE_DIR, `${scheduleId}.json`);
 }
 
-function resolveRootRelativePath(logicalPath?: string): string | null {
+function resolveRootRelativePath(logicalPath?: string | null): string | null {
   if (!logicalPath) return null;
   return pathResolver.rootResolve(logicalPath);
 }
@@ -32,17 +32,17 @@ export function resolveGenerationScheduleDeliveryPaths(schedule: GenerationSched
   schedulePath: string;
 } {
   return {
-    artifactDir: resolveRootRelativePath(schedule.delivery_policy?.artifact_dir || null),
-    latestAliasPath: resolveRootRelativePath(schedule.delivery_policy?.latest_alias_path || null),
+    artifactDir: resolveRootRelativePath(schedule.delivery_policy?.artifact_dir ?? undefined),
+    latestAliasPath: resolveRootRelativePath(schedule.delivery_policy?.latest_alias_path ?? undefined),
     schedulePath: generationSchedulePath(schedule.schedule_id),
   };
 }
 
 export function resolveGenerationScheduleWorkdir(schedule: GenerationSchedule): string {
-  const artifactDir = resolveRootRelativePath(schedule.delivery_policy?.artifact_dir || '');
+  const artifactDir = resolveRootRelativePath(schedule.delivery_policy?.artifact_dir ?? undefined);
   if (artifactDir) return artifactDir;
 
-  const latestAliasPath = resolveRootRelativePath(schedule.delivery_policy?.latest_alias_path || '');
+  const latestAliasPath = resolveRootRelativePath(schedule.delivery_policy?.latest_alias_path ?? undefined);
   if (latestAliasPath) return path.dirname(latestAliasPath);
 
   return pathResolver.rootResolve(path.dirname(generationSchedulePath(schedule.schedule_id)));
@@ -76,7 +76,7 @@ export function listGenerationSchedules(): GenerationSchedule[] {
 
 export function isGenerationScheduleDue(schedule: GenerationSchedule, now = new Date()): boolean {
   if (!schedule.enabled) return false;
-  const lastRunAt = (schedule as any).last_submitted_at || schedule.created_at;
+  const lastRunAt = (schedule as GenerationSchedule & { last_submitted_at?: string | null }).last_submitted_at ?? schedule.created_at;
   const lastRun = lastRunAt ? new Date(lastRunAt) : null;
 
   if (schedule.trigger.type === 'interval') {

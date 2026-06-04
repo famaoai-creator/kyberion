@@ -119,10 +119,11 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
       const content = safeReadFile(refPath, { encoding: 'utf8' }) as string;
       const subPipeline = JSON.parse(content);
       if (subPipeline.steps) {
-        ps.children = subPipeline.steps.map((s: any, j: number) =>
+        const children = subPipeline.steps.map((s: any, j: number) =>
           previewStep(s, j, { ...ctx, ...step.params?.bind })
         );
-        ps.description += ` (${ps.children.length} sub-steps)`;
+        ps.children = children;
+        ps.description += ` (${children.length} sub-steps)`;
       }
     } catch {
       ps.warnings.push(`ref path not readable: ${step.params.path}`);
@@ -141,10 +142,11 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
 
   // Control flow children: while
   if (step.op === 'while' && step.params?.pipeline) {
-    ps.children = step.params.pipeline.map((s: any, j: number) =>
+    const children = step.params.pipeline.map((s: any, j: number) =>
       previewStep(s, j, ctx)
     );
-    ps.description += ` (loop body: ${ps.children.length} steps, max ${step.params.max_iterations || '\u221e'} iterations)`;
+    ps.children = children;
+    ps.description += ` (loop body: ${children.length} steps, max ${step.params.max_iterations || '\u221e'} iterations)`;
   }
 
   // Control flow children: if
