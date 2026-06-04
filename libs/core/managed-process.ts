@@ -20,7 +20,7 @@ export interface ManagedProcessHandle {
 }
 
 export function spawnManagedProcess(spec: ManagedProcessSpec): ManagedProcessHandle {
-  const child = spawn(spec.command, spec.args || [], spec.spawnOptions);
+  const child = spawn(spec.command, spec.args || [], spec.spawnOptions ?? {});
 
   runtimeSupervisor.register({
     resourceId: spec.resourceId,

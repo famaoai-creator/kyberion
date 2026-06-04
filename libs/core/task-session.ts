@@ -346,10 +346,13 @@ function inferRequiresApproval(input: {
 function applyApprovalPolicy(
   intentId: string,
   payload: Record<string, unknown>,
-  requirements: TaskSession['requirements']
+  requirements: NonNullable<TaskSession['requirements']>
 ): {
   payload: Record<string, unknown>;
-  requirements: TaskSession['requirements'];
+  requirements: {
+    missing: string[];
+    collected: Record<string, unknown>;
+  };
 } {
   const policy = resolveApprovalPolicy({ intentId, payload });
   const nextRequirements = {
