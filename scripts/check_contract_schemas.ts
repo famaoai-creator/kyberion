@@ -71,6 +71,15 @@ function readServiceEndpointPayloads(): unknown[] {
     .map((entry) => readGovernanceJson(`knowledge/product/orchestration/service-endpoints/${entry}`));
 }
 
+function readServicePresetPayloads(): unknown[] {
+  const dir = pathResolver.rootResolve('knowledge/product/orchestration/service-presets');
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/service-presets/${entry}`));
+}
+
 function readAgentProfilePayloads(): unknown[] {
   const dir = pathResolver.rootResolve('knowledge/product/orchestration/agent-profiles');
   if (!safeExistsSync(dir)) return [];
@@ -2872,6 +2881,19 @@ function createChecks(): ContractCheck[] {
           services: {
             broken: {},
           },
+        },
+      ],
+    },
+    {
+      id: 'service-presets',
+      schemaPath: 'knowledge/product/schemas/service-presets.schema.json',
+      validPayloads: [
+        ...readServicePresetPayloads(),
+      ],
+      invalidPayloads: [
+        {
+          service_id: 'slack',
+          operations: {},
         },
       ],
     },

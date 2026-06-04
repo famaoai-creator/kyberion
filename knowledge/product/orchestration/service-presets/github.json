@@ -17,6 +17,46 @@
       },
       "output_mapping": { "id": "number", "url": "html_url" }
     },
+    "update_issue": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/issues/{{issue_number}}",
+      "method": "PATCH",
+      "description": "Updates a GitHub issue.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "issue_number": { "required": true, "type": "number" },
+        "title": { "required": false, "type": "string" },
+        "body": { "required": false, "type": "string" },
+        "state": { "required": false, "type": "string" }
+      }
+    },
+    "add_comment": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/issues/{{issue_number}}/comments",
+      "method": "POST",
+      "description": "Adds a comment to a GitHub issue.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "issue_number": { "required": true, "type": "number" },
+        "body": { "required": true, "type": "string" }
+      }
+    },
+    "close_issue": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/issues/{{issue_number}}",
+      "method": "PATCH",
+      "description": "Closes a GitHub issue.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "issue_number": { "required": true, "type": "number" }
+      },
+      "payload_template": {
+        "state": "closed"
+      }
+    },
     "list_repos": {
       "type": "api",
       "path": "user/repos",

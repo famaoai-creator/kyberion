@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/project-operational-state.schema.json",
+  "title": "Project Operational State",
+  "type": "object",
+  "required": ["project_id", "name", "summary", "status", "tier", "updated_at"],
+  "properties": {
+    "project_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "paused", "archived"]
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "project_path": { "type": "string", "minLength": 1 },
+    "current_phase": {
+      "type": "string",
+      "enum": ["initiate", "define", "design", "build", "validate", "transfer_run", "run", "unknown"]
+    },
+    "active_track_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "active_mission_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "active_task_session_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["mission", "track", "task_session", "artifact", "service_binding", "surface_event", "manual_note", "other"]
+          },
+          "ref": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string" },
+          "captured_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "distill_targets": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "knowledge_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "last_distilled_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

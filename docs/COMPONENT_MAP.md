@@ -16,6 +16,7 @@ For a layer-oriented view of the concepts themselves, read:
 - `knowledge/product/architecture/management-control-plane.md`
 - `knowledge/product/architecture/corporate-memory-loop.md`
 - `knowledge/product/architecture/project-mission-artifact-service-model.md`
+- `knowledge/product/architecture/project-operational-state-store.md`
 
 ## System at a glance
 
@@ -76,7 +77,7 @@ The concept map explains how those ideas fit together logically.
 | `plugins/` | Runtime guardrails and telemetry | Inspect policy enforcement and instrumentation |
 | `satellites/` | External bridges | Connect Kyberion to platforms like Slack |
 | `presence/` | Background sensing, dashboards, and control surfaces | Inspect pulse, display, sensory integrations, and Chronos Mirror v2 |
-| `active/` | Mission/runtime workspace | Review live mission state and generated operational files |
+| `active/` | Mission/runtime workspace and project operational state | Review live mission state, project state, and generated operational files |
 | `schemas/` | Structured data contracts | Validate JSON-based ADF and ecosystem data |
 | `tests/` | Cross-cutting tests | Run smoke and integration coverage |
 
@@ -200,13 +201,32 @@ Chronos does not directly own mission state. It delegates to:
 ### 5. Service binding and channel delivery
 
 - `libs/core/service-binding.ts`
+- `libs/core/service-preset-registry.ts`
 - `libs/actuators/service-actuator/`
 - `libs/actuators/presence-actuator/`
 - `libs/actuators/system-actuator/`
 - `knowledge/product/orchestration/service-endpoints/` (compatibility snapshot: `service-endpoints.json`)
+- `knowledge/product/orchestration/service-presets/`
+- `knowledge/product/architecture/service-runtime-abstraction.md`
 
 This path defines how authenticated external service access is separated from channel delivery and from local OS execution.
 It is the practical boundary between "how we authenticate to a service", "how we deliver to a channel", and "how we run local commands".
+
+Service naming is declarative and split across two catalogs:
+
+- `service-endpoints`
+  - canonical service identity, aliases, intent aliases, and endpoint-level metadata
+- `service-presets`
+  - operation templates for API / CLI / MCP / OAuth / reconcile flows
+
+Execution is then split by runtime class:
+
+- `tool-runtime`
+  - CLI and executable lifecycle management
+- `service-runtime`
+  - long-lived local service lifecycle management
+- `service-actuator`
+  - auth, routing, binding, and reconciliation across the named service catalogs
 
 Service binding should be treated as a first-class architecture concept.
 Bindings connect projects, missions, task sessions, and artifacts to external systems without collapsing secrets into channel gateways or actuator-local config.

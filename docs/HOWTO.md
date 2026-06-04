@@ -53,6 +53,16 @@ start → checkpoint (repeat) → verify → distill → finish
    `node dist/scripts/mission_controller.js finish <ID> [--seal]`
    Optionally encrypts with `--seal` (AES+RSA).
 
+### Project Operational State
+
+When a mission is linked to a project, Kyberion keeps the live operational truth under:
+
+`active/projects/<tier>/<tenant_or_shared>/<project_id>/state/`
+
+- Mission, track, and task-session links are recorded there as raw operational state.
+- `project-os/` remains the scaffolded project document set.
+- Distillation converts that raw state into reusable knowledge under `knowledge/product/evolution/` or `knowledge/product/incidents/`.
+
 ### Visibility
 
 ```bash
