@@ -199,14 +199,14 @@ async function startService(id: string, service: any, pids: any) {
 
 async function handleAction(input: any, onEvent?: (data: any) => void) {
   if (input.action === 'pipeline') {
-    const results = [];
+    const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
     let ctx = { ...input.context };
     for (const step of input.steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
       const stepResult = await withRetry(async () => {
         return await handleSingleAction({
           service_id: step.params.service_id,
-          mode: step.op.toUpperCase() as any,
+          mode: step.op.toUpperCase() as ServiceAction['mode'],
           action: step.params.action,
           params: step.params.params,
           auth: step.params.auth,

@@ -49,7 +49,7 @@ export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessa
   }
 
   let ctx = { ...conversationCtx, timestamp: new Date().toISOString() };
-  const results = [];
+  const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
 
   for (const step of steps) {
     state.stepCount++;
@@ -71,8 +71,9 @@ export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessa
         }
         results.push({ op: step.op, status: 'success' });
         break; // Success, exit attempt loop
-      } catch (err: any) {
-        const failure = classifyError(err);
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        const failure = classifyError(error);
         if (attempt === 0 && failure.repairAction) {
           logger.warn(`  [NERVE] Step failed: ${failure.label}. Attempting autonomous repair...`);
           const repaired = await attemptAutonomousRepair(step, failure, ctx);
@@ -82,9 +83,8 @@ export async function executeSuperPipeline(input: SuperPipelineStep[] | A2AMessa
             continue; // Retry once
           }
         }
-        
-        logger.error(`  [NERVE] Step failed (${step.op}): ${err.message}`);
-        results.push({ op: step.op, status: 'failed', error: err.message });
+        logger.error(`  [NERVE] Step failed (${step.op}): ${error.message}`);
+        results.push({ op: step.op, status: 'failed', error: error.message });
         return { status: derivePipelineStatus(results), results, context: ctx }; // Abort on final failure
       }
     }
@@ -114,8 +114,9 @@ Once finished, provide a brief summary of what you fixed.
     const report = await backend.delegateTask(instruction, `Self-Healing Mission for ${step.op}`);
     logger.info(`  [NERVE:REPAIR] Sub-agent report: ${report}`);
     return true; // Assume success if delegateTask completed without crashing
-  } catch (err: any) {
-    logger.error(`  [NERVE:REPAIR] Failed to perform repair: ${err.message}`);
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error(`  [NERVE:REPAIR] Failed to perform repair: ${error.message}`);
     return false;
   }
 }

@@ -1048,7 +1048,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
           violations.push(`active-surfaces:${entry}: surface manifest files must contain exactly one surface`);
           continue;
         }
-        const surface = surfaceManifest.surfaces[0];
+        const surfaces = surfaceManifest.surfaces || [];
+        const surface = surfaces[0];
         const expectedId = entry.replace(/\.json$/i, '');
         if (String(surface.id || '') !== expectedId) {
           violations.push(`active-surfaces:${entry}: surface id must match file name (${expectedId})`);

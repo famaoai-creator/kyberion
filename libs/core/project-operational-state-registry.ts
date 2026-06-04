@@ -91,7 +91,7 @@ function ensureValidator(): ValidateFunction {
   if (stateValidateFn) return stateValidateFn;
   const raw = safeReadFile(STATE_SCHEMA_PATH, { encoding: 'utf8' }) as string;
   stateValidateFn = ajv.compile(JSON.parse(raw));
-  return stateValidateFn;
+  return stateValidateFn!;
 }
 
 function normalizeSegment(value: string, fallback = 'shared'): string {
@@ -370,11 +370,12 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
   const tenantSlug = (input.tenant_slug || input.tenant_id || 'shared').trim() || 'shared';
   const existingProject = loadProjectRecord(projectId);
   const projectPath = input.relationships?.project?.project_path?.trim();
+  const relationships = input.relationships || {};
 
   const projectState = readProjectStateIfExists(projectId, input.tier, tenantSlug) || {
     project_id: projectId,
     name: existingProject?.name || projectId,
-    summary: existingProject?.summary || input.relationships?.project?.note || input.outcome_contract?.requested_result || `Operational state for ${projectId}`,
+    summary: existingProject?.summary || relationships.project?.note || input.outcome_contract?.requested_result || `Operational state for ${projectId}`,
     status: 'active',
     tier: input.tier,
     tenant_slug: tenantSlug,
@@ -394,23 +395,23 @@ export function syncProjectOperationalStateFromMission(input: ProjectOperational
     tier: input.tier,
     tenant_slug: tenantSlug,
     mission_id: input.mission_id,
-    relationship_type: input.relationships?.project?.relationship_type || 'independent',
-    summary: input.relationships?.project?.note || input.outcome_contract?.requested_result || input.mission_type || 'mission',
+    relationship_type: relationships.project?.relationship_type || 'independent',
+    summary: relationships.project?.note || input.outcome_contract?.requested_result || input.mission_type || 'mission',
     status: input.status,
     evidence_refs: input.context?.mission_finish_trace_persisted_path ? [input.context.mission_finish_trace_persisted_path] : [],
   });
 
-  const trackId = input.relationships?.track?.track_id?.trim();
+  const trackId = relationships.track?.track_id?.trim();
   if (trackId) {
     saveProjectTrackState({
       project_id: projectId,
       tier: input.tier,
       tenant_slug: tenantSlug,
       track_id: trackId,
-      name: input.relationships.track?.track_name || trackId,
-      summary: input.relationships.track?.note || input.relationships.track?.track_name || trackId,
+      name: relationships.track?.track_name || trackId,
+      summary: relationships.track?.note || relationships.track?.track_name || trackId,
       status: input.status === 'archived' ? 'archived' : input.status === 'completed' ? 'completed' : input.status === 'paused' ? 'paused' : 'active',
-      lifecycle_model: input.relationships.track?.lifecycle_model,
+      lifecycle_model: relationships.track?.lifecycle_model,
       required_artifacts: [],
       active_mission_ids: input.status === 'archived' ? [] : [input.mission_id],
     });
