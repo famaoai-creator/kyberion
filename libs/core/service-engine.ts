@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
+import { getServicePresetRecord } from './service-preset-registry.js';
 
 /**
  * Shared Service Execution Engine v1.2.0
@@ -325,8 +326,11 @@ export async function executeServicePreset(
   if (!serviceConfig || !serviceConfig.preset_path) {
     throw new Error(`No preset path defined for service: ${serviceId}`);
   }
-  
-  const preset = JSON.parse(safeReadFile(pathResolver.rootResolve(serviceConfig.preset_path), { encoding: 'utf8' }) as string);
+
+  const preset = getServicePresetRecord(serviceId, serviceConfig.preset_path);
+  if (!preset) {
+    throw new Error(`No service preset found for: ${serviceId}`);
+  }
   const op = preset.operations[action];
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
 
@@ -408,8 +412,8 @@ export async function executeServicePreset(
             ? resolveTemplateValue(alt.payload_template, mergedParams)
             : (envelope.hasBody ? envelope.body : params);
           const headers = {
-            ...preset.headers,
-            ...alt.headers,
+            ...(preset.headers || {}),
+            ...(alt.headers || {}),
             ...buildAuthHeaders(alt.auth_strategy || preset.auth_strategy, binding),
           };
           const payload = prepareRequestBody(rawPayload, headers);
