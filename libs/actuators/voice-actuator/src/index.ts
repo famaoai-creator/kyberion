@@ -5,6 +5,7 @@ import {
   classifyError,
   getVoiceSampleIngestionPolicy,
   getVoiceEngineRecord,
+  getVoiceEngineRegistry,
   getVoiceProfileRecord,
   getVoiceProfileRegistry,
   getVoiceRuntimePolicy,
@@ -14,6 +15,7 @@ import {
   recordInteraction,
   resolveVars,
   resolveVoiceEngineForPlatform,
+  listToolRuntimeInventory,
   recordVoiceSample,
   safeExec,
   safeExecResult,
@@ -128,6 +130,7 @@ const DEFAULT_VOICE_RETRY = {
 let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 type VoiceAction =
+  | { action: 'health'; params?: Record<string, unknown> }
   | { action: 'speak_local'; params: Record<string, unknown> }
   | { action: 'list_voices'; params: Record<string, unknown> }
   | {
@@ -185,6 +188,9 @@ type VoiceAction =
 type VoiceArtifactFormat = 'wav' | 'mp3' | 'ogg' | 'aiff';
 
 export async function handleSingleAction(input: VoiceAction) {
+  if (input.action === 'health') {
+    return voiceHealth(input as any);
+  }
   if (input.action === 'speak_local') {
     return speakLocal(((input as any).params || {}));
   }
@@ -244,6 +250,61 @@ export async function handleSingleAction(input: VoiceAction) {
     return { status: 'interaction_recorded', person_slug: p.person_slug, org: p.org, history_length: node.history.length };
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
+}
+
+async function voiceHealth(input: { action: 'health'; params?: Record<string, unknown> }): Promise<any> {
+  const requestedMode = String(input.params?.requested_mode || 'trial').trim() || 'trial';
+  const toolRuntimes = listToolRuntimeInventory(requestedMode as any);
+  const voiceEngineRegistry = getVoiceEngineRegistry();
+  const activeEngines = voiceEngineRegistry.engines.filter((engine) => engine.status === 'active');
+  const qwen3Engine = voiceEngineRegistry.engines.find((engine) => engine.engine_id === 'mlx_audio_qwen3') || null;
+  const resolvedQwen3Engine = qwen3Engine ? resolveVoiceEngineForPlatform(qwen3Engine.engine_id) : null;
+  const mlxAudioRuntime = toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_audio') || null;
+  const mlxWhisperRuntime = toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_whisper') || null;
+
+  return {
+    status: 'succeeded',
+    action: 'health',
+    requested_mode: requestedMode,
+    voice_engine_registry: {
+      version: voiceEngineRegistry.version,
+      default_engine_id: voiceEngineRegistry.default_engine_id,
+      active_engine_count: activeEngines.length,
+      qwen3_engine: qwen3Engine ? {
+        engine_id: qwen3Engine.engine_id,
+        status: qwen3Engine.status,
+        kind: qwen3Engine.kind,
+        provider: qwen3Engine.provider,
+        supported_artifact_formats: qwen3Engine.supports.artifact_formats,
+        fallback_engine_id: qwen3Engine.fallback_engine_id || null,
+        resolved_engine_id: resolvedQwen3Engine?.engine_id || null,
+      } : null,
+    },
+    tool_runtimes: {
+      version: toolRuntimes.version,
+      default_tool_id: toolRuntimes.default_tool_id,
+      items: {
+        mlx_audio: mlxAudioRuntime ? {
+          lifecycle_stage: mlxAudioRuntime.lifecycle_stage,
+          selected_action: mlxAudioRuntime.selected_action,
+          selected_backend: mlxAudioRuntime.selected_backend,
+          installed: mlxAudioRuntime.installed,
+          requires_install: mlxAudioRuntime.requires_install,
+          managed_env_path: mlxAudioRuntime.managed_env_path,
+          reason: mlxAudioRuntime.reason,
+        } : null,
+        mlx_whisper: mlxWhisperRuntime ? {
+          lifecycle_stage: mlxWhisperRuntime.lifecycle_stage,
+          selected_action: mlxWhisperRuntime.selected_action,
+          selected_backend: mlxWhisperRuntime.selected_backend,
+          installed: mlxWhisperRuntime.installed,
+          requires_install: mlxWhisperRuntime.requires_install,
+          managed_env_path: mlxWhisperRuntime.managed_env_path,
+          reason: mlxWhisperRuntime.reason,
+        } : null,
+      },
+    },
+  };
 }
 
 async function collectAndRegisterVoiceProfile(input: {

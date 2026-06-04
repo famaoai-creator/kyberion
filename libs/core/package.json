@@ -211,6 +211,14 @@
       "types": "./dist/tool-runtime-registry.d.ts",
       "default": "./dist/tool-runtime-registry.js"
     },
+    "./service-runtime-policy": {
+      "types": "./dist/service-runtime-policy.d.ts",
+      "default": "./dist/service-runtime-policy.js"
+    },
+    "./service-runtime-registry": {
+      "types": "./dist/service-runtime-registry.d.ts",
+      "default": "./dist/service-runtime-registry.js"
+    },
     "./video-frame-bus": {
       "types": "./dist/video-frame-bus.d.ts",
       "default": "./dist/video-frame-bus.js"

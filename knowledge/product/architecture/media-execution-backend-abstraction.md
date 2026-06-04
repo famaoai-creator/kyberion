@@ -60,6 +60,13 @@ The backend launch command itself is now resolved through the governed tool runt
 - `knowledge/product/governance/tool-runtime-policy.json`
 - `knowledge/product/governance/tool-runtime-registry.json`
 
+For long-lived services such as ComfyUI, the same idea applies one layer up via the service runtime abstraction:
+
+- `libs/core/service-runtime-policy.ts`
+- `libs/core/service-runtime-registry.ts`
+- `knowledge/product/governance/service-runtime-policy.json`
+- `knowledge/product/governance/service-runtime-registry.json`
+
 ## Design Rule
 
 Do not encode backend selection directly in the user intent.

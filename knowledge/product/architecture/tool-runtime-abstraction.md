@@ -67,6 +67,14 @@ The registry is intentionally not limited to Python tools:
   - OCR toolkit example
   - Trial probe through `tesseract --version`
   - Install through `brew install tesseract`
+- `mlx_audio`
+  - Apple Silicon TTS engine dependency example
+  - Trial probe through `python3 -c "import mlx_audio"`
+  - Install through `uv pip install mlx-audio`
+- `mlx_whisper`
+  - Apple Silicon STT engine dependency example
+  - Trial probe through `python3 -c "import mlx_whisper"`
+  - Install through `uv pip install mlx-whisper`
 
 ## Design Rule
 
