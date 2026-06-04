@@ -435,6 +435,8 @@ export * from './image-generation-types.js';
 export * from './image-generation-policy.js';
 export * from './tool-runtime-policy.js';
 export * from './tool-runtime-registry.js';
+export * from './service-runtime-policy.js';
+export * from './service-runtime-registry.js';
 export * from './voice-tts-config.js';
 export * from './voice-runtime-policy.js';
 export * from './voice-profile-registry.js';

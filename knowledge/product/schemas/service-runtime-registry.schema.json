@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "service-runtime-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default_service_id": { "type": "string", "minLength": 1 },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "service_id": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["local_service", "remote_service"] },
+          "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["any", "darwin", "linux", "win32"] }
+          },
+          "supported_modes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["trial", "approved_install", "installed", "pinned"] }
+          },
+          "default_base_url": { "type": "string" },
+          "trial_probe": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["http"] },
+              "method": { "type": "string", "enum": ["GET", "POST"] },
+              "path": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" }
+            },
+            "required": ["kind", "method", "path"]
+          },
+          "install_plan": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["service_preset"] },
+              "preset_path": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" }
+            },
+            "required": ["kind"]
+          },
+          "installed_probe": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["http"] },
+              "method": { "type": "string", "enum": ["GET", "POST"] },
+              "path": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" }
+            },
+            "required": ["kind", "method", "path"]
+          },
+          "fallback_service_id": { "type": "string", "minLength": 1 },
+          "managed_service_subpath": { "type": "string", "minLength": 1 },
+          "service_endpoint_path": { "type": "string", "minLength": 1 },
+          "service_preset_path": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        },
+        "required": ["service_id", "display_name", "kind", "status", "platforms", "supported_modes", "trial_probe"]
+      }
+    }
+  },
+  "required": ["version", "default_service_id", "services"]
+}
