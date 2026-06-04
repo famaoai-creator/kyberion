@@ -2,9 +2,18 @@
   "action": "pipeline",
   "name": "voice-health-check",
   "version": "2.0.0",
-  "description": "Verify mlx-audio TTS and mlx-whisper STT are installed and functional. Returns health status for both bridges.",
+  "description": "Verify governed tool runtime inventory for mlx-audio TTS and mlx-whisper STT, then confirm both bridges are installed and functional.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
+    {
+      "id": "list_tool_runtimes",
+      "role": "source",
+      "op": "system:list_tool_runtimes",
+      "produces": { "channel": "tool_runtimes", "type": "ToolRuntimeInventory" },
+      "params": {
+        "requested_mode": "trial"
+      }
+    },
     {
       "id": "check_tts",
       "role": "source",
@@ -51,19 +60,19 @@
       "id": "log_summary",
       "role": "sink",
       "op": "system:log",
-      "consumes": ["mlx_audio_health", "mlx_whisper_health", "sox_health"],
+      "consumes": ["tool_runtimes", "mlx_audio_health", "mlx_whisper_health", "sox_health"],
       "params": {
-        "message": "[voice-health-check] mlx_audio={{mlx_audio_health.available}}, mlx_whisper={{mlx_whisper_health.available}}, sox={{sox_health.available}}"
+        "message": "[voice-health-check] runtimes={{tool_runtimes.default_tool_id}}/{{tool_runtimes.tools.length}} mlx_audio={{mlx_audio_health.available}}, mlx_whisper={{mlx_whisper_health.available}}, sox={{sox_health.available}}"
       }
     },
     {
       "id": "notify_health",
       "role": "sink",
       "op": "system:system_notify",
-      "consumes": ["mlx_audio_health", "mlx_whisper_health", "sox_health"],
+      "consumes": ["tool_runtimes", "mlx_audio_health", "mlx_whisper_health", "sox_health"],
       "params": {
         "title": "Voice Health Check",
-        "message": "mlx_audio: {{mlx_audio_health.available}} | mlx_whisper: {{mlx_whisper_health.available}} | sox: {{sox_health.available}}",
+        "message": "runtimes: {{tool_runtimes.default_tool_id}} ({{tool_runtimes.tools.length}}) | mlx_audio: {{mlx_audio_health.available}} | mlx_whisper: {{mlx_whisper_health.available}} | sox: {{sox_health.available}}",
         "subtitle": "voice-health-check"
       }
     }

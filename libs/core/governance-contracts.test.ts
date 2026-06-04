@@ -122,6 +122,18 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'service-runtime-policy',
+    schemaPath: 'knowledge/product/schemas/service-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/service-runtime-policy.json',
+    invalidPayload: { version: '1.0.0' },
+  },
+  {
+    name: 'service-runtime-registry',
+    schemaPath: 'knowledge/product/schemas/service-runtime-registry.schema.json',
+    dataPath: 'knowledge/product/governance/service-runtime-registry.json',
+    invalidPayload: { version: '1.0.0' },
+  },
+  {
     name: 'voice-sample-ingestion-policy',
     schemaPath: 'knowledge/product/schemas/voice-sample-ingestion-policy.schema.json',
     dataPath: 'knowledge/product/governance/voice-sample-ingestion-policy.json',

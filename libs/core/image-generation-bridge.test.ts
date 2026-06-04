@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => {
   const safeExistsSync = vi.fn();
   const safeMkdir = vi.fn();
   const probeToolRuntime = vi.fn();
-  return { executeServicePreset, safeExecResult, safeExistsSync, safeMkdir, probeToolRuntime };
+  const probeServiceRuntime = vi.fn();
+  return { executeServicePreset, safeExecResult, safeExistsSync, safeMkdir, probeToolRuntime, probeServiceRuntime };
 });
 
 vi.mock('./service-engine.js', () => ({
@@ -23,6 +24,10 @@ vi.mock('./service-engine.js', () => ({
 
 vi.mock('./tool-runtime-registry.js', () => ({
   probeToolRuntime: mocks.probeToolRuntime,
+}));
+
+vi.mock('./service-runtime-registry.js', () => ({
+  probeServiceRuntime: mocks.probeServiceRuntime,
 }));
 
 vi.mock('./secure-io.js', async () => {
@@ -97,6 +102,10 @@ describe('AdaptivePolicyRouter', () => {
 describe('ComfyUiImageGenerationProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.probeServiceRuntime.mockResolvedValue({
+      available: true,
+      reason: 'probe_succeeded',
+    });
   });
 
   it('calls executeServicePreset with correct action and prompt', async () => {
@@ -123,6 +132,12 @@ describe('ComfyUiImageGenerationProvider', () => {
         target_path: 'output.png',
       })
     );
+  });
+
+  it('uses service runtime probe for availability', async () => {
+    const provider = new ComfyUiImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(true);
+    expect(mocks.probeServiceRuntime).toHaveBeenCalledWith('comfyui', 'trial');
   });
 });
 

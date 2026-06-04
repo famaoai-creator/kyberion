@@ -50,6 +50,39 @@ const mocks = vi.hoisted(() => ({
       artifact_formats: ['wav', 'aiff'],
     },
   })),
+  getVoiceEngineRegistry: vi.fn(() => ({
+    version: 'test',
+    default_engine_id: 'mlx_audio_qwen3',
+    engines: [
+      {
+        engine_id: 'local_say',
+        display_name: 'Local System TTS',
+        kind: 'native_local',
+        provider: 'system_tts',
+        status: 'active',
+        platforms: ['darwin', 'linux', 'win32'],
+        supports: {
+          list_voices: true,
+          playback: true,
+          artifact_formats: ['wav', 'aiff'],
+        },
+      },
+      {
+        engine_id: 'mlx_audio_qwen3',
+        display_name: 'mlx-audio Qwen3-TTS (ICL Voice Clone)',
+        kind: 'voice_clone_service',
+        provider: 'mlx_audio',
+        status: 'active',
+        platforms: ['darwin'],
+        supports: {
+          list_voices: false,
+          playback: true,
+          artifact_formats: ['wav'],
+        },
+        fallback_engine_id: 'local_say',
+      },
+    ],
+  })),
   resolveVoiceEngineForPlatform: vi.fn(() => ({
     engine_id: 'local_say',
     display_name: 'Local System TTS',
@@ -144,6 +177,70 @@ const mocks = vi.hoisted(() => ({
       })),
     })),
   })),
+  listToolRuntimeInventory: vi.fn(() => ({
+    version: '1.0.0',
+    platform: 'darwin',
+    requested_mode: 'trial',
+    default_tool_id: 'mflux',
+    items: [
+      {
+        tool: {
+          tool_id: 'mlx_audio',
+          display_name: 'mlx-audio TTS Runtime',
+          ecosystem: 'python',
+          status: 'active',
+          platforms: ['darwin'],
+          supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+          trial_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_audio; print("ok")'] },
+          install_backend: { kind: 'uv', command: 'uv', args: ['pip', 'install', 'mlx-audio'] },
+          installed_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_audio; print("ok")'] },
+          managed_env_subpath: 'tool-runtimes/mlx-audio',
+        },
+        state: null,
+        requested_mode: 'trial',
+        lifecycle_stage: 'trial',
+        selected_action: 'run_trial',
+        selected_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_audio; print("ok")'] },
+        trial_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_audio; print("ok")'] },
+        install_backend: { kind: 'uv', command: 'uv', args: ['pip', 'install', 'mlx-audio'] },
+        installed_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_audio; print("ok")'] },
+        installed: false,
+        requires_install: false,
+        managed_env_path: '/tmp/tool-runtimes/mlx-audio',
+        state_path: '/tmp/tool-runtimes/mlx-audio/state.json',
+        available_commands: ['python3', 'uv'],
+        reason: 'using trial backend for mlx_audio',
+      },
+      {
+        tool: {
+          tool_id: 'mlx_whisper',
+          display_name: 'mlx-whisper STT Runtime',
+          ecosystem: 'python',
+          status: 'active',
+          platforms: ['darwin'],
+          supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+          trial_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_whisper; print("ok")'] },
+          install_backend: { kind: 'uv', command: 'uv', args: ['pip', 'install', 'mlx-whisper'] },
+          installed_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_whisper; print("ok")'] },
+          managed_env_subpath: 'tool-runtimes/mlx-whisper',
+        },
+        state: null,
+        requested_mode: 'trial',
+        lifecycle_stage: 'trial',
+        selected_action: 'run_trial',
+        selected_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_whisper; print("ok")'] },
+        trial_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_whisper; print("ok")'] },
+        install_backend: { kind: 'uv', command: 'uv', args: ['pip', 'install', 'mlx-whisper'] },
+        installed_backend: { kind: 'system', command: 'python3', args: ['-c', 'import mlx_whisper; print("ok")'] },
+        installed: false,
+        requires_install: false,
+        managed_env_path: '/tmp/tool-runtimes/mlx-whisper',
+        state_path: '/tmp/tool-runtimes/mlx-whisper/state.json',
+        available_commands: ['python3', 'uv'],
+        reason: 'using trial backend for mlx_whisper',
+      },
+    ],
+  })),
   collectVoiceSamples: vi.fn((input: any) => ({
     status: 'succeeded',
     action: 'collect_voice_samples',
@@ -193,6 +290,7 @@ vi.mock('@agent/core', async () => {
     getVoiceProfileRecord: mocks.getVoiceProfileRecord,
     getVoiceRuntimePolicy: mocks.getVoiceRuntimePolicy,
     getVoiceEngineRecord: mocks.getVoiceEngineRecord,
+    getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
     resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
     getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
     safeExec: mocks.safeExec,
@@ -206,6 +304,7 @@ vi.mock('@agent/core', async () => {
     splitVoiceTextIntoChunks: mocks.splitVoiceTextIntoChunks,
     createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
     createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,
+    listToolRuntimeInventory: mocks.listToolRuntimeInventory,
     collectVoiceSamples: mocks.collectVoiceSamples,
     recordVoiceSample: mocks.recordVoiceSample,
     logger: {
@@ -315,6 +414,36 @@ describe('voice actuator', () => {
     );
     expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
     expect(mocks.withRetry).toHaveBeenCalled();
+  });
+
+  it('reports governed voice runtime health', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'health',
+      params: { requested_mode: 'trial' },
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      action: 'health',
+      requested_mode: 'trial',
+    }));
+    expect(result.voice_engine_registry).toEqual(expect.objectContaining({
+      version: 'test',
+      default_engine_id: 'mlx_audio_qwen3',
+      active_engine_count: 2,
+    }));
+    expect(result.tool_runtimes.items.mlx_audio).toEqual(expect.objectContaining({
+      lifecycle_stage: 'trial',
+      selected_action: 'run_trial',
+    }));
+    expect(result.tool_runtimes.items.mlx_whisper).toEqual(expect.objectContaining({
+      lifecycle_stage: 'trial',
+      selected_action: 'run_trial',
+    }));
+    expect(mocks.listToolRuntimeInventory).toHaveBeenCalledWith('trial');
   });
 
   it('runs generate_voice through native artifact and playback flow', async () => {

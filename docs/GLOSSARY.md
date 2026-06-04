@@ -173,6 +173,10 @@ Reference:
 
 The operational front door for agent runtimes. It owns runtime ensure, ask, refresh, restart, stop, and prewarm flows so callers do not spawn providers independently.
 
+### Service Runtime
+
+The governed lifecycle wrapper for long-lived services such as ComfyUI. It tracks probe availability, managed runtime paths, provisioning intent, and pinning separately from the service endpoint catalog.
+
 ### Reflex
 
 A predefined automatic response, often expressed declaratively in ADF instead of TypeScript.
