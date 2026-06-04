@@ -178,8 +178,9 @@ for (const [id, pipeline] of Object.entries(pipelines)) {
   try {
     const output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', filePath]);
     report += `## ${pipeline.name}\n\`\`\`text\n${output.trim()}\n\`\`\`\n\n`;
-  } catch (err) {
-    report += `## ${pipeline.name}\n**FAILED**\n\`\`\`text\n${err.stdout}\n${err.stderr}\n\`\`\`\n\n`;
+  } catch (err: unknown) {
+    const error = err as { stdout?: string; stderr?: string; message?: string };
+    report += `## ${pipeline.name}\n**FAILED**\n\`\`\`text\n${error.stdout || ''}\n${error.stderr || error.message || String(err)}\n\`\`\`\n\n`;
   }
 }
 

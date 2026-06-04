@@ -25,7 +25,7 @@ function ensureValidator(): ValidateFunction {
   if (bindingValidateFn) return bindingValidateFn;
   const raw = safeReadFile(BINDING_SCHEMA_PATH, { encoding: 'utf8' }) as string;
   bindingValidateFn = ajv.compile(JSON.parse(raw));
-  return bindingValidateFn;
+  return bindingValidateFn!;
 }
 
 function bindingPath(bindingId: string): string {

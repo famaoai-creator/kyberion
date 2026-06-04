@@ -139,6 +139,7 @@ export class ACPMediator {
   public async boot(): Promise<void> {
     if (this.booted) return;
     logger.info(`[ACP_MEDIATOR] Spawning ACP Agent: ${this.options.bootCommand}`);
+    const threadId = this.options.threadId;
 
     const managed = spawnManagedProcess({
       resourceId: this.runtimeResourceId,
@@ -237,7 +238,7 @@ export class ACPMediator {
           }
 
           // Actuator restriction: check manifest whitelist/blacklist
-          const manifest = getAgentManifest(this.options.threadId);
+          const manifest = getAgentManifest(threadId);
           if (manifest) {
             // Extract actuator name from tool call title (e.g., "run_shell_command" → system, "read_file" → file)
             const actuatorMap: Record<string, string> = {
@@ -248,7 +249,7 @@ export class ACPMediator {
             };
             for (const [keyword, actuator] of Object.entries(actuatorMap)) {
               if (title.includes(keyword) && !isActuatorAllowed(manifest, actuator)) {
-                logger.error(`[ACP_PERMISSION] DENIED by manifest: ${this.options.threadId} cannot use ${actuator} (tool: ${title})`);
+                logger.error(`[ACP_PERMISSION] DENIED by manifest: ${threadId} cannot use ${actuator} (tool: ${title})`);
                 return { outcome: 'denied' as const };
               }
             }

@@ -216,14 +216,14 @@ export class MeetingParticipationCoordinator {
       });
       if (!consent.allowed) {
         this.deps.trace?.addEvent('meeting_participation.recording_denied', {
-          reason: consent.reason,
+          ...(consent.reason ? { reason: consent.reason } : {}),
         });
         closeTrace('error', consent.reason);
         this.recordAudit('meeting_participation.recording_denied', target, 'denied', consent.reason);
         throw new Error(`[meeting-participation] ${consent.reason}`);
       }
       this.deps.trace?.addEvent('meeting_participation.recording_consent_granted', {
-        mission_id: options.mission_id,
+        ...(options.mission_id ? { mission_id: options.mission_id } : {}),
       });
     }
 
@@ -360,7 +360,7 @@ export class MeetingParticipationCoordinator {
       });
       if (!consent.allowed) {
         this.deps.trace?.addEvent('meeting_participation.speak_denied', {
-          reason: consent.reason,
+          ...(consent.reason ? { reason: consent.reason } : {}),
         });
         this.recordAudit('meeting_participation.speak_denied', target, 'denied', consent.reason);
         throw new Error(`[meeting-participation] ${consent.reason}`);
