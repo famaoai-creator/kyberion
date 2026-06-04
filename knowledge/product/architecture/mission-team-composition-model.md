@@ -24,6 +24,13 @@ Kyberion separates two kinds of roles:
 5. Emit a `team-composition.json` artifact into the mission directory
 6. When writing from CLI, execute with mission authority context. `scripts/compose_mission_team.ts --write` resolves the mission's assigned persona and applies it for governed writes.
 
+### Persona vs authority
+
+- `assigned_persona` is mission metadata and prompt-shaping context.
+- Mission file writes are governed by the process execution context (`MISSION_ROLE` / `KYBERION_PERSONA`), not by the descriptive persona string stored in mission state.
+- Mission lifecycle commands default to the safe worker persona. Use a more specific persona only when the mission explicitly needs that reasoning style.
+- `Ecosystem Architect` remains the system-maintenance persona for product-level editing, but it should not be the default mission lifecycle persona.
+
 ## Lifecycle Guardrails
 
 The composed team plan now carries a `team_governance` block with two concerns:

@@ -121,6 +121,56 @@ export function missionDir(missionId: string, tier: 'personal' | 'confidential' 
   return dir;
 }
 
+function normalizePathSegment(value: string, fallback = 'shared') {
+  return String(value || '')
+    .trim()
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || fallback;
+}
+
+/**
+ * Returns the workspace directory for a project.
+ * Path: active/projects/{tier}/{tenantOrShared}/{projectId}/
+ */
+export function projectWorkspaceDir(
+  projectId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug = 'shared',
+): string {
+  const dir = path.join(ACTIVE_ROOT, 'projects', tier, normalizePathSegment(tenantSlug, 'shared'), normalizePathSegment(projectId, 'project'));
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
+/**
+ * Returns the project OS scaffold directory for a project.
+ * Path: active/projects/{tier}/{tenantOrShared}/{projectId}/project-os/
+ */
+export function projectOsDir(
+  projectId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug = 'shared',
+): string {
+  const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'project-os');
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
+/**
+ * Returns the live project operational state directory.
+ * Path: active/projects/{tier}/{tenantOrShared}/{projectId}/state/
+ */
+export function projectStateDir(
+  projectId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug = 'shared',
+): string {
+  const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'state');
+  if (!rawExistsSync(dir)) rawMkdirp(dir);
+  return dir;
+}
+
 /**
  * Returns the path to the audit directory for a given mission (tier-aware).
  */
@@ -240,6 +290,9 @@ export const pathResolver = {
   capabilityDir,
   skillDir,
   missionDir,
+  projectWorkspaceDir,
+  projectOsDir,
+  projectStateDir,
   missionAuditDir,
   missionEvidenceDir,
   findMissionPath,

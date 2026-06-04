@@ -220,6 +220,62 @@ async function distillMission(id: string): Promise<void> {
   return missionSystem.distillMission(id);
 }
 
+async function dispatchMissionTickets(id: string): Promise<void> {
+  const result = await missionSystem.dispatchMissionTickets(id, resolveMissionTicketDispatchOptionsFromArgv());
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function dispatchMissionWorkItems(id: string): Promise<void> {
+  const result = await missionSystem.dispatchMissionWorkItems(id, resolveMissionWorkItemDispatchOptionsFromArgv());
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export function resolveMissionTicketDispatchOptionsFromArgv(
+  argv: string[] = process.argv,
+): {
+  targets: Array<'workitem' | 'github' | 'jira'>;
+  liveTargets: Array<'workitem' | 'github' | 'jira'>;
+  github?: { owner?: string; repo?: string };
+  jira?: { domain?: string; projectKey?: string };
+} {
+  const targets = parseCsvOption('--ticket-targets', argv) || ['workitem', 'github', 'jira'];
+  const liveTargets = parseCsvOption('--live-ticket-targets', argv) || [];
+  const githubOwner = getOptionValue('--github-owner', argv);
+  const githubRepo = getOptionValue('--github-repo', argv);
+  const jiraDomain = getOptionValue('--jira-domain', argv);
+  const jiraProjectKey = getOptionValue('--jira-project-key', argv);
+
+  return {
+    targets: (targets.length > 0 ? targets : ['workitem']) as Array<'workitem' | 'github' | 'jira'>,
+    liveTargets: liveTargets as Array<'workitem' | 'github' | 'jira'>,
+    github: githubOwner || githubRepo ? { owner: githubOwner, repo: githubRepo } : undefined,
+    jira: jiraDomain || jiraProjectKey ? { domain: jiraDomain, projectKey: jiraProjectKey } : undefined,
+  };
+}
+
+export function resolveMissionWorkItemDispatchOptionsFromArgv(
+  argv: string[] = process.argv,
+): {
+  mode: 'auto' | 'agent' | 'subagent';
+  limit?: number;
+  statuses: Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>;
+  sources: Array<'local' | 'github' | 'jira' | 'peer'>;
+  finalStatus: 'review' | 'done';
+} {
+  const mode = (getOptionValue('--dispatch-mode', argv) || 'auto') as 'auto' | 'agent' | 'subagent';
+  const limitRaw = getOptionValue('--dispatch-limit', argv);
+  const statusesRaw = parseCsvOption('--dispatch-statuses', argv) || ['ready'];
+  const sourcesRaw = parseCsvOption('--dispatch-sources', argv) || ['local'];
+  const finalStatus = (getOptionValue('--dispatch-final-status', argv) || 'review') as 'review' | 'done';
+  return {
+    mode,
+    ...(limitRaw ? { limit: Number(limitRaw) } : {}),
+    statuses: statusesRaw as Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>,
+    sources: sourcesRaw as Array<'local' | 'github' | 'jira' | 'peer'>,
+    finalStatus,
+  };
+}
+
 /**
  * Mission Commands
  */
@@ -421,7 +477,7 @@ async function createMission(
   tenantId: string = 'default',
   missionType: string = 'development',
   visionRef?: string,
-  persona: string = 'Ecosystem Architect',
+  persona: string = 'worker',
   relationships: any = {},
   tenantSlug?: string,
   organizationId?: string,
@@ -486,7 +542,7 @@ async function recordRoutingDecisionInMissionState(
 async function startMission(
   id: string,
   tier: 'personal' | 'confidential' | 'public' = 'confidential',
-  persona: string = 'Ecosystem Architect',
+  persona: string = 'worker',
   tenantId: string = 'default',
   missionType: string = 'development',
   visionRef?: string,
@@ -1149,6 +1205,16 @@ Lifecycle Commands:
   distill  <ID>                  Extract knowledge via LLM (distilling → completed)
   finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
   resume   [ID]                  Resume the last active mission (or specify ID)
+  dispatch-tickets <ID>          Register NEXT_TASKS as work items / issue payloads
+                                 --ticket-targets workitem,github,jira
+                                 --live-ticket-targets github,jira
+                                 --github-owner <OWNER> --github-repo <REPO>
+                                 --jira-domain <DOMAIN> --jira-project-key <KEY>
+  dispatch-workitems <ID>        Execute registered work items via agent/subagent routing
+                                 --dispatch-mode auto|agent|subagent
+                                 --dispatch-statuses ready,backlog
+                                 --dispatch-sources local,github,jira
+                                 --dispatch-final-status review|done
 
 Delegation Commands:
   delegate <ID> <agent_id> <a2a_message_id>
@@ -1259,7 +1325,7 @@ Organization Discovery:
     Linked project missions must point to a project_path whose 04_control ledger
     is writable under the current authority. Unsafe targets like libs/core will fail fast.
 
-Project Traceability Options:
+  Project Traceability Options:
   --project-id <ID>              Link mission to a project identifier
   --project-path <PATH>          Record the related project-os path
   --project-relationship <TYPE>  belongs_to | supports | governs | independent
@@ -1267,6 +1333,8 @@ Project Traceability Options:
   --gate-impact <TYPE>           none | informational | review_required | blocking
   --traceability-refs <CSV>      Comma-separated evidence or document refs
   --project-note <TEXT>          Free-text note for the project relationship
+                                 Linked missions auto-sync to active/projects/<tier>/<tenant_or_shared>/<project_id>/state/
+                                 and later distill into knowledge/product/evolution/ or knowledge/product/incidents/
 
 Track Traceability Options:
   --track-id <ID>                Link mission to a project track identifier
@@ -1591,6 +1659,12 @@ export async function main() {
       break;
     case 'distill':
       await distillMission(arg1);
+      break;
+    case 'dispatch-tickets':
+      await dispatchMissionTickets(arg1);
+      break;
+    case 'dispatch-workitems':
+      await dispatchMissionWorkItems(arg1);
       break;
     case 'seal':
       await sealMission(arg1);

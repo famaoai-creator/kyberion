@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   resolveOverlay: vi.fn(() => null),
   loadServiceEndpointsCatalog: vi.fn(),
   withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
+  safeExistsSync: vi.fn(() => true),
+  safeReaddir: vi.fn(() => []),
+  safeStat: vi.fn(() => ({ isFile: () => true })),
 }));
 
 vi.mock('./index.js', async () => {
@@ -31,6 +34,17 @@ vi.mock('./index.js', async () => {
 vi.mock('./customer-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
+
+vi.mock('./secure-io.js', async () => {
+  const actual = await vi.importActual('./secure-io.js') as any;
+  return {
+    ...actual,
+    safeReadFile: mocks.safeReadFile,
+    safeExistsSync: mocks.safeExistsSync,
+    safeReaddir: mocks.safeReaddir,
+    safeStat: mocks.safeStat,
+  };
+});
 
 describe('executeServicePreset', () => {
   beforeEach(() => {
