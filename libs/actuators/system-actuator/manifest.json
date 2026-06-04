@@ -23,6 +23,7 @@
     { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_media_devices", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_tool_runtimes", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "list_service_runtimes", "platforms": ["darwin", "linux", "win32"] },
     { "op": "control_media_devices", "platforms": ["darwin", "linux", "win32"] },
     { "op": "test_audio_outputs", "platforms": ["darwin", "linux", "win32"] },
     { "op": "test_audio_inputs", "platforms": ["darwin", "linux", "win32"] },

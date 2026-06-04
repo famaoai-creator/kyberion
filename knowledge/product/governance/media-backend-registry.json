@@ -21,7 +21,7 @@
       },
       "service_id": "media-generation",
       "action": "generate_image",
-      "notes": "Routes governed image generation through the media-generation service preset."
+      "notes": "Routes governed image generation through the media-generation service preset. ComfyUI availability and managed location are also tracked via the service runtime abstraction."
     },
     {
       "backend_id": "media-generation.local_flux",

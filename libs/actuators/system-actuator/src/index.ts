@@ -28,6 +28,7 @@ import {
   createScreenRecordingBridge,
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
+  listServiceRuntimeInventory,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
   StubVideoFrameBus,
@@ -327,6 +328,7 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'list_displays',
   'list_media_devices',
   'list_tool_runtimes',
+  'list_service_runtimes',
   'control_media_devices',
   'collect_artifacts',
   'sample_traces',
@@ -1436,6 +1438,67 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const data = { status: 'ok', capability_list: capabilities, count: capabilities.length };
       return { ...ctx, [params.export_as || 'capability_list_data']: data };
     }
+    case 'list_tool_runtimes': {
+      const inventory = listToolRuntimeInventory(
+        typeof params.requested_mode === 'string'
+          ? params.requested_mode as any
+          : 'trial',
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'tool_runtimes']: {
+          version: inventory.version,
+          platform: inventory.platform,
+          requested_mode: inventory.requested_mode,
+          default_tool_id: inventory.default_tool_id,
+          tools: inventory.items.map((item) => ({
+            tool_id: item.tool.tool_id,
+            display_name: item.tool.display_name,
+            ecosystem: item.tool.ecosystem,
+            lifecycle_stage: item.lifecycle_stage,
+            selected_action: item.selected_action,
+            selected_backend: item.selected_backend,
+            installed: item.installed,
+            requires_install: item.requires_install,
+            managed_env_path: item.managed_env_path,
+            available_commands: item.available_commands,
+            reason: item.reason,
+          })),
+        },
+      };
+    }
+    case 'list_service_runtimes': {
+      const inventory = await listServiceRuntimeInventory(
+        typeof params.requested_mode === 'string'
+          ? params.requested_mode as any
+          : 'trial',
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'service_runtimes']: {
+          version: inventory.version,
+          platform: inventory.platform,
+          requested_mode: inventory.requested_mode,
+          default_service_id: inventory.default_service_id,
+          services: inventory.items.map((item) => ({
+            service_id: item.service.service_id,
+            display_name: item.service.display_name,
+            kind: item.service.kind,
+            lifecycle_stage: item.lifecycle_stage,
+            selected_action: item.selected_action,
+            available: item.available,
+            installed: item.installed,
+            requires_install: item.requires_install,
+            managed_service_path: item.managed_service_path,
+            service_endpoint_path: item.service.service_endpoint_path,
+            service_preset_path: item.service.service_preset_path,
+            base_url: item.base_url,
+            probe_url: item.probe_url,
+            reason: item.reason,
+          })),
+        },
+      };
+    }
     case 'list_incidents':
     case 'list_knowledge': {
       // list_knowledge is kept as an alias for backward compatibility; prefer list_incidents
@@ -1626,6 +1689,38 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             requires_install: item.requires_install,
             managed_env_path: item.managed_env_path,
             available_commands: item.available_commands,
+            reason: item.reason,
+          })),
+        },
+      };
+    }
+    case 'list_service_runtimes': {
+      const inventory = await listServiceRuntimeInventory(
+        typeof params.requested_mode === 'string'
+          ? params.requested_mode as any
+          : 'trial',
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'service_runtimes']: {
+          version: inventory.version,
+          platform: inventory.platform,
+          requested_mode: inventory.requested_mode,
+          default_service_id: inventory.default_service_id,
+          services: inventory.items.map((item) => ({
+            service_id: item.service.service_id,
+            display_name: item.service.display_name,
+            kind: item.service.kind,
+            lifecycle_stage: item.lifecycle_stage,
+            selected_action: item.selected_action,
+            available: item.available,
+            installed: item.installed,
+            requires_install: item.requires_install,
+            managed_service_path: item.managed_service_path,
+            service_endpoint_path: item.service.service_endpoint_path,
+            service_preset_path: item.service.service_preset_path,
+            base_url: item.base_url,
+            probe_url: item.probe_url,
             reason: item.reason,
           })),
         },
