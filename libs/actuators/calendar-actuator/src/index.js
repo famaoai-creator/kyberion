@@ -50,8 +50,9 @@ function loadRecoveryPolicy() {
         return cachedRecoveryPolicy;
     try {
         const manifest = JSON.parse(safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }));
-        cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-        return cachedRecoveryPolicy;
+        const policy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+        cachedRecoveryPolicy = policy;
+        return policy;
     }
     catch (_) {
         cachedRecoveryPolicy = {};

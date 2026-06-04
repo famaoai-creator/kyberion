@@ -4,8 +4,7 @@ export {
   loadServiceEndpointsCatalog,
   resolveServiceIdForIntent,
 } from './service-endpoint-registry.js';
-import { getServiceEndpointRecord } from './service-endpoint-registry.js';
-import { secretGuard } from './secret-guard.js';
+import { getServiceCredentialSuffixes, resolveServiceSecret } from './service-secret-resolver.js';
 
 export interface ServiceBinding {
   serviceId: string;
@@ -17,21 +16,6 @@ export interface ServiceBinding {
   clientSecret?: string;
   redirectUri?: string;
   metadata?: Record<string, unknown>;
-}
-
-function resolveServiceSecret(serviceId: string, suffixes: string[]): string | null {
-  const upper = serviceId.toUpperCase();
-  for (const suffix of suffixes) {
-    const secret = secretGuard.getSecret(`${upper}_${suffix}`, serviceId);
-    if (secret) return secret;
-  }
-  return null;
-}
-
-function getServiceCredentialSuffixes(
-  serviceId: string,
-): Partial<Record<'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri', string[]>> {
-  return getServiceEndpointRecord(serviceId)?.credential_suffixes || {};
 }
 
 export function resolveServiceBinding(serviceId: string, authMode: 'none' | 'secret-guard' | 'session' = 'none'): ServiceBinding {

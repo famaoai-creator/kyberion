@@ -36,6 +36,7 @@ Create mission
     -> Compose team
       -> Staff / prewarm runtime
         -> Record task intent
+          -> Assemble scoped mission context pack
           -> Dispatch durable tickets (WorkItem / GitHub / Jira payloads)
           -> Execute registered work items and reflect results back to tickets
           -> Create / update board items
@@ -54,6 +55,7 @@ Create mission
 | Team | `mission_controller` + team composer | `team-composition.json`, `team-blueprint.json` | Chooses roles and governance before delegation begins. |
 | Staff | `agent-runtime-supervisor` | runtime request/result logs, runtime observability | Ensures live agents exist before tasks are delegated. |
 | Record task | mission owner / planner | `LATEST_TASK.json`, `execution-ledger.jsonl` | Flight recorder entry for the next unit of work. |
+| Context pack | mission owner / planner | `coordination/context-packs/**` | Compiles a scoped mission context pack from mission / project / task / role state before execution. |
 | Ticket dispatch | mission owner / planner | `coordination/tickets/**`, `coordination/events/ticket-events.jsonl`, `NEXT_TASKS.json` ticket annotations | Registers mission tasks as durable WorkItem records and optional GitHub / Jira payload artifacts before live routing. |
 | Work item dispatch | mission owner / planner | `coordination/tickets/replies/**`, ticket manifest updates, mission evidence response artifacts | Routes registered WorkItems to a live agent or subagent and writes the completion / review result back to the ticket records. |
 | Board update | Work Coordination Platform | `WorkItem`, board view, claim/handoff/release state | Durable work tracking; not runtime ownership. |

@@ -129,6 +129,8 @@ describe('mission work item dispatch', () => {
       item_id: manifest.records[0].item_id,
       execution_mode: 'agent',
     });
+    expect(response.context_pack_path).toContain('/coordination/context-packs/');
+    expect(response.prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
     expect(response.response_text).toContain('agent completed the outline');
     expect(safeExistsSync(`${missionPath}/coordination/events/workitem-dispatch.jsonl`)).toBe(true);
   });
@@ -164,6 +166,7 @@ describe('mission work item dispatch', () => {
       task_id: 'task-1',
       ticket_state: 'done',
     });
+    expect(reply.context_pack_path).toContain('/coordination/context-packs/');
 
     const ticketManifest = JSON.parse(safeReadFile(`${missionPath}/coordination/tickets/dispatch-manifest.json`, { encoding: 'utf8' }) as string);
     expect(ticketManifest.records[0]).toMatchObject({

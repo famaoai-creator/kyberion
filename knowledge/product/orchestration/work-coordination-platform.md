@@ -20,6 +20,7 @@ Mission lifecycle の記録と連動させる場合は、[`mission-lifecycle-and
 - Peer messaging は coordination command の transport として使う
 - GitHub Issue / Jira Issue を `WorkItem` に取り込む
 - Mission 由来の NEXT_TASKS は `dispatch-tickets` で WorkItem と issue payload に展開する
+- `dispatch-workitems` は、実行前に mission-scoped context pack を組み立てて、役割ごとに必要な最小コンテキストだけを agent に渡す
 - 個人 TODO / プロジェクトボード / peer queue / review queue を同じ実体から切り出す
 
 Mission 型の作業では、`record-task` / `checkpoint` / `verify` / `distill` / `finish` によって board 外の mission state と board view を同期します。
@@ -62,6 +63,7 @@ Mission-specific registration is separate from external import:
   - `coordination/tickets/dispatch-manifest.json`
   - `NEXT_TASKS.json` ticket annotations
   - mission-local GitHub / Jira issue payload artifacts
+- The dispatch prompt should be assembled from a scoped mission context pack stored under `coordination/context-packs/**`.
 - When the ticket is linked to live GitHub / Jira targets, the result is also appended as a comment and the issue state is advanced when possible.
 
 ## Board Types
