@@ -24,6 +24,23 @@
       "notes": "Routes governed image generation through the media-generation service preset."
     },
     {
+      "backend_id": "media-generation.local_flux",
+      "modality": "image",
+      "display_name": "Local FLUX Image Generation",
+      "kind": "cli",
+      "provider": "mflux",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supports": {
+        "artifact_formats": ["png", "jpg", "jpeg", "webp"],
+        "async": false
+      },
+      "command": "uvx",
+      "args": ["--from", "mflux", "mflux-generate"],
+      "fallback_backend_id": "media-generation.comfyui",
+      "notes": "Apple Silicon local FLUX generation via the governed tool runtime registry. Tuned via KYBERION_MFLUX_* env policy."
+    },
+    {
       "backend_id": "voice.local_say",
       "modality": "voice",
       "display_name": "Local System TTS",
