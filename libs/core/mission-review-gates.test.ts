@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveMissionReviewDesign, summarizeReviewGateVerdicts } from './mission-review-gates.js';
+import {
+  evaluateArtifactBundleGate,
+  resolveMissionReviewDesign,
+  summarizeReviewGateVerdicts,
+} from './mission-review-gates.js';
 
 describe('mission-review-gates', () => {
   it('selects strict mode for high-stakes stage-gated workflows', () => {
@@ -41,5 +45,35 @@ describe('mission-review-gates', () => {
 
     expect(summary.overall_verdict).toBe('blocked');
     expect(summary.review_mode).toBe('strict');
+  });
+
+  it('evaluates artifact bundle readiness with approval consistency', () => {
+    expect(
+      evaluateArtifactBundleGate({
+        bundle_id: 'BND-1',
+        mission_id: 'MSN-1',
+        status: 'assembling',
+        items: [],
+        fulfills_outcome_ids: [],
+        required_artifact_kinds: [],
+        approval: { status: 'pending' },
+        created_at: '2026-06-05T00:00:00.000Z',
+        updated_at: '2026-06-05T00:00:00.000Z',
+      }),
+    ).toMatchObject({ verdict: 'concerns' });
+
+    expect(
+      evaluateArtifactBundleGate({
+        bundle_id: 'BND-2',
+        mission_id: 'MSN-1',
+        status: 'approved',
+        items: [{ artifact_id: 'ART-1', kind: 'markdown', storage_class: 'artifact_store' }],
+        fulfills_outcome_ids: ['OUT-1'],
+        required_artifact_kinds: ['markdown'],
+        approval: { status: 'approved' },
+        created_at: '2026-06-05T00:00:00.000Z',
+        updated_at: '2026-06-05T00:00:00.000Z',
+      }),
+    ).toMatchObject({ verdict: 'ready' });
   });
 });

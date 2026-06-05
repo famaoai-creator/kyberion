@@ -84,6 +84,8 @@ The pack includes:
   - the concrete task being executed
 - `knowledge_hints`
   - a small set of distilled, relevant knowledge entries
+- `artifact_hints`
+  - reusable canonical artifact references from the project-level artifact registry
 - `sources`
   - traceability references used to build the pack
 - `redactions`
@@ -93,9 +95,9 @@ The pack includes:
 
 ```text
 Mission state
-  -> project / track / task session / work item resolution
+  -> project / track / task session / work item / artifact registry resolution
     -> role-specific assignment resolution
-      -> relevant distilled knowledge hints
+      -> relevant distilled knowledge hints + reusable artifact hints
         -> mission context pack
           -> prompt / artifact delivery
             -> agent execution
@@ -155,6 +157,7 @@ The scoped injection flow should be owned by these modules or boundaries:
 - `libs/core/mission-context-pack.ts`
   - resolve mission / project / track / task session / work item state
   - filter source facts by tier, tenant, role, and scope
+  - inject reusable artifact hints from the project-level artifact registry
   - assemble the mission context pack
   - render the pack into prompt text
   - persist the pack into mission-local coordination storage
@@ -184,10 +187,11 @@ The design is considered complete when the following are true:
 1. Agents receive a scoped context pack that is tailored to their role and mission scope.
 2. No dispatch path injects the full Kyberion knowledge base by default.
 3. Every dispatched task records the pack id, pack path, recipient, and source references.
-4. Mission-local evidence, ticket reflections, and project state are updated after execution.
-5. Knowledge is only updated through distillation after execution evidence exists.
-6. Tier and tenant isolation are preserved in both the pack and the persisted artifacts.
-7. The same mission can be replayed or audited from the stored pack and execution artifacts.
+4. Reusable artifact hints can be resolved from the project-level registry without forcing the artifact itself into mission-local ownership.
+5. Mission-local evidence, ticket reflections, and project state are updated after execution.
+6. Knowledge is only updated through distillation after execution evidence exists.
+7. Tier and tenant isolation are preserved in both the pack and the persisted artifacts.
+8. The same mission can be replayed or audited from the stored pack, artifact hints, and execution artifacts.
 
 ## Related docs
 

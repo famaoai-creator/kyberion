@@ -2,9 +2,23 @@
   "version": "1.0.0",
   "agents": {
     "nerve-agent": {
-      "authority_roles": ["mission_controller", "ecosystem_architect"],
-      "team_roles": ["owner", "tester", "operator"],
-      "capabilities": ["reasoning", "coordination", "routing", "analysis"],
+      "authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "team_roles": [
+        "owner",
+        "tester",
+        "operator",
+        "scribe",
+        "facilitator"
+      ],
+      "capabilities": [
+        "reasoning",
+        "coordination",
+        "routing",
+        "analysis"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "auto-gemini-3"
@@ -12,9 +26,19 @@
       "provider_strategy": "strict"
     },
     "planner-agent": {
-      "authority_roles": ["mission_controller", "ecosystem_architect"],
-      "team_roles": ["planner"],
-      "capabilities": ["planning", "strategy", "decomposition", "coordination"],
+      "authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "team_roles": [
+        "planner"
+      ],
+      "capabilities": [
+        "planning",
+        "strategy",
+        "decomposition",
+        "coordination"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "auto-gemini-3"
@@ -22,20 +46,53 @@
       "provider_strategy": "strict"
     },
     "implementation-architect": {
-      "authority_roles": ["ecosystem_architect", "software_developer"],
-      "team_roles": ["planner", "implementer", "reviewer", "tester", "experience_designer"],
-      "capabilities": ["architecture", "code", "review", "planning", "a2a"],
+      "authority_roles": [
+        "ecosystem_architect",
+        "software_developer"
+      ],
+      "team_roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "tester",
+        "experience_designer"
+      ],
+      "capabilities": [
+        "architecture",
+        "code",
+        "review",
+        "planning",
+        "a2a"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "auto-gemini-3"
       },
       "provider_strategy": "preferred",
-      "fallback_providers": ["claude", "codex"]
+      "fallback_providers": [
+        "claude",
+        "codex"
+      ]
     },
     "sovereign-brain": {
-      "authority_roles": ["mission_controller", "knowledge_steward", "ecosystem_architect"],
-      "team_roles": ["owner", "planner", "reviewer", "product_strategist"],
-      "capabilities": ["reasoning", "strategy", "coordination", "analysis"],
+      "authority_roles": [
+        "mission_controller",
+        "knowledge_steward",
+        "ecosystem_architect"
+      ],
+      "team_roles": [
+        "owner",
+        "planner",
+        "reviewer",
+        "product_strategist",
+        "tracker"
+      ],
+      "capabilities": [
+        "reasoning",
+        "strategy",
+        "coordination",
+        "analysis"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "auto-gemini-3"
@@ -43,59 +100,128 @@
       "provider_strategy": "strict"
     },
     "slack-surface-agent": {
-      "authority_roles": ["slack_bridge", "sovereign_concierge"],
-      "team_roles": ["surface_liaison"],
-      "capabilities": ["slack", "surface", "conversation", "delegation"],
+      "authority_roles": [
+        "slack_bridge",
+        "sovereign_concierge"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "slack",
+        "surface",
+        "conversation",
+        "delegation"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "gemini-2.5-flash"
       },
       "provider_strategy": "adaptive",
-      "fallback_providers": ["claude", "copilot", "codex"]
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
     },
     "telegram-surface-agent": {
-      "authority_roles": ["surface_runtime"],
-      "team_roles": ["surface_liaison"],
-      "capabilities": ["telegram", "surface", "conversation", "delegation"],
+      "authority_roles": [
+        "surface_runtime"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "telegram",
+        "surface",
+        "conversation",
+        "delegation"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "gemini-2.5-flash"
       },
       "provider_strategy": "adaptive",
-      "fallback_providers": ["claude", "copilot", "codex"]
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
     },
     "chronos-mirror": {
-      "authority_roles": ["chronos_operator", "chronos_gateway"],
-      "team_roles": ["operator", "surface_liaison"],
-      "capabilities": ["a2ui", "dashboard", "commands", "gateway"],
+      "authority_roles": [
+        "chronos_operator",
+        "chronos_gateway"
+      ],
+      "team_roles": [
+        "operator",
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "a2ui",
+        "dashboard",
+        "commands",
+        "gateway"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "gemini-2.5-flash"
       },
       "provider_strategy": "adaptive",
-      "fallback_providers": ["claude", "copilot", "codex"]
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
     },
     "presence-surface-agent": {
-      "authority_roles": ["surface_runtime", "chronos_operator"],
-      "team_roles": ["surface_liaison"],
-      "capabilities": ["presence", "surface", "conversation", "realtime"],
+      "authority_roles": [
+        "surface_runtime",
+        "chronos_operator"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "presence",
+        "surface",
+        "conversation",
+        "realtime"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "gemini-2.5-flash"
       },
       "provider_strategy": "adaptive",
-      "fallback_providers": ["claude", "copilot", "codex"]
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
     },
     "onboarding-surface-agent": {
-      "authority_roles": ["sovereign_concierge"],
-      "team_roles": ["surface_liaison"],
-      "capabilities": ["onboarding", "surface", "identity", "guidance"],
+      "authority_roles": [
+        "sovereign_concierge"
+      ],
+      "team_roles": [
+        "surface_liaison"
+      ],
+      "capabilities": [
+        "onboarding",
+        "surface",
+        "identity",
+        "guidance"
+      ],
       "selection_hints": {
         "preferred_provider": "gemini",
         "preferred_modelId": "gemini-2.5-flash"
       },
       "provider_strategy": "adaptive",
-      "fallback_providers": ["claude", "copilot", "codex"]
+      "fallback_providers": [
+        "claude",
+        "copilot",
+        "codex"
+      ]
     }
   }
 }
