@@ -4,8 +4,14 @@ import {
   safeExistsSync,
   safeReadFile,
   safeRmSync,
+  safeWriteFile,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import {
+  appendArtifactOwnershipRecord,
+  artifactOwnershipRegistryPath,
+  createArtifactOwnershipRecord,
+} from './artifact-registry.js';
 import {
   buildMissionContextPack,
   renderMissionContextPack,
@@ -15,9 +21,20 @@ import {
 
 const missionId = 'MSN-CONTEXT-PACK-TEST-001';
 const missionPath = pathResolver.sharedTmp(`mission-context-pack/${missionId}`);
+const artifactRegistryPath = artifactOwnershipRegistryPath();
+let originalArtifactRegistryRaw: string | null = null;
+
+if (safeExistsSync(artifactRegistryPath)) {
+  originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, { encoding: 'utf8' }) as string;
+}
 
 afterEach(() => {
   safeRmSync(missionPath, { recursive: true, force: true });
+  if (originalArtifactRegistryRaw !== null) {
+    safeWriteFile(artifactRegistryPath, originalArtifactRegistryRaw);
+    return;
+  }
+  if (safeExistsSync(artifactRegistryPath)) safeRmSync(artifactRegistryPath);
 });
 
 function makePack(): MissionContextPack {
@@ -276,5 +293,33 @@ describe('mission-context-pack', () => {
         mission_id: missionId,
       },
     });
+  });
+
+  it('injects reusable artifact hints without binding the artifact to the mission', () => {
+    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
+      artifact_id: 'ART-CONTEXT-PACK-BASE',
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      mission_id: 'MSN-CONTEXT-PACK-BASE',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/context-pack-base.md',
+      created_at: '2026-06-04T00:00:00.000Z',
+    }));
+    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
+      artifact_id: 'ART-CONTEXT-PACK-REVISION',
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      mission_id: 'MSN-CONTEXT-PACK-REVISION',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/context-pack-revision.md',
+      created_at: '2026-06-05T00:00:00.000Z',
+      evidence_refs: ['mission:MSN-CONTEXT-PACK-REVISION'],
+    }));
+
+    const pack = makePack();
+    expect(pack.artifact_hints?.[0]?.artifact_id).toBe('ART-CONTEXT-PACK-REVISION');
+    expect(pack.artifact_hints?.[0]?.reuse_reason).toContain('Reusable project artifact');
+    expect(pack.artifact_hints?.some((hint) => hint.artifact_id === 'ART-CONTEXT-PACK-BASE')).toBe(true);
+    expect(pack.artifact_hints?.every((hint) => hint.project_id === 'PRJ-CONTEXT-PACK-001')).toBe(true);
   });
 });

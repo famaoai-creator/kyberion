@@ -1361,6 +1361,7 @@ export * from './project-track-registry.js';
 export * from './sdlc-gate-readiness.js';
 export * from './service-binding-registry.js';
 export * from './artifact-record.js';
+export * from './artifact-bundle.js';
 export * from './artifact-registry.js';
 export * from './control-plane-client.js';
 export * from './computer-surface.js';

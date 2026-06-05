@@ -17,6 +17,8 @@ import {
   safeWriteFile,
   trustEngine,
   validateOutcomeContractAtCompletion,
+  evaluateArtifactBundleGate,
+  loadLatestArtifactBundleForMission,
 } from '@agent/core';
 import { readJsonFile, readTextFile } from './cli-input.js';
 import { loadState } from './mission-state.js';
@@ -89,6 +91,14 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
     });
     if (!outcomeCheck.ok) {
       return { ok: false, reason: outcomeCheck.reason };
+    }
+  }
+
+  const bundle = loadLatestArtifactBundleForMission(id);
+  if (bundle) {
+    const bundleGate = evaluateArtifactBundleGate(bundle);
+    if (bundleGate.verdict !== 'ready') {
+      return { ok: false, reason: bundleGate.reason || `Artifact bundle gate ${bundleGate.verdict}.` };
     }
   }
 

@@ -1,0 +1,29 @@
+{
+  "role": "scribe",
+  "description": "Captures meeting notes, decisions, and action items into durable records.",
+  "required_capabilities": [
+    "documentation",
+    "listening",
+    "summarization"
+  ],
+  "compatible_authority_roles": [
+    "mission_controller",
+    "ecosystem_architect"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "facilitator",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns transcripts, notes, decisions, and action-item records.",
+  "selection_hints": {
+    "preferred_agents": [
+      "nerve-agent",
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "medium"
+}
