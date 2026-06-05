@@ -31,6 +31,8 @@ Separate the proposal into:
    - `document_outline_from_brief`
    - `brief_to_design_protocol`
    - `generate_document`
+   - point `generate_document` at the original brief source with `from` or an inline `brief`
+   - pass `render_target: pptx` explicitly to `generate_document`
 5. `proposal_storyline_from_brief` and `proposal_content_from_storyline` remain useful as narrative inspection tools, but they are not the primary binary generation path anymore.
 
 ```bash
