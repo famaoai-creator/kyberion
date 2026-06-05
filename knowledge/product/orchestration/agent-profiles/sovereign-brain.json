@@ -11,7 +11,8 @@
         "owner",
         "planner",
         "reviewer",
-        "product_strategist"
+        "product_strategist",
+        "tracker"
       ],
       "capabilities": [
         "reasoning",

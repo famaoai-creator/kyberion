@@ -1,0 +1,30 @@
+{
+  "role": "tracker",
+  "description": "Tracks action items, deadlines, and follow-up closure across a meeting.",
+  "required_capabilities": [
+    "tracking",
+    "coordination",
+    "documentation"
+  ],
+  "compatible_authority_roles": [
+    "mission_controller",
+    "ecosystem_architect",
+    "knowledge_steward"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "facilitator",
+  "required_scope_classes": [
+    "mission_state"
+  ],
+  "ownership_scope": "Owns follow-up tracking, due dates, and closure state.",
+  "selection_hints": {
+    "preferred_agents": [
+      "sovereign-brain",
+      "nerve-agent"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "low"
+}

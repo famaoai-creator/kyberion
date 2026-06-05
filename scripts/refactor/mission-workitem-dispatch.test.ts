@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  artifactOwnershipRegistryPath,
+  appendArtifactOwnershipRecord,
+  createArtifactOwnershipRecord,
   clearWorkCoordinationStore,
   createWorkItem,
   listWorkItems,
@@ -18,6 +21,14 @@ import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 
 const missionId = 'MSN-WORKITEM-DISPATCH-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+const artifactRegistryPath = artifactOwnershipRegistryPath();
+let originalArtifactRegistryRaw: string | null = null;
+
+beforeEach(() => {
+  if (safeExistsSync(artifactRegistryPath) && originalArtifactRegistryRaw === null) {
+    originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, { encoding: 'utf8' }) as string;
+  }
+});
 
 function makeMissionState(): MissionState {
   return {
@@ -50,6 +61,28 @@ function makeMissionState(): MissionState {
   };
 }
 
+function makeLinkedProjectMissionState(input: {
+  missionId: string;
+  projectId: string;
+  projectPath: string;
+}): MissionState {
+  return {
+    ...makeMissionState(),
+    mission_id: input.missionId,
+    relationships: {
+      project: {
+        project_id: input.projectId,
+        project_path: input.projectPath,
+        relationship_type: 'supports',
+        affected_artifacts: [],
+        gate_impact: 'informational',
+        traceability_refs: [],
+        note: 'Linked project work item dispatch verification',
+      },
+    },
+  };
+}
+
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
@@ -62,6 +95,11 @@ afterEach(() => {
   clearWorkCoordinationStore();
   safeRmSync(missionPath, { recursive: true, force: true });
   setWorkCoordinationNamespace(null);
+  if (originalArtifactRegistryRaw !== null) {
+    safeWriteFile(artifactRegistryPath, originalArtifactRegistryRaw);
+    return;
+  }
+  if (safeExistsSync(artifactRegistryPath)) safeRmSync(artifactRegistryPath);
 });
 
 describe('mission work item dispatch', () => {
@@ -133,6 +171,152 @@ describe('mission work item dispatch', () => {
     expect(response.prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
     expect(response.response_text).toContain('agent completed the outline');
     expect(safeExistsSync(`${missionPath}/coordination/events/workitem-dispatch.jsonl`)).toBe(true);
+  });
+
+  it('injects reusable artifact hints into the dispatched prompt', async () => {
+    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
+      artifact_id: 'ART-WORKITEM-BASE',
+      project_id: missionId,
+      mission_id: 'MSN-WORKITEM-BASE',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/workitem-base.md',
+      created_at: '2026-06-03T00:00:00.000Z',
+    }));
+    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
+      artifact_id: 'ART-WORKITEM-REVISION',
+      project_id: missionId,
+      mission_id: 'MSN-WORKITEM-REVISION',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/workitem-revision.md',
+      created_at: '2026-06-04T00:00:00.000Z',
+      evidence_refs: ['mission:MSN-WORKITEM-REVISION'],
+    }));
+
+    createWorkItem({
+      title: `${missionId}: Revise the outline with existing artifact reuse`,
+      description: 'Revise the outline and explicitly reuse the latest canonical markdown artifact.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-1-reuse`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/outline.md',
+        target_path: 'deliverables/outline.md',
+        artifact_kind: 'markdown',
+      },
+    });
+
+    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
+      mode: 'agent',
+      finalStatus: 'review',
+    }, {
+      routeA2A: vi.fn(async (envelope) => ({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'RES-REUSE-1',
+          sender: 'sovereign-brain',
+          receiver: 'kyberion:workitem-dispatcher',
+          performative: 'result' as const,
+          timestamp: new Date().toISOString(),
+        },
+        payload: {
+          text: `${String(envelope.payload?.text || '')}\n\nartifact reuse confirmed`,
+        },
+      })),
+    });
+
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
+    const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
+    expect(response.prompt).toContain('Reusable artifact hints:');
+    expect(response.prompt).toContain('ART-WORKITEM-REVISION');
+    expect(response.prompt).toContain('Reusable project artifact');
+    expect(response.response_text).toContain('artifact reuse confirmed');
+  });
+
+  it('selects work items by linked project id when mission id differs from project id', async () => {
+    const linkedMissionId = 'MSN-WORKITEM-LINKED-PROJECT-001';
+    const linkedProjectId = 'PRJ-TEST-WEB';
+    const linkedMissionPath = pathResolver.missionDir(linkedMissionId, 'public');
+    if (!safeExistsSync(linkedMissionPath)) safeMkdir(linkedMissionPath, { recursive: true });
+
+    safeWriteFile(`${linkedMissionPath}/NEXT_TASKS.json`, JSON.stringify([
+      {
+        task_id: 'task-1-linked-project',
+        status: 'planned',
+        assigned_to: { role: 'planner', agent_id: 'sovereign-brain' },
+        description: 'Verify linked project work item selection and ensure project-scoped artifact hints are still injected.',
+        deliverable: 'evidence/linked-project-compatibility.md',
+        target_path: 'evidence/linked-project-compatibility.md',
+      },
+    ], null, 2));
+
+    createWorkItem({
+      title: `${linkedMissionId}: Verify linked project dispatch`,
+      description: 'Verify linked project work item selection and ensure project-scoped artifact hints are still injected.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${linkedMissionId}:task-1-linked-project`,
+      projectId: linkedProjectId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${linkedMissionId}`, 'team_role:planner', 'ticket:workitem'],
+      metadata: {
+        mission_id: linkedMissionId,
+        project_id: linkedProjectId,
+        team_role: 'planner',
+        deliverable: 'evidence/linked-project-compatibility.md',
+        target_path: 'evidence/linked-project-compatibility.md',
+        artifact_kind: 'markdown',
+      },
+    });
+
+    const manifest = await dispatchMissionTickets(makeLinkedProjectMissionState({
+      missionId: linkedMissionId,
+      projectId: linkedProjectId,
+      projectPath: `active/projects/public/shared/${linkedProjectId}/project-os`,
+    }), {
+      targets: ['workitem'],
+    });
+    expect(manifest.records[0]?.work_item_id).toBeDefined();
+
+    const dispatchManifest = await dispatchMissionWorkItems(makeLinkedProjectMissionState({
+      missionId: linkedMissionId,
+      projectId: linkedProjectId,
+      projectPath: `active/projects/public/shared/${linkedProjectId}/project-os`,
+    }), {
+      mode: 'agent',
+      finalStatus: 'review',
+    }, {
+      routeA2A: vi.fn(async (envelope) => ({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'RES-LINKED-1',
+          sender: 'sovereign-brain',
+          receiver: 'kyberion:workitem-dispatcher',
+          performative: 'result' as const,
+          timestamp: new Date().toISOString(),
+        },
+        payload: {
+          text: `${String(envelope.payload?.text || '')}\n\nlinked project dispatch confirmed`,
+        },
+      })),
+    });
+
+    expect(dispatchManifest.work_item_count).toBe(1);
+    expect(dispatchManifest.records[0]?.work_item_status_after).toBe('review');
+
+    const responseFile = `${linkedMissionPath}/evidence/workitem-dispatch-${dispatchManifest.records[0].item_id}.json`;
+    const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
+    expect(response.prompt).toContain('Reusable artifact hints:');
+    expect(response.prompt).toContain('PRJ-TEST-WEB');
+    expect(response.response_text).toContain('linked project dispatch confirmed');
+
+    safeRmSync(linkedMissionPath, { recursive: true, force: true });
   });
 
   it('reflects completed work item results back onto ticket artifacts', async () => {

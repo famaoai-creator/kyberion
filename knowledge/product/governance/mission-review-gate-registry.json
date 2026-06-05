@@ -83,6 +83,11 @@
       "applies_to": {
         "mission_classes": ["customer_engagement"]
       }
+    },
+    {
+      "gate_id": "ARTIFACT_BUNDLE",
+      "description": "Verify the mission's artifact bundle is assembled, approved, and fulfills all required artifact kinds declared by the Track and OutcomeContract.",
+      "required_in_modes": ["standard", "strict"]
     }
   ],
   "mode_rules": [

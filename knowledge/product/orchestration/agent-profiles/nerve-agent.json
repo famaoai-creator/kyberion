@@ -9,7 +9,9 @@
       "team_roles": [
         "owner",
         "tester",
-        "operator"
+        "operator",
+        "scribe",
+        "facilitator"
       ],
       "capabilities": [
         "reasoning",

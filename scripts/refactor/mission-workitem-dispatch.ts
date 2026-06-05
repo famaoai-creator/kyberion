@@ -479,7 +479,17 @@ function validateWorkItemGranularity(item: WorkItem, assigneePeerId?: string): {
   return { ok: notes.length === 0, notes };
 }
 
-function selectWorkItems(missionId: string, options: MissionWorkItemDispatchOptions): WorkItem[] {
+function resolveWorkItemProjectId(state: MissionState): string {
+  return String(
+    state.relationships?.project?.project_id ||
+    state.mission_id ||
+    '',
+  ).trim();
+}
+
+function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOptions): WorkItem[] {
+  const missionId = state.mission_id.toUpperCase();
+  const projectId = resolveWorkItemProjectId(state);
   const labels = [`mission:${missionId}`];
   const statuses = options.statuses && options.statuses.length > 0
     ? options.statuses
@@ -488,7 +498,7 @@ function selectWorkItems(missionId: string, options: MissionWorkItemDispatchOpti
     ? options.sources
     : (['local'] as WorkItemSource[]);
   return listWorkItems({
-    projectId: missionId,
+    projectId,
     source: sources,
     status: statuses,
     labels,
@@ -693,7 +703,7 @@ export async function dispatchMissionWorkItems(
     throw new Error(`Mission path not found for ${missionId}`);
   }
 
-  const workItems = selectWorkItems(missionId, options);
+  const workItems = selectWorkItems(state, options);
   const existingManifest = readManifest(missionPath);
   const records: MissionWorkItemDispatchRecord[] = [];
   const finalStatus = options.finalStatus || 'review';

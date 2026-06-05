@@ -32,7 +32,10 @@
       "type": "apply",
       "op": "generate_document",
       "params": {
+        "from": "proposal_brief",
         "brief": "{{proposal_brief}}",
+        "profile_id": "executive-proposal",
+        "render_target": "pptx",
         "output_path": "active/shared/tmp/media/document-brief-proposal-example.pptx"
       }
     }
