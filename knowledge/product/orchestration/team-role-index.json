@@ -342,6 +342,34 @@
       },
       "autonomy_level": "medium"
     },
+    "scribe": {
+      "description": "Captures meeting notes, decisions, and action items into durable records.",
+      "required_capabilities": [
+        "documentation",
+        "listening",
+        "summarization"
+      ],
+      "compatible_authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "facilitator",
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns transcripts, notes, decisions, and action-item records.",
+      "selection_hints": {
+        "preferred_agents": [
+          "nerve-agent",
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "medium"
+    },
     "surface_liaison": {
       "description": "Maintains human-facing communication quality on Slack or Chronos.",
       "required_capabilities": [
@@ -401,6 +429,35 @@
         ]
       },
       "autonomy_level": "medium"
+    },
+    "tracker": {
+      "description": "Tracks action items, deadlines, and follow-up closure across a meeting.",
+      "required_capabilities": [
+        "tracking",
+        "coordination",
+        "documentation"
+      ],
+      "compatible_authority_roles": [
+        "mission_controller",
+        "ecosystem_architect",
+        "knowledge_steward"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "facilitator",
+      "required_scope_classes": [
+        "mission_state"
+      ],
+      "ownership_scope": "Owns follow-up tracking, due dates, and closure state.",
+      "selection_hints": {
+        "preferred_agents": [
+          "sovereign-brain",
+          "nerve-agent"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "low"
     }
   }
 }

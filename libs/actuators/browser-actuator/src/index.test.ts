@@ -177,9 +177,9 @@ vi.mock('@playwright/test', async () => {
 
 describe('browser-actuator v3 contract', () => {
   beforeEach(async () => {
-    vi.clearAllMocks();
     const { resetBrowserRuntimeLeasesForTest } = await import('./index');
     await resetBrowserRuntimeLeasesForTest();
+    vi.clearAllMocks();
   });
 
   it('uses the manifest recovery policy for ref interactions', async () => {

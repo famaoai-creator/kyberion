@@ -16,6 +16,15 @@ export interface ArtifactOwnershipRecord {
   evidence_refs: string[];
 }
 
+export interface ArtifactOwnershipQuery {
+  projectId?: string;
+  missionId?: string;
+  taskSessionId?: string;
+  kind?: string;
+  storageClass?: ArtifactOwnershipRecord['storage_class'] | ArtifactOwnershipRecord['storage_class'][];
+  includeTmp?: boolean;
+}
+
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve('schemas/artifact-record.schema.json');
@@ -39,6 +48,28 @@ function parseJsonl(raw: string): ArtifactOwnershipRecord[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => JSON.parse(line) as ArtifactOwnershipRecord);
+}
+
+function normalizeStorageClasses(storageClass?: ArtifactOwnershipQuery['storageClass']): ArtifactOwnershipRecord['storage_class'][] {
+  if (!storageClass) return [];
+  return (Array.isArray(storageClass) ? storageClass : [storageClass]).map((value) => String(value).trim() as ArtifactOwnershipRecord['storage_class']).filter(Boolean);
+}
+
+function matchesQuery(record: ArtifactOwnershipRecord, query: ArtifactOwnershipQuery): boolean {
+  if (query.projectId && record.project_id !== query.projectId) return false;
+  if (query.missionId && record.mission_id !== query.missionId) return false;
+  if (query.taskSessionId && record.task_session_id !== query.taskSessionId) return false;
+  if (query.kind && record.kind !== query.kind) return false;
+  const storageClasses = normalizeStorageClasses(query.storageClass);
+  if (storageClasses.length > 0 && !storageClasses.includes(record.storage_class)) return false;
+  if (query.includeTmp === false && record.storage_class === 'tmp') return false;
+  return true;
+}
+
+function compareArtifactOwnershipRecords(a: ArtifactOwnershipRecord, b: ArtifactOwnershipRecord): number {
+  const createdAtCompare = String(b.created_at || '').localeCompare(String(a.created_at || ''));
+  if (createdAtCompare !== 0) return createdAtCompare;
+  return String(b.artifact_id || '').localeCompare(String(a.artifact_id || ''));
 }
 
 export function createArtifactOwnershipRecord(input: Omit<ArtifactOwnershipRecord, 'created_at' | 'evidence_refs'> & {
@@ -84,6 +115,28 @@ export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   if (!safeExistsSync(ARTIFACT_REGISTRY_PATH)) return [];
   const raw = safeReadFile(ARTIFACT_REGISTRY_PATH, { encoding: 'utf8' }) as string;
   return parseJsonl(raw);
+}
+
+export function listArtifactOwnershipRecordsByQuery(query: ArtifactOwnershipQuery = {}): ArtifactOwnershipRecord[] {
+  return listArtifactOwnershipRecords()
+    .filter((record) => matchesQuery(record, query))
+    .sort(compareArtifactOwnershipRecords);
+}
+
+export function listArtifactOwnershipRecordsForProject(projectId: string, query: Omit<ArtifactOwnershipQuery, 'projectId'> = {}): ArtifactOwnershipRecord[] {
+  return listArtifactOwnershipRecordsByQuery({ ...query, projectId });
+}
+
+export function listArtifactOwnershipRecordsForMission(missionId: string, query: Omit<ArtifactOwnershipQuery, 'missionId'> = {}): ArtifactOwnershipRecord[] {
+  return listArtifactOwnershipRecordsByQuery({ ...query, missionId });
+}
+
+export function findReusableArtifactOwnershipRecord(query: ArtifactOwnershipQuery & { projectId?: string }): ArtifactOwnershipRecord | null {
+  const records = listArtifactOwnershipRecordsByQuery({
+    ...query,
+    includeTmp: query.includeTmp ?? false,
+  });
+  return records.length ? records[0] : null;
 }
 
 export function artifactOwnershipRegistryPath(): string {

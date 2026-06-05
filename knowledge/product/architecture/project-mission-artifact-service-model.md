@@ -112,6 +112,7 @@ Examples:
 - delivery receipt
 
 Every artifact should carry explicit ownership metadata.
+Canonical artifacts are expected to live in the shared artifact registry and be reusable across missions; mission-local coordination artifacts should only point at them, not duplicate them.
 
 ### 3.5 Service Binding
 
@@ -197,6 +198,8 @@ Recommended `storage_class` values:
 - `vault`
 - `tmp`
 - `external_ref`
+
+Mission-local `artifact bundle` records are review wrappers. They describe which canonical artifacts a mission used or produced, but they are not the canonical artifact store themselves.
 
 This ensures storage, retention, and delivery policy remain coherent.
 

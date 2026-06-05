@@ -63,6 +63,10 @@
       "types": "./dist/artifacts.d.ts",
       "default": "./dist/artifacts.js"
     },
+    "./artifact-bundle": {
+      "types": "./dist/artifact-bundle.d.ts",
+      "default": "./dist/artifact-bundle.js"
+    },
     "./blackhole-audio-bus": {
       "types": "./dist/blackhole-audio-bus.d.ts",
       "default": "./dist/blackhole-audio-bus.js"

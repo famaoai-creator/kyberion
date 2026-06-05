@@ -1,26 +1,46 @@
 import {
   logger,
-  safeReadFile,
-  safeWriteFile,
   executeServicePreset,
-  compileMusicGenerationADF,
-  compileImageGenerationADF,
-  compileVideoGenerationADF,
-  secureFetch,
-  withRetry,
-  safeCopyFileSync,
-  safeExistsSync,
-  safeMkdir,
-  pathResolver,
   classifyError,
   derivePipelineStatus,
   createActuatorTrace,
   finalizeActuatorTrace,
-  resolveImageBackend,
+  safeReadFile,
+  safeWriteFile,
+  safeCopyFileSync,
+  safeExistsSync,
+  safeMkdir,
+  secureFetch,
+  withRetry,
+  compileMusicGenerationADF,
+  compileImageGenerationADF,
+  compileVideoGenerationADF,
+  pathResolver,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import type { GenerationJob } from '@agent/core';
+import {
+  resolveGenerationBackend,
+  buildRetryOptions,
+  ensureGenerationJobDir,
+  createGenerationJobId,
+  generationJobPath,
+  writeJob,
+  readJob,
+  extractArtifacts,
+  isTerminalStatus,
+  maybeCopyArtifact,
+  resolveImageArtifactFormat,
+  resolveImageProviderPreference,
+  preparePromptBasedGeneration,
+  collectGenerationResult,
+  nowIso,
+  isPlainObject,
+  loadRecoveryPolicy,
+  resolveArtifactPath,
+  sleep,
+} from './media-generation-helpers.js';
 
 /**
  * Media-Generation-Actuator v1.0.0 [THIN CLIENT]
@@ -57,224 +77,6 @@ type PromptGenerationRequest = {
   compiled?: any;
   workflow?: any;
 };
-
-function resolveGenerationBackend(action: string, params: any) {
-  const backendId = String(
-    params?.backend_id
-    || params?.image_adf?.engine?.backend_id
-    || params?.video_adf?.engine?.backend_id
-    || params?.music_adf?.engine?.backend_id
-    || 'media-generation.comfyui',
-  ).trim() || 'media-generation.comfyui';
-  void action;
-  return resolveImageBackend(backendId, process.platform);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(MEDIA_GENERATION_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy ?? {};
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy ?? {};
-  }
-}
-
-function buildRetryOptions(override?: Record<string, any>) {
-  const manifestRetry = isPlainObject(loadRecoveryPolicy().retry) ? loadRecoveryPolicy().retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(loadRecoveryPolicy().retryable_categories) ? loadRecoveryPolicy().retryable_categories.map(String) : [],
-  );
-  const resolved = {
-    ...DEFAULT_MEDIA_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
-    },
-  };
-}
-
-function ensureGenerationJobDir(): void {
-  if (!safeExistsSync(GENERATION_JOB_DIR)) {
-    safeMkdir(GENERATION_JOB_DIR, { recursive: true });
-  }
-}
-
-function createGenerationJobId(action: string): string {
-  return `genjob-${action}-${Date.now()}`;
-}
-
-function generationJobPath(jobId: string): string {
-  return path.join(GENERATION_JOB_DIR, `${jobId}.json`);
-}
-
-function writeJob(job: GenerationJob): GenerationJob {
-  ensureGenerationJobDir();
-  safeWriteFile(generationJobPath(job.job_id), JSON.stringify(job, null, 2));
-  return job;
-}
-
-function readJob(jobId: string): GenerationJob {
-  return JSON.parse(safeReadFile(generationJobPath(jobId), { encoding: 'utf8' }) as string) as GenerationJob;
-}
-
-function resolveArtifactPath(item: Record<string, any>): string {
-  const typeDir = item.type && item.type !== 'output' ? String(item.type) : '';
-  const subfolder = item.subfolder ? String(item.subfolder) : '';
-  return path.join(DEFAULT_COMFY_OUTPUT_DIR, typeDir, subfolder, String(item.filename));
-}
-
-function extractArtifacts(history: any): GeneratedArtifact[] {
-  const outputs = history?.outputs;
-  if (!outputs || typeof outputs !== 'object') return [];
-
-  const artifacts: GeneratedArtifact[] = [];
-  for (const nodeOutput of Object.values(outputs) as any[]) {
-    if (!nodeOutput || typeof nodeOutput !== 'object') continue;
-    for (const [kind, value] of Object.entries(nodeOutput)) {
-      if (!Array.isArray(value)) continue;
-      for (const item of value) {
-        if (!item?.filename) continue;
-        artifacts.push({
-          kind,
-          filename: String(item.filename),
-          type: String(item.type || 'output'),
-          subfolder: item.subfolder ? String(item.subfolder) : undefined,
-          path: resolveArtifactPath(item),
-        });
-      }
-    }
-  }
-  return artifacts;
-}
-
-async function waitForPromptCompletion(promptId: string, timeoutMs: number, pollIntervalMs: number): Promise<any> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    const history = await withRetry(async () => {
-      return await secureFetch({
-        method: 'GET',
-        url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
-      });
-    }, buildRetryOptions());
-    if (history && Object.keys(history).length > 0) {
-      const promptHistory = history[promptId];
-      if (promptHistory?.status?.completed || promptHistory?.outputs) {
-        return promptHistory;
-      }
-    }
-    await sleep(pollIntervalMs);
-  }
-  throw new Error(`Timed out waiting for Comfy prompt ${promptId}`);
-}
-
-function isTerminalStatus(status?: string): boolean {
-  return status ? TERMINAL_JOB_STATUSES.has(status) : false;
-}
-
-function maybeCopyArtifact(sourcePath: string, targetPath?: string): string | undefined {
-  if (!targetPath) return undefined;
-  if (!safeExistsSync(sourcePath)) {
-    throw new Error(`Generated artifact not found: ${sourcePath}`);
-  }
-  safeMkdir(path.dirname(targetPath), { recursive: true });
-  safeCopyFileSync(sourcePath, targetPath);
-  return targetPath;
-}
-
-function resolveImageArtifactFormat(sourcePath: string): string {
-  const ext = path.extname(sourcePath).toLowerCase().replace(/^\./, '');
-  return ext || 'jpg';
-}
-
-function resolveImageProviderPreference(params: any): string[] | undefined {
-  const explicitBackendId = String(
-    params?.backend_id
-    || params?.image_adf?.engine?.backend_id
-    || '',
-  ).trim();
-  if (explicitBackendId) {
-    const backendTokens = explicitBackendId.split('.').filter(Boolean);
-    const tail = backendTokens[backendTokens.length - 1] || explicitBackendId;
-    if (tail === 'local_flux' || explicitBackendId === 'local_flux') return ['local_flux'];
-    if (tail === 'comfyui' || explicitBackendId === 'media-generation.comfyui') return ['comfyui'];
-    if (tail === 'llm_api') return ['llm_api'];
-  }
-
-  const preference = params?.provider_preference || params?.providerPreference;
-  return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
-}
-
-function preparePromptBasedGeneration(action: string, params: any): PromptGenerationRequest {
-  const compiled =
-    action === 'generate_music' && params.music_adf ? compileMusicGenerationADF(params.music_adf) :
-    action === 'generate_image' && params.image_adf ? compileImageGenerationADF(params.image_adf) :
-    action === 'generate_video' && params.video_adf ? compileVideoGenerationADF(params.video_adf) :
-    null;
-  const workflow = params.workflow || compiled?.workflow;
-  const hasWorkflowPath = Boolean(params.workflow_path);
-  if (!workflow && !hasWorkflowPath) {
-    const message = action === 'generate_music'
-      ? 'generate_music requires either params.workflow or params.music_adf'
-      : action === 'generate_image'
-        ? 'generate_image requires params.workflow, params.workflow_path, or params.image_adf'
-        : action === 'generate_video'
-          ? 'generate_video requires params.workflow, params.workflow_path, or params.video_adf'
-          : `${action} requires params.workflow or params.workflow_path`;
-    throw new Error(message);
-  }
-  return { action, params, compiled, workflow };
-}
-
-async function collectGenerationResult(action: string, params: any, promptId: string, compiled?: any) {
-  const timeoutMs = Number(params.timeout_ms || params.music_adf?.output?.timeout_ms || 15 * 60 * 1000);
-  const pollIntervalMs = Number(params.poll_interval_ms || params.music_adf?.output?.poll_interval_ms || 5_000);
-  const history = await waitForPromptCompletion(promptId, timeoutMs, pollIntervalMs);
-  const artifacts = extractArtifacts(history);
-  const primaryArtifact = artifacts[0];
-  const backend = resolveGenerationBackend(action, params);
-  const copiedTo = primaryArtifact
-    ? maybeCopyArtifact(primaryArtifact.path, params.target_path || params.music_adf?.output?.target_path)
-    : undefined;
-
-  return {
-    status: 'succeeded' as const,
-    action,
-    prompt_id: promptId,
-    artifacts,
-    artifact: primaryArtifact || null,
-    copied_to: copiedTo,
-    compiled_generation_request: compiled?.resolved,
-    backend_id: backend.backend_id,
-    backend_kind: backend.kind,
-    backend_provider: backend.provider,
-  };
-}
 
 async function retryGenerationJob(job: GenerationJob): Promise<GenerationJob> {
   const maxAttempts = Number(job.retry_policy?.max_attempts || 1);
@@ -494,21 +296,22 @@ async function getGenerationJob(params: any) {
   try {
     const jobId = String(params.job_id || '');
     if (!jobId) throw new Error('get_generation_job requires job_id');
-    job = readJob(jobId);
-    if (job.status === 'retrying') {
-      const resumed = await resumeRetriedGenerationJob(job);
+    job = readJob(jobId) as GenerationJob;
+    const currentJob = job;
+    if (currentJob.status === 'retrying') {
+      const resumed = await resumeRetriedGenerationJob(currentJob);
       traceCtx.endSpan('ok');
       return { ...resumed, ...finalizeActuatorTrace(traceCtx) };
     }
-    if (isTerminalStatus(job.status)) {
+    if (isTerminalStatus(currentJob.status)) {
       traceCtx.endSpan('ok');
-      return { ...job, ...finalizeActuatorTrace(traceCtx) };
+      return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const promptId = String(job.provider?.prompt_id || '');
+    const promptId = String(currentJob.provider?.prompt_id || '');
     if (!promptId) {
       traceCtx.endSpan('ok');
-      return { ...job, ...finalizeActuatorTrace(traceCtx) };
+      return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
     const history = await secureFetch({
@@ -516,9 +319,10 @@ async function getGenerationJob(params: any) {
       url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
     });
     if (!history || Object.keys(history).length === 0 || !history[promptId]) {
-      if (job.status !== 'running') {
+      if (currentJob.status !== 'running') {
         const runningJob = {
-          ...job,
+          ...currentJob,
+          kind: currentJob.kind || 'generation-job',
           status: 'running',
           updated_at: nowIso(),
         } as GenerationJob;
@@ -526,15 +330,16 @@ async function getGenerationJob(params: any) {
         return { ...writeJob(runningJob), ...finalizeActuatorTrace(traceCtx) };
       }
       traceCtx.endSpan('ok');
-      return { ...job, ...finalizeActuatorTrace(traceCtx) };
+      return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const result = await collectGenerationResult(job.action, job.request || {}, promptId, { resolved: job.result?.compiled_generation_request });
+    const result = await collectGenerationResult(currentJob.action, currentJob.request || {}, promptId, { resolved: currentJob.result?.compiled_generation_request });
     const succeededJob: GenerationJob = {
-      ...job,
+      ...currentJob,
+      kind: currentJob.kind || 'generation-job',
       status: 'succeeded',
       result: {
-        ...job.result,
+        ...currentJob.result,
         artifact: result.artifact || undefined,
         artifacts: result.artifacts,
         copied_to: result.copied_to,
@@ -552,6 +357,7 @@ async function getGenerationJob(params: any) {
     if (job) {
       const failedJob: GenerationJob = {
         ...job,
+        kind: job.kind || 'generation-job',
         status: 'failed',
         result: {
           ...job.result,
@@ -597,6 +403,7 @@ async function waitGenerationJob(params: any) {
 
     const timedOut = {
       ...readJob(jobId),
+      kind: (readJob(jobId) as GenerationJob).kind || 'generation-job',
       status: 'timed_out',
       updated_at: nowIso(),
       completed_at: nowIso(),

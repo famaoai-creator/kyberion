@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/artifact-bundle.schema.json",
+  "title": "Artifact Bundle",
+  "type": "object",
+  "required": [
+    "bundle_id",
+    "mission_id",
+    "status",
+    "items",
+    "fulfills_outcome_ids",
+    "required_artifact_kinds",
+    "approval",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "bundle_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string" },
+    "track_id": { "type": "string" },
+    "track_name": { "type": "string" },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["assembling", "pending_review", "approved", "rejected", "superseded"]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "kind", "storage_class"],
+        "properties": {
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "storage_class": {
+            "type": "string",
+            "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]
+          },
+          "path": { "type": "string" },
+          "external_ref": { "type": "string" },
+          "fulfills_track_requirement": { "type": "string" },
+          "fulfills_outcome_id": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "fulfills_outcome_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "required_artifact_kinds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "approval": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "reviewer": { "type": "string" },
+        "reviewed_at": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "created_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "enum": ["assembling", "pending_review", "superseded"] }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "approval": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "pending" }
+            },
+            "required": ["status"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "approved" }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "approval": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "approved" }
+            },
+            "required": ["status"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "rejected" }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "approval": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "rejected" }
+            },
+            "required": ["status"]
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

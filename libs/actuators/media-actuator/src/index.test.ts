@@ -1,8 +1,9 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import AdmZip from 'adm-zip';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, safeExistsSync, safeReadFile, safeRmSync, saveProjectRecord, saveServiceBindingRecord } from '@agent/core';
+import { compileSchemaFromPath, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile, saveProjectRecord, saveServiceBindingRecord } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
@@ -19,12 +20,48 @@ vi.mock('tesseract.js', () => ({
 
 import { handleAction } from './index.js';
 
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'");
+}
+
+function extractPptxSlideText(pptxPath: string, slideName: string): string {
+  const buffer = safeReadFile(pptxPath, { encoding: null }) as Buffer;
+  const zip = new AdmZip(buffer);
+  const entry = zip.getEntry(slideName);
+  if (!entry) throw new Error(`Missing PPTX entry: ${slideName}`);
+  const xml = entry.getData().toString('utf8');
+  const texts = [...xml.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)].map((match) => decodeXmlEntities(match[1] || ''));
+  return texts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 describe('media-actuator pdf to pptx bridge', () => {
   let prevPersona: string | undefined;
+  const tenantOverrideRoot = path.resolve(process.cwd(), 'knowledge/confidential/__test/client-a/design');
+  const tenantOverridePath = path.join(tenantOverrideRoot, 'tenant-override.json');
   beforeEach(() => {
     vi.clearAllMocks();
     prevPersona = process.env.KYBERION_PERSONA;
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    safeMkdir(tenantOverrideRoot, { recursive: true });
+    safeWriteFile(tenantOverridePath, JSON.stringify({
+      tenant_id: 'client-a',
+      brand_name: 'Aster Bank',
+      matchers: ['aster bank', 'client-a'],
+      design_system_id: 'client-a',
+      layout_template_id: 'executive-neutral',
+      theme: 'client-a',
+      branding: {
+        brand_name: 'Aster Bank',
+        logo_url: '/vault/tenants/client-a/logo.png',
+        tone: 'corporate',
+      },
+    }, null, 2));
   });
   afterEach(() => {
     if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
@@ -409,6 +446,68 @@ describe('media-actuator pdf to pptx bridge', () => {
 
     expect(result.status).toBe('succeeded');
     expect(safeExistsSync(outputPath)).toBe(true);
+  });
+
+  it('renders the canonical proposal PPTX without leaking placeholder titles', async () => {
+    const outputPath = 'active/shared/tmp/media/canonical-proposal-regression.pptx';
+    if (safeExistsSync(outputPath)) {
+      safeRmSync(outputPath, { force: true });
+    }
+
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        context_path: 'active/shared/tmp/media/canonical-proposal-regression.context.json',
+      },
+      steps: [
+        {
+          type: 'capture',
+          op: 'json_read',
+          params: {
+            path: 'libs/actuators/media-actuator/examples/assets/document-brief-proposal-example.json',
+            export_as: 'proposal_brief',
+          },
+        },
+        {
+          type: 'transform',
+          op: 'document_outline_from_brief',
+          params: {
+            from: 'proposal_brief',
+            export_as: 'document_outline',
+          },
+        },
+        {
+          type: 'transform',
+          op: 'brief_to_design_protocol',
+          params: {
+            from: 'proposal_brief',
+            export_as: 'compiled_design_protocol',
+          },
+        },
+        {
+          type: 'apply',
+          op: 'generate_document',
+          params: {
+            from: 'proposal_brief',
+            brief: '{{proposal_brief}}',
+            profile_id: 'executive-proposal',
+            render_target: 'pptx',
+            output_path: outputPath,
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(safeExistsSync(outputPath)).toBe(true);
+
+    const slide1Text = extractPptxSlideText(outputPath, 'ppt/slides/slide1.xml');
+    const slide2Text = extractPptxSlideText(outputPath, 'ppt/slides/slide2.xml');
+
+    expect(slide1Text).toContain('Digital Onboarding Transformation Proposal');
+    expect(slide1Text).not.toContain('{{title}}');
+    expect(slide2Text).toContain('1. Digital Onboarding Transformation Proposal');
+    expect(slide2Text).not.toContain('executive-proposal —');
   });
 
   it('generates a report binary directly from a unified document request', async () => {

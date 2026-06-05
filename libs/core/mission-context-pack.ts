@@ -9,6 +9,11 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { findRelevantDistilledKnowledge, type DistilledKnowledgeEntry } from './distill-knowledge-injector.js';
+import {
+  findReusableArtifactOwnershipRecord,
+  listArtifactOwnershipRecordsForProject,
+  type ArtifactOwnershipRecord,
+} from './artifact-registry.js';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import {
   loadProjectOperationalState,
@@ -152,6 +157,20 @@ export interface MissionContextPackKnowledgeHint {
   last_updated?: string;
 }
 
+export interface MissionContextPackArtifactHint {
+  artifact_id: string;
+  kind: string;
+  storage_class: ArtifactOwnershipRecord['storage_class'];
+  project_id?: string;
+  mission_id?: string;
+  task_session_id?: string;
+  path?: string;
+  external_ref?: string;
+  created_at?: string;
+  evidence_refs?: string[];
+  reuse_reason: string;
+}
+
 export interface MissionContextPackMissionSummary {
   mission_id: string;
   mission_type?: string;
@@ -248,6 +267,7 @@ export interface MissionContextPack {
   task_session?: MissionContextPackTaskSessionSummary;
   work_item?: MissionContextPackWorkItemSummary;
   knowledge_hints?: MissionContextPackKnowledgeHint[];
+  artifact_hints?: MissionContextPackArtifactHint[];
   sources: MissionContextPackSource[];
   redactions: string[];
   delivery: {
@@ -408,7 +428,7 @@ function missionSources(input: {
     {
       kind: 'mission_state',
       ref: `mission:${input.missionId}`,
-      path: input.missionPath ? path.join(input.missionPath, 'mission-state.json') : missionStatePath(input.missionId, 'public'),
+      path: input.missionPath ? path.join(input.missionPath, 'mission-state.json') : missionStatePath(input.missionId, input.missionTier),
       summary: `Mission state for ${input.missionId}`,
       captured_at: new Date().toISOString(),
     },
@@ -593,6 +613,59 @@ async function loadKnowledgeHintsIfPossible(input: {
   }));
 }
 
+function loadArtifactHintsIfPossible(input: {
+  missionState: MissionStateSummary;
+  projectState?: ProjectOperationalState | null;
+  trackRecord?: ProjectTrackRecord | null;
+  taskSession?: TaskSession | null;
+  workItem?: WorkItem | null;
+}): MissionContextPackArtifactHint[] {
+  const projectId = String(
+    input.projectState?.project_id ||
+    input.missionState.relationships?.project?.project_id ||
+    input.workItem?.project_id ||
+    ''
+  ).trim();
+  if (!projectId) return [];
+
+  const preferredKinds = new Set<string>([
+    input.missionState.outcome_contract?.deliverable_kind,
+    ...(input.trackRecord?.required_artifacts || []),
+    input.taskSession?.artifact?.kind,
+  ].map((value) => String(value || '').trim()).filter(Boolean));
+
+  const reuseCandidates = Array.from(preferredKinds)
+    .map((kind) => findReusableArtifactOwnershipRecord({ projectId, kind }))
+    .filter((record): record is ArtifactOwnershipRecord => Boolean(record));
+
+  const allProjectRecords = listArtifactOwnershipRecordsForProject(projectId, { includeTmp: false });
+  const projectRecords = preferredKinds.size
+    ? allProjectRecords.filter((record) => preferredKinds.has(record.kind))
+    : allProjectRecords;
+  const fallbackRecords = projectRecords.length > 0 ? projectRecords : allProjectRecords;
+
+  const candidates = [...reuseCandidates, ...fallbackRecords]
+    .filter((record, index, all) => all.findIndex((candidate) => candidate.artifact_id === record.artifact_id) === index)
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, 3);
+
+  return candidates.map((record) => ({
+    artifact_id: record.artifact_id,
+    kind: record.kind,
+    storage_class: record.storage_class,
+    ...(record.project_id ? { project_id: record.project_id } : {}),
+    ...(record.mission_id ? { mission_id: record.mission_id } : {}),
+    ...(record.task_session_id ? { task_session_id: record.task_session_id } : {}),
+    ...(record.path ? { path: record.path } : {}),
+    ...(record.external_ref ? { external_ref: record.external_ref } : {}),
+    ...(record.created_at ? { created_at: record.created_at } : {}),
+    ...(record.evidence_refs?.length ? { evidence_refs: [...record.evidence_refs] } : {}),
+    reuse_reason: preferredKinds.has(record.kind)
+      ? 'Reusable project artifact matching the current deliverable or track requirement.'
+      : 'Reusable project artifact candidate for this mission context.',
+  }));
+}
+
 export function buildMissionContextPack(input: BuildMissionContextPackInput): MissionContextPack {
   const missionStateValidate = ensureMissionStateValidator();
   if (!missionStateValidate(input.missionState)) {
@@ -739,6 +812,13 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     missionTeamAssignment: assignment,
     knowledgeHints: input.knowledgeHints,
   });
+  const artifactHints = loadArtifactHintsIfPossible({
+    missionState: input.missionState,
+    projectState: input.projectState,
+    trackRecord: input.trackRecord,
+    taskSession: input.taskSession,
+    workItem: input.workItem,
+  });
 
   const summary = missionContextSummary({
     missionId: input.missionState.mission_id,
@@ -769,6 +849,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(taskSession ? { task_session: taskSession } : {}),
     ...(workItem ? { work_item: workItem } : {}),
     ...(input.knowledgeHints && input.knowledgeHints.length > 0 ? { knowledge_hints: input.knowledgeHints } : {}),
+    ...(artifactHints.length > 0 ? { artifact_hints: artifactHints } : {}),
     sources,
     redactions: defaultRedactions(),
     delivery: {
@@ -909,6 +990,18 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
     for (const hint of pack.knowledge_hints) {
       lines.push(`  - ${hint.title} (${hint.path})`);
       lines.push(`    ${summarizeText(hint.excerpt, 220) || hint.excerpt}`);
+    }
+  }
+
+  if (pack.artifact_hints && pack.artifact_hints.length > 0) {
+    lines.push('- Reusable artifact hints:');
+    for (const hint of pack.artifact_hints) {
+      lines.push(`  - ${hint.artifact_id} | ${hint.kind} | ${hint.storage_class}`);
+      lines.push(`    ${hint.reuse_reason}`);
+      if (hint.path) lines.push(`    path: ${hint.path}`);
+      if (hint.project_id || hint.mission_id || hint.task_session_id) {
+        lines.push(`    lineage: ${[hint.project_id ? `project=${hint.project_id}` : '', hint.mission_id ? `mission=${hint.mission_id}` : '', hint.task_session_id ? `task_session=${hint.task_session_id}` : ''].filter(Boolean).join(', ')}`);
+      }
     }
   }
 
