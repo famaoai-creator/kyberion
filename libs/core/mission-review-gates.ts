@@ -3,6 +3,8 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import type { MissionClass, MissionDeliveryShape, MissionRiskProfile, MissionStage } from './mission-classification.js';
+import type { ArtifactBundle } from './artifact-bundle.js';
+import { checkArtifactBundleFulfillment } from './artifact-bundle.js';
 
 export type MissionReviewMode = 'lean' | 'standard' | 'strict';
 export type ReviewGateVerdict = 'ready' | 'concerns' | 'blocked';
@@ -169,4 +171,36 @@ export function summarizeReviewGateVerdicts(input: {
     throw new Error(`Invalid review gate summary: ${errors}`);
   }
   return summary;
+}
+
+/**
+ * Converts a mission's ArtifactBundle into a ReviewGateResult for the ARTIFACT_BUNDLE gate.
+ * Use this helper when a mission produces a bundle of artifacts that should be approved before finish.
+ */
+export function evaluateArtifactBundleGate(bundle: ArtifactBundle | null | undefined): ReviewGateResult {
+  if (!bundle) {
+    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'No artifact bundle registered for this mission.' };
+  }
+  if (bundle.status === 'assembling') {
+    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'Bundle is still assembling — not all artifacts collected yet.' };
+  }
+  if (bundle.status === 'pending_review') {
+    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'Artifact bundle is awaiting review approval.' };
+  }
+  if (bundle.status === 'rejected') {
+    const note = bundle.approval.note ? `: ${bundle.approval.note}` : '.';
+    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'blocked', reason: `Bundle was rejected${note}` };
+  }
+  if (bundle.status === 'superseded') {
+    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'Bundle has been superseded — a new bundle must be created.' };
+  }
+  const report = checkArtifactBundleFulfillment(bundle);
+  if (!report.fulfilled) {
+    return {
+      gate_id: 'ARTIFACT_BUNDLE',
+      verdict: 'concerns',
+      reason: `Bundle approved but missing required artifact kinds: ${report.missing.join(', ')}.`,
+    };
+  }
+  return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'ready' };
 }

@@ -184,6 +184,27 @@ describe('Mission team composition contract', () => {
     expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.modelId).toBeTruthy();
   });
 
+  it('fills meeting operations roles for facilitation and tracking', () => {
+    const plan = composeMissionTeamPlan({
+      missionId: 'MSN-MEETING-TEAM',
+      missionType: 'meeting_operations',
+      tier: 'public',
+      assignedPersona: 'Meeting Facilitator',
+    });
+
+    const facilitator = plan.assignments.find((entry) => entry.team_role === 'facilitator');
+    const scribe = plan.assignments.find((entry) => entry.team_role === 'scribe');
+    const tracker = plan.assignments.find((entry) => entry.team_role === 'tracker');
+
+    expect(plan.team_governance?.composition.unfilled_required_roles).toEqual([]);
+    expect(facilitator?.status).toBe('assigned');
+    expect(scribe?.status).toBe('assigned');
+    expect(tracker?.status).toBe('assigned');
+    expect(facilitator?.agent_id).toBeTruthy();
+    expect(scribe?.agent_id).toBeTruthy();
+    expect(tracker?.agent_id).toBeTruthy();
+  });
+
   it('returns a specific team assignment by role', () => {
     const missionId = 'MSN-TEAM-STORAGE';
     const plan = composeMissionTeamPlan({
