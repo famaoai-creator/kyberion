@@ -1,4 +1,5 @@
 {
+  "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "m365": {
       "preset_path": "knowledge/product/orchestration/service-presets/m365.json",
