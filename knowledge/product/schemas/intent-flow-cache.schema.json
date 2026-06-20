@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "intent-flow-cache.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 },
+    "ttl_ms": { "type": "integer", "minimum": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "required": ["version", "updated_at", "ttl_ms", "entries"],
+  "$defs": {
+    "cacheKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "normalized_intent_text": { "type": "string", "minLength": 1 },
+        "locale": { "type": "string" },
+        "tier": { "type": "string", "enum": ["public", "confidential"] },
+        "channel": { "type": "string" },
+        "service_bindings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "runtime_context_fingerprint": {
+          "type": "object"
+        },
+        "selected_intent_id": { "type": "string", "minLength": 1 },
+        "selected_confidence_band": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "reasoning_level": { "type": "string", "minLength": 1 },
+        "reasoning_policy_version": { "type": "string", "minLength": 1 },
+        "intent_contract_schema_version": { "type": "string", "minLength": 1 },
+        "recommended_model_id": {
+          "anyOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": [
+        "normalized_intent_text",
+        "locale",
+        "tier",
+        "channel",
+        "service_bindings",
+        "runtime_context_fingerprint",
+        "selected_intent_id",
+        "selected_confidence_band",
+        "reasoning_level",
+        "reasoning_policy_version",
+        "intent_contract_schema_version",
+        "recommended_model_id"
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cache_key_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "cache_key": { "$ref": "#/$defs/cacheKey" },
+        "created_at": { "type": "string", "minLength": 1 },
+        "expires_at": { "type": "string", "minLength": 1 },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source": { "type": "string", "enum": ["llm"] },
+            "executionBrief": { "type": "object" },
+            "intentContract": { "type": "object" },
+            "workLoop": { "type": "object" },
+            "reasoningDecision": { "type": "object" },
+            "shadowModelRoute": { "type": "object" },
+            "routingDecision": { "type": "object" }
+          },
+          "required": [
+            "source",
+            "executionBrief",
+            "intentContract",
+            "workLoop",
+            "reasoningDecision",
+            "shadowModelRoute"
+          ]
+        }
+      },
+      "required": ["cache_key_hash", "cache_key", "created_at", "expires_at", "payload"]
+    }
+  }
+}

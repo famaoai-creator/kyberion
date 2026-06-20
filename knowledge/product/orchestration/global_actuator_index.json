@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
   "t": 28,
-  "u": "2026-05-30T10:01:37.757Z",
+  "u": "2026-06-20T08:50:34.984Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -206,7 +206,7 @@
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
       "version": "1.2.0",
-      "capability_count": 3,
+      "capability_count": 16,
       "contract_schema": "schemas/system-pipeline.schema.json"
     },
     {
@@ -224,7 +224,7 @@
       "d": "Governed deterministic composed-video bundle preparation actuator",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 6
+      "capability_count": 9
     },
     {
       "n": "vision-actuator",
@@ -241,7 +241,7 @@
       "d": "Governed local voice generation actuator with native playback and artifact fallback",
       "s": "implemented",
       "version": "1.2.0",
-      "capability_count": 7,
+      "capability_count": 8,
       "contract_schema": "schemas/voice-action.schema.json"
     },
     {
