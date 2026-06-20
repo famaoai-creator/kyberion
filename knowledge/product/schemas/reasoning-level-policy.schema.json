@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reasoning-level-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "low_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fast_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["low_confidence", "fast_confidence"]
+    },
+    "fast_shapes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["direct_reply", "task_session"]
+      }
+    },
+    "cache_ttl_hours": {
+      "type": "number",
+      "minimum": 1
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    },
+    "shadow_model_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "COGNITIVE_EXPLORATORY": { "type": "string", "minLength": 1 },
+        "COGNITIVE_STANDARD": { "type": "string", "minLength": 1 },
+        "REACTION_FAST": { "type": "string", "minLength": 1 },
+        "REFLEX_DETERMINISTIC": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "required": ["version", "thresholds", "fast_shapes", "rules"],
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": [
+            "simple-greeting-reflex",
+            "high-risk-exploratory",
+            "ambiguous-exploratory",
+            "known-low-risk-fast",
+            "default-standard"
+          ]
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "COGNITIVE_EXPLORATORY",
+            "COGNITIVE_STANDARD",
+            "REACTION_FAST",
+            "REFLEX_DETERMINISTIC"
+          ]
+        }
+      },
+      "required": ["id", "level"]
+    }
+  }
+}

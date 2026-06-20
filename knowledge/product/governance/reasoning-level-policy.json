@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "thresholds": {
+    "low_confidence": 0.65,
+    "fast_confidence": 0.85
+  },
+  "fast_shapes": [
+    "direct_reply",
+    "task_session"
+  ],
+  "cache_ttl_hours": 24,
+  "shadow_model_map": {
+    "COGNITIVE_EXPLORATORY": "openai:gpt-5.4",
+    "COGNITIVE_STANDARD": "openai:gpt-5.4",
+    "REACTION_FAST": "openai:gpt-5.4-mini"
+  },
+  "rules": [
+    {
+      "id": "simple-greeting-reflex",
+      "level": "REFLEX_DETERMINISTIC"
+    },
+    {
+      "id": "high-risk-exploratory",
+      "level": "COGNITIVE_EXPLORATORY"
+    },
+    {
+      "id": "ambiguous-exploratory",
+      "level": "COGNITIVE_EXPLORATORY"
+    },
+    {
+      "id": "known-low-risk-fast",
+      "level": "REACTION_FAST"
+    },
+    {
+      "id": "default-standard",
+      "level": "COGNITIVE_STANDARD"
+    }
+  ]
+}
