@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/inbound-inquiry.schema.json",
+  "title": "InboundInquiry",
+  "type": "object",
+  "required": ["source", "received_at", "lead", "message"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "received_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lead": {
+      "type": "object",
+      "required": ["name", "org", "email"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "org": {
+          "type": "string",
+          "minLength": 1
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

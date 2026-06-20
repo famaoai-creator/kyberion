@@ -9,14 +9,16 @@
   },
   "input": {
     "sources": ["meeting_notes", "client_context", "deck_profile"],
-    "required_params": ["tenant_slug", "audience"]
+    "required_params": ["tenant_slug", "audience"],
+    "optional_params": ["default_slide_count", "proposal_shape", "approval_owner"]
   },
   "first_run": {
     "reasoning_required": true,
     "questions": [
       "デッキの目的は何か",
       "対象読者は誰か",
-      "ブランド適用や修正許容範囲はどうするか"
+      "初期のスライド枚数や提案構成はどうするか",
+      "送付前の承認担当者は誰か"
     ],
     "profile_output": "knowledge/personal/task-profiles/meeting-to-proposal-pptx.json"
   },

@@ -551,8 +551,11 @@ export * from './organization-profile.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
 export * from './provider-capability-scanner.js';
+export * from './approval-gate-summary.js';
 export { enforceApprovalGate } from './approval-gate.js';
 export type { ApprovalGateParams, ApprovalGateResult } from './approval-gate.js';
+export * from './lead-score.js';
+export * from './inbound-inquiry-adapter.js';
 export { RISKY_OPS, isKnownRiskyOp, requireApprovalForOp } from './risky-op-registry.js';
 export type { RequireApprovalParams, RiskyOpId } from './risky-op-registry.js';
 export {

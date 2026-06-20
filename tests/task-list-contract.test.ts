@@ -18,6 +18,7 @@ describe('task list contract', () => {
     expect(scenarios.length).toBeGreaterThan(0);
     expect(scenarios.map((scenario) => scenario.id)).toContain('daily-email-triage');
     expect(scenarios.map((scenario) => scenario.id)).toContain('meeting-to-proposal-pptx');
+    expect(scenarios.map((scenario) => scenario.id)).toContain('weekly-executive-digest');
   });
 
   it('prints a concise repeatable task summary', () => {
@@ -30,7 +31,7 @@ describe('task list contract', () => {
     expect(output).toContain('Available repeatable tasks:');
     expect(output).toContain('daily-email-triage');
     expect(output).toContain('Result: email-triage.md + reply-drafts.json');
-    expect(output).toContain('First run: needs 3 preferences');
+    expect(output).toContain('First run: needs 4 preferences');
     expect(output).toContain('Repeat: schedule 0 8 * * 1-5 (Asia/Tokyo)');
   });
 

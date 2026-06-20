@@ -10,19 +10,26 @@
   "input": {
     "sources": ["gmail"],
     "required_params": ["mailbox", "reply_policy"],
-    "optional_params": ["priority_keywords", "quiet_hours"]
+    "optional_params": [
+      "important_senders",
+      "ignored_senders",
+      "auto_draft_categories",
+      "approval_boundary",
+      "preferred_reply_tone"
+    ]
   },
   "first_run": {
     "reasoning_required": true,
     "questions": [
-      "重要メールとして扱う条件は何か",
-      "返信下書きに含めてよい情報の範囲はどこまでか",
-      "人間承認が必要な送信条件は何か"
+      "重要メールとして扱う送信元や条件は何か",
+      "返信下書きに含めてよいカテゴリや情報の範囲はどこまでか",
+      "送信前に人間承認が必要になる条件は何か",
+      "返信トーンはどの程度まで自動化してよいか"
     ],
     "profile_output": "knowledge/personal/task-profiles/daily-email-triage.json"
   },
   "repeat_run": {
-    "pipeline_template": "knowledge/product/pipeline-templates/email-triage-and-reply-draft.json",
+    "pipeline_template": "knowledge/product/pipeline-templates/email-triage-workflow.json",
     "params_from_profile": true,
     "profile_input": "knowledge/personal/task-profiles/daily-email-triage.json"
   },

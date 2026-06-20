@@ -30,8 +30,8 @@ last_updated: 2026-06-21
 - Repeat-run behavior: 保存済み profile を読み、朝の triage を定型実行する
 - Output artifacts: `email-triage.md`, `reply-drafts.json`
 - Approval boundary: `send_email` は要承認、既定は `draft-only`
-- Existing pipeline-template: `knowledge/product/pipeline-templates/email-triage-and-reply-draft.json`
-- Implementation status: schema/example を追加済み。CLI と runtime profile 保存は次フェーズ
+- Existing pipeline-template: `knowledge/product/pipeline-templates/email-triage-workflow.json`
+- Implementation status: scenario + workflow + CLI profile path を追加済み
 
 ### 2. `meeting-action-items`
 
@@ -55,7 +55,7 @@ last_updated: 2026-06-21
 - Output artifacts: `proposal-deck.pptx`, `deck-brief.json`
 - Approval boundary: 顧客送付前の編集、外部共有、最終送信は要承認
 - Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-to-pptx-workflow.json`
-- Implementation status: workflow は既存。TaskScenario レイヤーのラップが必要
+- Implementation status: TaskScenario contract を追加済み
 
 ### 4. `sales-inbound-response`
 
@@ -78,8 +78,8 @@ last_updated: 2026-06-21
 - Repeat-run behavior: 毎週月曜に profile ベースで要約を生成し、同じフォーマットで配信準備する
 - Output artifacts: `weekly-digest.md`, `digest-brief.json`
 - Approval boundary: 配信前の公開範囲確認は要承認、既定は `notify-only`
-- Existing pipeline-template: まだ専用テンプレートなし
-- Implementation status: roadmap 先行、pipeline-template は次フェーズ
+- Existing pipeline-template: `knowledge/product/pipeline-templates/weekly-executive-digest.json`
+- Implementation status: scenario + workflow MVP を追加済み
 
 ## 次の実装順
 

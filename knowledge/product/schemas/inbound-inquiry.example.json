@@ -1,0 +1,14 @@
+{
+  "source": "web_form",
+  "received_at": "2026-06-21T09:00:00+09:00",
+  "lead": {
+    "name": "山田太郎",
+    "org": "Example株式会社",
+    "email": "taro@example.com"
+  },
+  "message": "社内の承認業務を自動化したいです。",
+  "metadata": {
+    "page": "/contact",
+    "utm_source": "google"
+  }
+}

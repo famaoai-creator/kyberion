@@ -30,7 +30,7 @@ describe('task run contract', () => {
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('TaskScenario: daily-email-triage');
-    expect(output).toContain('Pipeline template: knowledge/product/pipeline-templates/email-triage-and-reply-draft.json');
+    expect(output).toContain('Pipeline template: knowledge/product/pipeline-templates/email-triage-workflow.json');
     expect(output).toContain(`Profile: ${PROFILE_PATH}`);
     expect(output).toContain('Profile loaded: yes');
     expect(output).toContain('Expected artifacts:');
