@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/cognitive-routing-decision.schema.json",
+  "title": "Cognitive Routing Decision",
+  "type": "object",
+  "required": [
+    "tier",
+    "backend_preference",
+    "deterministic_eligible",
+    "risk",
+    "uncertainty",
+    "reason"
+  ],
+  "properties": {
+    "tier": {
+      "type": "string",
+      "enum": ["zero_llm", "fast_llm", "heavy_reasoning"]
+    },
+    "backend_preference": {
+      "type": "string",
+      "enum": ["deterministic_pipeline", "fast_reasoning", "heavy_reasoning"]
+    },
+    "deterministic_eligible": {
+      "type": "boolean"
+    },
+    "risk": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "uncertainty": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mission_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "item_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "team_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recipient_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt_length": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}

@@ -15,9 +15,16 @@ import {
   safeExistsSync,
   listWorkItems,
   updateWorkItem,
+  buildCognitiveRouteDecision,
+  formatCognitiveRouteDecision,
+  advanceReasoningDriftWatchdog,
+  encodeReasoningDriftWatchdogState,
+  hydrateReasoningDriftWatchdogState,
+  formatReasoningDriftWatchdogDecision,
   renderMissionContextPack,
   resolveMissionContextPack,
   saveMissionContextPack,
+  type CognitiveRouteDecision,
   type A2AMessage,
   type WorkItem,
   type WorkItemSource,
@@ -34,9 +41,10 @@ import {
   appendDispatchEvent,
   writeDispatchArtifact,
 } from './mission-dispatch-lifecycle.js';
+import { recordTask } from './mission-maintenance.js';
 
 export type MissionWorkItemDispatchMode = 'auto' | 'agent' | 'subagent';
-export type MissionWorkItemDispatchFinalStatus = 'review' | 'done';
+export type MissionWorkItemDispatchFinalStatus = 'review' | 'done' | 'blocked';
 
 export interface MissionWorkItemDispatchOptions {
   mode?: MissionWorkItemDispatchMode;
@@ -59,11 +67,15 @@ export interface MissionWorkItemDispatchRecord {
   work_item_status_after?: WorkItemStatus;
   response_path?: string;
   response_excerpt?: string;
+  cognitive_route?: CognitiveRouteDecision;
+  cognitive_route_summary?: string;
   reflection_status?: 'done' | 'review' | 'blocked';
   reflection_path?: string;
   reflection_excerpt?: string;
   reflected_at?: string;
   ticket_state_after?: string;
+  drift_watchdog?: Record<string, unknown>;
+  drift_watchdog_summary?: string;
   notes: string[];
 }
 
@@ -199,6 +211,8 @@ function buildTicketReflectionBody(input: {
   assigneePeerId?: string;
   contextPackId?: string;
   contextPackPath?: string;
+  cognitiveRouteSummary?: string;
+  driftWatchdogSummary?: string;
   ticketState: 'done' | 'review' | 'blocked';
   responseText: string;
   responsePath: string;
@@ -212,6 +226,8 @@ function buildTicketReflectionBody(input: {
     input.assigneePeerId ? `Assignee agent: ${input.assigneePeerId}` : '',
     input.contextPackId ? `Context pack: ${input.contextPackId}` : '',
     input.contextPackPath ? `Context pack path: ${input.contextPackPath}` : '',
+    input.cognitiveRouteSummary ? `Cognitive route: ${input.cognitiveRouteSummary}` : '',
+    input.driftWatchdogSummary ? `Drift watchdog: ${input.driftWatchdogSummary}` : '',
     `Result state: ${input.ticketState}`,
     `Response path: ${input.responsePath}`,
     '',
@@ -270,6 +286,8 @@ async function reflectTicketOutcome(input: {
   assigneePeerId?: string;
   contextPackId?: string;
   contextPackPath?: string;
+  cognitiveRoute?: CognitiveRouteDecision;
+  driftWatchdogSummary?: string;
   finalStatus: MissionWorkItemDispatchFinalStatus;
   responseText: string;
   responsePath: string;
@@ -293,6 +311,7 @@ async function reflectTicketOutcome(input: {
   const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(ticketManifestPath(input.missionPath));
   const manifestRecord = manifest?.records?.find((record) => String(record.task_id || '') === taskId);
   const liveResults = (manifestRecord?.live_results as Record<string, unknown> | undefined) || {};
+  const cognitiveRouteSummary = input.cognitiveRoute ? formatCognitiveRouteDecision(input.cognitiveRoute) : undefined;
   const reflectionBody = buildTicketReflectionBody({
     missionId: input.missionId,
     item: input.item,
@@ -300,12 +319,14 @@ async function reflectTicketOutcome(input: {
     assigneePeerId: input.assigneePeerId,
     contextPackId: input.contextPackId,
     contextPackPath: input.contextPackPath,
+    cognitiveRouteSummary,
+    driftWatchdogSummary: input.driftWatchdogSummary,
     ticketState,
     responseText: input.responseText,
-      responsePath: input.responsePath,
-      responseExcerpt: input.responseExcerpt,
-      notes,
-    });
+    responsePath: input.responsePath,
+    responseExcerpt: input.responseExcerpt,
+    notes,
+  });
   const reflectionPayload = {
     mission_id: input.missionId,
     task_id: taskId,
@@ -314,6 +335,9 @@ async function reflectTicketOutcome(input: {
     assignee_peer_id: input.assigneePeerId,
     context_pack_id: input.contextPackId,
     context_pack_path: input.contextPackPath,
+    cognitive_route: input.cognitiveRoute,
+    cognitive_route_summary: cognitiveRouteSummary,
+    drift_watchdog_summary: input.driftWatchdogSummary,
     execution_mode: input.executionMode,
     ticket_state: ticketState,
     response_path: input.responsePath,
@@ -333,19 +357,21 @@ async function reflectTicketOutcome(input: {
     record.notes = Array.from(new Set([...(Array.isArray(record.notes) ? record.notes as string[] : []), ...notes]));
   }, ticketState);
 
-    updateNextTasksReflection(input.missionPath, taskId, {
-      reflected_at: new Date().toISOString(),
-      ticket_state: ticketState,
-      ticket_reply_path: reflectionPath,
-      response_path: input.responsePath,
-      response_excerpt: input.responseExcerpt,
-      context_pack_id: input.contextPackId,
-      context_pack_path: input.contextPackPath,
-      result_status: ticketState,
-      review_required: ticketState === 'review',
-      blocked: ticketState === 'blocked',
-      work_item_status_after: input.finalStatus,
-    });
+  updateNextTasksReflection(input.missionPath, taskId, {
+    reflected_at: new Date().toISOString(),
+    ticket_state: ticketState,
+    ticket_reply_path: reflectionPath,
+    response_path: input.responsePath,
+    response_excerpt: input.responseExcerpt,
+    context_pack_id: input.contextPackId,
+    context_pack_path: input.contextPackPath,
+    cognitive_route: cognitiveRouteSummary,
+    drift_watchdog_summary: input.driftWatchdogSummary,
+    result_status: ticketState,
+    review_required: ticketState === 'review',
+    blocked: ticketState === 'blocked',
+    work_item_status_after: input.finalStatus,
+  });
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
   if (safeExistsSync(githubPath)) {
@@ -366,6 +392,8 @@ async function reflectTicketOutcome(input: {
         reflected_at: new Date().toISOString(),
         response_path: input.responsePath,
         response_excerpt: input.responseExcerpt,
+        cognitive_route: cognitiveRouteSummary,
+        drift_watchdog_summary: input.driftWatchdogSummary,
       };
       writeJsonFileFromDispatchIO(githubPath, githubIssue);
 
@@ -416,6 +444,8 @@ async function reflectTicketOutcome(input: {
         reflected_at: new Date().toISOString(),
         response_path: input.responsePath,
         response_excerpt: input.responseExcerpt,
+        cognitive_route: cognitiveRouteSummary,
+        drift_watchdog_summary: input.driftWatchdogSummary,
       };
       writeJsonFileFromDispatchIO(jiraPath, jiraIssue);
 
@@ -525,6 +555,9 @@ function buildDispatchResponseArtifact(input: {
   assigneePeerId?: string;
   contextPackId?: string;
   contextPackPath?: string;
+  cognitiveRoute?: CognitiveRouteDecision;
+  cognitiveRouteSummary?: string;
+  driftWatchdogSummary?: string;
   executionMode: MissionWorkItemDispatchMode | 'agent' | 'subagent';
   responseText: string;
   prompt: string;
@@ -537,6 +570,9 @@ function buildDispatchResponseArtifact(input: {
     assignee_peer_id: input.assigneePeerId,
     context_pack_id: input.contextPackId,
     context_pack_path: input.contextPackPath,
+    cognitive_route: input.cognitiveRoute,
+    cognitive_route_summary: input.cognitiveRouteSummary,
+    drift_watchdog_summary: input.driftWatchdogSummary,
     execution_mode: input.executionMode,
     prompt: input.prompt,
     response_text: input.responseText,
@@ -546,17 +582,53 @@ function buildDispatchResponseArtifact(input: {
   return { filePath, payload };
 }
 
+function evaluateWorkItemDrift(input: {
+  missionId: string;
+  item: WorkItem;
+  prompt: string;
+  responseText: string;
+  cognitiveRouteSummary: string;
+  executionMode: MissionWorkItemDispatchMode | 'agent' | 'subagent';
+  ticketState: MissionWorkItemDispatchFinalStatus;
+}): {
+  shouldStop: boolean;
+  decisionSummary: string;
+  stateUpdates: Record<string, unknown>;
+  decision: ReturnType<typeof advanceReasoningDriftWatchdog>;
+} {
+  const metadata = (input.item.metadata || {}) as Record<string, unknown>;
+  const priorState = hydrateReasoningDriftWatchdogState(metadata);
+  const decision = advanceReasoningDriftWatchdog(priorState, {
+    mission_id: input.missionId,
+    item_id: input.item.item_id,
+    prompt: input.prompt,
+    response_text: input.responseText,
+    cognitive_route_summary: input.cognitiveRouteSummary,
+    execution_mode: input.executionMode,
+    ticket_state: input.ticketState,
+    notes: Array.isArray(metadata.drift_watchdog_last_notes) ? (metadata.drift_watchdog_last_notes as string[]) : undefined,
+  });
+  return {
+    shouldStop: decision.should_stop,
+    decisionSummary: formatReasoningDriftWatchdogDecision(decision),
+    stateUpdates: encodeReasoningDriftWatchdogState(decision.state),
+    decision,
+  };
+}
+
 function buildWorkItemPromptBody(input: {
   missionId: string;
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
+  cognitiveRouteSummary?: string;
 }): string {
   const metadata = (input.item.metadata || {}) as Record<string, unknown>;
   const lines = [
     `Execute work item ${input.item.item_id} for mission ${input.missionId}.`,
     input.teamRole ? `Assigned team role: ${input.teamRole}` : '',
     input.assigneePeerId ? `Assigned agent: ${input.assigneePeerId}` : '',
+    input.cognitiveRouteSummary ? `Cognitive route: ${input.cognitiveRouteSummary}` : '',
     `Title: ${input.item.title}`,
     `Description: ${input.item.description}`,
     metadata.deliverable ? `Deliverable: ${String(metadata.deliverable)}` : '',
@@ -575,7 +647,14 @@ async function buildWorkItemDispatchContext(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
-}): Promise<{ prompt: string; contextPackId: string; contextPackPath: string }> {
+}): Promise<{
+  prompt: string;
+  contextPackId: string;
+  contextPackPath: string;
+  contextPackSummary: string;
+  contextPackPruningSummary?: Record<string, unknown>;
+  cognitiveRoute: CognitiveRouteDecision;
+}> {
   const contextPack = await resolveMissionContextPack({
     missionId: input.missionId,
     tier: input.missionState.tier,
@@ -593,7 +672,31 @@ async function buildWorkItemDispatchContext(input: {
     throw new Error(`Unable to resolve mission context pack for ${input.missionId}`);
   }
   const contextPackPath = saveMissionContextPack(input.missionPath, contextPack);
+  const cognitiveRoute = buildCognitiveRouteDecision({
+    mission_id: input.missionId,
+    mission_type: input.missionState.mission_type,
+    tenant_slug: input.missionState.tenant_slug,
+    assigned_persona: input.missionState.assigned_persona,
+    status: input.missionState.status,
+    team_role: input.teamRole,
+    recipient_kind: contextPack.recipient.kind,
+    item_id: input.item.item_id,
+    title: input.item.title,
+    description: input.item.description,
+    labels: input.item.labels,
+    metadata: input.item.metadata as Record<string, unknown> | undefined,
+    prompt: buildWorkItemPromptBody({
+      missionId: input.missionId,
+      item: input.item,
+      teamRole: input.teamRole,
+      assigneePeerId: input.assigneePeerId,
+    }),
+    context_pack_id: contextPack.context_pack_id,
+    context_pack_path: contextPackPath,
+  });
   const prompt = [
+    `Cognitive route: ${formatCognitiveRouteDecision(cognitiveRoute)}`,
+    '',
     renderMissionContextPack(contextPack),
     '',
     buildWorkItemPromptBody({
@@ -607,6 +710,11 @@ async function buildWorkItemDispatchContext(input: {
     prompt,
     contextPackId: contextPack.context_pack_id,
     contextPackPath,
+    contextPackSummary: contextPack.summary,
+    contextPackPruningSummary: contextPack.pruning
+      ? (contextPack.pruning as unknown as Record<string, unknown>)
+      : undefined,
+    cognitiveRoute,
   };
 }
 
@@ -756,8 +864,35 @@ export async function dispatchMissionWorkItems(
       mode,
       adapters,
     });
+    const cognitiveRouteSummary = formatCognitiveRouteDecision(dispatchContext.cognitiveRoute);
+    const driftWatchdog = evaluateWorkItemDrift({
+      missionId,
+      item,
+      prompt: dispatchContext.prompt,
+      responseText: response.responseText,
+      cognitiveRouteSummary,
+      executionMode: response.executionMode,
+      ticketState: finalStatus,
+    });
+    const effectiveFinalStatus = driftWatchdog.shouldStop ? 'blocked' : finalStatus;
     record.execution_mode = response.executionMode;
     record.notes.push(...response.notes);
+    if (driftWatchdog.shouldStop) {
+      record.notes.push(driftWatchdog.decision.reason);
+      record.notes.push('needs_attention');
+    }
+    record.cognitive_route = dispatchContext.cognitiveRoute;
+    record.cognitive_route_summary = cognitiveRouteSummary;
+    record.drift_watchdog = {
+      ...driftWatchdog.stateUpdates,
+      should_stop: driftWatchdog.shouldStop,
+      needs_attention: driftWatchdog.decision.needs_attention,
+      budget_exceeded: driftWatchdog.decision.budget_exceeded,
+      repeated_signature: driftWatchdog.decision.repeated_signature,
+      signature: driftWatchdog.decision.signature,
+      reason: driftWatchdog.decision.reason,
+    };
+    record.drift_watchdog_summary = driftWatchdog.decisionSummary;
 
     const artifact = buildDispatchResponseArtifact({
       missionPath,
@@ -767,6 +902,9 @@ export async function dispatchMissionWorkItems(
       assigneePeerId,
       contextPackId: dispatchContext.contextPackId,
       contextPackPath: dispatchContext.contextPackPath,
+      cognitiveRoute: dispatchContext.cognitiveRoute,
+      cognitiveRouteSummary,
+      driftWatchdogSummary: driftWatchdog.decisionSummary,
       executionMode: response.executionMode,
       responseText: response.responseText,
       prompt: dispatchContext.prompt,
@@ -779,7 +917,7 @@ export async function dispatchMissionWorkItems(
 
     updateWorkItem({
       itemId: item.item_id,
-      status: finalStatus,
+      status: effectiveFinalStatus,
       assigneePeerId: assigneePeerId || item.assignee_peer_id,
       metadata: {
         ...(item.metadata || {}),
@@ -790,6 +928,12 @@ export async function dispatchMissionWorkItems(
         last_dispatch_response_excerpt: record.response_excerpt,
         last_context_pack_id: dispatchContext.contextPackId,
         last_context_pack_path: dispatchContext.contextPackPath,
+        last_cognitive_route_tier: dispatchContext.cognitiveRoute.tier,
+        last_cognitive_route_reason: dispatchContext.cognitiveRoute.reason,
+        last_cognitive_route_summary: cognitiveRouteSummary,
+        ...driftWatchdog.stateUpdates,
+        last_drift_watchdog_summary: driftWatchdog.decisionSummary,
+        last_drift_watchdog_reason: driftWatchdog.decision.reason,
       },
     });
 
@@ -801,7 +945,9 @@ export async function dispatchMissionWorkItems(
       assigneePeerId,
       contextPackId: dispatchContext.contextPackId,
       contextPackPath: dispatchContext.contextPackPath,
-      finalStatus,
+      cognitiveRoute: dispatchContext.cognitiveRoute,
+      driftWatchdogSummary: driftWatchdog.decisionSummary,
+      finalStatus: effectiveFinalStatus,
       responseText: response.responseText,
       responsePath: artifact.filePath,
       responseExcerpt: record.response_excerpt || response.responseText.slice(0, 400),
@@ -825,14 +971,39 @@ export async function dispatchMissionWorkItems(
       assignee_peer_id: assigneePeerId,
       execution_mode: response.executionMode,
       response_path: artifact.filePath,
-      status_after: finalStatus,
+      status_after: effectiveFinalStatus,
       ticket_state_after: reflection.ticketState,
       ticket_reflection_path: reflection.reflectionPath || undefined,
       context_pack_id: dispatchContext.contextPackId,
       context_pack_path: dispatchContext.contextPackPath,
+      cognitive_route: dispatchContext.cognitiveRoute,
+      cognitive_route_summary: cognitiveRouteSummary,
+      drift_watchdog: record.drift_watchdog,
+      drift_watchdog_summary: driftWatchdog.decisionSummary,
     });
+    await recordTask(
+      missionId,
+      `Dispatched work item ${item.item_id}`,
+      {
+        next_step: effectiveFinalStatus === 'blocked'
+          ? 'resolve the blocker before continuing'
+          : 'await the dispatched response and continue reconciliation',
+        work_item_id: item.item_id,
+        team_role: teamRole,
+        assignee_peer_id: assigneePeerId,
+        execution_mode: response.executionMode,
+        context_pack_id: dispatchContext.contextPackId,
+        context_pack_path: dispatchContext.contextPackPath,
+        context_pack_summary: dispatchContext.contextPackSummary,
+        context_pack_pruning_summary: dispatchContext.contextPackPruningSummary,
+        cognitive_route_summary: cognitiveRouteSummary,
+        drift_watchdog_summary: driftWatchdog.decisionSummary,
+        ticket_state_after: reflection.ticketState,
+        response_path: artifact.filePath,
+      },
+    );
     record.status = 'updated';
-    record.work_item_status_after = finalStatus;
+    record.work_item_status_after = effectiveFinalStatus;
     records.push(record);
   }
 

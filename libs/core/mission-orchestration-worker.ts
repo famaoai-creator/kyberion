@@ -156,6 +156,20 @@ function runMissionController(env: NodeJS.ProcessEnv, args: string[]) {
   );
 }
 
+function recordMissionContextTask(
+  missionId: string,
+  description: string,
+  details: Record<string, unknown>,
+): void {
+  const env = buildExecutionEnv(process.env, 'mission_controller');
+  runMissionController(env, [
+    'record-task',
+    missionId,
+    description,
+    JSON.stringify(details),
+  ]);
+}
+
 function syncPlanningArtifacts(missionId: string): void {
   const missionPath = missionDir(missionId, 'public');
   const planPath = `${missionPath}/PLAN.md`;
