@@ -30,7 +30,7 @@ This document provides a comprehensive bilingual catalog of all external service
 | **`telegram`** | Messaging | `TELEGRAM_TOKEN` | Telegram Bot API messaging, channel post, and incoming updates retrieve. | Telegram Bot API を介したチャットメッセージ送受信、チャンネル投稿。 |
 | **`notion`** | Workspace | `NOTION_API_KEY` | Notion database CRUD, page creation, and knowledge base syncing. | Notion データベース操作、Wiki ページの自動起票、ナレッジ同期。 |
 | **`confluence`** | Workspace | `CONFLUENCE_DOMAIN`, `CONFLUENCE_TOKEN` | Confluence wiki page authoring, design spec syncing, and knowledge retrieval. | Confluence Wiki ページの自動作成、仕様書や設計情報のドキュメント同期。 |
-| **`google-workspace`** | Workspace | OAuth Credentials (`client_id`, `client_secret`) | Google Docs, Drive, Sheets, and Slides operations via API/CLI. | Google ドキュメント、スプレッドシート、スライド等の CLI/API 連携。 |
+| **`google-workspace`** | Workspace | OAuth Credentials (`client_id`, `client_secret`) | Google Docs, Drive, Sheets, Slides, Gmail, Calendar, and Meet operations via API/CLI. | Google ドキュメント、スプレッドシート、スライド、Gmail、Calendar、Meet の CLI/API 連携。 |
 | **`media-generation`** | AI / Creative | Cloud API Keys (e.g. `OPENAI_API_KEY`) | Generative image (DALL-E), music (Suno/Udio), and video assets. | 生成AIを利用したクリエイティブ画像、音楽、動画アセットの自律生成。 |
 | **`voice`** | AI / Creative | Voice learning profiles (`user-cloned` etc.) | Cloned voice synthesis, natural text-to-speech, and audio rendering. | クローン音声プロファイルによる自然な音声合成、ナレーション制作。 |
 | **`whisper`** | AI / Creative | API Keys or Local model configs | OpenAI Whisper speech-to-text audio transcription. | 音声ファイルのテキスト書き出し（Speech-to-Text）および要約連携。 |

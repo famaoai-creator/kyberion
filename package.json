@@ -77,6 +77,7 @@
     "export:validation-bundle": "node dist/scripts/export_validation_bundle.js",
     "meeting:run": "node dist/scripts/meeting_orchestrator.js",
     "meeting:participate": "node dist/scripts/meeting_participate.js",
+    "gws:meet:create": "pnpm tsx scripts/google_workspace_meet.ts",
     "env:bootstrap": "node dist/scripts/bootstrap_environment.js",
     "prereq:check": "node dist/scripts/bootstrap_environment.js --manifest kyberion-toolchain",
     "meeting:consent": "node dist/scripts/voice_consent.js",

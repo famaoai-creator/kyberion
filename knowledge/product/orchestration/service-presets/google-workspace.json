@@ -144,6 +144,60 @@
         "params": { "required": true, "type": "object" },
         "body": { "required": true, "type": "object" }
       }
+    },
+    "meet_spaces_create": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["meet", "spaces", "create", "--json", "{{params}}"],
+      "description": "Create a Google Meet space using the authenticated Google account.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "meet_spaces_get": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["meet", "spaces", "get", "--params", "{{params}}"],
+      "description": "Fetch a Google Meet space by name or resource identifier.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "meet_spaces_patch": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["meet", "spaces", "patch", "--params", "{{params}}", "--json", "{{params}}"],
+      "description": "Update a Google Meet space using the authenticated Google account.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "meet_spaces_end_active_conference": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["meet", "spaces", "endActiveConference", "--params", "{{params}}"],
+      "description": "End the active conference attached to a Google Meet space.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "meet_conference_records_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["meet", "conferenceRecords", "list", "--params", "{{params}}"],
+      "description": "List Google Meet conference records.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "meet_conference_records_get": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["meet", "conferenceRecords", "get", "--params", "{{params}}"],
+      "description": "Fetch a Google Meet conference record by name.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
     }
   }
 }
