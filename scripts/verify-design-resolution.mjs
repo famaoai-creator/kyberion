@@ -7,8 +7,8 @@ import { readFileSync } from 'fs';
 import { resolve, join } from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const rootDir = resolve(__dirname, '..');
+const moduleDir = fileURLToPath(new URL('.', import.meta.url));
+const rootDir = resolve(moduleDir, '..');
 
 function safeRead(p) {
   return JSON.parse(readFileSync(resolve(rootDir, p), 'utf8'));
