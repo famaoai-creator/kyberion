@@ -115,6 +115,10 @@
       "types": "./dist/email-workflow.d.ts",
       "default": "./dist/email-workflow.js"
     },
+    "./calendar-workflow": {
+      "types": "./dist/calendar-workflow.d.ts",
+      "default": "./dist/calendar-workflow.js"
+    },
     "./fs-utils": {
       "types": "./dist/fs-utils.d.ts",
       "default": "./dist/fs-utils.js"

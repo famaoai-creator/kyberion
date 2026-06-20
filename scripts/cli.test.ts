@@ -109,9 +109,31 @@ describe('Kyberion CLI helpers', () => {
     await main(['help']);
 
     const output = logSpy.mock.calls.flat().join('\n');
-    expect(output).toContain('email <status|draft|latest-draft|deliver>');
+    expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
     expect(output).toContain('npm run cli -- email status');
     expect(output).toContain('npm run cli -- email draft');
+    expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
+    expect(output).toContain('npm run cli -- calendar status');
+  });
+
+  it('includes the inbox archive example in email help output', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['email', 'help']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
+    expect(output).toContain('npm run cli -- email archive-inbox --apply');
+  });
+
+  it('includes the calendar workflow command in help output', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['calendar', 'help']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
+    expect(output).toContain('npm run cli -- calendar create-event --summary "Planning"');
   });
 
   it('allows only approved packet commands', () => {

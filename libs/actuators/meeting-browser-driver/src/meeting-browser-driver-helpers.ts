@@ -75,10 +75,30 @@ async function trySelectors(
   return false;
 }
 
+async function waitForAnyVisibleSelector(
+  page: { isVisible: (selector: string) => Promise<boolean> },
+  selectors: string[],
+  opts: { timeoutMs: number; pollMs?: number },
+): Promise<string | null> {
+  const pollMs = opts.pollMs ?? 500;
+  const deadline = Date.now() + opts.timeoutMs;
+  while (Date.now() < deadline) {
+    for (const sel of selectors) {
+      try {
+        if (await page.isVisible(sel).catch(() => false)) return sel;
+      } catch {
+        /* try next */
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+  return null;
+}
+
 export {
   buildRetryOptions,
   loadPlaywright,
   trySelectors,
+  waitForAnyVisibleSelector,
   DEFAULT_MEETING_BROWSER_RETRY,
 };
-

@@ -34,12 +34,14 @@ This workflow is split into two surfaces:
 2. Generate a reply draft with `pnpm cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md`.
 3. Inspect the latest stored draft with `pnpm cli -- email latest-draft`.
 4. Create a Gmail draft or send an approved message with `pnpm cli -- email deliver ...`.
+5. If you want to archive repeated unread inbox senders, run `pnpm cli -- email archive-inbox --apply` after reviewing the preview output.
 
 ## 4. What It Helps With
 - Summarizing unread mail into one place
 - Creating a reply draft from the triage output
 - Creating a Gmail draft or sending after explicit approval
 - Keeping the reply draft next to the triage output
+- Creating inbox archive filters from repeated unread senders
 - Reducing context switching between inbox review and response writing
 
 ## 5. Notes

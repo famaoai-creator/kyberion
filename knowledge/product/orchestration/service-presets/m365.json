@@ -1,0 +1,55 @@
+{
+  "service_id": "m365",
+  "name": "Microsoft 365 CLI Presets",
+  "auth_strategy": "none",
+  "allow_unsafe_cli": true,
+  "setup_hint": "Install CLI for Microsoft 365, run m365 status, and authenticate in the CLI.",
+  "operations": {
+    "auth_status": {
+      "type": "cli",
+      "command": "m365",
+      "args": ["status", "--output", "json"],
+      "description": "Check whether the Microsoft 365 CLI is authenticated."
+    },
+    "calendar_list": {
+      "type": "cli",
+      "command": "m365",
+      "args": ["request", "--url", "@graph/me/calendars", "--output", "json"],
+      "description": "List the signed-in user's calendars."
+    },
+    "calendar_events_list": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--url",
+        "@graph/{{calendarPath}}/calendarView?startDateTime={{timeMin}}&endDateTime={{timeMax}}",
+        "--output",
+        "json"
+      ],
+      "description": "List calendar events for the requested window."
+    },
+    "calendar_freebusy_query": {
+      "type": "cli",
+      "command": "m365",
+      "args": ["request", "--method", "post", "--url", "@graph/me/calendar/getSchedule", "--body", "{{body}}", "--output", "json"],
+      "description": "Query free/busy windows for one or more calendars."
+    },
+    "calendar_events_insert": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/{{calendarPath}}/events",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Create a Microsoft 365 calendar event."
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "google-meet-join-self-contained",
+  "version": "2.0.0",
+  "description": "Self-contained wrapper that primes a browser session and then drives a Google Meet page until the join button is pressed. Requires meeting_url and optional display_name from the caller.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used no roles.",
+  "context": {
+    "meeting_url": "{{meeting_url}}",
+    "display_name": "{{display_name}}"
+  },
+  "steps": [
+    {
+      "id": "prime_browser_session",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/browser-session-start.json"
+      }
+    },
+    {
+      "id": "meet_join_flow",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/google-meet-join-button.json",
+        "context": {
+          "meeting_url": "{{meeting_url}}",
+          "display_name": "{{display_name}}"
+        }
+      }
+    }
+  ]
+}

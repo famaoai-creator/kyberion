@@ -54,6 +54,11 @@
       "preset_path": "knowledge/product/orchestration/service-presets/google-workspace.json",
       "allow_unsafe_cli": true
     },
+    "m365": {
+      "preset_path": "knowledge/product/orchestration/service-presets/m365.json",
+      "allow_unsafe_cli": true,
+      "intent_aliases": ["outlook_calendar"]
+    },
     "jira": {
       "base_url": "https://atlassian.net/rest/api/3",
       "preset_path": "knowledge/product/orchestration/service-presets/jira.json"

@@ -105,6 +105,7 @@ export * from './schema-loader.js';
 export * from './operator-learning.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
+export * from './calendar-workflow.js';
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';

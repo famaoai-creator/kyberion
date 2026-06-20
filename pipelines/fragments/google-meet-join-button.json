@@ -1,0 +1,41 @@
+{
+  "name": "google-meet-join-button",
+  "version": "2.0.0",
+  "description": "Fragment for opening a Google Meet page, filling the guest display name when present, and clicking through to the join button.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used no roles.",
+  "steps": [
+    {
+      "id": "open_meet",
+      "role": "sink",
+      "op": "browser:goto",
+      "params": {
+        "url": "{{meeting_url}}"
+      }
+    },
+    {
+      "id": "fill_display_name",
+      "role": "sink",
+      "op": "browser:fill_ref",
+      "params": {
+        "selector": "input[jsname=\"YPqjbf\"], input[aria-label=\"Your name\"], input[placeholder=\"Your name\"], input[aria-label=\"お名前を入力\"], input[placeholder=\"お名前を入力\"]",
+        "value": "{{display_name}}"
+      }
+    },
+    {
+      "id": "continue_without_audio_video",
+      "role": "sink",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "button:has-text(\"Continue without microphone and camera\"), button:has-text(\"Continue without audio and video\"), button:has-text(\"マイクとカメラをオフにして参加\"), button:has-text(\"マイクとカメラなしで続行\"), [role=\"button\"]:has-text(\"Continue without microphone and camera\")"
+      }
+    },
+    {
+      "id": "click_join_button",
+      "role": "sink",
+      "op": "browser:click_ref",
+      "params": {
+        "selector": "button:has-text(\"Ask to join\"), button:has-text(\"Join now\"), button:has-text(\"参加をリクエスト\"), button:has-text(\"今すぐ参加\"), button[jsname=\"Qx7uuf\"]"
+      }
+    }
+  ]
+}
