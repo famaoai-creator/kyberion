@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createVirtualInputDeviceInventoryBridge, VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID } from './virtual-input-device-inventory-bridge.js';
 
 function makeCommandRunner() {
@@ -21,6 +21,22 @@ function makeCommandRunner() {
 }
 
 describe('createVirtualInputDeviceInventoryBridge', () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform,
+    });
+  });
+
   it('scans keyboard and mouse candidates from hidutil', async () => {
     const bridge = createVirtualInputDeviceInventoryBridge({
       command_runner: makeCommandRunner(),

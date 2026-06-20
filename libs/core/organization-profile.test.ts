@@ -11,9 +11,8 @@ describe('organization-profile', () => {
   const originalCustomer = process.env.KYBERION_CUSTOMER;
   const overlayRoot = pathResolver.sharedTmp('organization-profile-test-org');
   const overlayPath = `${overlayRoot}/customer/test-org/organization-profile.json`;
-  const alternateRoot = pathResolver.sharedTmp('organization-profile-alt-root');
-  const alternateOverlayRoot = `${alternateRoot}/customer/test-org`;
-  const alternateOverlayPath = `${alternateOverlayRoot}/organization-profile.json`;
+  const demoRoot = pathResolver.sharedTmp('organization-profile-demo-org');
+  const demoOverlayPath = `${demoRoot}/customer/demo-org/organization-profile.json`;
 
   afterEach(() => {
     if (originalCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
@@ -22,8 +21,8 @@ describe('organization-profile', () => {
     if (safeExistsSync(overlayRoot)) {
       safeRmSync(overlayRoot, { recursive: true, force: true });
     }
-    if (safeExistsSync(alternateRoot)) {
-      safeRmSync(alternateRoot, { recursive: true, force: true });
+    if (safeExistsSync(demoRoot)) {
+      safeRmSync(demoRoot, { recursive: true, force: true });
     }
   });
 
@@ -90,17 +89,17 @@ describe('organization-profile', () => {
     expect(profile?.mission_defaults?.default_team_template).toBe('development');
   });
 
-  it('loads the organization overlay from a different root when provided', () => {
-    process.env.KYBERION_CUSTOMER = 'test-org';
-    safeMkdir(alternateOverlayRoot, { recursive: true });
+  it('loads the customer overlay from a different root when provided', () => {
+    process.env.KYBERION_CUSTOMER = 'demo-org';
+    safeMkdir(`${demoRoot}/customer/demo-org`, { recursive: true });
     safeWriteFile(
-      alternateOverlayPath,
+      demoOverlayPath,
       JSON.stringify(
         {
           $schema: 'https://kyberion.local/schemas/organization-profile.schema.json',
           version: '1.0.0',
-          organization_id: 'test-org-root',
-          name: 'Test Org Root',
+          organization_id: 'demo-org-root',
+          name: 'Demo Org Root',
           mission_defaults: {
             default_mission_class: 'analysis',
             default_team_template: 'default',
@@ -120,9 +119,9 @@ describe('organization-profile', () => {
       ),
     );
 
-    const profile = loadOrganizationProfile(alternateRoot);
+    const profile = loadOrganizationProfile(demoRoot);
 
-    expect(profile?.organization_id).toBe('test-org-root');
+    expect(profile?.organization_id).toBe('demo-org-root');
     expect(profile?.mission_defaults?.default_agent_profile).toBe('review-agent');
   });
 
