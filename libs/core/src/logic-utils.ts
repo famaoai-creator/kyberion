@@ -34,7 +34,7 @@ export function resolveVars(val: any, ctx: any): any {
 
   // Single variable match: "{{var}}" or "{{var|default}}" — returns raw value (preserves type)
   // Uses [^{}]+ to avoid false matches on strings like "{{a}} / {{b}}" which start AND end with {{ }}
-  const singleVarMatch = val.match(/^{{([^{}]+)}}$/);
+  const singleVarMatch = val.match(/^\{\{([^{}]+)\}\}$/);
   if (singleVarMatch) {
     const [varName, defaultValue] = singleVarMatch[1].split('|').map((s) => s.trim());
     const current = getPathValue(ctx, varName);

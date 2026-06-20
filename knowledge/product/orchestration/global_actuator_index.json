@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
   "t": 28,
-  "u": "2026-06-20T08:50:34.984Z",
+  "u": "2026-06-20T13:55:24.291Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -71,8 +71,8 @@
       "path": "libs/actuators/code-actuator",
       "d": "ADF-driven code analysis and refactoring pipeline engine",
       "s": "implemented",
-      "version": "2.1.0",
-      "capability_count": 2,
+      "version": "2.2.0",
+      "capability_count": 3,
       "contract_schema": "schemas/code-pipeline.schema.json"
     },
     {
@@ -125,7 +125,7 @@
       "path": "libs/actuators/meeting-actuator",
       "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 6,
       "contract_schema": "schemas/meeting-action.schema.json"
     },
@@ -223,7 +223,7 @@
       "path": "libs/actuators/video-composition-actuator",
       "d": "Governed deterministic composed-video bundle preparation actuator",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 9
     },
     {

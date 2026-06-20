@@ -12,13 +12,15 @@
         "planner",
         "reviewer",
         "product_strategist",
-        "tracker"
+        "tracker",
+        "defender"
       ],
       "capabilities": [
         "reasoning",
         "strategy",
         "coordination",
-        "analysis"
+        "analysis",
+        "security"
       ],
       "selection_hints": {
         "preferred_provider": "gemini",

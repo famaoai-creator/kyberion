@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { StubAudioBus } from './audio-bus.js';
 import { createVirtualAudioDeviceBridge } from './virtual-audio-device-bridge.js';
 import { createVirtualCameraBridge } from './virtual-camera-bridge.js';
@@ -79,6 +79,22 @@ function makeCommandRunner() {
 }
 
 describe('createVirtualDeviceInventoryBridge', () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform,
+    });
+  });
+
   it('scans camera and audio candidates', async () => {
     const bridge = createVirtualDeviceInventoryBridge({
       command_runner: makeCommandRunner(),
