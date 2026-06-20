@@ -47,7 +47,7 @@ BLACKHOLE       = ROOT / "libs/actuators/voice-actuator/scripts/blackhole_audio_
 
 ALLOWED_HOSTS = {
     "zoom":  ("zoom.us", "zoom.com", "app.zoom.us"),
-    "teams": ("teams.microsoft.com", "teams.live.com"),
+    "teams": ("teams.microsoft.com", "teams.live.com", "microsoft.com"),
     "meet":  ("meet.google.com",),
 }
 
@@ -78,12 +78,16 @@ def _validate_url(platform, url):
 
 def _detect_platform(url):
     try:
-        host = urlparse(url).netloc
+        parsed = urlparse(url)
+        host = parsed.netloc
+        pathname = parsed.path.lower()
     except Exception:
         return "meet"
     if host.endswith("zoom.us") or host.endswith("zoom.com"):
         return "zoom"
     if host.endswith("teams.microsoft.com") or host.endswith("teams.live.com"):
+        return "teams"
+    if host.endswith("microsoft.com") and "/microsoft-teams/join-a-meeting" in pathname:
         return "teams"
     return "meet"
 
@@ -148,6 +152,8 @@ class MeetingBridge:
 
         if passcode:
             cmd += ["--passcode", passcode]
+        if meeting_id:
+            cmd += ["--meeting-id", meeting_id]
         if audio_path:
             cmd += ["--audio", audio_path]
         if screenshot_path:
