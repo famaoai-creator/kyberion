@@ -54,6 +54,7 @@
     "check:pr-title": "pnpm tsx scripts/check_pr_title.ts",
     "check:commit-subject": "pnpm tsx scripts/check_commit_subject.ts",
     "task:list": "node --import tsx scripts/task_list.ts",
+    "task:init": "node --import tsx scripts/task_init.ts",
     "check:pipeline-shell-independence": "node dist/scripts/check_pipeline_shell_independence.js",
     "check:reference-drift": "vitest run tests/reference-drift-contract.test.ts",
     "check:production-evidence": "vitest run tests/production-evidence-register-contract.test.ts",
