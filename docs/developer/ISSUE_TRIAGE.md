@@ -104,6 +104,7 @@ We may miss these — pre-1.0 — but they're the bar.
 - Duplicates (closed with a link).
 - "Add support for [proprietary thing] please" without offering implementation help — closed with a "PRs welcome" pointer.
 - Reports that violate `CODE_OF_CONDUCT.md`.
+- Synthetic test issues created for automation validation, such as GitHub issue #147, should be converted into an explicit docs/test PR or closed after the validation goal is satisfied.
 
 ## How to escalate
 
