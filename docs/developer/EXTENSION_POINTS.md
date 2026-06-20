@@ -192,10 +192,18 @@ For FDE / customer engagements:
 | Customer-specific actuator | A new actuator under `libs/actuators/` with its own version | Patching an existing actuator's behavior |
 | Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one | Forking the core actuator |
 
-If you find yourself wanting to modify something that isn't listed in §2 as Stable, that's a signal to either:
-
 1. File an issue/PR to lift the surface to Stable, or
 2. Use a wrapper / overlay rather than modifying internals.
+
+### 5.2 Decoupled Capability & Model Extension (Non-Code Extension)
+
+When extending Kyberion with new execution models (such as LLMs, TTS engines, STT engines, or image generators), developers **MUST NOT** modify the TypeScript/JavaScript core source code or the actuator implementations directly.
+
+Instead, follow the decoupled extension architecture:
+- **Registry Configuration**: Define the new engine in the corresponding registry JSON under `knowledge/product/governance/` (e.g., `voice-engine-registry.json`).
+- **Bridge Script**: Specify a `bridge_script` path pointing to an external execution script (e.g., a Python wrapper) in the registry JSON.
+- **Dynamic Invocation**: The core actuator resolves the engine record at runtime and invokes the designated `bridge_script` generically.
+- **Zero Source Modifications**: Adding support for a new model or backend must be achievable solely by adding configuration files and script files, requiring zero changes to stable core compiled code.
 
 ## 6. Deprecation
 

@@ -50,6 +50,22 @@
       },
       "fallback_engine_id": "local_say",
       "notes": "8-bit quantized Qwen3-TTS 1.7B via mlx-audio. ICL voice cloning using ref_audio + ref_text — no fine-tuning required. Requires Apple Silicon (M1+) and governed tool-runtime entries for mlx_audio and mlx_whisper. Shadow until governance promotion."
+    },
+    {
+      "engine_id": "kokoro",
+      "display_name": "Kokoro TTS (Ultra-lightweight TTS)",
+      "kind": "native_local",
+      "provider": "kokoro",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "bridge_script": "libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py",
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"]
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "Ultra-lightweight 82M parameter Kokoro-TTS. High performance on CPU/GPU. Requires: pip install kokoro soundfile. Supports multiple languages including Japanese ('jf_alpha', 'jm_kiko') and English. Zero-shot voices can be used by name."
     }
   ]
 }
