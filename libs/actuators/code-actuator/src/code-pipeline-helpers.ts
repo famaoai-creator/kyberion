@@ -257,6 +257,29 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }
       capabilities.push(...discoverProviderCliCapabilities());
       return { ...ctx, [params.export_as || 'capabilities_list']: capabilities };
+    case 'semgrep_scan':
+      return {
+        ...ctx,
+        [params.export_as || 'semgrep_findings']: await withRetry(
+          async () => {
+            const target = path.resolve(rootDir, resolve(params.target_dir));
+            const config = String(resolve(params.config) || 'auto');
+            const args = ['--config', config, target, '--json'];
+            try {
+              const stdout = execSync('semgrep', args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+              return JSON.parse(stdout);
+            } catch (err: any) {
+              if (err.stdout) {
+                try {
+                  return JSON.parse(err.stdout);
+                } catch { /* fallback */ }
+              }
+              throw new Error(`[SEMGREP_ERROR] Scan failed: ${err.message}`);
+            }
+          },
+          buildRetryOptions(),
+        ),
+      };
     case 'discover_skills':
       return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
     default: return ctx;
@@ -355,4 +378,3 @@ async function performReconcile(input: CodeAction) {
   }
   return { status: 'reconciled' };
 }
-

@@ -57,6 +57,60 @@
       },
       "autonomy_level": "high"
     },
+    "attacker": {
+      "description": "Builds offensive vulnerability hypotheses and adversarial proof paths from static analysis evidence.",
+      "required_capabilities": [
+        "reasoning",
+        "security",
+        "analysis"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "mission_controller"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "codebase_core"
+      ],
+      "ownership_scope": "Owns adversarial hypotheses, exploitability analysis, and red-team findings.",
+      "selection_hints": {
+        "preferred_agents": [
+          "nerve-agent"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "high"
+    },
+    "defender": {
+      "description": "Reviews and refutes adversarial findings, hardens mitigations, and checks for false positives.",
+      "required_capabilities": [
+        "reasoning",
+        "security",
+        "critique"
+      ],
+      "compatible_authority_roles": [
+        "ecosystem_architect",
+        "mission_controller"
+      ],
+      "allowed_delegate_team_roles": [],
+      "escalation_parent_team_role": "owner",
+      "required_scope_classes": [
+        "codebase_core"
+      ],
+      "ownership_scope": "Owns defensive verification, mitigation review, and blue-team rebuttals.",
+      "selection_hints": {
+        "preferred_agents": [
+          "sovereign-brain"
+        ],
+        "preferred_models": [
+          "auto-gemini-3"
+        ]
+      },
+      "autonomy_level": "high"
+    },
     "experience_designer": {
       "description": "Designs product flows, interaction models, and UX tradeoffs.",
       "required_capabilities": [
