@@ -22,7 +22,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `ios-actuator` | simctl-driven iOS Simulator Actuator | 1.1.0 | 1 | `schemas/mobile-device-pipeline.schema.json` | `libs/actuators/ios-actuator` |
 | `media-actuator` | Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. | 1.1.0 | 1 | `schemas/media-pipeline.schema.json` | `libs/actuators/media-actuator` |
 | `media-generation-actuator` | Generative image, video, music, and screen capture actuator | 1.1.0 | 10 | `schemas/media-generation-action.schema.json` | `libs/actuators/media-generation-actuator` |
-| `meeting-actuator` | Abstracted online meeting bridge (Zoom, Teams, Google Meet) | 1.0.0 | 6 | `schemas/meeting-action.schema.json` | `libs/actuators/meeting-actuator` |
+| `meeting-actuator` | Abstracted online meeting bridge (Zoom, Teams, Google Meet) | 1.1.0 | 6 | `schemas/meeting-action.schema.json` | `libs/actuators/meeting-actuator` |
 | `meeting-browser-driver` | Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. | 1.0.0 | 2 | `-` | `libs/actuators/meeting-browser-driver` |
 | `modeling-actuator` | Architectural Analysis and ADF Transformation Engine | 1.0.0 | 2 | `schemas/modeling-pipeline.schema.json` | `libs/actuators/modeling-actuator` |
 | `network-actuator` | ADF-driven secure fetch and A2A transport pipeline engine | 2.2.0 | 1 | `schemas/network-pipeline.schema.json` | `libs/actuators/network-actuator` |
@@ -33,7 +33,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `service-actuator` | Unified External SaaS/API/MCP Reachability Layer | 1.1.0 | 7 | `schemas/service-action.schema.json` | `libs/actuators/service-actuator` |
 | `system-actuator` | OS-level control plane for diagnostics, input toggles, and short-lived OS actions | 1.2.0 | 16 | `schemas/system-pipeline.schema.json` | `libs/actuators/system-actuator` |
 | `terminal-actuator` | PTY-driven Terminal Actuator | 1.0.0 | 5 | `schemas/terminal-action.schema.json` | `libs/actuators/terminal-actuator` |
-| `video-composition-actuator` | Governed deterministic composed-video bundle preparation actuator | 1.0.0 | 9 | `-` | `libs/actuators/video-composition-actuator` |
+| `video-composition-actuator` | Governed deterministic composed-video bundle preparation actuator | 1.1.0 | 9 | `-` | `libs/actuators/video-composition-actuator` |
 | `vision-actuator` | Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator | 1.3.0 | 2 | `schemas/vision-action.schema.json` | `libs/actuators/vision-actuator` |
 | `voice-actuator` | Governed local voice generation actuator with native playback and artifact fallback | 1.2.0 | 8 | `schemas/voice-action.schema.json` | `libs/actuators/voice-actuator` |
 | `wisdom-actuator` | Knowledge-tier search, injection, import/export, and decision-support operations | 1.2.1 | 33 | `schemas/wisdom-action.schema.json` | `libs/actuators/wisdom-actuator` |
