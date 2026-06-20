@@ -60,6 +60,10 @@ function loadScenario(filePath: string): TaskScenario {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
 }
 
+function resolveProfilePath(scenario: TaskScenario): string {
+  return pathResolver.rootResolve(scenario.first_run.profile_output);
+}
+
 function formatRepeatTrigger(trigger: TaskScenario['trigger']): string {
   if (trigger.type === 'schedule') {
     return `schedule ${trigger.cron}${trigger.timezone ? ` (${trigger.timezone})` : ''}`;
@@ -70,17 +74,35 @@ function formatRepeatTrigger(trigger: TaskScenario['trigger']): string {
   return `manual: ${trigger.prompt}`;
 }
 
+function formatReadiness(scenario: TaskScenario): { status: string; next: string } {
+  const profilePath = resolveProfilePath(scenario);
+  if (safeExistsSync(profilePath)) {
+    return {
+      status: 'ready for dry-run',
+      next: `pnpm task:run ${scenario.id} --dry-run`,
+    };
+  }
+
+  return {
+    status: 'setup needed',
+    next: `pnpm task:init ${scenario.id}`,
+  };
+}
+
 function formatScenarioSummary(scenario: TaskScenario): string[] {
   const firstRunSummary = scenario.first_run.questions.length
     ? `${scenario.first_run.questions.length} preference${scenario.first_run.questions.length === 1 ? '' : 's'}`
     : 'no extra preferences';
   const repeatSummary = formatRepeatTrigger(scenario.trigger);
   const artifacts = scenario.result.artifacts.join(' + ');
+  const readiness = formatReadiness(scenario);
 
   return [
     `- ${scenario.id}`,
     `  Title: ${scenario.title}`,
     `  Result: ${artifacts}`,
+    `  Status: ${readiness.status}`,
+    `  Next: ${readiness.next}`,
     `  First run: needs ${firstRunSummary}`,
     `  Repeat: ${repeatSummary}`,
   ];
