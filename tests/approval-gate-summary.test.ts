@@ -9,7 +9,7 @@ describe('approval gate summary', () => {
         artifacts: ['email-triage.md', 'reply-drafts.json'],
         approvalBoundary: {
           requiredFor: [],
-          defaultAction: 'draft_only',
+          defaultAction: 'draft-only',
         },
       }),
     ).toBe(
@@ -29,6 +29,19 @@ describe('approval gate summary', () => {
     );
   });
 
+  it('accepts the internal underscore-style approval value as well', () => {
+    expect(
+      summarizeApprovalGate({
+        taskId: 'weekly-digest',
+        artifacts: ['weekly-executive-digest.md'],
+        approvalBoundary: {
+          requiredFor: ['external_sharing'],
+          defaultAction: 'notify_only',
+        },
+      }),
+    ).toContain('- notify-only; no external delivery was performed');
+  });
+
   it('renders approval-required results clearly', () => {
     expect(
       summarizeApprovalGate({
@@ -36,7 +49,7 @@ describe('approval gate summary', () => {
         artifacts: ['deck-brief.json', 'proposal-deck.pptx'],
         approvalBoundary: {
           requiredFor: ['send_to_customer'],
-          defaultAction: 'requires_human_approval',
+          defaultAction: 'requires-human-approval',
         },
       }),
     ).toBe(

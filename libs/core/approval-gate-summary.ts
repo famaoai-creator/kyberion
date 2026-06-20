@@ -7,7 +7,13 @@ export interface ApprovalGateSummaryInput {
   };
 }
 
-type ApprovalGateDefaultAction = 'draft_only' | 'notify_only' | 'requires_human_approval';
+type ApprovalGateDefaultAction =
+  | 'draft-only'
+  | 'notify-only'
+  | 'requires-human-approval'
+  | 'draft_only'
+  | 'notify_only'
+  | 'requires_human_approval';
 
 function formatArtifactList(artifacts: string[]): string {
   if (artifacts.length === 0) {
