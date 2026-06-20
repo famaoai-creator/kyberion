@@ -75,6 +75,60 @@ export interface GwsAuthStatus {
   error?: string;
 }
 
+export interface GmailMessageHeader {
+  name?: string;
+  value?: string;
+}
+
+export interface GmailMessageListItem {
+  id?: string;
+  threadId?: string;
+}
+
+export interface GmailMessageMetadata {
+  id: string;
+  threadId?: string;
+  labelIds: string[];
+  snippet?: string;
+  payload?: {
+    headers?: GmailMessageHeader[];
+  };
+}
+
+export interface GmailInboxArchiveCandidate {
+  sender_email: string;
+  sender_display: string;
+  message_ids: string[];
+  subject_samples: string[];
+  message_count: number;
+  existing_filter_id: string | null;
+  reason: string;
+  will_create_filter: boolean;
+  will_archive_messages: boolean;
+}
+
+export interface GmailInboxArchiveResult {
+  ok: boolean;
+  applied: boolean;
+  query: string;
+  max_messages: number;
+  min_count: number;
+  inspected_messages: number;
+  candidates: GmailInboxArchiveCandidate[];
+  created_filters: Array<{
+    sender_email: string;
+    filter_id: string | null;
+    criteria: Record<string, unknown>;
+    action: Record<string, unknown>;
+  }>;
+  archived_message_ids: string[];
+}
+
+const GMAIL_INBOX_ARCHIVE_QUERY = 'in:inbox is:unread';
+const GMAIL_METADATA_HEADERS = ['From', 'Subject'];
+const GMAIL_AUTOMATED_SENDER_RE = /(?:no-?reply|noreply|newsletter|digest|notification|notify|alert|update|updates?|mailing)/i;
+const GMAIL_INBOX_ARCHIVE_LABEL = 'INBOX';
+
 export function resolveEmailDraftDir(): string {
   return pathResolver.shared('runtime/presence-studio/email-drafts');
 }
@@ -155,6 +209,316 @@ export function summarizeEmailSubject(triageText: string, fallback = 'Reply'): s
   const lines = triageText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const candidate = lines.find((line) => !/^#+\s/.test(line) && line.length > 8) || lines[0] || fallback;
   return candidate.replace(/^[-*]\s*/, '').slice(0, 90);
+}
+
+function normalizeHeaderValue(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+export function parseEmailAddressHeader(value: string): { display_name: string; email: string } {
+  const trimmed = normalizeHeaderValue(value);
+  const angled = trimmed.match(/^(.*)<([^>]+)>$/);
+  const emailMatch = trimmed.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+
+  if (angled) {
+    const display_name = normalizeHeaderValue(angled[1].replace(/^"|"$/g, '')) || angled[2].trim();
+    const email = angled[2].trim().toLowerCase();
+    return { display_name, email };
+  }
+
+  if (emailMatch) {
+    const email = emailMatch[0].toLowerCase();
+    const display_name = normalizeHeaderValue(trimmed.replace(emailMatch[0], '').replace(/[<>()"]/g, '')) || email;
+    return { display_name, email };
+  }
+
+  return {
+    display_name: trimmed || 'unknown sender',
+    email: trimmed.toLowerCase(),
+  };
+}
+
+function extractMessageHeader(message: GmailMessageMetadata | Record<string, any>, headerName: string): string {
+  const headers = Array.isArray(message?.payload?.headers) ? message.payload.headers : [];
+  const match = headers.find((header: GmailMessageHeader) => String(header?.name || '').toLowerCase() === headerName.toLowerCase());
+  return typeof match?.value === 'string' ? match.value.trim() : '';
+}
+
+function extractFilterCriteriaFromSender(senderEmail: string): Record<string, unknown> {
+  return {
+    from: senderEmail,
+  };
+}
+
+function extractFilterAction(): Record<string, unknown> {
+  return {
+    removeLabelIds: [GMAIL_INBOX_ARCHIVE_LABEL],
+  };
+}
+
+function extractMessageList(payload: any): GmailMessageListItem[] {
+  if (Array.isArray(payload)) {
+    return payload.filter((item) => item && typeof item === 'object') as GmailMessageListItem[];
+  }
+  return Array.isArray(payload?.messages) ? payload.messages : [];
+}
+
+function extractFilterList(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload?.filter) ? payload.filter : [];
+}
+
+function isAutomatedSender(senderEmail: string, senderDisplay: string): boolean {
+  return GMAIL_AUTOMATED_SENDER_RE.test(senderEmail) || GMAIL_AUTOMATED_SENDER_RE.test(senderDisplay);
+}
+
+function normalizeSenderKey(senderEmail: string): string {
+  return senderEmail.trim().toLowerCase();
+}
+
+function matchExistingArchiveFilter(filters: any[], senderEmail: string): string | null {
+  const normalizedSender = normalizeSenderKey(senderEmail);
+  for (const filter of filters) {
+    const criteria = filter?.criteria || {};
+    const action = filter?.action || {};
+    const removeLabelIds = Array.isArray(action?.removeLabelIds) ? action.removeLabelIds.map((label: unknown) => String(label)) : [];
+    if (!removeLabelIds.includes(GMAIL_INBOX_ARCHIVE_LABEL)) {
+      continue;
+    }
+
+    const fromCriteria = typeof criteria?.from === 'string'
+      ? normalizeSenderKey(parseEmailAddressHeader(criteria.from).email)
+      : '';
+    if (fromCriteria && fromCriteria === normalizedSender) {
+      return typeof filter?.id === 'string' ? filter.id : null;
+    }
+
+    const query = typeof criteria?.query === 'string' ? criteria.query.toLowerCase() : '';
+    if (query.includes(`from:${normalizedSender}`) || query.includes(`from:"${normalizedSender}"`)) {
+      return typeof filter?.id === 'string' ? filter.id : null;
+    }
+  }
+  return null;
+}
+
+async function gwsJson(action: string, params: Record<string, unknown>, body?: Record<string, unknown>): Promise<any> {
+  const request: Record<string, unknown> = { params };
+  if (body !== undefined) {
+    request.body = body;
+  }
+  return await executeServicePreset('google-workspace', action, request);
+}
+
+async function listUnreadInboxMessages(limit: number): Promise<GmailMessageListItem[]> {
+  const collected: GmailMessageListItem[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await gwsJson('gmail_messages_list', {
+      userId: 'me',
+      q: GMAIL_INBOX_ARCHIVE_QUERY,
+      maxResults: Math.max(1, Math.min(limit, 500)),
+      ...(pageToken ? { pageToken } : {}),
+    });
+    const pageMessages = extractMessageList(page);
+    for (const item of pageMessages) {
+      if (item?.id) {
+        collected.push({ id: item.id, threadId: item.threadId });
+      }
+      if (collected.length >= limit) {
+        return collected;
+      }
+    }
+    pageToken = typeof page?.nextPageToken === 'string' && page.nextPageToken.trim() ? page.nextPageToken : undefined;
+  } while (pageToken);
+  return collected;
+}
+
+async function getInboxMessageMetadata(messageId: string): Promise<GmailMessageMetadata | null> {
+  if (!messageId) return null;
+  const message = await gwsJson('gmail_message_get', {
+    userId: 'me',
+    id: messageId,
+    format: 'metadata',
+    metadataHeaders: GMAIL_METADATA_HEADERS,
+  });
+  if (!message || typeof message !== 'object') {
+    return null;
+  }
+  return {
+    id: String(message.id || messageId),
+    threadId: typeof message.threadId === 'string' ? message.threadId : undefined,
+    labelIds: Array.isArray(message.labelIds) ? message.labelIds.map((label: unknown) => String(label)) : [],
+    snippet: typeof message.snippet === 'string' ? message.snippet : undefined,
+    payload: message.payload && typeof message.payload === 'object'
+      ? {
+          headers: Array.isArray(message.payload.headers)
+            ? message.payload.headers
+                .map((header: GmailMessageHeader) => ({
+                  name: typeof header?.name === 'string' ? header.name : undefined,
+                  value: typeof header?.value === 'string' ? header.value : undefined,
+                }))
+                .filter((header: GmailMessageHeader) => Boolean(header.name || header.value))
+            : [],
+        }
+      : undefined,
+  };
+}
+
+async function listGmailFilters(): Promise<any[]> {
+  const response = await gwsJson('gmail_filters_list', { userId: 'me' });
+  return extractFilterList(response);
+}
+
+async function createArchiveFilter(senderEmail: string): Promise<any> {
+  return await gwsJson(
+    'gmail_filters_create',
+    { userId: 'me' },
+    {
+      criteria: extractFilterCriteriaFromSender(senderEmail),
+      action: extractFilterAction(),
+    },
+  );
+}
+
+async function batchArchiveMessageIds(messageIds: string[]): Promise<any> {
+  if (messageIds.length === 0) {
+    return { ok: true, archived_message_ids: [] };
+  }
+  return await gwsJson(
+    'gmail_messages_batch_modify',
+    { userId: 'me' },
+    {
+      ids: messageIds,
+      removeLabelIds: [GMAIL_INBOX_ARCHIVE_LABEL],
+    },
+  );
+}
+
+export interface GmailInboxArchiveInput {
+  max_messages?: number;
+  min_count?: number;
+  apply?: boolean;
+}
+
+export async function organizeGmailInboxWithFilters(input: GmailInboxArchiveInput = {}): Promise<GmailInboxArchiveResult> {
+  const resolvedMaxMessages = Number(input.max_messages);
+  const resolvedMinCount = Number(input.min_count);
+  const maxMessages = Math.max(
+    1,
+    Math.min(Number.isFinite(resolvedMaxMessages) ? resolvedMaxMessages : 50, 500),
+  );
+  const minCount = Math.max(1, Number.isFinite(resolvedMinCount) ? resolvedMinCount : 2);
+  const apply = input.apply === true;
+
+  const messageList = await listUnreadInboxMessages(maxMessages);
+  const messageDetails = [];
+  for (const item of messageList) {
+    if (!item.id) continue;
+    const detail = await getInboxMessageMetadata(item.id);
+    if (detail) {
+      messageDetails.push(detail);
+    }
+  }
+
+  const filters = await listGmailFilters();
+  const grouped = new Map<string, {
+    sender_email: string;
+    sender_display: string;
+    message_ids: string[];
+    subject_samples: string[];
+  }>();
+
+  for (const message of messageDetails) {
+    const headerValue = extractMessageHeader(message, 'From');
+    if (!headerValue) continue;
+    const sender = parseEmailAddressHeader(headerValue);
+    const senderKey = normalizeSenderKey(sender.email);
+    if (!senderKey) continue;
+    const existing = grouped.get(senderKey) || {
+      sender_email: sender.email,
+      sender_display: sender.display_name,
+      message_ids: [],
+      subject_samples: [],
+    };
+    existing.message_ids.push(message.id);
+    const subject = extractMessageHeader(message, 'Subject');
+    if (subject && !existing.subject_samples.includes(subject)) {
+      existing.subject_samples.push(subject);
+    }
+    if (!existing.sender_display && sender.display_name) {
+      existing.sender_display = sender.display_name;
+    }
+    grouped.set(senderKey, existing);
+  }
+
+  const candidates: GmailInboxArchiveCandidate[] = [];
+  const createdFilters: Array<{
+    sender_email: string;
+    filter_id: string | null;
+    criteria: Record<string, unknown>;
+    action: Record<string, unknown>;
+  }> = [];
+  const archivedMessageIds = new Set<string>();
+
+  for (const group of grouped.values()) {
+    const isAutomated = isAutomatedSender(group.sender_email, group.sender_display);
+    const qualifies = group.message_ids.length >= minCount || isAutomated;
+    const existingFilterId = matchExistingArchiveFilter(filters, group.sender_email);
+    const willCreateFilter = !existingFilterId && qualifies;
+    const willArchiveMessages = qualifies || Boolean(existingFilterId);
+
+    const reason = existingFilterId
+      ? `existing archive filter ${existingFilterId}`
+      : isAutomated
+        ? 'automated sender pattern'
+        : group.message_ids.length >= minCount
+          ? `repeated sender (${group.message_ids.length} messages)`
+          : 'sender did not meet archive threshold';
+
+    candidates.push({
+      sender_email: group.sender_email,
+      sender_display: group.sender_display,
+      message_ids: [...group.message_ids],
+      subject_samples: [...group.subject_samples],
+      message_count: group.message_ids.length,
+      existing_filter_id: existingFilterId,
+      reason,
+      will_create_filter: willCreateFilter,
+      will_archive_messages: willArchiveMessages,
+    });
+
+    if (apply && willCreateFilter) {
+      const filter = await createArchiveFilter(group.sender_email);
+      createdFilters.push({
+        sender_email: group.sender_email,
+        filter_id: typeof filter?.id === 'string' ? filter.id : null,
+        criteria: extractFilterCriteriaFromSender(group.sender_email),
+        action: extractFilterAction(),
+      });
+    }
+
+    if (willArchiveMessages) {
+      for (const messageId of group.message_ids) {
+        archivedMessageIds.add(messageId);
+      }
+    }
+  }
+
+  if (apply && archivedMessageIds.size > 0) {
+    await batchArchiveMessageIds([...archivedMessageIds]);
+  }
+
+  return {
+    ok: true,
+    applied: apply,
+    query: GMAIL_INBOX_ARCHIVE_QUERY,
+    max_messages: maxMessages,
+    min_count: minCount,
+    inspected_messages: messageDetails.length,
+    candidates,
+    created_filters: createdFilters,
+    archived_message_ids: [...archivedMessageIds],
+  };
 }
 
 export function buildFallbackEmailDraft(input: {
