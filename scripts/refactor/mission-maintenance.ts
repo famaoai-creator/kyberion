@@ -307,6 +307,7 @@ export async function recordTask(
   const upperId = missionId.toUpperCase();
   const missionDir = findMissionPath(upperId);
   if (!missionDir) throw new Error(`Mission ${upperId} not found.`);
+  const detailRecord = details && typeof details === 'object' ? details as Record<string, unknown> : {};
 
   const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
   safeWriteFile(
@@ -321,6 +322,53 @@ export async function recordTask(
       2
     )
   );
+
+  await withLock(`mission-${upperId}`, async () => {
+    const state = loadState(upperId);
+    if (!state) return;
+    const context = { ...(state.context || {}) } as Record<string, unknown>;
+    context.last_action = description;
+    if (typeof detailRecord.next_step === 'string' && detailRecord.next_step.trim()) {
+      context.next_step = detailRecord.next_step.trim();
+    }
+    if (typeof detailRecord.routing_decision_summary === 'string' && detailRecord.routing_decision_summary.trim()) {
+      context.routing_decision_summary = detailRecord.routing_decision_summary.trim();
+    }
+    if (typeof detailRecord.context_pack_id === 'string' && detailRecord.context_pack_id.trim()) {
+      context.context_pack_id = detailRecord.context_pack_id.trim();
+    }
+    if (typeof detailRecord.context_pack_path === 'string' && detailRecord.context_pack_path.trim()) {
+      context.context_pack_path = detailRecord.context_pack_path.trim();
+    }
+    if (typeof detailRecord.context_pack_summary === 'string' && detailRecord.context_pack_summary.trim()) {
+      context.context_pack_summary = detailRecord.context_pack_summary.trim();
+    }
+    if (detailRecord.context_pack_pruning_summary && typeof detailRecord.context_pack_pruning_summary === 'object') {
+      context.context_pack_pruning_summary = detailRecord.context_pack_pruning_summary;
+    }
+    if (detailRecord.work_item_dispatch_summary && typeof detailRecord.work_item_dispatch_summary === 'object') {
+      context.work_item_dispatch_summary = detailRecord.work_item_dispatch_summary;
+    }
+    if (detailRecord.ticket_dispatch_summary && typeof detailRecord.ticket_dispatch_summary === 'object') {
+      context.ticket_dispatch_summary = detailRecord.ticket_dispatch_summary;
+    }
+    if (typeof detailRecord.drift_watchdog_summary === 'string' && detailRecord.drift_watchdog_summary.trim()) {
+      context.work_item_dispatch_summary = {
+        ...(context.work_item_dispatch_summary && typeof context.work_item_dispatch_summary === 'object'
+          ? context.work_item_dispatch_summary as Record<string, unknown>
+          : {}),
+        drift_watchdog_summary: detailRecord.drift_watchdog_summary.trim(),
+      };
+    }
+    state.context = context as NonNullable<typeof state.context>;
+    state.history.push({
+      ts: new Date().toISOString(),
+      event: 'RECORD_TASK',
+      note: description,
+    });
+    await saveState(upperId, state, { alreadyLocked: true });
+  });
+
   logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
 }
 
