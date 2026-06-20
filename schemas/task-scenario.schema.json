@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/task-scenario.schema.json",
+  "title": "TaskScenario",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "description",
+    "trigger",
+    "input",
+    "first_run",
+    "repeat_run",
+    "result",
+    "approval_boundary"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "cron"],
+          "properties": {
+            "type": { "const": "schedule" },
+            "cron": { "type": "string", "minLength": 1 },
+            "timezone": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "event_name"],
+          "properties": {
+            "type": { "const": "event" },
+            "event_name": { "type": "string", "minLength": 1 },
+            "source": { "type": "string", "minLength": 1 },
+            "conditions": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "prompt"],
+          "properties": {
+            "type": { "const": "manual" },
+            "prompt": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "input": {
+      "type": "object",
+      "required": ["sources", "required_params"],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_params": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "optional_params": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "first_run": {
+      "type": "object",
+      "required": ["reasoning_required", "questions", "profile_output"],
+      "properties": {
+        "reasoning_required": { "type": "boolean" },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "profile_output": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "repeat_run": {
+      "type": "object",
+      "required": ["pipeline_template", "params_from_profile"],
+      "properties": {
+        "pipeline_template": { "type": "string", "minLength": 1 },
+        "params_from_profile": { "type": "boolean" },
+        "profile_input": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "required": ["artifacts", "summary_format"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "summary_format": {
+          "type": "string",
+          "enum": ["markdown", "json", "text"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "approval_boundary": {
+      "type": "object",
+      "required": ["required_for", "default_action"],
+      "properties": {
+        "required_for": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "default_action": {
+          "type": "string",
+          "enum": ["draft-only", "notify-only", "requires-human-approval"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,58 @@
+{
+  "action": "pipeline",
+  "name": "Email Triage Workflow",
+  "version": "2.0.0",
+  "description": "Summarizes unread Gmail items, writes a triage memo and reply draft artifacts, and keeps email sending approval-gated.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). This template aligns with the repeatable TaskScenario flow.",
+  "context": {
+    "reply_tone": "clear and concise",
+    "triage_output_path": "active/shared/tmp/email-triage.md",
+    "reply_drafts_path": "active/shared/tmp/reply-drafts.json"
+  },
+  "steps": [
+    {
+      "id": "triage_inbox",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "gmail_triage", "type": "GmailTriage" },
+      "params": {
+        "service_id": "google-workspace",
+        "action": "gmail_triage"
+      }
+    },
+    {
+      "id": "write_triage_memo",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "gmail_triage",
+      "params": {
+        "path": "{{triage_output_path}}",
+        "content": "# Email Triage\n\nGenerated: {{run_utc_now}}\nTone: {{reply_tone}}\n\n## Triage Output\n\n{{gmail_triage}}\n\n## Suggested Reply Draft\n\nUse the triage above to write a short reply with these parts:\n- Acknowledge receipt\n- Confirm the requested action or next step\n- Mention any blocker or missing detail\n- Close with the next date or action owner\n"
+      }
+    },
+    {
+      "id": "write_reply_drafts",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "gmail_triage",
+      "params": {
+        "path": "{{reply_drafts_path}}",
+        "content": {
+          "kind": "email-reply-drafts",
+          "generated_at": "{{run_utc_now}}",
+          "reply_tone": "{{reply_tone}}",
+          "triage_source": "{{gmail_triage}}",
+          "notes": "Reply drafts are prepared locally only; sending remains approval-gated."
+        }
+      }
+    },
+    {
+      "id": "log_result",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📧 Email triage memo written to {{triage_output_path}} and reply drafts to {{reply_drafts_path}}"
+      }
+    }
+  ]
+}
