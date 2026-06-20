@@ -22,6 +22,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/product/governance/intent-policy.json',
   },
   {
+    id: 'reasoning-level-policy',
+    schemaPath: 'knowledge/product/schemas/reasoning-level-policy.schema.json',
+    dataPath: 'knowledge/product/governance/reasoning-level-policy.json',
+  },
+  {
     id: 'intent-resolution-policy',
     schemaPath: 'knowledge/product/schemas/intent-resolution-policy.schema.json',
     dataPath: 'knowledge/product/governance/intent-resolution-policy.json',

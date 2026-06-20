@@ -2,7 +2,7 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   compileUserIntentFlow,
   deriveAgentRoutingDecision,
@@ -771,6 +771,328 @@ describe('intent-contract compiler', () => {
         why: 'The request is a governed presentation generation task.',
       })
     ).toBe(false);
+  });
+
+  it('emits trace metadata for successful llm compilation and fallback paths', async () => {
+    const events: Array<{ name: string; attributes?: Record<string, string | number | boolean> }> = [];
+    const trace = {
+      addEvent(name: string, attributes?: Record<string, string | number | boolean>) {
+        events.push({ name, attributes });
+      },
+    };
+    const responses = [
+      JSON.stringify({
+        kind: 'actuator-execution-brief',
+        request_text: '提案資料を作って',
+        archetype_id: 'generate-presentation',
+        confidence: 0.84,
+        summary: '提案資料の作成',
+        user_facing_summary: '提案用のスライドを作る',
+        normalized_scope: ['presentation_deck'],
+        target_actuators: ['presentation-outline-compiler', 'pptx-generator'],
+        deliverables: ['artifact:pptx'],
+        missing_inputs: [],
+        assumptions: ['Use standard proposal defaults.'],
+        clarification_questions: [],
+        readiness: 'fully_automatable',
+        readiness_reason: 'No missing inputs.',
+        llm_touchpoints: [
+          {
+            stage: 'execution_brief',
+            purpose: 'Extract the request into a governed execution brief',
+            output_contract: 'actuator-execution-brief',
+          },
+        ],
+        recommended_next_step: 'Compile the intent contract and work loop.',
+      }),
+      JSON.stringify({
+        kind: 'intent-contract',
+        source_text: '提案資料を作って',
+        intent_id: 'generate-presentation',
+        goal: {
+          summary: 'Create a presentation deck',
+          success_condition: 'A governed PPTX draft is prepared.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'presentation_deck',
+        },
+        required_inputs: [],
+        outcome_ids: ['artifact:pptx'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.92,
+        why: 'The request is a governed presentation generation task.',
+      }),
+      JSON.stringify({
+        intent: { label: 'generate-presentation' },
+        context: {
+          tier: 'confidential',
+          service_bindings: [],
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'presentation_deck',
+        },
+        workflow_design: {
+          workflow_id: 'single-track-default',
+          pattern: 'single_track_execution',
+          stage: 'planning',
+          phases: ['intake', 'planning', 'execution', 'verification', 'delivery'],
+          rationale: 'Default workflow for straightforward bounded work.',
+        },
+        review_design: {
+          review_mode: 'standard',
+          required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          all_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          rationale: 'Standard mode requires contract and QA gates.',
+        },
+        outcome_design: {
+          outcome_ids: ['artifact:pptx'],
+          labels: ['Presentation artifact'],
+        },
+        process_design: {
+          plan_outline: ['collect inputs', 'draft outline', 'generate artifact'],
+          intake_requirements: [],
+          operator_checklist: ['confirm the governed output path'],
+        },
+        runtime_design: {
+          owner_model: 'single_actor',
+          assignment_policy: 'direct_specialist',
+          coordination: {
+            bus: 'none',
+            channels: [],
+          },
+          memory: {
+            store: 'none',
+            scope: 'none',
+            purpose: [],
+          },
+        },
+        execution_boundary: {
+          llm_zone: {
+            allowed: ['draft_content_within_governed_slots'],
+            forbidden: ['override_governed_structure'],
+          },
+          knowledge_zone: {
+            owns: ['intent definitions'],
+          },
+          compiler_zone: {
+            responsibilities: ['map_intent_to_governed_execution_shape'],
+          },
+          executor_zone: {
+            responsibilities: ['perform_governed_execution'],
+          },
+          rule: 'LLM drafts within governed slots; compiler and executor remain deterministic',
+        },
+        teaming: {
+          specialist_id: 'document-specialist',
+          specialist_label: 'Document Specialist',
+          conversation_agent: 'nerve-agent',
+          team_roles: ['planner'],
+        },
+        authority: {
+          requires_approval: false,
+        },
+        learning: {
+          reusable_refs: [],
+        },
+      }),
+    ];
+
+    const llmFlow = await compileUserIntentFlow(
+      { text: '提案資料を作って' },
+      {
+        askFn: async () => responses.shift() || '',
+        trace,
+      }
+    );
+
+    expect(llmFlow.source).toBe('llm');
+    expect(events[0]?.name).toBe('intent_compilation.completed');
+    expect(events[0]?.attributes?.source).toBe('llm');
+    expect(events[0]?.attributes?.fallback_reason).toBe('none');
+    expect(events[0]?.attributes?.reasoning_level).toBe(llmFlow.reasoningDecision?.level);
+    expect(events[0]?.attributes?.recommended_model_id).toBe('openai:gpt-5.4');
+    expect(events[0]?.attributes?.model_route_status).toBe('shadow');
+
+    events.length = 0;
+
+    const greetingFlow = await compileUserIntentFlow(
+      { text: 'こんにちは' },
+      {
+        askFn: async () => {
+          throw new Error('should not be called');
+        },
+        trace,
+      }
+    );
+
+    expect(greetingFlow.source).toBe('fallback');
+    expect(events[0]?.attributes?.fallback_reason).toBe('simple_greeting');
+    expect(events[0]?.attributes?.source).toBe('fallback');
+
+    events.length = 0;
+
+    const invalidJsonFlow = await compileUserIntentFlow(
+      { text: '提案資料を作って' },
+      {
+        askFn: async () => 'not json',
+        trace,
+      }
+    );
+
+    expect(invalidJsonFlow.source).toBe('fallback');
+    expect(events[0]?.attributes?.fallback_reason).toBe('execution_brief_invalid');
+    expect(events[0]?.attributes?.source).toBe('fallback');
+
+    events.length = 0;
+
+    const backendErrorFlow = await compileUserIntentFlow(
+      { text: '提案資料を作って' },
+      {
+        askFn: async () => {
+          throw new Error('backend unavailable');
+        },
+        trace,
+      }
+    );
+
+    expect(backendErrorFlow.source).toBe('fallback');
+    expect(events[0]?.attributes?.fallback_reason).toBe('backend_error');
+    expect(events[0]?.attributes?.source).toBe('fallback');
+  });
+
+  it('keeps askFn call count and order unchanged', async () => {
+    const responses = [
+      JSON.stringify({
+        kind: 'actuator-execution-brief',
+        request_text: '提案資料を作って',
+        archetype_id: 'generate-presentation',
+        confidence: 0.84,
+        summary: '提案資料の作成',
+        user_facing_summary: '提案用のスライドを作る',
+        normalized_scope: ['presentation_deck'],
+        target_actuators: ['presentation-outline-compiler', 'pptx-generator'],
+        deliverables: ['artifact:pptx'],
+        missing_inputs: [],
+        assumptions: ['Use standard proposal defaults.'],
+        clarification_questions: [],
+        readiness: 'fully_automatable',
+        readiness_reason: 'No missing inputs.',
+        llm_touchpoints: [],
+        recommended_next_step: 'Compile the intent contract and work loop.',
+      }),
+      JSON.stringify({
+        kind: 'intent-contract',
+        source_text: '提案資料を作って',
+        intent_id: 'generate-presentation',
+        goal: {
+          summary: 'Create a presentation deck',
+          success_condition: 'A governed PPTX draft is prepared.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'presentation_deck',
+        },
+        required_inputs: [],
+        outcome_ids: ['artifact:pptx'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: 'one_shot',
+        clarification_needed: false,
+        confidence: 0.92,
+        why: 'The request is a governed presentation generation task.',
+      }),
+      JSON.stringify({
+        intent: { label: 'generate-presentation' },
+        context: {
+          tier: 'confidential',
+          service_bindings: [],
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'presentation_deck',
+        },
+        workflow_design: {
+          workflow_id: 'single-track-default',
+          pattern: 'single_track_execution',
+          stage: 'planning',
+          phases: ['intake', 'planning', 'execution', 'verification', 'delivery'],
+          rationale: 'Default workflow for straightforward bounded work.',
+        },
+        review_design: {
+          review_mode: 'standard',
+          required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          all_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
+          rationale: 'Standard mode requires contract and QA gates.',
+        },
+        outcome_design: {
+          outcome_ids: ['artifact:pptx'],
+          labels: ['Presentation artifact'],
+        },
+        process_design: {
+          plan_outline: ['collect inputs', 'draft outline', 'generate artifact'],
+          intake_requirements: [],
+          operator_checklist: ['confirm the governed output path'],
+        },
+        runtime_design: {
+          owner_model: 'single_actor',
+          assignment_policy: 'direct_specialist',
+          coordination: {
+            bus: 'none',
+            channels: [],
+          },
+          memory: {
+            store: 'none',
+            scope: 'none',
+            purpose: [],
+          },
+        },
+        execution_boundary: {
+          llm_zone: {
+            allowed: ['draft_content_within_governed_slots'],
+            forbidden: ['override_governed_structure'],
+          },
+          knowledge_zone: {
+            owns: ['intent definitions'],
+          },
+          compiler_zone: {
+            responsibilities: ['map_intent_to_governed_execution_shape'],
+          },
+          executor_zone: {
+            responsibilities: ['perform_governed_execution'],
+          },
+          rule: 'LLM drafts within governed slots; compiler and executor remain deterministic',
+        },
+        teaming: {
+          specialist_id: 'document-specialist',
+          specialist_label: 'Document Specialist',
+          conversation_agent: 'nerve-agent',
+          team_roles: ['planner'],
+        },
+        authority: {
+          requires_approval: false,
+        },
+        learning: {
+          reusable_refs: [],
+        },
+      }),
+    ];
+    const askFn = vi.fn(async () => responses.shift() || '');
+
+    await compileUserIntentFlow({ text: '提案資料を作って' }, { askFn });
+
+    expect(askFn).toHaveBeenCalledTimes(3);
+    expect(askFn.mock.calls.map((call) => call[0])).toEqual([
+      expect.stringContaining('Execution Brief Compiler'),
+      expect.stringContaining('Intent Contract Compiler'),
+      expect.stringContaining('Work Loop Compiler'),
+    ]);
   });
 });
 

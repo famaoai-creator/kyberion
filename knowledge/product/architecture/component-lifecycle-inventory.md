@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-05-30
+last_updated: 2026-06-20
 ---
 
 # Component Lifecycle Inventory
@@ -28,10 +28,10 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
-- `media-actuator`: Document and asset composition/rendering engine with template-aware updates. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
-- `media-generation-actuator`: Generative image, video, music, and screen-capture boundary (10 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
-- `meeting-actuator`: Abstracted online meeting bridge; browser join backend lives in meeting-browser-driver (6 ops, v1.0.0, schema schemas/meeting-action.schema.json)
-- `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Writes captured audio to an AudioBus. (2 ops, v1.0.0)
+- `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
+- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (10 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
+- `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.0.0, schema schemas/meeting-action.schema.json)
+- `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. (2 ops, v1.0.0)
 - `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema schemas/modeling-pipeline.schema.json)
 - `network-actuator`: ADF-driven secure fetch and A2A transport pipeline engine (1 ops, v2.2.0, schema schemas/network-pipeline.schema.json)
 - `orchestrator-actuator`: Mission/control-plane transformation and execution-plan orchestration actuator (2 ops, v1.0.0, schema schemas/orchestrator-pipeline.schema.json)
@@ -39,11 +39,11 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema schemas/process-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge (4 ops, v1.1.0, schema schemas/secret-action.schema.json)
 - `service-actuator`: Unified External SaaS/API/MCP Reachability Layer (7 ops, v1.1.0, schema schemas/service-action.schema.json)
-- `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (3 ops, v1.2.0, schema schemas/system-pipeline.schema.json)
+- `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (16 ops, v1.2.0, schema schemas/system-pipeline.schema.json)
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema schemas/terminal-action.schema.json)
-- `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (6 ops, v1.0.0)
-- `vision-actuator`: Perception-oriented compatibility facade; inspect_image and ocr_image are the canonical public ops (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
-- `voice-actuator`: Governed local voice synthesis, playback, and voice-profile workflows (7 ops, v1.2.0, schema schemas/voice-action.schema.json)
+- `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.0.0)
+- `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
+- `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (8 ops, v1.2.0, schema schemas/voice-action.schema.json)
 - `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (33 ops, v1.2.1, schema schemas/wisdom-action.schema.json)
 
 ## Legacy Review Queue
@@ -60,3 +60,4 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - Treat `vision-actuator` as compatibility-only and continue moving generation concerns into `media-generation-actuator` while keeping perception-oriented work elsewhere.
 - Keep `approval-actuator`, `code-actuator`, `network-actuator`, and `process-actuator` manifest-backed because governance or runtime layers still reference them directly.
 - Do not use `CAPABILITIES_GUIDE.md` as the source of truth for runtime discovery; it is broader and currently includes historical capability names that do not map 1:1 to actuator packages.
+

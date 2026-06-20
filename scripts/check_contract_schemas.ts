@@ -211,6 +211,21 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'reasoning-level-policy',
+      schemaPath: 'knowledge/product/schemas/reasoning-level-policy.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/reasoning-level-policy.json')],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          thresholds: {
+            low_confidence: 0.65,
+          },
+          fast_shapes: ['direct_reply'],
+          rules: [],
+        },
+      ],
+    },
+    {
       id: 'production-evidence-register',
       schemaPath: 'knowledge/product/schemas/production-evidence-register.schema.json',
       validPayloads: [readGovernanceJson('knowledge/product/governance/production-evidence-register.json')],
