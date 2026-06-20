@@ -41,6 +41,19 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
+    name: 'reasoning-level-policy',
+    schemaPath: 'knowledge/product/schemas/reasoning-level-policy.schema.json',
+    dataPath: 'knowledge/product/governance/reasoning-level-policy.json',
+    invalidPayload: {
+      version: '1.0.0',
+      thresholds: {
+        low_confidence: 0.65,
+      },
+      fast_shapes: ['direct_reply'],
+      rules: [],
+    },
+  },
+  {
     name: 'active-surfaces',
     schemaPath: 'knowledge/product/schemas/runtime-surface-manifest.schema.json',
     dataPath: 'knowledge/product/governance/active-surfaces.json',

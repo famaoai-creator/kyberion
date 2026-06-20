@@ -1042,6 +1042,27 @@ export {
   resetReasoningBackendPolicyCache,
 } from './reasoning-backend-policy.js';
 export {
+  loadReasoningLevelPolicy,
+  resolveReasoningLevelDecision,
+  resetReasoningLevelPolicyCache,
+  validateReasoningLevelPolicy,
+} from './reasoning-level-policy.js';
+export type {
+  ReasoningLevel,
+  ReasoningLevelDecision,
+  ReasoningLevelPolicy,
+} from './reasoning-level-policy.js';
+export {
+  loadModelRegistry,
+  resolveReasoningModelRoute,
+  resetReasoningModelRoutingCache,
+} from './reasoning-model-routing.js';
+export type {
+  ModelRegistryEntry,
+  ModelRegistryFile,
+  ReasoningModelRoute,
+} from './reasoning-model-routing.js';
+export {
   loadVoiceTaskProfileCatalog,
   resolveVoiceTaskDistillTargetKind,
   resolveVoiceTaskProfile,
