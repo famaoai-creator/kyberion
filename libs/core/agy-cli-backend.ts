@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process';
+import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
+import * as pathResolver from './path-resolver.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -29,6 +31,8 @@ export interface AgyCliBackendOptions {
   model?: string;
   timeoutMs?: number;
   extraArgs?: string[];
+  sandbox?: boolean;
+  logFile?: string;
 }
 
 export interface RunAgyCliQueryParams<T> {
@@ -123,12 +127,19 @@ export class AgyCliBackend implements ReasoningBackend {
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly extraArgs: string[];
+  private readonly sandbox: boolean;
+  private readonly logFile: string;
 
   constructor(options: AgyCliBackendOptions = {}) {
     this.bin = options.bin ?? 'agy';
     this.model = options.model ?? 'agy';
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
+    this.sandbox = options.sandbox ?? process.env.KYBERION_AGY_SANDBOX !== '0';
+    this.logFile = options.logFile ?? path.join(
+      pathResolver.sharedTmp(),
+      `agy-cli-${Date.now()}-${Math.random().toString(36).slice(2)}.log`,
+    );
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -296,23 +307,36 @@ export class AgyCliBackend implements ReasoningBackend {
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
 
+    const prompt = [
+      params.systemPrompt.trim(),
+      '',
+      'Return exactly one JSON object that matches the schema below.',
+      'Do not wrap the JSON in markdown fences.',
+      'Do not include commentary, code fences, or extra keys.',
+      '',
+      'Schema:',
+      JSON.stringify(jsonSchema, null, 2),
+      '',
+      'User input:',
+      params.userPrompt.trim(),
+    ].join('\n');
+
     const args = [
-      '-p',
-      '--output-format',
-      'json',
-      '--system-prompt',
-      params.systemPrompt,
-      '--json-schema',
-      JSON.stringify(jsonSchema),
+      '--log-file',
+      this.logFile,
       '--model',
       this.model,
+      ...(this.sandbox ? ['--sandbox'] : []),
+      '--dangerously-skip-permissions',
+      '-p',
+      prompt,
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args, params.userPrompt);
+    const stdout = await this.spawnCli(args);
     let cliResult: any;
     try {
-      cliResult = JSON.parse(stdout);
+      cliResult = JSON.parse(extractJsonPayload(stdout));
     } catch (err: any) {
       throw new Error(
         `[agy-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`,
@@ -321,11 +345,21 @@ export class AgyCliBackend implements ReasoningBackend {
     if (cliResult.is_error) {
       throw new Error(`[agy-cli] CLI reported error: ${cliResult.result ?? JSON.stringify(cliResult)}`);
     }
-    const structured = cliResult.structured_output;
-    if (structured === undefined) {
-      throw new Error(`[agy-cli] CLI did not emit structured_output. Result: ${cliResult.result}`);
+    const structured = cliResult.structured_output ?? cliResult.response ?? cliResult;
+    if (structured === undefined || structured === null) {
+      throw new Error(`[agy-cli] CLI did not emit structured output. Result: ${cliResult.result ?? stdout.slice(0, 500)}`);
     }
-    const parsed = params.schema.safeParse(structured);
+    let structuredValue: unknown = structured;
+    if (typeof structured === 'string') {
+      try {
+        structuredValue = JSON.parse(extractJsonPayload(structured));
+      } catch (err: any) {
+        throw new Error(
+          `[agy-cli] structured output was not valid JSON: ${err?.message ?? String(err)}. Structured: ${structured.slice(0, 500)}`,
+        );
+      }
+    }
+    const parsed = params.schema.safeParse(structuredValue);
     if (!parsed.success) {
       throw new Error(
         `[agy-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`,
@@ -336,29 +370,23 @@ export class AgyCliBackend implements ReasoningBackend {
 
   private async runPrompt(prompt: string): Promise<string> {
     const args = [
-      '-p',
-      prompt,
-      '-o',
-      'json',
-      '-y',
-      '--dangerously-skip-permissions',
+      '--log-file',
+      this.logFile,
       '--model',
       this.model,
+      ...(this.sandbox ? ['--sandbox'] : []),
+      '--dangerously-skip-permissions',
+      '-p',
+      prompt,
       ...this.extraArgs,
     ];
 
-    const stdout = await this.spawnCli(args, '');
-    const lines = stdout.split('\n');
-    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
-    if (jsonStartIdx === -1) {
-      return stdout.trim();
-    }
-    const cleanStdout = lines.slice(jsonStartIdx).join('\n');
+    const stdout = await this.spawnCli(args);
     try {
-      const cliResult = JSON.parse(cleanStdout);
+      const cliResult = JSON.parse(extractJsonPayload(stdout));
       const responseStr: string | undefined = cliResult.response;
       if (responseStr === undefined || responseStr === null) {
-        throw new Error('[agy-cli] CLI result missing "response" field');
+        return stdout.trim();
       }
       return responseStr.trim() || stdout.trim();
     } catch (err: any) {
@@ -367,7 +395,7 @@ export class AgyCliBackend implements ReasoningBackend {
     }
   }
 
-  private spawnCli(args: string[], stdin: string): Promise<string> {
+  private spawnCli(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -393,7 +421,6 @@ export class AgyCliBackend implements ReasoningBackend {
         clearTimeout(timer);
         reject(new Error(`[agy-cli] spawn failed: ${err.message}`));
       });
-      child.stdin.write(stdin);
       child.stdin.end();
     });
   }
@@ -406,10 +433,15 @@ export function buildAgyCliBackendFromEnv(
   const model = env.KYBERION_AGY_CLI_MODEL?.trim();
   const timeoutRaw = env.KYBERION_AGY_CLI_TIMEOUT_MS?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
+  const sandbox = env.KYBERION_AGY_SANDBOX?.trim();
+  const sandboxEnabled = sandbox === undefined ? undefined : sandbox !== '0';
+  const logFile = env.KYBERION_AGY_CLI_LOG_FILE?.trim();
   const backend = new AgyCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
     ...(timeoutMs && !Number.isNaN(timeoutMs) ? { timeoutMs } : {}),
+    ...(sandboxEnabled !== undefined ? { sandbox: sandboxEnabled } : {}),
+    ...(logFile ? { logFile } : {}),
   });
   logger.info(`[agy-cli] backend ready (bin=${bin ?? 'agy'}, model=${model ?? 'agy'})`);
   return backend;
@@ -419,4 +451,13 @@ export async function runAgyCliQuery<T>(params: RunAgyCliQueryParams<T>): Promis
   const backendOptions = params.options || {};
   const backend = new AgyCliBackend(backendOptions);
   return backend.runStructured({ systemPrompt: params.systemPrompt, userPrompt: params.userPrompt, schema: params.schema });
+}
+
+function extractJsonPayload(raw: string): string {
+  const trimmed = raw.trim();
+  const fenced = trimmed.match(/```json\s*([\s\S]*?)```/u) || trimmed.match(/```\s*([\s\S]*?)```/u);
+  if (fenced?.[1]) {
+    return fenced[1].trim();
+  }
+  return trimmed;
 }

@@ -19,6 +19,10 @@ describe('reasoning-bootstrap', () => {
     delete process.env.KYBERION_LOCAL_LLM_URL;
     delete process.env.KYBERION_LOCAL_LLM_MODEL;
     delete process.env.KYBERION_LOCAL_LLM_KEY;
+    delete process.env.KYBERION_OPENROUTER_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.KYBERION_OPENROUTER_MODEL;
+    delete process.env.KYBERION_OPENROUTER_URL;
   });
 
   it('installs codex-cli adapters when requested explicitly', () => {
@@ -50,6 +54,26 @@ describe('reasoning-bootstrap', () => {
     expect(installed).toBe(true);
     expect(getInstalledReasoningMode()).toBe('local');
     expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
+  it('installs the OpenRouter backend when configured', () => {
+    process.env.OPENROUTER_API_KEY = 'or-test-key';
+    process.env.KYBERION_OPENROUTER_MODEL = 'meta-llama/llama-3-70b-instruct';
+
+    const installed = installReasoningBackends({ mode: 'openrouter' });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('openrouter');
+    expect(getReasoningBackend().name).toBe('openrouter');
+  });
+
+  it('auto-selects OpenRouter when its API key is present', () => {
+    process.env.OPENROUTER_API_KEY = 'or-test-key';
+    const installed = installReasoningBackends({ refreshProviders: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('openrouter');
+    expect(getReasoningBackend().name).toBe('openrouter');
   });
 
   it('auto-selects codex-cli when the Codex CLI is the advertised host context', () => {

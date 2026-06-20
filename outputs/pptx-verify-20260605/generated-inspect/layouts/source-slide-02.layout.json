@@ -1,0 +1,551 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/pg3ex0nu",
+    "id": "pg3ex0nu",
+    "slide": 3,
+    "layoutId": "/ppt/slideLayouts/slideLayout2.xml",
+    "layoutName": "Standard Layout",
+    "layoutType": "obj",
+    "masterLayoutId": "/ppt/slideMasters/slideMaster1.xml",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 960,
+      "height": 540
+    }
+  },
+  "theme": {
+    "colorSchemeName": "Office",
+    "colors": {
+      "accent1": "#38BDF8",
+      "accent2": "#334155",
+      "accent3": "#A5A5A5",
+      "accent4": "#FFC000",
+      "accent5": "#4472C4",
+      "accent6": "#70AD47",
+      "dk1": "#0F172A",
+      "lt1": "#FFFFFF",
+      "dk2": "#334155",
+      "lt2": "#FFFFFF",
+      "hlink": "#0563C1",
+      "folHlink": "#954F72"
+    },
+    "fontScheme": {
+      "name": "Office",
+      "majorFont": {
+        "latinTypeface": "Calibri Light"
+      },
+      "minorFont": {
+        "latinTypeface": "Calibri"
+      }
+    },
+    "typefaces": [
+      "Calibri",
+      "Calibri Light",
+      "Inter",
+      "System-ui"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "/ppt/slideLayouts/slideLayout2.xml",
+      "name": "Standard Layout",
+      "type": "obj",
+      "parentLayoutId": "/ppt/slideMasters/slideMaster1.xml",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "/ppt/slideMasters/slideMaster1.xml",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5o7qpg3e",
+      "id": "2",
+      "name": "Shape 2",
+      "bbox": [
+        0,
+        0,
+        960,
+        69.12
+      ],
+      "geometry": "rect",
+      "resolvedFontSize": 18.67,
+      "resolvedTextStyle": {
+        "fontSize": 18.67,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": ""
+          }
+        ]
+      },
+      "fillColor": "#0F172A"
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/g3ex0nux",
+      "id": "3",
+      "name": "Shape 3",
+      "bbox": [
+        33.6,
+        0,
+        912,
+        69.12
+      ],
+      "geometry": "rect",
+      "text": "Contents",
+      "textPreview": "Contents",
+      "resolvedFontSize": 58.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 58.67,
+        "typeface": "Calibri Light",
+        "color": "tx1",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "wrap": "square",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 5.76
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Contents"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Contents",
+          "resolvedTextStyle": {
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Contents",
+              "fontSize": 29.33,
+              "typeface": "Inter",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "bulletCharacter": "",
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 0
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/r65wjudg",
+      "id": "4",
+      "name": "Shape 4",
+      "bbox": [
+        0,
+        69.12,
+        960,
+        2.3
+      ],
+      "geometry": "rect",
+      "resolvedFontSize": 18.67,
+      "resolvedTextStyle": {
+        "fontSize": 18.67,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": ""
+          }
+        ]
+      },
+      "fillColor": "#334155"
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ylc7u54z",
+      "id": "5",
+      "name": "Shape 5",
+      "bbox": [
+        28.8,
+        72.96,
+        6.24,
+        436.8
+      ],
+      "geometry": "rect",
+      "resolvedFontSize": 18.67,
+      "resolvedTextStyle": {
+        "fontSize": 18.67,
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": ""
+          }
+        ]
+      },
+      "fillColor": "#0F172A"
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/9cvixcze",
+      "id": "6",
+      "name": "Shape 6",
+      "bbox": [
+        42.24,
+        72.96,
+        878.4,
+        436.8
+      ],
+      "geometry": "rect",
+      "text": "1. デッキタイトル（Kyberion Context Injection and Artifact Lifecycle が空の場合は内容から生成） — コアメッセージ（1文）\n2. Executive Summary\n3. Why Change Now — Frame the business urgency and cost of inaction\n4. Target Outcome — Show the future-state result and customer or operator gain\n5. Solution Shape — Describe the recommended approach and its differentiators\n6. Governance and Controls — Explain how risk, compliance, and operations stay governed\n7. Delivery Plan — Break delivery into phases, milestones, and measurable wins\n8. Decision and Next Steps",
+      "textPreview": "1. デッキタイトル（Kyberion Context Injection and Artifact Lifecycle が空の場合は内容から生成） — コアメッセージ（1文） | 2. Executive Summary | 3. Why Change Now — Fra...",
+      "resolvedFontSize": 37.33,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 37.33,
+        "typeface": "Calibri",
+        "color": "tx1",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "wrap": "square",
+        "insets": {
+          "top": 9.6,
+          "right": 5.76,
+          "bottom": 5.76,
+          "left": 7.68
+        }
+      },
+      "textLayout": {
+        "lineCount": 17,
+        "lines": [
+          {
+            "index": 1,
+            "text": ""
+          },
+          {
+            "index": 2,
+            "text": "1. デッキタイトル（Kyberion Context Injection and Artifact Lifecycle が空の場合は内容から生成） —"
+          },
+          {
+            "index": 3,
+            "text": "コアメッセージ（1文）"
+          },
+          {
+            "index": 4,
+            "text": ""
+          },
+          {
+            "index": 5,
+            "text": "2. Executive Summary"
+          },
+          {
+            "index": 6,
+            "text": ""
+          },
+          {
+            "index": 7,
+            "text": "3. Why Change Now — Frame the business urgency and cost of inaction"
+          },
+          {
+            "index": 8,
+            "text": ""
+          },
+          {
+            "index": 9,
+            "text": "4. Target Outcome — Show the future-state result and customer or operator gain"
+          },
+          {
+            "index": 10,
+            "text": ""
+          },
+          {
+            "index": 11,
+            "text": "5. Solution Shape — Describe the recommended approach and its differentiators"
+          },
+          {
+            "index": 12,
+            "text": ""
+          },
+          {
+            "index": 13,
+            "text": "6. Governance and Controls — Explain how risk, compliance, and operations stay governed"
+          },
+          {
+            "index": 14,
+            "text": ""
+          },
+          {
+            "index": 15,
+            "text": "7. Delivery Plan — Break delivery into phases, milestones, and measurable wins"
+          },
+          {
+            "index": 16,
+            "text": ""
+          },
+          {
+            "index": 17,
+            "text": "8. Decision and Next Steps"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "1. デッキタイトル（Kyberion Context Injection and Artifact Lifecycle が空の場合は内容から生成） — コアメッセージ（1文）",
+          "resolvedTextStyle": {
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "1. デッキタイトル（Kyberion Context Injection and Artifact Lifecycle が空の場合は内容から生成） — コアメッセージ（1文）",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 2,
+          "text": "2. Executive Summary",
+          "runs": [
+            {
+              "index": 1,
+              "text": "2. Executive Summary",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 3,
+          "text": "3. Why Change Now — Frame the business urgency and cost of inaction",
+          "runs": [
+            {
+              "index": 1,
+              "text": "3. Why Change Now — Frame the business urgency and cost of inaction",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 4,
+          "text": "4. Target Outcome — Show the future-state result and customer or operator gain",
+          "runs": [
+            {
+              "index": 1,
+              "text": "4. Target Outcome — Show the future-state result and customer or operator gain",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 5,
+          "text": "5. Solution Shape — Describe the recommended approach and its differentiators",
+          "runs": [
+            {
+              "index": 1,
+              "text": "5. Solution Shape — Describe the recommended approach and its differentiators",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 6,
+          "text": "6. Governance and Controls — Explain how risk, compliance, and operations stay governed",
+          "runs": [
+            {
+              "index": 1,
+              "text": "6. Governance and Controls — Explain how risk, compliance, and operations stay governed",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 7,
+          "text": "7. Delivery Plan — Break delivery into phases, milestones, and measurable wins",
+          "runs": [
+            {
+              "index": 1,
+              "text": "7. Delivery Plan — Break delivery into phases, milestones, and measurable wins",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        },
+        {
+          "index": 8,
+          "text": "8. Decision and Next Steps",
+          "runs": [
+            {
+              "index": 1,
+              "text": "8. Decision and Next Steps",
+              "fontSize": 18.67,
+              "typeface": "System-ui",
+              "color": "#334155"
+            }
+          ],
+          "bulletCharacter": "•",
+          "marginLeft": 228600,
+          "indent": -228600,
+          "lineSpacingPercent": 90000,
+          "spaceBefore": 1000
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gr2p8nqx",
+      "id": "7",
+      "name": "Shape 7",
+      "bbox": [
+        0,
+        513.6,
+        960,
+        26.4
+      ],
+      "geometry": "rect",
+      "text": "Kyberion Standard  |  Confidential  ",
+      "textPreview": "Kyberion Standard  |  Confidential",
+      "resolvedFontSize": 18.67,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 18.67,
+        "verticalAlignment": "middle",
+        "wrap": "square",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Kyberion Standard  |  Confidential"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Kyberion Standard  |  Confidential  ",
+          "resolvedTextStyle": {
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Kyberion Standard  |  Confidential  ",
+              "fontSize": 10.67,
+              "color": "#334155"
+            }
+          ]
+        }
+      ],
+      "fillColor": "#F0F4FA"
+    }
+  ],
+  "composeRuns": []
+}

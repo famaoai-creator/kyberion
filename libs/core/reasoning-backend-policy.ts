@@ -13,6 +13,7 @@ export type ReasoningBackendMode =
   | 'gemini-api'
   | 'agy-cli'
   | 'local'
+  | 'openrouter'
   | 'stub';
 
 export interface ReasoningBackendSelectionRule {
@@ -65,12 +66,14 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'gemini-cli',
     'agy-cli',
     'local',
+    'openrouter',
     'stub',
   ],
   auto_select_env_priority: [
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
     { env: 'GEMINI_API_KEY', mode: 'gemini-cli' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
+    { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },
   ],
   cli_preference_rules: [
     { env_any: ['CODEX_CLI', 'CODEX_VERSION'], env_equals: { TERM_PROGRAM: 'codex' }, provider: 'codex', mode: 'codex-cli' },
@@ -170,9 +173,13 @@ export function resolveReasoningBackendModeFromContext(input: {
     }
   }
 
-  if (env.ANTHROPIC_API_KEY) return 'anthropic';
-  if (env.GEMINI_API_KEY) return 'gemini-cli';
-  if (env.KYBERION_LOCAL_LLM_URL) return 'local';
+  for (const rule of policy.auto_select_env_priority) {
+    if (!env[rule.env]) continue;
+    const normalizedRuleMode = normalizeReasoningBackendMode(rule.mode, policy);
+    if (policy.allowed_modes.includes(normalizedRuleMode)) {
+      return normalizedRuleMode;
+    }
+  }
 
   for (const rule of policy.cli_preference_rules) {
     if (!matchesSelectionRule(env, rule)) continue;

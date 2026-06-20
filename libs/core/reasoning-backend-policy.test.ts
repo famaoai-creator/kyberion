@@ -11,6 +11,7 @@ describe('reasoning-backend-policy', () => {
 
     expect(policy.default_mode).toBe('codex-cli');
     expect(policy.allowed_modes).toContain('gemini-cli');
+    expect(policy.allowed_modes).toContain('openrouter');
     expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
   });
 
@@ -70,5 +71,26 @@ describe('reasoning-backend-policy', () => {
         providers: [],
       }),
     ).toBe('codex-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {
+          OPENROUTER_API_KEY: 'or-key',
+        },
+        providers: [],
+      }),
+    ).toBe('openrouter');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {
+          KYBERION_LOCAL_LLM_URL: 'http://127.0.0.1:11434/v1',
+          OPENROUTER_API_KEY: 'or-key',
+        },
+        providers: [],
+      }),
+    ).toBe('local');
   });
 });
