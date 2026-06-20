@@ -8,7 +8,10 @@
     "mission_id": "",
     "attendees": [],
     "operator_label": "Operator",
-    "language": "ja"
+    "language": "ja",
+    "transcript_path": "active/shared/tmp/meeting-transcript-{{mission_id}}.txt",
+    "action_items_path": "active/shared/tmp/action-items-extracted-{{mission_id}}.json",
+    "speaker_fairness_path": "active/shared/tmp/speaker-fairness-{{mission_id}}.json"
   },
   "steps": [
     {
@@ -20,21 +23,48 @@
       }
     },
     {
-      "id": "write_action_items_stub",
-      "role": "sink",
-      "op": "code:write_artifact",
+      "id": "read_transcript",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "meeting_transcript", "type": "MeetingTranscript" },
       "params": {
-        "path": "active/shared/tmp/action-items-extracted-{{mission_id}}.json",
-        "content": "{\"mission_id\":\"{{mission_id}}\",\"transcript_path\":\"active/shared/tmp/meeting-transcript-{{mission_id}}.txt\",\"status\":\"stub\",\"action_items\":[]}"
+        "path": "{{transcript_path}}"
+      }
+    },
+    {
+      "id": "extract_action_items",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "meeting_transcript",
+      "produces": { "channel": "action_items_report", "type": "MeetingActionItemReport" },
+      "params": {
+        "instruction": "以下の会議トランスクリプトを読み、会議後の実行に必要な情報を JSON だけで返してください。余計な説明文は含めないでください。\n\n必須キー:\n- mission_id\n- transcript_path\n- summary\n- decisions\n- action_items\n- risks\n\n要件:\n- action_items は配列で、各項目に owner, task, due, confidence, needs_confirmation を含める\n- decisions は配列で、各項目に decision と confidence を含める\n- risks は配列の文字列で返す\n- transcript に基づいて、空配列だけで終わらせない\n- 不明点は needs_confirmation を true にして明示する\n- 出力は JSON オブジェクトとして成立する形にする",
+        "context": ["{{mission_id}}", "{{transcript_path}}", "{{meeting_transcript}}"]
+      }
+    },
+    {
+      "id": "write_action_items",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "action_items_report",
+      "params": {
+        "path": "{{action_items_path}}",
+        "content": "{{action_items_report}}"
       }
     },
     {
       "id": "write_fairness_stub",
       "role": "sink",
-      "op": "code:write_artifact",
+      "op": "system:write_file",
       "params": {
-        "path": "active/shared/tmp/speaker-fairness-{{mission_id}}.json",
-        "content": "{\"mission_id\":\"{{mission_id}}\",\"status\":\"stub\",\"fairness_notes\":[\"No live speaker attribution available in deterministic meeting transcript.\"]}"
+        "path": "{{speaker_fairness_path}}",
+        "content": {
+          "mission_id": "{{mission_id}}",
+          "status": "stub",
+          "fairness_notes": [
+            "No live speaker attribution available in deterministic meeting transcript."
+          ]
+        }
       }
     },
     {
@@ -42,7 +72,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "✅ Meeting postprocess complete: action items at active/shared/tmp/action-items-extracted-{{mission_id}}.json, fairness at active/shared/tmp/speaker-fairness-{{mission_id}}.json"
+        "message": "✅ Meeting postprocess complete: action items at {{action_items_path}}, fairness at {{speaker_fairness_path}}"
       }
     }
   ]
