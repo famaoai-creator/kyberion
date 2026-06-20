@@ -14,6 +14,7 @@ import {
   safeRmSync,
   safeWriteFile,
   setWorkCoordinationNamespace,
+  updateWorkItem,
 } from '@agent/core';
 import type { MissionState } from './mission-types.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
@@ -237,6 +238,121 @@ describe('mission work item dispatch', () => {
     expect(response.prompt).toContain('ART-WORKITEM-REVISION');
     expect(response.prompt).toContain('Reusable project artifact');
     expect(response.response_text).toContain('artifact reuse confirmed');
+  });
+
+  it('records the cognitive routing decision in the dispatch artifact and prompt', async () => {
+    createWorkItem({
+      title: `${missionId}: Execute the deterministic pipeline`,
+      description: 'Run the known deterministic pipeline from the pipeline_ref and persist the result artifact.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-1-deterministic`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/deterministic-result.md',
+        target_path: 'deliverables/deterministic-result.md',
+        pipeline_ref: 'pipelines/deterministic-result.json',
+      },
+    });
+
+    const delegateTask = vi.fn(async (instruction: string) => `subagent accepted\n${instruction}`);
+    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
+      mode: 'subagent',
+      finalStatus: 'review',
+    }, {
+      delegateTask,
+    });
+
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    const prompt = String(delegateTask.mock.calls[0]?.[0] || '');
+    expect(prompt).toContain('Cognitive route:');
+    expect(prompt).toContain('tier=zero_llm');
+    expect(prompt).toContain('deterministic_pipeline');
+
+    expect(manifest.records[0]).toMatchObject({
+      cognitive_route: {
+        tier: 'zero_llm',
+        backend_preference: 'deterministic_pipeline',
+        deterministic_eligible: true,
+      },
+    });
+
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
+    const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
+    expect(response.cognitive_route).toMatchObject({
+      tier: 'zero_llm',
+      backend_preference: 'deterministic_pipeline',
+      deterministic_eligible: true,
+    });
+    expect(response.cognitive_route_summary).toContain('tier=zero_llm');
+  });
+
+  it('blocks repeated identical dispatch outcomes and marks needs_attention', async () => {
+    createWorkItem({
+      title: `${missionId}: Repeat the same output until stopped`,
+      description: 'Repeat the same result three times so the drift watchdog can detect a loop and stop the mission work item.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-1-drift`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/drift-watchdog.md',
+        target_path: 'deliverables/drift-watchdog.md',
+      },
+    });
+
+    const delegateTask = vi.fn(async () => 'identical result');
+
+    const first = await dispatchMissionWorkItems(makeMissionState(), { mode: 'subagent', finalStatus: 'review' }, { delegateTask });
+    let current = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    updateWorkItem({
+      itemId: current.item_id,
+      status: 'ready',
+      metadata: {
+        ...(current.metadata || {}),
+        ...(first.records[0]?.drift_watchdog || {}),
+      },
+    });
+
+    const second = await dispatchMissionWorkItems(makeMissionState(), { mode: 'subagent', finalStatus: 'review' }, { delegateTask });
+    current = listWorkItems({ projectId: missionId, source: 'local' })[0];
+    updateWorkItem({
+      itemId: current.item_id,
+      status: 'ready',
+      metadata: {
+        ...(current.metadata || {}),
+        ...(second.records[0]?.drift_watchdog || {}),
+      },
+    });
+
+    const third = await dispatchMissionWorkItems(makeMissionState(), { mode: 'subagent', finalStatus: 'review' }, { delegateTask });
+
+    expect(delegateTask).toHaveBeenCalledTimes(3);
+    expect(first.records[0]?.work_item_status_after).toBe('review');
+    expect(second.records[0]?.work_item_status_after).toBe('review');
+    expect(third.records[0]).toMatchObject({
+      work_item_status_after: 'blocked',
+      drift_watchdog: expect.objectContaining({
+        should_stop: true,
+        needs_attention: true,
+      }),
+    });
+
+    const items = listWorkItems({ projectId: missionId, source: 'local' });
+    expect(items[0]).toMatchObject({ status: 'blocked' });
+
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${third.records[0].item_id}.json`;
+    const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
+    expect(response.drift_watchdog_summary).toContain('attention=yes');
+    expect(response.drift_watchdog_summary).toContain('stop=yes');
   });
 
   it('selects work items by linked project id when mission id differs from project id', async () => {

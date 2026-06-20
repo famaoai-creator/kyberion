@@ -54,6 +54,7 @@ beforeEach(() => {
   setWorkCoordinationNamespace('mission-ticket-dispatch-test');
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
+  safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(makeMissionState(), null, 2));
 });
 
 afterEach(() => {
@@ -109,6 +110,11 @@ describe('mission ticket dispatch', () => {
       targets: ['workitem', 'github', 'jira'],
       live_targets: [],
     });
+    const missionState = JSON.parse(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string);
+    expect(missionState.context?.last_action).toBe('Dispatched ticket task-1');
+    expect(missionState.context?.ticket_dispatch_summary?.task_id).toBe('task-1');
+    expect(missionState.context?.ticket_dispatch_summary?.work_item_id).toBe(manifest.records[0].work_item_id);
+    expect(missionState.history.at(-1)?.event).toBe('RECORD_TASK');
     expect(safeExistsSync(`${missionPath}/coordination/events/ticket-events.jsonl`)).toBe(true);
     expect(safeExistsSync(`${missionPath}/coordination/tickets/dispatch-manifest.json`)).toBe(true);
   });
