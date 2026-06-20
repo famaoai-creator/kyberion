@@ -26,7 +26,6 @@
 import {
   registerMeetingJoinDriver,
   logger,
-  classifyError,
   withRetry,
   type AudioBus,
   type AudioChunk,
@@ -44,6 +43,7 @@ import {
   type MeetingPreJoinSelectors,
 } from './selectors.js';
 import { readCookies, writeCookies } from './cookie-store.js';
+import { buildRetryOptions, loadPlaywright, trySelectors } from './meeting-browser-driver-helpers.js';
 import { safeReadFile, pathResolver } from '@agent/core';
 
 /* Playwright type stand-ins so this file compiles without playwright
@@ -65,18 +65,8 @@ type PlaywrightPage = {
   isVisible: (selector: string) => Promise<boolean>;
 };
 
-const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/meeting-browser-driver/manifest.json');
 export const MEETING_BROWSER_DRIVER_ID = 'browser-playwright' as const;
 export const MEETING_BROWSER_DRIVER_ROLE = 'internal-join-backend' as const;
-const DEFAULT_MEETING_BROWSER_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
-
-let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 export interface BrowserDriverOptions {
   /** When true, run a visible Chromium (debugging). Default: false (headed=false). */
@@ -90,54 +80,6 @@ export interface BrowserDriverOptions {
 }
 
 const DEFAULT_TIMEOUT = 20_000;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(MEETING_BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy ?? {};
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy ?? {};
-  }
-}
-
-function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
-  );
-  const resolved = {
-    ...DEFAULT_MEETING_BROWSER_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
-    },
-  };
-}
-
-async function loadPlaywright(): Promise<any> {
-  // Keep playwright optional: a literal dynamic import would make
-  // TypeScript require installed type declarations during repo builds.
-  return new Function('specifier', 'return import(specifier)')('playwright');
-}
 
 class BrowserMeetingJoinDriver implements MeetingJoinDriver {
   readonly driver_id = MEETING_BROWSER_DRIVER_ID;
@@ -254,9 +196,9 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
       },
       async leave(): Promise<void> {
         leaveSignaled = true;
-        await withRetry(async () => trySelectors(page, selectors.leave_button, async (sel) => {
-          await page.click(sel, { timeout: 5_000 });
-        }), buildRetryOptions());
+      await withRetry(async () => trySelectors(page, selectors.leave_button, async (sel) => {
+        await page.click(sel, { timeout: 5_000 });
+      }), buildRetryOptions());
         state.status = 'ended';
         state.left_at = new Date().toISOString();
         await withRetry(async () => browser.close().catch(() => undefined), buildRetryOptions());
@@ -264,24 +206,6 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
       },
     };
   }
-}
-
-async function trySelectors(
-  page: PlaywrightPage,
-  selectors: string[],
-  action: (selector: string) => Promise<void>,
-): Promise<boolean> {
-  for (const sel of selectors) {
-    try {
-      const visible = await page.isVisible(sel).catch(() => false);
-      if (!visible) continue;
-      await action(sel);
-      return true;
-    } catch {
-      /* try next */
-    }
-  }
-  return false;
 }
 
 export { BrowserMeetingJoinDriver, MEET_SELECTORS, TEAMS_SELECTORS, ZOOM_SELECTORS };
