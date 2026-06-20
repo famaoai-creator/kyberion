@@ -14,6 +14,20 @@ import type { MeetingPlatform } from '@agent/core';
 export interface MeetingPreJoinSelectors {
   /** Optional input where the AI's display name goes (Meet for guests). */
   name_input: string[];
+  /** Teams / vendor entry form field for a meeting ID or code. */
+  meeting_id_input: string[];
+  /** Teams / vendor entry form field for a passcode. */
+  meeting_passcode_input: string[];
+  /** Meet's pre-join continuation affordance before the actual join CTA appears. */
+  continue_without_audio_video_button: string[];
+  /** Open the Meet settings dialog before joining. */
+  settings_button: string[];
+  /** Device controls inside the Meet settings dialog. */
+  microphone_device_button: string[];
+  speaker_device_button: string[];
+  camera_device_button: string[];
+  /** Menu item / row for a device choice. */
+  device_option: string[];
   /** Toggle to mute the bot's mic before joining (we control speaking via TTS). */
   mute_mic_button: string[];
   /** Toggle to disable the camera (we don't render video). */
@@ -32,6 +46,46 @@ export const MEET_SELECTORS: MeetingPreJoinSelectors = {
     'input[placeholder="Your name"]',
     'input[aria-label="お名前を入力"]',
     'input[placeholder="お名前を入力"]',
+  ],
+  meeting_id_input: [],
+  meeting_passcode_input: [],
+  continue_without_audio_video_button: [
+    'button:has-text("Continue without microphone and camera")',
+    'button:has-text("Continue without audio and video")',
+    'button:has-text("マイクとカメラをオフにして参加")',
+    'button:has-text("マイクとカメラなしで続行")',
+    '[role="button"]:has-text("Continue without microphone and camera")',
+  ],
+  settings_button: [
+    'button[aria-label*="Settings" i]',
+    'button[aria-label*="設定" i]',
+    'button:has-text("Settings")',
+    'button:has-text("設定")',
+    '[role="button"][aria-label*="Settings" i]',
+  ],
+  microphone_device_button: [
+    'button[aria-label*="Microphone" i]',
+    'button:has-text("Microphone")',
+    'button:has-text("マイク")',
+    '[role="button"][aria-label*="Microphone" i]',
+  ],
+  speaker_device_button: [
+    'button[aria-label*="Speaker" i]',
+    'button:has-text("Speaker")',
+    'button:has-text("スピーカー")',
+    '[role="button"][aria-label*="Speaker" i]',
+  ],
+  camera_device_button: [
+    'button[aria-label*="Camera" i]',
+    'button:has-text("Camera")',
+    'button:has-text("カメラ")',
+    '[role="button"][aria-label*="Camera" i]',
+  ],
+  device_option: [
+    '[role="option"]',
+    'button[role="menuitem"]',
+    'button[role="option"]',
+    '[role="menuitem"]',
   ],
   mute_mic_button: [
     // Confirmed via live DOM inspection 2026-05-26
@@ -68,6 +122,14 @@ export const ZOOM_SELECTORS: MeetingPreJoinSelectors = {
     '#input-for-name',
     'input[aria-label="Your Name"]',
   ],
+  meeting_id_input: [],
+  meeting_passcode_input: [],
+  continue_without_audio_video_button: [],
+  settings_button: [],
+  microphone_device_button: [],
+  speaker_device_button: [],
+  camera_device_button: [],
+  device_option: [],
   mute_mic_button: [
     // Pre-join: aria-label="Mute" = mic is ON, clicking mutes it
     '#preview-audio-control-button',
@@ -98,6 +160,26 @@ export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
     // Confirmed via live DOM inspection 2026-05-26 (light-meetings/launch experience)
     'input[data-tid="prejoin-display-name-input"]',
   ],
+  meeting_id_input: [
+    'input[aria-label*="会議 ID" i]',
+    'input[placeholder*="会議 ID" i]',
+    'input[aria-label*="Meeting ID" i]',
+    'input[placeholder*="Meeting ID" i]',
+    'input[data-tid="meeting-id-input"]',
+  ],
+  meeting_passcode_input: [
+    'input[aria-label*="会議パスコード" i]',
+    'input[placeholder*="会議パスコード" i]',
+    'input[aria-label*="passcode" i]',
+    'input[placeholder*="passcode" i]',
+    'input[data-tid="meeting-passcode-input"]',
+  ],
+  continue_without_audio_video_button: [],
+  settings_button: [],
+  microphone_device_button: [],
+  speaker_device_button: [],
+  camera_device_button: [],
+  device_option: [],
   mute_mic_button: [
     // checkbox input — click toggles mute state
     'input[data-tid="toggle-mute"]',
@@ -107,6 +189,8 @@ export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
     'input[data-tid="toggle-video"]',
   ],
   join_button: [
+    'button:has-text("会議に参加する")',
+    'button:has-text("Join the meeting")',
     'button[data-tid="prejoin-join-button"]',
     'button[id="prejoin-join-button"]',
   ],

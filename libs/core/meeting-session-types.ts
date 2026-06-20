@@ -15,6 +15,10 @@ export interface MeetingTarget {
   url: string;
   /** Platform of the URL; `auto` lets the driver infer. */
   platform: MeetingPlatform;
+  /** Platform-specific meeting code / ID when the entry page requires one. */
+  meeting_id?: string;
+  /** Optional passcode / password for platforms that gate entry behind one. */
+  passcode?: string;
   /** Display name the AI should show in the participant list. */
   display_name?: string;
   /** Optional opaque auth handle (cookies / SDK token / OAuth). */

@@ -116,6 +116,9 @@ describe('BrowserMeetingJoinDriver registration', () => {
     const driver = new BrowserMeetingJoinDriver({
       headed: true,
       account_slug: 'test-account',
+      microphone_device: 'Built-in Microphone',
+      speaker_device: 'Built-in Output',
+      camera_device: 'FaceTime HD Camera',
       step_timeout_ms: 5000,
     });
     expect(driver.driver_id).toBe(MEETING_BROWSER_DRIVER_ID);
@@ -133,11 +136,18 @@ describe('BrowserMeetingJoinDriver selectors', () => {
     expect(MEET_SELECTORS).toBeDefined();
     expect(Array.isArray(MEET_SELECTORS.join_button)).toBe(true);
     expect(MEET_SELECTORS.join_button.length).toBeGreaterThan(0);
+    expect(Array.isArray(MEET_SELECTORS.continue_without_audio_video_button)).toBe(true);
+    expect(Array.isArray(MEET_SELECTORS.settings_button)).toBe(true);
+    expect(Array.isArray(MEET_SELECTORS.microphone_device_button)).toBe(true);
+    expect(Array.isArray(MEET_SELECTORS.speaker_device_button)).toBe(true);
+    expect(Array.isArray(MEET_SELECTORS.camera_device_button)).toBe(true);
   });
 
   it('TEAMS_SELECTORS has required fields', () => {
     expect(TEAMS_SELECTORS).toBeDefined();
     expect(Array.isArray(TEAMS_SELECTORS.join_button)).toBe(true);
+    expect(Array.isArray(TEAMS_SELECTORS.meeting_id_input)).toBe(true);
+    expect(Array.isArray(TEAMS_SELECTORS.meeting_passcode_input)).toBe(true);
   });
 
   it('ZOOM_SELECTORS has required fields', () => {
@@ -163,6 +173,12 @@ describe('resolveMeetingPlatform', () => {
     expect(
       resolveMeetingPlatform({
         url: 'https://teams.microsoft.com/l/meetup-join/abc',
+        platform: 'auto',
+      }),
+    ).toBe('teams');
+    expect(
+      resolveMeetingPlatform({
+        url: 'https://www.microsoft.com/ja-jp/microsoft-teams/join-a-meeting',
         platform: 'auto',
       }),
     ).toBe('teams');
