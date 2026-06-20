@@ -80,9 +80,20 @@ function resolveProfilePath(scenario: TaskScenario, override?: string): string {
   return resolved;
 }
 
+function loadProfile(profilePath: string): Record<string, unknown> {
+  return JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+}
+
 function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): string {
   const requiredFor = boundary.required_for.length > 0 ? boundary.required_for.join(', ') : 'none';
   return `${boundary.default_action} (required for: ${requiredFor})`;
+}
+
+function formatArtifactHint(artifact: string): string {
+  if (artifact.startsWith('active/')) {
+    return artifact;
+  }
+  return `active/shared/tmp/${artifact}`;
 }
 
 export function describeTaskRun(scenarioId: string, profileOverride?: string): string {
@@ -94,7 +105,10 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string): s
   const profilePath = resolveProfilePath(scenario, profileOverride);
   const profileLoaded = safeExistsSync(profilePath);
   const requiresProfile = scenario.repeat_run.params_from_profile;
-  const artifactList = scenario.result.artifacts.map((artifact) => `- ${artifact}`).join('\n');
+  const profile = profileLoaded ? loadProfile(profilePath) : null;
+  const artifactList = scenario.result.artifacts
+    .flatMap((artifact) => [`- ${artifact}`, `  Likely path: ${formatArtifactHint(artifact)}`])
+    .join('\n');
   const nextActions = requiresProfile && !profileLoaded
     ? [
         `1. Run pnpm task:init ${scenario.id} to create the profile.`,
@@ -114,6 +128,7 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string): s
     `Inputs:`,
     `- Sources: ${scenario.input.sources.join(', ')}`,
     `- Profile: ${profilePath}`,
+    profile ? `Profile loaded: yes` : 'Profile loaded: no',
     `- Pipeline template: ${scenario.repeat_run.pipeline_template}`,
     `Expected result:`,
     artifactList,
