@@ -80,21 +80,10 @@ export function selectAgentForTeamRole(
   const preferredAgents = new Set(selectionHints.preferred_agents);
   const preferredModels = new Set(selectionHints.preferred_models);
   const candidates = Object.entries(agents)
-    .map(([agentId, profile]) => {
-      if (!profile.team_roles.includes(teamRole)) return null;
-      const authorityRole = profile.authority_roles.find((role) =>
-        teamRoleRecord.compatible_authority_roles.includes(role),
-      );
-      if (!authorityRole) return null;
-      const authorityRecord = authorityRoles[authorityRole];
-      if (!authorityRecord) return null;
-      const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
-      const resolvedScopes = new Set(authorityRecord.scope_classes || []);
-      const missingScope = Array.from(requiredScopes).find((scopeClass) => !resolvedScopes.has(scopeClass));
-      if (missingScope) return null;
+    .flatMap(([agentId, profile]) => {
+      if (!profile.team_roles.includes(teamRole)) return [];
 
       const profileCapabilities = new Set((profile.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean));
-
       const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
         profile.selection_hints,
         undefined,
@@ -115,13 +104,24 @@ export function selectAgentForTeamRole(
       const providerBonus = selectionProvider === resolvedTarget.provider ? 2 : 0;
       const score = capabilityHits * 10 - capabilityPenalty + preferredAgentBonus + preferredModelBonus + providerBonus;
 
-      return {
-        agentId,
-        authorityRole,
-        authorityRecord,
-        resolvedTarget,
-        score,
-      } satisfies SelectionCandidate;
+      const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
+      const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>
+        teamRoleRecord.compatible_authority_roles.includes(role),
+      );
+      return compatibleAuthorityRoles.flatMap((authorityRole) => {
+        const authorityRecord = authorityRoles[authorityRole];
+        if (!authorityRecord) return [];
+        const resolvedScopes = new Set(authorityRecord.scope_classes || []);
+        const missingScope = Array.from(requiredScopes).find((scopeClass) => !resolvedScopes.has(scopeClass));
+        if (missingScope) return [];
+        return [{
+          agentId,
+          authorityRole,
+          authorityRecord,
+          resolvedTarget,
+          score,
+        } satisfies SelectionCandidate];
+      });
     })
     .filter((entry): entry is SelectionCandidate => Boolean(entry))
     .sort((left, right) => right.score - left.score || left.agentId.localeCompare(right.agentId));

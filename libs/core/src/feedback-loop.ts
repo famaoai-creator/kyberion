@@ -27,6 +27,15 @@ function sanitizeErrorMessage(error: string): string {
     .trim();
 }
 
+function sanitizeCategory(category: string): string {
+  const normalized = String(category || 'auto-learned')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || 'auto-learned';
+}
+
 /**
  * Extract learning hints from a completed trace.
  * Analyzes error spans and successful patterns to generate knowledge hints.
@@ -78,7 +87,7 @@ export function persistHints(hints: KnowledgeHint[], category: string = 'auto-le
   const hintsDir = FEEDBACK_HINTS_DIR;
   if (!safeExistsSync(hintsDir)) safeMkdir(hintsDir, { recursive: true });
 
-  const filePath = path.join(hintsDir, `${category}.json`);
+  const filePath = path.join(hintsDir, `${sanitizeCategory(category)}.json`);
   let existing: KnowledgeHint[] = [];
 
   if (safeExistsSync(filePath)) {

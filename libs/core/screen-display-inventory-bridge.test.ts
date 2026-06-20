@@ -4,6 +4,7 @@ import { createScreenDisplayInventoryBridge, SCREEN_DISPLAY_INVENTORY_BRIDGE_ID 
 describe('createScreenDisplayInventoryBridge', () => {
   it('parses macOS display inventory payloads', async () => {
     const bridge = createScreenDisplayInventoryBridge({
+      platform: 'darwin',
       command_runner: (command, args) => {
         expect(command).toBe('system_profiler');
         expect(args).toEqual(['SPDisplaysDataType', '-json']);

@@ -1,6 +1,6 @@
 {
   "name": "@actuator/meeting",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Meeting-Actuator — abstracts Zoom / Teams / Google Meet behind a single ADF surface (join / leave / speak / listen / chat / status).",

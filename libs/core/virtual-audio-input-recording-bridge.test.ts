@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const createVirtualDeviceInventoryBridge = vi.fn();
@@ -25,9 +25,15 @@ vi.mock('./secure-io.js', () => ({
 }));
 
 describe('createVirtualAudioInputRecordingBridge', () => {
+  const originalPlatform = process.platform;
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
     mocks.createVirtualDeviceInventoryBridge.mockReturnValue({
       bridge_id: 'virtual-device-inventory-bridge',
       probe: vi.fn().mockResolvedValue({
@@ -65,6 +71,13 @@ describe('createVirtualAudioInputRecordingBridge', () => {
       status: 0,
     });
     mocks.safeExec.mockReturnValue('{"status":"ok"}');
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform,
+    });
   });
 
   it('records a sample from the selected input using ffmpeg', async () => {

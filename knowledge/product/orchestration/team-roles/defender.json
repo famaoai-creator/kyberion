@@ -1,0 +1,28 @@
+{
+  "role": "defender",
+  "description": "Reviews and refutes adversarial findings, hardens mitigations, and checks for false positives.",
+  "required_capabilities": [
+    "reasoning",
+    "security",
+    "critique"
+  ],
+  "compatible_authority_roles": [
+    "ecosystem_architect",
+    "mission_controller"
+  ],
+  "allowed_delegate_team_roles": [],
+  "escalation_parent_team_role": "owner",
+  "required_scope_classes": [
+    "codebase_core"
+  ],
+  "ownership_scope": "Owns defensive verification, mitigation review, and blue-team rebuttals.",
+  "selection_hints": {
+    "preferred_agents": [
+      "sovereign-brain"
+    ],
+    "preferred_models": [
+      "auto-gemini-3"
+    ]
+  },
+  "autonomy_level": "high"
+}
