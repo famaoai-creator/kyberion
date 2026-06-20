@@ -1,0 +1,4 @@
+Operator: We need the revised proposal drafted by Tuesday.
+Alice: I will own the proposal outline and send the first version tomorrow.
+Bob: Please capture the open dependency on design review.
+Operator: Let's also flag the customer follow-up risk if the deck slips.
