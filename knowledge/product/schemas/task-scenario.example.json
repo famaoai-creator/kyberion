@@ -1,0 +1,37 @@
+{
+  "id": "daily-email-triage",
+  "title": "毎朝のメール重要度仕分け",
+  "description": "重要メールを抽出し、返信下書きと要約を作成する。",
+  "trigger": {
+    "type": "schedule",
+    "cron": "0 8 * * 1-5",
+    "timezone": "Asia/Tokyo"
+  },
+  "input": {
+    "sources": ["gmail"],
+    "required_params": ["mailbox", "reply_policy"],
+    "optional_params": ["priority_keywords", "quiet_hours"]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "重要メールとして扱う条件は何か",
+      "返信下書きに含めてよい情報の範囲はどこまでか",
+      "人間承認が必要な送信条件は何か"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/daily-email-triage.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/email-triage-and-reply-draft.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/daily-email-triage.json"
+  },
+  "result": {
+    "artifacts": ["email-triage.md", "reply-drafts.json"],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["send_email"],
+    "default_action": "draft-only"
+  }
+}
