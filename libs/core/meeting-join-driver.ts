@@ -40,7 +40,7 @@ export interface MeetingJoinDriver {
 const ALLOWED_MEETING_HOSTS: Record<'meet' | 'zoom' | 'teams', readonly string[]> = {
   meet: ['meet.google.com'],
   zoom: ['zoom.us', 'zoom.com'],
-  teams: ['teams.microsoft.com', 'teams.live.com'],
+  teams: ['teams.microsoft.com', 'teams.live.com', 'microsoft.com'],
 };
 
 export function redactMeetingUrl(url: string | undefined): string {
@@ -54,10 +54,13 @@ export function redactMeetingUrl(url: string | undefined): string {
 
 export function resolveMeetingPlatformFromUrl(url: string): 'meet' | 'zoom' | 'teams' | null {
   try {
-    const host = new URL(url).host.toLowerCase();
+    const parsed = new URL(url);
+    const host = parsed.host.toLowerCase();
+    const pathname = parsed.pathname.toLowerCase();
     if (host.endsWith('meet.google.com')) return 'meet';
     if (host.endsWith('zoom.us') || host.endsWith('zoom.com')) return 'zoom';
     if (host.endsWith('teams.microsoft.com') || host.endsWith('teams.live.com')) return 'teams';
+    if (host.endsWith('microsoft.com') && pathname.includes('/microsoft-teams/join-a-meeting')) return 'teams';
   } catch {
     /* fall through */
   }
@@ -86,6 +89,14 @@ export function validateMeetingTarget(target: MeetingTarget): MeetingTarget & { 
     throw new Error(
       `[browser-driver] meeting URL host '${host}' is not allow-listed for platform '${platform}'. Allowed hosts: ${allowlist.join(', ')}.`,
     );
+  }
+  if (platform === 'teams' && host === 'microsoft.com') {
+    const pathname = new URL(target.url).pathname.toLowerCase();
+    if (!pathname.includes('/microsoft-teams/join-a-meeting')) {
+      throw new Error(
+        `[browser-driver] Teams on microsoft.com must use the join-a-meeting entry page; got path '${pathname}'.`,
+      );
+    }
   }
   return { ...target, platform };
 }
