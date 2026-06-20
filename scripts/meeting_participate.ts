@@ -39,6 +39,7 @@ import {
   verifyReady,
   TraceContext,
   finalizeAndPersist,
+  pathResolver,
   type AudioFormat,
   type ConversationAgent,
   type MeetingJoinDriver,
@@ -48,6 +49,7 @@ import {
   validateMeetingTarget,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { pathToFileURL } from 'node:url';
 // Side-effect imports register the audio-bus capability probes so the
 // participation-runtime manifest can resolve `audio-bus.blackhole` etc.
 import '@agent/core/blackhole-audio-bus';
@@ -103,15 +105,65 @@ export function prepareMeetingTarget(target: MeetingTarget): MeetingTarget & { p
   return validateMeetingTarget(target);
 }
 
-async function loadDriver(driverId: string): Promise<MeetingJoinDriver> {
+async function loadDriver(
+  driverId: string,
+  opts: {
+    headed?: boolean;
+    accountSlug?: string;
+    microphoneDevice?: string;
+    speakerDevice?: string;
+    cameraDevice?: string;
+    userDataDir?: string;
+    profileDirectory?: string;
+    connectOverCdp?: boolean;
+    cdpUrl?: string;
+    cdpPort?: number;
+    browserChannel?: 'chrome' | 'chromium';
+  } = {},
+): Promise<MeetingJoinDriver> {
   if (driverId === 'browser-playwright') {
     try {
       const mod = await import('@actuator/meeting-browser-driver');
-      mod.installBrowserMeetingJoinDriver();
+      mod.installBrowserMeetingJoinDriver({
+        headed: Boolean(opts.headed),
+        user_data_dir: opts.userDataDir,
+        profile_directory: opts.profileDirectory,
+        connect_over_cdp: Boolean(opts.connectOverCdp),
+        cdp_url: opts.cdpUrl,
+        cdp_port: opts.cdpPort,
+        browser_channel: opts.browserChannel,
+        account_slug: opts.accountSlug,
+        microphone_device: opts.microphoneDevice,
+        speaker_device: opts.speakerDevice,
+        camera_device: opts.cameraDevice,
+      });
     } catch (err: any) {
-      logger.warn(
-        `[participate-cli] browser driver not installed; falling back to stub. (${err?.message ?? err})`,
-      );
+      try {
+        const fallbackPath = pathResolver.rootResolve('dist/libs/actuators/meeting-browser-driver/src/index.js');
+        const mod = await import(pathToFileURL(fallbackPath).href);
+        if (typeof mod.installBrowserMeetingJoinDriver === 'function') {
+          mod.installBrowserMeetingJoinDriver({
+            headed: Boolean(opts.headed),
+            user_data_dir: opts.userDataDir,
+            profile_directory: opts.profileDirectory,
+            connect_over_cdp: Boolean(opts.connectOverCdp),
+            cdp_url: opts.cdpUrl,
+            cdp_port: opts.cdpPort,
+            browser_channel: opts.browserChannel,
+            account_slug: opts.accountSlug,
+            microphone_device: opts.microphoneDevice,
+            speaker_device: opts.speakerDevice,
+            camera_device: opts.cameraDevice,
+          });
+          logger.info(`[participate-cli] browser driver loaded from ${fallbackPath}`);
+        } else {
+          throw new Error('fallback driver module did not export installBrowserMeetingJoinDriver');
+        }
+      } catch (fallbackErr: any) {
+        logger.warn(
+          `[participate-cli] browser driver not installed; falling back to stub. (${fallbackErr?.message ?? err?.message ?? err})`,
+        );
+      }
     }
   }
   const driver = getMeetingJoinDriver(driverId);
@@ -190,13 +242,25 @@ async function main(): Promise<void> {
     .option('mission', { type: 'string', demandOption: true })
     .option('meeting-url', { type: 'string', demandOption: true })
     .option('platform', { type: 'string', default: 'auto' })
+    .option('meeting-id', { type: 'string' })
+    .option('passcode', { type: 'string' })
     .option('display-name', { type: 'string', default: 'Kyberion' })
     .option('persona', { type: 'string', default: 'an attentive meeting participant' })
     .option('voice-profile-id', { type: 'string', default: 'operator-default-v1' })
     .option('driver', { type: 'string', default: 'browser-playwright' })
     .option('audio-bus', { type: 'string' })
+    .option('microphone-device', { type: 'string' })
+    .option('speaker-device', { type: 'string' })
+    .option('camera-device', { type: 'string' })
+    .option('user-data-dir', { type: 'string' })
+    .option('profile-directory', { type: 'string' })
+    .option('connect-over-cdp', { type: 'boolean', default: false })
+    .option('cdp-url', { type: 'string' })
+    .option('cdp-port', { type: 'number' })
+    .option('browser-channel', { type: 'string', choices: ['chrome', 'chromium'] as const })
     .option('max-minutes', { type: 'number', default: 30 })
     .option('headed', { type: 'boolean', default: false })
+    .option('account-slug', { type: 'string', default: 'default' })
     .option('skip-bootstrap-check', { type: 'boolean', default: false })
     .parseSync();
 
@@ -237,11 +301,40 @@ async function main(): Promise<void> {
     const target: MeetingTarget = {
       url: String(argv['meeting-url']),
       platform: (argv.platform as MeetingTarget['platform']) ?? 'auto',
+      meeting_id: typeof argv['meeting-id'] === 'string' ? String(argv['meeting-id']) : undefined,
+      passcode: typeof argv.passcode === 'string' ? String(argv.passcode) : undefined,
       display_name: String(argv['display-name']),
     };
     const validatedTarget = prepareMeetingTarget(target);
 
-    const driver = await loadDriver(String(argv.driver));
+    const driver = await loadDriver(String(argv.driver), {
+      headed: Boolean(argv.headed),
+      accountSlug: String(argv['account-slug']),
+      microphoneDevice: typeof argv['microphone-device'] === 'string' ? String(argv['microphone-device']) : undefined,
+      speakerDevice: typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
+      cameraDevice: typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
+      userDataDir: typeof argv['user-data-dir'] === 'string' ? String(argv['user-data-dir']) : undefined,
+      profileDirectory: typeof argv['profile-directory'] === 'string' ? String(argv['profile-directory']) : undefined,
+      connectOverCdp: Boolean(argv['connect-over-cdp']),
+      cdpUrl: typeof argv['cdp-url'] === 'string' ? String(argv['cdp-url']) : undefined,
+      cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
+      browserChannel: (argv['browser-channel'] as 'chrome' | 'chromium' | undefined) ?? undefined,
+    });
+    const selectedDevices = {
+      microphone: typeof argv['microphone-device'] === 'string' ? String(argv['microphone-device']) : undefined,
+      speaker: typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
+      camera: typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
+    };
+    if (selectedDevices.microphone || selectedDevices.speaker || selectedDevices.camera) {
+      logger.info(
+        `[participate-cli] device preferences microphone=${selectedDevices.microphone ?? 'default'} speaker=${selectedDevices.speaker ?? 'default'} camera=${selectedDevices.camera ?? 'default'}`,
+      );
+    }
+    if (argv['connect-over-cdp'] || argv['user-data-dir']) {
+      logger.info(
+        `[participate-cli] browser mode ${argv['connect-over-cdp'] ? 'cdp-attach' : 'persistent-profile'}${argv['profile-directory'] ? ` profile=${argv['profile-directory']}` : ''}${argv['cdp-url'] ? ` cdp_url=${argv['cdp-url']}` : ''}${argv['cdp-port'] ? ` cdp_port=${argv['cdp-port']}` : ''}`,
+      );
+    }
     const bus = resolveAudioBus((argv['audio-bus'] as any) || undefined);
     const busProbe = await bus.probe();
     if (!busProbe.available) {

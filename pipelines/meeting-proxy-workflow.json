@@ -8,6 +8,8 @@
     "persona_name": "the operator",
     "profile_id": "operator-default-v1",
     "meeting_url": "",
+    "meeting_id": "",
+    "passcode": "",
     "platform": "auto",
     "display_name": "Kyberion Agent",
     "listen_duration_sec": 1800,
@@ -43,7 +45,7 @@
       "op": "system:shell",
       "produces": { "channel": "join_result", "type": "ShellResult" },
       "params": {
-        "cmd": "node libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs --url '{{meeting_url}}' --name '{{display_name}}' --wait {{listen_duration_sec}} --python '{{python_bin}}' --screenshot '{{screenshot_path}}'"
+        "cmd": "node libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs --url '{{meeting_url}}' --name '{{display_name}}' --meeting-id '{{meeting_id}}' --passcode '{{passcode}}' --wait {{listen_duration_sec}} --python '{{python_bin}}' --screenshot '{{screenshot_path}}'"
       }
     },
     {
