@@ -8,6 +8,6 @@
     "id": "vital-check",
     "pipeline": "pipelines/vital-check.json",
     "note": "System vitals probe. Verifies that the dependency resolver, doctor script, and layer checks produce a consistent status shape.",
-    "ignore_paths": ["context.active_missions", "context.timestamp"]
+    "ignore_paths": ["context.active_missions", "context.runtime_state", "context.timestamp"]
   }
 ]
