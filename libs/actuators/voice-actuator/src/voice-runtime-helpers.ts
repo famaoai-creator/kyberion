@@ -133,12 +133,19 @@ function resolveArtifactPath(requestId: string, format: VoiceArtifactFormat, out
   return pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`);
 }
 
-async function runMlxAudioGenerate(text: string, outputPath: string, profile?: any): Promise<void> {
-  const bridgeScript = pathResolver.rootResolve(
-    'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py',
-  );
+async function runPythonBridgeGenerate(
+  bridgeScriptPath: string,
+  text: string,
+  outputPath: string,
+  options: {
+    voice?: string;
+    language?: string;
+    profile?: any;
+  },
+): Promise<void> {
+  const bridgeScript = pathResolver.rootResolve(bridgeScriptPath);
 
-  const refAudio = resolveProfileRefAudio(profile);
+  const refAudio = resolveProfileRefAudio(options.profile);
   const refText = refAudio ? resolveRefTranscript(refAudio) : undefined;
 
   const payload = JSON.stringify({
@@ -146,6 +153,8 @@ async function runMlxAudioGenerate(text: string, outputPath: string, profile?: a
     params: {
       text,
       output_path: outputPath,
+      voice: options.voice,
+      language: options.language,
       ...(refAudio ? { ref_audio: refAudio } : {}),
       ...(refText ? { ref_text: refText } : {}),
     },
@@ -153,18 +162,18 @@ async function runMlxAudioGenerate(text: string, outputPath: string, profile?: a
 
   const result = safeExecResult(resolvePythonBin(), [bridgeScript], { input: payload });
   if (result.error || result.status !== 0) {
-    throw new Error(`mlx_audio_tts_bridge failed: ${result.stderr || result.error?.message}`);
+    throw new Error(`bridge script execution failed for ${bridgeScriptPath}: ${result.stderr || result.error?.message}`);
   }
 
   let parsed: any;
   try {
     parsed = JSON.parse(result.stdout);
   } catch {
-    throw new Error(`mlx_audio_tts_bridge returned non-JSON: ${result.stdout}`);
+    throw new Error(`bridge script returned non-JSON: ${result.stdout}`);
   }
 
   if (parsed.status !== 'success') {
-    throw new Error(`mlx_audio_tts_bridge error: ${parsed.error}`);
+    throw new Error(`bridge script error in ${bridgeScriptPath}: ${parsed.error}`);
   }
 }
 
@@ -218,9 +227,14 @@ function renderNativeArtifact(
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });
 
-  if (options.engineId === 'mlx_audio_qwen3') {
+  const engineRecord = getVoiceEngineRecord(options.engineId) as any;
+  if (engineRecord && engineRecord.bridge_script) {
     return withRetry(async () => {
-      await runMlxAudioGenerate(text, artifactPath, options.profile);
+      await runPythonBridgeGenerate(engineRecord.bridge_script, text, artifactPath, {
+        voice: options.voice,
+        language: options.language,
+        profile: options.profile,
+      });
       return artifactPath;
     }, buildRetryOptions());
   }
@@ -269,11 +283,16 @@ async function performPlayback(
     throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
   }
 
-  if (engine.engine_id === 'mlx_audio_qwen3' && process.platform !== 'darwin') {
+  const engineRecord = engine as any;
+  if (engineRecord.bridge_script && process.platform !== 'darwin') {
     const tmpPath = playbackSourcePath || pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
     await withRetry(async () => {
       if (!playbackSourcePath) {
-        await runMlxAudioGenerate(text, tmpPath, options.profile);
+        await runPythonBridgeGenerate(engineRecord.bridge_script, text, tmpPath, {
+          profile: options.profile,
+          language: options.language,
+          voice: options.voice,
+        });
       }
       safeExec('open', [tmpPath]);
     }, buildRetryOptions());
@@ -363,7 +382,7 @@ export {
   renderVoicePlaybackSource,
   renderNativeArtifact,
   resolveArtifactPath,
-  runMlxAudioGenerate,
+  runPythonBridgeGenerate,
   resolveProfileRefAudio,
   resolveRefTranscript,
   renderWithEspeakNg,

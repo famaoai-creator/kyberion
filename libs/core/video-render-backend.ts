@@ -115,9 +115,10 @@ async function renderVideoCompositionBundleImpl(
     const execEnv = buildSafeExecEnv({
       NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${pathResolver.rootResolve('scripts/hyperframes-localhost-preload.cjs')}`,
     });
+    const cmdBin = backend.command || 'npx';
+    const baseArgs = backend.args || ['hyperframes', 'render'];
     const command = [
-      'hyperframes',
-      'render',
+      ...baseArgs,
       plan.bundle_dir,
       '--output',
       outputPath,
@@ -131,7 +132,7 @@ async function renderVideoCompositionBundleImpl(
 
     try {
       if (options.cancellable) {
-        await runCancellableCommand('npx', command, {
+        await runCancellableCommand(cmdBin, command, {
           timeout_ms: policy.render.command_timeout_ms,
           is_cancelled: options.isCancelled,
           poll_interval_ms: options.pollIntervalMs || 100,
@@ -139,7 +140,7 @@ async function renderVideoCompositionBundleImpl(
           cwd: rootDir,
         });
       } else {
-        safeExec('npx', command, {
+        safeExec(cmdBin, command, {
           timeoutMs: policy.render.command_timeout_ms,
           cwd: rootDir,
           env: execEnv,
@@ -166,7 +167,7 @@ async function renderVideoCompositionBundleImpl(
         executed: true,
         backend: 'hyperframes_cli',
         output_path: outputPath,
-        command: ['npx', ...command],
+        command: [cmdBin, ...command],
         backend_id: backend.backend_id,
         backend_kind: backend.kind,
         backend_provider: backend.provider,
