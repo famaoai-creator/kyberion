@@ -1,0 +1,82 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "weekly-executive-digest",
+  "version": "2.0.0",
+  "name": "Weekly Executive Digest",
+  "description": "週次の経営・開発・営業の要点をフィクスチャ入力からまとめ、公開前の確認が必要なダイジェストを生成する。",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "mission_evidence_dir": "active/shared/tmp",
+    "language": "ja",
+    "digest_input_path": "",
+    "notification_destination": "",
+    "target_projects": [],
+    "metrics_of_interest": [],
+    "red_flag_thresholds": {}
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📘 [DIGEST] Starting weekly executive digest (mission: {{mission_id}})"
+      }
+    },
+    {
+      "id": "read_digest_input",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "digest_input", "type": "WeeklyDigestInput" },
+      "params": {
+        "path": "{{digest_input_path}}"
+      }
+    },
+    {
+      "id": "generate_digest",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "digest_input",
+      "produces": { "channel": "digest_markdown", "type": "WeeklyDigestMarkdown" },
+      "params": {
+        "instruction": "以下の入力をもとに、週次エグゼクティブダイジェストを Markdown で作成してください。\n\n必須セクション:\n# Weekly Executive Digest\n## 今週の重要変化\n## 滞留している意思決定\n## 顧客・営業\n## 開発・運用\n## リスク\n## 今週やるべきこと Top 5\n\n要件:\n- 事実と推測を分ける\n- 外部共有前に確認が必要な点を明確化する\n- 週次の確認対象が分かるように簡潔にまとめる",
+        "context": ["{{mission_id}}", "{{project_name}}", "{{digest_input}}"]
+      }
+    },
+    {
+      "id": "write_digest",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "digest_markdown",
+      "params": {
+        "path": "{{mission_evidence_dir}}/weekly-executive-digest.md",
+        "content": "{{digest_markdown}}"
+      }
+    },
+    {
+      "id": "write_risks",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/weekly-executive-risks.json",
+        "content": {
+          "kind": "weekly-executive-risks",
+          "projects": "{{target_projects}}",
+          "thresholds": "{{red_flag_thresholds}}",
+          "destination": "{{notification_destination}}",
+          "approval_boundary": "notify-only"
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 [DIGEST] Complete. Digest: {{mission_evidence_dir}}/weekly-executive-digest.md"
+      }
+    }
+  ]
+}

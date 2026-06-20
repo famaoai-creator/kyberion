@@ -1,0 +1,38 @@
+{
+  "id": "meeting-to-proposal-pptx",
+  "title": "商談メモから提案資料を作成",
+  "description": "会議メモから提案書デッキを生成し、送付前の確認点をまとめる。",
+  "trigger": {
+    "type": "event",
+    "event_name": "meeting.completed",
+    "source": "meeting-actuator"
+  },
+  "input": {
+    "sources": ["meeting_notes", "client_context", "deck_profile"],
+    "required_params": ["tenant_slug", "audience"],
+    "optional_params": ["default_slide_count", "proposal_shape", "approval_owner"]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "デッキの目的は何か",
+      "対象読者は誰か",
+      "初期のスライド枚数や提案構成はどうするか",
+      "送付前の承認担当者は誰か"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/meeting-to-proposal-pptx.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/meeting-to-pptx-workflow.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/meeting-to-proposal-pptx.json"
+  },
+  "result": {
+    "artifacts": ["proposal-deck.pptx", "deck-brief.json"],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["send_external", "finalize_deck"],
+    "default_action": "requires-human-approval"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "weekly-executive-digest",
+  "title": "週次の経営・開発・営業ダイジェスト",
+  "description": "週次の要点をフィクスチャ入力からまとめ、公開前確認つきで準備する。",
+  "trigger": {
+    "type": "schedule",
+    "cron": "0 9 * * 1",
+    "timezone": "Asia/Tokyo"
+  },
+  "input": {
+    "sources": ["project_updates", "alerts", "milestones", "review_notes"],
+    "required_params": [
+      "target_projects",
+      "metrics_of_interest",
+      "red_flag_thresholds",
+      "notification_destination"
+    ],
+    "optional_params": ["approval_boundary"]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "重点的に見るプロジェクトはどれか",
+      "注視したい指標や閾値は何か",
+      "誰に対して共有するか",
+      "外部共有前に止める基準は何か"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/weekly-executive-digest.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/weekly-executive-digest.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/weekly-executive-digest.json"
+  },
+  "result": {
+    "artifacts": ["weekly-executive-digest.md", "weekly-executive-risks.json"],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["external_sharing"],
+    "default_action": "notify-only"
+  }
+}
