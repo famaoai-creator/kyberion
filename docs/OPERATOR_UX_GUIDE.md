@@ -136,7 +136,7 @@ Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to i
 
 Use `pnpm surfaces:repair -- --surface <surface-id>` when a surface is tracked but unhealthy or stale and you want Kyberion to restart it without doing a full reconcile.
 
-For Google Workspace email work:
+For Google Workspace email and Meet work:
 
 - `pnpm email:workflow status`
   - check the shared Gmail auth status from CLI
@@ -154,6 +154,12 @@ For Google Workspace email work:
   - `gws auth setup --project <gcp-project-id> --login` when `gcloud` is available
 - `gws auth status`
   - confirm the credential state before sending mail
+- `gws meet spaces create --json '<payload>'`
+  - create a Google Meet space with the authenticated Google account
+- `gws schema meet.spaces.create`
+  - inspect the exact request shape before creating a Meet space
+- `pnpm gws:meet:create -- --json '{}'`
+  - Kyberion wrapper for creating a Google Meet space from the terminal
 
 ### Email Triage Quick Start
 
