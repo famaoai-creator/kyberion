@@ -305,6 +305,143 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
+    case 'screenshot': {
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
+      const application = typeof params.application === 'string' ? params.application.trim() : '';
+      const windowTitle = typeof params.window_title === 'string' ? params.window_title.trim() : '';
+      const windowMatchPolicy = typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
+      let captureMode: 'screen' | 'focused_window' = 'screen';
+      let screenshotPath = typeof params.path === 'string' && params.path.trim()
+        ? pathResolver.rootResolve(resolve(params.path))
+        : pathResolver.shared(`runtime/computer/screenshots/screenshot-${Date.now()}.png`);
+      if (!safeExistsSync(path.dirname(screenshotPath))) {
+        safeMkdir(path.dirname(screenshotPath), { recursive: true });
+      }
+      if (application) {
+        activateApplication(application);
+        captureMode = 'focused_window';
+      }
+      let windowCandidates: string[] | undefined;
+      if (application) {
+        windowCandidates = getWindowList(application);
+      }
+      if (windowTitle) {
+        activateWindowByTitle(application || 'Google Chrome', windowTitle, windowMatchPolicy);
+        captureMode = 'focused_window';
+      }
+      const bridge = createScreenCaptureBridge();
+      const captureResult = await bridge.captureScreenshot({
+        save_path: screenshotPath,
+        display_index: displaySelection.display_index,
+        capture_mode: captureMode,
+        application: application || undefined,
+        window_title: windowTitle || undefined,
+        window_match_policy: windowMatchPolicy,
+      } as any);
+      screenshotPath = captureResult.save_path || screenshotPath;
+      return {
+        ...ctx,
+        [params.export_as || 'screenshot_path']: captureResult.save_path || screenshotPath,
+        screenshot_path: captureResult.save_path || screenshotPath,
+        screenshot_display_index: displaySelection.display_index,
+        screenshot_display_name: displaySelection.display_name,
+        screenshot_display_selection_source: displaySelection.selection_source,
+        screenshot_application: application || undefined,
+        screenshot_window_title: windowTitle || undefined,
+        screenshot_window_selection_source: windowTitle ? 'window_title' : application ? 'application' : 'display',
+        screenshot_window_candidates: windowCandidates || [],
+      };
+    }
+    case 'window_list': {
+      const application = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : '';
+      if (!application) {
+        throw new Error('window_list requires application param');
+      }
+      return { ...ctx, [params.export_as || 'window_list']: getWindowList(application) };
+    }
+    case 'chrome_tab_list': {
+      const browser = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : 'Google Chrome';
+      return { ...ctx, [params.export_as || 'chrome_tab_list']: listChromeTabs(browser) };
+    }
+    case 'clipboard_read':
+      return { ...ctx, [params.export_as || 'clipboard']: clipboardRead() };
+    case 'get_focused_input':
+      return { ...ctx, [params.export_as || 'focused_input']: detectFocusedInput() };
+    case 'get_screen_size':
+      return { ...ctx, [params.export_as || 'screen_size']: getScreenSize() };
+    case 'window_list': {
+      const application = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : '';
+      if (!application) {
+        throw new Error('window_list requires application param');
+      }
+      return { ...ctx, [params.export_as || 'window_list']: getWindowList(application) };
+    }
+    case 'chrome_tab_list': {
+      const browser = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : 'Google Chrome';
+      return { ...ctx, [params.export_as || 'chrome_tab_list']: listChromeTabs(browser) };
+    }
+    case 'test_screen_stream': {
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
+      const bridge = createScreenCaptureBridge();
+      const bus = new StubVideoFrameBus();
+      await bridge.pipeTo(bus, {
+        max_frames: Math.max(1, Number(params.max_frames || 2)),
+        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
+        display_index: displaySelection.display_index,
+        display_name: displaySelection.display_name,
+      } as any);
+      const frames: any[] = [];
+      for await (const frame of bus.frameStream()) {
+        frames.push(frame);
+        if (frames.length >= Math.max(1, Number(params.max_frames || 2))) {
+          break;
+        }
+      }
+      await bus.close();
+      return {
+        ...ctx,
+        [params.export_as || 'screen_stream_test']: {
+          bridge_id: bridge.bridge_id,
+          backend: 'stub',
+          selected_display_index: displaySelection.display_index,
+          selected_display_name: displaySelection.display_name,
+          display_selection_source: displaySelection.selection_source,
+          frame_count: frames.length,
+          frames,
+        },
+      };
+    }
+    case 'test_screen_mp4_roundtrip': {
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
+      const bridge = createScreenCaptureBridge();
+      const captureBus = new StubVideoFrameBus();
+      await bridge.pipeTo(captureBus, {
+        max_frames: Math.max(1, Number(params.max_frames || 2)),
+        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
+        display_index: displaySelection.display_index,
+        display_name: displaySelection.display_name,
+      } as any);
+      const outputPath = pathResolver.shared(`runtime/computer/screen-roundtrip-${Date.now()}.mp4`);
+      await captureBus.close();
+      const exported = await writeVideoFrameBusToMp4(captureBus, outputPath, {
+        fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
+      });
+      const importBus = new StubVideoFrameBus();
+      await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
+      await importBus.close();
+      return {
+        ...ctx,
+        [params.export_as || 'screen_roundtrip']: {
+          bridge_id: bridge.bridge_id,
+          selected_display_index: displaySelection.display_index,
+          selected_display_name: displaySelection.display_name,
+          display_selection_source: displaySelection.selection_source,
+          output_path: exported.output_path,
+          exported_frame_count: exported.frame_count,
+          imported_frame_count: exported.frame_count,
+        },
+      };
+    }
     case 'shell':
       assertUnsafeShellAllowed();
       return {
@@ -679,32 +816,50 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'list_input_devices': {
       const bridge = createVirtualInputDeviceInventoryBridge();
       const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'input_devices']: probe };
+      return { ...ctx, [params.export_as || 'input_devices']: probe.inventory };
     }
     case 'list_displays': {
       const bridge = createScreenDisplayInventoryBridge();
       const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'display_inventory']: probe.inventory };
+      return {
+        ...ctx,
+        [params.export_as || 'display_inventory']: {
+          inventory: probe.inventory,
+          primary_display: Array.isArray(probe.inventory.displays)
+            ? probe.inventory.displays.find((display) => display.primary) || probe.inventory.displays[0] || null
+            : null,
+          display_count: Array.isArray(probe.inventory.displays) ? probe.inventory.displays.length : 0,
+        },
+      };
     }
     case 'list_media_devices': {
       const bridge = createVirtualMediaDeviceControlBridge();
       const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'media_devices']: probe };
+      return {
+        ...ctx,
+        [params.export_as || 'media_devices']: {
+          ...probe.selection,
+          supported_actions: probe.supported_actions,
+        },
+      };
     }
     case 'control_media_devices': {
       const bridge = createVirtualMediaDeviceControlBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'media_control']: probe };
+      const result = await bridge.control({
+        action: typeof params.action === 'string' ? params.action : 'select',
+        scope: typeof params.scope === 'string' ? params.scope : 'all',
+      });
+      return { ...ctx, [params.export_as || 'media_control']: result };
     }
     case 'list_audio_output_devices': {
       const bridge = createVirtualAudioOutputPlaybackBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'audio_output_devices']: probe };
+      const result = await bridge.playOnOutputs(params.targets);
+      return { ...ctx, [params.export_as || 'audio_output_devices']: result };
     }
     case 'list_audio_input_devices': {
       const bridge = createVirtualAudioInputRecordingBridge();
-      const probe = await bridge.probe();
-      return { ...ctx, [params.export_as || 'audio_input_devices']: probe };
+      const result = await bridge.recordOnInputs(params.targets);
+      return { ...ctx, [params.export_as || 'audio_input_devices']: result };
     }
     case 'camera_capture': {
       const bridge = createVirtualCameraBridge();
@@ -725,6 +880,74 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const bridge = createScreenRecordingBridge();
       const probe = await bridge.probe();
       return { ...ctx, [params.export_as || 'screen_recording']: probe };
+    }
+    case 'test_audio_outputs': {
+      const bridge = createVirtualAudioOutputPlaybackBridge();
+      const result = await bridge.playOnOutputs(params.targets);
+      return { ...ctx, [params.export_as || 'audio_test']: result };
+    }
+    case 'test_audio_inputs': {
+      const bridge = createVirtualAudioInputRecordingBridge();
+      const result = await bridge.recordOnInputs(params.targets);
+      return { ...ctx, [params.export_as || 'audio_input_test']: result };
+    }
+    case 'test_camera_stream': {
+      const bridge = createVirtualCameraBridge();
+      const bus = new StubVideoFrameBus();
+      await bridge.pipeTo(bus, {
+        max_frames: Math.max(1, Number(params.frame_count || 2)),
+        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
+        camera_intent: 'record',
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      });
+      const frames: any[] = [];
+      for await (const frame of bus.frameStream()) {
+        frames.push(frame);
+        if (frames.length >= Math.max(1, Number(params.frame_count || 2))) {
+          break;
+        }
+      }
+      await bus.close();
+      const probe = await bridge.probe();
+      return {
+        ...ctx,
+        [params.export_as || 'camera_stream_test']: {
+          bridge_id: bridge.bridge_id,
+          backend: probe.backend || 'stub',
+          selected_camera: probe.selected_camera,
+          frame_count: frames.length,
+          frames,
+        },
+      };
+    }
+    case 'test_camera_mp4_roundtrip': {
+      const bridge = createVirtualCameraBridge();
+      const captureBus = new StubVideoFrameBus();
+      await bridge.pipeTo(captureBus, {
+        max_frames: Math.max(1, Number(params.frame_count || 2)),
+        frame_interval_ms: Math.max(0, Number(params.frame_interval_ms || 250)),
+        camera_intent: 'record',
+        subject_hint: typeof params.subject_hint === 'string' ? params.subject_hint : undefined,
+      });
+      const outputPath = pathResolver.shared(`runtime/computer/camera-roundtrip-${Date.now()}.mp4`);
+      await captureBus.close();
+      const exported = await writeVideoFrameBusToMp4(captureBus, outputPath, {
+        fps: Math.max(1, Math.round(1000 / Math.max(1, Number(params.frame_interval_ms || 250)))),
+      });
+      const importBus = new StubVideoFrameBus();
+      await pipeMp4ToVideoFrameBus(exported.output_path, importBus);
+      await importBus.close();
+      const probe = await bridge.probe();
+      return {
+        ...ctx,
+        [params.export_as || 'camera_mp4_roundtrip']: {
+          bridge_id: bridge.bridge_id,
+          selected_camera: probe.selected_camera,
+          exported_mp4_path: exported.output_path,
+          exported_frame_count: exported.frame_count,
+          imported_frame_count: exported.frame_count,
+        },
+      };
     }
     case 'test_camera_injection': {
       const inventoryBridge = createVirtualDeviceInventoryBridge();
