@@ -32,13 +32,17 @@ describe('task run contract', () => {
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('TaskScenario: daily-email-triage');
+    expect(output).toContain('Status: dry-run only; no external side effects');
     expect(output).toContain('Pipeline template: knowledge/product/pipeline-templates/email-triage-workflow.json');
-    expect(output).toContain(`Profile: ${PROFILE_PATH}`);
-    expect(output).toContain('Profile loaded: yes');
-    expect(output).toContain('Expected artifacts:');
+    expect(output).toContain('Inputs:');
+    expect(output).toContain('- Sources: gmail');
+    expect(output).toContain(`- Profile: ${PROFILE_PATH}`);
+    expect(output).toContain('Expected result:');
     expect(output).toContain('- email-triage.md');
-    expect(output).toContain('Approval boundary: draft-only (required for: send_email)');
-    expect(output).toContain('Execution: dry-run only (no side effects)');
+    expect(output).toContain('Approval required before:');
+    expect(output).toContain('- draft-only (required for: send_email)');
+    expect(output).toContain('Next actions:');
+    expect(output).toContain('- 1. Review the plan and expected artifacts.');
   });
 
   it('fails gracefully when the scenario id is unknown', async () => {
@@ -46,9 +50,15 @@ describe('task run contract', () => {
   });
 
   it('requires a profile when the scenario is profile-backed', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
     await expect(main(['daily-email-triage', '--profile', PROFILE_PATH, '--dry-run'])).rejects.toThrow(
       'Missing profile for daily-email-triage. Run pnpm task:init daily-email-triage first.'
     );
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('Next actions:');
+    expect(output).toContain('Run pnpm task:init daily-email-triage to create the profile.');
   });
 
   it('rejects profile paths outside the workspace', async () => {
@@ -70,6 +80,8 @@ describe('task run contract', () => {
     safeWriteFile(PROFILE_PATH, `${JSON.stringify({ mailbox: 'inbox' }, null, 2)}\n`);
     const plan = describeTaskRun('daily-email-triage', PROFILE_PATH);
     expect(plan).toContain('TaskScenario: daily-email-triage');
-    expect(plan).toContain('Profile loaded: yes');
+    expect(plan).toContain('Status: dry-run only; no external side effects');
+    expect(plan).toContain('Inputs:');
+    expect(plan).toContain('Next actions:');
   });
 });
