@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileNarratedVideoBriefToCompositionADF } from './narrated-video-brief-compiler.ts';
+import { compileNarratedVideoBriefToCompositionADF } from './narrated-video-brief-compiler.js';
 
 describe('narrated video brief compiler', () => {
   it('compiles narrated brief into a video-composition-adf', () => {

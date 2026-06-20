@@ -24,11 +24,26 @@ import {
 import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
 import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-resolution.js';
 import {
+  loadReasoningLevelPolicy,
+  resolveReasoningLevelDecision,
+  type ReasoningLevelDecision,
+} from './reasoning-level-policy.js';
+import {
+  resolveReasoningModelRoute,
+  type ReasoningModelRoute,
+} from './reasoning-model-routing.js';
+import {
+  buildIntentFlowCacheEligibility,
+  lookupIntentFlowCache,
+  storeIntentFlowCache,
+} from './intent-flow-cache.js';
+import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
 } from './execution-brief.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
+import type { TraceContext } from './src/trace.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
@@ -112,6 +127,8 @@ export interface UserIntentFlow {
   intentContract: IntentContract;
   workLoop: OrganizationWorkLoopSummary;
   routingDecision?: AgentRoutingDecision;
+  reasoningDecision: ReasoningLevelDecision;
+  shadowModelRoute: ReasoningModelRoute;
   clarificationPacket?: OperatorInteractionPacket;
   source: 'llm' | 'fallback';
 }
@@ -197,7 +214,16 @@ interface LlmCompileOptions {
   provider?: IntentCompilerProvider;
   model?: string;
   modelProvider?: string;
+  trace?: Pick<TraceContext, 'addEvent'>;
 }
+
+type CompilationFallbackReason =
+  | 'simple_greeting'
+  | 'execution_brief_invalid'
+  | 'intent_contract_invalid'
+  | 'work_loop_invalid'
+  | 'backend_error'
+  | 'none';
 
 export interface IntentCompilerTarget {
   provider: IntentCompilerProvider;
@@ -1311,6 +1337,37 @@ export function deriveAgentRoutingDecision(
 
 const SIMPLE_GREETING_REGEX = /^(こんにちは|おはよう|こんばんは|ありがとう|さようなら|バイバイ|お疲れ様|おつかれ|hello|hi|thanks|thank you|bye)[！!！？?]?$/i;
 
+function emitIntentCompilationCompletedEvent(
+  trace: Pick<TraceContext, 'addEvent'> | undefined,
+  input: {
+    reasoningDecision: ReasoningLevelDecision;
+    shadowModelRoute: ReasoningModelRoute;
+    source: 'llm' | 'fallback';
+    cacheStatus: 'disabled' | 'miss' | 'hit' | 'invalid' | 'write';
+    selectedIntentId?: string;
+    selectedConfidence?: number;
+    compilerProvider: string;
+    compilerModel: string;
+    fallbackReason: CompilationFallbackReason;
+    reasoningPolicyVersion: string;
+  },
+): void {
+  trace?.addEvent('intent_compilation.completed', {
+    reasoning_level: input.reasoningDecision.level,
+    reasoning_rule_id: input.reasoningDecision.rule_id,
+    source: input.source,
+    selected_intent_id: input.selectedIntentId || '',
+    selected_confidence: input.selectedConfidence ?? 0,
+    compiler_provider: input.compilerProvider,
+    compiler_model: input.compilerModel,
+    recommended_model_id: input.shadowModelRoute.recommended_model_id || '',
+    model_route_status: input.shadowModelRoute.model_route_status,
+    cache_status: input.cacheStatus,
+    fallback_reason: input.fallbackReason,
+    reasoning_policy_version: input.reasoningPolicyVersion,
+  });
+}
+
 export async function compileUserIntentFlow(
   input: CompileUserIntentFlowInput,
   options: LlmCompileOptions = {}
@@ -1320,15 +1377,57 @@ export async function compileUserIntentFlow(
     ...input,
     resolutionPacket,
   };
+  const compilerTarget = resolveIntentCompilerTarget(options);
+  const reasoningPolicy = loadReasoningLevelPolicy();
+  const selectedIntent = resolutionPacket.selected_intent_id
+    ? findStandardIntentById(resolutionPacket.selected_intent_id)
+    : undefined;
+  const reasoningDecision = resolveReasoningLevelDecision({
+    isSimpleGreeting: SIMPLE_GREETING_REGEX.test(input.text.trim()),
+    resolutionPacket,
+    selectedIntent,
+  }, reasoningPolicy);
+  const shadowModelRoute = resolveReasoningModelRoute(reasoningDecision, { policy: reasoningPolicy });
+  const cacheEligibility = buildIntentFlowCacheEligibility({
+    text: input.text,
+    locale: input.locale,
+    tier: input.tier,
+    channel: input.channel,
+    serviceBindings: input.serviceBindings,
+    runtimeContext: input.runtimeContext,
+    resolutionPacket,
+    selectedIntent,
+    reasoningDecision,
+    shadowModelRoute,
+  });
+  const cacheLookup = lookupIntentFlowCache({ eligibility: cacheEligibility, inputText: input.text });
+  if (cacheLookup.status === 'hit' && cacheLookup.cachedFlow) {
+    emitIntentCompilationCompletedEvent(options.trace, {
+      reasoningDecision: cacheLookup.cachedFlow.reasoningDecision,
+      shadowModelRoute: cacheLookup.cachedFlow.shadowModelRoute,
+      source: cacheLookup.cachedFlow.source,
+      cacheStatus: 'hit',
+      selectedIntentId: resolutionPacket.selected_intent_id,
+      selectedConfidence: resolutionPacket.selected_confidence,
+      compilerProvider: compilerTarget.provider,
+      compilerModel: compilerTarget.model || 'default',
+      fallbackReason: 'none',
+      reasoningPolicyVersion: reasoningPolicy.version,
+    });
+    return cacheLookup.cachedFlow;
+  }
   let executionBrief: ActuatorExecutionBrief | null = null;
   let intentContract: IntentContract | null = null;
   let workLoop: OrganizationWorkLoopSummary | null = null;
   let source: 'llm' | 'fallback' = 'llm';
+  let fallbackReason: CompilationFallbackReason = 'none';
+  let cacheStatus: 'disabled' | 'miss' | 'invalid' | 'hit' | 'write' = cacheLookup.status;
 
-  const isSimpleGreeting = SIMPLE_GREETING_REGEX.test(input.text.trim());
+  const isSimpleGreeting = reasoningDecision.level === 'REFLEX_DETERMINISTIC';
 
   if (isSimpleGreeting) {
     source = 'fallback';
+    fallbackReason = 'simple_greeting';
     intentContract = {
       kind: 'intent-contract',
       source_text: input.text,
@@ -1352,33 +1451,81 @@ export async function compileUserIntentFlow(
       executionBrief = await compileExecutionBriefWithLlm(resolvedInput, options);
       if (!executionBrief) {
         source = 'fallback';
+        if (fallbackReason === 'none') fallbackReason = 'execution_brief_invalid';
         executionBrief = buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
       }
       intentContract = await compileIntentContractWithLlm(resolvedInput, executionBrief, options);
       if (intentContract) {
         workLoop = await compileWorkLoopWithLlm(resolvedInput, executionBrief, intentContract, options);
+      } else if (fallbackReason === 'none') {
+        source = 'fallback';
+        fallbackReason = 'intent_contract_invalid';
       }
     } catch (error: any) {
       logger.warn(`[INTENT_CONTRACT] LLM compilation failed: ${error?.message || String(error)}`);
+      source = 'fallback';
+      fallbackReason = 'backend_error';
     }
   }
 
   if (!intentContract) {
     source = 'fallback';
+    if (fallbackReason === 'none') fallbackReason = 'intent_contract_invalid';
     intentContract = buildFallbackIntentContract(resolvedInput, executionBrief ?? undefined);
   }
   if (!workLoop) {
     source = 'fallback';
+    if (fallbackReason === 'none') fallbackReason = 'work_loop_invalid';
     workLoop = buildFallbackWorkLoop(resolvedInput, intentContract);
   }
   const routingDecision = deriveAgentRoutingDecision(intentContract, workLoop, resolvedInput.text);
   const finalExecutionBrief = executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
+  if (cacheEligibility.eligible) {
+    const writeResult = storeIntentFlowCache({
+      eligibility: cacheEligibility,
+      flow: {
+        executionBrief: finalExecutionBrief,
+        intentContract,
+        workLoop,
+        routingDecision,
+        reasoningDecision,
+        shadowModelRoute,
+        clarificationPacket: buildClarificationPacket(intentContract, workLoop, finalExecutionBrief),
+        source,
+      },
+    });
+    if (cacheStatus === 'invalid') {
+      // Preserve the invalid signal so corrupted cache files remain visible.
+    } else {
+      cacheStatus = writeResult.status === 'write' ? 'write' : cacheStatus;
+      if (cacheStatus === 'disabled') {
+        cacheStatus = writeResult.status;
+      }
+      if (cacheStatus === 'miss' && writeResult.status === 'disabled') {
+        cacheStatus = 'miss';
+      }
+    }
+  }
+  emitIntentCompilationCompletedEvent(options.trace, {
+    reasoningDecision,
+    shadowModelRoute,
+    source,
+    selectedIntentId: resolutionPacket.selected_intent_id,
+    selectedConfidence: resolutionPacket.selected_confidence,
+    compilerProvider: compilerTarget.provider,
+    compilerModel: compilerTarget.model || 'default',
+    fallbackReason,
+    reasoningPolicyVersion: reasoningPolicy.version,
+    cacheStatus,
+  });
 
   return {
     executionBrief: finalExecutionBrief,
     intentContract,
     workLoop,
     routingDecision,
+    reasoningDecision,
+    shadowModelRoute,
     clarificationPacket: buildClarificationPacket(intentContract, workLoop, finalExecutionBrief),
     source,
   };
