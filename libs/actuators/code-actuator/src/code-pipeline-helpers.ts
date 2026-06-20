@@ -2,7 +2,7 @@ import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeRea
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 const CODE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/code-actuator/manifest.json');
 const DEFAULT_CODE_RETRY = {
@@ -235,7 +235,14 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture']: await withRetry(
-          async () => execSync(resolve(params.cmd), { encoding: 'utf8' }).trim(),
+          async () => {
+            const result = spawnSync('/bin/sh', ['-c', resolve(params.cmd)], { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+            if (result.error) throw result.error;
+            if (result.status !== 0) {
+              throw new Error(result.stderr || `Command failed with exit code ${result.status}`);
+            }
+            return String(result.stdout || '').trim();
+          },
           buildRetryOptions(),
         ),
       };
@@ -257,6 +264,38 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }
       capabilities.push(...discoverProviderCliCapabilities());
       return { ...ctx, [params.export_as || 'capabilities_list']: capabilities };
+    case 'semgrep_scan':
+      return {
+        ...ctx,
+        [params.export_as || 'semgrep_findings']: await withRetry(
+          async () => {
+            const target = path.resolve(rootDir, resolve(params.target_dir));
+            const config = String(resolve(params.config) || 'auto');
+            const args = ['--config', config, target, '--json'];
+            const result = spawnSync('semgrep', args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+            if (result.error) {
+              throw result.error;
+            }
+            const stdout = String(result.stdout || '');
+            if (result.status !== 0 && !stdout) {
+              throw new Error(`[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`);
+            }
+            try {
+              return JSON.parse(stdout);
+            } catch {
+              if (result.status === 0) {
+                throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
+              }
+              try {
+                return JSON.parse(String(result.stderr || ''));
+              } catch {
+                throw new Error(`[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`);
+              }
+            }
+          },
+          buildRetryOptions(),
+        ),
+      };
     case 'discover_skills':
       return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
     default: return ctx;
@@ -355,4 +394,3 @@ async function performReconcile(input: CodeAction) {
   }
   return { status: 'reconciled' };
 }
-

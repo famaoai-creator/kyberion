@@ -1,6 +1,6 @@
 {
   "actuator_id": "meeting-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
   "contract_schema": "schemas/meeting-action.schema.json",
   "resilience_tier": "adaptive_retry",

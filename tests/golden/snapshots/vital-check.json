@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-06-20T13:32:44.702Z",
+  "pipeline_id": "vital-check",
+  "pipeline_path": "pipelines/vital-check.json",
+  "result_hash": "4dcb35cbf372ba7e7f00b17e7e1ff9e415af040eefa438f18741bc33ee626ff8",
+  "result": {
+    "status": "succeeded",
+    "results": [
+      {
+        "op": "system:log",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:probe",
+        "status": "success"
+      },
+      {
+        "op": "system:list_missions",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
+        "status": "success"
+      }
+    ],
+    "context": {
+      "p_node": {
+        "path": "node_modules",
+        "exists": true,
+        "kind": "dir"
+      },
+      "p_dist": {
+        "path": "dist",
+        "exists": true,
+        "kind": "dir"
+      },
+      "p_manifest_dir": {
+        "path": "knowledge/product/governance/surfaces",
+        "exists": true,
+        "kind": "dir"
+      },
+      "p_manifest": {
+        "path": "knowledge/product/governance/active-surfaces.json",
+        "exists": true,
+        "kind": "file"
+      },
+      "p_identity": {
+        "path": "knowledge/personal/my-identity.json",
+        "exists": false,
+        "kind": "unknown"
+      },
+      "p_vision": {
+        "path": "knowledge/personal/my-vision.md",
+        "exists": false,
+        "kind": "unknown"
+      }
+    }
+  }
+}

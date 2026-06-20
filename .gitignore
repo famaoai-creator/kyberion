@@ -30,6 +30,8 @@ projects/
 .next/
 
 # Runtime artifacts
+cache/
+outputs/
 active/
 /archive/
 work/
@@ -76,3 +78,7 @@ libs/actuators/presence-actuator/src/*.d.ts.map
 
 # Local distillation scratch output
 knowledge/evolution/distill_*.md
+
+# Repo-local generated notes that should not be committed
+vision/famaocloud.md
+evidence/lifecycle-smoke-summary.md

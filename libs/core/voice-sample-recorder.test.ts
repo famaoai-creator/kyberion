@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
@@ -41,9 +41,25 @@ vi.mock('./virtual-audio-input-recording-bridge.js', () => ({
 import { recordVoiceSample } from './voice-sample-recorder.js';
 
 describe('voice-sample-recorder', () => {
+  const originalPlatform = process.platform;
+
   afterEach(() => {
     vi.clearAllMocks();
     delete process.env.KYBERION_AUDIO_RECORD_COMMAND;
+  });
+
+  beforeEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform,
+    });
   });
 
   it('uses the microphone bridge when no recording command is configured', async () => {

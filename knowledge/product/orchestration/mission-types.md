@@ -53,7 +53,16 @@ last_updated: 2026-03-06
 - 本番セッションは **必ず人間が主導** し、エージェントは [real-time-coaching-protocol.md](knowledge/product/orchestration/real-time-coaching-protocol.md) の補助に徹する。
 - 相手情報は [relationship-graph-protocol.md](knowledge/product/orchestration/relationship-graph-protocol.md) から取得する。
 
-## 5. ミッション状態への反映
+## 5. セキュリティ検査ミッション (Security Scan Mission)
+
+**定義**: Anthropic Mythos のアプローチに基づき、コードベースの静的解析（Semgrep等）と自律エージェントによる脆弱性仮説の創出、相互批判、およびPoC検証を行うミッション。
+
+### 5.1 実行原則
+- **3-Phase 検査**: 探索(Divergence)、批判(Critique)、検証(Simulation)の3フェーズを順守すること。
+- **サンドボックス検証**: PoCの実行は必ず独立した Git Worktree などの安全なサンドボックスで行い、本番データ・インフラに影響を与えないこと。
+- `knowledge/product/pipeline-templates/security-vulnerability-scan.json` パイプラインをベースに実行される。
+
+## 6. ミッション状態への反映
 
 すべてのミッションは、`mission-state.json` の `type` フィールドによってその性質を明示しなければならない。
 
@@ -61,3 +70,4 @@ last_updated: 2026-03-06
 - `type: "development"` : 構築ミッション（書き込み許可）
 - `type: "hypothesis-tree"` : 仮説探索ミッション（発散→批判→収束）
 - `type: "negotiation"` : 交渉ミッション（合意形成、人間主導）
+- `type: "security-scan"` : セキュリティ検査ミッション（自動脆弱性探索・PoC検証）

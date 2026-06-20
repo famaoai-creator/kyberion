@@ -87,4 +87,36 @@ describe('mission-team-composer classification integration', () => {
     expect(plan.team_governance?.lifecycle.max_messages_per_run).toBe(65);
     expect(plan.team_governance?.lifecycle.max_wall_clock_minutes).toBe(240);
   });
+
+  it('composes a security scan team with attacker and defender roles assigned', () => {
+    const plan = composeMissionTeamPlan({
+      missionId: 'MSN-SEC-001',
+      missionType: 'security_scan',
+      intentId: 'scan-for-vulns',
+      shape: 'security_scan',
+      progressSignals: ['classified'],
+      tier: 'confidential',
+      organizationProfile: {
+        version: '1.0.0',
+        organization_id: 'sec-org',
+        name: 'Security Org',
+        mission_defaults: {
+          default_team_template: 'security_scan',
+          default_agent_profile: 'nerve-agent',
+        },
+        team_defaults: {
+          default_team_template: 'security_scan',
+          team_template_catalog_id: 'sec-org',
+        },
+        llm: {},
+      },
+    });
+
+    expect(plan.template).toBe('security_scan');
+    expect(plan.team_governance?.composition.required_roles).toEqual(
+      expect.arrayContaining(['attacker', 'defender']),
+    );
+    expect(plan.assignments.find((assignment) => assignment.team_role === 'attacker')?.agent_id).toBe('nerve-agent');
+    expect(plan.assignments.find((assignment) => assignment.team_role === 'defender')?.agent_id).toBe('sovereign-brain');
+  });
 });

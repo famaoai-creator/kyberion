@@ -119,6 +119,20 @@
         "resume_policy": "checkpoint_resume",
         "cooldown_minutes": 0
       }
+    },
+    "security_scan": {
+      "required_roles": ["owner", "planner", "reviewer", "attacker", "defender"],
+      "optional_roles": ["simulator"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 8,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
     }
   }
 }

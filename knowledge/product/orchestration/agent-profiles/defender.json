@@ -1,25 +1,18 @@
 {
   "version": "1.0.0",
   "agents": {
-    "nerve-agent": {
+    "defender": {
       "authority_roles": [
         "mission_controller",
         "ecosystem_architect"
       ],
       "team_roles": [
-        "owner",
-        "tester",
-        "operator",
-        "scribe",
-        "facilitator",
-        "attacker"
+        "defender"
       ],
       "capabilities": [
         "reasoning",
-        "coordination",
-        "routing",
-        "analysis",
-        "security"
+        "security",
+        "critique"
       ],
       "selection_hints": {
         "preferred_provider": "gemini",
