@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "attacker": {
+      "authority_roles": [
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "team_roles": [
+        "attacker"
+      ],
+      "capabilities": [
+        "reasoning",
+        "security",
+        "analysis"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "strict"
+    }
+  }
+}
