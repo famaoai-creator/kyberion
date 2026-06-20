@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { shouldSkipResumeEntry, RESUME_IDEMPOTENCY_WINDOW_MS } from './mission-maintenance.js';
+import { pathResolver } from '@agent/core';
+import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { recordTask, shouldSkipResumeEntry, RESUME_IDEMPOTENCY_WINDOW_MS } from './mission-maintenance.js';
 
 describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
   const now = new Date('2026-05-07T12:00:00.000Z');
@@ -82,5 +84,63 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
         2_000, // 2s window
       ),
     ).toBe(false);
+  });
+
+  it('records task details into the mission state context', async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'worker';
+    const missionId = 'MSN-MAINTENANCE-RECORD-TASK';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    safeMkdir(missionPath, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/mission-state.json`,
+      JSON.stringify({
+        mission_id: missionId,
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'delegated',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'start',
+          latest_commit: 'latest',
+          checkpoints: [],
+        },
+        history: [],
+      }, null, 2),
+    );
+
+    await recordTask(missionId, 'Dispatched work item WIT-1', {
+      next_step: 'await response',
+      context_pack_id: 'CPK-TEST-1',
+      context_pack_path: `${missionPath}/coordination/context-packs/CPK-TEST-1.json`,
+      context_pack_summary: 'Scoped context pack summary',
+      context_pack_pruning_summary: {
+        budget_chars: 900,
+        estimated_chars: 4800,
+        kept_sections: ['scope', 'mission'],
+        pruned_sections: ['knowledge_hints'],
+        rollup_summary: 'pruned knowledge hints',
+      },
+      cognitive_route_summary: 'fast_llm, owner=agent',
+      drift_watchdog_summary: 'attempts=1; repeat=0; stop=no; attention=no',
+      work_item_dispatch_summary: {
+        item_id: 'WIT-1',
+        team_role: 'implementer',
+        assignee_peer_id: 'agent-1',
+        execution_mode: 'agent',
+      },
+    });
+
+    const state = JSON.parse(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string);
+    expect(state.context.last_action).toBe('Dispatched work item WIT-1');
+    expect(state.context.next_step).toBe('await response');
+    expect(state.context.context_pack_id).toBe('CPK-TEST-1');
+    expect(state.context.context_pack_summary).toBe('Scoped context pack summary');
+    expect(state.context.context_pack_pruning_summary.pruned_sections).toEqual(['knowledge_hints']);
+    expect(state.context.work_item_dispatch_summary.drift_watchdog_summary).toBe('attempts=1; repeat=0; stop=no; attention=no');
+    expect(state.history.at(-1)?.event).toBe('RECORD_TASK');
   });
 });

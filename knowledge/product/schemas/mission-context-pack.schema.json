@@ -296,6 +296,25 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "pruning": {
+      "type": "object",
+      "properties": {
+        "budget_chars": { "type": "number", "minimum": 1 },
+        "estimated_chars": { "type": "number", "minimum": 0 },
+        "kept_sections": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "pruned_sections": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rollup_path": { "type": "string", "minLength": 1 },
+        "rollup_summary": { "type": "string", "minLength": 1 }
+      },
+      "required": ["budget_chars", "estimated_chars", "kept_sections", "pruned_sections", "rollup_summary"],
+      "additionalProperties": true
+    },
     "delivery": {
       "type": "object",
       "required": ["mode", "summary"],
