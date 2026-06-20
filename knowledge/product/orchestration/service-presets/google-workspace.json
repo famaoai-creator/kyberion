@@ -36,6 +36,36 @@
       "args": ["gmail", "+triage"],
       "description": "Summarize unread Gmail inbox items."
     },
+    "gmail_messages_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "messages", "list", "--params", "{{params}}"],
+      "description": "List Gmail messages with the discovery-backed Gmail API."
+    },
+    "gmail_message_get": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "messages", "get", "--params", "{{params}}"],
+      "description": "Get a Gmail message with metadata headers."
+    },
+    "gmail_filters_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "settings", "filters", "list", "--params", "{{params}}"],
+      "description": "List Gmail filters for the authenticated user."
+    },
+    "gmail_filters_create": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "settings", "filters", "create", "--params", "{{params}}", "--json", "{{body}}"],
+      "description": "Create a Gmail filter."
+    },
+    "gmail_messages_batch_modify": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "messages", "batchModify", "--params", "{{params}}", "--json", "{{body}}"],
+      "description": "Batch modify Gmail messages, including archiving by removing the INBOX label."
+    },
     "gmail_send": {
       "type": "cli",
       "command": "gws",
@@ -77,6 +107,43 @@
       "command": "gws",
       "args": ["calendar", "+agenda"],
       "description": "Show the upcoming Google Calendar agenda."
+    },
+    "calendar_calendarList_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "calendarList", "list", "--params", "{{params}}"],
+      "description": "List the authenticated user's calendars.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "calendar_events_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "events", "list", "--params", "{{params}}"],
+      "description": "List Google Calendar events for a calendar.",
+      "parameters": {
+        "params": { "required": false, "type": "object" }
+      }
+    },
+    "calendar_freebusy_query": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "freebusy", "query", "--json", "{{body}}"],
+      "description": "Query free/busy windows for one or more calendars.",
+      "parameters": {
+        "body": { "required": true, "type": "object" }
+      }
+    },
+    "calendar_events_insert": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["calendar", "events", "insert", "--params", "{{params}}", "--json", "{{body}}"],
+      "description": "Create a Google Calendar event, optionally with Google Meet.",
+      "parameters": {
+        "params": { "required": true, "type": "object" },
+        "body": { "required": true, "type": "object" }
+      }
     }
   }
 }

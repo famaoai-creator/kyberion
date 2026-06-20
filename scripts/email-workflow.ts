@@ -1,4 +1,11 @@
-import { readEmailDraftArtifact, readGwsAuthStatus, generateEmailReplyDraft, executeGmailDelivery, resolveEmailTriagePath } from '@agent/core/email-workflow';
+import {
+  executeGmailDelivery,
+  generateEmailReplyDraft,
+  organizeGmailInboxWithFilters,
+  readEmailDraftArtifact,
+  readGwsAuthStatus,
+  resolveEmailTriagePath,
+} from '@agent/core/email-workflow';
 import { safeExistsSync, safeReadFile } from '@agent/core';
 
 type ArgMap = Record<string, string | boolean>;
@@ -88,6 +95,16 @@ async function main() {
       subject: getString(args, '--subject'),
       to: getString(args, '--to'),
       message_id: getString(args, '--message-id'),
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === 'archive-inbox') {
+    const result = await organizeGmailInboxWithFilters({
+      max_messages: Number(getString(args, '--max-messages', '50') || '50'),
+      min_count: Number(getString(args, '--min-count', '2') || '2'),
+      apply: getBoolean(args, '--apply'),
     });
     console.log(JSON.stringify(result, null, 2));
     return;

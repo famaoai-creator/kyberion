@@ -14,10 +14,18 @@ import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-br
 import {
   executeGmailDelivery,
   generateEmailReplyDraft,
+  organizeGmailInboxWithFilters,
   readEmailDraftArtifact,
   readGwsAuthStatus,
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
+import {
+  createCalendarEvent,
+  listCalendarAgenda,
+  listCalendars,
+  queryCalendarFreeBusy,
+  readM365AuthStatus,
+} from '@agent/core/calendar-workflow';
 import { assertValidMobileAppProfileIndex, assertValidWebAppProfileIndex } from '@agent/core/app-profiles';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
@@ -168,6 +176,11 @@ function stripLocaleArg(args: string[]): string[] {
   return nextArgs;
 }
 
+function getCalendarProvider(options: Record<string, string | boolean>): 'google-workspace' | 'm365' {
+  const provider = typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
+  return provider === 'm365' ? 'm365' : 'google-workspace';
+}
+
 export function stripNpmSeparatorArg(args: string[]): string[] {
   return args.filter(arg => arg !== '--');
 }
@@ -312,11 +325,18 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  reject  <id> [ch]    Reject a pending request as the current sovereign');
   console.log('');
   console.log('── Email Workflow ───────────────────────────────────────────────────');
-  console.log('  email <status|draft|latest-draft|deliver>  Email workflow (run `npm run cli -- email --help` for details)');
+  console.log('  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `npm run cli -- email --help` for details)');
   console.log('  email status         Check Gmail auth readiness');
   console.log('  email draft          Generate a reply draft from inbox triage');
   console.log('  email latest-draft   Show the latest stored draft artifact');
   console.log('  email deliver        Create a Gmail draft or send an approved reply');
+  console.log('  email archive-inbox  Create archive filters for repeated inbox senders');
+  console.log('  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `npm run cli -- calendar --help` for details)');
+  console.log('  calendar status      Check calendar auth readiness');
+  console.log('  calendar list-calendars  List calendars on the authenticated account');
+  console.log('  calendar agenda      Show upcoming events from a calendar');
+  console.log('  calendar freebusy    Query free/busy windows for one or more calendars');
+  console.log('  calendar create-event  Create a calendar event, optionally with Google Meet');
   console.log('');
   console.log('Examples:');
   console.log('  npm run cli -- list');
@@ -327,6 +347,9 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  npm run cli -- approve <request-id>');
   console.log('  npm run cli -- email status');
   console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
+  console.log('  npm run cli -- calendar status');
+  console.log('  npm run cli -- calendar list-calendars');
+  console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
   console.log('');
   console.log('Useful first-run commands:');
   console.log('  pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
@@ -339,13 +362,14 @@ function printHelp(actuators: ActuatorRecord[]) {
 
 function printEmailHelp(): void {
   printHeader();
-  console.log('Usage: npm run cli -- email <status|draft|latest-draft|deliver> [options]');
+  console.log('Usage: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [options]');
   console.log('');
   console.log('Commands:');
   console.log('  status        Check Gmail auth readiness');
   console.log('  draft         Generate a reply draft from inbox triage');
   console.log('  latest-draft  Show the latest stored draft artifact');
   console.log('  deliver       Create a Gmail draft or send an approved email');
+  console.log('  archive-inbox Create archive filters for repeated inbox senders');
   console.log('');
   console.log('Examples:');
   console.log('  npm run cli -- email status');
@@ -353,6 +377,29 @@ function printEmailHelp(): void {
   console.log('  npm run cli -- email latest-draft');
   console.log('  npm run cli -- email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md');
   console.log('  npm run cli -- email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md');
+  console.log('  npm run cli -- email archive-inbox --apply');
+}
+
+function printCalendarHelp(): void {
+  printHeader();
+  console.log('Usage: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [options]');
+  console.log('');
+  console.log('Commands:');
+  console.log('  status        Check calendar auth readiness');
+  console.log('  list-calendars  List calendars on the authenticated account');
+  console.log('  agenda        Show upcoming events from a calendar');
+  console.log('  freebusy      Query free/busy windows for one or more calendars');
+  console.log('  create-event  Create a calendar event, optionally with meeting metadata');
+  console.log('');
+  console.log('Examples:');
+  console.log('  npm run cli -- calendar status');
+  console.log('  npm run cli -- calendar status --provider m365');
+  console.log('  npm run cli -- calendar list-calendars');
+  console.log('  npm run cli -- calendar list-calendars --provider m365');
+  console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
+  console.log('  npm run cli -- calendar agenda --provider m365 --calendar-id primary --days 7');
+  console.log('  npm run cli -- calendar freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00');
+  console.log('  npm run cli -- calendar create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet');
 }
 
 function parseEmailWorkflowOptions(args: string[]): Record<string, string | boolean> {
@@ -441,7 +488,117 @@ async function handleEmailWorkflowCommand(subcommand: string | undefined, args: 
     return;
   }
 
+  if (subcommand === 'archive-inbox') {
+    const result = await organizeGmailInboxWithFilters({
+      max_messages: Number(typeof options['--max-messages'] === 'string' ? options['--max-messages'] : '50') || 50,
+      min_count: Number(typeof options['--min-count'] === 'string' ? options['--min-count'] : '2') || 2,
+      apply: options['--apply'] === true || options['--apply'] === 'true',
+    });
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
   throw new Error(`Unknown email subcommand: ${subcommand}`);
+}
+
+async function handleCalendarWorkflowCommand(subcommand: string | undefined, args: string[]): Promise<void> {
+  if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
+    printCalendarHelp();
+    return;
+  }
+
+  const options = parseEmailWorkflowOptions(args);
+
+  if (subcommand === 'status') {
+    const provider = getCalendarProvider(options);
+    const status = provider === 'm365' ? await readM365AuthStatus() : readGwsAuthStatus();
+    printHeader();
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+
+  if (subcommand === 'list-calendars') {
+    const result = await listCalendars(getCalendarProvider(options));
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (subcommand === 'agenda') {
+    const provider = getCalendarProvider(options);
+    const result = await listCalendarAgenda({
+      provider,
+      calendar_id: typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
+      days: Number(typeof options['--days'] === 'string' ? options['--days'] : '7') || 7,
+      max_results: Number(typeof options['--max-results'] === 'string' ? options['--max-results'] : '20') || 20,
+      query: typeof options['--query'] === 'string' ? options['--query'] : undefined,
+      time_min: typeof options['--time-min'] === 'string' ? options['--time-min'] : undefined,
+      time_max: typeof options['--time-max'] === 'string' ? options['--time-max'] : undefined,
+      time_zone: typeof options['--time-zone'] === 'string' ? options['--time-zone'] : undefined,
+    });
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (subcommand === 'freebusy') {
+    const provider = getCalendarProvider(options);
+    const timeMin = typeof options['--time-min'] === 'string' ? options['--time-min'] : '';
+    const timeMax = typeof options['--time-max'] === 'string' ? options['--time-max'] : '';
+    if (!timeMin || !timeMax) {
+      throw new Error('time_min and time_max are required for freebusy');
+    }
+    const calendarIds = typeof options['--calendar-ids'] === 'string'
+      ? options['--calendar-ids'].split(',').map((item) => item.trim()).filter(Boolean)
+      : [];
+    const result = await queryCalendarFreeBusy({
+      provider,
+      calendar_id: typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
+      calendar_ids: calendarIds,
+      time_min: timeMin,
+      time_max: timeMax,
+      time_zone: typeof options['--time-zone'] === 'string' ? options['--time-zone'] : undefined,
+    });
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (subcommand === 'create-event') {
+    const provider = getCalendarProvider(options);
+    const summary = typeof options['--summary'] === 'string' ? options['--summary'] : '';
+    const start = typeof options['--start'] === 'string' ? options['--start'] : '';
+    const end = typeof options['--end'] === 'string' ? options['--end'] : '';
+    if (!summary || !start || !end) {
+      throw new Error('summary, start, and end are required for create-event');
+    }
+    const attendees = typeof options['--attendees'] === 'string'
+      ? options['--attendees'].split(',').map((item) => item.trim()).filter(Boolean)
+      : [];
+    const sendUpdatesValue = typeof options['--send-updates'] === 'string' ? options['--send-updates'] : '';
+    const result = await createCalendarEvent({
+      provider,
+      calendar_id: typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
+      summary,
+      start,
+      end,
+      description: typeof options['--description'] === 'string' ? options['--description'] : undefined,
+      location: typeof options['--location'] === 'string' ? options['--location'] : undefined,
+      attendees,
+      time_zone: typeof options['--time-zone'] === 'string' ? options['--time-zone'] : undefined,
+      send_updates: sendUpdatesValue === 'all' || sendUpdatesValue === 'externalOnly' || sendUpdatesValue === 'none'
+        ? sendUpdatesValue
+        : undefined,
+      with_meet: options['--with-meet'] === true || options['--with-meet'] === 'true',
+      conference_request_id: typeof options['--conference-request-id'] === 'string' ? options['--conference-request-id'] : undefined,
+    });
+    printHeader();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  throw new Error(`Unknown calendar subcommand: ${subcommand}`);
 }
 
 function printActuatorList(actuators: ActuatorRecord[]) {
@@ -1222,6 +1379,11 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'email') {
     await handleEmailWorkflowCommand(firstArg, restArgs);
+    return;
+  }
+
+  if (command === 'calendar') {
+    await handleCalendarWorkflowCommand(firstArg, restArgs);
     return;
   }
 
