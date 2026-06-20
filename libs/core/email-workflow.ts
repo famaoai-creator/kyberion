@@ -651,6 +651,86 @@ export function readGwsAuthStatus(): GwsAuthStatus {
   }
 }
 
+function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
+  const timestamp = new Date().toISOString();
+  const draftDir = resolveEmailDraftDir();
+  safeMkdir(draftDir, { recursive: true });
+  const fallbackId = `gws-fallback-${randomUUID()}`;
+  const artifactDir = path.join(draftDir, fallbackId);
+  safeMkdir(artifactDir, { recursive: true });
+
+  const subject = request.subject?.trim() || 'Re: Inbox update';
+  const to = request.to?.trim() || '';
+  const draftPath = path.join(artifactDir, `email-draft-${fallbackId}.md`);
+  const jsonPath = path.join(artifactDir, `email-draft-${fallbackId}.json`);
+  const draftMarkdown = [
+    `To: ${to || 'TBD'}`,
+    `Subject: ${subject}`,
+    `Tone: clear and concise`,
+    '',
+    request.body_markdown.trim(),
+    '',
+  ].join('\n');
+
+  safeWriteFile(draftPath, draftMarkdown, { encoding: 'utf8' });
+  safeWriteFile(
+    jsonPath,
+    JSON.stringify(
+      {
+        request_id: fallbackId,
+        backend: 'local-fallback',
+        fallback_reason: 'gws delivery unavailable',
+        to,
+        subject,
+        body_markdown: request.body_markdown.trim(),
+        draft_markdown: draftMarkdown,
+        draft_path: draftPath,
+        updated_at: timestamp,
+      },
+      null,
+      2,
+    ),
+    { encoding: 'utf8' },
+  );
+
+  const latest = resolveLatestEmailDraftPaths();
+  safeWriteFile(latest.markdown, `${draftMarkdown}\n`, { encoding: 'utf8' });
+  safeWriteFile(
+    latest.json,
+    JSON.stringify(
+      {
+        exists: true,
+        path: draftPath,
+        json_path: jsonPath,
+        updated_at: timestamp,
+        to,
+        subject,
+        tone: 'clear and concise',
+        body_markdown: request.body_markdown.trim(),
+        draft_markdown: draftMarkdown,
+        fallback_reason: 'gws delivery unavailable',
+      },
+      null,
+      2,
+    ),
+    { encoding: 'utf8' },
+  );
+
+  return {
+    ok: true,
+    fallback: true,
+    backend: 'local-fallback',
+    reason: 'gws delivery unavailable',
+    request_id: fallbackId,
+    to,
+    subject,
+    body_markdown: request.body_markdown.trim(),
+    draft_markdown: draftMarkdown,
+    draft_path: draftPath,
+    json_path: jsonPath,
+  };
+}
+
 export async function generateEmailReplyDraft(input: EmailDraftGenerationInput): Promise<EmailDraftGenerationResult> {
   const requestId = input.requestId?.trim() || randomUUID();
   const recipient = input.recipient?.trim() || '';
@@ -790,16 +870,30 @@ export async function executeGmailDelivery(request: EmailDeliveryRequest) {
     const action = replyMode === 'reply-all'
       ? (draftMode ? 'gmail_reply_all_draft' : 'gmail_reply_all')
       : (draftMode ? 'gmail_reply_draft' : 'gmail_reply');
-    return await executeServicePreset('google-workspace', action, {
-      message_id: messageId,
-      body,
-    });
+    try {
+      return await executeServicePreset('google-workspace', action, {
+        message_id: messageId,
+        body,
+      });
+    } catch (error: any) {
+      if (draftMode) {
+        return writeDraftModeFallbackArtifact(request);
+      }
+      throw error;
+    }
   }
 
   const action = draftMode ? 'gmail_send_draft' : 'gmail_send';
-  return await executeServicePreset('google-workspace', action, {
-    to: request.to?.trim() || '',
-    subject: request.subject?.trim() || 'Re: Inbox update',
-    body,
-  });
+  try {
+    return await executeServicePreset('google-workspace', action, {
+      to: request.to?.trim() || '',
+      subject: request.subject?.trim() || 'Re: Inbox update',
+      body,
+    });
+  } catch (error: any) {
+    if (draftMode) {
+      return writeDraftModeFallbackArtifact(request);
+    }
+    throw error;
+  }
 }
