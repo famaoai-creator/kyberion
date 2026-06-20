@@ -1,7 +1,7 @@
 {
   "v": "3.0.0",
   "t": 28,
-  "u": "2026-06-20T08:50:35.003Z",
+  "u": "2026-06-20T13:20:05.699Z",
   "s": [
     {
       "n": "agent-actuator",
@@ -112,7 +112,7 @@
       "path": "libs/actuators/meeting-actuator",
       "d": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 6
     },
     {
@@ -200,7 +200,7 @@
       "path": "libs/actuators/video-composition-actuator",
       "d": "Governed deterministic composed-video bundle preparation actuator",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 9
     },
     {
