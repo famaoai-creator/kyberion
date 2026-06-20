@@ -104,6 +104,37 @@ export interface MissionState {
     blockers?: string[];
     associated_projects?: string[];
     routing_decision_summary?: string;
+    context_pack_id?: string;
+    context_pack_path?: string;
+    context_pack_summary?: string;
+    context_pack_pruning_summary?: {
+      budget_chars: number;
+      estimated_chars: number;
+      kept_sections: string[];
+      pruned_sections: string[];
+      rollup_path?: string;
+      rollup_summary: string;
+    };
+    work_item_dispatch_summary?: {
+      item_id?: string;
+      team_role?: string;
+      assignee_peer_id?: string;
+      execution_mode?: string;
+      cognitive_route_summary?: string;
+      drift_watchdog_summary?: string;
+      ticket_state_after?: string;
+      response_path?: string;
+    };
+    ticket_dispatch_summary?: {
+      task_id?: string;
+      team_role?: string;
+      work_item_id?: string;
+      targets?: string[];
+      live_targets?: string[];
+      status?: string;
+      ticket_files?: string[];
+      live_results?: Record<string, unknown>;
+    };
     mission_finish_trace_summary?: {
       traceId: string;
       spans: number;
