@@ -11,13 +11,15 @@
         "tester",
         "operator",
         "scribe",
-        "facilitator"
+        "facilitator",
+        "attacker"
       ],
       "capabilities": [
         "reasoning",
         "coordination",
         "routing",
-        "analysis"
+        "analysis",
+        "security"
       ],
       "selection_hints": {
         "preferred_provider": "gemini",
