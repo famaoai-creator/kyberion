@@ -22,6 +22,7 @@ interface TaskInitArgs {
   answers?: Record<string, unknown>;
   answersFile?: string;
   answersJson?: string;
+  printTemplate?: boolean;
 }
 
 function parseArgs(argv: string[]): TaskInitArgs {
@@ -38,6 +39,8 @@ function parseArgs(argv: string[]): TaskInitArgs {
       parsed.answersFile = args[++i];
     } else if (arg === '--answers-json') {
       parsed.answersJson = args[++i];
+    } else if (arg === '--print-template') {
+      parsed.printTemplate = true;
     } else if (arg === '--scenario') {
       parsed.scenarioId = args[++i];
     }
@@ -79,6 +82,13 @@ function loadAnswers(args: TaskInitArgs): Record<string, unknown> {
   return args.answers || {};
 }
 
+function buildAnswerTemplate(scenario: TaskScenario): Record<string, string> {
+  return scenario.first_run.questions.reduce<Record<string, string>>((template, question) => {
+    template[question] = '';
+    return template;
+  }, {});
+}
+
 function assertProfilePathAllowed(profileOutput: string): void {
   const normalized = profileOutput.replace(/\\/g, '/').replace(/^\.\//, '');
   if (!normalized.startsWith('knowledge/personal/')) {
@@ -116,6 +126,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const scenario = loadScenarioById(args.scenarioId);
   if (!scenario) {
     throw new Error(`Unknown TaskScenario: ${args.scenarioId}`);
+  }
+
+  if (args.printTemplate) {
+    console.log(JSON.stringify(buildAnswerTemplate(scenario), null, 2));
+    return;
   }
 
   assertProfilePathAllowed(scenario.first_run.profile_output);

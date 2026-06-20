@@ -46,6 +46,22 @@ describe('task init contract', () => {
     expect(output).toContain('Next: pnpm task:run daily-email-triage');
   });
 
+  it('prints an answer template without writing a profile', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['daily-email-triage', '--print-template']);
+
+    expect(safeExistsSync(PROFILE_PATH)).toBe(false);
+    const output = logSpy.mock.calls.flat().join('\n');
+    const template = JSON.parse(output) as Record<string, string>;
+    expect(template).toEqual({
+      "重要メールとして扱う送信元や条件は何か": '',
+      "返信下書きに含めてよいカテゴリや情報の範囲はどこまでか": '',
+      "送信前に人間承認が必要になる条件は何か": '',
+      "返信トーンはどの程度まで自動化してよいか": '',
+    });
+  });
+
   it('fails gracefully when the scenario id is unknown', async () => {
     await expect(main(['unknown-scenario', '--answers-json', '{}'])).rejects.toThrow('Unknown TaskScenario: unknown-scenario');
   });
