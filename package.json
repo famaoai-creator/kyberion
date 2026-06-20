@@ -95,6 +95,7 @@
     "cli:preview": "node dist/scripts/cli.js preview",
     "cli:schedule": "node dist/scripts/cli.js schedule",
     "email:workflow": "node --import tsx scripts/email-workflow.ts",
+    "calendar:workflow": "node --import tsx scripts/calendar-workflow.ts",
     "mission": "node dist/scripts/mission_controller.js",
     "mission:prewarm": "node dist/scripts/mission_controller.js prewarm",
     "mission:create": "node dist/scripts/create_mission.js",
