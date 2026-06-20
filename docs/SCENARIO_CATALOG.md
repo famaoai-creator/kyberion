@@ -26,3 +26,4 @@ Rules:
 See also:
 - [`docs/user/README.md`](./user/README.md)
 - [`docs/DOC_INVENTORY.md`](./DOC_INVENTORY.md)
+- [`docs/TASK_SCENARIO_ROADMAP.md`](./TASK_SCENARIO_ROADMAP.md)
