@@ -9,6 +9,9 @@
  *                     CLI-harness coordination model). Auth can be inherited
  *                     from the surrounding interactive session when available.
  *   `anthropic`     — use @anthropic-ai/sdk directly. Requires ANTHROPIC_API_KEY.
+ *   `openrouter`    — use OpenRouter's OpenAI-compatible API. Requires
+ *                     OPENROUTER_API_KEY.
+ *   `local`         — use a local OpenAI-compatible server on localhost.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
  *
  * `gemini-api` is kept as a deprecated alias and resolves to `gemini-cli`.
@@ -16,7 +19,8 @@
  * auth is consumed through the CLI-backed adapter.
  *
  * Auto-selection when mode is unset:
- *   - If ANTHROPIC_API_KEY is present → `anthropic`
+ *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_LOCAL_LLM_URL /
+ *     OPENROUTER_API_KEY are present, the first matching policy rule wins.
  *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
  *     then `gemini-cli`, then `agy-cli`, with `claude-agent` only when
  *     explicitly selected.
@@ -54,6 +58,10 @@ import {
   OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
 } from './openai-compatible-backend.js';
+import {
+  OpenRouterBackend,
+  buildOpenRouterBackendFromEnv,
+} from './openrouter-backend.js';
 import { InSessionReasoningBackend } from './insession-reasoning-backend.js';
 import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
@@ -306,6 +314,28 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installedMode = 'local';
     logger.success(
       `[reasoning-bootstrap] mode=local — OpenAI-compatible local server (${baseURL}, model=${model})`,
+    );
+    return true;
+  }
+
+  if (mode === 'openrouter') {
+    const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
+    if (!openrouterBackend && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=openrouter selected but OPENROUTER_API_KEY is unset — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
+    const apiKey = process.env.KYBERION_OPENROUTER_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() || 'not-needed';
+    const baseURL = process.env.KYBERION_OPENROUTER_URL?.trim();
+    const model = options.model || process.env.KYBERION_OPENROUTER_MODEL?.trim() || 'meta-llama/llama-3-70b-instruct';
+    registerReasoningBackend(
+      openrouterBackend ?? new OpenRouterBackend({ baseURL, apiKey, model }),
+    );
+    installed = true;
+    installedMode = 'openrouter';
+    logger.success(
+      `[reasoning-bootstrap] mode=openrouter — OpenRouter API backend (model=${model})`,
     );
     return true;
   }

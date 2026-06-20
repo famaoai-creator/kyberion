@@ -1,0 +1,126 @@
+{
+  "sourcePptx": "/Users/famao/kyberion/active/shared/tmp/pptx-verify-20260605/kyberion-context-injection-proposal.pptx",
+  "workspace": "/Users/famao/kyberion/outputs/pptx-verify-20260605",
+  "outDir": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect",
+  "generatedAt": "2026-06-05T14:18:13.872Z",
+  "slideCount": 10,
+  "slideArtifacts": [
+    {
+      "slide": 1,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-01.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-01.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-01.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-01.layout.json"
+    },
+    {
+      "slide": 2,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-02.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-02.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-02.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-02.layout.json"
+    },
+    {
+      "slide": 3,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-03.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-03.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-03.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-03.layout.json"
+    },
+    {
+      "slide": 4,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-04.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-04.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-04.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-04.layout.json"
+    },
+    {
+      "slide": 5,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-05.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-05.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-05.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-05.layout.json"
+    },
+    {
+      "slide": 6,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-06.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-06.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-06.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-06.layout.json"
+    },
+    {
+      "slide": 7,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-07.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-07.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-07.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-07.layout.json"
+    },
+    {
+      "slide": 8,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-08.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-08.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-08.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-08.layout.json"
+    },
+    {
+      "slide": 9,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-09.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-09.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-09.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-09.layout.json"
+    },
+    {
+      "slide": 10,
+      "previewPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/source-slides/source-slide-10.png",
+      "previewRelativePath": "generated-inspect/source-slides/source-slide-10.png",
+      "layoutPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/layouts/source-slide-10.layout.json",
+      "layoutRelativePath": "generated-inspect/layouts/source-slide-10.layout.json"
+    }
+  ],
+  "inspectPath": "/Users/famao/kyberion/outputs/pptx-verify-20260605/generated-inspect/template-inspect.ndjson",
+  "inspectRelativePath": "generated-inspect/template-inspect.ndjson",
+  "inspectTruncated": true,
+  "inspectMetadata": {
+    "revision": "edhya1",
+    "target": {
+      "id": "pr/i1tc5f"
+    },
+    "kind": {
+      "requested": "slide,textbox,shape,image,table,chart",
+      "tokens": [
+        "slide",
+        "textbox",
+        "shape",
+        "image",
+        "table",
+        "chart"
+      ]
+    },
+    "include": {
+      "tokens": []
+    },
+    "exclude": {
+      "tokens": []
+    },
+    "notices": []
+  },
+  "extractedMedia": [],
+  "fonts": [
+    "+mj-cs",
+    "+mj-ea",
+    "+mj-lt",
+    "+mn-cs",
+    "+mn-ea",
+    "+mn-lt",
+    "Arial",
+    "Calibri",
+    "Calibri Light",
+    "Inter",
+    "System-ui"
+  ],
+  "packageParts": {
+    "mediaCount": 0,
+    "slideXmlCount": 10,
+    "chartCount": 0,
+    "tableSlideCount": 0
+  }
+}
