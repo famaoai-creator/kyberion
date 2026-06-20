@@ -25,6 +25,7 @@ import {
   appendDispatchEvent,
   writeDispatchArtifact,
 } from './mission-dispatch-lifecycle.js';
+import { recordTask } from './mission-maintenance.js';
 
 export type MissionTicketDispatchTarget = 'workitem' | 'github' | 'jira';
 
@@ -448,6 +449,22 @@ export async function dispatchMissionTickets(
       live_targets: liveTargets,
       status,
       notes,
+    });
+
+    await recordTask(missionId, `Dispatched ticket ${task.task_id}`, {
+      next_step: status === 'failed'
+        ? 'review ticket dispatch failure and repair the ticket payload'
+        : 'wait for ticket-side work to complete and then reconcile results',
+      ticket_dispatch_summary: {
+        task_id: task.task_id,
+        team_role: teamRole,
+        work_item_id: workItemId,
+        targets,
+        live_targets: liveTargets,
+        status,
+        ticket_files: ticketFiles,
+        live_results: liveResults,
+      },
     });
   }
 
