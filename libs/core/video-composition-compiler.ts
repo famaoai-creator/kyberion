@@ -1244,8 +1244,7 @@ function copySceneAssets(bundleDir: string, assetRefs: VideoCompositionAssetRef[
   for (const asset of assetRefs) {
     const sourcePath = pathResolver.rootResolve(asset.path);
     if (!safeExistsSync(sourcePath)) continue;
-    const fileName = path.basename(sourcePath);
-    const targetPath = path.join(assetsDir, fileName);
+    const targetPath = path.resolve(assetsDir, safeAssetName(sourcePath));
     if (!safeExistsSync(targetPath)) {
       safeCopyFileSync(sourcePath, targetPath);
     }
@@ -1263,6 +1262,14 @@ function sceneText(scene: CompiledVideoCompositionScene, key: string): string {
 
 function resolveAsset(assetRefs: VideoCompositionAssetRef[], role: VideoCompositionAssetRef['role']): VideoCompositionAssetRef | undefined {
   return assetRefs.find((asset) => asset.role === role) || assetRefs[0];
+}
+
+function safeAssetName(assetPath: string): string {
+  const fileName = path.basename(String(assetPath || '').trim());
+  if (!fileName || fileName === '.' || fileName === '..') {
+    throw new Error(`Invalid asset path: ${assetPath}`);
+  }
+  return fileName;
 }
 
 function slugify(input: string): string {

@@ -74,6 +74,14 @@ function extractTheme(zip: AdmZip, palette: { [key: string]: string }) {
   if (extraClrMatch) palette['__extraClrSchemeXml'] = extraClrMatch[0];
 }
 
+function safeFileName(name: string): string {
+  const fileName = path.basename(String(name || '').trim());
+  if (!fileName || fileName === '.' || fileName === '..') {
+    throw new Error(`Invalid file name: ${name}`);
+  }
+  return fileName;
+}
+
 function resolveColor(xml: string | undefined, palette: { [key: string]: string }): string | undefined {
   if (!xml || xml.includes('<a:noFill')) return undefined;
   
@@ -271,7 +279,8 @@ function extractObjects(zip: AdmZip, xml: string, palette: { [key: string]: stri
       while ((relMatch = relRegex.exec(block)) !== null) {
         const rId = relMatch[1];
         if (rels[rId]) {
-          rawRels[rId] = assetsDir ? path.join(assetsDir, path.basename(rels[rId].target)) : rels[rId].target;
+          const fileName = safeFileName(rels[rId].target);
+          rawRels[rId] = assetsDir ? path.resolve(assetsDir, fileName) : rels[rId].target;
         }
       }
 
@@ -562,7 +571,8 @@ function extractObjects(zip: AdmZip, xml: string, palette: { [key: string]: stri
     if (type === 'image') {
       const rId = body.match(/r:embed="([^"]*)"/)?.[1];
       if (rId && rels[rId]) {
-        el.imagePath = assetsDir ? path.join(assetsDir, path.basename(rels[rId].target)) : rels[rId].target;
+        const fileName = safeFileName(rels[rId].target);
+        el.imagePath = assetsDir ? path.resolve(assetsDir, fileName) : rels[rId].target;
         // Embed image data as base64 for lossless round-trip
         const relTarget = rels[rId].target;
         const mediaPath = path.posix.join(path.posix.dirname(relsFile.replace('_rels/', '').replace('.rels', '')), relTarget).replace(/^\//, '');
@@ -860,7 +870,7 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
   if (extractAssetsDir) {
     if (!safeExistsSync(extractAssetsDir)) safeMkdir(extractAssetsDir, { recursive: true });
     zip.getEntries().filter(e => e.entryName.startsWith('ppt/media/')).forEach(m => {
-      safeWriteFile(path.join(extractAssetsDir, path.basename(m.entryName)), m.getData());
+      safeWriteFile(path.resolve(extractAssetsDir, safeFileName(m.entryName)), m.getData());
     });
   }
 
