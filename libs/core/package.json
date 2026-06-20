@@ -339,6 +339,10 @@
       "types": "./dist/openai-compatible-backend.d.ts",
       "default": "./dist/openai-compatible-backend.js"
     },
+    "./openrouter-backend": {
+      "types": "./dist/openrouter-backend.d.ts",
+      "default": "./dist/openrouter-backend.js"
+    },
     "./reasoning-bootstrap": {
       "types": "./dist/reasoning-bootstrap.d.ts",
       "default": "./dist/reasoning-bootstrap.js"

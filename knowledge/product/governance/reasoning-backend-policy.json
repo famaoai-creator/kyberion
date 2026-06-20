@@ -11,6 +11,7 @@
     "gemini-cli",
     "agy-cli",
     "local",
+    "openrouter",
     "stub"
   ],
   "auto_select_env_priority": [
@@ -25,6 +26,10 @@
     {
       "env": "KYBERION_LOCAL_LLM_URL",
       "mode": "local"
+    },
+    {
+      "env": "OPENROUTER_API_KEY",
+      "mode": "openrouter"
     }
   ],
   "cli_preference_rules": [
