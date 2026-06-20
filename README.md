@@ -1,23 +1,40 @@
 # Kyberion
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D22.0.0-339933.svg?logo=node.js)](https://nodejs.org/)
-[![CI](https://github.com/famaoai-creator/kyberion/actions/workflows/ci.yml/badge.svg)](https://github.com/famaoai-creator/kyberion/actions/workflows/ci.yml)
+<p align="center">
+  <img src="./docs/assets/kyberion-wordmark.svg" alt="Kyberion" width="920" />
+</p>
 
-> **An organization work loop engine.**
-> You phrase outcomes. Kyberion plans, runs, and remembers — with audit trails.
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg" /></a>
+  <a href="https://nodejs.org/"><img alt="Node.js >=22" src="https://img.shields.io/badge/Node.js-%3E%3D22.0.0-339933.svg?logo=node.js" /></a>
+  <a href="https://github.com/famaoai-creator/kyberion/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/famaoai-creator/kyberion/actions/workflows/ci.yml/badge.svg" /></a>
+  <img alt="Status" src="https://img.shields.io/badge/Status-OSS%20%7C%20active%20development-0f172a" />
+</p>
 
-```
-Intent → Plan → Result
-```
+<p align="center">
+  <img alt="Category" src="https://img.shields.io/badge/category-agent%20orchestration-0ea5e9" />
+  <img alt="Category" src="https://img.shields.io/badge/category-browser%20automation-14b8a6" />
+  <img alt="Category" src="https://img.shields.io/badge/category-voice%20workflow-f59e0b" />
+  <img alt="Category" src="https://img.shields.io/badge/category-audit%20trails-6366f1" />
+  <img alt="Category" src="https://img.shields.io/badge/category-self%20hosted-475569" />
+</p>
 
-You ask `今週の進捗レポートを作って` or `この PDF をパワポにして` — Kyberion picks the right actuators, runs the work, asks only when something is genuinely ambiguous, and gives you a result + an artifact + a trace that next runs can learn from.
+<p align="center"><strong>An organization work loop engine.</strong><br />You phrase outcomes. Kyberion plans, runs, and remembers with evidence.</p>
 
-**Why this matters**: knowledge work is moving from "I do this manually with LLM help" to "I delegate and verify". The winning system is not the most chat-fluent model — it's the engine that captures intent reliably, has evidence and audit, and accumulates organizational memory. See [`docs/WHY.md`](./docs/WHY.md) for the full thesis ([日本語版](./docs/WHY.ja.md)).
+<p align="center">Intent → Plan → Result</p>
+
+Kyberion turns intent into governed execution. You ask `今週の進捗レポートを作って` or `この PDF をパワポにして`, and it picks the right actuators, runs the work, asks only when something is genuinely ambiguous, and returns the result plus an artifact plus a trace that next runs can learn from.
+
+**For people new to the repo**
+- If you want to try it quickly, start with [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).
+- If you want to understand what it does, read [`docs/WHY.md`](./docs/WHY.md) and [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md).
+- If you want to extend it, jump to [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) and [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md).
+
+**Why this matters**: knowledge work is moving from "I do this manually with LLM help" to "I delegate and verify". The winning system is not the most chat-fluent model, but the engine that captures intent reliably, keeps evidence, and accumulates organizational memory. See [`docs/WHY.md`](./docs/WHY.md) for the full thesis ([日本語版](./docs/WHY.ja.md)).
 
 ---
 
-## First win smoke
+## Quick Start
 
 Kyberion's first visible result comes in three short paths:
 
@@ -50,18 +67,17 @@ For the full setup, see [`docs/QUICKSTART.md`](./docs/QUICKSTART.md). For deploy
 
 ---
 
-## What's in the box
+## What It Covers
 
-23+ actuators covering:
+Kyberion currently covers:
 
-- **Browser** (Playwright-driven): record any web flow once, replay forever. RPA without the brittleness.
-- **Voice** (3 tiers, OS-native default → cloud → local self-hosted).
-- **File / Media**: PDF, PPTX, XLSX, DOCX, image, video — read, transform, generate.
-- **Code**: refactor, scaffold, analyze.
-- **Network**: governed fetch, A2A transport.
-- **Service**: unified Slack / Google / Notion / Microsoft 365 connection layer.
-- **System**: shell, screenshots, OS-level introspection.
-- **Wisdom**: knowledge tier search, distillation, reusable hint generation.
+- **Browser automation**: record a web flow once, replay it reliably.
+- **Voice workflows**: browser speech, OS-native speech, and self-hosted options.
+- **File and media handling**: PDF, PPTX, XLSX, DOCX, image, and video work.
+- **Code assistance**: refactor, scaffold, and analyze codebases.
+- **Network and service actions**: governed fetch plus Slack / Google / Notion / Microsoft 365 integration.
+- **System operations**: shell, screenshots, and OS-level introspection.
+- **Knowledge and memory**: search, distill, and reuse organizational hints.
 
 Plus:
 
@@ -75,7 +91,7 @@ For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md)
 
 ---
 
-## Status
+## Project Status
 
 **OSS, in active development.** Pre-1.0. The roadmap is in [`docs/PRODUCTIZATION_ROADMAP.md`](./docs/PRODUCTIZATION_ROADMAP.md):
 
@@ -88,7 +104,7 @@ The strategic positioning is **OSS-first, with paid implementation support / FDE
 
 ---
 
-## Documentation map
+## Documentation Map
 
 | If you want to | Read |
 |---|---|
@@ -111,7 +127,7 @@ Three audiences, three folders:
 
 ---
 
-## How it compares
+## How It Compares
 
 | You've used | What Kyberion adds |
 |---|---|
