@@ -22,6 +22,7 @@ type TaskRunArgs = {
 };
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
+const PERSONAL_TASK_PROFILE_DIR = pathResolver.rootResolve('knowledge/personal/task-profiles');
 
 function resolveScenarioDir(): string {
   const override = process.env.KYBERION_TASK_SCENARIO_DIR?.trim();
@@ -69,6 +70,12 @@ function resolveProfilePath(scenario: TaskScenario, override?: string): string {
   const relative = path.relative(pathResolver.rootDir(), resolved);
   if (relative.startsWith('..')) {
     throw new Error(`Profile path must stay within the workspace: ${override || scenario.first_run.profile_output}`);
+  }
+  const personalProfileRelative = path.relative(PERSONAL_TASK_PROFILE_DIR, resolved);
+  if (personalProfileRelative.startsWith('..') || path.isAbsolute(personalProfileRelative)) {
+    throw new Error(
+      `Profile path must stay within knowledge/personal/task-profiles/: ${override || scenario.first_run.profile_output}`
+    );
   }
   return resolved;
 }

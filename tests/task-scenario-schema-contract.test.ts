@@ -1,6 +1,6 @@
 import Ajv from 'ajv';
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
 
 function loadJson(relativePath: string): any {
   return JSON.parse(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string);
@@ -59,6 +59,25 @@ describe('TaskScenario schema contract', () => {
     }
   });
 
+  it('validates every committed TaskScenario JSON file', () => {
+    const schema = loadJson('schemas/task-scenario.schema.json');
+    const scenarioDir = pathResolver.rootResolve('knowledge/product/task-scenarios');
+    const files = safeExistsDir(scenarioDir)
+      ? safeReaddir(scenarioDir)
+          .filter((entry) => entry.endsWith('.json'))
+          .map((entry) => pathResolver.rootResolve(`knowledge/product/task-scenarios/${entry}`))
+      : [];
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(schema);
+
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const scenario = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string);
+      const valid = validate(scenario);
+      expect(valid, `${file}: ${ajv.errorsText(validate.errors)}`).toBe(true);
+    }
+  });
+
   it('exposes the required TaskScenario fields and trigger modes', () => {
     const schema = loadJson('schemas/task-scenario.schema.json');
 
@@ -81,3 +100,7 @@ describe('TaskScenario schema contract', () => {
     ]);
   });
 });
+
+function safeExistsDir(dir: string): boolean {
+  return safeExistsSync(dir);
+}

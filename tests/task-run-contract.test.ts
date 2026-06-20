@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
 import { describeTaskRun, main } from '../scripts/task_run.js';
 
-const PROFILE_PATH = pathResolver.rootResolve('active/shared/tmp/task-run-profile.json');
+const PROFILE_PATH = pathResolver.rootResolve('knowledge/personal/task-profiles/task-run-profile.json');
+const OUTSIDE_PERSONAL_PROFILE = pathResolver.rootResolve('active/shared/tmp/task-run-profile.json');
 
 describe('task run contract', () => {
   const originalPersona = process.env.KYBERION_PERSONA;
@@ -16,6 +17,7 @@ describe('task run contract', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     if (safeExistsSync(PROFILE_PATH)) safeRmSync(PROFILE_PATH);
+    if (safeExistsSync(OUTSIDE_PERSONAL_PROFILE)) safeRmSync(OUTSIDE_PERSONAL_PROFILE);
     if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
@@ -52,6 +54,14 @@ describe('task run contract', () => {
   it('rejects profile paths outside the workspace', async () => {
     await expect(main(['daily-email-triage', '--profile', '../escape.json', '--dry-run'])).rejects.toThrow(
       'Profile path must stay within the workspace: ../escape.json'
+    );
+  });
+
+  it('rejects profile overrides outside the personal task-profile directory', async () => {
+    safeWriteFile(OUTSIDE_PERSONAL_PROFILE, `${JSON.stringify({ mailbox: 'inbox' }, null, 2)}\n`);
+
+    await expect(main(['daily-email-triage', '--profile', OUTSIDE_PERSONAL_PROFILE, '--dry-run'])).rejects.toThrow(
+      'Profile path must stay within knowledge/personal/task-profiles/:'
     );
   });
 
