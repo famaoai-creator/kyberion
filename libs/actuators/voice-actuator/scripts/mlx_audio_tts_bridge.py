@@ -63,6 +63,7 @@ def _generate(params: dict) -> dict:
     ref_audio = str(params.get("ref_audio") or "").strip() or None
     ref_text = str(params.get("ref_text") or "").strip() or None
     model_id = str(params.get("model") or DEFAULT_MODEL).strip()
+    lang_code = str(params.get("lang_code") or "en").strip()
     verbose = bool(params.get("verbose", False))
 
     try:
@@ -88,6 +89,7 @@ def _generate(params: dict) -> dict:
             "output_path": output_dir,
             "file_prefix": file_prefix,
             "audio_format": "wav",
+            "lang_code": lang_code,
             "save": True,
             "play": False,
             "verbose": verbose,

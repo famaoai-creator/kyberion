@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "clone-my-voice",
   "version": "2.0.0",
-  "description": "声のクローン作成パイプライン。3サンプルを録音・トランスクリプト登録し、mlx_audio_qwen3 エンジンでの ICL クローンプロフィールを作成する。必須 context vars: profile_id, display_name。オプション: duration_sec (default 12), language (default ja)。モデルダウンロード済みであること（HuggingFace 接続が必要、初回のみ）。",
+  "description": "声のクローン作成パイプライン。3サンプルを録音・トランスクリプト登録し、mlx_audio_qwen3 エンジンでの ICL クローンプロフィールを作成する。収録直後の staging は active/shared/tmp/voice-samples/<profile_id>/、登録後の参照先は active/shared/runtime/voice-profiles/<profile_id>/ に移る。必須 context vars: profile_id, display_name。オプション: duration_sec (default 12), language (default ja)。モデルダウンロード済みであること（HuggingFace 接続が必要、初回のみ）。",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "profile_id": "my-voice-v1",
@@ -189,13 +189,20 @@
       }
     },
     {
+      "id": "announce_runtime_store",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "registration_result",
+      "params": { "message": "[clone-my-voice] 学習済み音声は active/shared/runtime/voice-profiles/{{profile_id}}/ に保存されました。tmp は収録 staging 用です。" }
+    },
+    {
       "id": "notify_done",
       "role": "sink",
       "op": "system:system_notify",
       "consumes": "registration_result",
       "params": {
         "title": "✅ 声のクローン登録完了",
-        "message": "プロフィール {{profile_id}} が登録されました。pnpm voice:speak で発話テストできます。",
+        "message": "プロフィール {{profile_id}} が登録されました。学習済み音声は active/shared/runtime/voice-profiles/{{profile_id}}/ に保存されています。pnpm voice:speak で発話テストできます。",
         "subtitle": "clone-my-voice"
       }
     },

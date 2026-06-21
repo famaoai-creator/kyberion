@@ -52,8 +52,14 @@ user request
 | Reasoning backend setup | `推論 backend を設定して` | `configure-reasoning-backend` | backend selection bundle | reasoning backend registry | ask for backend preference if missing |
 | Organization toolchain setup | `Slack や CI/CD も含めて連携して` | `configure-organization-toolchain` | org-toolchain bundle | service binding / toolchain registries | `setup-messaging-bridge` / deployment adapter setup |
 | Presentation preference setup | `資料の見た目も覚えておいて` | `register-presentation-preference-profile` | presentation profile bundle | presentation preference registry | ask for audience/theme hints |
-| Voice profile registration | `自分の声を使えるようにして` | `clone-my-voice` / `speak-with-my-voice` | voice profile bundle | `voice-actuator`, voice profile registry | `collect-voice-samples` → `register-voice-profile` → `promote-voice-profile` |
-| Voice generation | `声で読んで` | `speak-with-my-voice` | `voice-speak-with-my-voice-local-say` | `voice-actuator` | if voice profile missing, route to voice setup |
+| Contract / spec review | `この契約書をレビューして` | `contract-review` | contract review bundle | `media-actuator`, `wisdom-actuator` | if source kind is text-only, route to `review-text` |
+| General text review | `この文章をレビューして` | `review-text` | text review bundle | `media-actuator`, `browser-actuator`, `wisdom-actuator` | if source kind is contract/spec, route to `contract-review` |
+| PPTX design import | `このPowerPointをテーマ登録して` | `import-brand-from-pptx` | design theme import bundle | `media-actuator`, `browser-actuator` | if master/layout extraction is incomplete, fall back to `extract-brand-theme` |
+| Web design import | `このWebサイトをテーマ登録して` | `import-brand-from-html` | design theme import bundle | `media-actuator`, `browser-actuator` | if source capture is incomplete, fall back to `extract-brand-theme` |
+| Brand theme extraction | `この資料のデザインをテーマ化して` | `extract-brand-theme` | design extraction bundle | `media-actuator`, `browser-actuator` | if source type is unclear, ask whether it is PPTX or web |
+| Web concept build from theme | `このテーマでLPを作って` | `build-web-concept` | web build bundle | `code-actuator`, `browser-actuator` | if the theme pack is missing, ask for theme source or route to import flow |
+| Voice profile registration | `自分の声を使えるようにして` | `clone-my-voice` / `speak-with-my-voice` | voice profile bundle | `voice-actuator`, voice profile registry | `collect-voice-samples` → `register-voice-profile` → `promote-voice-profile` → runtime store `active/shared/runtime/voice-profiles/<profile_id>/` |
+| Voice generation | `声で読んで` | `speak-with-my-voice` | `voice-speak-with-my-voice-local-say` | `voice-actuator` | if voice profile missing, route to `collect-voice-samples` → `register-voice-profile` → `promote-voice-profile` |
 | Live voice conversation | `ライブ音声で会話したい` | `live-voice` | `voice-live-conversation-default` / `realtime-voice-governed` | `voice-actuator` + `whisper` + `meeting` bindings | if mic/STT missing, fall back to voice setup or STT bridge setup |
 | Batch transcription | `この音声を書き起こして` | `transcribe-audio` | `audio-transcribe-default` / `audio-transcription-governed` | `whisper` service endpoint | if audio source is missing, ask for file path or asset |
 | Slack bridge activation | `Slackサービスと連携して` | `setup-messaging-bridge` | messaging bridge setup bundle | `service-actuator` + declared bridge | if credentials or manifest missing, ask for channel/platform details |
@@ -96,10 +102,26 @@ user request
   - → `verify-environment-readiness`
   - → `configure-organization-toolchain`
   - → 必要なら `register-actuator-adapter`
-- `speak-with-my-voice` で voice profile が未登録
+- `import-brand-from-pptx` で PPTX master / layout / logo の抽出が不完全
+  - → `extract-brand-theme`
+  - → 必要なら `register-presentation-preference-profile`
+- `import-brand-from-html` で Web source capture が不完全
+  - → `extract-brand-theme`
+  - → 必要なら `configure-organization-toolchain`
+- `build-web-concept` で theme pack が不足
+  - → `import-brand-from-pptx` または `import-brand-from-html`
+  - → それでも不足する場合は `extract-brand-theme`
+- `contract-review` で契約・仕様が不足
+  - → `media:document_digest`
+  - → 必要なら `active-learning-escalate`
+- `review-text` で role / tenant / authority の文脈が不足
+  - → `clarify-user-request`
+  - → 必要なら `active-learning-escalate`
+- `speak-with-my-voice` で voice profile が未登録または未昇格
   - → `collect-voice-samples`
   - → `register-voice-profile`
   - → `promote-voice-profile`
+  - → runtime store `active/shared/runtime/voice-profiles/<profile_id>/`
 - `live-voice` で STT / mic routing が不足
   - → `verify-environment-readiness`
   - → `configure-organization-toolchain`
@@ -157,6 +179,7 @@ Kyberion は不足情報を補うために clarification を返します。
 2. `speak-with-my-voice` / `live-voice`
 3. `setup-messaging-bridge`
 4. `generate-video` / `generate-narrated-video`
+5. `contract-review` / `review-text` / `extract-brand-theme` / `import-brand-from-pptx` / `import-brand-from-html` / `build-web-concept`
 
 そのうえで、運用確認として:
 

@@ -43,7 +43,8 @@ Internally, Kyberion maps each Request through:
 |---|---|---|
 | Implement feature / fix bug / refactor | `code_change` | `implementation-plan` → `execute-task-plan` → `code-review-cycle` |
 | Cut a release | `operations_and_release` | `release-package` → `deploy-release` |
-| Review a contract / spec | — | `contract-review` |
+| Review a contract / spec | `research_and_absorption` | `contract-review` |
+| Review plain text / approval copy | `decision_support` | `review-text` |
 
 ### 3.2 Customer-facing requirements to delivery
 
@@ -147,6 +148,10 @@ Built on the relationship-graph + dissent-log protocols.
 | Marketing copy generation | `content_and_media` | `marketing-content` |
 | Re-execute marketing iteration | `content_and_media` | `marketing-re-execute` |
 | PPTX from a template (ownership-aware) | `content_and_media` | `pptx-template-inherit` |
+| PPTX design/theme import | `content_and_media` | `import-brand-from-pptx` |
+| Website/HTML design/theme import | `content_and_media` | `import-brand-from-html` |
+| Brand theme extraction from PPTX or Web | `content_and_media` | `extract-brand-theme` |
+| Web concept build from design theme | `product_delivery` | `build-web-concept` |
 
 ### 3.8 Platform / API extension
 
@@ -226,7 +231,7 @@ Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_R
 |---|---|
 | Microphone capture | `KYBERION_AUDIO_RECORD_COMMAND` + `voice-sample-recorder` |
 | TTS engine catalog | `knowledge/product/governance/voice-engines/*.json` + `voice-engine-registry.json` snapshot |
-| Voice profile catalog | `knowledge/product/governance/voice-profiles/*.json` canonical, `voice-profile-registry.json` compatibility snapshot |
+| Voice profile catalog | `knowledge/product/governance/voice-profiles/*.json` canonical, runtime store `active/shared/runtime/voice-profiles/`, `voice-profile-registry.json` compatibility snapshot |
 | Profile lifecycle policy | `voice-runtime-policy.ts` (record → collect → promote) |
 | Profile promotion procedure | `knowledge/public/procedures/media/promote-voice-profile.md` |
 | STT bridge | `SpeechToTextBridge` contract; shell impl driven by `KYBERION_STT_COMMAND` |
