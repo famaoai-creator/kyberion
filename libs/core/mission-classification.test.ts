@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import {
+  MISSION_CLASS_VALUES,
   mapMissionClassToMissionTypeTemplate,
   resolveMissionClassification,
 } from './mission-classification.js';
+import { safeReadFile } from './secure-io.js';
 
 describe('mission-classification', () => {
   it('classifies research-and-absorption analysis tasks', () => {
@@ -49,5 +52,18 @@ describe('mission-classification', () => {
     expect(mapMissionClassToMissionTypeTemplate('research_and_absorption')).toBe('system_query');
     expect(mapMissionClassToMissionTypeTemplate('content_and_media')).toBe('development');
     expect(mapMissionClassToMissionTypeTemplate('code_change')).toBe('development');
+    expect(mapMissionClassToMissionTypeTemplate('decision_support')).toBe('development');
+    expect(mapMissionClassToMissionTypeTemplate('customer_engagement')).toBe('surface_concierge');
+    expect(mapMissionClassToMissionTypeTemplate('platform_onboarding')).toBe('operations');
+  });
+
+  it('keeps the runtime mission class list aligned with the schema enum', () => {
+    const schemaPath = path.resolve(process.cwd(), 'knowledge/product/schemas/mission-classification.schema.json');
+    const schema = JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string) as {
+      properties?: { mission_class?: { enum?: string[] } };
+    };
+    const schemaClasses = schema.properties?.mission_class?.enum || [];
+
+    expect(MISSION_CLASS_VALUES).toEqual(schemaClasses);
   });
 });
