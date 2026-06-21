@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge/product/schemas/contextual-intent-learning-seed.schema.json",
+  "title": "Contextual Intent Learning Seed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "utterance",
+        "intent_id",
+        "action",
+        "object",
+        "subject",
+        "confirmed",
+        "tier",
+        "locale",
+        "source",
+        "recorded_at"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "utterance": { "type": "string", "minLength": 1 },
+        "intent_id": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "enum": ["read", "change"] },
+        "object": { "type": "string", "enum": ["calendar_events", "calendar_schedule"] },
+        "subject": { "type": "string", "enum": ["operator_self", "team"] },
+        "date_range": {
+          "type": "string",
+          "enum": ["today", "tomorrow", "this_week", "next_week", "this_month", "next_month", "custom"]
+        },
+        "source_binding": {
+          "type": "string",
+          "enum": ["operator_default_calendar", "google_calendar", "outlook_calendar", "browser_calendar"]
+        },
+        "clarification_needed": { "type": "boolean" },
+        "confirmed": { "type": "boolean" },
+        "tier": { "type": "string", "enum": ["public"] },
+        "locale": { "type": "string", "enum": ["ja-JP", "en-US"] },
+        "source": { "type": "string", "enum": ["seed"] },
+        "recorded_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
