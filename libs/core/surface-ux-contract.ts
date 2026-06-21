@@ -5,7 +5,7 @@ export interface SurfaceUxContractInput {
 
 export interface SurfaceUxContractResult {
   valid: boolean;
-  signals: Array<'request' | 'plan' | 'state' | 'result' | 'next_action'>;
+  signals: Array<'request' | 'plan' | 'state' | 'result' | 'next_action' | 'bounded_task' | 'governed_mission' | 'review_context'>;
   violations: string[];
 }
 
@@ -15,6 +15,9 @@ const SIGNAL_PATTERNS: Array<{ signal: SurfaceUxContractResult['signals'][number
   { signal: 'state', patterns: [/\bstate\b/i, /状況|状態|running|waiting|blocked|completed|failed/i] },
   { signal: 'result', patterns: [/\bresult\b/i, /結果|deliverable|artifact|outcome/i] },
   { signal: 'next_action', patterns: [/\bnext action\b/i, /次のアクション|次にやること|unblock|承認してください/i] },
+  { signal: 'bounded_task', patterns: [/短い作業として進めます|短い作業として進めて|短い作業|小さな作業|bounded task/i] },
+  { signal: 'governed_mission', patterns: [/承認と記録が必要なためミッションとして進めます|ミッションとして進めます|governed mission/i] },
+  { signal: 'review_context', patterns: [/レビュー目的|役割|テナント|persona|tenant|review purpose|レビュー対象/i] },
 ];
 
 const INTERNAL_LEAKAGE_PATTERNS = [
@@ -23,6 +26,8 @@ const INTERNAL_LEAKAGE_PATTERNS = [
   /\bruntime supervisor\b/i,
   /\bintent_resolution_packet\b/i,
   /\bexecution_shape\b/i,
+  /\bmission_class\b/i,
+  /\bworkflow_id\b/i,
 ];
 
 const APPROVAL_CONSEQUENCE_PATTERNS = [
