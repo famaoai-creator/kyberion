@@ -139,6 +139,19 @@
       "match": {
         "mission_classes": ["platform_onboarding"]
       }
+    },
+    {
+      "id": "mode-standard-core-work",
+      "review_mode": "standard",
+      "match": {
+        "mission_classes": [
+          "product_delivery",
+          "code_change",
+          "research_and_absorption",
+          "content_and_media",
+          "environment_and_recovery"
+        ]
+      }
     }
   ]
 }

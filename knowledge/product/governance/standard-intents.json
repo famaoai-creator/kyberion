@@ -219,7 +219,7 @@
     {
       "id": "speak-with-my-voice",
       "category": "outcome_execution",
-      "description": "Generate speech in the operator's cloned voice using mlx-audio TTS.",
+      "description": "Generate speech in the operator's cloned voice using mlx-audio TTS from a promoted runtime voice profile.",
       "surface_examples": [
         "私の声で喋らせて",
         "このテキストを私の声で読んで",
@@ -228,7 +228,7 @@
       ],
       "plan_outline": [
         "log voice speech request",
-        "generate narration audio using the cloned voice profile",
+        "resolve the promoted runtime voice profile and generate narration audio",
         "return the generated audio artifact"
       ],
       "execution_profile_id": "voice-speak-with-my-voice-local-say",
@@ -626,6 +626,94 @@
       "risk_profile": "review_required"
     },
     {
+      "id": "contract-review",
+      "category": "knowledge_lifecycle",
+      "description": "Review a contract, specification, or formal document by converting it to markdown and running adversarial persona critique over legal, operations, and red-team lenses.",
+      "surface_examples": [
+        "この契約書をレビューして",
+        "この仕様書をレビューして",
+        "契約前の文書を法務観点で見て"
+      ],
+      "plan_outline": [
+        "normalize the document to markdown",
+        "run adversarial persona critique over legal, ops, and red-team lenses",
+        "record surviving risks for human review"
+      ],
+      "intake_requirements": [
+        "source document",
+        "review target",
+        "approval or release scope"
+      ],
+      "outcome_ids": ["review_findings"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": [
+        "契約",
+        "仕様書",
+        "contract",
+        "spec",
+        "レビュー",
+        "法務",
+        "red-team"
+      ],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "review"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "knowledge",
+      "action": "review",
+      "object": "contract_or_spec_document",
+      "execution_shape": "pipeline",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "review-text",
+      "category": "knowledge_lifecycle",
+      "description": "Review plain text, markdown, or web copy with persona, tenant, and approval lenses, then return findings, rewrite suggestions, and escalation guidance.",
+      "surface_examples": [
+        "この文章をレビューして",
+        "この文面を承認前提で見て",
+        "この案内文を役割に応じてチェックして"
+      ],
+      "plan_outline": [
+        "detect the source kind and normalize the text",
+        "identify the review purpose and role lens",
+        "run the governed review and summarize findings"
+      ],
+      "intake_requirements": [
+        "source text",
+        "review purpose",
+        "persona / tenant / role lens"
+      ],
+      "outcome_ids": ["review_findings"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": [
+        "文章",
+        "文面",
+        "レビュー",
+        "review",
+        "確認",
+        "承認",
+        "role",
+        "tenant",
+        "persona"
+      ],
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "review"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "knowledge",
+      "action": "review",
+      "object": "text_document",
+      "execution_shape": "pipeline",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
       "id": "evolve-agent-harness",
       "category": "mission_process",
       "description": "Improve an agent harness through a benchmark-driven experiment loop with baseline, one-change iteration, and governed keep or discard decisions.",
@@ -1008,17 +1096,18 @@
     {
       "id": "extract-brand-theme",
       "category": "outcome_execution",
-      "description": "Extract brand design tokens (colors, fonts, logo elements) from an existing PowerPoint file or website URL to create a reusable design theme.",
+      "description": "Extract a reusable design theme from an existing PowerPoint file or website URL by capturing colors, fonts, logo treatment, layout structure, and other presentation or web-specific design signals.",
       "surface_examples": [
         "このパワポのデザインをテーマ化して",
         "このWebサイトをベースにデザインテーマを作って",
+        "表紙・マスター込みで再利用できるテーマにして",
         "Extract brand styles from this URL"
       ],
       "plan_outline": [
-        "access the source asset (load file or navigate to URL)",
-        "extract visual design tokens using media or vision actuators",
-        "synthesize tokens into a reusable Kyberion Design Spec",
-        "save as a registered Presentation Preference Profile"
+        "access the source asset (load the file or navigate to the URL)",
+        "extract presentation- or web-specific design signals using media or browser actuators",
+        "synthesize the signals into a reusable Kyberion theme pack",
+        "save the result as a registered design theme profile"
       ],
       "outcome_ids": ["design_theme_created", "artifact:design_spec"],
       "specialist_id": "document-specialist",
@@ -1040,15 +1129,16 @@
     {
       "id": "build-web-concept",
       "category": "outcome_execution",
-      "description": "Generate and build a functional web site prototype based on a conceptual brief and optionally an extracted design theme.",
+      "description": "Generate and build a functional web site prototype from a conceptual brief and an optional extracted web theme pack, preserving palette, typography, spacing, layout grid, breakpoints, and hero structure.",
       "surface_examples": [
         "このコンセプトでWebサイトを構築して",
         "Build a landing page for this product idea",
-        "AIエージェントの紹介サイトを作って"
+        "AIエージェントの紹介サイトを作って",
+        "このテーマでLPを作って"
       ],
       "plan_outline": [
         "frame the site structure and content from the conceptual brief",
-        "apply the selected design theme or brand styles",
+        "apply the selected design theme or web-theme-pack directly",
         "generate web assets (HTML/CSS/JS) using code-actuator",
         "deploy a local preview or verify the site layout in browser"
       ],
@@ -1068,6 +1158,70 @@
       "execution_shape": "task_session",
       "mission_class": "product_delivery",
       "risk_profile": "approval_required"
+    },
+    {
+      "id": "import-brand-from-pptx",
+      "category": "outcome_execution",
+      "description": "Import a PowerPoint file as a registry-ready design theme pack that preserves the source deck's presentation structure, master layout, and reusable visual tokens.",
+      "surface_examples": [
+        "このPowerPointをテーマ登録して",
+        "この資料を再利用できるテーマとして取り込んで",
+        "PPTX からブランドテーマを作って"
+      ],
+      "plan_outline": [
+        "access the source PowerPoint file",
+        "extract the deck theme, master, layouts, and tokens",
+        "store the result as a pptx-theme-pack",
+        "confirm the registry-ready artifact"
+      ],
+      "outcome_ids": ["design_theme_created", "artifact:design_spec"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["pptxテーマ", "PowerPoint取り込み", "テーマ登録", "pptx import"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "design_extraction",
+        "result_shape": "design_spec"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "brand_design_theme",
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "import-brand-from-html",
+      "category": "outcome_execution",
+      "description": "Import a website or HTML source as a registry-ready web theme pack that preserves palette, typography, spacing, grid, breakpoints, and hero structure for reuse.",
+      "surface_examples": [
+        "このWebサイトをテーマ登録して",
+        "このHTMLの見た目を再利用できるようにして",
+        "サイトのデザインを別ページ向けに取り込んで"
+      ],
+      "plan_outline": [
+        "open the source website or HTML representation",
+        "extract the reusable web design signals",
+        "store the result as a web-theme-pack",
+        "confirm the registry-ready artifact"
+      ],
+      "outcome_ids": ["design_theme_created", "artifact:design_spec"],
+      "specialist_id": "document-specialist",
+      "trigger_keywords": ["webテーマ", "HTML取り込み", "テーマ登録", "html import"],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "design_extraction",
+        "result_shape": "design_spec"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "brand_design_theme",
+      "execution_shape": "task_session",
+      "mission_class": "content_and_media",
+      "risk_profile": "review_required"
     },
     {
       "id": "setup-messaging-bridge",

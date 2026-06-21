@@ -33,18 +33,18 @@
       "mission_class": "environment_and_recovery"
     },
     {
-      "id": "class-operations-release",
-      "match": {
-        "task_types": ["service_operation", "meeting_operations"]
-      },
-      "mission_class": "operations_and_release"
-    },
-    {
       "id": "class-operations-release-schedule-intent",
       "match": {
         "intent_ids": ["schedule-coordination"]
       },
       "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-operations-release",
+      "match": {
+        "task_types": ["service_operation", "meeting_operations"]
+      },
+      "mission_class": "operations_and_release"
     },
     {
       "id": "class-operations-release-meeting-utterance",
@@ -275,6 +275,90 @@
       },
       "mission_class": "platform_onboarding"
     }
+    ,
+    {
+      "id": "class-customer-engagement-intent-extended",
+      "match": {
+        "intent_ids": [
+          "schedule-read-agenda",
+          "clarify-user-request"
+        ]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-research-absorption-intent-extended",
+      "match": {
+        "intent_ids": [
+          "knowledge-query",
+          "operator-profile-learning",
+          "distill-mission-knowledge",
+          "contract-review"
+        ]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-decision-support-intent-extended",
+      "match": {
+        "intent_ids": [
+          "review-text",
+          "technical-decision-memo"
+        ]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-content-media-intent-extended",
+      "match": {
+        "intent_ids": [
+          "import-brand-from-pptx",
+          "import-brand-from-html",
+          "extract-brand-theme"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-product-delivery-intent-extended",
+      "match": {
+        "intent_ids": [
+          "build-web-concept"
+        ]
+      },
+      "mission_class": "product_delivery"
+    },
+    {
+      "id": "class-operations-release-intent-extended",
+      "match": {
+        "intent_ids": [
+          "diagnose-kyberion-system",
+          "maintenance-routine"
+        ]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-environment-recovery-intent-extended",
+      "match": {
+        "intent_ids": [
+          "recover-environment",
+          "handoff-mission"
+        ]
+      },
+      "mission_class": "environment_and_recovery"
+    },
+    {
+      "id": "class-platform-onboarding-intent-extended",
+      "match": {
+        "intent_ids": [
+          "configure-organization-toolchain",
+          "launch-first-run-onboarding",
+          "register-presentation-preference-profile"
+        ]
+      },
+      "mission_class": "platform_onboarding"
+    }
   ],
   "delivery_shape_rules": [
     {
@@ -379,6 +463,64 @@
       },
       "delivery_shape": "cross_system_change"
     }
+    ,
+    {
+      "id": "delivery-interactive-exploration-intent-extended",
+      "match": {
+        "intent_ids": [
+          "schedule-read-agenda",
+          "clarify-user-request",
+          "knowledge-query",
+          "operator-profile-learning",
+          "technical-decision-memo"
+        ]
+      },
+      "delivery_shape": "interactive_exploration"
+    },
+    {
+      "id": "delivery-pipeline-intent-extended",
+      "match": {
+        "intent_ids": [
+          "review-text",
+          "contract-review",
+          "diagnose-kyberion-system"
+        ]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
+    {
+      "id": "delivery-single-artifact-intent-extended",
+      "match": {
+        "intent_ids": [
+          "import-brand-from-pptx",
+          "import-brand-from-html",
+          "extract-brand-theme",
+          "distill-mission-knowledge",
+          "register-presentation-preference-profile"
+        ]
+      },
+      "delivery_shape": "single_artifact"
+    },
+    {
+      "id": "delivery-cross-system-intent-extended",
+      "match": {
+        "intent_ids": [
+          "build-web-concept",
+          "configure-organization-toolchain",
+          "launch-first-run-onboarding"
+        ]
+      },
+      "delivery_shape": "cross_system_change"
+    },
+    {
+      "id": "delivery-long-running-intent-extended",
+      "match": {
+        "intent_ids": [
+          "recover-environment"
+        ]
+      },
+      "delivery_shape": "long_running_job"
+    }
   ],
   "risk_profile_rules": [
     {
@@ -449,6 +591,48 @@
         "task_types": ["platform_onboarding", "organization_setup", "secrets_rotation"]
       },
       "risk_profile": "high_stakes"
+    }
+    ,
+    {
+      "id": "risk-low-intent-extended",
+      "match": {
+        "intent_ids": [
+          "schedule-read-agenda",
+          "clarify-user-request",
+          "knowledge-query"
+        ]
+      },
+      "risk_profile": "low"
+    },
+    {
+      "id": "risk-review-required-intent-extended",
+      "match": {
+        "intent_ids": [
+          "review-text",
+          "contract-review",
+          "operator-profile-learning",
+          "distill-mission-knowledge",
+          "technical-decision-memo",
+          "import-brand-from-pptx",
+          "import-brand-from-html",
+          "extract-brand-theme",
+          "launch-first-run-onboarding",
+          "register-presentation-preference-profile"
+        ]
+      },
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "risk-approval-required-intent-extended",
+      "match": {
+        "intent_ids": [
+          "build-web-concept",
+          "diagnose-kyberion-system",
+          "configure-organization-toolchain",
+          "recover-environment"
+        ]
+      },
+      "risk_profile": "approval_required"
     }
   ],
   "stage_rules": [

@@ -17,6 +17,7 @@ const POLICY_PATH = pathResolver.knowledge(
 export type ContextualClarificationExecutionShape =
   | 'direct_reply'
   | 'task_session'
+  | 'pipeline'
   | 'mission'
   | 'project_bootstrap';
 

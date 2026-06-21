@@ -3,13 +3,19 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 
-export type MissionClass =
-  | 'product_delivery'
-  | 'code_change'
-  | 'research_and_absorption'
-  | 'content_and_media'
-  | 'operations_and_release'
-  | 'environment_and_recovery';
+export const MISSION_CLASS_VALUES = [
+  'product_delivery',
+  'code_change',
+  'research_and_absorption',
+  'content_and_media',
+  'operations_and_release',
+  'environment_and_recovery',
+  'decision_support',
+  'customer_engagement',
+  'platform_onboarding',
+] as const;
+
+export type MissionClass = (typeof MISSION_CLASS_VALUES)[number];
 
 export type MissionDeliveryShape =
   | 'single_artifact'
@@ -261,9 +267,22 @@ export function resolveMissionClassification(input: MissionClassificationInput):
 }
 
 export function mapMissionClassToMissionTypeTemplate(missionClass: MissionClass): string {
-  if (missionClass === 'product_delivery') return 'product_development';
-  if (missionClass === 'operations_and_release') return 'operations';
-  if (missionClass === 'environment_and_recovery') return 'incident';
-  if (missionClass === 'research_and_absorption') return 'system_query';
-  return 'development';
+  switch (missionClass) {
+    case 'product_delivery':
+      return 'product_development';
+    case 'operations_and_release':
+      return 'operations';
+    case 'environment_and_recovery':
+      return 'incident';
+    case 'research_and_absorption':
+      return 'system_query';
+    case 'customer_engagement':
+      return 'surface_concierge';
+    case 'platform_onboarding':
+      return 'operations';
+    case 'decision_support':
+    case 'content_and_media':
+    case 'code_change':
+      return 'development';
+  }
 }
