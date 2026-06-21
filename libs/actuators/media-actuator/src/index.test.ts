@@ -183,6 +183,37 @@ describe('media-actuator pdf to pptx bridge', () => {
     );
   });
 
+  it('reads plain text documents through document_digest', async () => {
+    const tmpDir = path.resolve(process.cwd(), 'active/shared/tmp/media-document-digest-tests');
+    const mdPath = path.join(tmpDir, 'sample.md');
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(mdPath, '# Review me\n\nThis is a test document.');
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: {},
+        steps: [
+          {
+            type: 'capture',
+            op: 'document_digest',
+            params: {
+              path: mdPath,
+              export_as: 'document_markdown',
+            },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.document_markdown).toContain('Review me');
+      expect(result.context.document_markdown).toContain('This is a test document.');
+    } finally {
+      if (safeExistsSync(mdPath)) safeRmSync(mdPath, { force: true });
+      if (safeExistsSync(tmpDir)) safeRmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it('auto-binds imported DESIGN.md systems from service binding design_reference metadata', async () => {
     saveServiceBindingRecord({
       binding_id: 'BIND-DESIGN-REF',
@@ -371,6 +402,327 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.compiled_protocol.metadata.generationBoundary.llm_zone.forbidden).toEqual(
       expect.arrayContaining(['invent_layout_coordinates']),
     );
+  });
+
+  it('loads confidential pptx theme packs with heritage when applying a registered theme', async () => {
+    const tenantSlug = '__pptx_theme_pack_test';
+    const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
+    const themePackPath = path.join(confDir, 'theme.json');
+    const themeName = `${tenantSlug}-imported`;
+    safeMkdir(confDir, { recursive: true });
+    safeWriteFile(themePackPath, JSON.stringify({
+      kind: 'pptx-theme-pack',
+      version: '1.0.0',
+      theme_id: themeName,
+      brand_name: 'Deck Studio',
+      tenant_slug: tenantSlug,
+      design_system_id: 'executive-standard',
+      theme: {
+        name: 'Deck Studio',
+        colors: {
+          primary: '#10203A',
+          secondary: '#31415B',
+          accent: '#D97706',
+          background: '#F8FAFC',
+          text: '#0F172A',
+        },
+        fonts: {
+          heading: 'Aptos Display, sans-serif',
+          body: 'Aptos, sans-serif',
+        },
+        assets: {
+          logo_url: '/assets/logos/kyberion-logo.png',
+        },
+      },
+      pptx: {
+        canvas: { w: 13.333, h: 7.5 },
+        master: {
+          elements: [{ type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 13.333, h: 0.25 } }],
+          bgXml: '<p:bg><a:solidFill><a:srgbClr val="F8FAFC"/></a:solidFill></p:bg>',
+        },
+      },
+      layout_template_id: 'corporate-standard',
+    }, null, 2));
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: {
+          last_json: {
+            kind: 'proposal-brief',
+            document_profile: 'executive-proposal',
+            design_system_id: themeName,
+            render_target: 'pptx',
+            title: 'Registered Theme Pack Deck',
+            objective: 'Validate confidential pptx theme pack reuse.',
+            story: {
+              core_message: 'Theme packs should preserve master and canvas.',
+              closing_cta: 'Approve reuse.',
+            },
+          },
+        },
+        steps: [
+          {
+            type: 'transform',
+            op: 'apply_theme',
+            params: { theme: themeName },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.active_theme_name).toBe(themeName);
+      expect(result.context.active_theme_pack).toEqual(expect.objectContaining({
+        kind: 'pptx-theme-pack',
+        theme_id: themeName,
+      }));
+      expect(result.context.active_canvas).toEqual({ w: 13.333, h: 7.5 });
+      expect(result.context.active_pptx_master.elements).toHaveLength(1);
+      expect(result.context.active_pptx_master.bgXml).toContain('F8FAFC');
+    } finally {
+      safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+    }
+  });
+
+  it('persists pptx brand registration when save_brand_to_confidential runs as a sink step', async () => {
+    const tenantSlug = '__pptx_sink_persist_test';
+    const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
+    safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: {
+          tenant_slug: tenantSlug,
+          source_pptx_design: {
+            version: '3.0.0',
+            generatedAt: new Date().toISOString(),
+            canvas: { w: 13.333, h: 7.5 },
+            theme: {},
+            master: {
+              elements: [],
+              bgXml: '<p:bg><a:solidFill><a:srgbClr val="F8FAFC"/></a:solidFill></p:bg>',
+            },
+            slides: [],
+          },
+          active_theme: {
+            name: 'Sink Persist Test',
+            colors: {
+              primary: '#10203A',
+              secondary: '#31415B',
+              accent: '#D97706',
+              background: '#F8FAFC',
+              text: '#0F172A',
+            },
+            fonts: {
+              heading: 'Aptos Display, sans-serif',
+              body: 'Aptos, sans-serif',
+            },
+          },
+          last_layout_geometry: {
+            geometry: {
+              chrome: { title_x: 0.35, title_y: 0.4 },
+            },
+            template: {
+              chrome: { title_x: 0.35, title_y: 0.4 },
+              hero: { title_x: 0.8, title_y: 1.0 },
+              body_zones: { single_column: { font_size: 13 } },
+            },
+            needs_new_template: true,
+            recommended_template_id: 'corporate-standard',
+          },
+        },
+        steps: [
+          {
+            type: 'sink',
+            op: 'save_brand_to_confidential',
+            params: {
+              tenant_slug: tenantSlug,
+              brand_name: 'Sink Persist Test',
+              matchers: ['sink persist test'],
+              design_system_id: 'executive-standard',
+              theme_from: 'active_theme',
+              layout_from: 'last_layout_geometry',
+              pptx_from: 'source_pptx_design',
+            },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(safeExistsSync(path.join(confDir, 'theme.json'))).toBe(true);
+      expect(safeExistsSync(path.join(confDir, 'layout-templates.json'))).toBe(true);
+      expect(safeExistsSync(path.join(confDir, 'tenant-override.json'))).toBe(true);
+      expect(safeExistsSync(path.resolve(process.cwd(), 'knowledge/confidential/tenants/index.json'))).toBe(true);
+    } finally {
+      safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+    }
+  });
+
+  it('persists web brand registration as a web theme pack', async () => {
+    const tenantSlug = '__web_theme_pack_test';
+    const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
+    const prevPersona = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'sovereign';
+    safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: {
+          tenant_slug: tenantSlug,
+          active_web_theme: {
+            theme: {
+              name: 'Web Studio',
+              colors: {
+                primary: '#10203A',
+                secondary: '#31415B',
+                accent: '#D97706',
+                background: '#F8FAFC',
+                text: '#0F172A',
+              },
+              fonts: {
+                heading: 'Inter, sans-serif',
+                body: 'Inter, sans-serif',
+              },
+              assets: {
+                logo_url: '/assets/logos/web-studio.svg',
+              },
+            },
+            web: {
+              source_url: 'https://www.example.com',
+              snapshot_summary: 'A crisp landing page with a compact hero.',
+              hero: {
+                title: 'Build faster',
+                subtitle: 'A concise value proposition.',
+                cta: 'Get started',
+              },
+              layout_grid: {
+                type: 'grid',
+                columns: 12,
+                container_max_width: '1200px',
+              },
+              spacing_scale: {
+                xs: '4px',
+                sm: '8px',
+                md: '16px',
+                lg: '24px',
+              },
+              breakpoints: ['640px', '1024px', '1280px'],
+              sections: ['hero', 'features', 'footer'],
+              typography: {
+                heading: 'Inter, sans-serif',
+                body: 'Inter, sans-serif',
+              },
+            },
+            layout_templates: {
+              version: '1.0.0',
+              default: 'web-studio-extracted',
+              templates: {
+                'web-studio-extracted': {
+                  chrome: {
+                    container_max_width: '1200px',
+                  },
+                  hero: {
+                    headline_max_width: '720px',
+                  },
+                  body_zones: {
+                    single_column: {
+                      gap: '24px',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        steps: [
+          {
+            type: 'sink',
+            op: 'save_brand_to_confidential',
+            params: {
+              tenant_slug: tenantSlug,
+              brand_name: 'Web Studio',
+              matchers: ['web studio'],
+              design_system_id: 'executive-standard',
+              theme_from: 'active_web_theme',
+              web_theme_from: 'active_web_theme',
+            },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      const themePackPath = path.join(confDir, 'theme.json');
+      const layoutPath = path.join(confDir, 'layout-templates.json');
+      expect(safeExistsSync(themePackPath)).toBe(true);
+      expect(safeExistsSync(layoutPath)).toBe(true);
+
+      const themePack = JSON.parse(safeReadFile(themePackPath, { encoding: 'utf8' }) as string);
+      expect(themePack.kind).toBe('web-theme-pack');
+      expect(themePack.web?.source_url).toBe('https://www.example.com');
+      expect(themePack.web?.hero?.title).toBe('Build faster');
+      expect(themePack.layout_templates?.default).toBe('web-studio-extracted');
+      expect(themePack.layout_templates?.templates?.['web-studio-extracted']?.hero?.headline_max_width).toBe('720px');
+      expect(themePack.layout_templates?.templates?.['web-studio-extracted']?.body_zones?.single_column?.gap).toBe('24px');
+      expect(safeExistsSync(path.resolve(process.cwd(), 'knowledge/confidential/tenants/index.json'))).toBe(true);
+    } finally {
+      process.env.KYBERION_PERSONA = prevPersona;
+      safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+    }
+  });
+
+  it('derives a hero-aware layout template from PPTX heritage', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        last_pptx_design: {
+          version: '3.0.0',
+          generatedAt: new Date().toISOString(),
+          canvas: { w: 13.333, h: 7.5 },
+          theme: {},
+          master: {
+            elements: [
+              {
+                type: 'text',
+                placeholderType: 'title',
+                pos: { x: 0.92, y: 0.98, w: 7.8, h: 2.1 },
+                style: { fontSize: 38 },
+              },
+              {
+                type: 'text',
+                placeholderType: 'subTitle',
+                pos: { x: 1.18, y: 3.42, w: 7.25, h: 0.72 },
+                style: { fontSize: 15 },
+              },
+              {
+                type: 'image',
+                pos: { x: 10.6, y: 0.12, w: 1.28, h: 0.46 },
+              },
+            ],
+          },
+          slides: [
+            {
+              id: 'cover',
+              elements: [],
+            },
+          ],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'layout_template_from_pptx_design',
+          params: { from: 'last_pptx_design', export_as: 'derived_layout' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.derived_layout.template.hero.title_x).toBe(0.92);
+    expect(result.context.derived_layout.template.hero.title_y).toBe(0.98);
+    expect(result.context.derived_layout.template.hero.subtitle_x).toBe(1.18);
+    expect(result.context.derived_layout.template.hero.logo_y).toBe(0.12);
   });
 
   it('renders xlsx from a minimal smart-table protocol without explicit table metadata', async () => {

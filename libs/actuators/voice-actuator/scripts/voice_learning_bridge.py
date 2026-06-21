@@ -21,7 +21,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-PROFILE_CACHE_ROOT = Path("active/shared/tmp/voice-profiles")
+PROFILE_CACHE_ROOT = Path("active/shared/runtime/voice-profiles")
 PROFILE_REGISTRY_PATH = Path("knowledge/personal/voice/profile-registry.json")
 
 

@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/web-theme-pack.schema.json",
+  "title": "Web Theme Pack",
+  "description": "Confidential theme pack derived from a source website or HTML snapshot. Stores palette, typography, layout grid, spacing, hero structure, and other web heritage so the site can be recreated consistently.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "theme_id", "brand_name", "tenant_slug", "design_system_id", "theme", "web"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["web-theme-pack"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "theme_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "brand_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "colors", "fonts"],
+      "properties": {
+        "name": { "type": "string" },
+        "colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary", "secondary", "accent", "background", "text"],
+          "properties": {
+            "primary": { "type": "string" },
+            "secondary": { "type": "string" },
+            "accent": { "type": "string" },
+            "background": { "type": "string" },
+            "text": { "type": "string" }
+          }
+        },
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["heading", "body"],
+          "properties": {
+            "heading": { "type": "string" },
+            "body": { "type": "string" }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "logo_url": { "type": "string" }
+          }
+        }
+      }
+    },
+    "web": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_url"],
+      "properties": {
+        "source_url": { "type": "string" },
+        "snapshot_summary": { "type": "string" },
+        "hero": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "title": { "type": "string" },
+            "subtitle": { "type": "string" },
+            "cta": { "type": "string" }
+          }
+        },
+        "layout_grid": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "type": { "type": "string" },
+            "columns": { "type": "number" },
+            "container_max_width": { "type": "string" }
+          }
+        },
+        "spacing_scale": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number"] }
+        },
+        "breakpoints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sections": {
+          "type": "array",
+          "items": { "type": ["string", "object"] }
+        },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "heading": { "type": "string" },
+            "body": { "type": "string" }
+          }
+        },
+        "snapshot": {
+          "type": ["object", "string", "null"],
+          "additionalProperties": true
+        }
+      }
+    },
+    "layout_templates": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "default": { "type": "string" },
+        "templates": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "layout_template_id": {
+      "type": "string"
+    },
+    "layout_template_catalog": {
+      "type": ["string", "null"]
+    },
+    "source_theme_name": {
+      "type": ["string", "null"]
+    }
+  }
+}

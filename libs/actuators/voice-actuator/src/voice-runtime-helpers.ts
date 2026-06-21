@@ -133,7 +133,7 @@ function resolveArtifactPath(requestId: string, format: VoiceArtifactFormat, out
   return pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`);
 }
 
-async function runMlxAudioGenerate(text: string, outputPath: string, profile?: any): Promise<void> {
+async function runMlxAudioGenerate(text: string, outputPath: string, language: string, profile?: any): Promise<void> {
   const bridgeScript = pathResolver.rootResolve(
     'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py',
   );
@@ -146,6 +146,7 @@ async function runMlxAudioGenerate(text: string, outputPath: string, profile?: a
     params: {
       text,
       output_path: outputPath,
+      lang_code: language.trim().toLowerCase().startsWith('ja') ? 'ja' : 'en',
       ...(refAudio ? { ref_audio: refAudio } : {}),
       ...(refText ? { ref_text: refText } : {}),
     },
@@ -158,13 +159,49 @@ async function runMlxAudioGenerate(text: string, outputPath: string, profile?: a
 
   let parsed: any;
   try {
-    parsed = JSON.parse(result.stdout);
+    const stdout = result.stdout.trim();
+    if (!stdout) throw new Error('No stdout received');
+    parsed = JSON.parse(stdout);
   } catch {
     throw new Error(`mlx_audio_tts_bridge returned non-JSON: ${result.stdout}`);
   }
 
   if (parsed.status !== 'success') {
     throw new Error(`mlx_audio_tts_bridge error: ${parsed.error}`);
+  }
+
+  // Auto-trim output based on text duration from end (remove reference audio context)
+  if (refAudio && safeExistsSync(outputPath)) {
+    try {
+      const probeTotal = safeExec('ffprobe', [
+        '-v', 'error',
+        '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1',
+        outputPath
+      ]).trim();
+      const totalDuration = parseFloat(probeTotal);
+      const estimatedDuration = Math.min(
+        totalDuration,
+        (text.length / 5.5) + 0.6
+      );
+
+      if (Number.isFinite(totalDuration) && totalDuration > estimatedDuration) {
+        const tempPath = `${outputPath}.tmp.wav`;
+        safeExec('ffmpeg', [
+          '-y',
+          '-sseof', `-${estimatedDuration.toFixed(2)}`,
+          '-i', outputPath,
+          '-c', 'copy',
+          tempPath
+        ]);
+        if (safeExistsSync(tempPath)) {
+          safeExec('mv', [tempPath, outputPath]);
+          logger.info(`[VOICE_CLONE] Trimmed context reference speech, kept target text speech of ${estimatedDuration.toFixed(2)}s from end.`);
+        }
+      }
+    } catch (err: any) {
+      logger.warn(`[VOICE_CLONE] Failed to auto-trim reference context: ${err.message}`);
+    }
   }
 }
 
@@ -220,7 +257,7 @@ function renderNativeArtifact(
 
   if (options.engineId === 'mlx_audio_qwen3') {
     return withRetry(async () => {
-      await runMlxAudioGenerate(text, artifactPath, options.profile);
+      await runMlxAudioGenerate(text, artifactPath, options.language, options.profile);
       return artifactPath;
     }, buildRetryOptions());
   }
@@ -273,7 +310,7 @@ async function performPlayback(
     const tmpPath = playbackSourcePath || pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
     await withRetry(async () => {
       if (!playbackSourcePath) {
-        await runMlxAudioGenerate(text, tmpPath, options.profile);
+        await runMlxAudioGenerate(text, tmpPath, options.language, options.profile);
       }
       safeExec('open', [tmpPath]);
     }, buildRetryOptions());

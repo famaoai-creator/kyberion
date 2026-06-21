@@ -82,6 +82,7 @@ Successful collection writes:
   - `active/shared/tmp/voice-sample-collection/<request_id>/collection-manifest.json`
 
 The result also includes `registration_candidate`, which can be passed directly into `register_voice_profile`.
+If that candidate is fed into `collect_and_register_voice_profile`, the samples are copied into `active/shared/runtime/voice-profiles/<profile_id>/` during registration and the runtime registry points there.
 
 ## Flow
 

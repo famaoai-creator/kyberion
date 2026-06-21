@@ -11,7 +11,8 @@
       "op": "reasoning:analyze",
       "produces": { "channel": "site_html", "type": "HtmlContent" },
       "params": {
-        "instruction": "Define and write a complete HTML document for a website based on this concept: {{concept_brief}}. Include landing page sections (Hero, Features, Pricing, Footer). If a design theme is provided ({{design_theme}}), incorporate those brand styles directly into the HTML and CSS. Return a single self-contained HTML string."
+        "instruction": "Define and write a complete HTML document for a website based on this concept: {{concept_brief}}. Include landing page sections (Hero, Features, Pricing, Footer). If a design theme is provided, treat it as a web-theme-pack and reuse its palette, typography, spacing scale, layout grid, breakpoints, and hero structure directly in the HTML and CSS. Return a single self-contained HTML string.",
+        "context": ["{{design_theme}}"]
       }
     },
     {

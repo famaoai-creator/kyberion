@@ -10,7 +10,7 @@
         "ja"
       ],
       "sample_refs": [
-        "active/shared/tmp/voice-samples/sample-01.wav"
+        "active/shared/runtime/voice-profiles/user-cloned/sample-01.wav"
       ],
       "default_engine_id": "open_voice_clone",
       "status": "active",

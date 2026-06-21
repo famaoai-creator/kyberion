@@ -30,9 +30,9 @@
             "role": "transform",
             "op": "reasoning:synthesize",
             "consumes": "web_snapshot",
-            "produces": { "channel": "active_theme", "type": "Theme" },
+            "produces": { "channel": "active_web_theme", "type": "WebThemePack" },
             "params": {
-              "instruction": "以下のDOM/CSSスナップショットからブランドカラーとフォントを特定してください。必ず次のJSON形式のみで出力してください:\n{\"colors\":{\"primary\":\"#XXXXXX\",\"secondary\":\"#XXXXXX\",\"accent\":\"#XXXXXX\",\"background\":\"#XXXXXX\",\"text\":\"#XXXXXX\"},\"fonts\":{\"heading\":\"フォント名\",\"body\":\"フォント名\"}}",
+              "instruction": "以下のDOM/CSSスナップショットから Web サイトの再現に必要なデザインパックを作成してください。必ず次の JSON 形式のみで出力してください。他のテキストは不要です:\n{\"theme\":{\"name\":\"ブランド名\",\"colors\":{\"primary\":\"#XXXXXX\",\"secondary\":\"#XXXXXX\",\"accent\":\"#XXXXXX\",\"background\":\"#XXXXXX\",\"text\":\"#XXXXXX\"},\"fonts\":{\"heading\":\"フォント名\",\"body\":\"フォント名\"},\"assets\":{\"logo_url\":\"/optional/logo.svg\"}},\"web\":{\"source_url\":\"元URL\",\"snapshot_summary\":\"1文要約\",\"hero\":{\"title\":\"見出し\",\"subtitle\":\"補足文\",\"cta\":\"CTA文言\"},\"layout_grid\":{\"type\":\"grid or flex\",\"columns\":12,\"container_max_width\":\"px or rem\"},\"spacing_scale\":{\"xs\":\"...\",\"sm\":\"...\",\"md\":\"...\",\"lg\":\"...\"},\"breakpoints\":[\"640px\",\"1024px\",\"1280px\"],\"sections\":[\"hero\",\"features\",\"pricing\",\"footer\"],\"typography\":{\"heading\":\"フォント名\",\"body\":\"フォント名\"}},\"layout_templates\":{\"version\":\"1.0.0\",\"default\":\"web-extracted\",\"templates\":{\"web-extracted\":{\"chrome\":{},\"hero\":{},\"body_zones\":{\"single_column\":{}}}}}}",
               "context": ["{{web_snapshot}}"]
             }
           },
@@ -40,13 +40,15 @@
             "id": "save_brand_web",
             "role": "sink",
             "op": "media:save_brand_to_confidential",
-            "consumes": "active_theme",
+            "consumes": "active_web_theme",
             "params": {
               "tenant_slug":      "{{tenant_slug}}",
               "brand_name":       "{{brand_name}}",
               "matchers":         "{{matchers}}",
               "design_system_id": "{{design_system_id}}",
-              "theme_from":       "active_theme"
+              "theme_from":       "active_web_theme",
+              "web_theme_from":   "active_web_theme",
+              "web_from":         "web_snapshot"
             }
           }
         ],
@@ -86,6 +88,7 @@
               "design_system_id": "{{design_system_id}}",
               "theme_from":       "active_theme",
               "layout_from":      "last_layout_geometry",
+              "pptx_from":        "source_pptx_design",
               "logo_url":         "{{logo_url}}"
             }
           }

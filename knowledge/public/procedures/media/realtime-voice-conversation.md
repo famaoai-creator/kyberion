@@ -22,6 +22,7 @@ This is the procedure behind the `live-voice` intent and its default execution p
 ## Preconditions
 
 - personal voice usage requires a registered and promoted `active` profile
+- the active profile's sample refs should resolve under `active/shared/runtime/voice-profiles/<profile_id>/`
 - strict mode rejects `shadow` profiles and clone-engine fallback
 - `KYBERION_STT_COMMAND` should be configured unless transcript sidecars are used
 - a reasoning backend should be available through `installReasoningBackends()`
@@ -82,6 +83,8 @@ If the user says `use my voice`, registration and promotion still have to happen
 
 - [register-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
 - [promote-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)
+
+After promotion, the runtime will read the registered profile from `active/shared/runtime/voice-profiles/<profile_id>/` through the voice profile registry.
 
 ## Related Procedures
 

@@ -552,6 +552,81 @@ function extractChromeGeometryFromPptxDesign(design: any): any {
   };
 }
 
+function pickSlideHeroElements(design: any): { titleEl?: any; subtitleEl?: any; logoEl?: any; slideIndex?: number } {
+  const masterElements: any[] = Array.isArray(design?.master?.elements) ? design.master.elements : [];
+  const slides: any[] = Array.isArray(design?.slides) ? design.slides : [];
+  const slide = slides[0] || null;
+  const slideElements: any[] = Array.isArray(slide?.elements) ? slide.elements : [];
+  const combined = [...slideElements, ...masterElements];
+  const findByPlaceholder = (placeholderTypes: string[]) => combined.find((e) => placeholderTypes.includes(e?.placeholderType));
+  const findLogo = combined.find((e) => e?.type === 'image' && typeof e?.pos?.x === 'number' && typeof e?.pos?.y === 'number' && e.pos.x > (design?.canvas?.w || 10) * 0.6);
+  return {
+    titleEl: findByPlaceholder(['title', 'ctrTitle']),
+    subtitleEl: findByPlaceholder(['subTitle', 'body']),
+    logoEl: findLogo,
+    slideIndex: slide ? 0 : undefined,
+  };
+}
+
+function deriveLayoutTemplateFromPptxDesign(design: any, fallbackTemplate: any = {}): any {
+  const geometry = extractChromeGeometryFromPptxDesign(design);
+  const canvas = geometry.canvas || design?.canvas || { w: 10, h: 7.5 };
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const hero = pickSlideHeroElements(design);
+  const baseHero = fallbackTemplate.hero || {};
+  const baseBodyZones = fallbackTemplate.body_zones || {};
+  const titleEl = hero.titleEl;
+  const subtitleEl = hero.subtitleEl;
+  const logoEl = hero.logoEl;
+  const derivedLogoRightMargin = logoEl
+    ? r2(Math.max(0.08, canvas.w - logoEl.pos.x - logoEl.pos.w))
+    : baseHero.logo_right_margin;
+  const derivedWhitePanelY = subtitleEl
+    ? r2(Math.min(canvas.h - 0.85, Math.max(subtitleEl.pos.y + subtitleEl.pos.h + 0.65, canvas.h * 0.56)))
+    : baseHero.white_panel_y;
+  const separatorH = baseHero.separator_h ?? geometry.chrome.separator_h ?? 0.03;
+  const derivedSeparatorY = typeof derivedWhitePanelY === 'number' ? r2(Math.max(0, derivedWhitePanelY - separatorH)) : baseHero.separator_y;
+  const derivedBrandNameY = subtitleEl
+    ? r2(subtitleEl.pos.y + subtitleEl.pos.h + 0.15)
+    : baseHero.brand_name_y;
+  const derivedTitleW = titleEl?.pos?.w ? r2(titleEl.pos.w) : (baseHero.title_w ?? baseHero.title_w_logo ?? baseHero.title_w_no_logo);
+  const derivedSubtitleW = subtitleEl?.pos?.w ? r2(subtitleEl.pos.w) : baseHero.subtitle_w;
+
+  return {
+    chrome: geometry.chrome,
+    hero: {
+      ...baseHero,
+      white_panel_y: derivedWhitePanelY ?? baseHero.white_panel_y,
+      white_panel_h: baseHero.white_panel_h,
+      separator_y: derivedSeparatorY ?? baseHero.separator_y,
+      separator_h: separatorH,
+      logo_display_h: logoEl?.pos?.h ? r2(Math.max(0.2, Math.min(logoEl.pos.h, 0.8))) : baseHero.logo_display_h,
+      logo_display_max_w: logoEl?.pos?.w ? r2(Math.max(logoEl.pos.w, 0.5)) : baseHero.logo_display_max_w,
+      logo_right_margin: derivedLogoRightMargin ?? baseHero.logo_right_margin,
+      logo_y: logoEl?.pos?.y ? r2(logoEl.pos.y) : baseHero.logo_y,
+      brand_name_x: baseHero.brand_name_x ?? geometry.chrome.title_x,
+      brand_name_y: derivedBrandNameY ?? baseHero.brand_name_y,
+      brand_name_w: baseHero.brand_name_w,
+      brand_name_h: baseHero.brand_name_h,
+      brand_name_font_size: baseHero.brand_name_font_size ?? titleEl?.style?.fontSize ?? 10,
+      title_x: titleEl?.pos?.x ? r2(titleEl.pos.x) : baseHero.title_x,
+      title_y: titleEl?.pos?.y ? r2(titleEl.pos.y) : baseHero.title_y,
+      title_w: derivedTitleW ?? baseHero.title_w,
+      title_h: titleEl?.pos?.h ? r2(titleEl.pos.h) : baseHero.title_h,
+      title_font_size: titleEl?.style?.fontSize || baseHero.title_font_size,
+      subtitle_x: subtitleEl?.pos?.x ? r2(subtitleEl.pos.x) : baseHero.subtitle_x,
+      subtitle_y: subtitleEl?.pos?.y ? r2(subtitleEl.pos.y) : baseHero.subtitle_y,
+      subtitle_w: derivedSubtitleW ?? baseHero.subtitle_w,
+      subtitle_h: subtitleEl?.pos?.h ? r2(subtitleEl.pos.h) : baseHero.subtitle_h,
+      subtitle_font_size: subtitleEl?.style?.fontSize || baseHero.subtitle_font_size,
+    },
+    body_zones: {
+      ...baseBodyZones,
+    },
+    _meta: 'Derived from PPTX heritage',
+  };
+}
+
 function matchLayoutTemplate(geometry: any, catalog: any): { id: string; score: number } | null {
   const templates = catalog?.templates as Record<string, any> | undefined;
   if (!templates) return null;
@@ -622,6 +697,18 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
   const slideBodyFont = pickFontFromElements(slideElements, ['body', 'subTitle']);
   const fallbackFont = pickFontFromElements(slideElements, []);
 
+  const pptxHeritage = {
+    canvas: design?.canvas || null,
+    master: design?.master || null,
+    rawThemeXml: design?.rawThemeXml || null,
+    rawMasterXml: design?.rawMasterXml || null,
+    rawMasterRelsXml: design?.rawMasterRelsXml || null,
+    rawLayouts: Array.isArray(design?.rawLayouts) ? design.rawLayouts : [],
+    rawMasters: Array.isArray(design?.rawMasters) ? design.rawMasters : [],
+    masterMedia: Array.isArray(design?.masterMedia) ? design.masterMedia : [],
+    rawParts: design?.rawParts || null,
+  };
+
   return {
     name: explicitName || 'pptx-extracted-theme',
     colors: {
@@ -635,6 +722,7 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
       heading: titleFont || slideTitleFont || fallbackFont || 'Aptos, sans-serif',
       body: bodyFont || slideBodyFont || fallbackFont || 'Aptos, sans-serif',
     },
+    pptx: pptxHeritage,
   };
 }
 
@@ -643,6 +731,7 @@ export {
   resolveDiagramTheme,
   generateDrawioDocument,
   extractChromeGeometryFromPptxDesign,
+  deriveLayoutTemplateFromPptxDesign,
   matchLayoutTemplate,
   deriveThemeFromPptxDesign,
   normalizeFontFamily,
