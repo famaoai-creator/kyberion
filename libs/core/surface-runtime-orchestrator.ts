@@ -58,6 +58,7 @@ import {
   selectContractCandidates,
   type ContractCandidate,
 } from './intent-contract-learning.js';
+import type { WorkScopeDecision } from './work-scope-decision.js';
 import {
   findServiceById,
   registerService,
@@ -842,6 +843,45 @@ function recordLearningOutcomeSafely(
   }
 }
 
+function getWorkScopeDecision(context: SurfaceRuntimeRouteContext): WorkScopeDecision | null {
+  return context.compiledFlow?.workLoop?.work_scope_decision || null;
+}
+
+function shouldPromoteToMission(context: SurfaceRuntimeRouteContext): boolean {
+  const workScopeDecision = getWorkScopeDecision(context);
+  if (!workScopeDecision?.promotion_required) return false;
+  const routeFamily = resolvedSurfaceIntent(context).routeFamily;
+  return routeFamily === 'task_session' || routeFamily === 'pipeline';
+}
+
+function buildWorkScopeGovernancePayload(context: SurfaceRuntimeRouteContext): Record<string, unknown> | null {
+  const workScopeDecision = getWorkScopeDecision(context);
+  if (!workScopeDecision) return null;
+  const routingDecision = context.compiledFlow?.routingDecision;
+  return {
+    ...(routingDecision && typeof routingDecision === 'object' ? routingDecision : {}),
+    work_scope_decision: workScopeDecision,
+  };
+}
+
+function buildWorkScopeGovernanceReceipt(context: SurfaceRuntimeRouteContext): {
+  policy_version?: string;
+  promotion_required?: boolean;
+  matched_rule_ids?: string[];
+  mandatory_triggers?: string[];
+  accumulation_triggers?: string[];
+} | undefined {
+  const workScopeDecision = getWorkScopeDecision(context);
+  if (!workScopeDecision) return undefined;
+  return {
+    policy_version: workScopeDecision.policy_version,
+    promotion_required: workScopeDecision.promotion_required,
+    matched_rule_ids: workScopeDecision.matched_rule_ids,
+    mandatory_triggers: workScopeDecision.mandatory_triggers,
+    accumulation_triggers: workScopeDecision.accumulation_triggers,
+  };
+}
+
 function missionActionGuidance(
   action: NonNullable<ReturnType<typeof resolveSurfaceIntent>['missionAction']>,
   missionId: string
@@ -925,6 +965,7 @@ async function handleGovernedExecutionHint(
             command,
             status: 'ok',
             candidateSelection: candidates,
+            governance: buildWorkScopeGovernanceReceipt(context),
           }),
           '',
           output.trim() || '(no output)',
@@ -997,6 +1038,72 @@ async function handleGovernedExecutionHint(
           command,
           status: 'ok',
           candidateSelection: candidates,
+          governance: buildWorkScopeGovernanceReceipt(context),
+        }),
+        '',
+        output.trim() || '(no output)',
+      ].join('\n')
+    );
+  }
+
+  if (shouldPromoteToMission(context)) {
+    const governancePayload = buildWorkScopeGovernancePayload(context);
+    const missionId = `MSN-${Date.now().toString(36).toUpperCase()}`;
+    const command = `node dist/scripts/mission_controller.js create ${missionId} public`;
+    let output = '';
+    try {
+      output = safeExec(
+        'node',
+        [
+          'dist/scripts/mission_controller.js',
+          'create',
+          missionId,
+          'public',
+          ...(governancePayload ? ['--routing-decision', JSON.stringify(governancePayload)] : []),
+        ],
+        {
+          cwd: pathResolver.rootDir(),
+        }
+      );
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: 'mission',
+          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
+          success: true,
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+    } catch (error: any) {
+      if (intentId) {
+        recordLearningOutcomeSafely({
+          intent_id: intentId,
+          execution_shape: 'mission',
+          contract_ref: { kind: 'mission_command', ref: 'mission_controller create' },
+          success: false,
+          error: error?.message || String(error),
+          context_fingerprint: {
+            execution_shape: resolved.shape,
+            surface: context.input.surface || 'unknown',
+          },
+        });
+      }
+      throw error;
+    }
+    return emptySurfaceResult(
+      [
+        `承認と記録が必要なためミッションとして進めます。ミッションID: ${missionId}`,
+        '',
+        formatExecutionReceipt({
+          intentId: resolved.intentId,
+          shape: 'mission',
+          command,
+          status: 'ok',
+          candidateSelection: candidates,
+          governance: buildWorkScopeGovernanceReceipt(context),
         }),
         '',
         output.trim() || '(no output)',
@@ -1050,7 +1157,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        `Created mission: ${missionId}`,
+        `承認と記録が必要なためミッションを作成しました。ミッションID: ${missionId}`,
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -1142,6 +1249,7 @@ async function handleGovernedExecutionHint(
         command,
         status: 'ok',
         candidateSelection: candidates,
+        governance: buildWorkScopeGovernanceReceipt(context),
       }),
       '',
       output.trim() || '(no output)',
@@ -1454,7 +1562,11 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
     matches: (context) => {
       if (!context.compiledFlow) return false;
       const resolved = resolvedSurfaceIntent(context);
-      return Boolean(resolved.routeFamily === 'pipeline' || resolved.routeFamily === 'mission');
+      return Boolean(
+        resolved.routeFamily === 'pipeline' ||
+          resolved.routeFamily === 'mission' ||
+          shouldPromoteToMission(context),
+      );
     },
     handle: async (context) => {
       try {

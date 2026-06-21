@@ -39,6 +39,15 @@ Internally, Kyberion may use:
 
 Those are execution details behind the contract above.
 
+Default operator phrasing should stay plain:
+
+- `短い作業として進めます。`
+  - when the request stays bounded and does not need mission governance
+- `承認と記録が必要なためミッションとして進めます。`
+  - when the request needs durable ownership, approval, or audit evidence
+- `この文章は、文章種別 / レビュー目的 / 役割 / テナントを確認してから見ます。`
+  - when the user asked for review and the source kind or reviewer context matters
+
 For mission-backed work, the team composition artifact also carries a small governance block:
 
 - `team_governance.lifecycle`
@@ -203,6 +212,8 @@ Examples:
   - Kyberion resolves this to a service inspection path
 - `今週の進捗レポートを作って`
   - Kyberion resolves this to a task session or mission-backed document flow
+- `この文章をレビューして`
+  - Kyberion first identifies the data type, review purpose, reviewer role, and tenant context, then asks only the missing review questions before it proceeds
 - `Teamsで開催されるオンラインミーティングに私の代わりに参加して無事成功させる`
   - Kyberion resolves this to `meeting-operations`, then asks for the meeting URL, role boundary, and purpose if they are missing
 - `スケジュールを調整して`
