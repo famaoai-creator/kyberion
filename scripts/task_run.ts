@@ -105,9 +105,6 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string, op
   const profilePath = resolveProfilePath(scenario, profileOverride, options);
   const profileLoaded = safeExistsSync(profilePath);
   const requiresProfile = scenario.repeat_run.params_from_profile;
-  if (requiresProfile && !profileLoaded) {
-    throw new Error(`Missing profile for ${scenario.id}. Run pnpm task:init ${scenario.id} first.`);
-  }
 
   const profile = profileLoaded ? loadProfile(profilePath) : null;
   const artifactList = scenario.result.artifacts.map((artifact) => `- ${artifact}`).join('\n');
