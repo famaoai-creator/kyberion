@@ -20,7 +20,7 @@ type TaskScenario = {
 
 type SmokeAnswers = Record<string, Record<string, string>>;
 
-const PROFILE_DIR = pathResolver.rootResolve('knowledge/personal/task-profiles');
+const SMOKE_PROFILE_DIR = pathResolver.rootResolve('active/shared/tmp/task-smoke');
 const SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 
 const BUILTIN_ANSWERS: SmokeAnswers = {
@@ -62,7 +62,7 @@ function buildSmokeProfile(scenario: TaskScenario, answers: Record<string, strin
 }
 
 function profilePathForScenario(scenarioId: string): string {
-  return pathResolver.rootResolve(`knowledge/personal/task-profiles/${scenarioId}.json`);
+  return path.join(SMOKE_PROFILE_DIR, `${scenarioId}.json`);
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -78,7 +78,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   const profilePath = profilePathForScenario(scenario.id);
-  safeMkdir(PROFILE_DIR, { recursive: true });
+  safeMkdir(SMOKE_PROFILE_DIR, { recursive: true });
   safeWriteFile(profilePath, `${JSON.stringify(buildSmokeProfile(scenario, answers), null, 2)}\n`);
 
   console.log(`TaskScenario smoke: ${scenario.id}`);
@@ -88,7 +88,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log('Phase 2: init');
   console.log(`- Fixture answers loaded: ${Object.keys(answers).length}`);
   console.log('Phase 3: run');
-  console.log(describeTaskRun(scenario.id, profilePath));
+  console.log(describeTaskRun(scenario.id, profilePath, { allowExternalProfilePath: true }));
   console.log(`TaskScenario smoke passed: ${scenario.id}`);
 }
 

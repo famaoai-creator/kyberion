@@ -21,6 +21,10 @@ type TaskRunArgs = {
   dryRun: boolean;
 };
 
+type TaskRunOptions = {
+  allowExternalProfilePath?: boolean;
+};
+
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 const PERSONAL_TASK_PROFILE_DIR = pathResolver.rootResolve('knowledge/personal/task-profiles');
 
@@ -65,11 +69,14 @@ function parseArgs(argv: string[]): TaskRunArgs {
   return parsed;
 }
 
-function resolveProfilePath(scenario: TaskScenario, override?: string): string {
+function resolveProfilePath(scenario: TaskScenario, override?: string, options: TaskRunOptions = {}): string {
   const resolved = pathResolver.rootResolve(override || scenario.first_run.profile_output);
   const relative = path.relative(pathResolver.rootDir(), resolved);
   if (relative.startsWith('..')) {
     throw new Error(`Profile path must stay within the workspace: ${override || scenario.first_run.profile_output}`);
+  }
+  if (options.allowExternalProfilePath) {
+    return resolved;
   }
   const personalProfileRelative = path.relative(PERSONAL_TASK_PROFILE_DIR, resolved);
   if (personalProfileRelative.startsWith('..') || path.isAbsolute(personalProfileRelative)) {
@@ -80,20 +87,29 @@ function resolveProfilePath(scenario: TaskScenario, override?: string): string {
   return resolved;
 }
 
+function loadProfile(profilePath: string): Record<string, unknown> {
+  return JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+}
+
 function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): string {
   const requiredFor = boundary.required_for.length > 0 ? boundary.required_for.join(', ') : 'none';
   return `${boundary.default_action} (required for: ${requiredFor})`;
 }
 
-export function describeTaskRun(scenarioId: string, profileOverride?: string): string {
+export function describeTaskRun(scenarioId: string, profileOverride?: string, options: TaskRunOptions = {}): string {
   const scenario = loadScenarioById(scenarioId);
   if (!scenario) {
     throw new Error(`Unknown TaskScenario: ${scenarioId}`);
   }
 
-  const profilePath = resolveProfilePath(scenario, profileOverride);
+  const profilePath = resolveProfilePath(scenario, profileOverride, options);
   const profileLoaded = safeExistsSync(profilePath);
   const requiresProfile = scenario.repeat_run.params_from_profile;
+  if (requiresProfile && !profileLoaded) {
+    throw new Error(`Missing profile for ${scenario.id}. Run pnpm task:init ${scenario.id} first.`);
+  }
+
+  const profile = profileLoaded ? loadProfile(profilePath) : null;
   const artifactList = scenario.result.artifacts.map((artifact) => `- ${artifact}`).join('\n');
   const nextActions = requiresProfile && !profileLoaded
     ? [

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
 import { main } from '../scripts/task_smoke.js';
 
-const PROFILE_PATH = pathResolver.rootResolve('knowledge/personal/task-profiles/daily-email-triage.json');
+const PROFILE_PATH = pathResolver.rootResolve('active/shared/tmp/task-smoke/daily-email-triage.json');
+const LEGACY_PROFILE_PATH = pathResolver.rootResolve('knowledge/personal/task-profiles/daily-email-triage.json');
 
 describe('task smoke contract', () => {
   const originalPersona = process.env.KYBERION_PERSONA;
@@ -18,13 +19,16 @@ describe('task smoke contract', () => {
     if (safeExistsSync(PROFILE_PATH)) {
       safeRmSync(PROFILE_PATH);
     }
+    if (safeExistsSync(LEGACY_PROFILE_PATH)) {
+      safeRmSync(LEGACY_PROFILE_PATH);
+    }
     if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = originalRole;
   });
 
-  it('runs the daily email triage smoke flow and writes the profile', async () => {
+  it('runs the daily email triage smoke flow and writes the profile to the temporary smoke path', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await main(['daily-email-triage']);
@@ -37,6 +41,7 @@ describe('task smoke contract', () => {
     expect(output).toContain('dry-run only');
     expect(output).toContain('TaskScenario smoke passed: daily-email-triage');
     expect(safeExistsSync(PROFILE_PATH)).toBe(true);
+    expect(safeExistsSync(LEGACY_PROFILE_PATH)).toBe(false);
 
     const profile = JSON.parse(safeReadFile(PROFILE_PATH, { encoding: 'utf8' }) as string) as {
       scenario_id?: string;
