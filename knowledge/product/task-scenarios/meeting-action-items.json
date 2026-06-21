@@ -1,0 +1,41 @@
+{
+  "id": "meeting-action-items",
+  "title": "会議後のアクションアイテム抽出",
+  "description": "会議 transcript から action item を抽出し、フォローアップ用の成果物をまとめる。",
+  "trigger": {
+    "type": "event",
+    "event_name": "meeting.completed",
+    "source": "meeting-actuator"
+  },
+  "input": {
+    "sources": ["meeting_transcript", "meeting_notes", "attendee_list"],
+    "required_params": ["meeting_id", "workspace_id"],
+    "optional_params": ["approval_owner", "follow_up_tone", "share_summary"]
+  },
+  "first_run": {
+    "reasoning_required": true,
+    "questions": [
+      "何を action item とみなすか",
+      "期限が曖昧な場合に確認扱いにするか",
+      "社外共有前に誰が確認するか",
+      "フォローアップ文面を自動生成してよいか"
+    ],
+    "profile_output": "knowledge/personal/task-profiles/meeting-action-items.json"
+  },
+  "repeat_run": {
+    "pipeline_template": "knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json",
+    "params_from_profile": true,
+    "profile_input": "knowledge/personal/task-profiles/meeting-action-items.json"
+  },
+  "result": {
+    "artifacts": [
+      "action-items-extracted-{{mission_id}}.json",
+      "speaker-fairness-{{mission_id}}.json"
+    ],
+    "summary_format": "markdown"
+  },
+  "approval_boundary": {
+    "required_for": ["share_summary", "send_followup"],
+    "default_action": "notify-only"
+  }
+}
