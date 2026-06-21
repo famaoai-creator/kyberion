@@ -33,11 +33,7 @@ For: Founders, FDE engineers running Kyberion on their own laptop, single-user p
 ```bash
 # Apple Silicon (arm64) is the primary CI target. Intel works but is less tested.
 # Required:
-<<<<<<< HEAD
 brew install node@24 pnpm git
-=======
-brew install node@22 pnpm git
->>>>>>> bbbee449 (build: raise minimum Node.js version to 24)
 node --version   # must be >= 24.0.0
 pnpm --version   # must be >= 10.x
 
