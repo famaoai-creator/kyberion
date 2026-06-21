@@ -33,8 +33,8 @@ For: Founders, FDE engineers running Kyberion on their own laptop, single-user p
 ```bash
 # Apple Silicon (arm64) is the primary CI target. Intel works but is less tested.
 # Required:
-brew install node@22 pnpm git
-node --version   # must be >= 22.0.0
+brew install node@24 pnpm git
+node --version   # must be >= 24.0.0
 pnpm --version   # must be >= 10.x
 
 # Optional, only if you'll use these actuators:
@@ -118,7 +118,7 @@ For: customer-controlled VMs, internal infrastructure, persistent always-on Kybe
 # Required
 sudo apt-get update
 sudo apt-get install -y curl git build-essential
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 sudo npm install -g pnpm@10
 
@@ -205,7 +205,7 @@ docker run --rm -it \
 ```
 
 This brings up a slim image with:
-- Node 22 + pnpm
+- Node 24 + pnpm
 - Core actuators (file, network, system, secret, wisdom, orchestrator, agent)
 - Cloud voice path (no Playwright, no Style-Bert-VITS2)
 
