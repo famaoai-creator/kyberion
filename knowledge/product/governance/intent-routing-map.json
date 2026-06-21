@@ -13,6 +13,8 @@
     "speak-with-my-voice":           "knowledge/product/pipeline-templates/speak-with-my-voice",
     "generate-narrated-video":       "knowledge/product/pipeline-templates/kyberion-howto-narrated-demo",
     "clone-my-voice":                "knowledge/product/pipeline-templates/clone-my-voice",
+    "contract-review":               "knowledge/product/pipeline-templates/contract-review",
+    "review-text":                   "knowledge/product/pipeline-templates/review-text",
     "assimilate-gateway-capability": "assimilate-gateway-capability",
     "diverge-hypotheses":            "knowledge/product/pipeline-templates/hypothesis-tree",
     "multi-agent-consensus":         "knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator"

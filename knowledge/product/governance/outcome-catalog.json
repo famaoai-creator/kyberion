@@ -129,7 +129,7 @@
     },
     "voice_profile_created": {
       "label": "Voice profile created",
-      "description": "A customized cloned voice profile is registered and ready for TTS use.",
+      "description": "A customized cloned voice profile is registered, promoted, and ready for TTS use from the runtime voice-profile store.",
       "deliverable_kind": "voice_profile",
       "downloadable": false,
       "previewable": true
@@ -748,6 +748,111 @@
       "description": "A review request outcome that records the identifier of the human review item.",
       "deliverable_kind": "report",
       "downloadable": false,
+      "previewable": true
+    },
+    "service_restarted": {
+      "label": "service restarted",
+      "description": "A governed service restart completed and the resulting state is recorded.",
+      "deliverable_kind": "system_state",
+      "downloadable": false,
+      "previewable": true
+    },
+    "voice_session_summary": {
+      "label": "voice session summary",
+      "description": "A concise summary of a live voice session is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "mission_inventory_summary": {
+      "label": "mission inventory summary",
+      "description": "A concise summary of the current mission inventory is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "generation_schedule_summary": {
+      "label": "generation schedule summary",
+      "description": "A concise summary of scheduled generation jobs is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "data_retrieved": {
+      "label": "data retrieved",
+      "description": "External data was retrieved and normalized for follow-up use.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "weather_report": {
+      "label": "weather report",
+      "description": "A weather summary is returned for the requested location.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "transit_plan": {
+      "label": "transit plan",
+      "description": "A transit route or schedule plan is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "restaurant_reservation": {
+      "label": "restaurant reservation",
+      "description": "A restaurant search or reservation summary is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "news_summary": {
+      "label": "news summary",
+      "description": "A concise news digest is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "email_draft": {
+      "label": "email draft",
+      "description": "A draft email is returned for review or sending.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "calendar_update": {
+      "label": "calendar update",
+      "description": "A calendar schedule or update summary is returned.",
+      "deliverable_kind": "summary",
+      "downloadable": false,
+      "previewable": true
+    },
+    "device_state_change": {
+      "label": "device state change",
+      "description": "A device control or state change was executed.",
+      "deliverable_kind": "system_state",
+      "downloadable": false,
+      "previewable": true
+    },
+    "reminder_created": {
+      "label": "reminder created",
+      "description": "A reminder was created and recorded.",
+      "deliverable_kind": "system_state",
+      "downloadable": false,
+      "previewable": true
+    },
+    "translation_result": {
+      "label": "translation result",
+      "description": "A translation output is returned for the requested text.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
+      "previewable": true
+    },
+    "artifact:transcript": {
+      "label": "transcript artifact",
+      "description": "A transcript artifact is produced and can be downloaded or previewed.",
+      "deliverable_kind": "artifact",
+      "downloadable": true,
       "previewable": true
     }
   }
