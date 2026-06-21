@@ -1,7 +1,8 @@
+import * as path from 'node:path';
 import { logger } from './core.js';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeCopyFileSync, safeExistsSync, safeReadFile, safeReaddir, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
 export interface VoiceProfileRecord {
@@ -155,6 +156,40 @@ function mergeRegistries(base: VoiceProfileRegistry, overlay: VoiceProfileRegist
 
 export function getVoiceProfileRegistryPath(): string {
   return getRegistryPath();
+}
+
+function resolveVoiceProfileSampleStoreDir(profileId: string, tier: VoiceProfileRecord['tier']): string | null {
+  const normalizedProfileId = String(profileId || '').trim();
+  if (!normalizedProfileId) {
+    throw new Error('voice profile profile_id must not be empty');
+  }
+
+  return pathResolver.shared(`runtime/voice-profiles/${normalizedProfileId}`);
+}
+
+export function materializeVoiceProfileSampleRefs(
+  profile: Pick<VoiceProfileRecord, 'profile_id' | 'tier'>,
+  samples: Array<{ sample_id: string; path: string }>,
+): string[] {
+  const targetDir = resolveVoiceProfileSampleStoreDir(profile.profile_id, profile.tier);
+  safeMkdir(targetDir, { recursive: true });
+  return samples.map((sample) => {
+    const sourcePath = pathResolver.rootResolve(String(sample.path || '').trim());
+    if (!safeExistsSync(sourcePath)) {
+      throw new Error(`voice sample does not exist (${sample.path})`);
+    }
+
+    const ext = path.extname(sourcePath).replace(/^\./u, '').toLowerCase() || 'wav';
+    const targetPath = `${targetDir}/${String(sample.sample_id || '').trim()}.${ext}`;
+    if (sourcePath !== targetPath) {
+      safeCopyFileSync(sourcePath, targetPath);
+      const transcriptPath = `${sourcePath}.transcript.txt`;
+      if (safeExistsSync(transcriptPath)) {
+        safeCopyFileSync(transcriptPath, `${targetPath}.transcript.txt`);
+      }
+    }
+    return targetPath;
+  });
 }
 
 export function resetVoiceProfileRegistryCache(): void {

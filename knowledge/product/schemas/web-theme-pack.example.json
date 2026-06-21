@@ -1,0 +1,82 @@
+{
+  "kind": "web-theme-pack",
+  "version": "1.0.0",
+  "theme_id": "acme-web-imported",
+  "brand_name": "Acme Corporation",
+  "tenant_slug": "acme-web",
+  "design_system_id": "executive-standard",
+  "theme": {
+    "name": "Acme Corporation",
+    "colors": {
+      "primary": "#10203A",
+      "secondary": "#31415B",
+      "accent": "#D97706",
+      "background": "#F8FAFC",
+      "text": "#0F172A"
+    },
+    "fonts": {
+      "heading": "Inter, sans-serif",
+      "body": "Inter, sans-serif"
+    },
+    "assets": {
+      "logo_url": "/assets/logos/acme.svg"
+    }
+  },
+  "web": {
+    "source_url": "https://www.acme.example",
+    "snapshot_summary": "Editorial landing page with dense hero and stacked feature cards.",
+    "hero": {
+      "title": "Build faster",
+      "subtitle": "A concise value proposition that mirrors the source site.",
+      "cta": "Get started"
+    },
+    "layout_grid": {
+      "type": "grid",
+      "columns": 12,
+      "container_max_width": "1200px"
+    },
+    "spacing_scale": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "40px"
+    },
+    "breakpoints": ["640px", "1024px", "1280px"],
+    "sections": ["hero", "features", "pricing", "footer"],
+    "typography": {
+      "heading": "Inter, sans-serif",
+      "body": "Inter, sans-serif"
+    }
+  },
+  "layout_templates": {
+    "version": "1.0.0",
+    "default": "acme-web-extracted",
+    "templates": {
+      "acme-web-extracted": {
+        "chrome": {
+          "container_max_width": "1200px",
+          "header_h": "72px",
+          "footer_h": "88px",
+          "content_padding": ["24px", "24px", "24px", "24px"]
+        },
+        "hero": {
+          "headline_max_width": "720px",
+          "title_font_size": "clamp(42px, 6vw, 72px)",
+          "subtitle_max_width": "600px",
+          "cta_style": "primary"
+        },
+        "body_zones": {
+          "single_column": {
+            "gap": "24px",
+            "font_size": "16px",
+            "line_height": 1.6
+          }
+        }
+      }
+    }
+  },
+  "layout_template_id": "acme-web-extracted",
+  "layout_template_catalog": "knowledge/confidential/acme-web/design/layout-templates.json",
+  "source_theme_name": "Acme Corporation"
+}

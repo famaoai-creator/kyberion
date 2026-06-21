@@ -1,0 +1,105 @@
+{
+  "kind": "pptx-theme-pack",
+  "version": "1.0.0",
+  "theme_id": "acme-corp-imported",
+  "brand_name": "Acme Corporation",
+  "tenant_slug": "acme-corp",
+  "design_system_id": "executive-standard",
+  "theme": {
+    "name": "Acme Corporation",
+    "colors": {
+      "primary": "#10203A",
+      "secondary": "#31415B",
+      "accent": "#D97706",
+      "background": "#F8FAFC",
+      "text": "#0F172A"
+    },
+    "fonts": {
+      "heading": "Aptos Display, sans-serif",
+      "body": "Aptos, sans-serif"
+    },
+    "assets": {
+      "logo_url": "/vault/tenants/acme-corp/logo.png"
+    }
+  },
+  "pptx": {
+    "canvas": {
+      "w": 13.333,
+      "h": 7.5
+    },
+    "master": {
+      "elements": [],
+      "bgXml": "<p:bg><a:solidFill><a:srgbClr val=\"F8FAFC\"/></a:solidFill></p:bg>"
+    },
+    "rawThemeXml": null,
+    "rawMasterXml": null,
+    "rawMasterRelsXml": null,
+    "rawLayouts": [],
+    "rawMasters": [],
+    "masterMedia": [],
+    "rawParts": null
+  },
+  "layout_templates": {
+    "version": "1.0.0",
+    "default": "acme-corp-extracted",
+    "templates": {
+      "acme-corp-extracted": {
+        "chrome": {
+          "header_h": 0.72,
+          "separator_h": 0.024,
+          "footer_y": 5.35,
+          "footer_h": 0.275,
+          "footer_font_size": 8,
+          "body_y": 0.76,
+          "body_x": 0.44,
+          "body_w": 9.15,
+          "body_h": 4.55,
+          "title_x": 0.35,
+          "title_font_size": 22,
+          "title_w_logo": 7.35,
+          "title_w_no_logo": 9.5,
+          "accent_strip_x": 0.3,
+          "accent_strip_w": 0.065,
+          "logo_zone_x": 7.82,
+          "logo_zone_y": 0.03,
+          "logo_zone_w": 2.1,
+          "logo_zone_h": 0.66,
+          "logo_display_h": 0.33,
+          "logo_display_max_w": 1.95
+        },
+        "hero": {
+          "white_panel_y": 4.42,
+          "white_panel_h": 1.205,
+          "separator_y": 4.4,
+          "separator_h": 0.03,
+          "logo_display_h": 0.48,
+          "logo_display_max_w": 2.84,
+          "logo_right_margin": 0.2,
+          "logo_y": 4.76,
+          "brand_name_x": 0.5,
+          "brand_name_y": 4.55,
+          "brand_name_w": 7.1,
+          "brand_name_h": 0.5,
+          "brand_name_font_size": 11,
+          "title_x": 0.8,
+          "title_y": 1.0,
+          "title_w": 8.4,
+          "title_h": 2.2,
+          "title_font_size": 36,
+          "subtitle_x": 1.2,
+          "subtitle_y": 3.3,
+          "subtitle_w": 7.6,
+          "subtitle_h": 0.85,
+          "subtitle_font_size": 16
+        },
+        "body_zones": {
+          "single_column": { "font_size": 13, "line_spacing_pct": 155, "margin": [0.1, 0.06, 0.06, 0.08] }
+        },
+        "_meta": "Template skeleton for a PPTX-derived confidential theme pack."
+      }
+    }
+  },
+  "layout_template_id": "acme-corp-extracted",
+  "layout_template_catalog": "knowledge/confidential/acme-corp/design/layout-templates.json",
+  "source_theme_name": "Acme Corporation"
+}
