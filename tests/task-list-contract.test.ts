@@ -43,6 +43,7 @@ describe('task list contract', () => {
 
     expect(scenarios.length).toBeGreaterThan(0);
     expect(scenarios.map((scenario) => scenario.id)).toContain('daily-email-triage');
+    expect(scenarios.map((scenario) => scenario.id)).toContain('meeting-action-items');
     expect(scenarios.map((scenario) => scenario.id)).toContain('meeting-to-proposal-pptx');
     expect(scenarios.map((scenario) => scenario.id)).toContain('weekly-executive-digest');
   });

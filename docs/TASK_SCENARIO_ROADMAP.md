@@ -43,7 +43,7 @@ last_updated: 2026-06-21
 - Output artifacts: `action-items.json`, `follow-up-summary.md`
 - Approval boundary: 外部共有前の要約編集は要確認、既定は `notify-only`
 - Existing pipeline-template: `knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json`
-- Implementation status: postprocess テンプレートは既存。scenario 化は未着手
+- Implementation status: scenario + workflow MVP を追加済み
 
 ### 3. `meeting-to-proposal-pptx`
 
