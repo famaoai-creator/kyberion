@@ -80,10 +80,6 @@ function resolveProfilePath(scenario: TaskScenario, override?: string): string {
   return resolved;
 }
 
-function loadProfile(profilePath: string): Record<string, unknown> {
-  return JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
-}
-
 function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): string {
   const requiredFor = boundary.required_for.length > 0 ? boundary.required_for.join(', ') : 'none';
   return `${boundary.default_action} (required for: ${requiredFor})`;
@@ -96,24 +92,35 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string): s
   }
 
   const profilePath = resolveProfilePath(scenario, profileOverride);
-  if (scenario.repeat_run.params_from_profile && !safeExistsSync(profilePath)) {
-    throw new Error(`Missing profile for ${scenario.id}. Run pnpm task:init ${scenario.id} first.`);
-  }
-
-  const profile = safeExistsSync(profilePath) ? loadProfile(profilePath) : null;
+  const profileLoaded = safeExistsSync(profilePath);
+  const requiresProfile = scenario.repeat_run.params_from_profile;
   const artifactList = scenario.result.artifacts.map((artifact) => `- ${artifact}`).join('\n');
+  const nextActions = requiresProfile && !profileLoaded
+    ? [
+        `1. Run pnpm task:init ${scenario.id} to create the profile.`,
+        `2. Review the generated profile.`,
+        `3. Re-run pnpm task:run ${scenario.id} --dry-run.`,
+      ]
+    : [
+        `1. Review the plan and expected artifacts.`,
+        `2. When you are ready to execute for real, run the task executor.`,
+      ];
 
   return [
     `TaskScenario: ${scenario.id}`,
+    `Status: dry-run only; no external side effects`,
     `Title: ${scenario.title}`,
     `Description: ${scenario.description}`,
-    `Pipeline template: ${scenario.repeat_run.pipeline_template}`,
-    `Profile: ${profilePath}`,
-    profile ? `Profile loaded: yes` : 'Profile loaded: no',
-    `Approval boundary: ${renderApprovalBoundary(scenario.approval_boundary)}`,
-    `Expected artifacts:`,
+    `Inputs:`,
+    `- Sources: ${scenario.input.sources.join(', ')}`,
+    `- Profile: ${profilePath}`,
+    `- Pipeline template: ${scenario.repeat_run.pipeline_template}`,
+    `Expected result:`,
     artifactList,
-    `Execution: dry-run only (no side effects)`,
+    `Approval required before:`,
+    `- ${renderApprovalBoundary(scenario.approval_boundary)}`,
+    `Next actions:`,
+    ...nextActions.map((action) => `- ${action}`),
   ].join('\n');
 }
 
@@ -125,7 +132,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const plan = describeTaskRun(args.scenarioId, args.profile);
   console.log(plan);
-  console.log(`Next: review the plan, then run pnpm task:init ${args.scenarioId} if the profile is missing.`);
+
+  const scenario = loadScenarioById(args.scenarioId);
+  if (!scenario) {
+    throw new Error(`Unknown TaskScenario: ${args.scenarioId}`);
+  }
+
+  const profilePath = resolveProfilePath(scenario, args.profile);
+  if (scenario.repeat_run.params_from_profile && !safeExistsSync(profilePath)) {
+    throw new Error(`Missing profile for ${scenario.id}. Run pnpm task:init ${scenario.id} first.`);
+  }
 }
 
 const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
