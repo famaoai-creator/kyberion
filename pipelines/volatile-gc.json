@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "name": "volatile-gc",
+  "version": "2.0.0",
+  "description": "Volatile Knowledge Layer GC — single working-memory:run-gc op that scans all *.volatile.json sidecars, expires ttl/session faces, rolls over daily TODO items, and writes a summary to active/shared/tmp/. No external scripts required.",
+  "_refs": {
+    "schema": "schemas/volatile-knowledge.schema.json",
+    "actuator": "working-memory-actuator",
+    "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 3"
+  },
+  "steps": [
+    {
+      "id": "run_gc",
+      "role": "source",
+      "op": "working-memory:run-gc",
+      "produces": { "channel": "gc_result", "type": "GCResult" },
+      "params": {
+        "export_as": "gc_result"
+      }
+    },
+    {
+      "id": "write_report",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "gc_result",
+      "params": {
+        "path": "active/shared/tmp/volatile-gc-report.md",
+        "content": "# Volatile GC Report\n\n## Expired\n{{gc_result.expired}} faces marked expired\n\n## Rolled Over\n{{gc_result.rolledOver}} TODO items carried forward"
+      }
+    }
+  ]
+}

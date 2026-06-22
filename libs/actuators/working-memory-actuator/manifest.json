@@ -1,0 +1,34 @@
+{
+  "actuator_id": "working-memory-actuator",
+  "version": "1.1.0",
+  "description": "Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>').",
+  "contract_schema": "schemas/working-memory-action.schema.json",
+  "resilience_tier": "best_effort",
+  "recovery_policy": {
+    "fallback_strategy": "skip_and_log",
+    "retry": {
+      "maxRetries": 1,
+      "initialDelayMs": 100,
+      "maxDelayMs": 500,
+      "factor": 2,
+      "jitter": false
+    },
+    "retryable_categories": ["resource_unavailable"]
+  },
+  "capabilities": [
+    { "op": "note", "platforms": ["darwin", "linux", "win32"], "description": "Append a note to a MEMORY.md face" },
+    { "op": "set-now", "platforms": ["darwin", "linux", "win32"], "description": "Overwrite the NOW section in a NOW.md face" },
+    { "op": "add-action-item", "platforms": ["darwin", "linux", "win32"], "description": "Add an action item to the ## Action Items section" },
+    { "op": "complete-action-item", "platforms": ["darwin", "linux", "win32"], "description": "Mark an action item as done (exact-match, end-anchored)" },
+    { "op": "daily-open", "platforms": ["darwin", "linux", "win32"], "description": "Initialize today's journal + today/TODO.md (personal/daily)" },
+    { "op": "todo-add", "platforms": ["darwin", "linux", "win32"], "description": "Add a TODO item to today's personal TODO face" },
+    { "op": "todo-done", "platforms": ["darwin", "linux", "win32"], "description": "Mark a personal TODO item as done and sync to journal" },
+    { "op": "todo-rollover", "platforms": ["darwin", "linux", "win32"], "description": "Roll pending TODO items from current face into tomorrow" },
+    { "op": "weekly-open", "platforms": ["darwin", "linux", "win32"], "description": "Initialize the current week's weekly-review face" },
+    { "op": "nominate-promotion", "platforms": ["darwin", "linux", "win32"], "description": "Nominate a volatile face to the memory-promotion-queue" },
+    { "op": "run-gc", "platforms": ["darwin", "linux", "win32"], "description": "Full GC pass: expire TTL faces, rollover daily TODO" },
+    { "op": "build-index", "platforms": ["darwin", "linux", "win32"], "description": "Regenerate active/INDEX.volatile.{md,json}" },
+    { "op": "read", "platforms": ["darwin", "linux", "win32"], "description": "Read a volatile face (Markdown + sidecar)" },
+    { "op": "list", "platforms": ["darwin", "linux", "win32"], "description": "List volatile faces from active/INDEX.volatile.json" }
+  ]
+}

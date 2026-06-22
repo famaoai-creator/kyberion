@@ -1,90 +1,55 @@
 # Kyberion Operating Guide
 
-Rules and lifecycle for AI agents working in this repository.
+Binding rules and lifecycle for AI agents working in this repository. **Read this first, every session.**
+Concepts are intentionally not explained here — follow the `→` links when you need the *why*.
 
-> **Language**: Operator-facing rules are in English; phase and onboarding docs are authored in Japanese. See [DOCUMENTATION_LOCALIZATION_POLICY.md](./docs/DOCUMENTATION_LOCALIZATION_POLICY.md).
-> **First-time setup**: See [docs/INITIALIZATION.md](./docs/INITIALIZATION.md).
-> **Canonical file**: `AGENTS.md`. `CLAUDE.md`, `CODEX.md`, and `GEMINI.md` are symlinks — edit here only.
+> **Canonical file**: `AGENTS.md`. `CLAUDE.md`, `CODEX.md`, `GEMINI.md` are symlinks — edit here only.
+> **Language**: rules in English; phase & onboarding docs in Japanese ([policy](./docs/DOCUMENTATION_LOCALIZATION_POLICY.md)).
+> **First-time setup**: [docs/INITIALIZATION.md](./docs/INITIALIZATION.md).
 
-## 1. Rules
+## 1. Invariants — never violate
 
-These apply in every phase. No exceptions.
+- **File I/O**: only via `@agent/core/secure-io`. Never call `node:fs` directly.
+- **Missions**: start / checkpoint / finish only via `scripts/mission_controller.ts`. One owner per mission; workers act through task contracts and never mutate mission-wide state directly.
+- **Data tiers**: `knowledge/personal/` → `confidential/` → `public/`. Never leak from a higher tier to a lower one. Project scope = `confidential/{project}/`.
+- **ADF**: execute only validated contracts (`draft → preflight → auto-repair → commit → execute`). If invalid, dispatch a repair subagent (`validateAndRepairAdf`) first. On failure, classify and repair — never retry a broken contract.
+- **Temp files**: `active/shared/tmp/` or mission-local storage only — never ad hoc directories.
 
-1. **All file I/O through `@agent/core/secure-io`.**
-   Never use `node:fs` directly. Manage mission lifecycles (start, checkpoint, finish) via `scripts/mission_controller.ts` ([KSMC](./docs/GLOSSARY.md#ksmc-kyberion-sovereign-mission-controller) v2.0). Each mission runs in its own Git repository for atomic rollback.
+→ Concepts: [GLOSSARY](./docs/GLOSSARY.md) (KSMC, ADF, mission, tier) · [mission-control-model](./knowledge/product/architecture/agent-mission-control-model.md) (why per-mission Git, atomic rollback)
 
-2. **Use existing Actuators first.**
-   Consult [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md) and `libs/actuators/` before writing custom code for screenshots, API calls, file conversions, etc. Temp files go in `active/shared/tmp/` or mission-local storage, not ad hoc directories.
+## 2. Defaults — do unless there is a clear reason not to
 
-3. **Strategic Delegation via Subagents.**
-   For high-volume or specialized tasks (e.g., bulk refactoring, deep codebase analysis), use `getReasoningBackend().delegateTask()`.
-   - **Gemini CLI specific:** When running in `gemini-cli` mode, this method spawns an autonomous sub-agent with YOLO mode enabled, leveraging `generalist` or `codebase_investigator` tools to minimize main-loop context consumption.
-   - **ADF Guardrails:** If an ADF file is invalid, use `validateAndRepairAdf` to dispatch a repair sub-agent before proceeding.
+- **Reuse, most-deterministic-first.** Prefer, in order: an existing `pipelines/` pipeline → existing actuators / governed compilers → hand-written ADF → ad-hoc Write/Edit. Check [`pipelines/README.md`](./pipelines/README.md) and [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md) before improvising; step down a rung only when the one above doesn't fit.
+- **Promote repeated deterministic work into a pipeline.** When the same deterministic steps will run again (re-execution likely, or the pattern recurs), capture them as a `pipelines/` pipeline instead of re-improvising — so the next run is replayable and traceable. Keep steps that need fresh model judgment as semantic briefs, not frozen ADF.
+- **Delegate heavy or specialized work** (bulk refactor, deep analysis, repair) to subagents via `getReasoningBackend().delegateTask()` to keep the main loop's context small.
+- **Mission-gate substantive work.** If a request meets **≥2 of**: (1) 5+ artifacts; (2) external/regulatory audience; (3) re-execution or variants likely; (4) same pattern expected ≥5×; (5) multiple legitimate viewpoints — create a mission + `pipelines/` pipeline instead of going straight to Write/Edit. Customer-facing governance evidence is **always** mission/pipeline (dog-food rule).
+- **Reasoning backend**: prefer `KYBERION_REASONING_BACKEND=claude-cli` (local `claude` CLI, no API key) → `anthropic` (`ANTHROPIC_API_KEY`) → `stub` (offline/deterministic tests). Divergent-thinking `wisdom:*` ops need a non-stub backend.
 
-4. **Execute only validated [ADF](./docs/GLOSSARY.md#adf-agentic-data-format) contracts.**
-   Lifecycle: `draft → preflight (including sub-agent repair if needed) → auto-repair (if safe) → commit → execute`. Prefer semantic briefs and governed compilers over hand-written executable ADF. On failure, classify and repair — never retry a broken contract.
+→ Concepts: [GLOSSARY](./docs/GLOSSARY.md) · [PRODUCTIZATION_ROADMAP](./docs/PRODUCTIZATION_ROADMAP.md) (dog-food rationale)
 
-5. **Enforce 3-tier data isolation.**
+## 3. Lifecycle — intent → goal → result
 
-   `knowledge/personal/` (private), `knowledge/confidential/` (org-internal), `knowledge/public/` (reusable). No leaks from higher to lower tiers. Project-scoped isolation uses `confidential/{project}/`.
+The work loop is: **capture intent → agree on the goal before changing anything (③) → execute (④) → review and learn (⑤).**
 
-6. **One owner per mission.**
-   Each mission has exactly one owner agent. Workers collaborate through task contracts — they do not mutate mission-wide state directly.
+**On session start**, run `pnpm pipeline --input pipelines/baseline-check.json` and branch on the report's `status`:
 
-7. **Create a mission for substantive work — don't bypass the framework.**
-   When a user request triggers **any 2 of the 5 conditions** below, start with `mission_controller.ts create` and route the work through a pipeline in `pipelines/` rather than going straight to Write/Edit:
-
-   1. **5+ artifacts** — the output is not a one-shot edit; divergence and cross-critique add value
-   2. **External / regulatory audience** — governance, audit trail, and review gates become deliverables
-   3. **Re-execution or variant exploration likely** — ADF replayability matters
-   4. **Same pattern ≥5 times expected** — knowledge accumulation is load-bearing
-   5. **Multiple legitimate viewpoints** — single-view output would degrade quality (strategy, architecture choice, business plan)
-
-   **Dog-food rule:** anything that ships to customers as evidence of Kyberion's own governance (reports, audit trails, architecture decisions sold as differentiators) **must** be produced via the mission/pipeline path — never ad-hoc. Output from `projects/` whose selling point is "Kyberion-backed audit trail" and was not itself produced under a mission is a contradiction.
-
-   **Reasoning backend:** prefer `KYBERION_REASONING_BACKEND=claude-cli` when a local `claude` CLI is authenticated (no API key needed); fall back to `anthropic` with `ANTHROPIC_API_KEY`, or `stub` for offline / deterministic testing. Pipelines with divergent-thinking ops (`wisdom:a2a_fanout`, `wisdom:cross_critique`, etc.) only produce real content with a non-stub backend.
-
-## 2. Lifecycle (5 Phases)
-
-### Session Start Detection
-
-Immediately on session start, run:
-
-`pnpm pipeline --input pipelines/baseline-check.json`
-
-Transition by the `status` field in the report:
-
-| Status | Action |
+| status | action |
 |---|---|
-| `needs_recovery` | → **② Recovery** |
-| `needs_onboarding` | → **① Onboarding** |
-| `needs_attention` | → **③ Alignment**, but surface the failed layer to the user before proceeding. |
-| `all_clear` | → **③ Alignment** |
-| `fatal_error` | Pipeline itself failed. Report the error to the user and halt — do not enter any phase until resolved. |
+| `needs_recovery` | → ② Recovery |
+| `needs_onboarding` | → ① Onboarding |
+| `needs_attention` | → ③ Alignment, but surface the failed layer to the user first |
+| `all_clear` | → ③ Alignment |
+| `fatal_error` | Pipeline itself failed — report to the user and halt; enter no phase until resolved |
 
-### ① Onboarding
-Set up the environment and user identity: `pnpm install` → `pnpm build` → `pnpm surfaces:reconcile` → `pnpm onboard`.
-→ [phases/onboarding.md](./knowledge/product/governance/phases/onboarding.md)
+1. **Onboarding** — set up environment & identity: `pnpm install → build → surfaces:reconcile → onboard`. → [onboarding.md](./knowledge/product/governance/phases/onboarding.md)
+2. **Recovery** — restore prior state, resume from the suspension point. → [recovery.md](./knowledge/product/governance/phases/recovery.md)
+3. **Alignment** — interpret intent and agree on goals. No code changes until goals are agreed. → [alignment.md](./knowledge/product/governance/phases/alignment.md)
+4. **Execution** — change one thing, test immediately; on a major obstacle, return to ③. → [execution.md](./knowledge/product/governance/phases/execution.md)
+5. **Review** — distill learnings (success & failure) into `knowledge/`, clean up temp files, auto-generate Trace-based hints for future runs. → [review.md](./knowledge/product/governance/phases/review.md)
 
-### ② Recovery
-Resume from interruptions. Restore prior state and continue from the suspension point.
-→ [phases/recovery.md](./knowledge/product/governance/phases/recovery.md)
+→ Concepts: [INTENT_LOOP_CONCEPT](./docs/INTENT_LOOP_CONCEPT.md) · [USER_EXPERIENCE_CONTRACT](./docs/USER_EXPERIENCE_CONTRACT.md) · [WHY](./docs/WHY.md)
 
-### ③ Alignment
-Interpret user intent and define goals. Do not change code until goals are agreed upon.
-→ [phases/alignment.md](./knowledge/product/governance/phases/alignment.md)
-
-### ④ Execution
-Change one thing at a time, test immediately. If a major obstacle arises, return to ③ to re-align.
-The owner controls mission state; workers participate via task contracts.
-(See Rule 4 for ADF preflight requirements.)
-→ [phases/execution.md](./knowledge/product/governance/phases/execution.md)
-
-### ⑤ Review
-Extract learnings from both successes and failures into `knowledge/`. Clean up temp files. Auto-generate hints from execution Traces for future runs (Feedback Loop).
-→ [phases/review.md](./knowledge/product/governance/phases/review.md)
-
-## 3. References
+## 4. References
 
 | Document | Content |
 |---|---|

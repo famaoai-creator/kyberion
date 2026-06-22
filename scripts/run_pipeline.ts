@@ -89,7 +89,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
 
-type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
+type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string, trace?: TraceContext) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
 const dispatchCache: Record<string, DispatchFunc> = {};
 const moduleCache: Record<string, any> = {};
@@ -117,7 +117,7 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
   if (dispatchCache[domain]) return dispatchCache[domain];
   
   if (domain === 'reasoning') {
-    dispatchCache[domain] = async (op, params, ctx, type) => {
+    dispatchCache[domain] = async (op, params, ctx, type, _trace?) => {
       const { getReasoningBackend } = await import('@agent/core');
       const backend = getReasoningBackend();
       if (op === 'analyze' || op === 'transform' || op === 'synthesize') {
@@ -158,7 +158,7 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
 
   const { resolveProviderCapabilityId, invokeProviderCapability } = await import('@agent/core/provider-bridge');
 
-  dispatchCache[domain] = async (op, params, ctx, type) => {
+  dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
     const resolvedId = resolveProviderCapabilityId(domain, op);
     if (resolvedId) {
       const result = await invokeProviderCapability({
@@ -195,11 +195,12 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
       
       if (!result.handled && typeof mod.handleAction === 'function') {
         try {
-          const actionResult = await mod.handleAction({ 
-            action: 'pipeline', 
-            steps: [{ type: type || 'apply', op, params }], 
+          const actionResult = await mod.handleAction({
+            action: 'pipeline',
+            steps: [{ type: type || 'apply', op, params }],
             context: ctx,
-            options: ctx.__pipeline_options
+            options: ctx.__pipeline_options,
+            ...(trace ? { pipelineTrace: trace } : {}),
           });
           result = {
             handled: true,
@@ -518,8 +519,21 @@ for (const step of steps) {
           const transformKey = resolveExportKey(step, 'last_transform');
           ctx = { ...ctx, [transformKey]: result };
         } else {
+          // Emit capability.missing before dispatch so the trace records the gap
+          // even if the subsequent import throws and the step is classified generically.
+          if (opts.trace) {
+            const mainEntry = capabilityEntry(`${domain}-actuator`);
+            const altEntry = capabilityEntry(domain);
+            if (!safeExistsSync(mainEntry) && !safeExistsSync(altEntry)) {
+              opts.trace.addEvent('capability.missing', {
+                actuator: domain,
+                step_op: step.op,
+                tried_entries: `${mainEntry}, ${altEntry}`,
+              });
+            }
+          }
           const dispatch = await loadActuatorDispatch(domain);
-          const result = await dispatch(action, params, ctx, effectiveType);
+          const result = await dispatch(action, params, ctx, effectiveType, opts.trace);
           if (!result.handled) {
             throw new Error(`Unsupported pipeline op: ${step.op}`);
           }

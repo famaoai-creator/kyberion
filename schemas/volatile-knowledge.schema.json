@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/volatile-knowledge.schema.json",
+  "title": "Volatile Knowledge Sidecar",
+  "description": "Sidecar metadata for a volatile (working-memory) face. Each *.volatile.json accompanies a Markdown surface file.",
+  "type": "object",
+  "required": [
+    "scope",
+    "cadence",
+    "tier",
+    "lifetime",
+    "created_at",
+    "updated_at",
+    "status"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "scope": {
+      "type": "string",
+      "enum": ["session", "mission", "project", "personal", "tenant", "global"],
+      "description": "Axis-A: what this face is bound to"
+    },
+    "scope_ref": {
+      "type": ["string", "null"],
+      "description": "Identifier for the scope target (mission-id, project-id, tenant-slug, session-id). null for personal/global."
+    },
+    "cadence": {
+      "type": "string",
+      "enum": ["resident", "daily", "weekly", "adhoc-ttl"],
+      "description": "Axis-B: temporal cycle of this face"
+    },
+    "period_key": {
+      "type": ["string", "null"],
+      "description": "ISO date string (YYYY-MM-DD) for daily, ISO week (YYYY-Www) for weekly. null for resident/adhoc-ttl."
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"],
+      "description": "Data-tier of this face (must not be weaker than the scope's tier)"
+    },
+    "lifetime": {
+      "type": "string",
+      "enum": ["session", "mission", "daily", "weekly", "ttl", "until-distilled", "sticky"],
+      "description": "Eviction policy"
+    },
+    "expires_at": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 datetime. Required for lifetime=session|daily|weekly|ttl. null otherwise."
+    },
+    "created_at": {
+      "type": "string",
+      "description": "ISO 8601 datetime of surface creation"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "ISO 8601 datetime of last content update"
+    },
+    "rollover_to": {
+      "type": ["string", "null"],
+      "description": "Relative path of the next-period face to roll unfinished items into"
+    },
+    "rollup_to": {
+      "type": ["string", "null"],
+      "description": "Relative path of the higher-cadence face to aggregate into at period-end"
+    },
+    "promote_target": {
+      "type": ["string", "null"],
+      "description": "Hint for the distill destination in knowledge/ (e.g. knowledge/product/governance/HINTS.md)"
+    },
+    "promotion_candidate_id": {
+      "type": ["string", "null"],
+      "description": "ID of the MemoryCandidate in the promotion queue once nominated"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "expired", "rolled-over", "promoted", "archived"],
+      "description": "Lifecycle status"
+    },
+    "pinned": {
+      "type": "boolean",
+      "description": "If true, treated as sticky and excluded from TTL-based GC",
+      "default": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "cadence": { "const": "daily" } }, "required": ["cadence"] },
+      "then": { "required": ["period_key", "expires_at"] }
+    },
+    {
+      "if": { "properties": { "cadence": { "const": "weekly" } }, "required": ["cadence"] },
+      "then": { "required": ["period_key", "expires_at"] }
+    },
+    {
+      "if": { "properties": { "lifetime": { "const": "ttl" } }, "required": ["lifetime"] },
+      "then": { "required": ["expires_at"] }
+    }
+  ]
+}
