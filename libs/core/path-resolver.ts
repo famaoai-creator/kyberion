@@ -44,6 +44,69 @@ export function sharedTmp(subPath = '') {
   if (!rawExistsSync(base)) rawMkdirp(base);
   return path.join(base, subPath);
 }
+
+export type VolatileScope = 'session' | 'mission' | 'project' | 'personal' | 'tenant' | 'global';
+export type VolatileCadence = 'resident' | 'daily' | 'weekly' | 'adhoc-ttl';
+
+/**
+ * Resolves the physical path for a volatile knowledge face.
+ * Scope × cadence determine the canonical location under active/.
+ *
+ * @param scope   - Volatile scope (session/mission/project/personal/tenant/global)
+ * @param ref     - Scope reference: mission-id, project-id, tenant-slug, session-id, or null
+ * @param opts    - Optional: cadence and periodKey (YYYY-MM-DD or YYYY-Www)
+ * @param opts.cadence   - Temporal cycle (defaults to 'resident')
+ * @param opts.periodKey - Period key for daily/weekly faces
+ * @param opts.tier      - Data tier (defaults to 'confidential')
+ */
+export function volatile(
+  scope: VolatileScope,
+  ref: string | null = null,
+  opts: { cadence?: VolatileCadence; periodKey?: string; tier?: 'personal' | 'confidential' | 'public' } = {},
+): string {
+  const cadence = opts.cadence ?? 'resident';
+  const tier = opts.tier ?? 'confidential';
+  const normalRef = ref ? normalizePathSegment(ref, 'shared') : null;
+
+  switch (scope) {
+    case 'session': {
+      const sessionId = normalRef || 'default-session';
+      return path.join(ACTIVE_SHARED_ROOT, 'runtime', 'session', sessionId);
+    }
+    case 'mission': {
+      if (!normalRef) throw new Error('volatile(mission) requires a mission ref');
+      const missionPath = findMissionPath(normalRef) ?? path.join(ACTIVE_ROOT, 'missions', tier, normalRef);
+      return missionPath;
+    }
+    case 'project': {
+      if (!normalRef) throw new Error('volatile(project) requires a project ref');
+      return path.join(ACTIVE_ROOT, 'projects', tier, normalRef);
+    }
+    case 'personal': {
+      const personalBase = path.join(ACTIVE_ROOT, 'personal');
+      if (!rawExistsSync(personalBase)) rawMkdirp(personalBase);
+      if (cadence === 'daily' && opts.periodKey) {
+        return path.join(personalBase, 'journal', opts.periodKey + '.md');
+      }
+      if (cadence === 'weekly' && opts.periodKey) {
+        return path.join(personalBase, 'weekly', opts.periodKey + '.md');
+      }
+      if (cadence === 'daily') {
+        return path.join(personalBase, 'today', 'TODO.md');
+      }
+      return personalBase;
+    }
+    case 'tenant': {
+      if (!normalRef) throw new Error('volatile(tenant) requires a tenant slug ref');
+      return path.join(ACTIVE_ROOT, 'projects', tier, normalRef);
+    }
+    case 'global': {
+      return ACTIVE_SHARED_ROOT;
+    }
+    default:
+      throw new Error(`Unknown volatile scope: ${scope}`);
+  }
+}
 export function sharedExports(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'exports');
   if (!rawExistsSync(base)) rawMkdirp(base);
@@ -296,6 +359,7 @@ export const pathResolver = {
   missionAuditDir,
   missionEvidenceDir,
   findMissionPath,
+  volatile,
   resolve,
   rootResolve,
 };

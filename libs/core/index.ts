@@ -43,6 +43,7 @@ export { safeAppendFileSync as safeAppendFile, safeUnlinkSync as safeUnlink } fr
 
 // Paths & Navigation
 export * as pathResolver from './path-resolver.js';
+export type { VolatileScope, VolatileCadence } from './path-resolver.js';
 export * as customerResolver from './customer-resolver.js';
 
 // Error Classification (Phase A-7)

@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/working-memory-action.schema.json",
+  "title": "Working Memory Actuator Action",
+  "description": "Contract schema for the working-memory-actuator. All ops share this envelope.",
+  "type": "object",
+  "required": ["op"],
+  "properties": {
+    "op": {
+      "type": "string",
+      "enum": [
+        "note",
+        "set-now",
+        "add-action-item",
+        "complete-action-item",
+        "daily-open",
+        "todo-add",
+        "todo-done",
+        "todo-rollover",
+        "weekly-open",
+        "nominate-promotion",
+        "run-gc",
+        "build-index",
+        "read",
+        "list"
+      ]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+    },
+    "scope_ref": { "type": "string" },
+    "tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
+    "section": { "type": "string" },
+    "content": { "type": "string" },
+    "focus": { "type": "string" },
+    "nextAction": { "type": "string" },
+    "context": { "type": "string" },
+    "item": { "type": "string" },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "weekKey": { "type": "string", "pattern": "^\\d{4}-W\\d{2}$" },
+    "mdPath": { "type": "string" },
+    "summary": { "type": "string" },
+    "source_type": {
+      "type": "string",
+      "enum": ["mission", "task_session", "artifact", "incident"]
+    },
+    "proposed_memory_kind": {
+      "type": "string",
+      "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+    },
+    "sensitivity_tier": {
+      "type": "string",
+      "enum": ["public", "confidential", "personal"]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "export_as": { "type": "string" }
+  },
+  "additionalProperties": false
+}
