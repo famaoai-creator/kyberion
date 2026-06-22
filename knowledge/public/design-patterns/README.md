@@ -146,6 +146,8 @@ Excel テンプレート群は次で管理する。
 
 共通 theme 定義は `media-templates/themes/` に集約する。
 
+テーマ / 外部デザインシステム / PPTX抽出の関係は [theme-and-design-system-reference.md](/Users/famao/kyberion/knowledge/public/procedures/media/theme-and-design-system-reference.md) を参照。
+
 高密度な document profile 群は `media-templates/artifact-library/` に置き、directory scan で media resolver に統合する。
 
 - `kyberion-standard`: 汎用の標準テーマ

@@ -39,6 +39,8 @@ The preset catalog is stored as directory-scanned knowledge packs at:
 
 `design-md-catalog` contains imported DESIGN.md-derived design systems. These are reference visual systems that can be selected explicitly with `design_system_id`, and they resolve through the same `theme -> design_system -> semantic/layout override` path as native Kyberion systems. When no explicit imported system is selected, Kyberion may still emit `design_recommendations` based on the brief semantics.
 
+For the current theme / design-system split and the relation between `themes.json`, imported reference systems such as `designmd-claude`, and source-deck extraction, see [theme-and-design-system-reference.md](/Users/famao/kyberion/knowledge/public/procedures/media/theme-and-design-system-reference.md).
+
 ## Current Profiles
 
 - `executive-proposal`

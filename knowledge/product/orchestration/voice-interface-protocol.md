@@ -75,7 +75,7 @@ label in its bridge/status payloads.
 
 ### Related Media Intents
 
-- `speak-with-my-voice`: local TTS / cloned-voice generation
+- `speak-with-my-voice`: local TTS / cloned-voice generation from promoted runtime voice profiles
 - `transcribe-audio`: batch audio transcription
 - `live-voice`: turn-based live conversation with STT and TTS
 
