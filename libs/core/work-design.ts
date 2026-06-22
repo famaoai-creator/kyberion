@@ -9,6 +9,15 @@ import { loadStandardIntentCatalog, type StandardIntentDefinition } from './inte
 import { resolveMissionClassification } from './mission-classification.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
+import {
+  normalizeExecutionShape,
+  projectExecutionShapeToWorkflowShape,
+  type WorkflowExecutionShape,
+} from './execution-shape.js';
+import {
+  resolveWorkScopeDecision,
+  type WorkScopeDecision,
+} from './work-scope-decision.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -130,7 +139,7 @@ interface ProcessChecklistRule {
 
 interface ExecutionShapeRule {
   match?: RoutingMatch;
-  shape: OrganizationWorkLoopSummary['resolution']['execution_shape'];
+  shape: WorkflowExecutionShape;
 }
 
 interface IntentLabelRule {
@@ -181,7 +190,10 @@ export interface OrganizationWorkLoopSummary {
     service_bindings: string[];
   };
   resolution: {
-    execution_shape: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
+    execution_shape: WorkflowExecutionShape;
+    selected_execution_shape?: WorkflowExecutionShape;
+    recommended_execution_shape?: WorkflowExecutionShape;
+    mismatch_reason?: string;
     task_type?: string;
   };
   workflow_design: {
@@ -247,6 +259,7 @@ export interface OrganizationWorkLoopSummary {
   learning: {
     reusable_refs: string[];
   };
+  work_scope_decision?: WorkScopeDecision;
 }
 
 function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | 'public' {
@@ -445,20 +458,17 @@ function inferExecutionShape(input: {
   intentId?: string;
   taskType?: string;
   shape?: string;
-}): OrganizationWorkLoopSummary['resolution']['execution_shape'] {
-  if (input.shape) {
-    if (input.shape === 'project_bootstrap' || input.shape === 'mission' || input.shape === 'task_session') {
-      return input.shape;
-    }
-    return 'direct_reply';
-  }
+}): WorkflowExecutionShape {
   const intentDefinition = findIntentDefinition(input.intentId);
   const catalogShape = intentDefinition?.resolution?.shape;
+  const normalizedInputShape = projectExecutionShapeToWorkflowShape(
+    normalizeExecutionShape(input.shape || catalogShape),
+  );
   const rules = loadWorkDesignRules();
   const matchedRule = (rules.execution_shape_rules || []).find((rule) =>
-    Boolean(rule.shape) && ruleMatches({ ...input, catalogShape }, rule.match),
+    Boolean(rule.shape) && ruleMatches({ ...input, shape: normalizedInputShape, catalogShape: normalizedInputShape }, rule.match),
   );
-  return matchedRule?.shape || 'direct_reply';
+  return matchedRule?.shape || normalizedInputShape || 'direct_reply';
 }
 
 function inferIntentLabel(input: {
@@ -552,6 +562,21 @@ export function buildOrganizationWorkLoopSummary(input: {
   locale?: string;
   serviceBindings?: string[];
   requiresApproval?: boolean;
+  artifactEstimate?: number;
+  externalAudience?: boolean;
+  regulatoryAudience?: boolean;
+  replayOrVariantLikelihood?: boolean;
+  repetitionEstimate?: number;
+  multipleLegitimateViewpoints?: boolean;
+  stakeholderCount?: number;
+  approvalRequired?: boolean;
+  crossSystemMutation?: boolean;
+  expectedContinuationBeyondSession?: boolean;
+  highStakesOrDogfoodEvidence?: boolean;
+  customerSignoff?: boolean;
+  productionRelease?: boolean;
+  missionHandoff?: boolean;
+  securitySensitiveCrossSystemChange?: boolean;
 }): OrganizationWorkLoopSummary {
   const tier = normalizeKnowledgeTier(input.tier);
   const executionShape = inferExecutionShape(input);
@@ -580,6 +605,24 @@ export function buildOrganizationWorkLoopSummary(input: {
     workflowPattern: workflowDesign.pattern,
     stage: missionClassification.stage,
   });
+  const workScopeDecision = resolveWorkScopeDecision({
+    catalogMinimumShape: executionShape,
+    artifactEstimate: input.artifactEstimate,
+    externalAudience: input.externalAudience,
+    regulatoryAudience: input.regulatoryAudience,
+    replayOrVariantLikelihood: input.replayOrVariantLikelihood,
+    repetitionEstimate: input.repetitionEstimate,
+    multipleLegitimateViewpoints: input.multipleLegitimateViewpoints,
+    stakeholderCount: input.stakeholderCount,
+    approvalRequired: input.approvalRequired ?? input.requiresApproval,
+    crossSystemMutation: input.crossSystemMutation,
+    expectedContinuationBeyondSession: input.expectedContinuationBeyondSession,
+    highStakesOrDogfoodEvidence: input.highStakesOrDogfoodEvidence,
+    customerSignoff: input.customerSignoff,
+    productionRelease: input.productionRelease,
+    missionHandoff: input.missionHandoff,
+    securitySensitiveCrossSystemChange: input.securitySensitiveCrossSystemChange,
+  });
   const design = resolveWorkDesign({
     intentId: input.intentId,
     taskType: input.taskType,
@@ -603,6 +646,12 @@ export function buildOrganizationWorkLoopSummary(input: {
     },
     resolution: {
       execution_shape: executionShape,
+      selected_execution_shape: executionShape,
+      recommended_execution_shape: projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape),
+      mismatch_reason:
+        projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape) === executionShape
+          ? undefined
+          : `work scope decision recommends ${projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape)} because ${workScopeDecision.rationale}`,
       task_type: input.taskType,
     },
     workflow_design: workflowDesign,
@@ -626,5 +675,6 @@ export function buildOrganizationWorkLoopSummary(input: {
     learning: {
       reusable_refs: design.reusable_refs.map((ref) => ref.promoted_ref || ref.title),
     },
+    work_scope_decision: workScopeDecision,
   };
 }

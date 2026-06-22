@@ -42,6 +42,12 @@ import {
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
 } from './execution-brief.js';
+import {
+  normalizeExecutionShape,
+  projectExecutionShapeToWorkflowShape,
+  type ExecutionShape,
+  type WorkflowExecutionShape,
+} from './execution-shape.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { TraceContext } from './src/trace.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
@@ -63,7 +69,6 @@ const INTENT_POLICY_PATH = pathResolver.knowledge('product/governance/intent-pol
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const WORK_POLICY_PATH = pathResolver.knowledge('product/governance/work-policy.json');
 
-type ExecutionShape = 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
 export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';
 export type IntentDeliveryMode = 'one_shot' | 'managed_program';
 
@@ -78,7 +83,7 @@ export interface IntentContract {
     success_condition: string;
   };
   resolution: {
-    execution_shape: ExecutionShape;
+    execution_shape: WorkflowExecutionShape;
     task_type?: string;
   };
   required_inputs: string[];
@@ -430,9 +435,11 @@ function resolvePolicyRoutingDecision(
 }
 
 function normalizeShape(shape?: string): ExecutionShape {
-  if (shape === 'project_bootstrap' || shape === 'mission' || shape === 'direct_reply')
-    return shape;
-  return 'task_session';
+  return normalizeExecutionShape(shape);
+}
+
+function toWorkflowShape(shape?: string): WorkflowExecutionShape {
+  return projectExecutionShapeToWorkflowShape(normalizeExecutionShape(shape));
 }
 
 function isApprovalWorkflowRequest(text: string): boolean {
@@ -619,7 +626,7 @@ function buildFallbackIntentContract(
         ? 'project_bootstrap'
         : 'task_session';
     const shape = packet.selected_resolution?.shape ? selectedShape : classifiedShape;
-    const normalizedShape = normalizeShape(shape);
+    const normalizedShape = toWorkflowShape(shape);
     const requiredInputs = [...(executionBrief?.missing_inputs || classified.requirements?.missing || [])];
     if (packet.selected_intent_id === 'setup-messaging-bridge') {
       if (selectedPlatformId) {
@@ -647,7 +654,7 @@ function buildFallbackIntentContract(
         success_condition: classified.goal.success_condition,
       },
       resolution: {
-        execution_shape: normalizeShape(shape),
+        execution_shape: normalizedShape,
         task_type: executionBrief?.target_actuators?.includes('pptx-generator')
           ? 'presentation_deck'
           : classified.taskType,
@@ -690,7 +697,7 @@ function buildFallbackIntentContract(
   const clarificationAssessment = assessContextualClarification({
     intentId: executionBrief?.archetype_id || 'general_request',
     text: input.text,
-    executionShape: selectedShape,
+    executionShape: toWorkflowShape(selectedShape),
     requiredInputs,
     confidence: executionBrief?.confidence,
     contextualFrame,
@@ -709,7 +716,7 @@ function buildFallbackIntentContract(
     },
     required_inputs: effectiveRequiredInputs,
     resolution: {
-      execution_shape: selectedShape,
+      execution_shape: toWorkflowShape(selectedShape),
       task_type: resolvedExecutionBrief.target_actuators?.includes('pptx-generator')
         ? 'presentation_deck'
         : undefined,
@@ -841,7 +848,7 @@ function buildIntentContractPrompt(
         execution_profile_id: 'string?',
         goal: { summary: 'string', success_condition: 'string' },
         resolution: {
-          execution_shape: 'direct_reply|task_session|mission|project_bootstrap',
+          execution_shape: 'direct_reply|task_session|pipeline|mission|project_bootstrap',
           task_type: 'string?',
         },
         required_inputs: ['string'],

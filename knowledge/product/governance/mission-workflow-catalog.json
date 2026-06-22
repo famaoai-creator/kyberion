@@ -65,6 +65,15 @@
       "phases": ["intake", "classification", "planning", "discovery", "normalization", "registration", "reconciliation", "activation", "observation", "refresh", "retirement", "delivery"]
     },
     {
+      "id": "platform-onboarding-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Platform onboarding missions (organization integration, secrets rotation, adapter registration) route through strict stage gates — cross_system_change delivery, SECURITY_READY and ARCHITECTURE_READY required, because these touch governance-scope config.",
+      "match": {
+        "mission_classes": ["platform_onboarding"]
+      },
+      "phases": ["intake", "classification", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
+    },
+    {
       "id": "coordinated-multi-track",
       "pattern": "coordinated_multi_track_execution",
       "description": "Cross-system work requiring a coordinated owner and delegated specialists.",
@@ -91,15 +100,6 @@
         "mission_classes": ["customer_engagement"]
       },
       "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery", "retrospective"]
-    },
-    {
-      "id": "platform-onboarding-stage-gated",
-      "pattern": "stage_gated_delivery",
-      "description": "Platform onboarding missions (organization integration, secrets rotation, adapter registration) route through strict stage gates — cross_system_change delivery, SECURITY_READY and ARCHITECTURE_READY required, because these touch governance-scope config.",
-      "match": {
-        "mission_classes": ["platform_onboarding"]
-      },
-      "phases": ["intake", "classification", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
     },
     {
       "id": "deterministic-patrol-aggregation",
@@ -196,6 +196,17 @@
       "pattern": "single_track_execution",
       "description": "Default workflow for straightforward bounded work.",
       "match": {
+        "mission_classes": [
+          "product_delivery",
+          "code_change",
+          "research_and_absorption",
+          "content_and_media",
+          "operations_and_release",
+          "environment_and_recovery",
+          "decision_support",
+          "customer_engagement",
+          "platform_onboarding"
+        ],
         "delivery_shapes": ["single_artifact", "long_running_job", "*"],
         "execution_shapes": ["direct_reply", "task_session", "mission", "project_bootstrap"]
       },

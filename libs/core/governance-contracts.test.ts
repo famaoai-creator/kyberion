@@ -256,6 +256,15 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'mission-task-classification-scenarios',
+    schemaPath: 'knowledge/product/schemas/mission-task-classification-scenarios.schema.json',
+    dataPath: 'knowledge/product/governance/mission-task-classification-scenarios.json',
+    invalidPayload: {
+      version: '1.0.0',
+      scenarios: [],
+    },
+  },
+  {
     name: 'operator-learning-scenario-pack',
     schemaPath: 'knowledge/product/schemas/operator-learning-scenario-pack.schema.json',
     dataPath: 'knowledge/product/governance/operator-learning-scenario-pack.json',
