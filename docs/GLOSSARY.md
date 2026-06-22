@@ -332,6 +332,40 @@ The combined protection model around tier isolation, operational governance, and
 
 The requirement for explicit sovereign approval before riskier or architectural actions are taken.
 
+## Volatile Knowledge Layer
+
+### Volatile Knowledge / Working Memory
+
+The set of structured surfaces (`MEMORY.md`, `NOW.md`, daily journals, TODO, weekly reviews) that hold in-progress work context and decay over time. Distinguished from `knowledge/` (permanent, distilled) by their explicit lifetime and automatic GC. Physical root: `active/`. Schema: `schemas/volatile-knowledge.schema.json`.
+
+### Scope (Volatile)
+
+Axis-A of the volatile knowledge model. What a face is bound to: `session` / `mission` / `project` / `personal` / `tenant` / `global`. Determines the physical path and applicable tier restrictions.
+
+### Cadence
+
+Axis-B of the volatile knowledge model. The temporal cycle of a face: `resident` (no fixed period), `daily`, `weekly`, `adhoc-ttl`. Cadence drives the rollover/rollup schedule and the period key embedded in the filename.
+
+### Lifetime
+
+The eviction policy of a volatile face: `session` | `mission` | `daily` | `weekly` | `ttl` | `until-distilled` | `sticky`. Determines how GC and rollover treat the face at period-end.
+
+### Rollover
+
+Moving unfinished items (e.g. incomplete TODOs) from the current face to the next-period face (e.g. today → tomorrow). Recorded in the sidecar as `rollover_to`.
+
+### Rollup
+
+Aggregating a lower-cadence face into a higher-cadence face at period-end (daily × 7 → weekly, weekly → distill candidate). Recorded in the sidecar as `rollup_to`.
+
+### Promotion (Memory)
+
+Nominating content in a volatile face to the `memory-promotion-queue` (`MemoryCandidate`) for eventual distillation into `knowledge/`. The face's sidecar records `promotion_candidate_id` and transitions to `status: promoted`.
+
+### Sidecar (volatile)
+
+A `*.volatile.json` file co-located with each volatile Markdown surface. Holds machine-readable metadata (scope, cadence, lifetime, expires_at, status, etc.) enabling GC and promotion without parsing the Markdown body.
+
 ## Practical entrypoints
 
 ### Onboarding Wizard

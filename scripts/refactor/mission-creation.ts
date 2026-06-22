@@ -147,6 +147,17 @@ export async function createMission(
     initMissionRepo(missionDir, upperId);
   }
 
+  // Initialize volatile working-memory faces (MEMORY.md + NOW.md with sidecar)
+  try {
+    const { initMissionMemory } = await import(
+      pathResolver.rootResolve('dist/libs/actuators/working-memory-actuator/src/index.js')
+    );
+    initMissionMemory({ missionId: upperId, tier: finalTier });
+    logger.info(`📝 [WorkingMemory] Volatile memory faces initialized for ${upperId}.`);
+  } catch {
+    // Best-effort: working-memory-actuator may not be compiled yet
+  }
+
   const missionGitHash = !isEphemeral ? getGitHash(missionDir) : 'ephemeral';
   const missionBranch = !isEphemeral ? getCurrentBranch(missionDir) : 'ephemeral';
   const initialState: MissionState & { is_ephemeral?: boolean } = {
