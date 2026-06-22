@@ -1,0 +1,112 @@
+{
+  "$schema": "https://kyberion.internal/schemas/cowork-sync-policy/v1.json",
+  "version": "1.0.0",
+  "description": "Bidirectional sync policy between Kyberion knowledge base and Cowork workspace. Governs tier mapping, promotion rules, and leakage prevention.",
+
+  "cowork_to_kyberion": {
+    "description": "Rules for ingesting Cowork work-folder artifacts into Kyberion memory-promotion-queue.",
+    "default_sensitivity_tier": "confidential",
+    "default_ratification_required": true,
+    "source_type": "artifact",
+
+    "kind_inference": [
+      {
+        "comment": "Files matching SOP patterns are promoted as 'sop'",
+        "pattern": "(?i)(手順|sop|procedure|runbook|howto|how-to)",
+        "proposed_kind": "sop"
+      },
+      {
+        "comment": "Template files",
+        "pattern": "(?i)(template|テンプレ|雛形|draft)",
+        "proposed_kind": "template"
+      },
+      {
+        "comment": "Risk-related notes",
+        "pattern": "(?i)(risk|リスク|注意|danger|warning|caveat)",
+        "proposed_kind": "risk_rule"
+      },
+      {
+        "comment": "Clarification prompts and Q&A logs",
+        "pattern": "(?i)(clarif|質問|確認|faq|q&a)",
+        "proposed_kind": "clarification_prompt"
+      },
+      {
+        "comment": "Default: heuristic",
+        "pattern": ".*",
+        "proposed_kind": "heuristic"
+      }
+    ],
+
+    "tier_assignment": {
+      "rules": [
+        {
+          "comment": "Paths under outputs/ or shared/ in Cowork are treated as public candidates",
+          "source_path_pattern": "(?i)(outputs|shared|public)",
+          "assigned_tier": "public",
+          "ratification_required": true
+        },
+        {
+          "comment": "Paths containing customer/tenant names stay confidential",
+          "source_path_pattern": "(?i)(customer|tenant|client|sbiss|sbi)",
+          "assigned_tier": "confidential",
+          "ratification_required": true
+        },
+        {
+          "comment": "Personal notes stay personal",
+          "source_path_pattern": "(?i)(personal|private|draft|wip|memo)",
+          "assigned_tier": "personal",
+          "ratification_required": false
+        }
+      ],
+      "default": "confidential"
+    },
+
+    "leakage_prevention": {
+      "block_promotion_if_evidence_refs_contain": [
+        "knowledge/personal/",
+        "knowledge/confidential/"
+      ],
+      "comment": "Public-tier candidates must not reference confidential/personal paths (enforced by memory-promotion-queue)."
+    },
+
+    "idempotency": {
+      "strategy": "content_hash_sha256",
+      "comment": "A candidate with the same source_ref + content hash is not re-enqueued if already queued/promoted."
+    }
+  },
+
+  "kyberion_to_cowork": {
+    "description": "Rules for supplying Kyberion knowledge to Cowork sessions.",
+    "allowed_tiers": ["public"],
+    "comment": "Only public tier knowledge is supplied to Cowork. confidential/personal are never exposed.",
+
+    "domains": [
+      "procedures",
+      "architecture",
+      "governance",
+      "hints"
+    ],
+
+    "delivery": {
+      "channel": "cowork",
+      "format": "markdown",
+      "max_hints_per_sync": 50,
+      "idempotency": {
+        "strategy": "content_hash_sha256",
+        "state_file": "active/shared/runtime/cowork-sync-state.json"
+      }
+    },
+
+    "feedback_loop": {
+      "description": "Trace-derived hints from Phase 5 Review are re-injected into Cowork knowledge supply.",
+      "source_path": "knowledge/public/procedures/hints",
+      "enabled": true
+    }
+  },
+
+  "conflict_resolution": {
+    "strategy": "append_prefer_newer",
+    "overwrite_requires_approval": true,
+    "comment": "Conflicting updates are appended (newer wins for display) but overwriting promoted knowledge requires approval gate."
+  }
+}
