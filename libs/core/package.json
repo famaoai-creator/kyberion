@@ -55,6 +55,10 @@
       "types": "./dist/approval-store.d.ts",
       "default": "./dist/approval-store.js"
     },
+    "./approval-cowork-adapter": {
+      "types": "./dist/approval-cowork-adapter.d.ts",
+      "default": "./dist/approval-cowork-adapter.js"
+    },
     "./app-profiles": {
       "types": "./dist/app-profiles.d.ts",
       "default": "./dist/app-profiles.js"
@@ -82,6 +86,18 @@
     "./channel-surface": {
       "types": "./dist/channel-surface.d.ts",
       "default": "./dist/channel-surface.js"
+    },
+    "./cowork-health-check": {
+      "types": "./dist/cowork-health-check.d.ts",
+      "default": "./dist/cowork-health-check.js"
+    },
+    "./cowork-knowledge-bridge": {
+      "types": "./dist/cowork-knowledge-bridge.d.ts",
+      "default": "./dist/cowork-knowledge-bridge.js"
+    },
+    "./cowork-surface": {
+      "types": "./dist/cowork-surface.d.ts",
+      "default": "./dist/cowork-surface.js"
     },
     "./customer-resolver": {
       "types": "./dist/customer-resolver.d.ts",
