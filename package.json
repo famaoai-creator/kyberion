@@ -195,7 +195,11 @@
     "nerve:stop": "pnpm surfaces:stop",
     "nerve:status": "pnpm surfaces:status",
     "skill:install": "pnpm tsx scripts/skill_installer.ts",
-    "actuator:play": "pnpm tsx scripts/actuator_playground.ts"
+    "actuator:play": "pnpm tsx scripts/actuator_playground.ts",
+    "mcp:server": "node dist/scripts/mcp_server.js",
+    "mcp:server:dev": "pnpm tsx scripts/mcp_server.ts",
+    "knowledge:cowork-sync": "node dist/scripts/cowork_knowledge_bridge.js",
+    "knowledge:cowork-sync:dev": "pnpm tsx scripts/cowork_knowledge_bridge.ts"
   },
   "lint-staged": {
     "knowledge/**/*.md": [

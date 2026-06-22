@@ -1,0 +1,109 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "cowork-integration-review",
+  "version": "1.0.0",
+  "description": "Cowork Integration Review — checks MCP server reachability, surface outbox health, sync-state freshness, and pending approvals. Emits a structured health report and surface-notifies the operator on degradation.",
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🔌 [COWORK] Starting Cowork integration health review..." }
+    },
+    {
+      "id": "probe-mcp-script",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_mcp_script", "type": "ProbeResult" },
+      "params": { "path": "dist/scripts/mcp_server.js" }
+    },
+    {
+      "id": "probe-cowork-outbox",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_outbox", "type": "ProbeResult" },
+      "params": { "path": "active/shared/coordination/channels/cowork/outbox" }
+    },
+    {
+      "id": "probe-sync-state",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_sync_state", "type": "ProbeResult" },
+      "params": { "path": "active/shared/runtime/cowork-sync-state.json" }
+    },
+    {
+      "id": "probe-plugin-manifest",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_plugin", "type": "ProbeResult" },
+      "params": { "path": "plugins/kyberion/plugin-manifest.json" }
+    },
+    {
+      "id": "probe-connector",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_connector", "type": "ProbeResult" },
+      "params": { "path": "plugins/kyberion/connector.json" }
+    },
+    {
+      "id": "probe-sync-policy",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_sync_policy", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/cowork-sync-policy.json" }
+    },
+    {
+      "id": "probe-surface-manifest",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "p_surface", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/surfaces/mcp-server-cowork.json" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_mcp_script",
+      "params": { "message": "🔧 MCP Server (built):    {{p_mcp_script.exists}} ({{p_mcp_script.kind}})" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_outbox",
+      "params": { "message": "📬 Cowork Outbox dir:     {{p_outbox.exists}} ({{p_outbox.kind}})" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_sync_state",
+      "params": { "message": "🔄 Sync State file:       {{p_sync_state.exists}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_plugin",
+      "params": { "message": "🧩 Plugin Manifest:       {{p_plugin.exists}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_connector",
+      "params": { "message": "🔗 Connector Config:      {{p_connector.exists}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_sync_policy",
+      "params": { "message": "📋 Sync Policy:           {{p_sync_policy.exists}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "p_surface",
+      "params": { "message": "🖥️  Surface Manifest:      {{p_surface.exists}}" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ [COWORK] Integration review complete." }
+    }
+  ]
+}

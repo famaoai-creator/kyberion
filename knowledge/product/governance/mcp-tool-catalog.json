@@ -1,0 +1,148 @@
+{
+  "$schema": "https://kyberion.internal/schemas/mcp-tool-catalog/v1.json",
+  "version": "1.0.0",
+  "description": "Allowlist and schema definitions for Kyberion MCP server tools exposed to Cowork and other MCP clients.",
+  "default_tier_visibility": ["public"],
+  "tools": [
+    {
+      "name": "kyberion.pipeline.list",
+      "description": "List available Kyberion pipeline definitions.",
+      "category": "pipeline",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.pipeline.run",
+      "description": "Execute a named Kyberion pipeline by input path.",
+      "category": "pipeline",
+      "risk_class": "medium",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "notes": "Only pipelines on the explicit allowlist may be run via MCP. Risky-op pipelines require approval gate."
+    },
+    {
+      "name": "kyberion.knowledge.search",
+      "description": "Search Kyberion knowledge base (public tier by default).",
+      "category": "knowledge",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "notes": "confidential tier requires explicit project scope grant via allowed_confidential_projects."
+    },
+    {
+      "name": "kyberion.mission.create",
+      "description": "Create a new Kyberion mission.",
+      "category": "mission",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "cowork"]
+    },
+    {
+      "name": "kyberion.mission.status",
+      "description": "Get the status of a Kyberion mission.",
+      "category": "mission",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.mission.journal",
+      "description": "Read the journal entries of a Kyberion mission.",
+      "category": "mission",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.capability.list",
+      "description": "List available Kyberion actuator capabilities.",
+      "category": "capability",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.approval.list_pending",
+      "description": "List pending approval requests in Kyberion.",
+      "category": "approval",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "cowork"]
+    },
+    {
+      "name": "kyberion.approval.decide",
+      "description": "Submit an approval decision (approve/reject) for a pending request.",
+      "category": "approval",
+      "risk_class": "high",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator"],
+      "notes": "Two-step required: list_pending first, then decide. Operator role only."
+    },
+    {
+      "name": "kyberion.audit.export",
+      "description": "Export the audit chain for a mission.",
+      "category": "audit",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "cowork"]
+    },
+    {
+      "name": "kyberion.surface.cowork.deliver",
+      "description": "Deliver a Kyberion artifact to the Cowork workspace.",
+      "category": "surface",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.surface.cowork.list",
+      "description": "List previously delivered artifacts in the Cowork outbox.",
+      "category": "surface",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"]
+    },
+    {
+      "name": "kyberion.audit.verify",
+      "description": "Verify the integrity of the Kyberion audit chain (hash-linked). Returns pass/fail for tamper detection.",
+      "category": "audit",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "cowork"]
+    },
+    {
+      "name": "kyberion.knowledge.cowork_sync",
+      "description": "Bidirectional knowledge sync between Cowork work-folder artifacts and Kyberion's knowledge base. Respects 3-tier isolation.",
+      "category": "knowledge",
+      "risk_class": "medium",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "cowork"],
+      "notes": "Only public tier knowledge flows to Cowork. Cowork artifacts are enqueued for memory promotion, never directly written to confidential/personal."
+    }
+  ],
+  "pipeline_run_allowlist": [
+    "pipelines/list-capabilities.json",
+    "pipelines/knowledge-sync.json",
+    "pipelines/vital-check.json",
+    "pipelines/system-diagnostics.json",
+    "pipelines/inspect-workspace-surfaces.json",
+    "pipelines/inspect-network-environment.json",
+    "pipelines/baseline-check.json",
+    "pipelines/cowork-integration-review.json"
+  ]
+}

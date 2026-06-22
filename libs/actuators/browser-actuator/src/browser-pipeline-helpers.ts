@@ -220,6 +220,7 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
       const spanId = traceCtx.startSpan(`${step.type}:${step.op}`, {
         stepId: (step as any).id || `step-${stepIndex}`,
       });
+      const trailBefore = Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0;
 
       try {
         logger.info(`  [BROWSER_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
@@ -240,6 +241,21 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
           const screenshotPath = ctx.last_screenshot || ctx[step.params?.export_as || 'last_screenshot'];
           if (screenshotPath) {
             traceCtx.addArtifact('screenshot', screenshotPath, (step as any).id || 'screenshot');
+          }
+        }
+
+        // Emit each new browser action as a trace event so the trail is queryable in Chronos
+        if (Array.isArray(ctx.action_trail) && ctx.action_trail.length > trailBefore) {
+          for (const act of (ctx.action_trail as any[]).slice(trailBefore)) {
+            const attrs: Record<string, string | number | boolean> = {
+              kind: String(act.kind || ''),
+              op: String(act.op || ''),
+            };
+            if (act.tab_id) attrs.tab_id = String(act.tab_id);
+            if (act.url) attrs.url = String(act.url).slice(0, 200);
+            if (act.title) attrs.title = String(act.title).slice(0, 120);
+            if (act.selector) attrs.selector = String(act.selector).slice(0, 200);
+            traceCtx.addEvent('browser.action', attrs);
           }
         }
 
@@ -277,6 +293,7 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
       await browserContext.tracing.stop({ path: tracePath });
       logger.info(`🎞️ [BROWSER] Trace recorded at: ${tracePath}`);
       ctx.last_trace_path = tracePath;
+      traceCtx.addArtifact('log', tracePath, 'playwright-trace');
     }
     ctx.browser_tabs = await browserRuntimeHelpers.summarizeTabs(runtime);
     ctx.active_tab_id = runtime.activeTabId;
@@ -305,6 +322,9 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
     if (shouldClose) {
       finalizedVideoPaths = videoRecordingEnabled ? await browserRuntimeHelpers.collectRecordedVideoPaths(runtime) : undefined;
       ctx.recorded_videos = finalizedVideoPaths || [];
+      for (const vp of finalizedVideoPaths ?? []) {
+        traceCtx.addArtifact('file', vp, 'browser-video');
+      }
       ctx.video_output_dir = videoRecordingEnabled ? resolvedVideoDir : undefined;
       ctx.video_recording_pending = false;
       browserRuntimeHelpers.saveBrowserSessionMetadata(sessionMetadataPath, {
