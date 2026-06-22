@@ -12,7 +12,7 @@ import {
 import * as path from 'node:path';
 
 export interface MediaPipelineStep {
-  type: 'capture' | 'transform' | 'apply' | 'control';
+  type: 'capture' | 'transform' | 'apply' | 'sink' | 'control';
   op: string;
   params: any;
   on_error?: any;
@@ -89,6 +89,9 @@ export async function executeMediaPipeline(
           ctx = await deps!.opTransform(op, step.params, ctx, resolve);
           break;
         case 'apply':
+          ctx = await deps!.opApply(op, step.params, ctx, resolve);
+          break;
+        case 'sink':
           ctx = await deps!.opApply(op, step.params, ctx, resolve);
           break;
         case 'control': {

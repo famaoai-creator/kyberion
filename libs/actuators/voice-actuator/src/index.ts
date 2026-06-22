@@ -7,6 +7,7 @@ import {
   getVoiceEngineRegistry,
   getVoiceProfileRecord,
   getVoiceProfileRegistry,
+  materializeVoiceProfileSampleRefs,
   getVoiceRuntimePolicy,
   getVoiceTtsLanguageConfig,
   logger,
@@ -572,7 +573,7 @@ async function registerVoiceProfile(input: {
   // Direct upsert: update existing profile's sample_refs in registry
   if (input.policy?.allow_update) {
     const registry = getVoiceProfileRegistry();
-    const sampleRefs = input.samples.map((s) => s.path);
+    const sampleRefs = materializeVoiceProfileSampleRefs(input.profile, input.samples);
     const existing = registry.profiles.find((p) => p.profile_id === input.profile.profile_id);
     const updated = existing
       ? { ...existing, ...input.profile, sample_refs: sampleRefs, status: existing.status }

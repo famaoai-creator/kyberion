@@ -34,7 +34,8 @@
   "pipeline_ops": {
     "capture": [
       { "op": "pptx_slide_text", "note": "Extract slide text from a PPTX file into context." },
-      { "op": "pptx_extract", "note": "Extract full PPTX design protocol (slides + master theme) into context." },
+      { "op": "pptx_extract", "note": "Extract full PPTX design protocol (slides + master theme + raw passthrough) into context." },
+      { "op": "xlsx_extract", "note": "Extract full XLSX design protocol (sheets + styles + raw passthrough) into context." },
       { "op": "json_read", "note": "Read a JSON file into context." }
     ],
     "transform": [

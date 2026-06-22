@@ -5,6 +5,7 @@ import {
   getPersonalVoiceProfileRegistryPath,
   getVoiceProfileRegistry,
   getVoiceProfileRegistryPath,
+  materializeVoiceProfileSampleRefs,
   type VoiceProfileRecord,
   type VoiceProfileRegistry,
   writeVoiceProfileRegistry,
@@ -64,13 +65,14 @@ function loadRegistrationReceipt(receiptPath: string): VoiceProfileRegistrationR
 function buildPromotedProfile(
   receipt: VoiceProfileRegistrationReceipt,
   promotedStatus: 'active' | 'shadow',
+  sampleRefs: string[],
 ): VoiceProfileRecord {
   return {
     profile_id: receipt.profile.profile_id,
     display_name: receipt.profile.display_name,
     tier: receipt.profile.tier,
     languages: receipt.profile.languages,
-    sample_refs: receipt.samples.map((sample) => sample.path),
+    sample_refs: sampleRefs,
     default_engine_id: receipt.profile.default_engine_id,
     status: promotedStatus,
     notes: receipt.profile.notes,
@@ -146,7 +148,8 @@ export function promoteVoiceProfileFromReceipt(input: PromoteVoiceProfileInput):
   }
   const promotedStatus = input.targetStatus || 'active';
   const receipt = loadRegistrationReceipt(input.receiptPath);
-  const promotedProfile = buildPromotedProfile(receipt, promotedStatus);
+  const sampleRefs = materializeVoiceProfileSampleRefs(receipt.profile, receipt.samples);
+  const promotedProfile = buildPromotedProfile(receipt, promotedStatus, sampleRefs);
   const targetRegistryPath = resolvePromotionRegistryPath(promotedProfile.tier);
   const nextRegistry = appendProfileToRegistry({
     registry: loadRegistryForPromotion(targetRegistryPath),

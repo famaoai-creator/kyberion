@@ -10,10 +10,14 @@ describe('voice profile promotion', () => {
   const registryDir = `${tmpDir}/voice-profiles`;
   const personalRegistryPath = `${tmpDir}/voice-profile-registry.personal.json`;
   const receiptPath = `${tmpDir}/receipt.json`;
+  const promotedSampleDir = pathResolver.shared('runtime/voice-profiles/me-ja-live');
+  const overlaySampleDir = pathResolver.shared('runtime/voice-profiles/me-ja-overlay');
 
   afterEach(() => {
     safeRmSync(tmpDir, { recursive: true, force: true });
     safeRmSync(pathResolver.sharedTmp('voice-profile-promotion'), { recursive: true, force: true });
+    safeRmSync(promotedSampleDir, { recursive: true, force: true });
+    safeRmSync(overlaySampleDir, { recursive: true, force: true });
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR;
     delete process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH;
@@ -55,12 +59,16 @@ describe('voice profile promotion', () => {
           default_engine_id: 'open_voice_clone',
         },
         samples: [
-          { sample_id: 's1', path: 'knowledge/personal/voice/me-ja-01.wav', language: 'ja' },
-          { sample_id: 's2', path: 'knowledge/personal/voice/me-ja-02.wav', language: 'ja' },
-          { sample_id: 's3', path: 'knowledge/personal/voice/me-ja-03.wav', language: 'ja' },
+          { sample_id: 'sample-01', path: `${tmpDir}/me-ja-01.wav`, language: 'ja' },
+          { sample_id: 'sample-02', path: `${tmpDir}/me-ja-02.wav`, language: 'ja' },
+          { sample_id: 'sample-03', path: `${tmpDir}/me-ja-03.wav`, language: 'ja' },
         ],
       }),
     );
+    safeWriteFile(`${tmpDir}/me-ja-01.wav`, Buffer.from('voice-sample-1'));
+    safeWriteFile(`${tmpDir}/me-ja-01.wav.transcript.txt`, 'こんにちは。');
+    safeWriteFile(`${tmpDir}/me-ja-02.wav`, Buffer.from('voice-sample-2'));
+    safeWriteFile(`${tmpDir}/me-ja-03.wav`, Buffer.from('voice-sample-3'));
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = registryPath;
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_DIR = registryDir;
 
@@ -81,6 +89,8 @@ describe('voice profile promotion', () => {
     const promoted = registry.profiles.find((profile) => profile.profile_id === 'me-ja-live');
     expect(promoted?.status).toBe('active');
     expect(promoted?.sample_refs).toHaveLength(3);
+    expect(promoted?.sample_refs?.[0]).toBe(pathResolver.shared('runtime/voice-profiles/me-ja-live/sample-01.wav'));
+    expect(safeReadFile(pathResolver.shared('runtime/voice-profiles/me-ja-live/sample-01.wav.transcript.txt'), { encoding: 'utf8' })).toBe('こんにちは。');
   });
 
   it('rejects receipts that are not pending promotion', () => {
@@ -137,10 +147,11 @@ describe('voice profile promotion', () => {
           default_engine_id: 'open_voice_clone',
         },
         samples: [
-          { sample_id: 's1', path: 'knowledge/personal/voice/me-ja-overlay-01.wav', language: 'ja' },
+          { sample_id: 'sample-01', path: `${tmpDir}/me-ja-overlay-01.wav`, language: 'ja' },
         ],
       }),
     );
+    safeWriteFile(`${tmpDir}/me-ja-overlay-01.wav`, Buffer.from('voice-sample-overlay'));
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = personalRegistryPath;
 
     const result = promoteVoiceProfileFromReceipt({

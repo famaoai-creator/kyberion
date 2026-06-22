@@ -66,6 +66,11 @@ pnpm onboard
 - **ステップ構成**: `build:packages` → `build:actuators` → `build:repo` → `build:ui`。
   個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
 
+### Python Runtime Resolution
+- Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → `.venv/bin/python3` → `python3` の順で解決されます。
+- `.venv/bin/python3` は repo-local の実行環境候補であり、学習済み音声データや中間生成物の置き場ではありません。
+- 音声サンプルやプロモート後の voice profile データは `active/shared/tmp/` または `active/shared/runtime/voice-profiles/<profile_id>/` に置きます。
+
 ### Stage 4: Runtime Surface Setup
 - **実行コマンド**: `pnpm surfaces:setup`
 - **目的**: `slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface について、認証の不足項目、CLI 代替、ホスト管理 surface を確認します。

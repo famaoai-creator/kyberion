@@ -33,6 +33,8 @@ The command:
 - appends the promoted profile to the voice profile registry
 - updates the canonical `knowledge/product/governance/voice-profiles/*.json` entry when using the public registry
 - optionally updates `default_profile_id`
+- copies the promoted sample files into the governed voice profile store:
+  - `active/shared/runtime/voice-profiles/<profile_id>/`
 - writes a promotion receipt under:
   - `active/shared/tmp/voice-profile-promotion/<request_id>.json`
 

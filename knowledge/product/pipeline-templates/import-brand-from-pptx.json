@@ -59,6 +59,7 @@
         "design_system_id":  "{{design_system_id}}",
         "theme_from":        "active_theme",
         "layout_from":       "last_layout_geometry",
+        "pptx_from":         "source_pptx_design",
         "logo_url":          "{{logo_url}}"
       }
     },

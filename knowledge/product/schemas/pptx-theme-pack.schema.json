@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/pptx-theme-pack.schema.json",
+  "title": "PPTX Theme Pack",
+  "description": "Confidential theme pack derived from a source PowerPoint deck. Stores palette, fonts, logo, and PPTX heritage so the deck can be re-applied with high fidelity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "theme_id", "brand_name", "tenant_slug", "design_system_id", "theme", "pptx"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["pptx-theme-pack"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "theme_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "brand_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "colors", "fonts"],
+      "properties": {
+        "name": { "type": "string" },
+        "colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary", "secondary", "accent", "background", "text"],
+          "properties": {
+            "primary": { "type": "string" },
+            "secondary": { "type": "string" },
+            "accent": { "type": "string" },
+            "background": { "type": "string" },
+            "text": { "type": "string" }
+          }
+        },
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["heading", "body"],
+          "properties": {
+            "heading": { "type": "string" },
+            "body": { "type": "string" }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "logo_url": { "type": "string" }
+          }
+        }
+      }
+    },
+    "pptx": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canvas", "master"],
+      "properties": {
+        "canvas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["w", "h"],
+          "properties": {
+            "w": { "type": "number" },
+            "h": { "type": "number" }
+          }
+        },
+        "master": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "rawThemeXml": { "type": ["string", "null"] },
+        "rawMasterXml": { "type": ["string", "null"] },
+        "rawMasterRelsXml": { "type": ["string", "null"] },
+        "rawLayouts": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "rawMasters": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "masterMedia": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "rawParts": {
+          "type": ["object", "null"],
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "layout_templates": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "default": { "type": "string" },
+        "templates": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "layout_template_id": {
+      "type": "string"
+    },
+    "layout_template_catalog": {
+      "type": ["string", "null"]
+    },
+    "source_theme_name": {
+      "type": ["string", "null"]
+    }
+  }
+}
