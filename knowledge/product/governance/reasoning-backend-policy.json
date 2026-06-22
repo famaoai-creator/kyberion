@@ -1,7 +1,8 @@
 {
   "version": "1.0.0",
   "mode_aliases": {
-    "gemini-api": "gemini-cli"
+    "gemini-api": "gemini-cli",
+    "nemotron": "nemotron-api"
   },
   "allowed_modes": [
     "claude-cli",
@@ -11,6 +12,7 @@
     "gemini-cli",
     "agy-cli",
     "local",
+    "nemotron-api",
     "openrouter",
     "stub"
   ],
@@ -22,6 +24,10 @@
     {
       "env": "GEMINI_API_KEY",
       "mode": "gemini-cli"
+    },
+    {
+      "env": "KYBERION_NEMOTRON_URL",
+      "mode": "nemotron-api"
     },
     {
       "env": "KYBERION_LOCAL_LLM_URL",

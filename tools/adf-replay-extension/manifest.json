@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Kyberion Browser Bridge",
+  "version": "0.1.0",
+  "description": "Record and review governed Kyberion browser workflows in the active tab.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel"
+  ],
+  "action": {
+    "default_title": "Open Kyberion Browser Bridge"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
