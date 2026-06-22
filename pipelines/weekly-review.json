@@ -1,0 +1,36 @@
+{
+  "action": "pipeline",
+  "name": "weekly-review",
+  "version": "2.0.0",
+  "description": "Volatile Knowledge Layer — weekly review: opens the current week's face, then nominates it as a memory-promotion-queue candidate for distillation into knowledge/.",
+  "_refs": {
+    "schema": "schemas/volatile-knowledge.schema.json",
+    "actuator": "working-memory-actuator",
+    "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
+  },
+  "steps": [
+    {
+      "id": "open_weekly",
+      "role": "source",
+      "op": "working-memory:weekly-open",
+      "produces": { "channel": "weekly_face", "type": "WeeklyOpenResult" },
+      "params": {
+        "export_as": "weekly_face"
+      }
+    },
+    {
+      "id": "nominate_promotion",
+      "role": "sink",
+      "op": "working-memory:nominate-promotion",
+      "consumes": "weekly_face",
+      "params": {
+        "export_as": "nomination_result",
+        "mdPath": "{{weekly_face.weeklyPath}}",
+        "summary": "Weekly review face — candidate for knowledge distillation",
+        "source_type": "task_session",
+        "proposed_memory_kind": "heuristic",
+        "sensitivity_tier": "personal"
+      }
+    }
+  ]
+}

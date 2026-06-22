@@ -38,6 +38,8 @@ import {
   safeWriteFile,
   safeExistsSync,
   safeLstat,
+  TraceContext,
+  persistTrace,
   safeReaddir,
   findMissionPath,
   missionEvidenceDir,
@@ -477,7 +479,19 @@ function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'
 }
 
 async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
-  return missionSystem.createCheckpoint(taskId, note, explicitMissionId);
+  const result = await missionSystem.createCheckpoint(taskId, note, explicitMissionId);
+  try {
+    const tc = new TraceContext('mission:checkpoint', {
+      missionId: explicitMissionId || (result as any)?.missionId || undefined,
+    });
+    tc.addEvent('checkpoint.recorded', {
+      task_id: String(taskId),
+      note: String(note).slice(0, 200),
+      ...(explicitMissionId ? { mission_id: String(explicitMissionId) } : {}),
+    });
+    persistTrace(tc.finalize());
+  } catch (_) { /* non-critical */ }
+  return result;
 }
 
 async function resumeMission(id?: string) {
@@ -497,7 +511,22 @@ async function recordEvidence(
   actorId?: string,
   actorType?: 'agent' | 'human' | 'service'
 ) {
-  return missionSystem.recordEvidence(missionId, taskId, note, evidence, teamRole, actorId, actorType);
+  const result = await missionSystem.recordEvidence(missionId, taskId, note, evidence, teamRole, actorId, actorType);
+  try {
+    const tc = new TraceContext('mission:evidence', { missionId: missionId.toUpperCase() });
+    const attrs: Record<string, string | number | boolean> = {
+      mission_id: missionId.toUpperCase(),
+      task_id: String(taskId),
+      note: String(note).slice(0, 200),
+    };
+    if (teamRole) attrs.team_role = String(teamRole);
+    if (actorId) attrs.actor_id = String(actorId);
+    if (actorType) attrs.actor_type = String(actorType);
+    if (evidence?.length) attrs.evidence_count = evidence.length;
+    tc.addEvent('evidence.recorded', attrs);
+    persistTrace(tc.finalize());
+  } catch (_) { /* non-critical */ }
+  return result;
 }
 
 async function purgeMissions(dryRun: boolean = false) {
