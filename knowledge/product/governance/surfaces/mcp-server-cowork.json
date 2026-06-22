@@ -15,10 +15,9 @@
       },
       "cwd": ".",
       "shutdownPolicy": "detached",
-      "startupMode": "on-demand",
+      "startupMode": "background",
       "ownerType": "surface-runtime-manifest",
-      "enabled": true,
-      "notes": "Started by Cowork as a stdio MCP server process. Not a persistent background daemon — Cowork manages the lifecycle."
+      "enabled": true
     }
   ]
 }
