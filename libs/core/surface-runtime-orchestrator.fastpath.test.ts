@@ -498,6 +498,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'スケジュールを調整して',
       senderAgentId: 'test-sender',
     });
+    expect(result.text).toContain('短い作業として進めます。');
     expect(result.text).toContain('予定の確認を進めます。');
     expect(result.text).toContain('確認したい点があります: 対象、期間');
     expect(result.text).toContain('必要なら会議調整まで引き継げます。');
@@ -540,6 +541,49 @@ describe('surface-runtime-orchestrator fast-path', () => {
         task_type: 'analysis',
       }),
     );
+  });
+
+  it('promotes a task-session route to mission creation when the work-scope policy requires it', async () => {
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'pptx-theme-import',
+      shape: 'task_session',
+      routeFamily: 'task_session',
+    });
+    mocks.compileUserIntentFlow.mockResolvedValue({
+      intentContract: { resolution: { execution_shape: 'task_session' } },
+      workLoop: {
+        work_scope_decision: {
+          execution_shape: 'mission',
+          minimum_catalog_shape: 'task_session',
+          promotion_required: true,
+          mandatory_triggers: [],
+          accumulation_triggers: ['artifact_estimate_5plus', 'stakeholder_count_3plus'],
+          matched_rule_ids: ['accumulation-trigger-promotion'],
+          policy_version: '1.0.0',
+          rationale: 'Policy threshold was met.',
+        },
+      },
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: 'PPTX のテーマを取り込んで再現して',
+      senderAgentId: 'test-sender',
+    });
+    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain('"kind": "execution-receipt"');
+    expect(result.text).toContain('"governance"');
+    expect(result.text).toContain('"policy_version": "1.0.0"');
+    expect(result.text).toContain('"accumulation-trigger-promotion"');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'node',
+      expect.arrayContaining([
+        'dist/scripts/mission_controller.js',
+        'create',
+      ]),
+      expect.any(Object),
+    );
+    expect(mocks.createTaskSession).not.toHaveBeenCalled();
   });
 
   it('executes capture_photo task sessions through the virtual camera bridge path', async () => {
