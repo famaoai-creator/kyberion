@@ -91,7 +91,7 @@ pnpm onboard
 
 ### Stage 6: Reasoning Backend Setup
 - **実行コマンド**: `pnpm reasoning:setup`
-- **目的**: `claude-cli` / `gemini-cli` / `codex-cli` / `anthropic` / `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します。
+- **目的**: `claude-cli` / `gemini-cli` / `codex-cli` / `anthropic` / `nemotron-api` / `local` / `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します。
 - **物理的変化**:
   - まだ実体の変更は行いません。利用可能な backend と不足条件が見えるだけです。
 

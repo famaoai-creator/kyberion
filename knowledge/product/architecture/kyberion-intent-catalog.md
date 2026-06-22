@@ -33,7 +33,7 @@ Internally, Kyberion maps each Request through:
 - **Pipeline(s)** (41 ADF pipelines — see §3-§5)
 - **Team composition** (5+ roles auto-assigned per mission)
 - **Actuators** (26 capability domains)
-- **Reasoning backend** (5 modes, swappable)
+- **Reasoning backend** (8 modes, swappable)
 
 ## 3. Outcome Intents — get something built or decided
 
@@ -216,12 +216,14 @@ Use this policy surface to select profiles and adapters without hardcoding provi
 
 | Setting | Env var(s) |
 |---|---|
-| Mode | `KYBERION_REASONING_BACKEND={claude-cli\|claude-agent\|anthropic\|gemini-cli\|codex-cli\|stub}` |
+| Mode | `KYBERION_REASONING_BACKEND={claude-cli\|claude-agent\|anthropic\|gemini-cli\|codex-cli\|nemotron-api\|local\|stub}` |
 | Claude CLI | `KYBERION_CLAUDE_CLI_BIN`, `KYBERION_CLAUDE_CLI_MODEL`, `KYBERION_CLAUDE_CLI_TIMEOUT_MS`, `KYBERION_CLAUDE_CLI_EXTRA_ARGS` |
 | Gemini CLI | `KYBERION_GEMINI_CLI_BIN`, `KYBERION_GEMINI_CLI_MODEL` |
 | Codex CLI | `KYBERION_CODEX_CLI_BIN`, `KYBERION_CODEX_CLI_MODEL`, `KYBERION_CODEX_MODE`, `KYBERION_CODEX_APPROVAL`, `KYBERION_CODEX_MODEL_PROVIDER` |
 | Anthropic SDK direct | `ANTHROPIC_API_KEY` |
 | Gemini API direct | `GEMINI_API_KEY` |
+| Nemotron OpenAI-compatible API | `KYBERION_NEMOTRON_URL`, `KYBERION_NEMOTRON_KEY`, `KYBERION_NEMOTRON_MODEL` |
+| Local OpenAI-compatible API | `KYBERION_LOCAL_LLM_URL`, `KYBERION_LOCAL_LLM_KEY`, `KYBERION_LOCAL_LLM_MODEL` |
 
 Auto-selection order for runtime reasoning remains env-driven unless `KYBERION_REASONING_BACKEND` is set. Distillation policy selection is handled separately by `wisdom-policy.json`.
 
@@ -440,7 +442,7 @@ Otherwise a one-shot pipeline is fine.
 | Layer | State |
 |---|---|
 | Intent intake (text / audio / photo / email) | All four routes implemented |
-| Reasoning backends (Claude / Gemini / Codex / Anthropic / stub) | 5 modes, swappable |
+| Reasoning backends (Claude / Gemini / Codex / Anthropic / Nemotron / local / stub) | 8 modes, swappable |
 | Mission lifecycle | create → start → checkpoint → verify → distill → finish |
 | Pipeline runner (wisdom dispatch + tier-aware paths) | End-to-end |
 | Persona divergence + cross-critique | Verified with stub and `claude-cli` |

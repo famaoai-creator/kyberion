@@ -38,7 +38,7 @@
     },
     "browser": {
       "capture": ["goto", "content", "evaluate", "screenshot"],
-      "apply": ["click", "fill", "press", "wait", "log"]
+      "apply": ["click", "fill", "press", "wait", "log", "extension_session"]
     },
     "system": {
       "capture": ["shell", "list", "pulse_status"],

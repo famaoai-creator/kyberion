@@ -994,7 +994,9 @@ export { runCodexCliQuery, buildCodexCliQueryOptionsFromEnv } from './codex-cli-
 export {
   OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
+  buildNemotronBackendFromEnv,
   probeOpenAiCompatibleBackendAvailability,
+  probeNemotronBackendAvailability,
 } from './openai-compatible-backend.js';
 export type {
   OpenAiCompatibleBackendOptions,
@@ -1363,6 +1365,7 @@ export type * from './channel-surface-types.js';
 
 export * from './browser-conversation-session.js';
 export * from './browser-distill-candidate.js';
+export * from './browser-extension-bridge.js';
 export * from './narrated-video-preference-profile.js';
 export * from './narrated-video-upload-package.js';
 export * from './meeting-operations-profile.js';

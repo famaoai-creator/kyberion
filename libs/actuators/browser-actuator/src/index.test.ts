@@ -1059,4 +1059,53 @@ describe('browser-actuator v3 contract', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.current_url).toBe('https://example.com');
   });
+
+  it('preflights browser extension sessions without launching Playwright', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{
+        type: 'apply',
+        op: 'extension_session',
+        params: {
+          recording: {
+            schema_version: 'browser-recording.v1',
+            recording_id: 'REC-1',
+            source: 'chrome-extension',
+            created_at: '2026-06-23T00:00:00.000Z',
+            tab: { origin: 'https://example.com', origin_hash: 'a'.repeat(64), title: 'Example' },
+            extension: { version: '0.1.0' },
+            actions: [{
+              action_id: 'step-1',
+              op: 'click_ref',
+              summary: 'Continue を選択',
+              risk: 'low',
+              captured_at: '2026-06-23T00:00:01.000Z',
+              target: { ref: '@e1', role: 'button', name: 'Continue', snapshot_hash: 'b'.repeat(64) },
+            }],
+            risk_summary: {
+              requires_manual_review: true,
+              sensitive_input_omitted: 0,
+              approval_required_count: 0,
+            },
+          },
+          session: {
+            kind: 'browser-extension-session.v1',
+            mission_id: 'MSN-1',
+            pipeline_id: 'browser-candidate-1',
+            tab_id: '42',
+            origin: 'https://example.com',
+            mode: 'record',
+            recording_id: 'REC-1',
+            requested_operations: ['click_ref'],
+          },
+        },
+      }],
+    });
+
+    expect(result.status).toBe('success');
+    expect(result.context.browser_extension_session.status).toBe('ready_for_review');
+    expect(result.context.browser_extension_pipeline_candidate.recording_id).toBe('REC-1');
+    expect(mocks.context.newPage).not.toHaveBeenCalled();
+  });
 });

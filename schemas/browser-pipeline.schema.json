@@ -43,7 +43,7 @@
             "enum": [
               "goto", "screenshot", "content", "evaluate",
               "regex_extract", "json_query",
-              "click", "fill", "press", "wait", "log",
+              "click", "fill", "press", "wait", "log", "extension_session",
               "if", "while",
               "setup_passkey_authenticator",
               "remove_passkey_authenticator",

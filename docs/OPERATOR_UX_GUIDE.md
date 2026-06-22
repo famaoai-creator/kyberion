@@ -117,7 +117,7 @@ For hands-free dictation on macOS, use `system:voice_input_toggle` as the fallba
 
 Use `pnpm prereq:check` first when you want to confirm the local toolchain needed to build and run Kyberion from source. Then use `pnpm surfaces:setup` when you want to confirm which credentials, CLI fallbacks, or host permissions are missing. After that, use `pnpm surfaces:reconcile` when you want Kyberion to bring managed bridges and surfaces up to the manifest-defined state.
 
-Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs.
+Use `pnpm services:setup` when you want the external service catalog to tell you which presets still need customer/personal connection files or authentication secrets. Use `pnpm reasoning:setup` when you want the reasoning backend decision to be explicit before `doctor` or `env:bootstrap` runs. The reasoning setup now distinguishes `claude-cli`, `anthropic`, `codex-cli`, `gemini-cli`, `nemotron-api`, `local`, and `stub`, so OpenAI-compatible Nemotron endpoints are visible before bootstrap chooses a backend.
 
 Use `pnpm setup:report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 

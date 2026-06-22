@@ -9,7 +9,7 @@ import {
   withExecutionContext,
   loadServiceEndpointsCatalog,
 } from '@agent/core';
-import { runCoworkHealthCheck } from '@agent/core/cowork-health-check.js';
+import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
 function hasAnyKey(obj: Record<string, unknown>, keys: string[]): boolean {

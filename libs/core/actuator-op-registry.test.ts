@@ -12,6 +12,7 @@ describe('actuator-op-registry', () => {
   it('classifies browser and system ops through the shared registry', () => {
     expect(determineActuatorStepType('browser', 'goto')).toBe('capture');
     expect(determineActuatorStepType('browser', 'click')).toBe('apply');
+    expect(determineActuatorStepType('browser', 'extension_session')).toBe('apply');
     expect(determineActuatorStepType('system', 'log')).toBe('apply');
     expect(determineActuatorStepType('system', 'voice_input_toggle')).toBe('apply');
   });

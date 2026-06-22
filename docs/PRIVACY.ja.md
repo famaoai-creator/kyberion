@@ -41,7 +41,9 @@ Kyberion がデータに対して何をして、何をしないか。
 | Anthropic / Claude | 会話 context + tool 呼び出し | `anthropic` reasoning backend を選んだとき |
 | OpenAI / Codex | 同上 | `codex-cli` backend を選んだとき |
 | Google Gemini CLI | 同上 | `gemini-cli` backend を選んだとき |
+| NVIDIA Nemotron API | 同上 | `nemotron-api` backend を選んだとき |
 | Local Claude CLI | 同上、ただしローカル CLI 経由 | `claude-cli` を選んだとき |
+| Local OpenAI-compatible LLM | 同上、ただし自分で用意した endpoint 経由 | `local` を選んだとき |
 | Style-Bert-VITS2 (local) | TTS テキスト → ローカルサーバ、外部送信なし | ローカル voice (Phase 2) を opt-in したとき |
 | Whisper (local) | STT 音声 → ローカルサーバ、外部送信なし | 同上 |
 | Slack / Google Workspace / Notion | 接続が読み書きするよう設定したもの | 接続を作成したとき |

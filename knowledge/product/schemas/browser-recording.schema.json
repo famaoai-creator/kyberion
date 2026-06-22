@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-recording.schema.json",
+  "title": "Browser Extension Recording",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "recording_id",
+    "source",
+    "created_at",
+    "tab",
+    "extension",
+    "actions",
+    "risk_summary"
+  ],
+  "properties": {
+    "schema_version": { "const": "browser-recording.v1" },
+    "recording_id": { "type": "string", "minLength": 1 },
+    "source": { "const": "chrome-extension" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "tab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "origin_hash", "title"],
+      "properties": {
+        "origin": { "type": "string", "pattern": "^https?://" },
+        "origin_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "title": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/action" }
+    },
+    "risk_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requires_manual_review", "sensitive_input_omitted", "approval_required_count"],
+      "properties": {
+        "requires_manual_review": { "type": "boolean" },
+        "sensitive_input_omitted": { "type": "integer", "minimum": 0 },
+        "approval_required_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "decisions"],
+      "properties": {
+        "status": { "enum": ["pending", "in_review", "approved", "rejected"] },
+        "reviewed_at": { "type": "string", "format": "date-time" },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action_id", "status"],
+            "properties": {
+              "action_id": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["pending", "approved", "rejected"] },
+              "reason": { "type": "string", "maxLength": 500 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "op", "summary", "risk", "captured_at"],
+      "properties": {
+        "action_id": { "type": "string", "minLength": 1 },
+        "op": {
+          "enum": [
+            "snapshot",
+            "screenshot",
+            "extract_text_ref",
+            "list_tabs",
+            "open_tab",
+            "select_tab",
+            "click_ref",
+            "fill_ref",
+            "select_ref",
+            "press_ref",
+            "wait_for_ref",
+            "submit_form",
+            "upload_file",
+            "download_file",
+            "delete",
+            "purchase",
+            "credential_submit",
+            "settings_change",
+            "sensitive_input_omitted"
+          ]
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "risk": { "enum": ["observe", "low", "high", "sensitive"] },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "role", "name", "snapshot_hash"],
+          "properties": {
+            "ref": { "type": "string", "pattern": "^@[a-zA-Z0-9_-]+$" },
+            "role": { "type": "string", "maxLength": 80 },
+            "name": { "type": "string", "maxLength": 500 },
+            "snapshot_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "variable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "classification"],
+          "properties": {
+            "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "classification": { "enum": ["user_input", "secret_ref"] }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["option", "toggle"] },
+            "label": { "type": "string", "maxLength": 500 },
+            "checked": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

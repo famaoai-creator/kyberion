@@ -28,7 +28,10 @@ import {
 } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
 import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
-import { probeOpenAiCompatibleBackendAvailability } from './openai-compatible-backend.js';
+import {
+  probeNemotronBackendAvailability,
+  probeOpenAiCompatibleBackendAvailability,
+} from './openai-compatible-backend.js';
 
 export function installCoreEnvironmentProbes(): void {
   registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
@@ -60,6 +63,10 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
     if (localProbe.available) return { available: true };
   }
+  if (Boolean(process.env.KYBERION_NEMOTRON_URL)) {
+    const nemotronProbe = await probeNemotronBackendAvailability(process.env);
+    if (nemotronProbe.available) return { available: true };
+  }
   if (binaryAvailable('gemini', ['--version'])) {
     return { available: true };
   }
@@ -72,7 +79,7 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, anthropic API key (ANTHROPIC_API_KEY), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, anthropic API key (ANTHROPIC_API_KEY), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 
