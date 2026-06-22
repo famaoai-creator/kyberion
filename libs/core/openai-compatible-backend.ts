@@ -37,6 +37,15 @@ export interface OpenAiCompatibleBackendAvailability {
   reason?: string;
 }
 
+export interface OpenAiCompatibleBackendEnvNames {
+  baseURL: string[];
+  apiKey: string[];
+  model: string[];
+  defaultModel: string;
+  unavailableReason: string;
+  probeLabel: string;
+}
+
 type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
 interface ChatMessage {
@@ -102,6 +111,14 @@ function assertLocalCompatibleEndpoint(baseURL: string): URL {
   }
   if (!isLocalHost(url.hostname)) {
     throw new Error(`Local LLM endpoint must resolve to localhost or a private address: ${url.hostname}`);
+  }
+  return url;
+}
+
+function assertHttpEndpoint(baseURL: string): URL {
+  const url = new URL(normalizeBaseUrl(baseURL));
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`Unsupported OpenAI-compatible protocol: ${url.protocol}`);
   }
   return url;
 }
@@ -191,6 +208,65 @@ function safeJsonParse(text: string): unknown {
     return JSON.parse(text);
   } catch {
     return null;
+  }
+}
+
+function firstConfiguredEnv(env: NodeJS.ProcessEnv, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = env[key]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function buildBackendFromEnvNames(
+  env: NodeJS.ProcessEnv,
+  names: OpenAiCompatibleBackendEnvNames,
+): OpenAiCompatibleBackend | null {
+  const baseURL = firstConfiguredEnv(env, names.baseURL);
+  if (!baseURL) return null;
+  const apiKey = firstConfiguredEnv(env, names.apiKey) || 'not-needed';
+  const model = firstConfiguredEnv(env, names.model) || names.defaultModel;
+  return new OpenAiCompatibleBackend({ baseURL, apiKey, model });
+}
+
+async function probeBackendAvailabilityFromEnvNames(
+  env: NodeJS.ProcessEnv,
+  names: OpenAiCompatibleBackendEnvNames,
+  options: { allowPublicEndpoint: boolean },
+): Promise<OpenAiCompatibleBackendAvailability> {
+  const baseURL = firstConfiguredEnv(env, names.baseURL);
+  if (!baseURL) {
+    return {
+      available: false,
+      reason: `${names.unavailableReason} is not set`,
+    };
+  }
+
+  try {
+    const url = options.allowPublicEndpoint ? assertHttpEndpoint(baseURL) : assertLocalCompatibleEndpoint(baseURL);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4_000);
+    try {
+      const headers: Record<string, string> = {};
+      const apiKey = firstConfiguredEnv(env, names.apiKey);
+      if (apiKey && apiKey !== 'not-needed') {
+        headers.authorization = `Bearer ${apiKey}`;
+      }
+      const response = await fetch(new URL('models', url).toString(), {
+        method: 'GET',
+        signal: controller.signal,
+        headers,
+      });
+      if (!response.ok) {
+        return { available: false, reason: `${names.probeLabel} probe returned HTTP ${response.status}` };
+      }
+      return { available: true };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err: any) {
+    return { available: false, reason: err?.message ?? String(err) };
   }
 }
 
@@ -358,49 +434,48 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   }
 }
 
+const LOCAL_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'llama3',
+  unavailableReason: 'KYBERION_LOCAL_LLM_URL',
+  probeLabel: 'local LLM',
+};
+
+const NEMOTRON_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_NEMOTRON_URL', 'KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_NEMOTRON_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_NEMOTRON_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'nemotron',
+  unavailableReason: 'KYBERION_NEMOTRON_URL',
+  probeLabel: 'Nemotron API',
+};
+
 export function buildOpenAiCompatibleBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): OpenAiCompatibleBackend | null {
-  const baseURL = env.KYBERION_LOCAL_LLM_URL?.trim();
-  if (!baseURL) return null;
-  const apiKey = env.KYBERION_LOCAL_LLM_KEY?.trim() || 'not-needed';
-  const model = env.KYBERION_LOCAL_LLM_MODEL?.trim() || 'llama3';
-  return new OpenAiCompatibleBackend({ baseURL, apiKey, model });
+  return buildBackendFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV);
+}
+
+export function buildNemotronBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV);
 }
 
 export async function probeOpenAiCompatibleBackendAvailability(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<OpenAiCompatibleBackendAvailability> {
-  const baseURL = env.KYBERION_LOCAL_LLM_URL?.trim();
-  if (!baseURL) {
-    return {
-      available: false,
-      reason: 'KYBERION_LOCAL_LLM_URL is not set',
-    };
-  }
+  return probeBackendAvailabilityFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
 
-  try {
-    const url = assertLocalCompatibleEndpoint(baseURL);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4_000);
-    try {
-      const headers: Record<string, string> = {};
-      if (env.KYBERION_LOCAL_LLM_KEY && env.KYBERION_LOCAL_LLM_KEY !== 'not-needed') {
-        headers.authorization = `Bearer ${env.KYBERION_LOCAL_LLM_KEY}`;
-      }
-      const response = await fetch(new URL('models', url).toString(), {
-        method: 'GET',
-        signal: controller.signal,
-        headers,
-      });
-      if (!response.ok) {
-        return { available: false, reason: `local LLM probe returned HTTP ${response.status}` };
-      }
-      return { available: true };
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (err: any) {
-    return { available: false, reason: err?.message ?? String(err) };
-  }
+export async function probeNemotronBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: true,
+  });
 }

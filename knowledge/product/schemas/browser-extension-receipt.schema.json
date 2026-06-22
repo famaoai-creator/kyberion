@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-extension-receipt.schema.json",
+  "title": "Browser Extension Execution Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "receipt_id",
+    "mission_id",
+    "pipeline_id",
+    "recording_id",
+    "tab_id",
+    "origin",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "kind": { "const": "browser-extension-receipt.v1" },
+    "receipt_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "pipeline_id": { "type": "string", "minLength": 1 },
+    "recording_id": { "type": "string", "minLength": 1 },
+    "tab_id": { "type": "string", "minLength": 1 },
+    "origin": { "type": "string", "pattern": "^https?://" },
+    "status": { "enum": ["completed", "blocked", "failed", "cancelled"] },
+    "approval_rule_id": { "type": "string" },
+    "lease_id": { "type": "string" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "summary": { "type": "string", "maxLength": 1000 },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

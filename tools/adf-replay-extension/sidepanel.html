@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kyberion Browser Bridge</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <header class="masthead">
+      <p class="eyebrow">KYBERION / BROWSER BRIDGE</p>
+      <h1>Chrome の操作を、安全な下書きへ。</h1>
+      <p class="subhead">ページの文章は外部データです。実行する前に、Kyberion の review と承認を通します。</p>
+    </header>
+
+    <nav class="tabs" aria-label="Browser Bridge sections">
+      <button class="tab is-active" data-tab="live" type="button">Live</button>
+      <button class="tab" data-tab="record" type="button">Record</button>
+      <button class="tab" data-tab="review" type="button">Review</button>
+      <button class="tab" data-tab="run" type="button">Run</button>
+    </nav>
+
+    <main>
+      <section class="panel is-active" data-panel="live">
+        <p class="section-kicker">CURRENT TAB</p>
+        <div class="connection-card">
+          <span id="connection-status" class="status-pill">未接続</span>
+          <h2 id="connection-title">タブを接続してください</h2>
+          <p id="connection-origin">http(s) の通常タブだけを接続できます。</p>
+          <div class="button-row">
+            <button id="connect-button" class="primary" type="button">このタブを接続</button>
+            <button id="disconnect-button" class="secondary" type="button" disabled>接続を解除</button>
+          </div>
+        </div>
+        <p class="notice">接続は現在のタブと origin に限定されます。ページ遷移で origin が変わった場合は、記録を停止して再接続します。</p>
+      </section>
+
+      <section class="panel" data-panel="record">
+        <p class="section-kicker">CAPTURE INTENT, NOT DATA</p>
+        <h2>操作を記録</h2>
+        <p>入力内容は保存しません。パスワード、OTP、token、Cookie、WebAuthn は記録から除外します。</p>
+        <div class="button-row">
+          <button id="start-recording-button" class="primary" type="button">記録を開始</button>
+          <button id="resume-recording-button" class="secondary" type="button" disabled>再接続して続行</button>
+          <button id="stop-recording-button" class="secondary" type="button" disabled>記録を停止</button>
+        </div>
+        <div class="recording-summary" aria-live="polite">
+          <strong id="recording-count">0 操作</strong>
+          <span id="omitted-count">秘密入力の除外: 0</span>
+        </div>
+        <ol id="recording-actions" class="action-list"></ol>
+        <button id="discard-last-button" class="text-button" type="button" disabled>直前の操作を破棄</button>
+      </section>
+
+      <section class="panel" data-panel="review">
+        <p class="section-kicker">HUMAN REVIEW REQUIRED</p>
+        <h2>下書きをレビュー</h2>
+        <p id="review-summary">記録を停止すると、ここに redaction 済みの下書きが表示されます。</p>
+        <ol id="review-actions" class="action-list"></ol>
+        <div class="button-row">
+          <button id="finalize-review-button" class="primary" type="button" disabled>承認済み操作を確定</button>
+          <button id="reject-draft-button" class="secondary" type="button" disabled>下書きを拒否</button>
+        </div>
+        <pre id="draft-preview" class="draft-preview" aria-label="Browser recording draft"></pre>
+      </section>
+
+      <section class="panel" data-panel="run">
+        <p class="section-kicker">GOVERNED EXECUTION</p>
+        <h2>次に何が起きるか</h2>
+        <p id="handoff-status">Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。</p>
+        <ol id="handoff-steps" class="action-list"></ol>
+        <div class="button-row">
+          <button id="copy-draft-button" class="primary" type="button" disabled>承認済み下書きをコピー</button>
+          <button id="request-execution-button" class="secondary" type="button" disabled>Native Bridge 導入待ち</button>
+        </div>
+      </section>
+    </main>
+
+    <footer id="notice" class="notice" aria-live="polite"></footer>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
