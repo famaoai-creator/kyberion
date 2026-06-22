@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "cowork",
+      "channel": "cowork",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "beta",
+      "summary": "Claude Cowork surface provider — MCP-connected desktop integration (Phase 0/1)."
+    }
+  ]
+}

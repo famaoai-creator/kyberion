@@ -584,6 +584,12 @@ importers:
         specifier: ^17.7.2
         version: 17.7.2
 
+  libs/actuators/working-memory-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/core:
     dependencies:
       axios:
@@ -648,6 +654,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6)
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   libs/shared-vision:
     dependencies:
