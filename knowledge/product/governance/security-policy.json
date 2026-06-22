@@ -1,6 +1,6 @@
 {
   "$schema": "../../../schemas/governance-policy.schema.json",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "default_allow": [
     "active/missions/${MISSION_ID}/",
     "active/missions/confidential/${MISSION_ID}/",
@@ -11,8 +11,34 @@
     "work/metrics/",
     "active/shared/runtime/",
     "active/audit/",
-    "active/shared/logs/"
+    "active/shared/logs/",
+    "active/shared/runtime/session/",
+    "active/shared/runtime/ttl/",
+    "active/shared/MEMORY.md",
+    "active/shared/MEMORY.volatile.json",
+    "active/INDEX.volatile.md",
+    "active/INDEX.volatile.json",
+    "active/personal/"
   ],
+  "volatile_face_policy": {
+    "description": "Volatile Knowledge Layer (working-memory) path governance. tier_restrictions apply — active/personal/ is personal tier only.",
+    "paths": {
+      "session": "active/shared/runtime/session/<session_id>/",
+      "mission": "active/missions/<TIER>/<MISSION_ID>/MEMORY.md",
+      "project": "active/projects/<TIER>/<project>/MEMORY.md",
+      "personal": "active/personal/",
+      "global": "active/shared/MEMORY.md",
+      "daily_journal": "active/personal/journal/<YYYY-MM-DD>.md",
+      "today_todo": "active/personal/today/TODO.md",
+      "weekly": "active/personal/weekly/<YYYY>-W<WW>.md",
+      "adhoc_ttl": "active/shared/runtime/ttl/"
+    },
+    "personal_tier_paths": [
+      "active/personal/"
+    ],
+    "sidecar_pattern": "*.volatile.json",
+    "schema_ref": "schemas/volatile-knowledge.schema.json"
+  },
   "tenant_scope": {
     "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
     "protected_prefixes": [
@@ -131,7 +157,13 @@
         "CONTRIBUTING.md",
         "AGENTS.md",
         "active/audit/",
-        "active/shared/logs/"
+        "active/shared/logs/",
+        "active/shared/MEMORY.md",
+        "active/shared/MEMORY.volatile.json",
+        "active/INDEX.volatile.md",
+        "active/INDEX.volatile.json",
+        "active/projects/",
+        "active/personal/"
       ]
     },
     "worker": {
@@ -142,6 +174,8 @@
         "active/missions/confidential/${MISSION_ID}/",
         "active/missions/personal/${MISSION_ID}/",
         "active/missions/public/${MISSION_ID}/",
+        "active/shared/MEMORY.md",
+        "active/INDEX.volatile.md",
         "knowledge/public/",
         "knowledge/product/"
       ],
@@ -212,7 +246,13 @@
         "customer/${KYBERION_CUSTOMER}/logs/audit/",
         "knowledge/product/governance/voice-profile-registry.json",
         "knowledge/product/governance/voice-engine-registry.json",
-        "knowledge/product/governance/voice-engines/"
+        "knowledge/product/governance/voice-engines/",
+        "active/shared/MEMORY.md",
+        "active/shared/MEMORY.volatile.json",
+        "active/INDEX.volatile.md",
+        "active/INDEX.volatile.json",
+        "active/personal/",
+        "knowledge/product/governance/HINTS.md"
       ]
     },
     "run_super_pipeline": {

@@ -1,0 +1,42 @@
+{
+  "action": "pipeline",
+  "name": "daily-routine",
+  "version": "2.0.0",
+  "description": "Volatile Knowledge Layer — daily routine: opens today's journal + TODO, rolls over pending items from previous TODO.md.",
+  "_refs": {
+    "schema": "schemas/volatile-knowledge.schema.json",
+    "actuator": "working-memory-actuator",
+    "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
+  },
+  "steps": [
+    {
+      "id": "open_today",
+      "role": "source",
+      "op": "working-memory:daily-open",
+      "produces": { "channel": "daily_faces", "type": "DailyOpenResult" },
+      "params": {
+        "export_as": "daily_faces"
+      }
+    },
+    {
+      "id": "rollover_previous",
+      "role": "transform",
+      "op": "working-memory:todo-rollover",
+      "consumes": "daily_faces",
+      "produces": { "channel": "rollover_result", "type": "RolloverResult" },
+      "params": {
+        "export_as": "rollover_result"
+      }
+    },
+    {
+      "id": "emit_summary",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "rollover_result",
+      "params": {
+        "path": "active/shared/tmp/daily-routine-summary.md",
+        "content": "# Daily Routine Summary\n\nJournal: {{daily_faces.journalPath}}\nTODO: {{daily_faces.todoPath}}\nRolled over: {{rollover_result.rolledOver}} items"
+      }
+    }
+  ]
+}
