@@ -40,6 +40,24 @@
       "enabled": true
     },
     {
+      "id": "mcp-server-cowork",
+      "kind": "gateway",
+      "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
+      "command": "node",
+      "args": [
+        "dist/scripts/mcp_server.js"
+      ],
+      "env": {
+        "KYBERION_PERSONA": "sovereign_concierge",
+        "MISSION_ROLE": "mcp_server"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "enabled": true
+    },
+    {
       "id": "discord-bridge",
       "kind": "gateway",
       "description": "Discord Bot ingress gateway and surface-agent host",
