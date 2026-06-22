@@ -4,6 +4,7 @@ import { describeTaskRun, main } from '../scripts/task_run.js';
 
 const PROFILE_PATH = pathResolver.rootResolve('knowledge/personal/task-profiles/task-run-profile.json');
 const OUTSIDE_PERSONAL_PROFILE = pathResolver.rootResolve('active/shared/tmp/task-run-profile.json');
+const OVERRIDE_SCENARIO_DIR = pathResolver.rootResolve('active/shared/tmp/task-run-scenarios');
 
 describe('task run contract', () => {
   const originalPersona = process.env.KYBERION_PERSONA;
@@ -18,6 +19,7 @@ describe('task run contract', () => {
     vi.restoreAllMocks();
     if (safeExistsSync(PROFILE_PATH)) safeRmSync(PROFILE_PATH);
     if (safeExistsSync(OUTSIDE_PERSONAL_PROFILE)) safeRmSync(OUTSIDE_PERSONAL_PROFILE);
+    if (safeExistsSync(OVERRIDE_SCENARIO_DIR)) safeRmSync(OVERRIDE_SCENARIO_DIR, { recursive: true, force: true });
     if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = originalPersona;
     if (originalRole === undefined) delete process.env.MISSION_ROLE;
@@ -37,12 +39,47 @@ describe('task run contract', () => {
     expect(output).toContain('Inputs:');
     expect(output).toContain('- Sources: gmail');
     expect(output).toContain(`- Profile: ${PROFILE_PATH}`);
+    expect(output).toContain('Profile loaded: yes');
     expect(output).toContain('Expected result:');
     expect(output).toContain('- email-triage.md');
+    expect(output).toContain('Likely path: active/shared/tmp/email-triage.md');
+    expect(output).toContain('Likely path: active/shared/tmp/reply-drafts.json');
     expect(output).toContain('Approval required before:');
-    expect(output).toContain('- draft-only (required for: send_email)');
     expect(output).toContain('Next actions:');
     expect(output).toContain('- 1. Review the plan and expected artifacts.');
+  });
+
+  it('preserves already-qualified artifact paths as-is', () => {
+    safeMkdir(OVERRIDE_SCENARIO_DIR, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve('active/shared/tmp/task-run-scenarios/qualified-artifacts.json'),
+      `${JSON.stringify(
+        {
+          id: 'qualified-artifacts',
+          title: 'Qualified artifact test',
+          description: 'Checks that active/... artifact paths stay intact.',
+          trigger: { type: 'manual', prompt: 'test' },
+          input: { sources: ['gmail'], required_params: [], optional_params: [] },
+          first_run: { reasoning_required: false, questions: [], profile_output: 'knowledge/personal/task-profiles/task-run-profile.json' },
+          repeat_run: { pipeline_template: 'knowledge/product/pipeline-templates/email-triage-workflow.json', params_from_profile: false },
+          result: { artifacts: ['active/shared/tmp/already-qualified.json'], summary_format: 'json' },
+          approval_boundary: { required_for: [], default_action: 'notify-only' },
+        },
+        null,
+        2
+      )}\n`
+    );
+    const originalEnv = process.env.KYBERION_TASK_SCENARIO_DIR;
+    process.env.KYBERION_TASK_SCENARIO_DIR = OVERRIDE_SCENARIO_DIR;
+
+    try {
+      const plan = describeTaskRun('qualified-artifacts');
+
+      expect(plan).toContain('Likely path: active/shared/tmp/already-qualified.json');
+    } finally {
+      if (originalEnv === undefined) delete process.env.KYBERION_TASK_SCENARIO_DIR;
+      else process.env.KYBERION_TASK_SCENARIO_DIR = originalEnv;
+    }
   });
 
   it('fails gracefully when the scenario id is unknown', async () => {

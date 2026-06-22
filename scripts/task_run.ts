@@ -96,6 +96,13 @@ function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): st
   return `${boundary.default_action} (required for: ${requiredFor})`;
 }
 
+function formatArtifactHint(artifact: string): string {
+  if (artifact.startsWith('active/')) {
+    return artifact;
+  }
+  return `active/shared/tmp/${artifact}`;
+}
+
 export function describeTaskRun(scenarioId: string, profileOverride?: string, options: TaskRunOptions = {}): string {
   const scenario = loadScenarioById(scenarioId);
   if (!scenario) {
@@ -107,7 +114,9 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string, op
   const requiresProfile = scenario.repeat_run.params_from_profile;
 
   const profile = profileLoaded ? loadProfile(profilePath) : null;
-  const artifactList = scenario.result.artifacts.map((artifact) => `- ${artifact}`).join('\n');
+  const artifactList = scenario.result.artifacts
+    .flatMap((artifact) => [`- ${artifact}`, `  Likely path: ${formatArtifactHint(artifact)}`])
+    .join('\n');
   const nextActions = requiresProfile && !profileLoaded
     ? [
         `1. Run pnpm task:init ${scenario.id} to create the profile.`,
@@ -127,6 +136,7 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string, op
     `Inputs:`,
     `- Sources: ${scenario.input.sources.join(', ')}`,
     `- Profile: ${profilePath}`,
+    profile ? `Profile loaded: yes` : 'Profile loaded: no',
     `- Pipeline template: ${scenario.repeat_run.pipeline_template}`,
     `Expected result:`,
     artifactList,
