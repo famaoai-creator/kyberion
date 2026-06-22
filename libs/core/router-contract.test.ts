@@ -59,6 +59,19 @@ describe('router-contract', () => {
     expect(inspectState.missionAction).toBe('inspect_state');
   });
 
+  it('routes contract and text review intents to different pipelines', () => {
+    const contract = resolveSurfaceIntent('この契約書をレビューして');
+    const text = resolveSurfaceIntent('この文章をレビューして');
+
+    expect(contract.intentId).toBe('contract-review');
+    expect(contract.routeFamily).toBe('pipeline');
+    expect(contract.pipelineId).toBe('knowledge/product/pipeline-templates/contract-review');
+
+    expect(text.intentId).toBe('review-text');
+    expect(text.routeFamily).toBe('pipeline');
+    expect(text.pipelineId).toBe('knowledge/product/pipeline-templates/review-text');
+  });
+
   it('maps environment readiness intents to governed pipeline hints', () => {
     const verify = resolveSurfaceIntent('verify-environment-readiness');
     const inspect = resolveSurfaceIntent('inspect-environment-readiness');

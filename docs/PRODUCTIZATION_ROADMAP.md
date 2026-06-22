@@ -388,6 +388,7 @@ Kyberion の実務では、`project` / `track` / `mission` / `task` / `direct_re
 | `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 5 | Phase B-1 と一体化（ここで終わらせる）。 |
 | `docs/ROADMAP_ENGINE_REFINEMENT.md` Phase 6 | **本計画では遅らせる**。tier の multi-tenant 拡張は K1〜K4 が立った後に再検討。 |
 | `docs/developer/architecture/POST_ONBOARDING_UX_ROADMAP.md` | Phase A-4 / A-5 の具体実装ガイド。 |
+| `knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md` | 5.7 の実行単位境界を、9つの mission class、standalone `task_session`、昇格条件、workflow/team/review 接続として実装する計画。 |
 | `docs/archive/CONCEPT_INTEGRATION_BACKLOG.md` | アーカイブ済。主要項目は完了、残りは本ロードマップで追跡。 |
 | `docs/developer/architecture/AUTONOMY_SYSTEM_GUIDE.md` / `NERVE_SYSTEM_GUIDE.md` | Phase B-3（24h ミッション）の参照元。 |
 

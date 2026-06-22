@@ -8,6 +8,7 @@ import { resolveDefaultApprovalSystem, resolveDefaultScheduleSource } from './co
 import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
+import { type WorkflowExecutionShape } from './execution-shape.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -21,7 +22,7 @@ export interface ExecutionBriefSeed {
   intentId?: string;
   goalSummary?: string;
   taskType?: string;
-  executionShape?: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
+  executionShape?: WorkflowExecutionShape;
   requiredInputs?: string[];
   outcomeIds?: string[];
   confidence?: number;

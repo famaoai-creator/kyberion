@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "accumulation_trigger_threshold": 2
+  },
+  "mandatory_triggers": [
+    "external_regulatory_evidence",
+    "high_stakes_action",
+    "mission_handoff",
+    "production_release",
+    "customer_signoff",
+    "security_sensitive_cross_system_change",
+    "high_stakes_or_dogfood_evidence"
+  ],
+  "accumulation_triggers": [
+    "artifact_estimate_5plus",
+    "replay_or_variant_likelihood",
+    "repetition_5plus",
+    "multiple_legitimate_viewpoints",
+    "stakeholder_count_3plus",
+    "approval_required",
+    "cross_system_mutation",
+    "expected_continuation_beyond_session"
+  ],
+  "rules": [
+    {
+      "id": "catalog-floor",
+      "when": {
+        "minimum_catalog_shapes": [
+          "mission",
+          "project_bootstrap"
+        ]
+      },
+      "promotion_required": true,
+      "result_shape": "mission",
+      "rationale": "Catalog minimum mission or project bootstrap scope must never be demoted."
+    },
+    {
+      "id": "mandatory-trigger-promotion",
+      "when": {
+        "mandatory_trigger_present": true
+      },
+      "promotion_required": true,
+      "result_shape": "mission",
+      "rationale": "Any mandatory trigger promotes task scope to mission scope."
+    },
+    {
+      "id": "accumulation-trigger-promotion",
+      "when": {
+        "accumulation_trigger_count_at_least": 2
+      },
+      "promotion_required": true,
+      "result_shape": "mission",
+      "rationale": "Two or more accumulation triggers promote task scope to mission scope."
+    },
+    {
+      "id": "catalog-floor-pass-through",
+      "promotion_required": false,
+      "rationale": "When no mission trigger is present, the catalog minimum execution shape is preserved."
+    }
+  ]
+}

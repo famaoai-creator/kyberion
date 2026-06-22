@@ -1,0 +1,640 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "scenario_id": "schedule-read-agenda-ja",
+      "utterance": "来週の予定教えて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply"
+      },
+      "expected": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "mission_class": "customer_engagement",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "schedule-read-agenda-en",
+      "utterance": "Show my calendar agenda",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply"
+      },
+      "expected": {
+        "intent_id": "schedule-read-agenda",
+        "execution_shape": "direct_reply",
+        "mission_class": "customer_engagement",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "schedule-coordination-internal-ja",
+      "utterance": "会議の日程を調整して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "stakeholder_count": 2
+      },
+      "expected": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "mission_class": "customer_engagement",
+        "delivery_shape": "long_running_job",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "customer-engagement-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "REQUIREMENTS_COMPLETENESS",
+          "CUSTOMER_SIGNOFF",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "schedule-coordination-external-ja",
+      "utterance": "社外メンバーも含めて会議の日程を調整して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "stakeholder_count": 4,
+        "external_audience": true,
+        "approval_required": true
+      },
+      "expected": {
+        "intent_id": "schedule-coordination",
+        "execution_shape": "task_session",
+        "mission_class": "customer_engagement",
+        "delivery_shape": "long_running_job",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "customer-engagement-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "REQUIREMENTS_COMPLETENESS",
+          "CUSTOMER_SIGNOFF",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "review-text-ja",
+      "utterance": "この文章をレビューして",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "pipeline"
+      },
+      "expected": {
+        "intent_id": "review-text",
+        "execution_shape": "pipeline",
+        "mission_class": "decision_support",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "crystallize-then-freeze",
+        "workflow_pattern": "pipeline_crystallization_loop",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "STAKEHOLDER_ALIGNMENT",
+          "DISSENT_RESOLUTION",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "contract-review-ja",
+      "utterance": "この契約書をレビューして",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "pipeline"
+      },
+      "expected": {
+        "intent_id": "contract-review",
+        "execution_shape": "pipeline",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "crystallize-then-freeze",
+        "workflow_pattern": "pipeline_crystallization_loop",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "import-brand-from-pptx-ja",
+      "utterance": "このPowerPointをテーマ登録して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "artifact_estimate": 1
+      },
+      "expected": {
+        "intent_id": "import-brand-from-pptx",
+        "execution_shape": "task_session",
+        "mission_class": "content_and_media",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "import-brand-from-html-ja",
+      "utterance": "このWebサイトをテーマ登録して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "artifact_estimate": 1
+      },
+      "expected": {
+        "intent_id": "import-brand-from-html",
+        "execution_shape": "task_session",
+        "mission_class": "content_and_media",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "extract-brand-theme-ja",
+      "utterance": "このWebサイトをベースにデザインテーマを作って",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "artifact_estimate": 1
+      },
+      "expected": {
+        "intent_id": "extract-brand-theme",
+        "execution_shape": "task_session",
+        "mission_class": "content_and_media",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "bootstrap-project-ja",
+      "utterance": "Webサービスを作って",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "project_bootstrap"
+      },
+      "expected": {
+        "intent_id": "bootstrap-project",
+        "execution_shape": "project_bootstrap",
+        "mission_class": "product_delivery",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "stage-gated-high-stakes",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "build-web-concept-en",
+      "utterance": "Build a landing page for this product idea",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "artifact_estimate": 5,
+        "cross_system_mutation": true,
+        "approval_required": true
+      },
+      "expected": {
+        "intent_id": "build-web-concept",
+        "execution_shape": "task_session",
+        "mission_class": "product_delivery",
+        "delivery_shape": "cross_system_change",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "coordinated-multi-track",
+        "workflow_pattern": "coordinated_multi_track_execution",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "diagnose-kyberion-system-ja",
+      "utterance": "Kyberionを診断して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "pipeline",
+        "approval_required": true
+      },
+      "expected": {
+        "intent_id": "diagnose-kyberion-system",
+        "execution_shape": "pipeline",
+        "mission_class": "operations_and_release",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "crystallize-then-freeze",
+        "workflow_pattern": "pipeline_crystallization_loop",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "SECURITY_READY",
+          "RELEASE_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "recover-environment-ja",
+      "utterance": "環境を復旧して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "mission_handoff": true
+      },
+      "expected": {
+        "intent_id": "recover-environment",
+        "execution_shape": "task_session",
+        "mission_class": "environment_and_recovery",
+        "delivery_shape": "long_running_job",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "knowledge-query-ja",
+      "utterance": "mission authority を教えて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply"
+      },
+      "expected": {
+        "intent_id": "knowledge-query",
+        "execution_shape": "direct_reply",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "operator-profile-learning-ja",
+      "utterance": "CEO/CTOとしての使い方にKyberionを最適化して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply",
+        "expected_continuation_beyond_session": false
+      },
+      "expected": {
+        "intent_id": "operator-profile-learning",
+        "execution_shape": "direct_reply",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "distill-mission-knowledge-ja",
+      "utterance": "ミッション結果を知識化して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "artifact_estimate": 5,
+        "repetition_estimate": 5
+      },
+      "expected": {
+        "intent_id": "distill-mission-knowledge",
+        "execution_shape": "task_session",
+        "mission_class": "research_and_absorption",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "technical-decision-memo-ja",
+      "utterance": "この投資判断の技術面を整理して、採用可否を1枚でまとめて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply"
+      },
+      "expected": {
+        "intent_id": "technical-decision-memo",
+        "execution_shape": "direct_reply",
+        "mission_class": "decision_support",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "STAKEHOLDER_ALIGNMENT",
+          "DISSENT_RESOLUTION",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "clarify-user-request-ja",
+      "utterance": "不足している情報を質問して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "direct_reply"
+      },
+      "expected": {
+        "intent_id": "clarify-user-request",
+        "execution_shape": "direct_reply",
+        "mission_class": "customer_engagement",
+        "delivery_shape": "interactive_exploration",
+        "risk_profile": "low",
+        "stage": "planning",
+        "workflow_id": "explore-then-govern",
+        "workflow_pattern": "exploratory_to_deterministic_conversion",
+        "review_mode": "lean",
+        "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "configure-organization-toolchain-ja",
+      "utterance": "CI/CDを設定して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "cross_system_mutation": true,
+        "approval_required": true
+      },
+      "expected": {
+        "intent_id": "configure-organization-toolchain",
+        "execution_shape": "task_session",
+        "mission_class": "platform_onboarding",
+        "delivery_shape": "cross_system_change",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "platform-onboarding-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "launch-first-run-onboarding-ja",
+      "utterance": "初回セットアップを始めて",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session",
+        "artifact_estimate": 5,
+        "expected_continuation_beyond_session": true
+      },
+      "expected": {
+        "intent_id": "launch-first-run-onboarding",
+        "execution_shape": "task_session",
+        "mission_class": "platform_onboarding",
+        "delivery_shape": "cross_system_change",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "platform-onboarding-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "register-presentation-preference-profile-ja",
+      "utterance": "デザインテーマを登録して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session"
+      },
+      "expected": {
+        "intent_id": "register-presentation-preference-profile",
+        "execution_shape": "task_session",
+        "mission_class": "platform_onboarding",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "platform-onboarding-stage-gated",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    },
+    {
+      "scenario_id": "chain-of-thought-planning-ja",
+      "utterance": "このシェルスクリプトの shebang を直してテストを通して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session"
+      },
+      "expected": {
+        "intent_id": "chain-of-thought-planning",
+        "execution_shape": "task_session",
+        "mission_class": "code_change",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE"
+        ],
+        "promotion_required": false
+      }
+    }
+  ]
+}

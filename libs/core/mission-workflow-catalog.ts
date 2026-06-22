@@ -8,13 +8,19 @@ import type {
   MissionRiskProfile,
   MissionStage,
 } from './mission-classification.js';
+import {
+  normalizeExecutionShape,
+  projectExecutionShapeToWorkflowShape,
+  type ExecutionShape,
+  type WorkflowExecutionShape,
+} from './execution-shape.js';
 
 export interface MissionWorkflowSelectionInput {
   missionClass: MissionClass;
   deliveryShape: MissionDeliveryShape;
   riskProfile: MissionRiskProfile;
   stage: MissionStage;
-  executionShape: 'direct_reply' | 'task_session' | 'mission' | 'project_bootstrap';
+  executionShape: ExecutionShape;
   intentId?: string;
   taskType?: string;
 }
@@ -86,7 +92,7 @@ function templateMatches(input: {
   missionClass: string;
   deliveryShape: string;
   riskProfile: string;
-  executionShape: string;
+  executionShape: WorkflowExecutionShape;
   intentId?: string;
   taskType?: string;
 }, template: WorkflowTemplate): boolean {
@@ -114,11 +120,14 @@ function loadWorkflowCatalog(): WorkflowCatalogFile {
 
 export function resolveMissionWorkflowDesign(input: MissionWorkflowSelectionInput): MissionWorkflowDesign {
   const catalog = loadWorkflowCatalog();
+  const projectedExecutionShape = projectExecutionShapeToWorkflowShape(
+    normalizeExecutionShape(input.executionShape),
+  );
   const normalizedInput = {
     missionClass: normalize(input.missionClass) || 'code_change',
     deliveryShape: normalize(input.deliveryShape) || 'single_artifact',
     riskProfile: normalize(input.riskProfile) || 'review_required',
-    executionShape: normalize(input.executionShape) || 'task_session',
+    executionShape: projectedExecutionShape,
     intentId: normalize(input.intentId),
     taskType: normalize(input.taskType),
   };

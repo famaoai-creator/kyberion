@@ -39,8 +39,17 @@
       "properties": {
         "execution_shape": {
           "type": "string",
-          "enum": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+          "enum": ["direct_reply", "task_session", "pipeline", "mission", "project_bootstrap"]
         },
+        "selected_execution_shape": {
+          "type": "string",
+          "enum": ["direct_reply", "task_session", "pipeline", "mission", "project_bootstrap"]
+        },
+        "recommended_execution_shape": {
+          "type": "string",
+          "enum": ["direct_reply", "task_session", "pipeline", "mission", "project_bootstrap"]
+        },
+        "mismatch_reason": { "type": "string" },
         "task_type": { "type": "string" }
       },
       "additionalProperties": false
@@ -246,6 +255,45 @@
           "type": "array",
           "items": { "type": "string" }
         }
+      },
+      "additionalProperties": false
+    },
+    "work_scope_decision": {
+      "type": "object",
+      "required": [
+        "execution_shape",
+        "minimum_catalog_shape",
+        "promotion_required",
+        "mandatory_triggers",
+        "accumulation_triggers",
+        "matched_rule_ids",
+        "policy_version",
+        "rationale"
+      ],
+      "properties": {
+        "execution_shape": {
+          "type": "string",
+          "enum": ["direct_reply", "actuator_action", "browser_session", "task_session", "pipeline", "mission", "project_bootstrap"]
+        },
+        "minimum_catalog_shape": {
+          "type": "string",
+          "enum": ["direct_reply", "actuator_action", "browser_session", "task_session", "pipeline", "mission", "project_bootstrap"]
+        },
+        "promotion_required": { "type": "boolean" },
+        "mandatory_triggers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "accumulation_triggers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "matched_rule_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "policy_version": { "type": "string" },
+        "rationale": { "type": "string" }
       },
       "additionalProperties": false
     }

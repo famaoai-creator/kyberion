@@ -195,6 +195,28 @@ describe('work-design', () => {
     expect(summary.process_design.operator_checklist).toContain('prepare the first governed work items');
   });
 
+  it('surfaces advisory scope drift without changing the selected execution shape', () => {
+    const summary = buildOrganizationWorkLoopSummary({
+      intentId: 'generate-presentation',
+      taskType: 'presentation_deck',
+      shape: 'task_session',
+      outcomeIds: ['artifact:pptx'],
+      tier: 'confidential',
+      artifactEstimate: 5,
+      stakeholderCount: 3,
+    });
+
+    expect(summary.resolution.execution_shape).toBe('task_session');
+    expect(summary.resolution.selected_execution_shape).toBe('task_session');
+    expect(summary.resolution.recommended_execution_shape).toBe('mission');
+    expect(summary.resolution.mismatch_reason).toContain('mission');
+    expect(summary.work_scope_decision?.promotion_required).toBe(true);
+    expect(summary.work_scope_decision?.mandatory_triggers).toEqual([]);
+    expect(summary.work_scope_decision?.accumulation_triggers).toEqual(
+      expect.arrayContaining(['artifact_estimate_5plus', 'stakeholder_count_3plus']),
+    );
+  });
+
   it('keeps the governed work policy file schema-valid', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });

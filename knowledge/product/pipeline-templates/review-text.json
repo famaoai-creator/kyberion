@@ -1,0 +1,88 @@
+{
+  "action": "pipeline",
+  "name": "review-text",
+  "version": "2.0.0",
+  "description": "General text review pipeline. Converts plain text, markdown, or supported office documents to markdown, then runs persona-based critique across content quality, approval readiness, tenant scope, and authority boundaries. Surviving concerns land in dissent-log.json for human review.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "source_document": "active/shared/tmp/review-input/document.md",
+    "review_purpose": "general text review",
+    "persona_lens": "self persona",
+    "tenant_scope": "",
+    "authority_boundary": "",
+    "markdown_output": "active/missions/{{mission_id}}/evidence/review.md",
+    "hypotheses_output": "active/missions/{{mission_id}}/evidence/review-risks-raw.json",
+    "critique_output": "active/missions/{{mission_id}}/evidence/review-risks.json",
+    "dissent_output": "active/missions/{{mission_id}}/evidence/dissent-log.json",
+    "report_output": "active/missions/{{mission_id}}/evidence/review-report.md",
+    "personas": [
+      "Content Reviewer",
+      "Approval Gatekeeper",
+      "Tenant Boundary Auditor"
+    ]
+  },
+  "steps": [
+    {
+      "id": "convert_to_markdown",
+      "role": "source",
+      "op": "media:document_digest",
+      "produces": { "channel": "markdown_ref", "type": "MarkdownRef" },
+      "params": {
+        "path": "{{source_document}}"
+      }
+    },
+    {
+      "id": "persist_markdown",
+      "role": "sink",
+      "op": "media:write_file",
+      "consumes": "markdown_ref",
+      "params": {
+        "path": "{{markdown_output}}",
+        "from": "markdown_ref"
+      }
+    },
+    {
+      "id": "diverge_review",
+      "role": "sink",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas_from": "personas",
+        "min_hypotheses_per_persona": 2,
+        "topic": "Review the text at {{markdown_output}} for {{review_purpose}}. Lens: persona={{persona_lens}}, tenant={{tenant_scope}}, authority={{authority_boundary}}. Focus on content quality, approval readiness, role fit, and risks.",
+        "output_path": "{{hypotheses_output}}"
+      }
+    },
+    {
+      "id": "critique_review",
+      "role": "sink",
+      "op": "wisdom:cross_critique",
+      "params": {
+        "input": "{{hypotheses_output}}",
+        "personas_from": "personas",
+        "output_path": "{{critique_output}}"
+      }
+    },
+    {
+      "id": "record_dissent",
+      "role": "sink",
+      "op": "wisdom:emit_dissent_log",
+      "params": {
+        "source": "{{critique_output}}",
+        "output_path": "{{dissent_output}}",
+        "mission_id": "{{mission_id}}",
+        "topic": "review-text"
+      }
+    },
+    {
+      "id": "render_report",
+      "role": "sink",
+      "op": "wisdom:render_hypothesis_report",
+      "params": {
+        "source": "{{critique_output}}",
+        "output_path": "{{report_output}}",
+        "title": "Text Review — {{review_purpose}}"
+      }
+    }
+  ]
+}
