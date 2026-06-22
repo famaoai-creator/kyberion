@@ -560,6 +560,11 @@ describe('executeServicePreset', () => {
               command: 'gws',
               args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}'],
             },
+            meet_spaces_create: {
+              type: 'cli',
+              command: 'gws',
+              args: ['meet', 'spaces', 'create', '--json', '{{params}}'],
+            },
           },
         });
       }
@@ -627,6 +632,45 @@ describe('executeServicePreset', () => {
       'Hello',
       '--body',
       'Thanks for the update.',
+    ]);
+  });
+
+  it('executes google meet space creation through gws', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('google-workspace.json')) {
+        return JSON.stringify({
+          auth_strategy: 'session',
+          allow_unsafe_cli: true,
+          operations: {
+            meet_spaces_create: {
+              type: 'cli',
+              command: 'gws',
+              args: ['meet', 'spaces', 'create', '--json', '{{params}}'],
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeExec.mockReturnValue(JSON.stringify({ name: 'spaces/abc123', meetingUri: 'https://meet.google.com/abc-defg-hij' }));
+
+    await expect(
+      executeServicePreset('google-workspace', 'meet_spaces_create', {
+        params: { topic: 'Team Sync', accessType: 'TRUSTED' },
+      })
+    ).resolves.toEqual({
+      name: 'spaces/abc123',
+      meetingUri: 'https://meet.google.com/abc-defg-hij',
+    });
+
+    expect(mocks.safeExec).toHaveBeenCalledWith('gws', [
+      'meet',
+      'spaces',
+      'create',
+      '--json',
+      JSON.stringify({ topic: 'Team Sync', accessType: 'TRUSTED' }),
     ]);
   });
 });
