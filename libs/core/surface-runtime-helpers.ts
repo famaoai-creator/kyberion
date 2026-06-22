@@ -135,6 +135,14 @@ function buildTaskSessionReply(params: {
   const isScheduleCoordination = params.intentId === 'schedule-coordination';
 
   if (params.status === 'completed') {
+    lines.push('短い作業として完了しました。');
+  } else if (params.status === 'pending') {
+    lines.push('短い作業として進めます。');
+  } else {
+    lines.push('短い作業としてうまく進められませんでした。');
+  }
+
+  if (params.status === 'completed') {
     lines.push(isScheduleCoordination ? '予定の確認が終わりました。' : '確認が終わりました。');
   } else if (params.status === 'pending') {
     lines.push(isScheduleCoordination ? '予定の確認を進めます。' : '確認を進めます。');

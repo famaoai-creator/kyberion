@@ -262,6 +262,13 @@ function formatExecutionReceipt(params: {
   command?: string;
   status: 'ok' | 'error';
   candidateSelection?: Array<{ contract_ref: unknown; score: number; source: string }>;
+  governance?: {
+    policy_version?: string;
+    promotion_required?: boolean;
+    matched_rule_ids?: string[];
+    mandatory_triggers?: string[];
+    accumulation_triggers?: string[];
+  };
 }): string {
   return JSON.stringify(
     {
@@ -276,6 +283,15 @@ function formatExecutionReceipt(params: {
         score: candidate.score,
         source: candidate.source,
       })),
+      governance: params.governance
+        ? {
+            policy_version: params.governance.policy_version,
+            promotion_required: params.governance.promotion_required,
+            matched_rule_ids: params.governance.matched_rule_ids || [],
+            mandatory_triggers: params.governance.mandatory_triggers || [],
+            accumulation_triggers: params.governance.accumulation_triggers || [],
+          }
+        : undefined,
     },
     null,
     2
