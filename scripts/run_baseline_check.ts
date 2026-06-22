@@ -1,14 +1,15 @@
 import * as path from 'node:path';
 import {
-  SovereignSentinel, 
-  validateService, 
+  SovereignSentinel,
+  validateService,
   customerResolver,
-  pathResolver, 
+  pathResolver,
   safeExistsSync,
   safeReadFile,
   withExecutionContext,
   loadServiceEndpointsCatalog,
 } from '@agent/core';
+import { runCoworkHealthCheck } from '@agent/core/cowork-health-check.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
 function hasAnyKey(obj: Record<string, unknown>, keys: string[]): boolean {
@@ -131,6 +132,15 @@ async function main() {
   // L5: Trust/API Layer (Vault/Credentials)
   sentinel.registerLayer('L5', async () => {
     return checkServiceConnectionReadiness();
+  });
+
+  // L6: Cowork Integration Layer
+  sentinel.registerLayer('L6', async () => {
+    const coworkHealth = runCoworkHealthCheck();
+    if (coworkHealth.warnings.length > 0) {
+      coworkHealth.warnings.forEach((w) => process.stderr.write(`[COWORK WARN] ${w}\n`));
+    }
+    return coworkHealth.healthy;
   });
 
   const result = await sentinel.run();

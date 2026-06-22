@@ -1,0 +1,101 @@
+{
+  "$schema": "https://kyberion.internal/schemas/cowork-plugin-manifest/v1.json",
+  "plugin_id": "kyberion",
+  "version": "1.0.0",
+  "display_name": "Kyberion Sovereign Operator System",
+  "description": "Kyberion's full capability suite — mission control, pipeline execution, governed knowledge management, audit/approval workflows, and bidirectional Cowork knowledge sync — exposed as MCP tools for Claude Cowork.",
+  "author": "Kyberion (famao)",
+  "status": "beta",
+
+  "mcp_server": {
+    "transport": "stdio",
+    "command": "pnpm",
+    "args": ["mcp:server"],
+    "cwd": ".",
+    "env": {
+      "KYBERION_PERSONA": "sovereign_concierge",
+      "NODE_ENV": "production"
+    },
+    "health_check": {
+      "method": "tools/list",
+      "expect_tool": "kyberion.pipeline.list"
+    }
+  },
+
+  "tools": [
+    { "name": "kyberion.pipeline.list",          "category": "pipeline",    "risk_class": "low" },
+    { "name": "kyberion.pipeline.run",           "category": "pipeline",    "risk_class": "medium" },
+    { "name": "kyberion.knowledge.search",       "category": "knowledge",   "risk_class": "low" },
+    { "name": "kyberion.knowledge.cowork_sync",  "category": "knowledge",   "risk_class": "medium" },
+    { "name": "kyberion.capability.list",        "category": "capability",  "risk_class": "low" },
+    { "name": "kyberion.mission.create",         "category": "mission",     "risk_class": "medium" },
+    { "name": "kyberion.mission.status",         "category": "mission",     "risk_class": "low" },
+    { "name": "kyberion.mission.journal",        "category": "mission",     "risk_class": "low" },
+    { "name": "kyberion.approval.list_pending",  "category": "approval",    "risk_class": "low" },
+    { "name": "kyberion.approval.decide",        "category": "approval",    "risk_class": "high", "requires_approval": true },
+    { "name": "kyberion.audit.export",           "category": "audit",       "risk_class": "low" },
+    { "name": "kyberion.audit.verify",           "category": "audit",       "risk_class": "low" },
+    { "name": "kyberion.surface.cowork.deliver", "category": "surface",     "risk_class": "low" },
+    { "name": "kyberion.surface.cowork.list",    "category": "surface",     "risk_class": "low" }
+  ],
+
+  "skills": [
+    {
+      "id": "kyberion-pipeline",
+      "name": "Kyberion Pipeline Runner",
+      "description": "Run governed Kyberion pipelines from Cowork. Use kyberion.pipeline.list to discover available pipelines and kyberion.pipeline.run to execute them.",
+      "trigger_intents": ["run pipeline", "execute pipeline", "list pipelines"]
+    },
+    {
+      "id": "kyberion-mission",
+      "name": "Kyberion Mission Control",
+      "description": "Create and monitor Kyberion missions from Cowork. Mission results appear in the Cowork outbox.",
+      "trigger_intents": ["create mission", "mission status", "mission journal"]
+    },
+    {
+      "id": "kyberion-knowledge",
+      "name": "Kyberion Knowledge Search",
+      "description": "Search Kyberion's governed knowledge base. Returns public-tier hints, procedures, and architecture notes.",
+      "trigger_intents": ["search knowledge", "find procedures", "look up", "how to"]
+    },
+    {
+      "id": "kyberion-approval",
+      "name": "Kyberion Approval Gate",
+      "description": "List and decide pending approval requests from Cowork. All approval actions are recorded in the audit chain.",
+      "trigger_intents": ["pending approvals", "approve", "reject", "approval gate"]
+    },
+    {
+      "id": "kyberion-audit",
+      "name": "Kyberion Audit Chain",
+      "description": "Export and verify the Kyberion append-only audit chain. Use verify to detect tampering.",
+      "trigger_intents": ["audit export", "audit verify", "compliance check"]
+    },
+    {
+      "id": "kyberion-knowledge-sync",
+      "name": "Kyberion Knowledge Sync",
+      "description": "Bidirectional sync between Cowork work folder artifacts and Kyberion's knowledge base. Respects 3-tier isolation.",
+      "trigger_intents": ["sync knowledge", "promote artifact", "knowledge bridge"]
+    }
+  ],
+
+  "permissions": {
+    "file_access": ["active/shared/coordination/channels/cowork/", "knowledge/public/"],
+    "network_access": false,
+    "shell_exec": true,
+    "tier_visibility": ["public"],
+    "risky_ops_require_approval": true
+  },
+
+  "customer_overlay": {
+    "enabled": true,
+    "overlay_path": "customer/{slug}/plugin-overrides/kyberion.json",
+    "override_fields": ["tools", "permissions.tier_visibility", "mcp_server.env"]
+  },
+
+  "references": {
+    "mcp_tool_catalog": "knowledge/product/governance/mcp-tool-catalog.json",
+    "surface_manifest": "knowledge/product/governance/surface-provider-manifests.json",
+    "sync_policy": "knowledge/product/governance/cowork-sync-policy.json",
+    "skill_guide": "plugins/kyberion/SKILL.md"
+  }
+}

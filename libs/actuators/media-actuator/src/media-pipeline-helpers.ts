@@ -9,6 +9,7 @@ import {
   createActuatorTrace,
   finalizeActuatorTrace,
 } from '@agent/core';
+import type { TraceContext } from '@agent/core';
 import * as path from 'node:path';
 
 export interface MediaPipelineStep {
@@ -26,6 +27,8 @@ export interface MediaAction {
     max_steps?: number;
     timeout_ms?: number;
   };
+  /** When provided by the pipeline runner, media steps are recorded as child spans of this trace. */
+  pipelineTrace?: TraceContext;
 }
 
 export interface MediaPipelineDeps {
@@ -36,10 +39,33 @@ export interface MediaPipelineDeps {
 
 export async function handleMediaAction(input: MediaAction, deps: MediaPipelineDeps) {
   if (input.action !== 'pipeline') throw new Error('Unsupported action');
+  const stepCount = Array.isArray(input.steps) ? input.steps.length : 0;
+
+  // When called from the pipeline runner with a live TraceContext, record media steps as
+  // child spans of the pipeline trace instead of creating a disconnected standalone trace.
+  if (input.pipelineTrace) {
+    const pt = input.pipelineTrace;
+    pt.startSpan('media:pipeline', { stepCount });
+    try {
+      const result = await executeMediaPipeline(
+        input.steps || [],
+        input.context || {},
+        input.options,
+        { stepCount: 0, startTime: Date.now() },
+        pt,
+        deps,
+      );
+      pt.endSpan('ok');
+      return result;
+    } catch (err: any) {
+      pt.endSpan('error', err?.message ?? String(err));
+      return { status: 'failed', message: err?.message ?? String(err) };
+    }
+  }
+
+  // Standalone execution — create a self-contained actuator trace.
   const traceCtx = createActuatorTrace('media-actuator', 'pipeline');
-  traceCtx.startSpan('media:pipeline', {
-    stepCount: Array.isArray(input.steps) ? input.steps.length : 0,
-  });
+  traceCtx.startSpan('media:pipeline', { stepCount });
   try {
     const result = await executeMediaPipeline(
       input.steps || [],
