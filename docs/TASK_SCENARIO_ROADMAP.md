@@ -19,6 +19,18 @@ last_updated: 2026-06-21
 - 以後は保存済み profile と pipeline-template で反復実行する
 - 送信や承認の境界を approval boundary で明示する
 
+## Quickstart
+
+この短い手順は、コピーしてすぐ動かしたい人向けです。
+
+- [TaskScenario Quickstart](./TASK_SCENARIO_QUICKSTART.md)
+
+## Current flow
+
+1. Discover available tasks with `pnpm task:list`.
+2. Initialize a saved profile with `pnpm task:init <task-id> --answers-json '<json>'`.
+3. Review the dry-run plan with `pnpm task:run <task-id> --dry-run`.
+
 ## 初期シナリオ
 
 ### 1. `daily-email-triage`
