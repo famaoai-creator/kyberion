@@ -110,6 +110,7 @@ import {
   resolveDiagramTheme,
   generateDrawioDocument,
   extractChromeGeometryFromPptxDesign,
+  deriveLayoutTemplateFromPptxDesign,
   matchLayoutTemplate,
   deriveThemeFromPptxDesign,
   normalizeFontFamily,
@@ -329,7 +330,13 @@ function resolveConfidentialTenantOverride(rootDir: string, brandName: string, d
   return null;
 }
 
-function resolveLayoutTemplate(rootDir: string, designSystemId: string | undefined, slideData?: any): any {
+function resolveLayoutTemplate(rootDir: string, designSystemId: string | undefined, slideData?: any, theme?: any): any {
+  const themeTemplateCatalog = theme?.layout_templates || theme?.pptx?.layout_templates || theme?.web?.layout_templates || null;
+  if (themeTemplateCatalog?.templates) {
+    const templateId = slideData?.layout_template_id || themeTemplateCatalog.default || theme?.layout_template_id;
+    const tpl = themeTemplateCatalog.templates?.[templateId] || themeTemplateCatalog.templates?.[themeTemplateCatalog.default];
+    if (tpl) return tpl;
+  }
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
   const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
   const brandName: string = slideData?.branding?.brand_name || '';
@@ -391,7 +398,7 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
   const isHero = semanticType === 'hero';
   const headingFont = theme?.fonts?.heading?.split(',')[0]?.trim() || 'Inter';
   const bodyFont    = theme?.fonts?.body?.split(',')[0]?.trim() || 'System-ui';
-  const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data);
+  const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
   const hro = bzl.hero;
 
@@ -687,6 +694,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       }
       const filePath = path.resolve(rootDir, resolve(params.path));
       const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.txt' || ext === '.md') {
+        const markdown = safeReadFile(filePath, { encoding: 'utf8' });
+        return { ...ctx, [exportKey]: markdown };
+      }
       let protocol: any;
       switch (ext) {
         case '.pdf': {
@@ -754,11 +765,30 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       }
       const themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
       const theme = themes.themes[themeName];
-      if (!theme) {
+      const confidentialPack = theme ? null : resolveConfidentialThemePack(rootDir, themeName);
+      const resolvedTheme = theme || (confidentialPack?.theme ? {
+        ...confidentialPack.theme,
+        layout_templates: confidentialPack.layout_templates || null,
+        pptx: confidentialPack.pptx || null,
+        web: confidentialPack.web || null,
+      } : null);
+      if (!resolvedTheme) {
         logger.warn(`[MEDIA_TRANSFORM] Theme "${themeName}" not found, available: ${Object.keys(themes.themes).join(', ')}`);
         return ctx;
       }
-      return { ...ctx, active_theme: theme, active_theme_name: themeName };
+      return {
+        ...ctx,
+        active_theme: resolvedTheme,
+        active_theme_name: themeName,
+        active_theme_pack: confidentialPack || null,
+        active_pptx_master: confidentialPack?.pptx?.master || ctx.active_pptx_master,
+        active_canvas: confidentialPack?.pptx?.canvas || ctx.active_canvas,
+        active_web_theme: confidentialPack?.web ? {
+          theme: confidentialPack.theme || resolvedTheme,
+          web: confidentialPack.web,
+          layout_templates: confidentialPack.layout_templates || null,
+        } : ctx.active_web_theme,
+      };
     }
     case 'apply_pattern': {
       const patternPath = path.resolve(rootDir, resolve(params.pattern_path));
@@ -776,8 +806,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 
       if (outputFormat === 'pptx') {
         const themeColors = theme?.colors || {};
-        const activeMaster = ctx.active_pptx_master;
-        const canvas = ctx.active_canvas || { w: 10, h: 5.625 };
+        const themePack = ctx.active_theme_pack || null;
+        const activeMaster = ctx.active_pptx_master || themePack?.pptx?.master;
+        const canvas = ctx.active_canvas || themePack?.pptx?.canvas || { w: 10, h: 5.625 };
         const protocol: any = {
           version: '3.0.0',
           generatedAt: new Date().toISOString(),
@@ -830,7 +861,11 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       }
 
       const THRESHOLD = 0.85;
-      const chosen = (confMatch?.score ?? 0) >= (publicMatch?.score ?? 0) ? confMatch : publicMatch;
+      const chosen: any = (confMatch?.score ?? 0) >= (publicMatch?.score ?? 0) ? confMatch : publicMatch;
+      const baseTemplate = chosen?.id ? (chosen?.catalog === 'public' || !chosen?.catalog
+        ? publicCatalog.templates?.[chosen.id]
+        : null) : null;
+      const template = deriveLayoutTemplateFromPptxDesign(design, baseTemplate || publicCatalog.templates?.[chosen?.id || 'corporate-standard'] || {});
       const result: any = {
         geometry,
         matched_template_id:   chosen && chosen.score >= THRESHOLD ? chosen.id : null,
@@ -838,6 +873,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         match_catalog:         (chosen as any)?.catalog || 'public',
         needs_new_template:    !chosen || chosen.score < THRESHOLD,
         recommended_template_id: chosen?.id || 'corporate-standard',
+        template,
       };
       return { ...ctx, [params.export_as || 'last_layout_geometry']: result };
     }
@@ -855,6 +891,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         active_theme_name: derivedTheme.name || resolve(params.name) || 'pptx-extracted-theme',
         active_pptx_master: design.master,
         active_canvas: design.canvas,
+        active_pptx_design: design,
         active_theme_source: fromKey,
       };
 
@@ -1248,7 +1285,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const matchers: string[]   = params.matchers ? (Array.isArray(params.matchers) ? params.matchers : [resolve(params.matchers)]) : [brandName.toLowerCase()];
       const dsId: string         = resolve(params.design_system_id) || ctx.design_system_id || 'executive-standard';
       const theme: any           = ctx[resolve(params.theme_from) || 'active_theme'] || {};
+      const webTheme: any        = ctx[resolve(params.web_theme_from) || 'active_web_theme'] || ctx.active_web_theme || null;
+      const webSnapshot: any     = ctx[resolve(params.web_from) || 'web_snapshot'] || ctx.active_web_snapshot || null;
       const layoutGeo: any       = ctx[resolve(params.layout_from) || 'last_layout_geometry'] || {};
+      const pptxDesign: any      = ctx[resolve(params.pptx_from) || 'source_pptx_design'] || ctx.active_pptx_design || null;
+      const isWebPack = Boolean(webTheme);
+      const webHeritage = webTheme?.web ? cloneJsonValue(webTheme.web) : (webSnapshot ? cloneJsonValue(webSnapshot) : null);
+      const webLayoutTemplates = webTheme?.layout_templates || webHeritage?.layout_templates || null;
+      const extractedTemplate: any = layoutGeo?.template || (pptxDesign ? deriveLayoutTemplateFromPptxDesign(pptxDesign) : null);
 
       if (!tenantSlug) throw new Error('save_brand_to_confidential: tenant_slug is required');
 
@@ -1257,15 +1301,35 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       // 1. Build and write layout-templates.json
       const templateId = `${tenantSlug}-extracted`;
-      const needsNewTemplate = layoutGeo.needs_new_template !== false;
-      if (needsNewTemplate && layoutGeo.geometry) {
+      const needsNewTemplate = isWebPack
+        ? true
+        : layoutGeo.needs_new_template !== false;
+      const webTemplate = webLayoutTemplates?.templates
+        ? webLayoutTemplates.templates?.[webLayoutTemplates.default] || webLayoutTemplates.templates?.[Object.keys(webLayoutTemplates.templates)[0]]
+        : null;
+      const templatePayload = isWebPack
+        ? (webTemplate || {
+          chrome: {
+            viewport: webHeritage?.viewport || null,
+            background: webHeritage?.background || null,
+            container: webHeritage?.container || null,
+          },
+          hero: webHeritage?.hero || {},
+          body_zones: webHeritage?.body_zones || {},
+          web: webHeritage || {},
+        })
+        : (extractedTemplate || { chrome: layoutGeo.geometry?.chrome || {}, hero: {}, body_zones: {} });
+      if (needsNewTemplate && (layoutGeo.geometry || extractedTemplate || isWebPack)) {
         const pubCatalog = loadLayoutTemplateCatalog(rootDir);
         const baseTemplate = pubCatalog.templates?.[layoutGeo.recommended_template_id || 'corporate-standard'] || {};
         const newTemplate = {
-          chrome: { ...baseTemplate.chrome, ...layoutGeo.geometry.chrome },
-          hero: baseTemplate.hero || {},
-          body_zones: baseTemplate.body_zones || {},
-          _meta: `Auto-extracted from PPTX for ${brandName}. Review geometry before production use.`,
+          chrome: { ...baseTemplate.chrome, ...(templatePayload.chrome || {}) },
+          hero: { ...baseTemplate.hero, ...(templatePayload.hero || {}) },
+          body_zones: { ...baseTemplate.body_zones, ...(templatePayload.body_zones || {}) },
+          ...(templatePayload.web ? { web: cloneJsonValue(templatePayload.web) } : {}),
+          _meta: isWebPack
+            ? `Auto-extracted from Web heritage for ${brandName}. Review layout before production use.`
+            : `Auto-extracted from PPTX for ${brandName}. Review geometry before production use.`,
         };
         const layoutCatalog = { version: '1.0.0', default: templateId, templates: { [templateId]: newTemplate } };
         safeWriteFile(path.join(confDir, 'layout-templates.json'), JSON.stringify(layoutCatalog, null, 2));
@@ -1286,14 +1350,75 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       } else {
         override.layout_template_id = usedTemplateId;
       }
-      if (theme?.colors || theme?.fonts) {
-        override.extracted_theme = { colors: theme.colors, fonts: theme.fonts };
+      const extractedTheme = webTheme?.theme || theme?.theme || theme;
+      if (extractedTheme?.colors || extractedTheme?.fonts) {
+        override.extracted_theme = { colors: extractedTheme.colors, fonts: extractedTheme.fonts };
       }
       if (resolve(params.logo_url)) override.branding = { brand_name: brandName, logo_url: resolve(params.logo_url), tone: 'professional-enterprise' };
       else override.branding = { brand_name: brandName };
+      if (pptxDesign || theme?.pptx || webTheme) {
+        override.theme_pack_path = `knowledge/confidential/${tenantSlug}/design/theme.json`;
+      }
 
       safeWriteFile(path.join(confDir, 'tenant-override.json'), JSON.stringify(override, null, 2));
       logger.info(`[BRAND_IMPORT] Wrote confidential tenant-override.json for ${tenantSlug}`);
+
+      const packTheme = {
+        name: webTheme?.theme?.name || theme?.name || brandName,
+        colors: webTheme?.theme?.colors || theme?.colors || {},
+        fonts: webTheme?.theme?.fonts || theme?.fonts || {},
+        assets: {
+          logo_url: resolve(params.logo_url) || webTheme?.theme?.assets?.logo_url || theme?.assets?.logo_url || undefined,
+        },
+      };
+      const packHeritage = pptxDesign ? {
+        canvas: cloneJsonValue(pptxDesign.canvas || null),
+        master: cloneJsonValue(pptxDesign.master || null),
+        rawThemeXml: pptxDesign.rawThemeXml || null,
+        rawMasterXml: pptxDesign.rawMasterXml || null,
+        rawMasterRelsXml: pptxDesign.rawMasterRelsXml || null,
+        rawLayouts: Array.isArray(pptxDesign.rawLayouts) ? cloneJsonValue(pptxDesign.rawLayouts) : [],
+        rawMasters: Array.isArray(pptxDesign.rawMasters) ? cloneJsonValue(pptxDesign.rawMasters) : [],
+        masterMedia: Array.isArray(pptxDesign.masterMedia) ? cloneJsonValue(pptxDesign.masterMedia) : [],
+        rawParts: pptxDesign.rawParts || null,
+      } : theme?.pptx ? cloneJsonValue(theme.pptx) : null;
+      const packLayoutTemplates = isWebPack && webLayoutTemplates
+        ? cloneJsonValue(webLayoutTemplates)
+        : (needsNewTemplate && extractedTemplate ? {
+          version: '1.0.0',
+          default: templateId,
+          templates: {
+            [templateId]: {
+              chrome: { ...(extractedTemplate.chrome || {}) },
+              hero: { ...(extractedTemplate.hero || {}) },
+              body_zones: { ...(extractedTemplate.body_zones || {}) },
+              _meta: `Derived from PPTX heritage for ${brandName}.`,
+            },
+          },
+        } : (extractedTemplate ? {
+          version: '1.0.0',
+          default: layoutGeo.matched_template_id || layoutGeo.recommended_template_id || templateId,
+          templates: {
+            [layoutGeo.matched_template_id || layoutGeo.recommended_template_id || templateId]: cloneJsonValue(extractedTemplate),
+          },
+        } : null));
+      const themePack = {
+        kind: isWebPack ? 'web-theme-pack' : 'pptx-theme-pack',
+        version: '1.0.0',
+        theme_id: `${tenantSlug}-imported`,
+        brand_name: brandName,
+        tenant_slug: tenantSlug,
+        design_system_id: dsId,
+        theme: packTheme,
+        web: webHeritage,
+        pptx: packHeritage,
+        layout_templates: packLayoutTemplates,
+        layout_template_id: usedTemplateId,
+        layout_template_catalog: override.layout_template_catalog || null,
+        source_theme_name: webTheme?.theme?.name || theme?.name || null,
+      };
+      safeWriteFile(path.join(confDir, 'theme.json'), JSON.stringify(themePack, null, 2));
+      logger.info(`[BRAND_IMPORT] Wrote confidential theme.json for ${tenantSlug}`);
 
       // 3. Update knowledge/confidential/tenants/index.json
       const registryPath = path.resolve(rootDir, 'knowledge/confidential/tenants/index.json');
@@ -1418,6 +1543,46 @@ function loadThemeCatalog(rootDir: string): any {
     fallback: { default_theme: 'kyberion-standard', themes: {} },
   });
   return deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
+}
+
+function loadConfidentialThemePackEntries(rootDir: string): { theme_id: string; theme_name?: string; pack_path: string }[] {
+  try {
+    const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
+    const tenantNames = safeReaddir(confidentialDir);
+    const entries: { theme_id: string; theme_name?: string; pack_path: string }[] = [];
+    for (const tenantName of tenantNames) {
+      const themePackPath = path.join(confidentialDir, tenantName, 'design', 'theme.json');
+      if (!safeExistsSync(themePackPath)) continue;
+      try {
+        const pack = JSON.parse(safeReadFile(themePackPath, { encoding: 'utf8' }) as string);
+        const themeId = String(pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || '').trim();
+        if (!themeId) continue;
+        entries.push({ theme_id: themeId, theme_name: pack?.theme?.name, pack_path: `knowledge/confidential/${tenantName}/design/theme.json` });
+      } catch {
+        continue;
+      }
+    }
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
+  const normalized = String(themeName || '').trim().toLowerCase();
+  if (!normalized) return null;
+  for (const entry of loadConfidentialThemePackEntries(rootDir)) {
+    if (entry.theme_id.toLowerCase() !== normalized && String(entry.theme_name || '').toLowerCase() !== normalized) {
+      continue;
+    }
+    try {
+      const packPath = path.resolve(rootDir, entry.pack_path);
+      return JSON.parse(safeReadFile(packPath, { encoding: 'utf8' }) as string);
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 function loadMediaDesignSystemsCatalog(rootDir: string): any {
@@ -1677,7 +1842,20 @@ function resolveSemanticComponentRule(rootDir: string, semanticType: string | un
 function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
   const catalog = loadThemeCatalog(rootDir);
   const themeName = String(preferredTheme || catalog.default_theme || 'kyberion-standard').trim();
-  return catalog.themes?.[themeName] || catalog.themes?.[catalog.default_theme] || null;
+  const publicTheme = catalog.themes?.[themeName] || catalog.themes?.[catalog.default_theme] || null;
+  if (publicTheme) return publicTheme;
+
+  const confidentialPack = resolveConfidentialThemePack(rootDir, themeName);
+  if (confidentialPack?.theme) {
+    return {
+      ...confidentialPack.theme,
+      layout_templates: confidentialPack.layout_templates || null,
+      pptx: confidentialPack.pptx || null,
+      web: confidentialPack.web || null,
+      kind: confidentialPack.kind || null,
+    };
+  }
+  return null;
 }
 
 function resolveDocumentCompositionPresetCore(rootDir: string, brief: any): { profileId: string; preset: any } {

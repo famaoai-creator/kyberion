@@ -75,6 +75,8 @@ A successful registration emits a receipt under:
 
 - `active/shared/tmp/voice-profile-registration/<request_id>.json`
 
+If you use the combined `collect_and_register_voice_profile` shortcut, the samples are first staged under `active/shared/tmp/voice-sample-collection/<request_id>/` and then copied into `active/shared/runtime/voice-profiles/<profile_id>/` during registration. The runtime path is the one referenced by the active registry.
+
 ## 6. Promotion Rule
 
 Registration validates candidate input only.

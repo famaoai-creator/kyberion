@@ -81,6 +81,31 @@ The following media intents are normalized through the same shared brief flow, t
 | `transcribe-audio` | `audio-transcribe-default` | `audio-transcription-governed` | [`transcribe-audio-from-asset.md`](knowledge/public/procedures/media/transcribe-audio-from-asset.md) |
 | `live-voice` | `voice-live-conversation-default` | `realtime-voice-governed` | [`realtime-voice-conversation.md`](knowledge/public/procedures/media/realtime-voice-conversation.md) |
 
+## Document Review Routing
+
+Document review requests also begin with the shared coordination brief, but they immediately split by source type and review purpose.
+
+| Source kind | Normalized path | Primary review intent | Typical lens |
+|---|---|---|---|
+| `pdf` / `docx` / `pptx` / `xlsx` | document digest → markdown | `contract-review` | legal, ops, red-team |
+| `txt` / `md` | direct text normalization | `review-text` | content, approval, role fit |
+| `html` / URL | browser capture → text extraction | web copy review flow | content, CTA, display risk |
+| approval-critical request | review decision gate | `active-learning-escalate` when needed | authority, tenant, approval chain |
+
+The important rule is:
+
+- do not review before you know the source kind
+- do not approve before you know the purpose
+- do not explain the result before you know the persona / tenant / role lens
+
+If the user says `この文章をレビューして`, the default path is:
+
+1. detect the source kind
+2. normalize the content
+3. identify the review purpose
+4. pick the role/tenant lens
+5. run the review or escalate
+
 ## LLM Touchpoint Rule
 
 - LLM の主な接点は `operator-interaction-packet`

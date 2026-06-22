@@ -191,9 +191,9 @@ function describeStep(step: any): string {
     case 'while':
       return `Loop while ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
     case 'pptx_extract':
-      return `Extract PPTX design from ${step.params?.path || '?'}`;
+      return `Extract PPTX design from ${step.params?.path || '?'} (raw-preserving)`;
     case 'xlsx_extract':
-      return `Extract XLSX design from ${step.params?.path || '?'}`;
+      return `Extract XLSX design from ${step.params?.path || '?'} (raw-preserving)`;
     case 'pdf_to_pptx_design':
       return `Convert PDF design to PPTX design`;
     case 'pdf_to_xlsx_design':
