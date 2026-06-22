@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "scenarios"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "utterance",
+          "classification_input",
+          "work_scope_input",
+          "expected"
+        ],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "utterance": { "type": "string", "minLength": 1 },
+          "classification_input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["progress_signals"],
+            "properties": {
+              "progress_signals": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "artifact_paths": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "work_scope_input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["catalog_minimum_shape"],
+            "properties": {
+              "catalog_minimum_shape": {
+                "type": "string",
+                "enum": [
+                  "direct_reply",
+                  "actuator_action",
+                  "browser_session",
+                  "task_session",
+                  "pipeline",
+                  "mission",
+                  "project_bootstrap"
+                ]
+              },
+              "artifact_estimate": { "type": "integer", "minimum": 0 },
+              "external_audience": { "type": "boolean" },
+              "regulatory_audience": { "type": "boolean" },
+              "replay_or_variant_likelihood": { "type": "boolean" },
+              "repetition_estimate": { "type": "integer", "minimum": 0 },
+              "multiple_legitimate_viewpoints": { "type": "boolean" },
+              "stakeholder_count": { "type": "integer", "minimum": 0 },
+              "approval_required": { "type": "boolean" },
+              "cross_system_mutation": { "type": "boolean" },
+              "expected_continuation_beyond_session": { "type": "boolean" },
+              "high_stakes_or_dogfood_evidence": { "type": "boolean" },
+              "customer_signoff": { "type": "boolean" },
+              "production_release": { "type": "boolean" },
+              "mission_handoff": { "type": "boolean" },
+              "security_sensitive_cross_system_change": { "type": "boolean" }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "intent_id",
+              "execution_shape",
+              "mission_class",
+              "delivery_shape",
+              "risk_profile",
+              "stage",
+              "workflow_id",
+              "workflow_pattern",
+              "review_mode",
+              "required_gate_ids",
+              "promotion_required"
+            ],
+            "properties": {
+              "intent_id": { "type": "string", "minLength": 1 },
+              "execution_shape": {
+                "type": "string",
+                "enum": [
+                  "direct_reply",
+                  "actuator_action",
+                  "browser_session",
+                  "task_session",
+                  "pipeline",
+                  "mission",
+                  "project_bootstrap"
+                ]
+              },
+              "mission_class": {
+                "type": "string",
+                "enum": [
+                  "product_delivery",
+                  "code_change",
+                  "research_and_absorption",
+                  "content_and_media",
+                  "operations_and_release",
+                  "environment_and_recovery",
+                  "decision_support",
+                  "customer_engagement",
+                  "platform_onboarding"
+                ]
+              },
+              "delivery_shape": {
+                "type": "string",
+                "enum": [
+                  "single_artifact",
+                  "multi_artifact_pipeline",
+                  "long_running_job",
+                  "interactive_exploration",
+                  "cross_system_change"
+                ]
+              },
+              "risk_profile": {
+                "type": "string",
+                "enum": ["low", "review_required", "approval_required", "high_stakes"]
+              },
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "intake",
+                  "classification",
+                  "planning",
+                  "contract_authoring",
+                  "preflight",
+                  "execution",
+                  "verification",
+                  "delivery",
+                  "retrospective"
+                ]
+              },
+              "workflow_id": { "type": "string", "minLength": 1 },
+              "workflow_pattern": { "type": "string", "minLength": 1 },
+              "review_mode": {
+                "type": "string",
+                "enum": ["lean", "standard", "strict"]
+              },
+              "required_gate_ids": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "promotion_required": { "type": "boolean" }
+            }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}
