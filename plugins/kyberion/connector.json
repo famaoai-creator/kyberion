@@ -1,0 +1,48 @@
+{
+  "$schema": "https://kyberion.internal/schemas/mcp-connector/v1.json",
+  "connector_id": "kyberion",
+  "display_name": "Kyberion",
+  "description": "Connect to the Kyberion Sovereign Operator System via MCP stdio transport.",
+  "transport": "stdio",
+  "command": "pnpm",
+  "args": ["--dir", "${KYBERION_REPO_PATH}", "mcp:server"],
+  "env": {
+    "KYBERION_PERSONA": "sovereign_concierge",
+    "NODE_ENV": "production"
+  },
+  "setup": {
+    "prerequisites": [
+      { "check": "command -v node", "install_hint": "Install Node.js 20+" },
+      { "check": "command -v pnpm", "install_hint": "npm install -g pnpm" }
+    ],
+    "one_time_setup": [
+      "cd ${KYBERION_REPO_PATH} && pnpm install && pnpm build"
+    ],
+    "env_vars_required": [
+      { "name": "KYBERION_REPO_PATH", "description": "Absolute path to the Kyberion repository root" }
+    ]
+  },
+  "expected_tools": [
+    "kyberion.pipeline.list",
+    "kyberion.pipeline.run",
+    "kyberion.knowledge.search",
+    "kyberion.knowledge.cowork_sync",
+    "kyberion.capability.list",
+    "kyberion.mission.create",
+    "kyberion.mission.status",
+    "kyberion.mission.journal",
+    "kyberion.approval.list_pending",
+    "kyberion.approval.decide",
+    "kyberion.audit.export",
+    "kyberion.audit.verify",
+    "kyberion.surface.cowork.deliver",
+    "kyberion.surface.cowork.list"
+  ],
+  "health_check": {
+    "tool": "kyberion.pipeline.list",
+    "params": {},
+    "expect_non_empty": true
+  },
+  "tier_visibility": ["public"],
+  "notes": "To enable confidential/{project} tier access for a specific tenant, set KYBERION_TIER_SCOPE=confidential/{slug} in the env override."
+}
