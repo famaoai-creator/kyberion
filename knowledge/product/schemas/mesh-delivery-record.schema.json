@@ -1,0 +1,221 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mesh-delivery-record.schema.json",
+  "title": "Mesh Delivery Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "delivery_id",
+    "message_id",
+    "request_id",
+    "tenant_scope",
+    "request_kind",
+    "target",
+    "payload",
+    "attempt_count",
+    "status",
+    "route",
+    "created_at"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "mesh-delivery-record"
+    },
+    "delivery_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "scope"],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "const": "same_tenant"
+        }
+      }
+    },
+    "request_kind": {
+      "type": "string",
+      "enum": [
+        "review.request",
+        "workitem.claim",
+        "workitem.handoff",
+        "workitem.status_update",
+        "capability.query",
+        "notification.publish"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector"],
+      "properties": {
+        "selector": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "peer_id"],
+              "properties": {
+                "kind": { "type": "string", "const": "peer" },
+                "peer_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "role"],
+              "properties": {
+                "kind": { "type": "string", "const": "role" },
+                "role": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "capability_id"],
+              "properties": {
+                "kind": { "type": "string", "const": "capability" },
+                "capability_id": { "type": "string", "minLength": 1 },
+                "version": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "topic"],
+              "properties": {
+                "kind": { "type": "string", "const": "topic" },
+                "topic": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "reference"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["public", "confidential"]
+        },
+        "reference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifact_ref", "integrity_hash", "storage_class"],
+          "properties": {
+            "artifact_ref": { "type": "string", "minLength": 1 },
+            "integrity_hash": { "type": "string", "minLength": 1 },
+            "storage_class": {
+              "type": "string",
+              "enum": ["artifact_store", "vault", "external_ref"]
+            }
+          }
+        }
+      }
+    },
+    "attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": ["accepted", "queued", "dispatched", "acknowledged", "completed", "rejected", "expired", "dead_lettered"]
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector", "decision", "policy_version"],
+      "properties": {
+        "selector": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "peer_id"],
+              "properties": {
+                "kind": { "type": "string", "const": "peer" },
+                "peer_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "role"],
+              "properties": {
+                "kind": { "type": "string", "const": "role" },
+                "role": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "capability_id"],
+              "properties": {
+                "kind": { "type": "string", "const": "capability" },
+                "capability_id": { "type": "string", "minLength": 1 },
+                "version": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "topic"],
+              "properties": {
+                "kind": { "type": "string", "const": "topic" },
+                "topic": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["direct", "requires_operator_selection", "rejected"]
+        },
+        "selected_peer_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,63}$"
+        },
+        "selected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "retry_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "failure_class": {
+      "type": "string",
+      "enum": ["transport_error", "policy_denied", "expired", "recipient_rejected", "dead_lettered"]
+    }
+  }
+}
