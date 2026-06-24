@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-05-08
+last_updated: 2026-06-24
 ---
 
 # Kyberion Extension Points
@@ -54,6 +54,7 @@ The JSON format of `pipelines/*.json`.
 - Step shape: `op` (form: `domain.action`), `params`, `export_as`.
 - The `ref` reference resolution (Phase 1 of engine refinement, completed).
 - The `on_error` semantics: `skip` / `abort` / `fallback`.
+- The canonical first-win smoke uses `pipelines/verify-session.json`; the optional voice smoke uses `pipelines/voice-hello.json`.
 
 **Beta elements** (may change in minor):
 
@@ -135,6 +136,7 @@ The set of `pnpm <command>` scripts in `package.json`.
 - Existing top-level scripts: `build`, `test`, `lint`, `typecheck`, `validate`, `doctor`, `mission`, `pipeline`, `cli`, `onboard`, `surfaces:*`, `dashboard`, `control`, `release:notes`.
 - Release and migration helpers: `release:notes`, `migration:run`, `migration:rollback`.
 - Meeting runtime checks: `doctor:meeting` and `test:meeting-dry-run`.
+- The first-win ladder is `pnpm doctor` → `pnpm pipeline --input pipelines/verify-session.json`.
 - Their flags and exit codes.
 
 **Internal**:
