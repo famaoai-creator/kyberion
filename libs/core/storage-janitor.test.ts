@@ -35,7 +35,7 @@ vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
 
-import { scanTmp, rotateLogs, runJanitor, DEFAULT_TMP_TTL_MS } from './storage-janitor.js';
+import { scanTmp, rotateLogs, scanRuntime, runJanitor, DEFAULT_TMP_TTL_MS } from './storage-janitor.js';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -157,6 +157,32 @@ describe('storage-janitor', () => {
     });
   });
 
+  describe('scanRuntime', () => {
+    it('expires browser-receipts older than 90 days but keeps fresh ones', () => {
+      const dir = path.join(path.dirname(tmpDir), 'runtime', 'browser-receipts');
+      const oldReceipt = path.join(dir, 'RCP-old.json');
+      const freshReceipt = path.join(dir, 'RCP-fresh.json');
+      writeFile(oldReceipt);
+      writeFile(freshReceipt);
+      setMtime(oldReceipt, 91 * 24 * 60 * 60 * 1000);
+
+      const result = scanRuntime({ dryRun: true });
+      expect(result.expired).toContain(oldReceipt);
+      expect(result.expired).not.toContain(freshReceipt);
+    });
+
+    it('expires procedure-deltas older than 14 days', () => {
+      const dir = path.join(path.dirname(tmpDir), 'runtime', 'procedure-deltas', 'proc-1');
+      const oldDelta = path.join(dir, 'delta-old.json');
+      writeFile(oldDelta);
+      setMtime(oldDelta, 15 * 24 * 60 * 60 * 1000);
+
+      const result = scanRuntime({ dryRun: false });
+      expect(result.deleted).toContain(oldDelta);
+      expect(fs.existsSync(oldDelta)).toBe(false);
+    });
+  });
+
   describe('runJanitor', () => {
     it('returns a valid report shape', () => {
       const report = runJanitor({ dryRun: true });
@@ -167,6 +193,8 @@ describe('storage-janitor', () => {
         rotatedLogs: expect.any(Number),
         expiredDataVault: expect.any(Number),
         deletedDataVault: expect.any(Number),
+        expiredRuntime: expect.any(Number),
+        deletedRuntime: expect.any(Number),
         errors: expect.any(Array),
         timestamp: expect.any(String),
         dryRun: true,

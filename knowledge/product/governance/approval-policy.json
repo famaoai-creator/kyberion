@@ -50,6 +50,12 @@
       "intent_ids": ["claude:document_generation"],
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "browser-extension-execute",
+      "intent_ids": ["browser:extension_execute"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
     }
   ],
   "defaults": {

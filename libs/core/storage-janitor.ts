@@ -12,6 +12,19 @@ import { logger } from './core.js';
 export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_LOG_RETENTION_DAYS = 30;
 
+/**
+ * Retention rules for governed runtime artifacts under active/shared/runtime/.
+ * These directories are written by the browser-bridge / intent-driven automation
+ * flow and previously had no TTL governance (review finding OP-M3).
+ *  - browser-receipts: execution evidence — kept ~90d to align with audit retention.
+ *  - procedure-deltas: self-repair artifacts — short-lived until promoted (~14d).
+ */
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const RUNTIME_RETENTION: ReadonlyArray<{ subdir: string; ttlMs: number }> = [
+  { subdir: 'browser-receipts', ttlMs: 90 * DAY_MS },
+  { subdir: 'procedure-deltas', ttlMs: 14 * DAY_MS },
+];
+
 export interface ScanTmpOptions {
   dryRun: boolean;
   ttlMs?: number;
@@ -41,6 +54,11 @@ export interface ScanDataVaultResult {
   deleted: string[];
 }
 
+export interface ScanRuntimeResult {
+  expired: string[];
+  deleted: string[];
+}
+
 export interface JanitorReport {
   expiredTmp: number;
   deletedTmp: number;
@@ -48,6 +66,8 @@ export interface JanitorReport {
   rotatedLogs: number;
   expiredDataVault: number;
   deletedDataVault: number;
+  expiredRuntime: number;
+  deletedRuntime: number;
   errors: string[];
   timestamp: string;
   dryRun: boolean;
@@ -170,6 +190,33 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
   return { expired, deleted };
 }
 
+export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
+  const now = Date.now();
+  const expired: string[] = [];
+  const deleted: string[] = [];
+
+  for (const rule of RUNTIME_RETENTION) {
+    const dir = shared(`runtime/${rule.subdir}`);
+    for (const filePath of collectFiles(dir)) {
+      try {
+        const stat = safeStat(filePath);
+        if (now - stat.mtimeMs > rule.ttlMs) {
+          expired.push(filePath);
+          if (!opts.dryRun) {
+            safeUnlinkSync(filePath);
+            deleted.push(filePath);
+            logger.info(`[JANITOR] deleted runtime artifact: ${filePath}`);
+          }
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  return { expired, deleted };
+}
+
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
@@ -194,6 +241,13 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`data-vault: ${err?.message ?? String(err)}`);
   }
 
+  let runtimeResult: ScanRuntimeResult = { expired: [], deleted: [] };
+  try {
+    runtimeResult = scanRuntime({ dryRun: opts.dryRun });
+  } catch (err: any) {
+    errors.push(`runtime: ${err?.message ?? String(err)}`);
+  }
+
   return {
     expiredTmp: tmpResult.expired.length,
     deletedTmp: tmpResult.deleted.length,
@@ -201,6 +255,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     rotatedLogs: logResult.rotated.length,
     expiredDataVault: vaultResult.expired.length,
     deletedDataVault: vaultResult.deleted.length,
+    expiredRuntime: runtimeResult.expired.length,
+    deletedRuntime: runtimeResult.deleted.length,
     errors,
     timestamp: new Date().toISOString(),
     dryRun: opts.dryRun,

@@ -20,19 +20,133 @@ const elements = {
   draftPreview: document.querySelector('#draft-preview'),
   handoffStatus: document.querySelector('#handoff-status'),
   handoffSteps: document.querySelector('#handoff-steps'),
+  executionInputs: document.querySelector('#execution-inputs'),
+  executionInputsFields: document.querySelector('#execution-inputs-fields'),
+  executionResults: document.querySelector('#execution-results'),
+  preflightButton: document.querySelector('#preflight-button'),
   copyDraftButton: document.querySelector('#copy-draft-button'),
   requestExecutionButton: document.querySelector('#request-execution-button'),
   notice: document.querySelector('#notice'),
+  // Intent tab
+  intentInput: document.querySelector('#intent-input'),
+  intentResolveButton: document.querySelector('#intent-resolve-button'),
+  intentResult: document.querySelector('#intent-result'),
+  intentOutcomeLabel: document.querySelector('#intent-outcome-label'),
+  intentMatchedInfo: document.querySelector('#intent-matched-info'),
+  intentProcedureId: document.querySelector('#intent-procedure-id'),
+  intentConfidence: document.querySelector('#intent-confidence'),
+  intentCandidates: document.querySelector('#intent-candidates'),
+  intentExecuteButton: document.querySelector('#intent-execute-button'),
+  intentRecordButton: document.querySelector('#intent-record-button'),
+  intentRepairStatus: document.querySelector('#intent-repair-status'),
+  intentRepairReason: document.querySelector('#intent-repair-reason'),
+  intentRepairRecordButton: document.querySelector('#intent-repair-record-button'),
+  intentRepairApplyButton: document.querySelector('#intent-repair-apply-button'),
+  intentInputs: document.querySelector('#intent-inputs'),
+  intentInputsFields: document.querySelector('#intent-inputs-fields'),
+  intentRunButton: document.querySelector('#intent-run-button'),
 };
 
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => selectTab(tab.dataset.tab));
 });
 
-elements.connectButton.addEventListener('click', () => invoke('bridge:connect-active-tab'));
+// Intent tab wiring
+elements.intentResolveButton.addEventListener('click', resolveIntent);
+elements.intentInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') resolveIntent(); });
+elements.intentExecuteButton.addEventListener('click', () => startProcedure(state.current?.intentResolution?.best?.procedure_id));
+elements.intentRunButton.addEventListener('click', async () => {
+  const procedureId = elements.intentInputs.dataset.procedureId;
+  if (!procedureId) return showNotice('実行する手順が選択されていません。');
+  selectTab('run');
+  await invoke('bridge:execute-procedure', {
+    procedureId,
+    origin: state.current?.connected?.origin,
+    values: collectIntentInputValues(),
+  });
+});
+elements.intentRecordButton.addEventListener('click', () => {
+  selectTab('record');
+  showNotice('Pattern A: 新しい操作を記録してください。');
+});
+elements.intentRepairRecordButton.addEventListener('click', () => {
+  selectTab('record');
+  showNotice('修正操作を記録してください。記録停止後、Review で承認すると「修正を手順に反映」が押せます。');
+});
+elements.intentRepairApplyButton.addEventListener('click', async () => {
+  const procedureId = state.current?.repairPending?.procedure_id;
+  if (!procedureId) return showNotice('反映対象の修復がありません。');
+  await invoke('bridge:apply-repair', { procedureId });
+});
+
+// #1: Pattern B start — ask the host what inputs are needed; if any, render
+// fields and wait for the user before dispatching; otherwise execute directly.
+async function startProcedure(procedureId) {
+  if (!procedureId) return showNotice('実行する手順が選択されていません。');
+  const prepared = await invoke('bridge:prepare-procedure', { procedureId, origin: state.current?.connected?.origin });
+  if (!prepared) return;
+  if (prepared.hasInputs) {
+    renderIntentInputs(procedureId, prepared.inputs || []);
+    showNotice('入力値を指定して「入力して実行」を押してください。');
+    return;
+  }
+  selectTab('run');
+  await invoke('bridge:execute-procedure', { procedureId, origin: state.current?.connected?.origin, values: {} });
+}
+
+function renderIntentInputs(procedureId, inputs) {
+  elements.intentInputs.dataset.procedureId = procedureId;
+  elements.intentInputs.hidden = inputs.length === 0;
+  elements.intentInputsFields.replaceChildren();
+  inputs.forEach((input) => {
+    const label = document.createElement('label');
+    label.className = 'execution-input';
+    const span = document.createElement('span');
+    span.textContent = `${input.label}${input.optional ? '（任意）' : ''}`;
+    const field = document.createElement('input');
+    field.type = input.type === 'number' ? 'number' : input.type === 'date' ? 'date' : 'text';
+    field.dataset.variable = input.name;
+    field.autocomplete = 'off';
+    label.append(span, field);
+    elements.intentInputsFields.append(label);
+  });
+}
+
+function collectIntentInputValues() {
+  const values = {};
+  elements.intentInputsFields.querySelectorAll('input[data-variable]').forEach((input) => {
+    if (input.value) values[input.dataset.variable] = input.value;
+  });
+  return values;
+}
+
+elements.connectButton.addEventListener('click', () => withHostPermission('bridge:connect-active-tab'));
 elements.disconnectButton.addEventListener('click', () => invoke('bridge:disconnect'));
-elements.startRecordingButton.addEventListener('click', () => invoke('bridge:start-recording'));
-elements.resumeRecordingButton.addEventListener('click', () => invoke('bridge:resume-recording'));
+elements.startRecordingButton.addEventListener('click', () => withHostPermission('bridge:start-recording'));
+elements.resumeRecordingButton.addEventListener('click', () => withHostPermission('bridge:resume-recording'));
+
+// Request site access from the side panel (a valid user gesture) before any
+// action that needs to inject the content script. Once granted, injection keeps
+// working across navigations and reconnects — without it, activeTab only grants
+// a single page and the connection breaks on the next navigation/tab switch.
+async function ensureHostPermission() {
+  const origins = ['http://*/*', 'https://*/*'];
+  try {
+    if (await chrome.permissions.contains({ origins })) return true;
+    return await chrome.permissions.request({ origins });
+  } catch {
+    return false;
+  }
+}
+
+async function withHostPermission(type) {
+  const granted = await ensureHostPermission();
+  if (!granted) {
+    showNotice('サイトへのアクセスが許可されませんでした。記録・実行にはアクセス許可が必要です。');
+    return null;
+  }
+  return invoke(type);
+}
 elements.stopRecordingButton.addEventListener('click', async () => {
   const result = await invoke('bridge:stop-recording');
   if (result?.draft) selectTab('review');
@@ -44,11 +158,95 @@ elements.finalizeReviewButton.addEventListener('click', async () => {
 });
 elements.rejectDraftButton.addEventListener('click', () => invoke('bridge:reject-draft'));
 elements.copyDraftButton.addEventListener('click', copyApprovedDraft);
-elements.requestExecutionButton.addEventListener('click', () => invoke('bridge:request-execution'));
+elements.preflightButton.addEventListener('click', () => invoke('bridge:preflight-draft'));
+elements.requestExecutionButton.addEventListener('click', () => invoke('bridge:request-execution', { values: collectInputValues() }));
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'bridge:state-changed') render(message.state);
 });
+
+async function resolveIntent() {
+  const intent = elements.intentInput.value.trim();
+  if (!intent) return showNotice('やりたいことを入力してください。');
+  // Resolution may call the LLM (seconds of latency) — show an explicit busy
+  // state so the panel never looks hung.
+  elements.intentResolveButton.disabled = true;
+  elements.intentResolveButton.classList.add('is-busy');
+  const originalLabel = elements.intentResolveButton.textContent;
+  elements.intentResolveButton.textContent = '照合中';
+  showNotice('登録済みの手順と照合しています…');
+  try {
+    const response = await invoke('bridge:resolve-intent', { intent });
+    if (response?.resolution) renderIntentResolution(intent, response.resolution);
+  } finally {
+    elements.intentResolveButton.disabled = false;
+    elements.intentResolveButton.classList.remove('is-busy');
+    elements.intentResolveButton.textContent = originalLabel;
+  }
+}
+
+function renderIntentResolution(intent, resolution) {
+  elements.intentResult.hidden = false;
+  elements.intentCandidates.hidden = true;
+  elements.intentMatchedInfo.hidden = true;
+  elements.intentExecuteButton.hidden = true;
+  elements.intentRecordButton.hidden = true;
+  elements.intentCandidates.replaceChildren();
+
+  if (resolution.outcome === 'matched' && resolution.best) {
+    elements.intentOutcomeLabel.textContent = '✓ 手順が見つかりました（Pattern B 実行可能）';
+    elements.intentOutcomeLabel.className = 'intent-outcome is-matched';
+    elements.intentMatchedInfo.hidden = false;
+    elements.intentProcedureId.textContent = resolution.best.procedure_id;
+    elements.intentConfidence.textContent = `信頼度 ${Math.round(resolution.best.confidence * 100)}%`;
+    elements.intentExecuteButton.hidden = false;
+  } else if (resolution.outcome === 'ambiguous') {
+    elements.intentOutcomeLabel.textContent = '△ 複数の候補があります。選択してください。';
+    elements.intentOutcomeLabel.className = 'intent-outcome is-ambiguous';
+    elements.intentCandidates.hidden = false;
+    (resolution.candidates || []).forEach((c) => {
+      const li = document.createElement('li');
+      const title = document.createElement('strong');
+      title.textContent = c.procedure_id;
+      const detail = document.createElement('small');
+      detail.textContent = `信頼度 ${Math.round(c.confidence * 100)}% — ${c.reason || ''}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'decision-button';
+      btn.textContent = 'この手順で実行';
+      btn.addEventListener('click', () => startProcedure(c.procedure_id));
+      li.append(title, detail, btn);
+      elements.intentCandidates.append(li);
+    });
+    elements.intentRecordButton.hidden = false;
+  } else {
+    elements.intentOutcomeLabel.textContent = '✗ 一致する手順がありません（Pattern A: 新規記録）';
+    elements.intentOutcomeLabel.className = 'intent-outcome is-unmatched';
+    elements.intentRecordButton.hidden = false;
+  }
+}
+
+function renderRepairStatus(state) {
+  const repair = state.repairPending;
+  if (!repair) {
+    elements.intentRepairStatus.hidden = true;
+    return;
+  }
+  elements.intentRepairStatus.hidden = false;
+  const reasonLabel = {
+    mfa: 'MFA チャレンジ',
+    new_popup: '新しいポップアップ',
+    handoff: 'タブ遷移',
+    ambiguity: 'UI 変更',
+  }[repair.reason] || repair.reason;
+  // The "apply repair" button appears once a corrective recording is finalized
+  // (an approved draft) — it merges the correction into the failed procedure.
+  const correctiveReady = state.lastDraft?.review?.status === 'approved';
+  elements.intentRepairApplyButton.hidden = !correctiveReady;
+  elements.intentRepairReason.textContent = correctiveReady
+    ? `「${repair.procedure_id}」の step ${repair.anchor_step_index + 1}（${reasonLabel}）の修正記録が承認されました。「修正を手順に反映」で手順へマージできます。`
+    : `「${repair.procedure_id}」の step ${repair.anchor_step_index + 1} で ${reasonLabel} が発生しました。修正操作を記録してください。`;
+}
 
 refresh();
 
@@ -94,16 +292,21 @@ function render(nextState) {
   renderRecordingActions(actions);
   renderReview(draft);
   renderHandoff(draft);
+  renderRepairStatus(state.current);
   showNotice(recording?.pausedReason || state.current.notice || '');
 }
 
 function renderHandoff(draft) {
   elements.handoffSteps.replaceChildren();
+  const execution = state.current?.execution || null;
   const approved = draft?.review?.status === 'approved';
-  const approvedCount = approved
-    ? draft.review.decisions.filter((decision) => decision.status === 'approved').length
-    : 0;
+  const approvedActions = approved ? approvedActionableActions(draft) : [];
   elements.copyDraftButton.disabled = !approved;
+  elements.preflightButton.disabled = !approved;
+  elements.requestExecutionButton.disabled = !approved || execution?.status === 'running';
+
+  renderInputFields(approvedActions);
+  renderExecutionResults(execution);
 
   if (!draft) {
     elements.handoffStatus.textContent = 'Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。';
@@ -121,11 +324,110 @@ function renderHandoff(draft) {
     return;
   }
 
-  elements.handoffStatus.textContent = `${approvedCount} 件の操作を承認済みです。下書きをコピーして Kyberion Bridge に渡すと、schema / policy / capability preflight の対象になります。`;
+  const highRisk = approvedActions.filter((action) => action.risk === 'high').length;
+  elements.handoffStatus.textContent = `${approvedActions.length} 件の操作を承認済み（高リスク ${highRisk} 件）。Native Bridge 経由で preflight → 承認 → lease → Chrome 実行へ進みます。`;
   appendHandoffStep('1. Review 確定', 'completed');
-  appendHandoffStep(`2. Kyberion preflight (${approvedCount} 操作)`, 'ready');
-  appendHandoffStep('3. Native Messaging lease 発行', 'blocked');
-  appendHandoffStep('4. Chrome 実行', 'blocked');
+  appendHandoffStep(`2. Kyberion preflight (${approvedActions.length} 操作)`, execution?.preflight ? 'completed' : 'ready');
+  appendHandoffStep('3. 承認 + lease 発行', executionLeaseStatus(execution));
+  appendHandoffStep('4. Chrome 実行', executionRunStatus(execution));
+}
+
+function executionLeaseStatus(execution) {
+  if (!execution) return 'ready';
+  if (execution.status === 'approval_required') return 'pending';
+  if (execution.lease) return 'completed';
+  return 'ready';
+}
+
+function executionRunStatus(execution) {
+  if (!execution) return 'blocked';
+  if (execution.status === 'running') return 'ready';
+  if (execution.status === 'completed') return 'completed';
+  if (['failed', 'cancelled', 'blocked', 'verification_failed'].includes(execution.status)) return 'rejected';
+  return 'blocked';
+}
+
+function approvedActionableActions(draft) {
+  const decisions = new Map((draft.review?.decisions || []).map((entry) => [entry.action_id, entry.status]));
+  return draft.actions.filter((action) => action.op !== 'sensitive_input_omitted' && decisions.get(action.action_id) === 'approved');
+}
+
+function renderInputFields(approvedActions) {
+  const fillActions = approvedActions.filter((action) => action.op === 'fill_ref' && action.variable);
+  elements.executionInputsFields.replaceChildren();
+  if (fillActions.length === 0) {
+    elements.executionInputs.hidden = true;
+    return;
+  }
+  elements.executionInputs.hidden = false;
+  const seen = new Set();
+  fillActions.forEach((action) => {
+    const name = action.variable.name;
+    if (seen.has(name)) return;
+    seen.add(name);
+    const label = document.createElement('label');
+    label.className = 'execution-input';
+    const span = document.createElement('span');
+    span.textContent = action.summary || name;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.dataset.variable = name;
+    input.autocomplete = 'off';
+    label.append(span, input);
+    elements.executionInputsFields.append(label);
+  });
+}
+
+function collectInputValues() {
+  const values = {};
+  elements.executionInputsFields.querySelectorAll('input[data-variable]').forEach((input) => {
+    if (input.value) values[input.dataset.variable] = input.value;
+  });
+  return values;
+}
+
+function renderExecutionResults(execution) {
+  elements.executionResults.replaceChildren();
+  if (!execution) return;
+
+  // #4: segmented (multi-origin) progress — show which origin segment is running.
+  if (execution.segment && execution.segment.segmentCount > 1) {
+    const seg = document.createElement('li');
+    seg.className = 'is-done';
+    const t = document.createElement('strong');
+    t.textContent = `セグメント ${execution.segment.segmentIndex + 1} / ${execution.segment.segmentCount}`;
+    const d = document.createElement('small');
+    d.textContent = execution.session?.origin ? `実行中: ${execution.session.origin.replace(/^https?:\/\//, '')}` : 'クロスサイト手順';
+    seg.append(t, d);
+    elements.executionResults.append(seg);
+  }
+
+  // #3: golden-scenario verification verdict.
+  if (execution.golden) {
+    const g = document.createElement('li');
+    g.className = execution.golden.passed ? 'is-done' : 'is-high';
+    const t = document.createElement('strong');
+    t.textContent = execution.golden.passed ? '✓ 成功条件を満たしました' : '✗ 成功条件の検証に失敗';
+    const d = document.createElement('small');
+    const failed = (execution.golden.results || []).filter((r) => !r.pass);
+    d.textContent = execution.golden.passed
+      ? `${(execution.golden.results || []).length} 条件 OK`
+      : failed.map((r) => `${r.kind}: ${r.detail || 'NG'}`).join(' / ');
+    g.append(t, d);
+    elements.executionResults.append(g);
+  }
+
+  if (!execution.results?.length) return;
+  execution.results.forEach((result, index) => {
+    const item = document.createElement('li');
+    item.className = result.status === 'done' ? 'is-done' : result.status === 'skipped' ? '' : 'is-high';
+    const title = document.createElement('strong');
+    title.textContent = `${index + 1}. ${result.op || ''}`;
+    const detail = document.createElement('small');
+    detail.textContent = `${result.status}${result.detail ? ` — ${result.detail}` : ''}`;
+    item.append(title, detail);
+    elements.executionResults.append(item);
+  });
 }
 
 function appendHandoffStep(label, status) {

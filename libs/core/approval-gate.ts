@@ -77,7 +77,16 @@ export function enforceApprovalGate(
   );
 
   if (matched) {
-    if (matched.status === 'approved') {
+    // An approved record that carries an expiry must not be reused past it —
+    // otherwise a single human "yes" becomes a standing, permanent grant
+    // (security review CR-4). Records with no expiresAt keep prior behavior.
+    const approvalExpired =
+      matched.status === 'approved' &&
+      typeof matched.expiresAt === 'string' &&
+      Number.isFinite(Date.parse(matched.expiresAt)) &&
+      Date.parse(matched.expiresAt) <= Date.now();
+
+    if (matched.status === 'approved' && !approvalExpired) {
       auditChain.record({
         agentId,
         action: 'approval_gate',
@@ -94,20 +103,21 @@ export function enforceApprovalGate(
       };
     }
 
-    // Pending, expired, rejected, etc. — block execution.
+    // Pending, expired, rejected, or approved-but-expired — block execution.
+    const effectiveStatus = approvalExpired ? 'expired' : matched.status;
     auditChain.record({
       agentId,
       action: 'approval_gate',
       operation: operationId,
       result: 'denied',
-      reason: `Existing request is ${matched.status}`,
-      metadata: { correlationId, intentId, requestId: matched.id, requestStatus: matched.status },
+      reason: `Existing request is ${effectiveStatus}`,
+      metadata: { correlationId, intentId, requestId: matched.id, requestStatus: effectiveStatus },
     });
     return {
       allowed: false,
       status: 'pending',
       requestId: matched.id,
-      message: `Approval request ${matched.id} is ${matched.status}`,
+      message: `Approval request ${matched.id} is ${effectiveStatus}`,
     };
   }
 
