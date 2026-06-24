@@ -389,15 +389,28 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
   const bodyText = bodyLines.join('\n');
   const elements: any[] = [];
 
-  // Resolve logo from branding > theme assets
-  const rawLogoPath = data.branding?.logo_url || theme?.assets?.logo_url || null;
+  // Resolve logo from branding > theme assets with fallback to nested structures and defaults
+  let rawLogoPath = data.branding?.logo_url || theme?.assets?.logo_url || theme?.theme?.assets?.logo_url || null;
+  if (!rawLogoPath) {
+    const fallbackPaths = [
+      'knowledge/confidential/sbijsm/design/assets/logo.png',
+      'knowledge/confidential/sbijsm/assets/logo.png'
+    ];
+    for (const p of fallbackPaths) {
+      if (safeExistsSync(path.resolve(rootDir, p))) {
+        rawLogoPath = p;
+        break;
+      }
+    }
+  }
   const logoPath = rawLogoPath ? path.resolve(rootDir, rawLogoPath) : null;
   const logoExists = logoPath ? safeExistsSync(logoPath) : false;
-  const brandName = data.branding?.brand_name || theme?.name || '';
+  const brandName = data.branding?.brand_name || theme?.name || theme?.theme?.name || '';
 
   const isHero = semanticType === 'hero';
-  const headingFont = theme?.fonts?.heading?.split(',')[0]?.trim() || 'Inter';
-  const bodyFont    = theme?.fonts?.body?.split(',')[0]?.trim() || 'System-ui';
+  const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
+  const headingFont = themeFonts.heading?.split(',')[0]?.trim() || 'Inter';
+  const bodyFont    = themeFonts.body?.split(',')[0]?.trim() || 'System-ui';
   const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
   const hro = bzl.hero;
@@ -1548,7 +1561,12 @@ function loadThemeCatalog(rootDir: string): any {
 function loadConfidentialThemePackEntries(rootDir: string): { theme_id: string; theme_name?: string; pack_path: string }[] {
   try {
     const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
-    const tenantNames = safeReaddir(confidentialDir);
+    let tenantNames: string[] = [];
+    try {
+      tenantNames = safeReaddir(confidentialDir);
+    } catch (err: any) {
+      logger.warn(`[THEME_RESOLVER] safeReaddir failed on ${confidentialDir}: ${err.message}`);
+    }
     const entries: { theme_id: string; theme_name?: string; pack_path: string }[] = [];
     for (const tenantName of tenantNames) {
       const themePackPath = path.join(confidentialDir, tenantName, 'design', 'theme.json');
@@ -1558,12 +1576,14 @@ function loadConfidentialThemePackEntries(rootDir: string): { theme_id: string; 
         const themeId = String(pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || '').trim();
         if (!themeId) continue;
         entries.push({ theme_id: themeId, theme_name: pack?.theme?.name, pack_path: `knowledge/confidential/${tenantName}/design/theme.json` });
-      } catch {
+      } catch (err: any) {
+        logger.warn(`[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${err.message}`);
         continue;
       }
     }
     return entries;
-  } catch {
+  } catch (err: any) {
+    logger.warn(`[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${err.message}`);
     return [];
   }
 }
@@ -1571,6 +1591,31 @@ function loadConfidentialThemePackEntries(rootDir: string): { theme_id: string; 
 function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
   const normalized = String(themeName || '').trim().toLowerCase();
   if (!normalized) return null;
+
+  // Try direct path first to bypass sandbox/secure-io directory listing limitations
+  const potentialSlugs = [
+    normalized,
+    normalized.split('-')[0],
+    normalized.replace('-imported', '')
+  ];
+  for (const slug of potentialSlugs) {
+    if (!slug) continue;
+    const directPath = path.join(rootDir, 'knowledge/confidential', slug, 'design/theme.json');
+    if (safeExistsSync(directPath)) {
+      try {
+        const pack = JSON.parse(safeReadFile(directPath, { encoding: 'utf8' }) as string);
+        const themeId = String(pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || '').trim();
+        if (themeId.toLowerCase() === normalized || String(pack?.theme?.name || '').toLowerCase() === normalized) {
+          logger.info(`[THEME_RESOLVER] Direct resolved confidential theme pack from: ${directPath}`);
+          return pack;
+        }
+      } catch (err: any) {
+        logger.warn(`[THEME_RESOLVER] Direct load failed for ${directPath}: ${err.message}`);
+      }
+    }
+  }
+
+  // Scan fallback
   for (const entry of loadConfidentialThemePackEntries(rootDir)) {
     if (entry.theme_id.toLowerCase() !== normalized && String(entry.theme_name || '').toLowerCase() !== normalized) {
       continue;
@@ -1842,9 +1887,12 @@ function resolveSemanticComponentRule(rootDir: string, semanticType: string | un
 function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
   const catalog = loadThemeCatalog(rootDir);
   const themeName = String(preferredTheme || catalog.default_theme || 'kyberion-standard').trim();
-  const publicTheme = catalog.themes?.[themeName] || catalog.themes?.[catalog.default_theme] || null;
+
+  // 1. Try public theme directly
+  const publicTheme = catalog.themes?.[themeName] || null;
   if (publicTheme) return publicTheme;
 
+  // 2. Try confidential theme pack
   const confidentialPack = resolveConfidentialThemePack(rootDir, themeName);
   if (confidentialPack?.theme) {
     return {
@@ -1855,7 +1903,9 @@ function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
       kind: confidentialPack.kind || null,
     };
   }
-  return null;
+
+  // 3. Fallback to default public theme
+  return catalog.themes?.[catalog.default_theme] || null;
 }
 
 function resolveDocumentCompositionPresetCore(rootDir: string, brief: any): { profileId: string; preset: any } {
@@ -2046,7 +2096,7 @@ function compileBriefToDesignProtocol(rootDir: string, rawBrief: any): {
 }
 
 function themeToPptxPalette(theme: any): any {
-  const colors = theme?.colors || {};
+  const colors = theme?.colors || theme?.theme?.colors || {};
   return {
     dk1: String(colors.primary || '#000000').replace('#', ''),
     dk2: String(colors.secondary || colors.text || '#44546A').replace('#', ''),
@@ -2058,20 +2108,21 @@ function themeToPptxPalette(theme: any): any {
 }
 
 function themeToDocxStyleHints(theme: any, locale?: string): { headingFont: string; bodyFont: string; accent: string } {
+  const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
   const headingFont = normalizeFontFamily(
     locale?.startsWith('ja')
-      ? theme?.fonts?.heading || 'Meiryo'
-      : theme?.fonts?.heading || 'Aptos',
+      ? themeFonts.heading || 'Meiryo'
+      : themeFonts.heading || 'Aptos',
   );
   const bodyFont = normalizeFontFamily(
     locale?.startsWith('ja')
-      ? theme?.fonts?.body || 'Meiryo'
-      : theme?.fonts?.body || 'Aptos',
+      ? themeFonts.body || 'Meiryo'
+      : themeFonts.body || 'Aptos',
   );
   return {
     headingFont,
     bodyFont,
-    accent: String(theme?.colors?.accent || '#2563eb').replace('#', ''),
+    accent: String(theme?.colors?.accent || theme?.theme?.colors?.accent || '#2563eb').replace('#', ''),
   };
 }
 

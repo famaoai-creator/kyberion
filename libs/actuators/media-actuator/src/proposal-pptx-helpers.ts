@@ -393,7 +393,7 @@ function buildProposalNarrativeOutline(deps: ProposalPptxDependencies, rootDir: 
     source_design: preset.source_design || null,
     design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'generic-structured',
-    recommended_theme: preset.recommended_theme || 'kyberion-standard',
+    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: deps.buildMediaGenerationBoundary({
       document_profile: profileId,

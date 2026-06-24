@@ -14,6 +14,7 @@
     </header>
 
     <nav class="tabs" aria-label="Browser Bridge sections">
+      <button class="tab" data-tab="intent" type="button">Intent</button>
       <button class="tab is-active" data-tab="live" type="button">Live</button>
       <button class="tab" data-tab="record" type="button">Record</button>
       <button class="tab" data-tab="review" type="button">Review</button>
@@ -21,6 +22,43 @@
     </nav>
 
     <main>
+      <section class="panel" data-panel="intent">
+        <p class="section-kicker">INTENT-DRIVEN AUTOMATION</p>
+        <h2>何をしたいか入力してください</h2>
+        <p>自然言語でやりたいことを入力すると、登録済みの手順と照合します。</p>
+        <div class="intent-input-row">
+          <input id="intent-input" type="text" class="intent-input" placeholder="例: 勤怠の承認をしておいて" autocomplete="off">
+          <button id="intent-resolve-button" class="primary" type="button">解決</button>
+        </div>
+        <div id="intent-result" class="intent-result" hidden>
+          <p id="intent-outcome-label" class="intent-outcome"></p>
+          <div id="intent-matched-info" class="intent-matched" hidden>
+            <strong id="intent-procedure-id"></strong>
+            <span id="intent-confidence"></span>
+          </div>
+          <ol id="intent-candidates" class="action-list" hidden></ol>
+          <div class="button-row" id="intent-action-row">
+            <button id="intent-execute-button" class="primary" type="button" hidden>Pattern B: このまま実行</button>
+            <button id="intent-record-button" class="secondary" type="button" hidden>Pattern A: 新しく記録する</button>
+          </div>
+          <div id="intent-inputs" class="execution-inputs" hidden>
+            <p class="section-kicker">INPUT VALUES (記録されません)</p>
+            <div id="intent-inputs-fields"></div>
+            <div class="button-row">
+              <button id="intent-run-button" class="primary" type="button">入力して実行</button>
+            </div>
+          </div>
+        </div>
+        <div id="intent-repair-status" class="intent-repair" hidden>
+          <p class="section-kicker">SELF-REPAIR</p>
+          <p id="intent-repair-reason"></p>
+          <div class="button-row">
+            <button id="intent-repair-record-button" class="secondary" type="button">修正操作を記録する</button>
+            <button id="intent-repair-apply-button" class="primary" type="button" hidden>修正を手順に反映</button>
+          </div>
+        </div>
+      </section>
+
       <section class="panel is-active" data-panel="live">
         <p class="section-kicker">CURRENT TAB</p>
         <div class="connection-card">
@@ -69,9 +107,15 @@
         <h2>次に何が起きるか</h2>
         <p id="handoff-status">Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。</p>
         <ol id="handoff-steps" class="action-list"></ol>
+        <div id="execution-inputs" class="execution-inputs" hidden>
+          <p class="section-kicker">INPUT VALUES (記録されません)</p>
+          <div id="execution-inputs-fields"></div>
+        </div>
+        <ol id="execution-results" class="action-list"></ol>
         <div class="button-row">
-          <button id="copy-draft-button" class="primary" type="button" disabled>承認済み下書きをコピー</button>
-          <button id="request-execution-button" class="secondary" type="button" disabled>Native Bridge 導入待ち</button>
+          <button id="preflight-button" class="secondary" type="button" disabled>Kyberion preflight</button>
+          <button id="request-execution-button" class="primary" type="button" disabled>承認済み操作を実行</button>
+          <button id="copy-draft-button" class="secondary" type="button" disabled>下書きをコピー</button>
         </div>
       </section>
     </main>
