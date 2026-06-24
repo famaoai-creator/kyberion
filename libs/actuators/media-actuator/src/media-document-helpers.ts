@@ -246,7 +246,7 @@ export function buildReportNarrativeOutline(
     source_design: preset.source_design || null,
     design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'report-standard',
-    recommended_theme: preset.recommended_theme || 'kyberion-standard',
+    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: buildMediaGenerationBoundary({
       document_profile: profileId,
@@ -313,7 +313,7 @@ export function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any, re
     source_design: preset.source_design || null,
     design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'operator-dashboard',
-    recommended_theme: preset.recommended_theme || 'kyberion-standard',
+    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: buildMediaGenerationBoundary({
       document_profile: profileId,
@@ -365,7 +365,7 @@ export function buildDiagramNarrativeOutline(rootDir: string, brief: any, resolv
     source_design: preset.source_design || null,
     design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'solution-overview',
-    recommended_theme: preset.recommended_theme || brief.layout_template_id || 'aws-architecture',
+    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || brief.layout_template_id || 'aws-architecture',
     recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: buildMediaGenerationBoundary({
       document_profile: profileId,
@@ -647,6 +647,7 @@ export function buildUnifiedDocumentBrief(
       locale: source.locale || data.locale || 'en-US',
       layout_template_id: source.layout_template_id || data.layout_template_id,
       project_id: source.project_id || data.project_id,
+      theme: source.theme || data.theme || payload.theme,
       title: source.title || data.title || payload.title || profileId,
       objective: source.objective || data.objective || payload.objective || '',
       client: source.client || data.client || payload.client,
@@ -667,6 +668,7 @@ export function buildUnifiedDocumentBrief(
       render_target: 'xlsx',
       locale: source.locale || data.locale || 'en-US',
       layout_template_id: source.layout_template_id || data.layout_template_id,
+      theme: source.theme || data.theme || (source.payload?.theme) || (data.payload?.theme),
       payload: source.payload || data.payload || data,
     };
   }
@@ -680,6 +682,7 @@ export function buildUnifiedDocumentBrief(
     locale: source.locale || data.locale || 'en-US',
     layout_template_id: source.layout_template_id || data.layout_template_id,
     project_id: source.project_id || data.project_id,
+    theme: source.theme || data.theme || (source.payload?.theme) || (data.payload?.theme),
     title: source.title || data.title,
     summary: source.summary || data.summary,
     payload: source.payload || data.payload || data,
