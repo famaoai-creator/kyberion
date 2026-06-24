@@ -3,11 +3,15 @@
  * Command routing for the Mission Controller CLI.
  */
 
-import { logger, auditChain } from '@agent/core';
+import { logger, auditChain, resolveIntentTrackGate, saveProjectTrackRecord } from '@agent/core';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import type { MissionRelationships } from './mission-types.js';
 
 type Awaitable<T> = T | Promise<T>;
+
+type MissionStartCreateInput = ReturnType<
+  MissionControllerRoutingContext['validateMissionStartCreateInput']
+>;
 
 export interface MissionControllerRoutingContext {
   argv: string[];
@@ -155,6 +159,98 @@ function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
   }
 }
 
+function parseIntentConfidence(value?: string): number {
+  if (!value) throw new Error('--intent-confidence is required when --intent-id is provided');
+  const confidence = Number(value);
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new Error(`--intent-confidence must be a number between 0 and 1: ${value}`);
+  }
+  return confidence;
+}
+
+function summarizeIntentTrackGate(
+  gate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null,
+): Record<string, unknown> | null {
+  if (!gate) return null;
+  if (gate.status === 'escalation_required') return gate;
+  return {
+    status: gate.status,
+    confidence: gate.confidence,
+    intent_id: gate.policy.intent_id,
+    track_type: gate.policy.track_type,
+    lifecycle_model: gate.policy.lifecycle_model,
+    min_confidence_to_autostart: gate.policy.mapping.min_confidence_to_autostart,
+    override_count: gate.policy.override_paths.length,
+    relationship: gate.relationship,
+    track_record: {
+      track_id: gate.track_record.track_id,
+      project_id: gate.track_record.project_id,
+      name: gate.track_record.name,
+      status: gate.track_record.status,
+      track_type: gate.track_record.track_type,
+      lifecycle_model: gate.track_record.lifecycle_model,
+      tier: gate.track_record.tier,
+      gate_profile_id: gate.track_record.gate_profile_id,
+      active_missions: gate.track_record.active_missions,
+    },
+  };
+}
+
+async function applyIntentTrackGate(
+  context: MissionControllerRoutingContext,
+  input: MissionStartCreateInput,
+  missionId: string | undefined,
+): Promise<{ input: MissionStartCreateInput; intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null }> {
+  const intentId = context.getOptionValue('--intent-id', context.argv);
+  if (!intentId) return { input, intentTrackGate: null };
+
+  const executionShape = context.getOptionValue('--execution-shape', context.argv);
+  if (executionShape && !['mission', 'project_bootstrap'].includes(executionShape)) {
+    return { input, intentTrackGate: null };
+  }
+  if (!input.relationships?.project?.project_id || !input.relationships.project.project_path) {
+    throw new Error(
+      '--intent-id requires --project-id and --project-path so the generated track remains linked to a governed project',
+    );
+  }
+
+  const result = await resolveIntentTrackGate({
+    intentId,
+    confidence: parseIntentConfidence(context.getOptionValue('--intent-confidence', context.argv)),
+    tenantId: input.tenantSlug || input.tenantId,
+    targetTier: input.tier || 'confidential',
+    projectId: input.relationships?.project?.project_id,
+    missionId,
+    confirmationReason: context.getOptionValue('--confirm-intent-track', context.argv),
+    persist: false,
+  });
+
+  if (result.status === 'escalation_required') {
+    if (context.hasDryRun) return { input, intentTrackGate: result };
+    throw new Error(
+      `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`,
+    );
+  }
+
+  return {
+    input: {
+      ...input,
+      relationships: {
+        ...(input.relationships || {}),
+        track: result.relationship.track,
+      } as MissionRelationships,
+    },
+    intentTrackGate: result,
+  };
+}
+
+function persistIntentTrackGate(
+  intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null,
+): void {
+  if (intentTrackGate?.status !== 'ready_to_provision') return;
+  saveProjectTrackRecord(intentTrackGate.track_record);
+}
+
 function syncRoutingDecisionSummary(
   context: MissionControllerRoutingContext,
   missionId: string,
@@ -178,7 +274,9 @@ export async function runMissionControllerAction(context: MissionControllerRouti
   switch (action) {
     case 'create': {
       const positionalTier = context.arg2 as 'personal' | 'confidential' | 'public' | undefined;
-      const createInput = context.validateMissionStartCreateInput('create', arg1, context.argv);
+      let createInput = context.validateMissionStartCreateInput('create', arg1, context.argv);
+      const intentTrack = await applyIntentTrackGate(context, createInput, arg1);
+      createInput = intentTrack.input;
       const routingDecision = parseRoutingDecision(createInput?.routingDecision);
       if (hasDryRun) {
         console.log(
@@ -188,6 +286,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
               mission_id: arg1,
               input: createInput,
               routingDecision,
+              intentTrackGate: summarizeIntentTrackGate(intentTrack.intentTrackGate),
             },
             null,
             2,
@@ -206,6 +305,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
         createInput?.tenantSlug,
         createInput?.organizationId,
       );
+      persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
       if (routingDecision) {
         auditChain.record({
@@ -222,7 +322,9 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       break;
     }
     case 'start': {
-      const input = context.validateMissionStartCreateInput('start', arg1, context.argv);
+      let input = context.validateMissionStartCreateInput('start', arg1, context.argv);
+      const intentTrack = await applyIntentTrackGate(context, input, arg1);
+      input = intentTrack.input;
       const routingDecision = parseRoutingDecision(input?.routingDecision);
       if (hasDryRun) {
         console.log(
@@ -232,6 +334,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
               mission_id: arg1,
               input,
               routingDecision,
+              intentTrackGate: summarizeIntentTrackGate(intentTrack.intentTrackGate),
             },
             null,
             2,
@@ -250,6 +353,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
         input?.tenantSlug,
         input?.organizationId,
       );
+      persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
       if (routingDecision) {
         auditChain.record({

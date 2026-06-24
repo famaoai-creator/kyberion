@@ -1150,6 +1150,33 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'track-policy-override',
+      schemaPath: 'schemas/track-policy-override.schema.json',
+      validPayloads: [
+        {
+          track_types: {
+            delivery: {
+              entry_criteria: ['tenant approval captured'],
+              gate_profile: 'strict-sdlc',
+            },
+          },
+          lifecycle_models: {
+            'default-sdlc': {
+              phases: ['custom_review'],
+              gates_per_phase: {
+                custom_review: ['gate-custom-review'],
+              },
+            },
+          },
+        },
+      ],
+      invalidPayloads: [
+        {
+          track_types: [],
+        },
+      ],
+    },
+    {
       id: 'next-action',
       schemaPath: 'schemas/next-action.schema.json',
       validPayloads: [
