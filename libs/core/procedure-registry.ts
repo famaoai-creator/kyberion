@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { logger } from './core.js';
+import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
@@ -149,9 +150,7 @@ function scoreEntry(
   // the caller's origin is unknown/mismatched (the dispatcher re-checks origin
   // binding authoritatively before any execution) — bias, don't gate.
   if (origin && entry.target.origins && entry.target.origins.length > 0) {
-    const matched = entry.target.origins.some(
-      (o) => o === origin || origin.startsWith(o) || o.startsWith(origin),
-    );
+    const matched = entry.target.origins.some((o) => matchesAllowedOrigin(o, origin));
     best = matched ? Math.min(1.0, best + 0.1) : Math.max(0, best - 0.15);
   }
 
