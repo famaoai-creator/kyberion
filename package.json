@@ -75,6 +75,7 @@
     "check:tier-hygiene": "node dist/scripts/check_tier_hygiene.js",
     "smoke:intent": "node dist/scripts/intent_smoke.js",
     "watch:tenant-drift": "node dist/scripts/watch_tenant_drift.js",
+    "mesh-hub:inspect": "pnpm exec tsx scripts/mesh_hub_inspect.ts",
     "export:validation-bundle": "node dist/scripts/export_validation_bundle.js",
     "meeting:run": "node dist/scripts/meeting_orchestrator.js",
     "meeting:participate": "node dist/scripts/meeting_participate.js",

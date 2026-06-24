@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mesh-peer-presence.schema.json",
+  "title": "Mesh Peer Presence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "peer_id",
+    "tenant_id",
+    "heartbeat_at",
+    "expires_at",
+    "health",
+    "capacity",
+    "receive_modes"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "mesh-peer-presence"
+    },
+    "peer_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,63}$"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "heartbeat_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "health": {
+      "type": "string",
+      "enum": ["healthy", "degraded", "unhealthy", "maintenance"]
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepting_new_work", "available_slots", "max_inflight"],
+      "properties": {
+        "accepting_new_work": {
+          "type": "boolean"
+        },
+        "available_slots": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_inflight": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "receive_modes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["request", "topic", "capability_query", "workitem"]
+      }
+    }
+  }
+}

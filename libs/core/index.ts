@@ -167,6 +167,65 @@ export type {
   ResolvedPeerDispatchTarget,
 } from './peer-messaging.js';
 export {
+  advertiseMeshCapabilities,
+  expireMeshPresence,
+  listEligibleMeshPeers,
+  listMeshPeerDirectoryEntries,
+  recordMeshHeartbeat,
+  registerMeshPeer,
+  resolveMeshPeer,
+} from './mesh-peer-directory.js';
+export type {
+  AdvertiseMeshCapabilitiesInput,
+  MeshPeerDirectoryEntry,
+  MeshPeerDirectoryPolicyContext,
+  RecordMeshHeartbeatInput,
+  RegisterMeshPeerInput,
+} from './mesh-peer-directory.js';
+export {
+  clearMeshTopicRegistryNamespace,
+  listMeshTopicSubscriptions,
+  resolveMeshTopicRecipients,
+  subscribeMeshTopic,
+} from './mesh-topic-registry.js';
+export type {
+  MeshTopicRegistryPolicyContext,
+  MeshTopicResolution,
+  MeshTopicResolutionOptions,
+  MeshTopicSubscriptionFilter,
+  MeshTopicSubscriptionInput,
+} from './mesh-topic-registry.js';
+export {
+  clearMeshHubPeerMessagingAdapterNamespace,
+  createMeshHubPeerMessagingAdapter,
+  MeshHubPeerMessagingAdapter,
+} from './mesh-hub-peer-messaging-adapter.js';
+export type {
+  MeshHubDispatchInput,
+  MeshHubPeerMessagingAdapterOptions,
+  MeshHubRecipientProposalRecord,
+} from './mesh-hub-peer-messaging-adapter.js';
+export {
+  routeMeshRequest,
+} from './mesh-router.js';
+export type {
+  MeshRouteCandidate,
+  MeshRouteDecision,
+  MeshRouteExclusion,
+  MeshRouteOptions,
+} from './mesh-router.js';
+export {
+  formatMeshHubInspectionReport,
+  inspectMeshHub,
+} from './mesh-hub-inspection.js';
+export type {
+  MeshHubDeliveryInspection,
+  MeshHubInspectionOptions,
+  MeshHubInspectionReport,
+  MeshHubPeerInspection,
+  MeshHubTopicInspection,
+} from './mesh-hub-inspection.js';
+export {
   appendCoordinationEvent,
   claimWorkItem,
   clearWorkCoordinationStore,
