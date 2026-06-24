@@ -854,6 +854,129 @@ describe('mission_controller argument parsing', () => {
     });
   });
 
+  it('emits a redacted intent-track gate summary for project-linked dry runs', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-TEST-INTENT-DRY',
+      '--dry-run',
+      '--project-id',
+      'PRJ-TEST-INTENT-DRY',
+      '--project-path',
+      'active/projects/sample',
+      '--project-relationship',
+      'belongs_to',
+      '--intent-id',
+      'request-feature-development',
+      '--intent-confidence',
+      '0.9',
+    ];
+
+    try {
+      await main();
+      const payload = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      expect(payload.input.relationships.track.track_id).toBe('TRK-TEST-INTENT-DRY-DELIVERY');
+      expect(payload.intentTrackGate.status).toBe('ready_to_provision');
+      expect(payload.intentTrackGate.track_record.project_id).toBe('PRJ-TEST-INTENT-DRY');
+      expect(payload.intentTrackGate.policy).toBeUndefined();
+      expect(payload.intentTrackGate.effective_policy).toBeUndefined();
+      expect(payload.intentTrackGate.track_record.metadata).toBeUndefined();
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+    }
+  });
+
+  it('requires a project link when intent-to-track gating is requested', async () => {
+    const originalArgv = process.argv;
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-TEST-INTENT-NO-PROJECT',
+      '--dry-run',
+      '--intent-id',
+      'request-feature-development',
+      '--intent-confidence',
+      '0.9',
+    ];
+
+    try {
+      await expect(main()).rejects.toThrow('--intent-id requires --project-id and --project-path');
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('surfaces low-confidence intent-track gates unless explicitly confirmed', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-TEST-INTENT-LOW',
+      '--dry-run',
+      '--project-id',
+      'PRJ-TEST-INTENT-LOW',
+      '--project-path',
+      'active/projects/sample',
+      '--project-relationship',
+      'belongs_to',
+      '--intent-id',
+      'request-feature-development',
+      '--intent-confidence',
+      '0.4',
+    ];
+
+    try {
+      await main();
+      const payload = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      expect(payload.intentTrackGate.status).toBe('escalation_required');
+      expect(payload.input.relationships.track).toBeUndefined();
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+    }
+  });
+
+  it('allows low-confidence intent-track dry runs with explicit confirmation', async () => {
+    const originalArgv = process.argv;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-TEST-INTENT-CONFIRMED',
+      '--dry-run',
+      '--project-id',
+      'PRJ-TEST-INTENT-CONFIRMED',
+      '--project-path',
+      'active/projects/sample',
+      '--project-relationship',
+      'belongs_to',
+      '--intent-id',
+      'request-feature-development',
+      '--intent-confidence',
+      '0.4',
+      '--confirm-intent-track',
+      'human approved after triage',
+    ];
+
+    try {
+      await main();
+      const payload = JSON.parse(logSpy.mock.calls.flat().join('\n'));
+      expect(payload.intentTrackGate.status).toBe('ready_to_provision');
+      expect(payload.input.relationships.track.note).toContain('confirmed below threshold');
+    } finally {
+      process.argv = originalArgv;
+      logSpy.mockRestore();
+    }
+  });
+
   it('fails fast when a linked project path is not writable for the current authority', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'worker';
