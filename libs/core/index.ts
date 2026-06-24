@@ -1441,6 +1441,7 @@ export * from './next-action-contract.js';
 export * from './task-session.js';
 export * from './intent-resolution.js';
 export * from './intent-resolution-contract.js';
+export * from './intent-track-resolver.js';
 export * from './capability-bundle-registry.js';
 export * from './outcome-contract.js';
 export * from './analysis-contract.js';

@@ -281,6 +281,27 @@
       "downloadable": false,
       "previewable": true
     },
+    "compliance_report": {
+      "label": "Compliance report",
+      "description": "A governed compliance, audit, or optimization report summarizes findings and required follow-up.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
+    },
+    "process_adr": {
+      "label": "Process ADR",
+      "description": "A governed architecture or process decision record captures the approved operating decision.",
+      "deliverable_kind": "decision_record",
+      "downloadable": false,
+      "previewable": true
+    },
+    "sop_document": {
+      "label": "SOP document",
+      "description": "A standard operating procedure document defines the approved operational process.",
+      "deliverable_kind": "document",
+      "downloadable": false,
+      "previewable": true
+    },
     "environment_bootstrapped": {
       "label": "environment bootstrapped",
       "description": "Governed outcome for intent bootstrap-kyberion-runtime.",

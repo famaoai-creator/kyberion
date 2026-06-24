@@ -35,5 +35,37 @@
   "direct_intent_commands": {
     "bootstrap-kyberion-runtime": { "command": "pnpm", "args": ["env:bootstrap"] },
     "verify-actuator-capability":  { "command": "pnpm", "args": ["capabilities"] }
+  },
+  "track_intent_policy_map": {
+    "request-feature-development": {
+      "track_type": "delivery",
+      "default_lifecycle": "default-sdlc",
+      "min_confidence_to_autostart": 0.75
+    },
+    "remediate-security-incident": {
+      "track_type": "incident",
+      "default_lifecycle": "incident-response",
+      "min_confidence_to_autostart": 0.85
+    },
+    "explore-product-solution": {
+      "track_type": "product_discovery",
+      "default_lifecycle": "discovery-sdlc",
+      "min_confidence_to_autostart": 0.75
+    },
+    "apply-infrastructure-change": {
+      "track_type": "change",
+      "default_lifecycle": "change-control",
+      "min_confidence_to_autostart": 0.8
+    },
+    "define-engineering-governance": {
+      "track_type": "engineering_governance",
+      "default_lifecycle": "governance-sdlc",
+      "min_confidence_to_autostart": 0.8
+    },
+    "define-operational-process": {
+      "track_type": "operational_governance",
+      "default_lifecycle": "governance-sdlc",
+      "min_confidence_to_autostart": 0.8
+    }
   }
 }
