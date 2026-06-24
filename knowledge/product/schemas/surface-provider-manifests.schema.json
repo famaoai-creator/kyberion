@@ -17,7 +17,8 @@
         "presence": { "$ref": "#/$defs/providerManifest" },
         "imessage": { "$ref": "#/$defs/providerManifest" },
         "discord": { "$ref": "#/$defs/providerManifest" },
-        "telegram": { "$ref": "#/$defs/providerManifest" }
+        "telegram": { "$ref": "#/$defs/providerManifest" },
+        "cowork": { "$ref": "#/$defs/coworkProviderManifest" }
       }
     }
   },
@@ -119,6 +120,56 @@
         "supportsNotifications": { "type": "boolean" }
       }
     },
+    "intentRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_label"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "patterns"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "patterns": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/textMatchRule" }
+              }
+            }
+          }
+        },
+        "default_label": { "type": "string" }
+      }
+    },
+    "mcpBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "server_script"],
+      "properties": {
+        "transport": { "type": "string", "enum": ["stdio"] },
+        "server_script": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "coworkProviderManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "agentId", "channel", "interactionMode", "capabilities", "delivery", "mcp"],
+      "properties": {
+        "id": { "type": "string", "enum": ["cowork"] },
+        "displayName": { "type": "string" },
+        "agentId": { "type": "string" },
+        "channel": { "type": "string" },
+        "interactionMode": { "type": "string", "enum": ["threaded", "session", "live"] },
+        "capabilities": { "$ref": "#/$defs/capabilities" },
+        "delivery": { "$ref": "#/$defs/delivery" },
+        "mcp": { "$ref": "#/$defs/mcpBinding" },
+        "intent_rules": { "$ref": "#/$defs/intentRules" }
+      }
+    },
     "providerManifest": {
       "type": "object",
       "additionalProperties": false,
@@ -132,30 +183,7 @@
         "capabilities": { "$ref": "#/$defs/capabilities" },
         "delivery": { "$ref": "#/$defs/delivery" },
         "routing": { "$ref": "#/$defs/routingPolicy" },
-        "intent_rules": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["default_label"],
-          "properties": {
-            "rules": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["label", "patterns"],
-                "properties": {
-                  "id": { "type": "string" },
-                  "label": { "type": "string" },
-                  "patterns": {
-                    "type": "array",
-                    "items": { "$ref": "#/$defs/textMatchRule" }
-                  }
-                }
-              }
-            },
-            "default_label": { "type": "string" }
-          }
-        },
+        "intent_rules": { "$ref": "#/$defs/intentRules" },
         "surface_rules": {
           "type": "object",
           "additionalProperties": false,

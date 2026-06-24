@@ -82,3 +82,6 @@ knowledge/evolution/distill_*.md
 # Repo-local generated notes that should not be committed
 vision/famaocloud.md
 evidence/lifecycle-smoke-summary.md
+
+# Native messaging host: machine-local pinned node path (written by install.sh)
+tools/adf-replay-extension/native-host/.node-path

@@ -1553,3 +1553,59 @@ export type { ValidatorName } from './prompt-constraints.js';
 
 // BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
 export { markRouterActive, markRouterInactive, isRouterActive, resetRouterSync } from './blackhole-routing-guard.js';
+
+// ---------------------------------------------------------------------------
+// Intent-driven automation (P0-P4) — procedure catalog, compiler, dispatcher,
+// and self-repair.  All browser-execution types are in browser-extension-bridge
+// (already exported above).
+// ---------------------------------------------------------------------------
+export type {
+  ProcedureEntry,
+  ProcedureCatalog,
+  ProcedureSubstrate,
+  ProcedureResolution,
+  ProcedureDelta,
+  GoldenScenario,
+  GoldenSuccessCondition,
+  ProcedureRiskClass,
+} from './procedure-types.js';
+export { PROCEDURE_RESOLUTION_THRESHOLDS } from './procedure-types.js';
+export {
+  loadProcedures,
+  invalidateProcedureCache,
+  resolveAllowlistedRecordingRef,
+  resolveProcedure,
+} from './procedure-registry.js';
+export type { ResolveOptions } from './procedure-registry.js';
+export { isDryRunSafe, compileBrowserRecording } from './browser-recording-compiler.js';
+export type { CompiledBrowserStep, CompileOptions, CompileRecordingResult } from './browser-recording-compiler.js';
+// dispatchProcedure — re-exports extendLeaseForMfa from browser-extension-bridge (already exported above)
+export { dispatchProcedure } from './procedure-dispatcher.js';
+export type { DispatchInput, DispatchResult, DispatchStatus } from './procedure-dispatcher.js';
+export {
+  classifyFailure,
+  createProcedureDelta,
+  saveProcedureDelta,
+  loadProcedureDelta,
+  suggestRepairAnchor,
+  applyProcedureDelta,
+} from './procedure-self-repair.js';
+export { collectProcedureUserInputs } from './procedure-inputs.js';
+export type { ProcedureInputField } from './procedure-inputs.js';
+// Service substrate (intent-driven automation adapter)
+export {
+  validateServiceRecording,
+  isExternalEffectStep,
+  collectServiceInputNames,
+} from './service-recording.js';
+export type { ServiceRecording, ServiceRecordingStep } from './service-recording.js';
+export { compileServiceRecording } from './service-recording-compiler.js';
+export type { CompileServiceOptions, CompileServiceResult } from './service-recording-compiler.js';
+export { executeServiceProcedure, resolveServiceParams } from './service-procedure-executor.js';
+export type {
+  ServicePresetRunner,
+  ServiceStepResult,
+  ExecuteServiceProcedureInput,
+  ExecuteServiceProcedureResult,
+} from './service-procedure-executor.js';
+export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
