@@ -22,7 +22,16 @@
           { "type": "contains", "value": "track" },
           { "type": "contains", "value": "トラック" },
           { "type": "contains", "value": "ロードマップ" },
-          { "type": "contains", "value": "継続改善" }
+          { "type": "contains", "value": "継続改善" },
+          { "type": "contains", "value": "技術統制" },
+          { "type": "contains", "value": "ガバナンス" },
+          { "type": "contains", "value": "スタック監査" },
+          { "type": "contains", "value": "コスト最適化" },
+          { "type": "contains", "value": "プロセス定義" },
+          { "type": "contains", "value": "業務フロー" },
+          { "type": "contains", "value": "SOP策定" },
+          { "type": "contains", "value": "プロセス設計" },
+          { "type": "contains", "value": "業務設計" }
         ]
       },
       {

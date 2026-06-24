@@ -1223,6 +1223,12 @@ Organization Discovery:
                                  Linked missions auto-sync to active/projects/<tier>/<tenant_or_shared>/<project_id>/state/
                                  and later distill into knowledge/product/evolution/ or knowledge/product/incidents/
 
+Intent-to-Track Gate Options:
+  --intent-id <ID>               Resolve the intent to a governed project track before create/start
+  --intent-confidence <0..1>     Confidence score; below policy threshold requires confirmation
+  --confirm-intent-track <REASON> Explicitly confirm low-confidence track provisioning
+  --execution-shape <SHAPE>      Gate only mission/project_bootstrap shapes when specified
+
 Track Traceability Options:
   --track-id <ID>                Link mission to a project track identifier
   --track-name <NAME>            Human-readable track name

@@ -4494,6 +4494,79 @@
           }
         }
       ]
+    },
+    {
+      "id": "define-engineering-governance",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "Create a track for engineering governance, audits, cost optimization, and technology compliance.",
+      "surface_examples": [
+        "技術統治のトラックを開始して",
+        "スタック監査プロセスを定義して",
+        "インフラコスト最適化の計画を立てて"
+      ],
+      "plan_outline": [
+        "define governance focus",
+        "run workspace and dependency audit",
+        "remediate findings and approve process ADRs"
+      ],
+      "outcome_ids": ["compliance_report", "process_adr"],
+      "specialist_id": "governance-lead",
+      "trigger_keywords": [
+        "技術統制",
+        "ガバナンス",
+        "スタック監査",
+        "コスト最適化",
+        "engineering governance"
+      ],
+      "resolution": {
+        "shape": "project_bootstrap",
+        "result_shape": "track_created"
+      },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "track",
+      "execution_shape": "project_bootstrap",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "define-operational-process",
+      "category": "outcome_execution",
+      "legacy_category": "surface",
+      "description": "Create a track for defining business/operational processes, SOP authoring, and operational governance.",
+      "surface_examples": [
+        "業務プロセス定義を開始して",
+        "SOP策定のトラックを作って",
+        "オペレーションフローを設計して"
+      ],
+      "plan_outline": [
+        "define business operation and stakeholders",
+        "map operational flow and draft SOP documentation",
+        "approve and adaptation rollout"
+      ],
+      "outcome_ids": ["sop_document", "process_adr"],
+      "specialist_id": "governance-lead",
+      "trigger_keywords": [
+        "プロセス定義",
+        "業務フロー",
+        "SOP策定",
+        "プロセス設計",
+        "業務設計",
+        "operational process"
+      ],
+      "resolution": {
+        "shape": "project_bootstrap",
+        "result_shape": "track_created"
+      },
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "track",
+      "execution_shape": "project_bootstrap",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
     }
   ]
 }
