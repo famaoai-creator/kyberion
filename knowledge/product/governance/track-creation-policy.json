@@ -101,9 +101,91 @@
       "mission_class": "customer_engagement",
       "tier": "confidential",
       "note": "track_type='product_discovery' は mission_controller --track-type に直接渡す値。現在のバリデーションが delivery 等の列挙値のみ受け入れる場合は --track-type delivery で代替し、このポリシーへの参照を --track-note に記載する。"
+    },
+    "engineering_governance": {
+      "description": "技術統括統治業務: 全社の技術スタック、インフラ/APIコスト、セキュリティ、パートナーの生産性監査およびプロセス（ADR）改善を統括するトラック。",
+      "typical_lifecycle": "governance-sdlc",
+      "gate_profile": "strict",
+      "entry_criteria": [
+        "governance focus defined (e.g., cost, security, licenses, stack drift)",
+        "audit boundary and target repositories identified"
+      ],
+      "exit_criteria": [
+        "audit verification reports signed",
+        "compliance or optimization findings addressed",
+        "process ADRs (Architecture Decision Records) approved and merged"
+      ],
+      "recommended_pipeline": "pipelines/inspect-workspace-surfaces.json",
+      "mission_class": "governance_audit",
+      "tier": "confidential"
+    },
+    "operational_governance": {
+      "description": "業務プロセス定義業務: 業務を遂行するためのプロセス設計、SOP（標準作業手順書）の策定、およびプロセス（ADR）改善を管理するトラック。",
+      "typical_lifecycle": "governance-sdlc",
+      "gate_profile": "strict",
+      "entry_criteria": [
+        "target business operation defined (e.g., customer onboarding, sales operations)",
+        "stakeholders and process owner identified"
+      ],
+      "exit_criteria": [
+        "process verification reports signed",
+        "SOP or documentation approved and published",
+        "process ADRs (Architecture/Process Decision Records) approved and merged"
+      ],
+      "recommended_pipeline": "pipelines/inspect-workspace-surfaces.json",
+      "mission_class": "process_governance",
+      "tier": "confidential"
     }
   },
   "lifecycle_models": {
+    "default-sdlc": {
+      "phases": [
+        "initiate",
+        "define",
+        "design",
+        "build",
+        "validate",
+        "transfer_run",
+        "close"
+      ],
+      "gates_per_phase": {
+        "initiate": ["gate-initiation-approval"],
+        "define": ["gate-requirements-baseline"],
+        "design": ["gate-design-approval"],
+        "build": ["gate-build-readiness"],
+        "validate": ["gate-validation-approval"],
+        "transfer_run": ["gate-release-readiness"],
+        "close": ["gate-closure-review"]
+      }
+    },
+    "incident-response": {
+      "phases": [
+        "triage",
+        "containment",
+        "remediation",
+        "validation",
+        "postmortem"
+      ],
+      "gates_per_phase": {
+        "triage": ["INCIDENT_SEVERITY_GATE"],
+        "remediation": ["REMEDIATION_APPROVAL_GATE"],
+        "postmortem": ["POST_INCIDENT_REVIEW_GATE"]
+      }
+    },
+    "change-control": {
+      "phases": [
+        "request",
+        "impact_review",
+        "approval",
+        "implementation",
+        "verification"
+      ],
+      "gates_per_phase": {
+        "impact_review": ["CHANGE_IMPACT_GATE"],
+        "approval": ["CHANGE_APPROVAL_GATE"],
+        "verification": ["CHANGE_VERIFICATION_GATE"]
+      }
+    },
     "discovery-sdlc": {
       "phases": [
         "intake",
@@ -166,6 +248,22 @@
       "gates_per_phase": {
         "expansion_proposal": ["UPSELL_QUALIFICATION_GATE"],
         "approval": ["EXPANSION_PROPOSAL_GATE"]
+      }
+    },
+    "governance-sdlc": {
+      "phases": [
+        "scope_definition",
+        "audit_collection",
+        "findings_analysis",
+        "remediation_proposal",
+        "governance_approval",
+        "process_adaptation",
+        "closure"
+      ],
+      "gates_per_phase": {
+        "findings_analysis": ["COMPLIANCE_FINDINGS_GATE"],
+        "governance_approval": ["GOVERNANCE_SIGN_OFF_GATE"],
+        "process_adaptation": ["PROCESS_ADR_MERGE_GATE"]
       }
     }
   }
