@@ -6,6 +6,10 @@ describe('check_commit_subject', () => {
     expect(checkCommitSubject('fix(ci): enforce merge subject').ok).toBe(true);
   });
 
+  it('accepts a github merge commit subject', () => {
+    expect(checkCommitSubject('Merge pull request #385 from famaoai-creator/docs/developer-tour-update').ok).toBe(true);
+  });
+
   it('rejects a non-conventional commit subject', () => {
     const result = checkCommitSubject('Update ci checks');
     expect(result.ok).toBe(false);
