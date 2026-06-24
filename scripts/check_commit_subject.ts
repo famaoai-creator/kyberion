@@ -9,11 +9,20 @@
 import { safeExec, pathResolver } from '@agent/core';
 import { checkTitle } from './check_pr_title.js';
 
+const MERGE_PULL_REQUEST_SUBJECT_RE = /^Merge pull request #\d+ from [^\s]+\/[^\s]+$/;
+
 function readHeadSubject(): string {
   return safeExec('git', ['log', '-1', '--format=%s'], { cwd: pathResolver.rootDir() }).trim();
 }
 
+function isMergePullRequestSubject(subject: string): boolean {
+  return MERGE_PULL_REQUEST_SUBJECT_RE.test(subject.trim());
+}
+
 export function checkCommitSubject(subject: string): ReturnType<typeof checkTitle> {
+  if (isMergePullRequestSubject(subject)) {
+    return { ok: true, source: 'HEAD commit subject', value: subject.trim() };
+  }
   return checkTitle(subject, 'HEAD commit subject');
 }
 
