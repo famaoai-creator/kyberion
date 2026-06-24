@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { enforceApprovalGate } from './approval-gate.js';
+import { matchesAllowedOrigin } from './origin-policy.js';
 import {
   type BrowserExtensionLease,
   type BrowserExtensionRecording,
@@ -152,9 +153,7 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
   const segments = segmentRecording(recording);
   if (procedure.target.origins && procedure.target.origins.length > 0) {
     for (const segment of segments) {
-      const allowed = procedure.target.origins.some(
-        (o) => o === segment.origin || segment.origin.startsWith(o),
-      );
+      const allowed = procedure.target.origins.some((o) => matchesAllowedOrigin(o, segment.origin));
       if (!allowed) {
         return {
           status: 'blocked',

@@ -141,11 +141,11 @@ describe('dispatchProcedure', () => {
   it('returns blocked when recording origin is not in procedure allowed origins', async () => {
     const wrongOriginRecording: BrowserExtensionRecording = {
       ...RECORDING,
-      tab: { ...RECORDING.tab, origin: 'https://evil.example.com' },
+      tab: { ...RECORDING.tab, origin: 'https://trusted.example.com.evil' },
     };
     const result = await dispatchProcedure({ ...BASE_INPUT, recording: wrongOriginRecording });
     expect(result.status).toBe('blocked');
-    expect(result.errors[0]).toContain('evil.example.com');
+    expect(result.errors[0]).toContain('trusted.example.com.evil');
     expect(result.errors[0]).toContain('not in allowed origins');
   });
 
