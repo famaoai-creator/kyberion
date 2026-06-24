@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-pipeline.schema.json",
+  "title": "Kyberion Browser Pipeline Draft",
+  "type": "object",
+  "required": [
+    "pipeline_id",
+    "version",
+    "description",
+    "action",
+    "_source",
+    "_draft",
+    "_review_required",
+    "options",
+    "steps"
+  ],
+  "properties": {
+    "pipeline_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "enum": ["pipeline"]
+    },
+    "_source": {
+      "type": "object",
+      "required": ["kind", "recording_id", "origin", "review_status"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["browser-recording.v1"]
+        },
+        "recording_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "type": ["string", "null"]
+        },
+        "review_status": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "_draft": {
+      "type": "boolean",
+      "const": true
+    },
+    "_review_required": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "options": {
+      "type": "object",
+      "required": ["record_trace"],
+      "properties": {
+        "record_trace": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "op", "params"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": ["capture", "transform", "apply", "control"]
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "params": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
