@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "placement": {
+    "mode": "in_process_local_control_plane",
+    "writer_model": "single_writer_per_runtime_root"
+  },
+  "tenant_scope": {
+    "same_tenant_only": true,
+    "runtime_presence_required": true,
+    "catalog_is_bootstrap_only": true,
+    "catalog_cannot_override_runtime_revocation": true
+  },
+  "routing": {
+    "selectors": ["peer", "role", "capability", "topic"],
+    "request_kinds": [
+      "review.request",
+      "workitem.claim",
+      "workitem.handoff",
+      "workitem.status_update",
+      "capability.query",
+      "notification.publish"
+    ],
+    "automatic_peer_selection": "deny",
+    "load_signals": ["enrollment", "tenant", "presence", "advertised_capability", "request_kind", "policy"]
+  },
+  "data_tier": {
+    "personal": "deny",
+    "confidential": {
+      "delivery_scope": "same_tenant_only",
+      "hub_copy": "deny",
+      "topic_reference": "allow_only_same_tenant"
+    },
+    "public": {
+      "hub_copy": "allow_metadata_only"
+    }
+  },
+  "topic_delivery": {
+    "publisher_authorization": "explicit",
+    "subscriber_authorization": "explicit_subscription",
+    "max_fan_out": 10
+  },
+  "recipient_acceptance": {
+    "review.request": "required",
+    "workitem.handoff": "required",
+    "side_effects": "required",
+    "mission_lifecycle": "deny"
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mesh-request.schema.json",
+  "title": "Mesh Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "request_id",
+    "tenant_scope",
+    "sender_peer_id",
+    "created_at",
+    "ttl_ms",
+    "idempotency_key",
+    "correlation_id",
+    "request_kind",
+    "target",
+    "payload"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "mesh-request"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "scope"],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "const": "same_tenant"
+        }
+      }
+    },
+    "sender_peer_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,63}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ttl_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_kind": {
+      "type": "string",
+      "enum": [
+        "review.request",
+        "workitem.claim",
+        "workitem.handoff",
+        "workitem.status_update",
+        "capability.query",
+        "notification.publish"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector"],
+      "properties": {
+        "selector": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "peer_id"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "peer"
+                },
+                "peer_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{1,63}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "role"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "role"
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "capability_id"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "capability"
+                },
+                "capability_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "topic"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "topic"
+                },
+                "topic": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "reference"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["public", "confidential"]
+        },
+        "reference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifact_ref", "integrity_hash", "storage_class"],
+          "properties": {
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "integrity_hash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "storage_class": {
+              "type": "string",
+              "enum": ["artifact_store", "vault", "external_ref"]
+            }
+          }
+        }
+      }
+    }
+  }
+}
