@@ -12,7 +12,9 @@ describe('reasoning-backend-policy', () => {
     expect(policy.default_mode).toBe('codex-cli');
     expect(policy.allowed_modes).toContain('gemini-cli');
     expect(policy.allowed_modes).toContain('openrouter');
+    expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
+    expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
   });
 
   it('normalizes deprecated mode aliases', () => {
@@ -81,6 +83,16 @@ describe('reasoning-backend-policy', () => {
         providers: [],
       }),
     ).toBe('openrouter');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {
+          KYBERION_NEMOTRON_URL: 'https://integrate.api.nvidia.com/v1',
+        },
+        providers: [],
+      }),
+    ).toBe('nemotron-api');
 
     expect(
       resolveReasoningBackendModeFromContext({

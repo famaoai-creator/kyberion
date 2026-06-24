@@ -1,4 +1,4 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, persistTrace, pathResolver, resolveVars, evaluateCondition, getPathValue, withRetry, classifyError } from '@agent/core';
+import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, persistTrace, pathResolver, resolveVars, evaluateCondition, getPathValue, withRetry, classifyError, buildBrowserExtensionPipelineCandidate, preflightBrowserExtensionSession } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { createBrowserInteractionHelpers } from './browser-interaction-helpers.js';
@@ -295,7 +295,31 @@ async function handleAction(input: BrowserAction) {
   if (input.action !== 'pipeline') {
     throw new Error(`Unsupported action: ${(input as any).action}. Browser-Actuator accepts pipeline and computer_interaction contracts.`);
   }
+  if (input.steps?.length === 1 && input.steps[0]?.op === 'extension_session') {
+    return handleExtensionSessionPreflight(input.steps[0].params || {}, input.context || {});
+  }
   return await executeBrowserPipeline(input.steps || [], input.session_id || 'default', input.options || {}, input.context || {});
+}
+
+function handleExtensionSessionPreflight(params: Record<string, unknown>, context: Record<string, unknown>) {
+  const preflight = preflightBrowserExtensionSession({
+    recording: params.recording,
+    session: params.session,
+  });
+  if (preflight.status === 'blocked') {
+    throw new Error(`[BROWSER_EXTENSION_BLOCKED] ${preflight.errors.join('; ')}`);
+  }
+  const candidate = buildBrowserExtensionPipelineCandidate(params.recording as any);
+  return {
+    status: 'success',
+    results: [{ op: 'extension_session', status: preflight.status }],
+    context: {
+      ...context,
+      browser_extension_session: preflight,
+      browser_extension_pipeline_candidate: candidate,
+    },
+    total_steps: 1,
+  };
 }
 
 function resolveRefSelector(ctx: any, ref: string): string {

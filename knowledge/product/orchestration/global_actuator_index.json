@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 28,
-  "u": "2026-06-20T13:55:24.291Z",
+  "t": 29,
+  "u": "2026-06-24T01:45:25.658Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -53,7 +53,7 @@
       "path": "libs/actuators/browser-actuator",
       "d": "Pipeline-driven Playwright browser execution and session artifact actuator",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 2,
       "contract_schema": "schemas/browser-pipeline.schema.json"
     },
@@ -252,6 +252,15 @@
       "version": "1.2.1",
       "capability_count": 33,
       "contract_schema": "schemas/wisdom-action.schema.json"
+    },
+    {
+      "n": "working-memory-actuator",
+      "path": "libs/actuators/working-memory-actuator",
+      "d": "Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>').",
+      "s": "implemented",
+      "version": "1.1.0",
+      "capability_count": 14,
+      "contract_schema": "schemas/working-memory-action.schema.json"
     }
   ]
 }

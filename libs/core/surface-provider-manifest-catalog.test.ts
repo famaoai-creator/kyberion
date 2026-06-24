@@ -14,7 +14,7 @@ describe('surface-provider-manifest-catalog', () => {
   it('lists shipped provider manifest entries', () => {
     const ids = listSurfaceProviderManifestCatalogEntries().map((entry) => entry.id).sort();
 
-    expect(ids).toEqual(['chronos', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
+    expect(ids).toEqual(['chronos', 'cowork', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
   });
 
   it('keeps the canonical directory in sync with the snapshot', () => {
