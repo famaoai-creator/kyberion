@@ -56,7 +56,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
   function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protocol: any; theme: any; themeName: string } {
     const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme);
-    const themeColors = theme?.colors || {};
+    const themeColors = theme?.colors || theme?.theme?.colors || {};
     const canvas = { w: 10, h: 5.625 };
     const contentData = outline.toc.map((entry: any) => ({
       title: entry.title,

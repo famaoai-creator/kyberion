@@ -83,6 +83,44 @@ describe('enforceApprovalGate', () => {
     expect(result.requestId).toBe('req-1');
   });
 
+  it('allows when an approved request has a future expiresAt', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockListRequests.mockReturnValue([
+      {
+        id: 'req-1',
+        correlationId: 'corr-123',
+        status: 'approved',
+        decidedBy: 'admin',
+        decidedAt: '2026-04-14T00:00:00Z',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      } as any,
+    ]);
+
+    const result = enforceApprovalGate(baseParams);
+    expect(result.allowed).toBe(true);
+    expect(result.status).toBe('approved');
+  });
+
+  it('blocks reuse of an approved request whose expiresAt has passed (CR-4)', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockListRequests.mockReturnValue([
+      {
+        id: 'req-1',
+        correlationId: 'corr-123',
+        status: 'approved',
+        decidedBy: 'admin',
+        decidedAt: '2026-04-14T00:00:00Z',
+        expiresAt: new Date(Date.now() - 60_000).toISOString(), // 1 min ago
+      } as any,
+    ]);
+
+    const result = enforceApprovalGate(baseParams);
+    expect(result.allowed).toBe(false);
+    expect(mockAuditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'denied', reason: 'Existing request is expired' }),
+    );
+  });
+
   it('blocks when an existing request is pending', () => {
     mockResolvePolicy.mockReturnValue({
       requiresApproval: true,

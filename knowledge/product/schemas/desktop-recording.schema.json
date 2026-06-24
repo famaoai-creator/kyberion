@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/desktop-recording.schema.json",
+  "title": "Desktop Procedure Recording (substrate: desktop) — CONTRACT ONLY",
+  "description": "Frozen contract for desktop UI automation. NO executor exists yet (no OS-automation backend); dispatchProcedure returns not_implemented for executor=system. Design: docs/INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "recording_id", "source", "created_at", "target", "steps", "risk_summary"],
+  "properties": {
+    "schema_version": { "const": "desktop-recording.v1" },
+    "recording_id": { "type": "string", "minLength": 1 },
+    "source": { "const": "desktop-capture" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "platform"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "platform": { "enum": ["darwin", "win32", "linux"] },
+        "app": { "type": "string", "minLength": 1 }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step_id", "op", "summary", "risk_class"],
+        "properties": {
+          "step_id": { "type": "string", "minLength": 1 },
+          "op": { "enum": ["focus_window", "click_element", "type_text", "key_combo", "menu_select", "wait_for_element", "screenshot"] },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "risk_class": { "enum": ["read", "low", "high"] },
+          "selector": { "type": "object", "additionalProperties": true },
+          "variable": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "classification"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+              "classification": { "enum": ["user_input", "secret_ref"] }
+            }
+          }
+        }
+      }
+    },
+    "risk_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requires_manual_review", "approval_required_count"],
+      "properties": {
+        "requires_manual_review": { "type": "boolean" },
+        "approval_required_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

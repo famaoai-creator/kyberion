@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/media-recipe.schema.json",
+  "title": "Media Generation Recipe (substrate: media) — CONTRACT ONLY",
+  "description": "Frozen contract for distilled media-generation recipes. Executor (media:pipeline) is deferred: recipe→pipeline mapping over the existing media/video/voice actuators is a separate phase; dispatchProcedure returns not_implemented for executor=media:pipeline. Design: docs/INTENT_DRIVEN_MEDIA_AUTOMATION_DESIGN.ja.md",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "recipe_id", "source", "created_at", "target", "stages"],
+  "properties": {
+    "schema_version": { "const": "media-recipe.v1" },
+    "recipe_id": { "type": "string", "minLength": 1 },
+    "source": { "const": "media-distill" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "medium"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "medium": { "enum": ["image", "video", "voice", "music", "slide"] }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage_id", "actuator", "summary"],
+        "properties": {
+          "stage_id": { "type": "string", "minLength": 1 },
+          "actuator": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "params": { "type": "object", "additionalProperties": true },
+          "produces": { "type": "string", "minLength": 1 },
+          "consumes": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["pending", "in_review", "approved", "rejected"] },
+        "reviewed_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
