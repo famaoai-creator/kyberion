@@ -1,0 +1,65 @@
+:root {
+  --ink: #1c2b24;
+  --muted: #5d6b63;
+  --paper: #f5f0e6;
+  --panel: #fffdf8;
+  --line: #d6d0c3;
+  --forest: #174b3b;
+  --lime: #c6eb72;
+  --orange: #dc7b34;
+  --red: #a93636;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: radial-gradient(circle at 100% 0%, #d9e8b5 0, transparent 35%), var(--paper);
+  font-family: Georgia, "Hiragino Mincho ProN", serif;
+  line-height: 1.5;
+}
+
+button { font: inherit; }
+
+.masthead { padding: 24px 20px 16px; border-bottom: 1px solid var(--line); }
+.eyebrow, .section-kicker { margin: 0 0 6px; color: var(--forest); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+h1, h2, p { margin-top: 0; }
+h1 { max-width: 15em; margin-bottom: 8px; font-size: 25px; line-height: 1.2; }
+h2 { margin-bottom: 8px; font-size: 19px; line-height: 1.25; }
+.subhead, .notice { color: var(--muted); font-size: 13px; }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: #e3ded3; }
+.tab { min-height: 38px; border: 0; color: var(--muted); background: transparent; cursor: pointer; font-size: 13px; }
+.tab:focus-visible, button:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.tab.is-active { color: var(--ink); background: var(--panel); box-shadow: inset 0 -3px 0 var(--forest); font-weight: 700; }
+
+main { padding: 18px 20px 28px; }
+.panel { display: none; }
+.panel.is-active { display: block; animation: reveal .18s ease-out; }
+@keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.connection-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 4px 4px 0 #ded8ca; }
+.status-pill { display: inline-block; margin-bottom: 16px; padding: 3px 8px; border-radius: 999px; color: #fff; background: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
+.status-pill.is-connected { color: var(--ink); background: var(--lime); }
+
+.primary, .secondary { min-height: 42px; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: 700; }
+.primary { border: 1px solid var(--forest); color: #fff; background: var(--forest); }
+.secondary { border: 1px solid var(--forest); color: var(--forest); background: transparent; }
+button:disabled { cursor: not-allowed; opacity: .48; }
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+
+.recording-summary { display: flex; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.recording-summary strong { color: var(--ink); }
+.action-list { display: grid; gap: 8px; margin: 14px 0; padding: 0; list-style: none; }
+.action-list li { padding: 10px 12px; border-left: 4px solid var(--forest); background: var(--panel); font-size: 13px; }
+.action-list li.is-sensitive { border-left-color: var(--orange); }
+.action-list li.is-high { border-left-color: var(--red); }
+.action-list small { display: block; color: var(--muted); }
+.review-controls { display: flex; gap: 6px; margin-top: 8px; }
+.decision-button { padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--forest); background: var(--panel); cursor: pointer; font-size: 12px; }
+.decision-button.is-selected { color: var(--ink); border-color: var(--forest); background: var(--lime); font-weight: 700; }
+.text-button { padding: 0; border: 0; color: var(--forest); background: transparent; cursor: pointer; text-decoration: underline; }
+
+.draft-preview { min-height: 180px; max-height: 440px; overflow: auto; margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 6px; color: #24332c; background: #edf0e6; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+footer.notice { min-height: 44px; margin: 0; padding: 12px 20px; border-top: 1px solid var(--line); background: rgba(255, 253, 248, .86); }

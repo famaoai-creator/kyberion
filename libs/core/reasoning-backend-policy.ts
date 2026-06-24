@@ -13,6 +13,8 @@ export type ReasoningBackendMode =
   | 'gemini-api'
   | 'agy-cli'
   | 'local'
+  | 'nemotron'
+  | 'nemotron-api'
   | 'openrouter'
   | 'stub';
 
@@ -57,6 +59,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   version: '1.0.0',
   mode_aliases: {
     'gemini-api': 'gemini-cli',
+    nemotron: 'nemotron-api',
   },
   allowed_modes: [
     'claude-cli',
@@ -66,12 +69,14 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'gemini-cli',
     'agy-cli',
     'local',
+    'nemotron-api',
     'openrouter',
     'stub',
   ],
   auto_select_env_priority: [
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
     { env: 'GEMINI_API_KEY', mode: 'gemini-cli' },
+    { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
     { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },
   ],

@@ -2983,6 +2983,121 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'browser-recording',
+      schemaPath: 'knowledge/product/schemas/browser-recording.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'browser-recording.v1',
+          recording_id: 'REC-1',
+          source: 'chrome-extension',
+          created_at: '2026-06-23T00:00:00.000Z',
+          tab: {
+            origin: 'https://example.com',
+            origin_hash: 'a'.repeat(64),
+            title: 'Example',
+          },
+          extension: { version: '0.1.0' },
+          actions: [
+            {
+              action_id: 'step-1',
+              op: 'fill_ref',
+              summary: '会社名を入力（値は保存しない）',
+              risk: 'low',
+              captured_at: '2026-06-23T00:00:01.000Z',
+              target: { ref: '@e1', role: 'textbox', name: 'Company name', snapshot_hash: 'b'.repeat(64) },
+              variable: { name: 'company_name', classification: 'user_input' },
+            },
+          ],
+          risk_summary: {
+            requires_manual_review: true,
+            sensitive_input_omitted: 0,
+            approval_required_count: 0,
+          },
+        },
+      ],
+      invalidPayloads: [
+        {
+          schema_version: 'browser-recording.v1',
+          recording_id: 'REC-1',
+          source: 'chrome-extension',
+          created_at: '2026-06-23T00:00:00.000Z',
+          tab: { origin: 'https://example.com', origin_hash: 'a'.repeat(64), title: 'Example' },
+          extension: { version: '0.1.0' },
+          actions: [{
+            action_id: 'step-1',
+            op: 'fill_ref',
+            summary: '入力',
+            risk: 'low',
+            captured_at: '2026-06-23T00:00:01.000Z',
+            value: 'must-not-be-recorded',
+          }],
+          risk_summary: {
+            requires_manual_review: true,
+            sensitive_input_omitted: 0,
+            approval_required_count: 0,
+          },
+        },
+      ],
+    },
+    {
+      id: 'browser-extension-session',
+      schemaPath: 'knowledge/product/schemas/browser-extension-session.schema.json',
+      validPayloads: [
+        {
+          kind: 'browser-extension-session.v1',
+          mission_id: 'MSN-1',
+          pipeline_id: 'browser-candidate-1',
+          tab_id: '42',
+          origin: 'https://example.com',
+          mode: 'record',
+          recording_id: 'REC-1',
+          requested_operations: ['click_ref'],
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'browser-extension-session.v1',
+          mission_id: 'MSN-1',
+          pipeline_id: 'browser-candidate-1',
+          tab_id: '42',
+          origin: 'https://example.com',
+          mode: 'execute',
+          recording_id: 'REC-1',
+          requested_operations: ['evaluate'],
+        },
+      ],
+    },
+    {
+      id: 'browser-extension-receipt',
+      schemaPath: 'knowledge/product/schemas/browser-extension-receipt.schema.json',
+      validPayloads: [
+        {
+          kind: 'browser-extension-receipt.v1',
+          receipt_id: 'RCP-1',
+          mission_id: 'MSN-1',
+          pipeline_id: 'browser-candidate-1',
+          recording_id: 'REC-1',
+          tab_id: '42',
+          origin: 'https://example.com',
+          status: 'blocked',
+          created_at: '2026-06-23T00:00:00.000Z',
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'browser-extension-receipt.v1',
+          receipt_id: 'RCP-1',
+          mission_id: 'MSN-1',
+          pipeline_id: 'browser-candidate-1',
+          recording_id: 'REC-1',
+          tab_id: '42',
+          origin: 'chrome://extensions',
+          status: 'completed',
+          created_at: '2026-06-23T00:00:00.000Z',
+        },
+      ],
+    },
+    {
       id: 'service-endpoints',
       schemaPath: 'knowledge/product/schemas/service-endpoints.schema.json',
       validPayloads: [

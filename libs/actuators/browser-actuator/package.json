@@ -1,6 +1,6 @@
 {
   "name": "@actuator/browser",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Browser-Actuator for Web Automation and Playwright operations",
   "main": "../../../dist/libs/actuators/browser-actuator/src/index.js",

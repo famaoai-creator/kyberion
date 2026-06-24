@@ -4,6 +4,7 @@
   "name": "Voice Hello (First-Win)",
   "version": "1.0.0",
   "description": "Minimal voice first-win pipeline: check TTS, wait for user input, speak a greeting.",
+  "labels": ["first-win", "tier-0"],
   "steps": [
     {
       "id": "check_tts",

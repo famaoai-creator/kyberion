@@ -19,6 +19,9 @@ describe('reasoning-bootstrap', () => {
     delete process.env.KYBERION_LOCAL_LLM_URL;
     delete process.env.KYBERION_LOCAL_LLM_MODEL;
     delete process.env.KYBERION_LOCAL_LLM_KEY;
+    delete process.env.KYBERION_NEMOTRON_URL;
+    delete process.env.KYBERION_NEMOTRON_MODEL;
+    delete process.env.KYBERION_NEMOTRON_KEY;
     delete process.env.KYBERION_OPENROUTER_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.KYBERION_OPENROUTER_MODEL;
@@ -56,6 +59,17 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('openai-compatible');
   });
 
+  it('installs the Nemotron OpenAI-compatible backend when configured', () => {
+    process.env.KYBERION_NEMOTRON_URL = 'https://integrate.api.nvidia.com/v1';
+    process.env.KYBERION_NEMOTRON_MODEL = 'nemotron';
+
+    const installed = installReasoningBackends({ mode: 'nemotron-api' });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('nemotron-api');
+    expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
   it('installs the OpenRouter backend when configured', () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     process.env.KYBERION_OPENROUTER_MODEL = 'meta-llama/llama-3-70b-instruct';
@@ -76,6 +90,15 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('openrouter');
   });
 
+  it('auto-selects Nemotron before the generic local LLM when its URL is present', () => {
+    process.env.KYBERION_NEMOTRON_URL = 'https://integrate.api.nvidia.com/v1';
+    const installed = installReasoningBackends({ refreshProviders: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('nemotron-api');
+    expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
   it('auto-selects codex-cli when the Codex CLI is the advertised host context', () => {
     process.env.CODEX_CLI = '1';
     const installed = installReasoningBackends({ refreshProviders: true });
@@ -90,5 +113,6 @@ describe('reasoning-bootstrap', () => {
   it('normalizes gemini-api to the CLI-backed gemini mode', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');
     expect(normalizeReasoningBackendMode('claude-agent')).toBe('claude-agent');
+    expect(normalizeReasoningBackendMode('nemotron')).toBe('nemotron-api');
   });
 });

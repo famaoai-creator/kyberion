@@ -96,6 +96,18 @@ export MISSION_ROLE=mission_controller
 # Use a specific reasoning model
 export KYBERION_REASONING_BACKEND=anthropic
 export ANTHROPIC_MODEL=claude-sonnet-4-5
+
+# Use a Nemotron OpenAI-compatible endpoint
+export KYBERION_REASONING_BACKEND=nemotron-api
+export KYBERION_NEMOTRON_URL=https://integrate.api.nvidia.com/v1
+export KYBERION_NEMOTRON_KEY=...
+export KYBERION_NEMOTRON_MODEL=nemotron
+
+# Use a self-hosted OpenAI-compatible endpoint
+export KYBERION_REASONING_BACKEND=local
+export KYBERION_LOCAL_LLM_URL=http://127.0.0.1:11434/v1
+export KYBERION_LOCAL_LLM_KEY=not-needed
+export KYBERION_LOCAL_LLM_MODEL=llama3.2
 ```
 
 ## Editor setup

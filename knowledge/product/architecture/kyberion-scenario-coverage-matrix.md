@@ -122,7 +122,7 @@ the canonical surface(s) involved.
 
 | # | Scenario | Mechanism | Status |
 |---|---|---|---|
-| I1 | Reasoning backend selection | `KYBERION_REASONING_BACKEND={claude-cli\|anthropic\|gemini-cli\|codex-cli\|claude-agent\|stub}` | ✅ |
+| I1 | Reasoning backend selection | `KYBERION_REASONING_BACKEND={claude-cli\|anthropic\|gemini-cli\|codex-cli\|claude-agent\|nemotron-api\|local\|stub}` | ✅ |
 | I2 | CI/CD adapter | `DeploymentAdapter` + `KYBERION_DEPLOY_COMMAND` | ✅ |
 | I3 | SIEM forwarder | `audit-forwarder.ts` + `TenantFilteringAuditForwarder` | ✅ |
 | I4 | Secret resolver (Vault / HSM / KMS) | `SecretResolver` chain | ✅ |

@@ -11,6 +11,7 @@
  *   `anthropic`     — use @anthropic-ai/sdk directly. Requires ANTHROPIC_API_KEY.
  *   `openrouter`    — use OpenRouter's OpenAI-compatible API. Requires
  *                     OPENROUTER_API_KEY.
+ *   `nemotron-api`  — use an OpenAI-compatible Nemotron endpoint.
  *   `local`         — use a local OpenAI-compatible server on localhost.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
  *
@@ -19,8 +20,9 @@
  * auth is consumed through the CLI-backed adapter.
  *
  * Auto-selection when mode is unset:
- *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_LOCAL_LLM_URL /
- *     OPENROUTER_API_KEY are present, the first matching policy rule wins.
+ *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_NEMOTRON_URL /
+ *     KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY are present, the first
+ *     matching policy rule wins.
  *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
  *     then `gemini-cli`, then `agy-cli`, with `claude-agent` only when
  *     explicitly selected.
@@ -57,6 +59,7 @@ import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
 import {
   OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
+  buildNemotronBackendFromEnv,
 } from './openai-compatible-backend.js';
 import {
   OpenRouterBackend,
@@ -97,7 +100,7 @@ export function normalizeReasoningBackendMode(
 export interface InstallReasoningOptions {
   /** Explicit mode selection. Overrides KYBERION_REASONING_BACKEND env var. */
   mode?: ReasoningBackendMode;
-  /** Override model for all three backends. Defaults to claude-opus-4-7 / 'opus' or gemini equivalent. */
+  /** Override model for model-based backends. Defaults to the provider's standard model when omitted. */
   model?: string;
   /** Pre-built Anthropic client (applies only to `anthropic` mode). */
   anthropicClient?: Anthropic;
@@ -314,6 +317,26 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installedMode = 'local';
     logger.success(
       `[reasoning-bootstrap] mode=local — OpenAI-compatible local server (${baseURL}, model=${model})`,
+    );
+    return true;
+  }
+
+  if (mode === 'nemotron-api') {
+    const nemotronBackend = buildNemotronBackendFromEnv(process.env);
+    if (!nemotronBackend && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=nemotron-api selected but KYBERION_NEMOTRON_URL is unset — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
+    const baseURL = process.env.KYBERION_NEMOTRON_URL || process.env.KYBERION_LOCAL_LLM_URL || 'http://localhost:11434/v1';
+    const apiKey = process.env.KYBERION_NEMOTRON_KEY || process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
+    const model = options.model || process.env.KYBERION_NEMOTRON_MODEL || process.env.KYBERION_LOCAL_LLM_MODEL || 'nemotron';
+    registerReasoningBackend(new OpenAiCompatibleBackend({ baseURL, apiKey, model }));
+    installed = true;
+    installedMode = 'nemotron-api';
+    logger.success(
+      `[reasoning-bootstrap] mode=nemotron-api — OpenAI-compatible Nemotron endpoint (${baseURL}, model=${model})`,
     );
     return true;
   }

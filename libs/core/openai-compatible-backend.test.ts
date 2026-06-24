@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OpenAiCompatibleBackend, buildOpenAiCompatibleBackendFromEnv } from './openai-compatible-backend.js';
+import {
+  OpenAiCompatibleBackend,
+  buildNemotronBackendFromEnv,
+  buildOpenAiCompatibleBackendFromEnv,
+} from './openai-compatible-backend.js';
 
 vi.mock('./secure-io.js', () => ({
   safeExec: vi.fn(() => 'shell-ok'),
@@ -15,6 +19,9 @@ describe('openai-compatible-backend', () => {
     delete process.env.KYBERION_LOCAL_LLM_URL;
     delete process.env.KYBERION_LOCAL_LLM_KEY;
     delete process.env.KYBERION_LOCAL_LLM_MODEL;
+    delete process.env.KYBERION_NEMOTRON_URL;
+    delete process.env.KYBERION_NEMOTRON_KEY;
+    delete process.env.KYBERION_NEMOTRON_MODEL;
   });
 
   it('builds from env when a local llm url is configured', () => {
@@ -22,6 +29,14 @@ describe('openai-compatible-backend', () => {
     process.env.KYBERION_LOCAL_LLM_MODEL = 'llama3.2';
 
     const backend = buildOpenAiCompatibleBackendFromEnv();
+    expect(backend?.name).toBe('openai-compatible');
+  });
+
+  it('builds a Nemotron backend from the Nemotron-compatible env vars', () => {
+    process.env.KYBERION_NEMOTRON_URL = 'https://integrate.api.nvidia.com/v1';
+    process.env.KYBERION_NEMOTRON_MODEL = 'nemotron';
+
+    const backend = buildNemotronBackendFromEnv();
     expect(backend?.name).toBe('openai-compatible');
   });
 

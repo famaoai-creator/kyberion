@@ -48,6 +48,14 @@
       "policy_path": "public/governance/surface-provider-manifests.json",
       "status": "shipped",
       "summary": "Chronos surface provider manifest and routing policy."
+    },
+    {
+      "id": "cowork",
+      "channel": "cowork",
+      "manifest_path": "public/governance/surface-provider-manifests.json",
+      "policy_path": "public/governance/surface-provider-manifests.json",
+      "status": "beta",
+      "summary": "Claude Cowork surface provider — MCP-connected desktop integration (Phase 0/1)."
     }
   ]
 }
