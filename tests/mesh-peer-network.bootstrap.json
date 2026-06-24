@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "peers": [
+    {
+      "peer_id": "bootstrap-peer",
+      "base_url": "http://127.0.0.1:4199",
+      "shared_secret": "BOOTSTRAP_SECRET",
+      "allow_local_network": true,
+      "capabilities": ["request", "handoff"],
+      "description": "Bootstrap peer for mesh directory tests"
+    }
+  ]
+}
