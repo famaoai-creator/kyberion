@@ -29,6 +29,7 @@
 | テーマ | 文書 | 範囲 | ステータス |
 |---|---|---|---|
 | 製品全体 | [PRODUCTIZATION_ROADMAP](./PRODUCTIZATION_ROADMAP.md) | OSS強化・FDE対応の12ヶ月目標 | Phase A 進行中 / D3 統一Trace 約25% |
+| エコシステム進化 | [kyberion-ecosystem-evolution-roadmap](../knowledge/product/architecture/kyberion-ecosystem-evolution-roadmap-2026-06.md) | 承認UI→学習→Mesh信頼→助言型ルーティングの依存順 | 提案済 / E0開始前 |
 | エンジン | [ROADMAP_ENGINE_REFINEMENT](./ROADMAP_ENGINE_REFINEMENT.md) | パイプライン合成性・反応的知識・設計プロトコル汎化 | Phase 1–3 定義済 |
 | タスク網羅 | [TASK_SCENARIO_ROADMAP](./TASK_SCENARIO_ROADMAP.md) | シナリオ×ワークフロー×CLIプロファイルの拡充 | 一部実装済 |
 | オンボUX | [POST_ONBOARDING_UX_ROADMAP](./developer/architecture/POST_ONBOARDING_UX_ROADMAP.md) | 初回後の再開フロー・状態言語の洗練 | — |
@@ -60,6 +61,7 @@
 
 ### 2.1 製品全体・エンジン基盤
 - **PRODUCTIZATION_ROADMAP** — マスター（§0 参照）。12ヶ月の指標と現状充足度を持つ。
+- **kyberion-ecosystem-evolution-roadmap** — Mesh Hub v1 を起点に、承認可能な共同作業、候補化された学習、same-tenant Mesh 実証、公開鍵アイデンティティ、助言型の資源/モデルルーティングを依存順に実装する計画。マスターの OSS/FDE 方針を置き換えない。
 - **ROADMAP_ENGINE_REFINEMENT** — エンジン洗練の3フェーズ: ①パイプライン合成性 ②反応的知識(Reactive Knowledge) ③Design Protocol の汎化。
 - **TASK_SCENARIO_ROADMAP** — 「意図→シナリオ→ワークフロー→CLIプロファイル」の網羅拡充。一部 MVP 実装済。
 
