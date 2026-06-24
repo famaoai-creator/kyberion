@@ -3,7 +3,7 @@ title: Kyberion in 1 Hour
 category: Developer
 tags: [tour, onboarding, architecture, c-2]
 importance: 10
-last_updated: 2026-05-08
+last_updated: 2026-06-24
 ---
 
 # Kyberion in 1 Hour
@@ -11,6 +11,8 @@ last_updated: 2026-05-08
 A guided tour of Kyberion's codebase. Read top-to-bottom in one sitting; you should leave with a working mental model of how it all fits together.
 
 This is **Phase C'-2**: the entry point that lets a new contributor be productive in a week.
+
+This map is kept in sync with the current first-win ladder (`docs/QUICKSTART.md`), the stable boundary contract (`docs/developer/EXTENSION_POINTS.md`), and the release path (`docs/developer/RELEASE_OPERATIONS.md`).
 
 If you only have 5 minutes, read just §1.
 
@@ -56,6 +58,7 @@ A specialized executor for one domain (browser, file, voice, code, etc.). 23+ ex
 - Each lives in `libs/actuators/<name>/`, has a `manifest.json` declaring its `op`s and a contract schema in `schemas/`.
 - Called via the pipeline engine, not directly.
 - Each actuator's `version` follows semver and is enforced by `pnpm check:contract-semver`.
+- Public extension surfaces stop at the actuator / CLI boundary. Internal helpers such as `meeting-browser-driver` stay implementation details behind `meeting-actuator`.
 
 Code: `libs/actuators/`, `CAPABILITIES_GUIDE.md`.
 
@@ -66,6 +69,7 @@ A declarative, schema-validated description of *what to do*. Steps reference act
 - Lives in `pipelines/*.json`. Composable: a step can reference another pipeline via `ref`.
 - Has `on_error` semantics: `skip` / `abort` / `fallback`.
 - Validated before execution (preflight). Repaired by an LLM sub-agent on validation failure.
+- The canonical first-win smoke is `pipelines/verify-session.json`; the optional voice smoke is `pipelines/voice-hello.json`.
 
 Code: `libs/core/src/pipeline-engine.ts`, `pipelines/`, `schemas/*-pipeline.schema.json`.
 
@@ -232,9 +236,9 @@ kyberion/
 └── migration/              # Per-version migration scripts
 ```
 
-## 5. The 8 most important files to read (15 min)
+## 5. The most important files to read (15 min)
 
-If you're going to read 8 files end-to-end, these are the ones:
+If you're going to read these files end-to-end, these are the ones:
 
 1. `docs/WHY.md` — the thesis.
 2. `docs/PRODUCTIZATION_ROADMAP.md` — the phasing of where we're going.
@@ -244,6 +248,8 @@ If you're going to read 8 files end-to-end, these are the ones:
 6. `libs/core/src/pipeline-engine.ts` — the executor.
 7. `scripts/mission_controller.ts` + `scripts/refactor/mission-maintenance.ts` — mission lifecycle.
 8. `libs/actuators/browser-actuator/src/index.ts` — a complete actuator reference.
+9. `docs/developer/EXTENSION_POINTS.md` — what is stable vs internal.
+10. `docs/QUICKSTART.md` — the current first-win ladder.
 
 After these, the rest of the codebase makes sense by analogy.
 

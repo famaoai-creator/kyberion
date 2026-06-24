@@ -6,6 +6,7 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 
 | Doc | When to read |
 |---|---|
+| [TOUR.md](./TOUR.md) | The current 1-hour map of the codebase. Read after the first-win smoke if you need the system shape fast. |
 | [EXTENSION_POINTS.md](./EXTENSION_POINTS.md) | What's stable, what's beta, what's internal. **Read first** before patching anything. |
 | [ROLE_PERSONA_MATRIX.md](./ROLE_PERSONA_MATRIX.md) | How to reason about personas, authority roles, and what they do not imply. |
 | [CUSTOMER_AGGREGATION.md](./CUSTOMER_AGGREGATION.md) / [.ja.md](./CUSTOMER_AGGREGATION.ja.md) | How per-customer config layers on top of the codebase. |
@@ -39,7 +40,7 @@ The deep architecture lives in `knowledge/product/architecture/` — 92 docs of 
 | [`enterprise-operating-kernel.md`](../../knowledge/product/architecture/enterprise-operating-kernel.md) | The kernel layer above missions. |
 | [`ceo-ux.md`](../../knowledge/product/architecture/ceo-ux.md) | The user-facing interaction model. |
 
-Phase C'-1 of `PRODUCTIZATION_ROADMAP.md` will consolidate these 92 docs into a smaller "1 hour to read" tour. Until then, the above 4 are the recommended entry points.
+`TOUR.md` is the current "1 hour to read" map for contributors. The 92 architecture docs remain the deeper system-referenced material; use the four files above when you need the original design entry points.
 
 ## Building on Kyberion
 
