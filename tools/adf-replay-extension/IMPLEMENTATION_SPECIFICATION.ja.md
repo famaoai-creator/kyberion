@@ -95,7 +95,7 @@ V1 は Native Messaging のみを採用する。ローカル loopback HTTP、任
 | select、checkbox、radio | 選択肢の表示名と value を別途リスク判定し、初期値は表示名だけを記録する。 |
 | ファイル upload / download | パス・内容を記録しない。ファイル選択または download の intent と承認要否だけを記録する。 |
 
-拡張の `storage.local` には、未送信 recording の redaction 済み要約だけを短期保存できる。完了、取消、7 日経過のいずれかで削除する。canonical record、証跡、変数定義は Kyberion 側で tier を指定して保存する。
+拡張側の一時状態（接続・記録・下書き・実行進捗）は `chrome.storage.session` に保持し、ブラウザ終了で破棄する（実装は `background.js` の `STATE_KEY`）。`storage.local` への永続保存は行わない。canonical record、証跡、変数定義、receipt は Kyberion 側で tier を指定して保存する。
 
 ### 5.3 ページを信頼しない
 
@@ -145,7 +145,7 @@ compiler は recording を直接実行可能 ADF にしない。`browser-pipelin
 
 ### 7.2 Pipeline の接続点
 
-新しい pipeline operation は `browser:extension_session` とする。これは Chrome Extension へ直接命令を送るものではなく、Bridge service に session と lease を要求する orchestration op である。
+pipeline 上の接続点は、`browser` actuator パイプラインの step `op: "extension_session"` とする（`actuator-op-registry.json` の `browser.apply` に登録）。単独の `browser:extension_session` op ではない点に注意。これは Chrome Extension へ直接命令を送るものではなく、Bridge service に preflight と lease を要求する orchestration step である。
 
 入力は `pipeline_id`、`mission_id`、`allowed_origins`、`mode`、`recording_id` または `compiled_plan_id`、`approval_context`。出力は `browser_session_id`、`lease_id`、`approval_status`、`receipt_ref`。既存の `browser:pipeline` は Playwright execution として維持する。
 
@@ -178,6 +178,14 @@ Side Panel は以下の 4 タブに固定する。
 | in-memory state のみ | service worker 停止で進行状態と停止理由が不明瞭 | resumable session summary、lease 再検証、明示的な aborted state |
 
 ## 10. 実装フェーズと受入条件
+
+> **実装状況（2026-06-23 時点）**
+> - Phase 0–1: ✅ 完了（3 schema + op registry + preflight、最小権限 manifest、record-only、値・秘密・contenteditable 本文・raw selector を非記録）
+> - Phase 2: ✅ 完了（Native Messaging host `scripts/browser_bridge_host.ts` + `native-host/`、recording→pipeline candidate compile）
+> - Phase 3: ✅ 完了（高リスク op を approval-gate に接続、execution lease 発行、再 snapshot + ambiguity 停止の executor、receipt 生成/検証）
+> - Phase 4: 🟡 一部完了（recording→draft pipeline crystallization `compileBrowserRecordingToPipeline` + schema 適合テスト、実行フロー回帰テスト、lease 期限切れ回帰、a11y 構造テストを追加。Chrome 実機 E2E の CI 化は未着手）
+>
+> Phase 3 の DOM 実行は Native Messaging host を登録した環境でのみ有効化される（未登録時は `bridgeAvailable=false` で execute がブロックされる）。
 
 ### Phase 0: 契約と threat model
 

@@ -90,6 +90,7 @@
             "list_tabs",
             "open_tab",
             "select_tab",
+            "navigate",
             "click_ref",
             "fill_ref",
             "select_ref",
@@ -136,6 +137,16 @@
             "kind": { "enum": ["option", "toggle"] },
             "label": { "type": "string", "maxLength": 500 },
             "checked": { "type": "boolean" }
+          }
+        },
+        "navigation": {
+          "description": "Set only for op=navigate: an origin transition (handoff) captured mid-recording so a cross-origin flow stays one recording, segmented per origin.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from_origin", "to_origin"],
+          "properties": {
+            "from_origin": { "type": "string", "pattern": "^https?://" },
+            "to_origin": { "type": "string", "pattern": "^https?://" }
           }
         }
       }

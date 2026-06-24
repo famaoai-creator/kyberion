@@ -200,6 +200,176 @@ function createChecks(): ContractCheck[] {
 
   const additionalGovernanceChecks: ContractCheck[] = [
     {
+      // Intent-driven automation: substrate-neutral procedure catalog (P0 frozen contract).
+      // Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §6
+      id: 'procedures',
+      schemaPath: 'knowledge/product/schemas/procedures.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/orchestration/procedures.json'),
+        {
+          schema_version: 'procedures.v1',
+          procedures: [
+            {
+              procedure_id: 'attendance.approve.kingoftime',
+              substrate: 'browser',
+              adapter: {
+                recorder: 'chrome-extension',
+                executor: 'extension_session',
+                recording_ref: 'active/shared/runtime/recordings/attendance-approve-kingoftime.json',
+              },
+              target: { name: 'King of Time', origins: ['https://s2.kingtime.jp'] },
+              intent_phrases: ['勤怠の承認', 'approve attendance'],
+              execution_substrate: 'extension',
+              pipeline_ref: 'pipelines/browser/attendance-approve-kingoftime.json',
+              required_inputs: [{ name: 'target_period', label: '対象期間', type: 'string', optional: true }],
+              required_secrets: [{ name: 'kingoftime_login', scope: 'confidential/{project}' }],
+              risk_class: 'high',
+              golden_scenario_ref: 'knowledge/product/golden/attendance-approve-kingoftime.v1.json',
+              version: '1.0.0',
+              status: 'active',
+            },
+            {
+              procedure_id: 'deal.intake.jira-slack-box',
+              substrate: 'service',
+              adapter: { recorder: 'service-capture', executor: 'service:preset' },
+              target: { name: 'Deal Intake', services: ['jira', 'slack', 'box'] },
+              intent_phrases: ['起票してSlack通知してBoxに格納'],
+              pipeline_ref: 'pipelines/service/deal-intake.json',
+              risk_class: 'high',
+              version: '1.0.0',
+              status: 'active',
+            },
+          ],
+        },
+      ],
+      invalidPayloads: [
+        { schema_version: 'procedures.v1', procedures: [{ procedure_id: 'x', substrate: 'quantum' }] },
+        {
+          schema_version: 'procedures.v1',
+          procedures: [
+            {
+              procedure_id: 'x',
+              substrate: 'browser',
+              adapter: { recorder: 'a', executor: 'b' },
+              target: { name: 'n' },
+              intent_phrases: [],
+              pipeline_ref: 'p',
+              risk_class: 'high',
+              version: '1.0.0',
+              status: 'active',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'procedure-delta',
+      schemaPath: 'knowledge/product/schemas/procedure-delta.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'procedure-delta.v1',
+          procedure_id: 'attendance.approve.kingoftime',
+          anchor: { step_index: 2, ref_snapshot_hash: 'a'.repeat(64) },
+          delta_recording_ref: 'runtime/recordings/delta-1.json',
+          reason: 'ambiguity',
+          created_at: '2026-06-23T00:00:00.000Z',
+        },
+      ],
+      invalidPayloads: [
+        {
+          schema_version: 'procedure-delta.v1',
+          procedure_id: 'x',
+          anchor: { step_index: 0 },
+          delta_recording_ref: 'r',
+          reason: 'not_a_reason',
+          created_at: '2026-06-23T00:00:00.000Z',
+        },
+      ],
+    },
+    {
+      id: 'golden-scenario',
+      schemaPath: 'knowledge/product/schemas/golden-scenario.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'golden-scenario.v1',
+          scenario_id: 'gs-1',
+          procedure_id: 'attendance.approve.kingoftime',
+          success_conditions: [{ kind: 'text_present', name_contains: '承認が完了しました' }],
+          captured_from: 'receipt-123',
+          version: '1.0.0',
+        },
+      ],
+      invalidPayloads: [
+        {
+          schema_version: 'golden-scenario.v1',
+          scenario_id: 'gs-1',
+          procedure_id: 'x',
+          success_conditions: [{ kind: 'telepathy' }],
+          captured_from: 'r',
+          version: '1.0.0',
+        },
+      ],
+    },
+    {
+      // Intent-driven automation: service substrate recording (E2E).
+      id: 'service-recording',
+      schemaPath: 'knowledge/product/schemas/service-recording.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'service-recording.v1',
+          recording_id: 'svc-rec-1',
+          source: 'service-capture',
+          created_at: '2026-06-24T00:00:00.000Z',
+          target: { name: 'Deal Intake', services: ['jira', 'slack'] },
+          steps: [
+            { step_id: 's1', service_id: 'jira', action: 'create_issue', summary: '起票', risk_class: 'high', params: { summary: '{{input.title}}' }, produces: 'issue_key' },
+            { step_id: 's2', service_id: 'slack', action: 'post_message', summary: '通知', risk_class: 'high', params: { text: '{{channel.issue_key}}' }, consumes: ['issue_key'] },
+          ],
+          risk_summary: { requires_manual_review: true, approval_required_count: 2 },
+        },
+      ],
+      invalidPayloads: [
+        { schema_version: 'service-recording.v1', recording_id: 'x', source: 'service-capture', created_at: '2026-06-24T00:00:00.000Z', target: { name: 'X', services: [] }, steps: [], risk_summary: { requires_manual_review: true, approval_required_count: 0 } },
+      ],
+    },
+    {
+      // Substrate contract (executor deferred): desktop UI automation.
+      id: 'desktop-recording',
+      schemaPath: 'knowledge/product/schemas/desktop-recording.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'desktop-recording.v1',
+          recording_id: 'dsk-1',
+          source: 'desktop-capture',
+          created_at: '2026-06-24T00:00:00.000Z',
+          target: { name: 'Excel', platform: 'darwin' },
+          steps: [{ step_id: 'd1', op: 'click_element', summary: 'OKをクリック', risk_class: 'low' }],
+          risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+        },
+      ],
+      invalidPayloads: [
+        { schema_version: 'desktop-recording.v1', recording_id: 'x', source: 'desktop-capture', created_at: '2026-06-24T00:00:00.000Z', target: { name: 'X', platform: 'solaris' }, steps: [], risk_summary: { requires_manual_review: true, approval_required_count: 0 } },
+      ],
+    },
+    {
+      // Substrate contract (executor deferred): media generation recipe.
+      id: 'media-recipe',
+      schemaPath: 'knowledge/product/schemas/media-recipe.schema.json',
+      validPayloads: [
+        {
+          schema_version: 'media-recipe.v1',
+          recipe_id: 'med-1',
+          source: 'media-distill',
+          created_at: '2026-06-24T00:00:00.000Z',
+          target: { name: 'Explainer Video', medium: 'video' },
+          stages: [{ stage_id: 'm1', actuator: 'video-composition-actuator', summary: 'compose', produces: 'render' }],
+        },
+      ],
+      invalidPayloads: [
+        { schema_version: 'media-recipe.v1', recipe_id: 'x', source: 'media-distill', created_at: '2026-06-24T00:00:00.000Z', target: { name: 'X', medium: 'hologram' }, stages: [] },
+      ],
+    },
+    {
       id: 'intent-policy',
       schemaPath: 'knowledge/product/schemas/intent-policy.schema.json',
       validPayloads: [readGovernanceJson('knowledge/product/governance/intent-policy.json')],

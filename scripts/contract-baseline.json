@@ -349,6 +349,28 @@
       ],
       "contract_schema": "schemas/wisdom-action.schema.json",
       "contract_schema_sha256": "19a16497499411fde1595184d73751f3006ff63c1f6f8902a34ed3e1f7321225"
+    },
+    {
+      "actuator_id": "working-memory-actuator",
+      "version": "1.1.0",
+      "ops": [
+        "add-action-item",
+        "build-index",
+        "complete-action-item",
+        "daily-open",
+        "list",
+        "nominate-promotion",
+        "note",
+        "read",
+        "run-gc",
+        "set-now",
+        "todo-add",
+        "todo-done",
+        "todo-rollover",
+        "weekly-open"
+      ],
+      "contract_schema": "schemas/working-memory-action.schema.json",
+      "contract_schema_sha256": "ecd56339909694bea0618aaf723cb5da26e13701942fecadc051881a9cef0389"
     }
   ]
 }
