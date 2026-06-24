@@ -42,7 +42,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 | `build:` / `ci:` / `chore:` | none |
 | `feat!:` or any with `BREAKING CHANGE:` footer | major |
 
-PRs must use one of these types. CI rejects PR titles that do not match the pattern, and pushes to `main` reject commit subjects that do not match the pattern.
+PRs must use one of these types. CI rejects PR titles that do not match the pattern. Pushes to `main` reject commit subjects that do not match the pattern, except for the default GitHub merge commit subject (`Merge pull request #...`) when a human uses the merge button.
 
 ## Release cadence
 
