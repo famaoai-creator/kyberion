@@ -1846,6 +1846,93 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'mesh-peer-registration',
+      schemaPath: 'knowledge/product/schemas/mesh-peer-registration.schema.json',
+      validPayloads: [{
+        kind: 'mesh-peer-registration', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
+        endpoint_ref: 'mesh://peer-a1.local', key_ref: 'vault://mesh/peer-a1/key',
+        status: 'enrolled', registered_at: '2026-06-24T00:00:00.000Z',
+        allowed_request_kinds: ['review.request'],
+      }],
+      invalidPayloads: [{
+        kind: 'mesh-peer-registration', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
+        endpoint_ref: 'mesh://peer-a1.local', status: 'enrolled', registered_at: '2026-06-24T00:00:00.000Z',
+      }],
+    },
+    {
+      id: 'mesh-peer-presence',
+      schemaPath: 'knowledge/product/schemas/mesh-peer-presence.schema.json',
+      validPayloads: [{
+        kind: 'mesh-peer-presence', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
+        heartbeat_at: '2026-06-24T00:00:00.000Z', expires_at: '2026-06-24T00:05:00.000Z', health: 'healthy',
+        capacity: { accepting_new_work: true, available_slots: 1, max_inflight: 2 }, receive_modes: ['request'],
+      }],
+      invalidPayloads: [{
+        kind: 'mesh-peer-presence', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
+        heartbeat_at: '2026-06-24T00:00:00.000Z', health: 'healthy',
+      }],
+    },
+    {
+      id: 'mesh-capability-advertisement',
+      schemaPath: 'knowledge/product/schemas/mesh-capability-advertisement.schema.json',
+      validPayloads: [{
+        kind: 'mesh-capability-advertisement', capability_id: 'document.review', version: '1', peer_id: 'peer-a1',
+        tenant_id: 'tenant-acme', roles: ['reviewer'], request_kinds: ['review.request'], visibility: 'tenant',
+        approval_policy: { requires_explicit_acceptance: true, requires_local_validation: true, requires_policy_check: true },
+        advertised_at: '2026-06-24T00:00:00.000Z',
+      }],
+      invalidPayloads: [{
+        kind: 'mesh-capability-advertisement', capability_id: 'document.review', version: '1', peer_id: 'peer-a1',
+        tenant_id: 'tenant-acme', roles: ['reviewer'], request_kinds: ['mission.start'], visibility: 'tenant',
+        approval_policy: { requires_explicit_acceptance: true }, advertised_at: '2026-06-24T00:00:00.000Z',
+      }],
+    },
+    {
+      id: 'mesh-request',
+      schemaPath: 'knowledge/product/schemas/mesh-request.schema.json',
+      validPayloads: [{
+        kind: 'mesh-request', request_id: 'meshreq-1', tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
+        sender_peer_id: 'peer-sender', created_at: '2026-06-24T00:00:00.000Z', ttl_ms: 60000, idempotency_key: 'idem-1',
+        correlation_id: 'corr-1', request_kind: 'review.request', target: { selector: { kind: 'peer', peer_id: 'peer-a1' } },
+        payload: { classification: 'confidential', reference: { artifact_ref: 'artifact://tenant-acme/brief', integrity_hash: 'sha256:abc', storage_class: 'artifact_store' } },
+      }],
+      invalidPayloads: [{
+        kind: 'mesh-request', request_id: 'meshreq-1', tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
+        sender_peer_id: 'peer-sender', created_at: '2026-06-24T00:00:00.000Z', ttl_ms: 60000, idempotency_key: 'idem-1',
+        correlation_id: 'corr-1', request_kind: 'mission.start', target: { selector: { kind: 'broadcast' } },
+        payload: { classification: 'personal', reference: { artifact_ref: 'artifact://tenant-acme/brief', integrity_hash: 'sha256:abc', storage_class: 'artifact_store' } },
+      }],
+    },
+    {
+      id: 'mesh-delivery-record',
+      schemaPath: 'knowledge/product/schemas/mesh-delivery-record.schema.json',
+      validPayloads: [{
+        kind: 'mesh-delivery-record', delivery_id: 'delivery-1', message_id: 'msg-1', request_id: 'meshreq-1',
+        tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' }, request_kind: 'review.request',
+        target: { selector: { kind: 'peer', peer_id: 'peer-a1' } },
+        payload: { classification: 'public', reference: { artifact_ref: 'artifact://tenant-acme/brief', integrity_hash: 'sha256:abc', storage_class: 'artifact_store' } },
+        attempt_count: 0, status: 'queued', route: { selector: { kind: 'peer', peer_id: 'peer-a1' }, decision: 'direct', policy_version: '1.0.0' },
+        created_at: '2026-06-24T00:00:00.000Z',
+      }],
+      invalidPayloads: [{
+        kind: 'mesh-delivery-record', delivery_id: 'delivery-1', message_id: 'msg-1', request_id: 'meshreq-1',
+        tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' }, request_kind: 'review.request', attempt_count: 0, status: 'queued',
+      }],
+    },
+    {
+      id: 'mesh-topic-subscription',
+      schemaPath: 'knowledge/product/schemas/mesh-topic-subscription.schema.json',
+      validPayloads: [{
+        kind: 'mesh-topic-subscription', subscription_id: 'sub-1', tenant_id: 'tenant-acme', topic: 'release.review', peer_id: 'peer-a1',
+        filters: { request_kinds: ['notification.publish'], payload_classifications: ['public'] },
+        expires_at: '2026-06-24T01:00:00.000Z', policy_version: '1.0.0',
+      }],
+      invalidPayloads: [{
+        kind: 'mesh-topic-subscription', subscription_id: 'sub-1', tenant_id: 'tenant-acme', topic: 'release.review', peer_id: 'peer-a1',
+        filters: { request_kinds: ['mission.start'], payload_classifications: ['personal'] }, policy_version: '1.0.0',
+      }],
+    },
+    {
       id: 'bridge-request',
       schemaPath: 'schemas/bridge-request.schema.json',
       validPayloads: [
