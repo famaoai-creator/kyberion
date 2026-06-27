@@ -38,9 +38,11 @@ export function selectPresentationBriefQuestionSet(
 
 export function getPresentationBriefQuestions(
   profile: PresentationPreferenceProfile,
-  deckPurpose?: PresentationDeckPurpose | string | null
+  deckPurpose?: PresentationDeckPurpose | string | null,
+  maxQuestions = 2
 ): string[] {
-  return selectPresentationBriefQuestionSet(profile, deckPurpose)?.questions || [];
+  const questions = selectPresentationBriefQuestionSet(profile, deckPurpose)?.questions || [];
+  return questions.slice(0, Math.max(1, maxQuestions));
 }
 
 export function selectPresentationThemeSet(

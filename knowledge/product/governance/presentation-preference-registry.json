@@ -37,8 +37,7 @@
           "deck_purposes": ["proposal"],
           "questions": [
             "誰に見せる資料ですか?",
-            "最終的に何を決めたいですか?",
-            "何枚くらいでまとめたいですか?"
+            "最終的に何を決めたいですか?"
           ],
           "notes": "Use for decision-making or approval-oriented decks."
         },
@@ -47,8 +46,7 @@
           "deck_purposes": ["internal_share"],
           "questions": [
             "社内のどのチーム向けですか?",
-            "結論を先に出すか、経緯を先に出すか、どちらですか?",
-            "口頭補足なしでも伝わる必要がありますか?"
+            "結論を先に出すか、経緯を先に出すか、どちらですか?"
           ],
           "notes": "Keep it short and practical for internal alignment."
         },
@@ -57,8 +55,7 @@
           "deck_purposes": ["briefing"],
           "questions": [
             "説明相手は経営層ですか、現場ですか?",
-            "比較資料と要点まとめのどちらが必要ですか?",
-            "スピーカーノートも必要ですか?"
+            "比較資料と要点まとめのどちらが必要ですか?"
           ],
           "notes": "Use for short, structured briefings."
         },
@@ -67,8 +64,7 @@
           "deck_purposes": ["marketing"],
           "questions": [
             "営業資料ですか、告知資料ですか?",
-            "ブランド準拠の強さはどの程度必要ですか?",
-            "図解中心と写真中心のどちらが良いですか?"
+            "ブランド準拠の強さはどの程度必要ですか?"
           ],
           "notes": "Prefer persuasive and brand-aligned framing."
         }

@@ -6,6 +6,7 @@ import {
   resolveProposalSectionKeywords,
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
+  buildSlidePatternDiagnostics,
   selectSlidePattern,
 } from '@agent/core';
 
@@ -452,6 +453,8 @@ function buildProposalNarrativeOutline(deps: ProposalPptxDependencies, rootDir: 
     });
   }
 
+  const diagnostics = buildSlidePatternDiagnostics(toc as Array<Record<string, unknown>>);
+
   return {
     kind: 'document-outline-adf',
     artifact_family: brief.artifact_family,
@@ -470,6 +473,7 @@ function buildProposalNarrativeOutline(deps: ProposalPptxDependencies, rootDir: 
       design_system_id: preset.design_system_id,
     }),
     toc,
+    diagnostics,
   };
 }
 
