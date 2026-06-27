@@ -1088,17 +1088,36 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                     </button>
                   </div>
                   {rawTraceLoading ? (
-                    <div className="mt-2 text-sm text-white/60">Loading raw trace log...</div>
+                    <div className="mt-2">
+                      <SurfaceStatusPanel
+                        eyebrow="Raw trace"
+                        title="Loading raw trace log"
+                        detail="Chronos is opening the selected JSONL record and focusing it on the chosen trace id."
+                        tone="neutral"
+                      />
+                    </div>
                   ) : rawTraceError ? (
-                    <div className="mt-2 rounded-xl border border-rose-400/25 bg-rose-500/10 p-3 text-sm text-rose-100">
-                      {rawTraceError}
+                    <div className="mt-2">
+                      <SurfaceStatusPanel
+                        eyebrow="Raw trace"
+                        title="Unable to load raw trace log"
+                        detail={rawTraceError}
+                        tone="error"
+                      />
                     </div>
                   ) : rawTraceText ? (
                     <pre className="mt-2 max-h-[24rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-cyan-300/15 bg-black/40 p-3 font-mono text-[11px] leading-5 text-white/70">
                       {rawTraceText}
                     </pre>
                   ) : (
-                    <div className="mt-2 text-sm text-white/50">Open the raw file to inspect the underlying JSONL trace.</div>
+                    <div className="mt-2">
+                      <SurfaceStatusPanel
+                        eyebrow="Raw trace"
+                        title="Open the raw file to inspect the JSONL trace"
+                        detail="The span tree is already available above; open the raw file only when you need the source record."
+                        tone="info"
+                      />
+                    </div>
                   )}
                 </div>
               ) : null}
