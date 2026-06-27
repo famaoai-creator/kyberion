@@ -65,7 +65,7 @@ import {
   OpenRouterBackend,
   buildOpenRouterBackendFromEnv,
 } from './openrouter-backend.js';
-import { InSessionReasoningBackend } from './insession-reasoning-backend.js';
+import { maybeWrapWithDispatcher } from './agent-dispatch.js';
 import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
 import { registerVoiceBridge } from './voice-bridge.js';
@@ -76,6 +76,7 @@ import { installSecretResolverIfAvailable } from './secret-resolver.js';
 import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
 import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from './provider-discovery.js';
+import { resolveProviderDecision } from './capability-broker.js';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode as normalizeReasoningBackendModeFromPolicy,
@@ -122,6 +123,39 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
   }) as ReasoningBackendMode;
 }
 
+const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([
+  'claude-cli', 'codex-cli', 'claude-agent', 'anthropic', 'gemini-cli', 'gemini-api',
+  'agy-cli', 'local', 'nemotron', 'nemotron-api', 'openrouter', 'stub',
+]);
+
+/**
+ * GAP2: route the reasoning-backend selection through the Capability Broker so
+ * its decision is audit-recorded and a per-mission *pin* is honored (the broker
+ * exists for reproducible, audited provider selection but had no execution call
+ * site). Conservative by design: the env/policy-resolved mode is authoritative;
+ * the broker only OVERRIDES when a frozen pin names a usable reasoning mode.
+ * Skipped in stub/offline mode and never fatal.
+ */
+export function consultCapabilityBrokerForMode(resolvedMode: ReasoningBackendMode): ReasoningBackendMode {
+  if (resolvedMode === 'stub') return resolvedMode;
+  try {
+    const decision = resolveProviderDecision({
+      decisionKey: 'reasoning-backend',
+      requiredCapabilities: ['reasoning'],
+      record: true,
+    });
+    if (decision.pinned && REASONING_BACKEND_MODES.has(decision.provider as ReasoningBackendMode)) {
+      if (decision.provider !== resolvedMode) {
+        logger.info(`[reasoning-bootstrap] capability-broker pin overrides mode ${resolvedMode} → ${decision.provider}`);
+      }
+      return decision.provider as ReasoningBackendMode;
+    }
+  } catch (err) {
+    logger.warn(`[reasoning-bootstrap] capability-broker consult skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return resolvedMode;
+}
+
 /**
  * Install a real reasoning + intent + voice backend. Returns true when a
  * non-stub mode installed; false when the stubs remain. Idempotent.
@@ -135,7 +169,7 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
 }
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
-  const mode = resolveMode(options);
+  const mode = consultCapabilityBrokerForMode(resolveMode(options));
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
   installShellSpeechToTextBridgeIfAvailable();
@@ -222,6 +256,15 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   }
 
   if (mode === 'claude-agent') {
+    // The Agent SDK authenticates via the parent Claude Code harness (CLAUDECODE)
+    // or ANTHROPIC_API_KEY. Without either it cannot run, so fall back to stubs
+    // rather than registering a backend that would fail at delegate time.
+    if (!process.env.CLAUDECODE && !process.env.ANTHROPIC_API_KEY && !options.force) {
+      logger.warn('[reasoning-bootstrap] mode=claude-agent selected but no Claude Code harness (CLAUDECODE) or ANTHROPIC_API_KEY — keeping stubs.');
+      installed = true;
+      installedMode = 'stub';
+      return false;
+    }
     registerReasoningBackend(new ClaudeAgentReasoningBackend({ model: options.model }));
     registerIntentExtractor(new ClaudeAgentIntentExtractor({ model: options.model }));
     registerVoiceBridge(new ClaudeAgentVoiceBridge({ model: options.model }));
@@ -249,12 +292,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
       return false;
     }
 
-    if (process.env.KYBERION_IN_SESSION_SUBAGENT === '1') {
-      registerReasoningBackend(new InSessionReasoningBackend(geminiBackend));
-      logger.success('[reasoning-bootstrap] ⚡ In-Session Subagent mode enabled');
-    } else {
-      registerReasoningBackend(geminiBackend);
-    }
+    registerReasoningBackend(maybeWrapWithDispatcher(geminiBackend));
     const geminiOptions = {
       bin: process.env.KYBERION_GEMINI_CLI_BIN?.trim() || undefined,
       model: options.model ?? (process.env.KYBERION_GEMINI_CLI_MODEL?.trim() || undefined),

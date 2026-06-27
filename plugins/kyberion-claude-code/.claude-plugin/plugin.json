@@ -1,0 +1,8 @@
+{
+  "name": "kyberion-claude-code",
+  "version": "0.1.0",
+  "description": "Governed Kyberion integration for Claude Code: tier-guard + audit-chain hooks bridge Claude Code's native tool lifecycle into Kyberion governance, plus lifecycle slash commands and the kyberion.* MCP tool surface.",
+  "author": { "name": "Kyberion (famao)" },
+  "homepage": "https://kyberion.internal/plugins/kyberion-claude-code",
+  "keywords": ["kyberion", "governance", "audit", "mission-control", "tier-guard"]
+}

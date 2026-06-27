@@ -105,4 +105,29 @@ describe('reasoning-backend-policy', () => {
       }),
     ).toBe('local');
   });
+
+  it('prefers the in-session claude-agent when inside a Claude Code harness (CLAUDECODE)', () => {
+    const policy = loadReasoningBackendPolicy();
+
+    // Inside Claude Code with no explicit API-key signal → in-session sub-agent
+    // (instead of spawning a CLI / falling back to the default codex-cli).
+    expect(
+      resolveReasoningBackendModeFromContext({ policy, env: { CLAUDECODE: '1' }, providers: [] }),
+    ).toBe('claude-agent');
+
+    // Explicit API-key signals still win (conservative placement, last in priority).
+    expect(
+      resolveReasoningBackendModeFromContext({ policy, env: { CLAUDECODE: '1', ANTHROPIC_API_KEY: 'x' }, providers: [] }),
+    ).toBe('anthropic');
+
+    // An explicit requested mode always overrides host detection.
+    expect(
+      resolveReasoningBackendModeFromContext({ requestedMode: 'codex-cli', policy, env: { CLAUDECODE: '1' }, providers: [] }),
+    ).toBe('codex-cli');
+
+    // No CLAUDECODE → behavior unchanged (default).
+    expect(
+      resolveReasoningBackendModeFromContext({ policy, env: {}, providers: [] }),
+    ).toBe('codex-cli');
+  });
 });

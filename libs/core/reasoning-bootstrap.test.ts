@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getIntentExtractor, resetIntentExtractor } from './intent-extractor.js';
 import { getReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
 import {
+  consultCapabilityBrokerForMode,
   getInstalledReasoningMode,
   installReasoningBackends,
   normalizeReasoningBackendMode,
@@ -10,7 +11,18 @@ import {
 import { getVoiceBridge, resetVoiceBridge } from './voice-bridge.js';
 
 describe('reasoning-bootstrap', () => {
+  // Isolate resolution from the harness host env: when this suite runs *inside* a
+  // Claude Code session, the ambient CLAUDECODE would otherwise trigger the
+  // claude-agent host-detection rule and pollute provider-fallback assertions.
+  let savedClaudeCode: string | undefined;
+  beforeEach(() => {
+    savedClaudeCode = process.env.CLAUDECODE;
+    delete process.env.CLAUDECODE;
+  });
+
   afterEach(() => {
+    if (savedClaudeCode === undefined) delete process.env.CLAUDECODE;
+    else process.env.CLAUDECODE = savedClaudeCode;
     resetReasoningBootstrap();
     resetReasoningBackend();
     resetIntentExtractor();
@@ -114,5 +126,18 @@ describe('reasoning-bootstrap', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');
     expect(normalizeReasoningBackendMode('claude-agent')).toBe('claude-agent');
     expect(normalizeReasoningBackendMode('nemotron')).toBe('nemotron-api');
+  });
+});
+
+describe('consultCapabilityBrokerForMode (GAP2: broker wired into reasoning selection)', () => {
+  it('skips the broker entirely in stub/offline mode', () => {
+    expect(consultCapabilityBrokerForMode('stub')).toBe('stub');
+  });
+
+  it('never overrides the resolved mode without a pin (safety: no behavior change)', () => {
+    delete process.env.MISSION_ID; // clean pin scope → no reasoning-backend pin
+    // With no pin, the broker either resolves fresh-but-unpinned or fails; both
+    // paths must return the original mode unchanged.
+    expect(consultCapabilityBrokerForMode('claude-cli')).toBe('claude-cli');
   });
 });

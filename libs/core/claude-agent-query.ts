@@ -16,7 +16,7 @@
  * model: Kyberion never calls the API itself, a sub-agent does.
  */
 
-import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
+import { query, type CanUseTool, type McpServerConfig, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
 export interface ClaudeAgentQueryParams<T> {
@@ -135,4 +135,78 @@ export async function runClaudeAgentQuery<T>(
     totalCostUsd,
     numTurns,
   };
+}
+
+export interface ClaudeAgentTaskParams {
+  systemPrompt: string;
+  userPrompt: string;
+  model?: string;
+  abortController?: AbortController;
+  /** MCP servers exposed to the sub-agent (e.g. Kyberion's governed surface). */
+  mcpServers?: Record<string, McpServerConfig>;
+  /** Advisory tool allowlist; the real enforcement is `canUseTool`. */
+  allowedTools?: string[];
+  /** Governance gate invoked before each tool call. */
+  canUseTool?: CanUseTool;
+  /** Multi-turn budget for the agentic loop. Defaults to 8. */
+  maxTurns?: number;
+  extraOptions?: Partial<Options>;
+}
+
+export interface ClaudeAgentTaskResult {
+  text: string;
+  sessionId: string;
+  totalCostUsd: number;
+  numTurns: number;
+}
+
+/**
+ * Run an **agentic** (multi-turn, tool-using) sub-agent task and return its final
+ * text. Unlike {@link runClaudeAgentQuery} (one-shot, `tools: []`, json_schema),
+ * this path enables tools — intended to be driven by Kyberion governance
+ * (`mcpServers` + `canUseTool` from `claude-agent-governance.ts`).
+ */
+export async function runClaudeAgentTask(params: ClaudeAgentTaskParams): Promise<ClaudeAgentTaskResult> {
+  const options: Options = {
+    systemPrompt: params.systemPrompt,
+    model: params.model ?? 'opus',
+    maxTurns: params.maxTurns ?? 8,
+    permissionMode: 'default',
+    ...(params.mcpServers ? { mcpServers: params.mcpServers } : {}),
+    ...(params.allowedTools ? { allowedTools: params.allowedTools } : {}),
+    ...(params.canUseTool ? { canUseTool: params.canUseTool } : {}),
+    abortController: params.abortController,
+    ...(params.extraOptions ?? {}),
+  };
+
+  const iterator = query({ prompt: params.userPrompt, options });
+
+  let text = '';
+  let sessionId = '';
+  let totalCostUsd = 0;
+  let numTurns = 0;
+  let lastError: unknown;
+
+  for await (const message of iterator) {
+    if (message.type === 'result') {
+      if (message.subtype === 'success') {
+        text = (message as { result?: string }).result ?? '';
+        sessionId = (message as { session_id?: string }).session_id ?? '';
+        totalCostUsd = (message as { total_cost_usd?: number }).total_cost_usd ?? 0;
+        numTurns = (message as { num_turns?: number }).num_turns ?? 0;
+      } else {
+        lastError = message;
+      }
+      break;
+    }
+    if (message.type === 'assistant' && (message as any).error) {
+      lastError = (message as any).error;
+    }
+  }
+
+  if (lastError) {
+    throw new ClaudeAgentQueryError('[claude-agent-query] agentic sub-agent returned error', 'agent_error', lastError);
+  }
+
+  return { text, sessionId, totalCostUsd, numTurns };
 }

@@ -79,6 +79,10 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
     { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },
+    // Running inside a Claude Code harness: prefer the in-session claude-agent
+    // sub-agent (inherits the host session's auth, no new CLI spawn) over the
+    // CLI-spawn fallback. Explicit API-key signals above still win.
+    { env: 'CLAUDECODE', mode: 'claude-agent' },
   ],
   cli_preference_rules: [
     { env_any: ['CODEX_CLI', 'CODEX_VERSION'], env_equals: { TERM_PROGRAM: 'codex' }, provider: 'codex', mode: 'codex-cli' },
