@@ -16,9 +16,14 @@ export interface VoiceEngineRecord {
   provider: string;
   status: VoiceEngineStatus;
   platforms: VoiceEnginePlatform[];
+  model_id?: string;
+  bridge_script?: string;
+  stt_bridge_script?: string;
   supports: {
     list_voices: boolean;
     playback: boolean;
+    voice_clone?: boolean;
+    icl_ref_audio?: boolean;
     artifact_formats: VoiceEngineArtifactFormat[];
   };
   fallback_engine_id?: string;

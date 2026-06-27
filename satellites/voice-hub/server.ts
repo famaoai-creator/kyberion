@@ -2523,6 +2523,17 @@ function resolvePreferredLocale(input: {
 function buildPresentationDeckBrief(session: TaskSessionShape): any {
   const payload = session.payload || {};
   const purpose = String(payload.deck_purpose || 'proposal');
+  const slidePatternId = String(payload.slide_pattern_id || '').trim();
+  const slidePatternPackId = String(payload.slide_pattern_pack_id || '').trim();
+  const slidePatternPolicy =
+    payload.slide_pattern_selection_policy && typeof payload.slide_pattern_selection_policy === 'object'
+      ? payload.slide_pattern_selection_policy
+      : slidePatternId || slidePatternPackId
+        ? {
+            pack_id: slidePatternPackId || 'slide-md-core',
+            default_pattern_id: slidePatternId || undefined,
+          }
+        : undefined;
   const reusableRefs = resolveWorkDesign({
     intentId: 'generate-presentation',
     taskType: session.task_type,
@@ -2563,6 +2574,9 @@ function buildPresentationDeckBrief(session: TaskSessionShape): any {
         { title: 'Session', point: session.session_id },
       ],
       required_sections: ['executive-summary', 'recommendation', 'plan'],
+      slide_pattern_id: slidePatternId || undefined,
+      slide_pattern_pack_id: slidePatternPackId || undefined,
+      slide_pattern_selection_policy: slidePatternPolicy,
       reusable_refs: reusableRefs,
     },
   };

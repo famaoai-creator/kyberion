@@ -1145,6 +1145,16 @@ describe('media-actuator pdf to pptx bridge', () => {
             { title: 'Governance design', point: 'Controls are embedded without exposing back-office complexity.' },
             { title: 'Pilot roadmap', point: 'A phased rollout de-risks delivery while creating wins.' }
           ],
+          slide_pattern_selection_policy: {
+            pack_id: 'slide-md-core',
+            default_pattern_id: 'key-message-single',
+            rules: [
+              { semantic_type: 'hero', pattern_id: 'cover-title-center' },
+              { semantic_type: 'problem', pattern_id: 'problem-solution' },
+              { semantic_type: 'roadmap', pattern_id: 'milestone-timeline' },
+              { semantic_type: 'cta', pattern_id: 'action-items-list' },
+            ],
+          },
         },
       },
       steps: [
@@ -1211,6 +1221,16 @@ describe('media-actuator pdf to pptx bridge', () => {
             { title: 'Governance design', point: 'Controls are embedded without exposing back-office complexity.' },
             { title: 'Pilot roadmap', point: 'A phased rollout de-risks delivery while creating wins.' }
           ],
+          slide_pattern_selection_policy: {
+            pack_id: 'slide-md-core',
+            default_pattern_id: 'key-message-single',
+            rules: [
+              { semantic_type: 'hero', pattern_id: 'cover-title-center' },
+              { semantic_type: 'problem', pattern_id: 'problem-solution' },
+              { semantic_type: 'roadmap', pattern_id: 'milestone-timeline' },
+              { semantic_type: 'cta', pattern_id: 'action-items-list' },
+            ],
+          },
         },
       },
       steps: [
@@ -1232,9 +1252,10 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.proposal_storyline.slides.length).toBeGreaterThanOrEqual(6);
     expect(result.context.proposal_storyline.slides).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'why-change', layout_key: 'evidence-callout' }),
-        expect.objectContaining({ id: 'delivery-plan', media_kind: 'timeline' }),
-        expect.objectContaining({ id: 'decision', layout_key: 'decision-cta' }),
+        expect.objectContaining({ id: 'cover', pattern_id: 'cover-title-center' }),
+        expect.objectContaining({ id: 'why-change', layout_key: 'evidence-callout', pattern_id: 'problem-solution' }),
+        expect.objectContaining({ id: 'delivery-plan', media_kind: 'timeline', pattern_id: 'milestone-timeline' }),
+        expect.objectContaining({ id: 'decision', layout_key: 'decision-cta', pattern_id: 'action-items-list' }),
       ]),
     );
     expect(result.context.proposal_storyline.slides[0].design_system_id).toBe('executive-standard');

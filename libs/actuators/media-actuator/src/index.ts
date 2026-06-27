@@ -292,10 +292,13 @@ let _cachedTenantRegistry: any = null;
 
 /** Build entry list from index.json, or fall back to directory-scanning knowledge/confidential/. */
 function loadTenantEntries(rootDir: string): { override_path: string }[] {
+  const entries: { override_path: string }[] = [];
   const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
   try {
     const registry = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string);
-    if (Array.isArray(registry.tenants) && registry.tenants.length > 0) return registry.tenants;
+    if (Array.isArray(registry.tenants)) {
+      entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
+    }
   } catch { /* index.json absent or unreadable — fall through to directory scan */ }
   // Fallback: scan knowledge/confidential/*/design/tenant-override.json
   try {
@@ -304,10 +307,16 @@ function loadTenantEntries(rootDir: string): { override_path: string }[] {
     const slugs = names.filter(name => {
       try { return safeStat(path.join(confidentialDir, name)).isDirectory(); } catch { return false; }
     });
-    return slugs.map((s: string) => ({
+    entries.push(...slugs.map((s: string) => ({
       override_path: `knowledge/confidential/${s}/design/tenant-override.json`
-    }));
-  } catch { return []; }
+    })));
+  } catch { /* confidential directory absent or unreadable */ }
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    if (!entry.override_path || seen.has(entry.override_path)) return false;
+    seen.add(entry.override_path);
+    return true;
+  });
 }
 
 function resolveConfidentialTenantOverride(rootDir: string, brandName: string, designSystemId?: string): any {
@@ -933,6 +942,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         media_kind: entry.media_kind,
         layout_key: entry.layout_key,
         semantic_type: entry.semantic_type,
+        pattern_id: entry.pattern_id,
+        slide_pattern: entry.slide_pattern,
+        body_zone: entry.body_zone,
         design_system_id: outline.design_system_id,
         branding: outline.branding || {},
       }));

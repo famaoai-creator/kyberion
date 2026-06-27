@@ -18,6 +18,19 @@
         ],
         "default_theme_hint": "executive_clean"
       },
+      "slide_pattern_selection_policy": {
+        "pack_id": "slide-md-core",
+        "default_pattern_id": "key-message-single",
+        "rules": [
+          { "semantic_type": "hero", "pattern_id": "cover-title-center" },
+          { "semantic_type": "problem", "pattern_id": "problem-solution" },
+          { "semantic_type": "solution", "pattern_id": "three-col-icon-card-body-text" },
+          { "semantic_type": "plan", "pattern_id": "four-step-flow" },
+          { "semantic_type": "roadmap", "pattern_id": "milestone-timeline" },
+          { "semantic_type": "roi", "pattern_id": "three-kpi-big-number" },
+          { "semantic_type": "cta", "pattern_id": "action-items-list" }
+        ]
+      },
       "brief_question_sets": [
         {
           "label": "Proposal deck",
