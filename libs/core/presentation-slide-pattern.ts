@@ -89,12 +89,31 @@ export interface SlidePatternSelection {
   };
 }
 
+export interface SlidePatternDiagnostic {
+  level: 'info' | 'warn';
+  code: string;
+  message: string;
+  slide_id?: string;
+  pattern_id?: string;
+}
+
 const DEFAULT_PACK_PATH = 'knowledge/public/design-patterns/presentation/slide-pattern-pack.json';
+const GENERIC_LAYOUT_KEYS = new Set(['title-body', 'doc-contents']);
+const COMPARISON_PATTERN_IDS = new Set([
+  'problem-solution',
+  'before-after-two-col',
+  'comparison-table-with-highlight',
+]);
+const ROADMAP_PATTERN_IDS = new Set(['four-step-flow', 'milestone-timeline']);
 
 let cachedPack: SlidePatternPack | null = null;
 
 function normalize(value?: string | null): string {
   return String(value || '').trim().toLowerCase();
+}
+
+function isGenericLayoutKey(layoutKey?: string | null): boolean {
+  return GENERIC_LAYOUT_KEYS.has(normalize(layoutKey));
 }
 
 function loadPackFromPath(packPath: string): SlidePatternPack {
@@ -116,13 +135,14 @@ export function loadSlidePatternPack(packPath?: string): SlidePatternPack {
 function scorePattern(
   pattern: SlidePatternDefinition,
   input: SelectSlidePatternInput,
-): { score: number; reason: string } {
+): { score: number; reason: string; genericLayout: boolean } {
   const deckPurpose = normalize(input.deckPurpose);
   const semanticType = normalize(input.semanticType);
   const slideType = normalize(input.slideType);
   const layoutKey = normalize(input.layoutKey);
   let score = 0;
   const reasons: string[] = [];
+  const genericLayout = isGenericLayoutKey(pattern.renderer_hints.layout_key);
 
   if (semanticType && pattern.semantic_types.map(normalize).includes(semanticType)) {
     score += 8;
@@ -133,15 +153,24 @@ function scorePattern(
     reasons.push(`slide_type:${slideType}`);
   }
   if (layoutKey && normalize(pattern.renderer_hints.layout_key) === layoutKey) {
-    score += 4;
-    reasons.push(`layout_key:${layoutKey}`);
+    if (genericLayout) {
+      score -= 2;
+      reasons.push(`generic_layout_match:${layoutKey}`);
+    } else {
+      score += 4;
+      reasons.push(`layout_key:${layoutKey}`);
+    }
   }
   if (deckPurpose && pattern.deck_purposes?.map(normalize).includes(deckPurpose)) {
     score += 2;
     reasons.push(`deck_purpose:${deckPurpose}`);
   }
+  if (genericLayout) {
+    score -= 1;
+    reasons.push(`generic_layout:${pattern.renderer_hints.layout_key}`);
+  }
 
-  return { score, reason: reasons.join(',') || 'fallback' };
+  return { score, reason: reasons.join(',') || 'fallback', genericLayout };
 }
 
 function patternToSelection(
@@ -187,12 +216,123 @@ export function selectSlidePattern(input: SelectSlidePatternInput): SlidePattern
   const scored = patterns
     .map((pattern) => ({ pattern, ...scorePattern(pattern, input) }))
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || a.pattern.pattern_id.localeCompare(b.pattern.pattern_id));
+    .sort((a, b) =>
+      b.score - a.score ||
+      Number(a.genericLayout) - Number(b.genericLayout) ||
+      a.pattern.pattern_id.localeCompare(b.pattern.pattern_id)
+    );
   if (scored[0]) return patternToSelection(scored[0].pattern, pack, scored[0].reason);
 
   const fallbackId = input.policy?.default_pattern_id || 'key-message-single';
   const fallback = patterns.find((entry) => entry.pattern_id === fallbackId) || patterns[0];
   return patternToSelection(fallback, pack, 'default');
+}
+
+function extractSlidePatternContent(slide: Record<string, unknown>): Record<string, unknown> {
+  const body = Array.isArray(slide.body)
+    ? slide.body.map((entry) => String(entry).trim()).filter(Boolean)
+    : [];
+  const title = String(slide.title || '').trim();
+  const objective = String(slide.objective || '').trim();
+  const splitIndex = Math.max(1, Math.ceil(body.length / 2));
+  return {
+    title,
+    subtitle: objective,
+    message: title,
+    support: body[0] || objective,
+    agenda_items: body,
+    takeaways: body,
+    actions: body,
+    steps: body,
+    milestones: body,
+    cards: body,
+    comparison_rows: body,
+    kpis: body,
+    problem_items: body.slice(0, splitIndex),
+    solution_items: body.slice(splitIndex),
+    before_items: body.slice(0, splitIndex),
+    after_items: body.slice(splitIndex),
+    section_title: title,
+    section_subtitle: objective,
+  };
+}
+
+function appendDiagnostic(
+  diagnostics: SlidePatternDiagnostic[],
+  diagnostic: SlidePatternDiagnostic,
+  limit = 8,
+): void {
+  if (diagnostics.length >= limit) return;
+  diagnostics.push(diagnostic);
+}
+
+export function buildSlidePatternDiagnostics(
+  slides: Array<Record<string, unknown>>,
+): SlidePatternDiagnostic[] {
+  const diagnostics: SlidePatternDiagnostic[] = [];
+  const list = Array.isArray(slides) ? slides : [];
+  let genericLayoutCount = 0;
+  let hasComparisonPattern = false;
+  let hasRoadmapPattern = false;
+
+  for (const slide of list) {
+    const slideId = String(slide.id || slide.section_id || '').trim();
+    const selection = slide.slide_pattern as SlidePatternSelection | undefined;
+    const layoutKey = String(slide.layout_key || selection?.layout_key || '').trim();
+    const patternId = String(slide.pattern_id || selection?.pattern_id || '').trim();
+
+    if (isGenericLayoutKey(layoutKey)) {
+      genericLayoutCount += 1;
+    }
+
+    const title = String(slide.title || '').trim();
+    if (title.length > 54) {
+      appendDiagnostic(diagnostics, {
+        level: 'warn',
+        code: 'headline-too-long',
+        message: `${slideId || 'slide'} has a headline that is too long.`,
+        slide_id: slideId || undefined,
+        pattern_id: patternId || undefined,
+      });
+    }
+
+    if (selection) {
+      if (COMPARISON_PATTERN_IDS.has(selection.pattern_id)) {
+        hasComparisonPattern = true;
+      }
+      if (ROADMAP_PATTERN_IDS.has(selection.pattern_id)) {
+        hasRoadmapPattern = true;
+      }
+      const warnings = validateSlidePatternContent(selection, extractSlidePatternContent(slide));
+      for (const warning of warnings) {
+        appendDiagnostic(diagnostics, {
+          level: 'warn',
+          code: 'pattern-validation',
+          message: warning,
+          slide_id: slideId || undefined,
+          pattern_id: selection.pattern_id,
+        });
+      }
+    }
+  }
+
+  if (genericLayoutCount > 0) {
+    diagnostics.unshift({
+      level: 'warn',
+      code: 'generic-layouts',
+      message: `${genericLayoutCount} slide(s) still use a generic title-body/doc-contents layout.`,
+    });
+  }
+
+  if (hasComparisonPattern && hasRoadmapPattern) {
+    appendDiagnostic(diagnostics, {
+      level: 'info',
+      code: 'mixed-story-families',
+      message: 'Comparison and roadmap patterns are mixed in the same deck.',
+    });
+  }
+
+  return diagnostics;
 }
 
 export function applySlidePatternToSection(

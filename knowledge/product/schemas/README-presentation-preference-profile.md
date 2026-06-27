@@ -10,7 +10,7 @@ It separates:
 
 Use it when the request is closer to "write a deck" than "answer a question". The content brief should stay separate from visual styling.
 
-`brief_question_sets` tells Kyberion which first 1-3 questions to ask for a given deck purpose.
+`brief_question_sets` tells Kyberion which first 1-2 questions to ask for a given deck purpose.
 
 `theme_sets` tells Kyberion which visual theme to prefer for that purpose.
 
