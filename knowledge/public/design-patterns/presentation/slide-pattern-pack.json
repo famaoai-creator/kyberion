@@ -1,0 +1,208 @@
+{
+  "kind": "slide-pattern-pack",
+  "version": "1.0.0",
+  "pack_id": "slide-md-core",
+  "source": {
+    "name": "sho-ai-magic/slide.md",
+    "repository": "https://github.com/sho-ai-magic/slide.md",
+    "revision": "da4b5c41b3329bd97de02ce09ce9b06be00db241",
+    "notes": "First Kyberion subset of SLIDE.md patterns. Keep theme/frame concerns in PPTX theme packs and presentation preference profiles."
+  },
+  "patterns": [
+    {
+      "pattern_id": "cover-title-center",
+      "category": "cover",
+      "summary": "Centered title cover with subtitle and sparse metadata.",
+      "suitable_scenes": ["opening slide", "proposal cover", "section opener"],
+      "slide_types": ["cover", "hero", "title"],
+      "semantic_types": ["hero"],
+      "deck_purposes": ["proposal", "briefing", "marketing", "training"],
+      "structure": { "layout": "centered-title", "alignment": "center" },
+      "element_slots": [
+        { "slot_id": "title", "role": "Main title", "required": true, "max_items": 1, "max_chars_per_item": 42 },
+        { "slot_id": "subtitle", "role": "Subtitle", "required": false, "max_items": 1, "max_chars_per_item": 72 }
+      ],
+      "constraints": [{ "kind": "single_message", "slots": ["title"], "message": "Keep the cover focused on one clear title." }],
+      "renderer_hints": { "layout_key": "cover-statement", "body_zone": "single-column", "media_kind": "hero" }
+    },
+    {
+      "pattern_id": "agenda-toc",
+      "category": "agenda",
+      "summary": "Numbered agenda list for a deck with clear sections.",
+      "suitable_scenes": ["agenda", "table of contents", "section overview"],
+      "slide_types": ["agenda", "toc", "contents"],
+      "semantic_types": ["summary"],
+      "deck_purposes": ["proposal", "internal_share", "briefing", "training"],
+      "structure": { "layout": "numbered-list", "numbered": true },
+      "element_slots": [
+        { "slot_id": "agenda_items", "role": "Agenda items", "required": true, "min_items": 3, "max_items": 7, "max_chars_per_item": 34 }
+      ],
+      "renderer_hints": { "layout_key": "title-body", "body_zone": "single-column", "media_kind": "contents" }
+    },
+    {
+      "pattern_id": "section-divider",
+      "category": "section",
+      "summary": "Sparse section divider with section number, title, and optional subtitle.",
+      "suitable_scenes": ["chapter break", "section intro", "agenda transition"],
+      "slide_types": ["section", "divider"],
+      "semantic_types": ["summary"],
+      "deck_purposes": ["proposal", "briefing", "training", "marketing"],
+      "structure": { "layout": "section-divider", "accent": "vertical-rule" },
+      "element_slots": [
+        { "slot_id": "section_title", "role": "Section title", "required": true, "max_items": 1, "max_chars_per_item": 36 },
+        { "slot_id": "section_subtitle", "role": "Section subtitle", "required": false, "max_items": 1, "max_chars_per_item": 70 }
+      ],
+      "renderer_hints": { "layout_key": "cover-statement", "body_zone": "single-column", "media_kind": "section" }
+    },
+    {
+      "pattern_id": "key-message-single",
+      "category": "message",
+      "summary": "One large key message with a short support line.",
+      "suitable_scenes": ["core claim", "executive takeaway", "chapter conclusion"],
+      "slide_types": ["key_message", "summary", "content"],
+      "semantic_types": ["summary", "decision"],
+      "deck_purposes": ["proposal", "briefing", "marketing"],
+      "structure": { "layout": "single-message", "emphasis": "large-center" },
+      "element_slots": [
+        { "slot_id": "message", "role": "Key message", "required": true, "max_items": 1, "max_chars_per_item": 64 },
+        { "slot_id": "support", "role": "Supporting note", "required": false, "max_items": 1, "max_chars_per_item": 90 }
+      ],
+      "constraints": [{ "kind": "single_message", "slots": ["message"], "message": "This pattern should carry one message only." }],
+      "renderer_hints": { "layout_key": "decision-cta", "body_zone": "decision-cta", "media_kind": "summary" }
+    },
+    {
+      "pattern_id": "problem-solution",
+      "category": "comparison",
+      "summary": "Two-column problem and solution layout with paired numbered items.",
+      "suitable_scenes": ["solution proposal", "problem framing", "project plan"],
+      "slide_types": ["comparison", "problem_solution", "content"],
+      "semantic_types": ["problem", "solution"],
+      "deck_purposes": ["proposal", "briefing", "comparison"],
+      "structure": { "layout": "two-column-paired-list", "columns": 2 },
+      "element_slots": [
+        { "slot_id": "problem_items", "role": "Problems", "required": true, "min_items": 2, "max_items": 4, "max_chars_per_item": 52 },
+        { "slot_id": "solution_items", "role": "Solutions", "required": true, "min_items": 2, "max_items": 4, "max_chars_per_item": 52 }
+      ],
+      "constraints": [
+        { "kind": "paired_item_counts_match", "slots": ["problem_items", "solution_items"], "message": "Problems and solutions must align by item number." }
+      ],
+      "renderer_hints": { "layout_key": "two-column-story", "body_zone": "two-column-callout", "media_kind": "comparison" }
+    },
+    {
+      "pattern_id": "before-after-two-col",
+      "category": "comparison",
+      "summary": "Before/after comparison with two balanced columns.",
+      "suitable_scenes": ["improvement proposal", "change narrative", "state comparison"],
+      "slide_types": ["comparison", "before_after"],
+      "semantic_types": ["problem", "solution"],
+      "deck_purposes": ["proposal", "comparison", "training"],
+      "structure": { "layout": "two-column-before-after", "columns": 2 },
+      "element_slots": [
+        { "slot_id": "before_items", "role": "Before state", "required": true, "min_items": 2, "max_items": 4, "max_chars_per_item": 48 },
+        { "slot_id": "after_items", "role": "After state", "required": true, "min_items": 2, "max_items": 4, "max_chars_per_item": 48 }
+      ],
+      "constraints": [
+        { "kind": "paired_item_counts_match", "slots": ["before_items", "after_items"], "message": "Before and after items should map one-to-one." }
+      ],
+      "renderer_hints": { "layout_key": "two-column-story", "body_zone": "two-column-callout", "media_kind": "comparison" }
+    },
+    {
+      "pattern_id": "four-step-flow",
+      "category": "flow",
+      "summary": "Four horizontal steps connected as a process.",
+      "suitable_scenes": ["workflow", "implementation steps", "process explanation"],
+      "slide_types": ["flow", "steps", "plan"],
+      "semantic_types": ["plan", "roadmap"],
+      "deck_purposes": ["proposal", "training", "internal_share"],
+      "structure": { "layout": "horizontal-step-flow", "steps": 4 },
+      "element_slots": [
+        { "slot_id": "steps", "role": "Process steps", "required": true, "min_items": 3, "max_items": 5, "max_chars_per_item": 38 }
+      ],
+      "renderer_hints": { "layout_key": "timeline-roadmap", "body_zone": "timeline", "media_kind": "timeline" }
+    },
+    {
+      "pattern_id": "milestone-timeline",
+      "category": "flow",
+      "summary": "Timeline with milestones and planned checkpoints.",
+      "suitable_scenes": ["roadmap", "project plan", "progress report"],
+      "slide_types": ["timeline", "roadmap", "plan"],
+      "semantic_types": ["roadmap", "plan"],
+      "deck_purposes": ["proposal", "briefing", "internal_share"],
+      "structure": { "layout": "milestone-timeline", "axis": "horizontal" },
+      "element_slots": [
+        { "slot_id": "milestones", "role": "Milestones", "required": true, "min_items": 3, "max_items": 6, "max_chars_per_item": 42 }
+      ],
+      "renderer_hints": { "layout_key": "timeline-roadmap", "body_zone": "timeline", "media_kind": "timeline" }
+    },
+    {
+      "pattern_id": "three-col-icon-card-body-text",
+      "category": "card_grid",
+      "summary": "Three equal cards with icon/illustration, concise heading, and category label.",
+      "suitable_scenes": ["three issues", "three features", "category overview"],
+      "slide_types": ["cards", "features", "content"],
+      "semantic_types": ["problem", "solution", "architecture"],
+      "deck_purposes": ["proposal", "marketing", "training"],
+      "structure": { "layout": "three-card-grid", "columns": 3 },
+      "element_slots": [
+        { "slot_id": "cards", "role": "Three card summaries", "required": true, "min_items": 3, "max_items": 3, "max_chars_per_item": 44 }
+      ],
+      "renderer_hints": { "layout_key": "three-pillars", "body_zone": "architecture-panel", "media_kind": "cards" }
+    },
+    {
+      "pattern_id": "comparison-table-with-highlight",
+      "category": "table",
+      "summary": "Comparison table where one option or row can be highlighted.",
+      "suitable_scenes": ["option comparison", "pricing", "capability comparison"],
+      "slide_types": ["table", "comparison"],
+      "semantic_types": ["roi", "decision", "execution"],
+      "deck_purposes": ["proposal", "comparison", "briefing"],
+      "structure": { "layout": "comparison-table", "highlight": true },
+      "element_slots": [
+        { "slot_id": "comparison_rows", "role": "Comparison rows", "required": true, "min_items": 3, "max_items": 7, "max_chars_per_item": 36 }
+      ],
+      "renderer_hints": { "layout_key": "evidence-callout", "body_zone": "two-column-callout", "media_kind": "table" }
+    },
+    {
+      "pattern_id": "three-kpi-big-number",
+      "category": "kpi_summary",
+      "summary": "Three large KPI numbers for outcome and impact reporting.",
+      "suitable_scenes": ["impact summary", "KPI report", "executive summary"],
+      "slide_types": ["kpi", "summary", "data"],
+      "semantic_types": ["roi", "summary", "evidence"],
+      "deck_purposes": ["proposal", "briefing", "marketing"],
+      "structure": { "layout": "three-kpi", "columns": 3 },
+      "element_slots": [
+        { "slot_id": "kpis", "role": "KPI values", "required": true, "min_items": 3, "max_items": 3, "max_chars_per_item": 28 }
+      ],
+      "renderer_hints": { "layout_key": "evidence-callout", "body_zone": "two-column-callout", "media_kind": "data" }
+    },
+    {
+      "pattern_id": "summary-three-points",
+      "category": "closing",
+      "summary": "Three-point summary for closing or decision alignment.",
+      "suitable_scenes": ["closing", "summary", "takeaways"],
+      "slide_types": ["summary", "closing", "takeaways"],
+      "semantic_types": ["summary", "decision"],
+      "deck_purposes": ["proposal", "briefing", "training", "internal_share"],
+      "structure": { "layout": "three-point-summary", "items": 3 },
+      "element_slots": [
+        { "slot_id": "takeaways", "role": "Takeaways", "required": true, "min_items": 3, "max_items": 3, "max_chars_per_item": 48 }
+      ],
+      "renderer_hints": { "layout_key": "title-body", "body_zone": "single-column", "media_kind": "summary" }
+    },
+    {
+      "pattern_id": "action-items-list",
+      "category": "action_items",
+      "summary": "Action item list with owner and deadline cues.",
+      "suitable_scenes": ["next steps", "meeting close", "project kickoff"],
+      "slide_types": ["actions", "next_steps", "cta"],
+      "semantic_types": ["cta", "decision"],
+      "deck_purposes": ["proposal", "internal_share", "briefing"],
+      "structure": { "layout": "action-list", "columns": ["action", "owner", "due"] },
+      "element_slots": [
+        { "slot_id": "actions", "role": "Action items", "required": true, "min_items": 2, "max_items": 6, "max_chars_per_item": 46 }
+      ],
+      "renderer_hints": { "layout_key": "decision-cta", "body_zone": "decision-cta", "media_kind": "cta" }
+    }
+  ]
+}

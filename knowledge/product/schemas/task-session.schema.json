@@ -269,6 +269,33 @@
               },
               "slide_count_hint": { "type": "integer", "minimum": 1 },
               "theme_hint": { "type": "string" },
+              "slide_pattern_id": { "type": "string" },
+              "slide_pattern_pack_id": { "type": "string" },
+              "slide_pattern_selection_policy": {
+                "type": "object",
+                "properties": {
+                  "pack_id": { "type": "string" },
+                  "default_pattern_id": { "type": "string" },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["pattern_id"],
+                      "properties": {
+                        "deck_purpose": {
+                          "type": "string",
+                          "enum": ["proposal", "internal_share", "briefing", "marketing", "training", "comparison"]
+                        },
+                        "semantic_type": { "type": "string" },
+                        "slide_type": { "type": "string" },
+                        "pattern_id": { "type": "string" }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "output_path": { "type": "string" }
             },
             "additionalProperties": false

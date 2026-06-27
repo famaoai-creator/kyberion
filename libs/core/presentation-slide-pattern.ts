@@ -1,0 +1,257 @@
+import { pathResolver } from './path-resolver.js';
+import type { PresentationDeckPurpose } from './presentation-preference-profile.js';
+import { safeReadFile } from './secure-io.js';
+
+export interface SlidePatternSlot {
+  slot_id: string;
+  role: string;
+  required: boolean;
+  min_items?: number;
+  max_items?: number;
+  max_chars_per_item?: number;
+  notes?: string;
+}
+
+export interface SlidePatternConstraint {
+  kind: 'paired_item_counts_match' | 'requires_visual' | 'single_message';
+  slots?: string[];
+  message?: string;
+}
+
+export interface SlidePatternRendererHints {
+  layout_key: string;
+  body_zone: string;
+  media_kind?: string;
+  visual_treatment?: string;
+  fallback_pattern_id?: string;
+}
+
+export interface SlidePatternDefinition {
+  pattern_id: string;
+  category: string;
+  summary: string;
+  suitable_scenes: string[];
+  slide_types: string[];
+  semantic_types: string[];
+  deck_purposes?: PresentationDeckPurpose[];
+  structure: Record<string, unknown> & { layout: string };
+  element_slots: SlidePatternSlot[];
+  constraints?: SlidePatternConstraint[];
+  renderer_hints: SlidePatternRendererHints;
+}
+
+export interface SlidePatternPack {
+  kind: 'slide-pattern-pack';
+  version: string;
+  pack_id: string;
+  source: {
+    name: string;
+    repository?: string;
+    revision?: string;
+    notes?: string;
+  };
+  patterns: SlidePatternDefinition[];
+}
+
+export interface PresentationSlidePatternSelectionRule {
+  semantic_type?: string;
+  slide_type?: string;
+  deck_purpose?: PresentationDeckPurpose;
+  pattern_id: string;
+}
+
+export interface PresentationSlidePatternSelectionPolicy {
+  pack_id?: string;
+  default_pattern_id?: string;
+  rules?: PresentationSlidePatternSelectionRule[];
+}
+
+export interface SelectSlidePatternInput {
+  deckPurpose?: string | null;
+  semanticType?: string | null;
+  slideType?: string | null;
+  layoutKey?: string | null;
+  policy?: PresentationSlidePatternSelectionPolicy | null;
+  pack?: SlidePatternPack;
+}
+
+export interface SlidePatternSelection {
+  pattern_id: string;
+  category: string;
+  layout_key: string;
+  media_kind?: string;
+  body_zone: string;
+  constraints: SlidePatternConstraint[];
+  element_slots: SlidePatternSlot[];
+  source: {
+    pack_id: string;
+    reason: string;
+  };
+}
+
+const DEFAULT_PACK_PATH = 'knowledge/public/design-patterns/presentation/slide-pattern-pack.json';
+
+let cachedPack: SlidePatternPack | null = null;
+
+function normalize(value?: string | null): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function loadPackFromPath(packPath: string): SlidePatternPack {
+  return JSON.parse(safeReadFile(packPath, { encoding: 'utf8' }) as string) as SlidePatternPack;
+}
+
+export function resetSlidePatternPackCache(): void {
+  cachedPack = null;
+}
+
+export function loadSlidePatternPack(packPath?: string): SlidePatternPack {
+  const resolvedPath = packPath || pathResolver.rootResolve(DEFAULT_PACK_PATH);
+  if (!packPath && cachedPack) return cachedPack;
+  const pack = loadPackFromPath(resolvedPath);
+  if (!packPath) cachedPack = pack;
+  return pack;
+}
+
+function scorePattern(
+  pattern: SlidePatternDefinition,
+  input: SelectSlidePatternInput,
+): { score: number; reason: string } {
+  const deckPurpose = normalize(input.deckPurpose);
+  const semanticType = normalize(input.semanticType);
+  const slideType = normalize(input.slideType);
+  const layoutKey = normalize(input.layoutKey);
+  let score = 0;
+  const reasons: string[] = [];
+
+  if (semanticType && pattern.semantic_types.map(normalize).includes(semanticType)) {
+    score += 8;
+    reasons.push(`semantic_type:${semanticType}`);
+  }
+  if (slideType && pattern.slide_types.map(normalize).includes(slideType)) {
+    score += 5;
+    reasons.push(`slide_type:${slideType}`);
+  }
+  if (layoutKey && normalize(pattern.renderer_hints.layout_key) === layoutKey) {
+    score += 4;
+    reasons.push(`layout_key:${layoutKey}`);
+  }
+  if (deckPurpose && pattern.deck_purposes?.map(normalize).includes(deckPurpose)) {
+    score += 2;
+    reasons.push(`deck_purpose:${deckPurpose}`);
+  }
+
+  return { score, reason: reasons.join(',') || 'fallback' };
+}
+
+function patternToSelection(
+  pattern: SlidePatternDefinition,
+  pack: SlidePatternPack,
+  reason: string,
+): SlidePatternSelection {
+  return {
+    pattern_id: pattern.pattern_id,
+    category: pattern.category,
+    layout_key: pattern.renderer_hints.layout_key,
+    media_kind: pattern.renderer_hints.media_kind,
+    body_zone: pattern.renderer_hints.body_zone,
+    constraints: pattern.constraints || [],
+    element_slots: pattern.element_slots,
+    source: {
+      pack_id: pack.pack_id,
+      reason,
+    },
+  };
+}
+
+export function selectSlidePattern(input: SelectSlidePatternInput): SlidePatternSelection | null {
+  const pack = input.pack || loadSlidePatternPack();
+  const patterns = Array.isArray(pack.patterns) ? pack.patterns : [];
+  if (patterns.length === 0) return null;
+
+  const rules = input.policy?.rules || [];
+  const deckPurpose = normalize(input.deckPurpose);
+  const semanticType = normalize(input.semanticType);
+  const slideType = normalize(input.slideType);
+  const matchedRule = rules.find((rule) => {
+    if (rule.deck_purpose && normalize(rule.deck_purpose) !== deckPurpose) return false;
+    if (rule.semantic_type && normalize(rule.semantic_type) !== semanticType) return false;
+    if (rule.slide_type && normalize(rule.slide_type) !== slideType) return false;
+    return true;
+  });
+  if (matchedRule) {
+    const pattern = patterns.find((entry) => entry.pattern_id === matchedRule.pattern_id);
+    if (pattern) return patternToSelection(pattern, pack, 'policy-rule');
+  }
+
+  const scored = patterns
+    .map((pattern) => ({ pattern, ...scorePattern(pattern, input) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.pattern.pattern_id.localeCompare(b.pattern.pattern_id));
+  if (scored[0]) return patternToSelection(scored[0].pattern, pack, scored[0].reason);
+
+  const fallbackId = input.policy?.default_pattern_id || 'key-message-single';
+  const fallback = patterns.find((entry) => entry.pattern_id === fallbackId) || patterns[0];
+  return patternToSelection(fallback, pack, 'default');
+}
+
+export function applySlidePatternToSection(
+  section: Record<string, unknown>,
+  input: SelectSlidePatternInput = {},
+): Record<string, unknown> {
+  const selection = selectSlidePattern({
+    ...input,
+    semanticType: input.semanticType ?? String(section.semantic_type || ''),
+    slideType: input.slideType ?? String(section.media_kind || section.slide_type || ''),
+    layoutKey: input.layoutKey ?? String(section.layout_key || ''),
+  });
+  if (!selection) return section;
+  return {
+    ...section,
+    pattern_id: selection.pattern_id,
+    slide_pattern: selection,
+    layout_key: section.layout_key || selection.layout_key,
+    media_kind: section.media_kind || selection.media_kind,
+  };
+}
+
+export function validateSlidePatternContent(
+  selection: SlidePatternSelection,
+  content: Record<string, unknown>,
+): string[] {
+  const warnings: string[] = [];
+  for (const slot of selection.element_slots) {
+    const value = content[slot.slot_id];
+    const values = Array.isArray(value) ? value.map(String).filter(Boolean) : value ? [String(value)] : [];
+    if (slot.required && values.length === 0) {
+      warnings.push(`${slot.slot_id} is required for ${selection.pattern_id}.`);
+    }
+    if (slot.min_items && values.length > 0 && values.length < slot.min_items) {
+      warnings.push(`${slot.slot_id} expects at least ${slot.min_items} item(s).`);
+    }
+    if (slot.max_items && values.length > slot.max_items) {
+      warnings.push(`${slot.slot_id} expects at most ${slot.max_items} item(s).`);
+    }
+    if (slot.max_chars_per_item) {
+      for (const item of values) {
+        if (item.length > slot.max_chars_per_item) {
+          warnings.push(`${slot.slot_id} item exceeds ${slot.max_chars_per_item} characters.`);
+          break;
+        }
+      }
+    }
+  }
+  for (const constraint of selection.constraints) {
+    if (constraint.kind !== 'paired_item_counts_match' || !constraint.slots || constraint.slots.length < 2) {
+      continue;
+    }
+    const counts = constraint.slots.map((slot) => {
+      const value = content[slot];
+      return Array.isArray(value) ? value.length : value ? 1 : 0;
+    });
+    if (new Set(counts).size > 1) {
+      warnings.push(constraint.message || `${constraint.slots.join(', ')} item counts must match.`);
+    }
+  }
+  return warnings;
+}

@@ -1,0 +1,31 @@
+{
+  "kind": "slide-pattern-pack",
+  "version": "1.0.0",
+  "pack_id": "slide-md-core",
+  "source": {
+    "name": "sho-ai-magic/slide.md",
+    "repository": "https://github.com/sho-ai-magic/slide.md",
+    "revision": "da4b5c41b3329bd97de02ce09ce9b06be00db241",
+    "notes": "Representative subset normalized for Kyberion renderer-aware selection."
+  },
+  "patterns": [
+    {
+      "pattern_id": "problem-solution",
+      "category": "comparison",
+      "summary": "Two-column problem and solution layout with paired numbered items.",
+      "suitable_scenes": ["solution proposal", "problem framing", "project plan"],
+      "slide_types": ["comparison", "problem_solution", "content"],
+      "semantic_types": ["problem", "solution"],
+      "deck_purposes": ["proposal", "briefing", "comparison"],
+      "structure": { "layout": "two-column-paired-list", "columns": 2 },
+      "element_slots": [
+        { "slot_id": "problem_items", "role": "Problems", "required": true, "min_items": 2, "max_items": 4, "max_chars_per_item": 52 },
+        { "slot_id": "solution_items", "role": "Solutions", "required": true, "min_items": 2, "max_items": 4, "max_chars_per_item": 52 }
+      ],
+      "constraints": [
+        { "kind": "paired_item_counts_match", "slots": ["problem_items", "solution_items"], "message": "Problems and solutions must align by item number." }
+      ],
+      "renderer_hints": { "layout_key": "two-column-story", "body_zone": "two-column-callout", "media_kind": "comparison" }
+    }
+  ]
+}
