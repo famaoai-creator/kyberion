@@ -2,6 +2,7 @@
 
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { SurfaceStatusPanel } from "./SurfaceStatusPanel";
 
 type TraceFeedRecord = {
   traceId: string;
@@ -820,15 +821,34 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-3">
           {loadingList && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/65">Loading trace feed...</div>
+            <SurfaceStatusPanel
+              eyebrow="Trace feed"
+              title="Loading trace feed"
+              detail="Chronos is reading persisted JSONL traces from the shared runtime log."
+              tone="neutral"
+            />
           )}
           {listError && (
-            <div className="rounded-2xl border border-rose-400/25 bg-rose-500/10 p-4 text-sm text-rose-100">{listError}</div>
+            <SurfaceStatusPanel
+              eyebrow="Trace feed"
+              title="Unable to load traces"
+              detail={listError}
+              tone="error"
+              actionLabel="Retry"
+              onAction={() => setRefreshTick((value) => value + 1)}
+            />
           )}
           {!loadingList && !listError && traces.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-white/15 bg-black/20 p-4 text-sm text-white/60">
-              No persisted traces matched the current filters under {data?.traceDir ?? "active/shared/logs/traces"}.
-            </div>
+            <SurfaceStatusPanel
+              eyebrow="No matches"
+              title="No traces matched the current filters"
+              detail={`Try clearing the filters or refreshing. The trace directory is ${data?.traceDir ?? "active/shared/logs/traces"}.`}
+              tone="warning"
+              actionLabel="Reset filters"
+              onAction={resetTraceViewerPrefs}
+              secondaryActionLabel="Refresh"
+              onSecondaryAction={() => setRefreshTick((value) => value + 1)}
+            />
           )}
 
           <div className="space-y-3">
@@ -896,10 +916,22 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
           </div>
 
           {loadingDetail && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/60">Loading trace detail...</div>
+            <SurfaceStatusPanel
+              eyebrow="Selected trace"
+              title="Loading trace detail"
+              detail="The selected trace is being resolved into its span tree and raw record."
+              tone="neutral"
+            />
           )}
           {detailError && (
-            <div className="rounded-2xl border border-rose-400/25 bg-rose-500/10 p-3 text-sm text-rose-100">{detailError}</div>
+            <SurfaceStatusPanel
+              eyebrow="Selected trace"
+              title="Unable to load trace detail"
+              detail={detailError}
+              tone="error"
+              actionLabel="Retry"
+              onAction={() => setRefreshTick((value) => value + 1)}
+            />
           )}
 
           {selectedTrace ? (
@@ -1077,7 +1109,14 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
               </div>
             </div>
           ) : (
-            <p className="text-sm text-white/60">No trace summary is available yet.</p>
+            <SurfaceStatusPanel
+              eyebrow="Selected trace"
+              title="No trace selected"
+              detail="Choose a trace from the list to inspect its span tree, metadata, and raw JSONL record."
+              tone="info"
+              actionLabel="Reset filters"
+              onAction={resetTraceViewerPrefs}
+            />
           )}
         </aside>
       </div>

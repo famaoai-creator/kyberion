@@ -15,6 +15,25 @@ interface ChatMessage {
   status?: "pending" | "complete" | "error";
 }
 
+const GUIDED_PROMPTS = [
+  {
+    label: "Health",
+    query: "Summarize system health and current blockers.",
+  },
+  {
+    label: "Missions",
+    query: "List the active missions and what needs attention.",
+  },
+  {
+    label: "Traces",
+    query: "Show the latest trace issues and what failed.",
+  },
+  {
+    label: "Next step",
+    query: "What should I do next to unblock delivery?",
+  },
+];
+
 export function SovereignChat({
   onA2UIMessage,
   onReady,
@@ -202,26 +221,25 @@ export function SovereignChat({
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="flex flex-col gap-6 pt-4">
-            <div className="text-center text-[11px] opacity-40 italic">
-              {uxText("chronos_chat_welcome", "Welcome, Sovereign. The mirror is ready for your command.", locale)}
+            <div className="text-center text-[11px] leading-6 text-white/45">
+              {uxText(
+                "chronos_chat_welcome",
+                "Start with a short request or pick one of the guided prompts below.",
+                locale,
+              )}
             </div>
             
             <div className="space-y-3">
-              <div className="text-[9px] uppercase tracking-widest opacity-30 px-2">Suggested Commands</div>
-              <div className="grid gap-2">
-                {[
-                  { label: "Check system health", cmd: "How is the system doing?" },
-                  { label: "List active missions", cmd: "Show me all active missions." },
-                  { label: "Start a new mission", cmd: "I want to start a new mission for..." },
-                  { label: "What are my next actions?", cmd: "What should I do next?" }
-                ].map((hint, i) => (
+              <div className="px-2 text-[9px] uppercase tracking-widest text-white/30">Guided prompts</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {GUIDED_PROMPTS.map((hint) => (
                   <button
-                    key={i}
-                    onClick={() => setInput(hint.cmd)}
-                    className="text-left p-2 rounded-lg bg-white/5 border border-white/5 hover:border-cyan-400/30 transition group"
+                    key={hint.label}
+                    onClick={() => void sendQuery(hint.query)}
+                    className="rounded-xl border border-white/8 bg-white/5 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[0.06]"
                   >
-                    <div className="text-[10px] text-white/60 group-hover:text-cyan-400">{hint.label}</div>
-                    <div className="text-[9px] text-white/30 truncate">"{hint.cmd}"</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/72">{hint.label}</div>
+                    <div className="mt-1 text-[9px] leading-5 text-white/34">{hint.query}</div>
                   </button>
                 ))}
               </div>
@@ -272,7 +290,7 @@ export function SovereignChat({
             }}
             placeholder={isListening
               ? uxText("chronos_chat_listening", "Listening...", locale)
-              : uxText("chronos_chat_placeholder", "Command the mirror...", locale)}
+              : uxText("chronos_chat_placeholder", "Ask for health, missions, traces, or a next step...", locale)}
             className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-[11px] outline-none transition ${
               isListening ? "border-red-500/50 bg-red-900/10" : "border-white/10 focus:border-kyberion-gold/30"
             }`}
