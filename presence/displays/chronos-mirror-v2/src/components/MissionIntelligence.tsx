@@ -15,6 +15,7 @@ import {
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
 interface MissionSummary {
   missionId: string;
@@ -1730,12 +1731,18 @@ export function MissionIntelligence({
 
   if (error) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="rounded-2xl border border-red-500/20 bg-red-950/10 px-6 py-5 text-center">
-          <div className="text-[11px] uppercase tracking-[0.25em] text-red-300/70">
-            Mission Intelligence
-          </div>
-          <div className="mt-2 text-sm text-red-200/80">{error}</div>
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="w-full max-w-xl">
+          <SurfaceStatusPanel
+            eyebrow="Mission Intelligence"
+            title="Unable to load mission intelligence"
+            detail={error}
+            tone="error"
+            actionLabel="Retry"
+            onAction={() => {
+              void refreshData();
+            }}
+          />
         </div>
       </div>
     );
@@ -1743,19 +1750,23 @@ export function MissionIntelligence({
 
   if (!mounted) {
     return (
-      <div className="rounded-[24px] border border-white/8 bg-black/20 px-5 py-5 text-[11px] uppercase tracking-[0.22em] text-white/40">
-        Loading mission intelligence...
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Mission Intelligence"
+        title="Loading mission intelligence"
+        detail="Chronos is fetching missions, runtime state, and the latest governance signals."
+        tone="neutral"
+      />
     );
   }
 
   if (!data) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="text-[11px] uppercase tracking-[0.25em] text-kyberion-gold/40">
-          {mt('chronos_mission_loading', 'Loading mission intelligence...')}
-        </div>
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Mission Intelligence"
+        title="Waiting for mission data"
+        detail={mt('chronos_mission_loading', 'Loading mission intelligence...')}
+        tone="neutral"
+      />
     );
   }
 
@@ -2722,7 +2733,12 @@ export function MissionIntelligence({
                 </div>
                 <div className="space-y-2">
                   {data.runtimeTopology.owners.length === 0 ? (
-                    <div className="text-[10px] text-white/35">No managed owners discovered.</div>
+                    <SurfaceStatusPanel
+                      eyebrow="Owners"
+                      title="No managed owners discovered"
+                      detail="Owner records appear once runtimes are bound to a mission or surface."
+                      tone="neutral"
+                    />
                   ) : (
                     data.runtimeTopology.owners.map((owner) => (
                       <div
@@ -2754,7 +2770,12 @@ export function MissionIntelligence({
                 </div>
                 <div className="space-y-2">
                   {data.runtimeTopology.runtimes.length === 0 ? (
-                    <div className="text-[10px] text-white/35">No managed runtimes discovered.</div>
+                    <SurfaceStatusPanel
+                      eyebrow="Managed runtimes"
+                      title="No managed runtimes discovered"
+                      detail="Runtime records appear after an agent or surface registers with the control plane."
+                      tone="neutral"
+                    />
                   ) : (
                     data.runtimeTopology.runtimes.map((runtime) => (
                       <div
@@ -2985,9 +3006,12 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {data.projects.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                {mt('chronos_no_projects', 'No projects registered yet.')}
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="Projects"
+                title="No projects registered yet"
+                detail="Create the first project to anchor durable intent, bindings, and bootstrap work."
+                tone="warning"
+              />
             ) : (
               data.projects.map((project) => (
                 <div
@@ -4249,9 +4273,12 @@ export function MissionIntelligence({
         <Panel id="browser-sessions" title="Browser Session Oversight">
           <div className="space-y-3">
             {data.browserSessions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                No browser sessions recorded yet.
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="Browser Session Oversight"
+                title="No browser sessions recorded yet"
+                detail="Open a browser task or capture a session to populate the registry."
+                tone="neutral"
+              />
             ) : (
               data.browserSessions.map((session) => (
                 <div
@@ -4426,9 +4453,12 @@ export function MissionIntelligence({
         <Panel id="browser-conversation-sessions" title="Browser Tasks">
           <div className="space-y-3">
             {data.browserConversationSessions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                No browser tasks recorded yet.
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="Browser Tasks"
+                title="No browser tasks recorded yet"
+                detail="Start a task from the browser surface to capture guided confirmations and result state."
+                tone="neutral"
+              />
             ) : (
               data.browserConversationSessions.map((session) => (
                 <div
@@ -4931,12 +4961,12 @@ export function MissionIntelligence({
             </div>
             <div className="space-y-3">
               {!effectiveMissionId || missionThread.length === 0 ? (
-                <div className="text-[11px] italic text-kyberion-gold/30">
-                  {mt(
-                    'chronos_no_unified_mission_thread',
-                    'No thread yet.'
-                  )}
-                </div>
+                <SurfaceStatusPanel
+                  eyebrow="Selected Mission Thread"
+                  title="No thread yet"
+                  detail="Select a mission to inspect its unified message thread and handoffs."
+                  tone="info"
+                />
               ) : (
                 missionThread.map((entry, index) => (
                   <div
