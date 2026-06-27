@@ -24,6 +24,7 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
+import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 
 export interface OpenRouterBackendOptions {
   apiKey: string;
@@ -183,7 +184,10 @@ export class OpenRouterBackend implements ReasoningBackend {
     return this.model;
   }
 
-  private async fetchChatCompletion(messages: ChatMessage[]): Promise<ChatCompletionResponse> {
+  private async fetchChatCompletion(
+    messages: ChatMessage[],
+    opts: { useTools?: boolean } = {},
+  ): Promise<ChatCompletionResponse> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       authorization: `Bearer ${this.apiKey}`,
@@ -191,15 +195,16 @@ export class OpenRouterBackend implements ReasoningBackend {
       'X-Title': 'Kyberion',
     };
 
+    const body: ChatCompletionRequest = {
+      model: this.model,
+      messages: redactSensitiveObject(messages),
+      ...(opts.useTools ?? true ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
+    };
+
     const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model: this.model,
-        messages: redactSensitiveObject(messages),
-        tools: createToolDefinitions(),
-        tool_choice: 'auto',
-      } satisfies ChatCompletionRequest),
+      body: JSON.stringify(body),
       signal: buildAbortSignal(this.timeoutMs),
     });
 
@@ -297,40 +302,55 @@ export class OpenRouterBackend implements ReasoningBackend {
     return extractTextContent(message.content);
   }
 
+  /** Single toolless completion returning raw model text — used for structured reasoning. */
+  private async completeStructured(systemPrompt: string, userPrompt: string): Promise<string> {
+    const response = await this.fetchChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      { useTools: false },
+    );
+    return extractTextContent(response.choices[0].message.content);
+  }
+
+  private readonly runStructured = (systemPrompt: string, userPrompt: string) =>
+    this.completeStructured(systemPrompt, userPrompt);
+
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.divergePersonas, input, this.runStructured);
   }
 
   async crossCritique(input: CritiqueInput): Promise<CritiqueResult> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.crossCritique, input, this.runStructured);
   }
 
   async synthesizePersona(input: PersonaSynthesisInput): Promise<SynthesizedPersona> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.synthesizePersona, input, this.runStructured);
   }
 
   async forkBranches(input: BranchForkInput): Promise<ForkedBranch[]> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.forkBranches, input, this.runStructured);
   }
 
   async simulateBranches(input: SimulationInput): Promise<SimulationResult> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.simulateBranches, input, this.runStructured);
   }
 
   async extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.extractRequirements, input, this.runStructured);
   }
 
   async extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.extractDesignSpec, input, this.runStructured);
   }
 
   async extractTestPlan(input: ExtractTestPlanInput): Promise<ExtractedTestPlan> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.extractTestPlan, input, this.runStructured);
   }
 
   async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
-    throw new Error('Not implemented');
+    return runStructuredReasoningOp(structuredReasoningSpecs.decomposeIntoTasks, input, this.runStructured);
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {

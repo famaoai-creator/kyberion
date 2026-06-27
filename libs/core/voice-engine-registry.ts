@@ -22,6 +22,9 @@ export interface VoiceEngineRecord {
     artifact_formats: VoiceEngineArtifactFormat[];
   };
   fallback_engine_id?: string;
+  bridge_script?: string;
+  stt_bridge_script?: string;
+  model_id?: string;
   notes?: string;
 }
 
