@@ -1190,7 +1190,7 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.document_outline.toc.length).toBeGreaterThanOrEqual(6);
     expect(result.context.document_outline.toc).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ section_id: 'executive-summary', layout_key: 'title-body' }),
+        expect.objectContaining({ section_id: 'executive-summary', layout_key: 'decision-cta', pattern_id: 'key-message-single' }),
         expect.objectContaining({ section_id: 'governance', media_kind: 'controls' }),
       ]),
     );
@@ -1260,6 +1260,9 @@ describe('media-actuator pdf to pptx bridge', () => {
     );
     expect(result.context.proposal_storyline.slides[0].design_system_id).toBe('executive-standard');
     expect(result.context.proposal_storyline.slides[0].branding.brand_name).toBe('Aster Bank');
+    expect(result.context.proposal_storyline.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'generic-layouts' })]),
+    );
   });
 
   it('emits proposal storyline adfs that satisfy the schema', () => {
@@ -1273,6 +1276,13 @@ describe('media-actuator pdf to pptx bridge', () => {
         title: 'Digital Onboarding Transformation Proposal',
         client: 'Aster Bank',
         core_message: 'A lighter, guided onboarding experience reduces drop-off.',
+        diagnostics: [
+          {
+            level: 'warn',
+            code: 'generic-layouts',
+            message: '2 slide(s) still use a generic title-body/doc-contents layout.',
+          },
+        ],
         slides: [
           {
             id: 'why-change',

@@ -7,3 +7,5 @@
 - brief から storyline を生成する
 - storyline から PPTX/DOCX を render する
 - review と traceability を分離する
+
+`diagnostics` には、汎用レイアウトの残数、長すぎる見出し、パターン不整合などの短い診断を入れます。生成直後に見た目の手戻りを減らすための補助情報です。

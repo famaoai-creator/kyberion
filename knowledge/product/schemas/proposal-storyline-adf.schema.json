@@ -36,6 +36,13 @@
         "additionalProperties": true
       }
     },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
     "slides": {
       "type": "array",
       "items": {

@@ -964,6 +964,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           recommended_theme: outline.recommended_theme,
           recommended_layout_template_id: outline.recommended_layout_template_id,
           toc: outline.toc,
+          diagnostics: outline.diagnostics,
           slides,
         },
       };

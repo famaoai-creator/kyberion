@@ -23,7 +23,7 @@ Keep two layers distinct inside the shared coordination flow:
 2. Theme layer: how the deck should look and feel.
 3. Pattern layer: how each slide should be structured.
 
-Use `presentation-preference-profile` to store the reusable theme, slide pattern selection policy, and the first questions Kyberion should ask.
+Use `presentation-preference-profile` to store the reusable theme, slide pattern selection policy, and the first 1-2 questions Kyberion should ask.
 Use `slide-pattern-pack` for reusable slide structures derived from proven presentation patterns, including cover, agenda, problem-solution, timeline, KPI, comparison, and action-item layouts.
 
 On first use, Kyberion should register the profile through the
@@ -39,7 +39,7 @@ Before drafting slides, decide which brief questions, theme, and slide pattern p
 2. Pick the brief question set that matches the deck purpose.
 3. Pick the theme set that matches the same purpose and audience.
 4. Pick the slide pattern selection policy that maps semantic slide intent to concrete structures.
-5. Ask only the first 1-3 questions that would materially change the outline, theme, or structural pattern choices.
+5. Ask only the first 1-2 questions that would materially change the outline, theme, or structural pattern choices.
 6. If no profile exists yet, create one in the personal overlay before drafting.
 
 Keep this preflight short. It should decide how to frame the deck, not write the deck itself.
@@ -52,7 +52,7 @@ Good fits for this preflight include proposal decks, internal updates, briefing 
 2. Clarification pass: ask only the questions that change the content brief or theme.
 3. Brief draft: create a presentation brief with goal, audience, sources, and constraints.
 4. Theme selection: choose a theme hint from the profile, or ask if the choice is unclear.
-5. Pattern selection: select a `slide-pattern-pack` pattern for each slide by semantic type, deck purpose, and media kind.
+5. Pattern selection: select a `slide-pattern-pack` pattern for each slide by semantic type, deck purpose, and media kind. Treat theme and structure as separate decisions.
 6. Outline: produce the slide story and section structure with `pattern_id` and `slide_pattern` metadata.
 7. Approval: pause before generating a final deck if source material or style needs confirmation.
 8. Generate: build the deck with the selected brief, theme, and pattern pack.
@@ -66,6 +66,7 @@ Minimum output:
 2. Brief summary and chosen theme.
 3. Slide outline.
 4. Approval preview if anything external or high-risk is needed.
+5. Short diagnostics for generic layouts or pattern mismatches after outline generation.
 
 Full output:
 
