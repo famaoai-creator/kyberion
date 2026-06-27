@@ -50,6 +50,10 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'http_proxy',
   'https_proxy',
   'no_proxy',
+  'HF_HUB_OFFLINE',
+  'HF_TOKEN',
+  'HUGGING_FACE_HUB_TOKEN',
+  'HF_HOME',
 ] as const;
 
 export interface SafeReadOptions {

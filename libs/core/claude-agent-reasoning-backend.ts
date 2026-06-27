@@ -11,7 +11,13 @@
  */
 
 import { z } from 'zod';
-import { runClaudeAgentQuery } from './claude-agent-query.js';
+import { runClaudeAgentQuery, runClaudeAgentTask } from './claude-agent-query.js';
+import {
+  GOVERNED_AGENT_ALLOWED_TOOLS,
+  buildGovernedAgentSystemPrompt,
+  buildKyberionMcpServerConfig,
+  createKyberionCanUseTool,
+} from './claude-agent-governance.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -568,6 +574,24 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
+    // Direction B: governed agentic path (tools + Kyberion MCP + tier/approval gate),
+    // opt-in via KYBERION_CLAUDE_AGENT_TOOLS=1. Default stays the pure single-turn
+    // answer below — no behavior change unless explicitly enabled.
+    if (process.env.KYBERION_CLAUDE_AGENT_TOOLS === '1') {
+      const result = await runClaudeAgentTask({
+        systemPrompt: buildGovernedAgentSystemPrompt({
+          base: 'You are a focused Kyberion sub-agent. Complete the task and return a concise report.',
+          missionContext: context,
+        }),
+        userPrompt: `Task: ${instruction}`,
+        model: this.model,
+        mcpServers: buildKyberionMcpServerConfig(),
+        allowedTools: GOVERNED_AGENT_ALLOWED_TOOLS,
+        canUseTool: createKyberionCanUseTool(),
+      });
+      return result.text;
+    }
+
     const result = await runClaudeAgentQuery({
       systemPrompt:
         'You are a focused sub-agent. Complete the given task with a concise textual answer.',
