@@ -133,10 +133,14 @@ function resolveArtifactPath(requestId: string, format: VoiceArtifactFormat, out
   return pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`);
 }
 
-async function runMlxAudioGenerate(text: string, outputPath: string, language: string, profile?: any): Promise<void> {
-  const bridgeScript = pathResolver.rootResolve(
-    'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py',
-  );
+async function runPythonTtsBridge(
+  bridgeScriptPath: string,
+  text: string,
+  outputPath: string,
+  language: string,
+  profile?: any
+): Promise<void> {
+  const bridgeScript = pathResolver.rootResolve(bridgeScriptPath);
 
   const refAudio = resolveProfileRefAudio(profile);
   const refText = refAudio ? resolveRefTranscript(refAudio) : undefined;
@@ -154,7 +158,7 @@ async function runMlxAudioGenerate(text: string, outputPath: string, language: s
 
   const result = safeExecResult(resolvePythonBin(), [bridgeScript], { input: payload });
   if (result.error || result.status !== 0) {
-    throw new Error(`mlx_audio_tts_bridge failed: ${result.stderr || result.error?.message}`);
+    throw new Error(`${path.basename(bridgeScriptPath)} failed: ${result.stderr || result.error?.message}`);
   }
 
   let parsed: any;
@@ -163,11 +167,11 @@ async function runMlxAudioGenerate(text: string, outputPath: string, language: s
     if (!stdout) throw new Error('No stdout received');
     parsed = JSON.parse(stdout);
   } catch {
-    throw new Error(`mlx_audio_tts_bridge returned non-JSON: ${result.stdout}`);
+    throw new Error(`${path.basename(bridgeScriptPath)} returned non-JSON: ${result.stdout}`);
   }
 
   if (parsed.status !== 'success') {
-    throw new Error(`mlx_audio_tts_bridge error: ${parsed.error}`);
+    throw new Error(`${path.basename(bridgeScriptPath)} error: ${parsed.error}`);
   }
 
   // Auto-trim output based on text duration from end (remove reference audio context)
@@ -203,6 +207,22 @@ async function runMlxAudioGenerate(text: string, outputPath: string, language: s
       logger.warn(`[VOICE_CLONE] Failed to auto-trim reference context: ${err.message}`);
     }
   }
+}
+
+function openPlaybackArtifact(artifactPath: string): void {
+  if (process.platform === 'linux') {
+    safeExec('xdg-open', [artifactPath]);
+    return;
+  }
+  if (process.platform === 'win32') {
+    safeExec('powershell', [
+      '-NoProfile',
+      '-Command',
+      `Start-Process -FilePath '${artifactPath.replace(/'/g, "''")}'`,
+    ]);
+    return;
+  }
+  safeExec('open', [artifactPath]);
 }
 
 async function renderWithEspeakNg(
@@ -255,9 +275,10 @@ function renderNativeArtifact(
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });
 
-  if (options.engineId === 'mlx_audio_qwen3') {
+  const engineRecord = getVoiceEngineRecord(options.engineId);
+  if (engineRecord && engineRecord.bridge_script) {
     return withRetry(async () => {
-      await runMlxAudioGenerate(text, artifactPath, options.language, options.profile);
+      await runPythonTtsBridge(engineRecord.bridge_script, text, artifactPath, options.language, options.profile);
       return artifactPath;
     }, buildRetryOptions());
   }
@@ -306,13 +327,13 @@ async function performPlayback(
     throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
   }
 
-  if (engine.engine_id === 'mlx_audio_qwen3' && process.platform !== 'darwin') {
+  if (engine.bridge_script && process.platform !== 'darwin') {
     const tmpPath = playbackSourcePath || pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
     await withRetry(async () => {
       if (!playbackSourcePath) {
-        await runMlxAudioGenerate(text, tmpPath, options.language, options.profile);
+        await runPythonTtsBridge(engine.bridge_script!, text, tmpPath, options.language, options.profile);
       }
-      safeExec('open', [tmpPath]);
+      openPlaybackArtifact(tmpPath);
     }, buildRetryOptions());
     return {
       playback_source_path: tmpPath,
@@ -400,7 +421,7 @@ export {
   renderVoicePlaybackSource,
   renderNativeArtifact,
   resolveArtifactPath,
-  runMlxAudioGenerate,
+  runPythonTtsBridge,
   resolveProfileRefAudio,
   resolveRefTranscript,
   renderWithEspeakNg,
