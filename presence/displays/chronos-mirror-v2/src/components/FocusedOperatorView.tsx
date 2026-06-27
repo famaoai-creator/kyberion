@@ -812,7 +812,14 @@ export function FocusedOperatorView({
                   );
                   if (!session) {
                     return (
-                      <div className="mt-2 text-[10px] text-white/38">Select a session to inspect its details.</div>
+                      <div className="mt-2">
+                        <SurfaceStatusPanel
+                          eyebrow="Selected session"
+                          title="Select a session to inspect its details"
+                          detail="The session list on the left determines which runtime, process, and action trail appear here."
+                          tone="info"
+                        />
+                      </div>
                     );
                   }
                   return (
