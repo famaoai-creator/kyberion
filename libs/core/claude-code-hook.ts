@@ -44,6 +44,20 @@ export interface SessionStartHookOutput {
   };
 }
 
+export interface UserPromptSubmitHookOutput {
+  hookSpecificOutput: {
+    hookEventName: 'UserPromptSubmit';
+    additionalContext: string;
+  };
+}
+
+export interface StopHookOutput {
+  hookSpecificOutput: {
+    hookEventName: 'Stop';
+    additionalContext: string;
+  };
+}
+
 /** File-mutating tools whose target path we can reliably extract + tier-check. */
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 /** Tools whose completed execution we record into the audit chain. */
@@ -51,6 +65,20 @@ const AUDITED_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Ba
 
 function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+function normalizePrompt(value: unknown): string {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function classifyPromptIntent(prompt: string): string[] {
+  const normalized = prompt.toLowerCase();
+  const hints: string[] = [];
+  if (/presentation|slide|deck|proposal/.test(normalized)) hints.push('Use the presentation preference profile and keep pattern selection separate from theme selection.');
+  if (/mission|scope|task|implement|build|fix/.test(normalized)) hints.push('Start or update a Kyberion mission before changing code.');
+  if (/review|pr|pull request|validate|test/.test(normalized)) hints.push('Run the validation path first, then /ky-review after the work is stable.');
+  if (/voice|audio|meeting|slack/.test(normalized)) hints.push('Prefer the governed actuator or plugin surface instead of ad hoc shell work.');
+  return hints.slice(0, 3);
 }
 
 function targetPaths(toolInput: Record<string, unknown> = {}): string[] {
@@ -99,6 +127,54 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
   return pre('allow', 'Kyberion tier-guard: write permitted.');
 }
 
+function recordSessionSignal(action: string, metadata: Record<string, unknown>): void {
+  try {
+    auditChain.record({
+      agentId: 'claude-code',
+      action,
+      operation: 'session_signal',
+      result: 'completed',
+      metadata,
+    });
+  } catch {
+    // best-effort; never fail the session on logging
+  }
+}
+
+export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}): string {
+  const prompt = normalizePrompt(input.prompt);
+  const summary = prompt ? truncate(prompt, 180) : 'No prompt text was provided.';
+  const hints = prompt ? classifyPromptIntent(prompt) : [];
+  recordSessionSignal('claude_code_user_prompt', {
+    cwd: input.cwd,
+    prompt_summary: summary,
+    hints,
+  });
+
+  return [
+    'Kyberion captured the user prompt for coordination.',
+    `Prompt summary: ${summary}`,
+    ...(hints.length ? ['Next-step hints:', ...hints.map((hint) => `- ${hint}`)] : ['Next-step hints: keep the work inside the shared coordination brief.']),
+    'If this becomes scoped work, start a Kyberion mission; if it is closing work, run /ky-review.',
+  ].join('\n');
+}
+
+export function buildStopContext(input: Record<string, unknown> = {}): string {
+  const reason = normalizePrompt(input.reason);
+  const summary = reason ? truncate(reason, 180) : 'No stop reason was provided.';
+  recordSessionSignal('claude_code_stop', {
+    cwd: input.cwd,
+    reason_summary: summary,
+  });
+
+  return [
+    'Kyberion received a Stop event for this session.',
+    `Stop summary: ${summary}`,
+    'If code or knowledge changed, run /ky-review before ending the work.',
+    'If the task is incomplete, checkpoint the mission instead of leaving it implicit.',
+  ].join('\n');
+}
+
 function describeToolInput(tool: string, toolInput: Record<string, unknown> = {}): Record<string, unknown> {
   if (tool === 'Bash') {
     return { command: truncate(String(toolInput.command ?? ''), 300) };
@@ -134,6 +210,8 @@ export function buildSessionStartContext(): string {
     'Kyberion governance is active for this session (kyberion-claude-code plugin).',
     '- Writes into knowledge/ tiers are gated by tier-guard (PreToolUse) — leaks are denied.',
     '- Write/Edit/Bash executions are recorded into the Kyberion audit chain (PostToolUse).',
+    '- UserPromptSubmit captures the user prompt as a shared coordination signal.',
+    '- Stop emits a review reminder so the session closes with an explicit handoff.',
     '- Follow the Operating Guide (CLAUDE.md §3): capture intent → align → execute → review.',
     'Use /ky-baseline to check system health, or /ky-mission-start to open a governed mission.',
   ].join('\n');
