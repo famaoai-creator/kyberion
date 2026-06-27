@@ -6,6 +6,7 @@ import {
   resolveProposalSectionKeywords,
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
+  selectSlidePattern,
 } from '@agent/core';
 
 type ProposalCompositionPresetResolution = {
@@ -201,6 +202,68 @@ function insertDocumentContentsSection(entries: any[], locale?: string): any[] {
   return next;
 }
 
+function resolveBriefDeckPurpose(brief: any): string {
+  return String(brief.deck_purpose || brief.payload?.deck_purpose || 'proposal');
+}
+
+function resolveSlidePatternSelectionPolicy(brief: any): any | undefined {
+  const explicitPolicy =
+    brief.slide_pattern_selection_policy ||
+    brief.payload?.slide_pattern_selection_policy ||
+    brief.slide_pattern_selection;
+  if (explicitPolicy && typeof explicitPolicy === 'object') return explicitPolicy;
+
+  const requestedPatternId = String(brief.slide_pattern_id || brief.payload?.slide_pattern_id || '').trim();
+  const requestedPackId = String(brief.slide_pattern_pack_id || brief.payload?.slide_pattern_pack_id || '').trim();
+  if (!requestedPatternId && !requestedPackId) return undefined;
+  return {
+    pack_id: requestedPackId || 'slide-md-core',
+    default_pattern_id: requestedPatternId || undefined,
+  };
+}
+
+function classifySlidePatternSemantic(section: any, entry: any): string {
+  const sectionId = String(section?.section_id || entry?.section_id || '').toLowerCase();
+  const candidates: Record<string, string> = {
+    cover: 'hero',
+    contents: 'summary',
+    'executive-summary': 'summary',
+    'why-change': 'problem',
+    'target-outcome': 'solution',
+    'solution-shape': 'architecture',
+    recommendation: 'solution',
+    plan: 'plan',
+    governance: 'roi',
+    'delivery-plan': 'roadmap',
+    decision: 'cta',
+  };
+  return candidates[sectionId] || String(entry?.semantic_type || '').trim() || classifyRenderSemantic(entry?.layout_key, entry?.media_kind);
+}
+
+function applySlidePatternSelection(entry: any, brief: any, section: any = entry): any {
+  const semanticType = classifySlidePatternSemantic(section, entry);
+  const selection = selectSlidePattern({
+    deckPurpose: resolveBriefDeckPurpose(brief),
+    semanticType,
+    slideType: entry.media_kind,
+    layoutKey: entry.layout_key,
+    policy: resolveSlidePatternSelectionPolicy(brief),
+  });
+  if (!selection) return entry;
+
+  const currentLayoutKey = String(entry.layout_key || '').trim();
+  const canUsePatternLayout = !currentLayoutKey || ['title-body', 'doc-contents'].includes(currentLayoutKey);
+  return {
+    ...entry,
+    semantic_type: semanticType,
+    pattern_id: selection.pattern_id,
+    slide_pattern: selection,
+    layout_key: canUsePatternLayout ? selection.layout_key : entry.layout_key,
+    media_kind: entry.media_kind || selection.media_kind,
+    body_zone: selection.body_zone,
+  };
+}
+
 function buildCanonicalProposalSlides(deps: ProposalPptxDependencies, rootDir: string, brief: any): any[] {
   const { preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
   const sections = Array.isArray(preset.sections) ? preset.sections : [];
@@ -291,14 +354,14 @@ function buildCanonicalProposalSlides(deps: ProposalPptxDependencies, rootDir: s
       const providedTitle = sanitizeProposalText(canonicalSlide?.title, '');
       const title = providedTitle || titleFallback;
       const body = providedBody.length > 0 ? providedBody : fallbackBody;
-      return {
+      return applySlidePatternSelection({
         id: sectionId,
         semantic_type: sanitizeProposalText(canonicalSlide?.semantic_type, section.media_kind || 'content'),
         title,
         body,
         visual: sanitizeProposalText(canonicalSlide?.visual, section.visual || 'supporting visual'),
         speaker_notes: sanitizeProposalText(canonicalSlide?.speaker_notes, objectiveFallback || objective),
-      };
+      }, brief, section);
     });
 
   return slideDefs;
@@ -314,7 +377,7 @@ function buildProposalNarrativeOutline(deps: ProposalPptxDependencies, rootDir: 
     .map((section: any, index: number) => {
       const supporting = chooseProposalSectionEvidence(section.section_id, brief) || {};
       const chapter = Array.isArray(brief.story?.chapters) ? brief.story.chapters[index] : undefined;
-      return {
+      return applySlidePatternSelection({
         section_id: section.section_id,
         title: applyCompositionTemplate(section.title, tokens, chapter || section.section_id),
         objective: applyCompositionTemplate(section.objective, tokens, chapter || brief.objective || ''),
@@ -327,8 +390,14 @@ function buildProposalNarrativeOutline(deps: ProposalPptxDependencies, rootDir: 
         media_kind: section.media_kind || 'content',
         layout_key: section.layout_key || 'title-body',
         semantic_type: classifyRenderSemantic(section.layout_key, section.media_kind),
-      };
+      }, brief, section);
     }), brief.locale);
+
+  for (const entry of toc) {
+    if (!entry.pattern_id) {
+      Object.assign(entry, applySlidePatternSelection(entry, brief));
+    }
+  }
 
   const resolvedProposalTitle = sanitizeProposalText(brief.title || brief.payload?.title, '');
   const resolvedCoreMessage = sanitizeProposalText(
@@ -376,6 +445,7 @@ function buildProposalNarrativeOutline(deps: ProposalPptxDependencies, rootDir: 
           usedSlideIds.add(matchId);
           if (Array.isArray(match.body) && match.body.length > 0) entry.body = match.body;
           if (match.title && typeof match.title === 'string') entry.title = match.title;
+          Object.assign(entry, applySlidePatternSelection(entry, brief));
           break;
         }
       }
@@ -437,6 +507,14 @@ function normalizeProposalBrief(deps: ProposalPptxDependencies, rootDir: string,
       document_type: 'proposal',
       document_profile: defaultProfile,
       layout_template_id: base.layout_template_id,
+      project_id: base.project_id || base.payload?.project_id,
+      project_name: base.project_name || base.payload?.project_name,
+      tenant_id: base.tenant_id || base.payload?.tenant_id,
+      client_key: base.client_key || base.payload?.client_key,
+      design_system_id: base.design_system_id || base.payload?.design_system_id,
+      design_reference: base.design_reference || base.payload?.design_reference,
+      theme: base.theme || base.payload?.theme,
+      branding: base.branding || base.payload?.branding,
       title: base.title || base.payload?.title,
       client: base.client || base.payload?.client,
       objective: base.objective || base.payload?.objective,
@@ -485,6 +563,14 @@ function normalizeProposalBrief(deps: ProposalPptxDependencies, rootDir: string,
       design_system_id: normalized.design_system_id || normalized.payload?.design_system_id,
       design_reference: normalized.design_reference || normalized.payload?.design_reference,
       theme: normalized.theme || normalized.payload?.theme,
+      deck_purpose: normalized.deck_purpose || normalized.payload?.deck_purpose,
+      slide_pattern_id: normalized.slide_pattern_id || normalized.payload?.slide_pattern_id,
+      slide_pattern_pack_id: normalized.slide_pattern_pack_id || normalized.payload?.slide_pattern_pack_id,
+      slide_pattern_selection_policy:
+        normalized.slide_pattern_selection_policy ||
+        normalized.payload?.slide_pattern_selection_policy ||
+        normalized.slide_pattern_selection ||
+        normalized.payload?.slide_pattern_selection,
       branding: normalized.branding || normalized.payload?.branding || {},
       title: title || client || objective || canonicalSections?.[0]?.title || 'Proposal',
       client: client || '対象組織',

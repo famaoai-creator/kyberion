@@ -6,56 +6,108 @@
  * and run `pnpm generate:types` to regenerate this file.
  */
 
+/**
+ * Reusable preferences for presentation briefs, question prompts, and visual themes. The profile keeps content intent separate from slide style and theme selection.
+ */
 export interface PresentationPreferenceProfile {
   kind: 'presentation-preference-profile';
   profile_id: string;
   scope?: 'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'default';
-  theme_selection_policy: {
+  theme_selection_policy?: {
     decision_mode: 'auto_with_preflight' | 'ask_when_uncertain' | 'always_confirm_theme';
-    ask_user_when: (
-      | 'audience_unclear'
-      | 'brand_alignment_unclear'
-      | 'chart_density_unclear'
-      | 'executive_tone_unclear'
-      | 'new_deck_category'
-      | 'user_requested_precheck'
-    )[];
+    /**
+     * @minItems 1
+     */
+    ask_user_when: [
+      (
+        | 'audience_unclear'
+        | 'brand_alignment_unclear'
+        | 'chart_density_unclear'
+        | 'executive_tone_unclear'
+        | 'new_deck_category'
+        | 'user_requested_precheck'
+      ),
+      ...(
+        | 'audience_unclear'
+        | 'brand_alignment_unclear'
+        | 'chart_density_unclear'
+        | 'executive_tone_unclear'
+        | 'new_deck_category'
+        | 'user_requested_precheck'
+      )[]
+    ];
     default_theme_hint?: string;
   };
-  brief_question_sets: {
-    label: string;
-    deck_purposes?: (
-      | 'proposal'
-      | 'internal_share'
-      | 'briefing'
-      | 'marketing'
-      | 'training'
-      | 'comparison'
-    )[];
-    questions: [string, ...string[]];
-    notes?: string;
-  }[];
-  theme_sets: {
-    label: string;
-    deck_purposes?: (
-      | 'proposal'
-      | 'internal_share'
-      | 'briefing'
-      | 'marketing'
-      | 'training'
-      | 'comparison'
-    )[];
-    theme_hint: string;
-    design_traits?: (
-      | 'executive'
-      | 'brand_aligned'
-      | 'minimal'
-      | 'chart_heavy'
-      | 'narrative'
-      | 'technical'
-      | 'teaching'
-      | 'dense'
-    )[];
-    notes?: string;
-  }[];
+  slide_pattern_selection_policy?: {
+    pack_id?: string;
+    default_pattern_id?: string;
+    rules?: {
+      deck_purpose?: 'proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison';
+      semantic_type?: string;
+      slide_type?: string;
+      pattern_id: string;
+    }[];
+  };
+  /**
+   * @minItems 1
+   */
+  brief_question_sets: [
+    {
+      label: string;
+      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      /**
+       * @minItems 1
+       * @maxItems 3
+       */
+      questions: [string] | [string, string] | [string, string, string];
+      notes?: string;
+    },
+    ...{
+      label: string;
+      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      /**
+       * @minItems 1
+       * @maxItems 3
+       */
+      questions: [string] | [string, string] | [string, string, string];
+      notes?: string;
+    }[]
+  ];
+  /**
+   * @minItems 1
+   */
+  theme_sets: [
+    {
+      label: string;
+      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      theme_hint: string;
+      design_traits?: (
+        | 'executive'
+        | 'brand_aligned'
+        | 'minimal'
+        | 'chart_heavy'
+        | 'narrative'
+        | 'technical'
+        | 'teaching'
+        | 'dense'
+      )[];
+      notes?: string;
+    },
+    ...{
+      label: string;
+      deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
+      theme_hint: string;
+      design_traits?: (
+        | 'executive'
+        | 'brand_aligned'
+        | 'minimal'
+        | 'chart_heavy'
+        | 'narrative'
+        | 'technical'
+        | 'teaching'
+        | 'dense'
+      )[];
+      notes?: string;
+    }[]
+  ];
 }

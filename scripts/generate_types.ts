@@ -129,6 +129,14 @@ const targets: GenerationTarget[] = [
     outputPath: 'libs/core/src/types/booking-preference-profile.ts',
   },
   {
+    schemaPath: 'knowledge/product/schemas/presentation-preference-profile.schema.json',
+    outputPath: 'libs/core/src/types/presentation-preference-profile.ts',
+  },
+  {
+    schemaPath: 'knowledge/product/schemas/slide-pattern-pack.schema.json',
+    outputPath: 'libs/core/src/types/slide-pattern-pack.ts',
+  },
+  {
     schemaPath: 'knowledge/product/schemas/narrated-video-preference-profile.schema.json',
     outputPath: 'libs/core/src/types/narrated-video-preference-profile.ts',
   },

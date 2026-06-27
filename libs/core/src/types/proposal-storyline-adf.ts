@@ -11,11 +11,35 @@ export interface ProposalStorylineADF {
   title: string;
   client?: string;
   core_message?: string;
+  document_profile?: string;
+  design_system_id?: string;
+  branding?: {
+    [k: string]: unknown;
+  };
+  layout_template_id?: string;
+  narrative_pattern_id?: string;
+  recommended_theme?: string;
+  recommended_layout_template_id?: string;
+  toc?: {
+    [k: string]: unknown;
+  }[];
   slides: {
     id: string;
     title: string;
     objective: string;
     body?: string[];
     visual?: string;
+    media_kind?: string;
+    layout_key?: string;
+    semantic_type?: string;
+    pattern_id?: string;
+    slide_pattern?: {
+      [k: string]: unknown;
+    };
+    body_zone?: string;
+    design_system_id?: string;
+    branding?: {
+      [k: string]: unknown;
+    };
   }[];
 }

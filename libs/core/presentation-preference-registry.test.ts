@@ -62,6 +62,11 @@ describe('presentation preference registry', () => {
               ask_user_when: ['new_deck_category'],
               default_theme_hint: 'executive_clean',
             },
+            slide_pattern_selection_policy: {
+              pack_id: 'slide-md-core',
+              default_pattern_id: 'summary-three-points',
+              rules: [{ semantic_type: 'problem', pattern_id: 'problem-solution' }],
+            },
             brief_question_sets: [
               {
                 label: 'Proposal deck',
@@ -85,6 +90,9 @@ describe('presentation preference registry', () => {
     const registry = getPresentationPreferenceRegistry();
     expect(registry.default_profile_id).toBe('personal-exec-clean');
     expect(getPresentationPreferenceProfile().profile_id).toBe('personal-exec-clean');
+    expect(getPresentationPreferenceProfile().slide_pattern_selection_policy?.default_pattern_id).toBe(
+      'summary-three-points'
+    );
   });
 
   it('registers a presentation preference profile in the personal registry', () => {
@@ -134,6 +142,10 @@ describe('presentation preference registry', () => {
           ask_user_when: ['user_requested_precheck'],
           default_theme_hint: 'executive_clean',
         },
+        slide_pattern_selection_policy: {
+          pack_id: 'slide-md-core',
+          default_pattern_id: 'key-message-single',
+        },
         brief_question_sets: [
           {
             label: 'Proposal deck',
@@ -155,11 +167,21 @@ describe('presentation preference registry', () => {
     expect(profilePath).toBe(registrationPath);
     const registry = JSON.parse(
       safeReadFile(registrationPath, { encoding: 'utf8' }) as string
-    ) as { default_profile_id: string; profiles: Array<{ profile_id: string }> };
+    ) as {
+      default_profile_id: string;
+      profiles: Array<{
+        profile_id: string;
+        slide_pattern_selection_policy?: { default_pattern_id?: string };
+      }>;
+    };
     expect(registry.default_profile_id).toBe('ceo-onboarding-theme');
     expect(registry.profiles.some((profile) => profile.profile_id === 'ceo-onboarding-theme')).toBe(
       true
     );
+    expect(
+      registry.profiles.find((profile) => profile.profile_id === 'ceo-onboarding-theme')
+        ?.slide_pattern_selection_policy?.default_pattern_id
+    ).toBe('key-message-single');
   });
 
   it('exposes the registry path helper', () => {
