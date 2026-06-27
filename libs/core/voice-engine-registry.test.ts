@@ -42,11 +42,19 @@ describe('voice engine registry', () => {
     const engine = getVoiceEngineRecord();
     expect(engine.engine_id).toBe('local_say');
     expect(engine.supports.playback).toBe(true);
+    expect(registry.engines.some((entry) => entry.engine_id === 'kokoro')).toBe(true);
   });
 
   it('resolves active clone engine on darwin', () => {
     const engine = resolveVoiceEngineForPlatform('open_voice_clone', 'darwin');
     expect(engine.engine_id).toBe('open_voice_clone');
+  });
+
+  it('exposes bridge-backed kokoro engine metadata', () => {
+    const engine = getVoiceEngineRecord('kokoro');
+    expect(engine.engine_id).toBe('kokoro');
+    expect(engine.bridge_script).toContain('kokoro_tts_bridge.py');
+    expect(engine.supports.artifact_formats).toEqual(['wav']);
   });
 
   it('falls back to default when unknown engine id is requested', () => {
