@@ -5014,12 +5014,12 @@ export function MissionIntelligence({
         <Panel title={mt('chronos_a2a_handoff_trail', 'A2A Handoff Trail')}>
           <div className="space-y-3">
             {filteredA2AHandoffs.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                {mt(
-                  'chronos_no_a2a_handoffs_for_filter',
-                  'No A2A handoffs observed for the current mission filter.'
-                )}
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="A2A handoff trail"
+                title="No A2A handoffs observed for the current mission filter"
+                detail="Handoffs appear here once the selected mission exchanges prompts, tasks, or acknowledgements."
+                tone="neutral"
+              />
             ) : (
               filteredA2AHandoffs.map((handoff, index) => (
                 <div
