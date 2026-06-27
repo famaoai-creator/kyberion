@@ -91,6 +91,10 @@
       "types": "./dist/cowork-health-check.d.ts",
       "default": "./dist/cowork-health-check.js"
     },
+    "./cowork-health-check.js": {
+      "types": "./dist/cowork-health-check.d.ts",
+      "default": "./dist/cowork-health-check.js"
+    },
     "./cowork-knowledge-bridge": {
       "types": "./dist/cowork-knowledge-bridge.d.ts",
       "default": "./dist/cowork-knowledge-bridge.js"
@@ -486,6 +490,14 @@
     "./legacy-media-ops": {
       "types": "./dist/legacy-media-ops.d.ts",
       "default": "./dist/legacy-media-ops.js"
+    },
+    "./claude-code-hook": {
+      "types": "./dist/claude-code-hook.d.ts",
+      "default": "./dist/claude-code-hook.js"
+    },
+    "./claude-code-hook.js": {
+      "types": "./dist/claude-code-hook.d.ts",
+      "default": "./dist/claude-code-hook.js"
     },
     "./claude-task-runner": {
       "types": "./dist/claude-task-runner.d.ts",

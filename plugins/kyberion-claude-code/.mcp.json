@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "kyberion": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/../../dist/scripts/mcp_server.js"],
+      "cwd": "${CLAUDE_PLUGIN_ROOT}/../..",
+      "env": {
+        "KYBERION_PERSONA": "sovereign_concierge",
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
