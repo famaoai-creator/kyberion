@@ -236,6 +236,15 @@ interface ControlActionDetail {
   error?: string;
 }
 
+function safeCollect<T>(label: string, fallback: T, collect: () => T): T {
+  try {
+    return collect();
+  } catch (err) {
+    console.warn(`[chronos-mirror-v2] ${label} failed`, err);
+    return fallback;
+  }
+}
+
 interface ControlActionDefinition {
   operation: string;
   label: string;
@@ -1395,22 +1404,22 @@ export async function GET(req: NextRequest) {
       secretApprovals,
       surfaces,
       accessRole,
-      recentEvents: collectRecentEvents(),
+      recentEvents: safeCollect('collectRecentEvents', [], collectRecentEvents),
       agentMessages,
       a2aHandoffs,
       controlActionCatalog,
       controlActionAvailability,
       controlActions,
-      controlActionDetails: collectControlActionDetails(),
-      ownerSummaries: collectOwnerSummaries(),
-      browserSessions: collectBrowserSessions(),
-      browserConversationSessions: collectBrowserConversationSessions(),
-      computerSessions: collectComputerSessions(),
+      controlActionDetails: safeCollect('collectControlActionDetails', {}, collectControlActionDetails),
+      ownerSummaries: safeCollect('collectOwnerSummaries', [], collectOwnerSummaries),
+      browserSessions: safeCollect('collectBrowserSessions', [], collectBrowserSessions),
+      browserConversationSessions: safeCollect('collectBrowserConversationSessions', [], collectBrowserConversationSessions),
+      computerSessions: safeCollect('collectComputerSessions', [], collectComputerSessions),
       surfaceOutbox: {
         slack: listSurfaceOutboxMessages('slack').length,
         chronos: listSurfaceOutboxMessages('chronos').length,
       },
-      recentSurfaceOutbox: collectRecentSurfaceOutbox(),
+      recentSurfaceOutbox: safeCollect('collectRecentSurfaceOutbox', [], collectRecentSurfaceOutbox),
       runtime: {
         total: runtime.length,
         ready: runtime.filter((entry) => entry.agent.status === 'ready').length,

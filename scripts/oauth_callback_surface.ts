@@ -110,3 +110,8 @@ withExecutionContext('surface_runtime', () => {
     logger.info(`[oauth-callback-surface] listening on http://${HOST}:${PORT}${CALLBACK_PATH}`);
   });
 });
+
+server.on('error', (error: NodeJS.ErrnoException) => {
+  logger.error(`[oauth-callback-surface] failed to listen on http://${HOST}:${PORT}${CALLBACK_PATH}: ${error.message}`);
+  process.exitCode = 1;
+});

@@ -171,3 +171,9 @@ app.post('/a2ui/dispatch', (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`[computer-surface] listening on http://${HOST}:${PORT}`);
 });
+
+server.on('error', (error: NodeJS.ErrnoException) => {
+  const reason = error?.message || String(error);
+  console.error(`[computer-surface] failed to listen on http://${HOST}:${PORT}: ${reason}`);
+  process.exitCode = 1;
+});
