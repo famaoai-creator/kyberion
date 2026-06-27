@@ -36,6 +36,10 @@
     {
       "env": "OPENROUTER_API_KEY",
       "mode": "openrouter"
+    },
+    {
+      "env": "CLAUDECODE",
+      "mode": "claude-agent"
     }
   ],
   "cli_preference_rules": [
