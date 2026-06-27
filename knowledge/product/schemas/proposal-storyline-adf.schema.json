@@ -19,6 +19,23 @@
     "core_message": {
       "type": "string"
     },
+    "document_profile": { "type": "string" },
+    "design_system_id": { "type": "string" },
+    "branding": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "layout_template_id": { "type": "string" },
+    "narrative_pattern_id": { "type": "string" },
+    "recommended_theme": { "type": "string" },
+    "recommended_layout_template_id": { "type": "string" },
+    "toc": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
     "slides": {
       "type": "array",
       "items": {
@@ -33,7 +50,21 @@
             "type": "array",
             "items": { "type": "string" }
           },
-          "visual": { "type": "string" }
+          "visual": { "type": "string" },
+          "media_kind": { "type": "string" },
+          "layout_key": { "type": "string" },
+          "semantic_type": { "type": "string" },
+          "pattern_id": { "type": "string" },
+          "slide_pattern": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "body_zone": { "type": "string" },
+          "design_system_id": { "type": "string" },
+          "branding": {
+            "type": "object",
+            "additionalProperties": true
+          }
         }
       }
     }

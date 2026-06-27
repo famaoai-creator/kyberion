@@ -68,6 +68,53 @@
               }
             }
           },
+          "slide_pattern_selection_policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pack_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default_pattern_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["pattern_id"],
+                  "properties": {
+                    "deck_purpose": {
+                      "type": "string",
+                      "enum": [
+                        "proposal",
+                        "internal_share",
+                        "briefing",
+                        "marketing",
+                        "training",
+                        "comparison"
+                      ]
+                    },
+                    "semantic_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slide_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "pattern_id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
           "brief_question_sets": {
             "type": "array",
             "minItems": 1,

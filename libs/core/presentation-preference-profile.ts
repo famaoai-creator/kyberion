@@ -1,4 +1,5 @@
 import type { PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
+import type { PresentationSlidePatternSelectionPolicy } from './presentation-slide-pattern.js';
 
 export type PresentationDeckPurpose =
   | 'proposal'
@@ -62,4 +63,22 @@ export function getPresentationThemeHint(
     selectPresentationThemeSet(profile, deckPurpose)?.theme_hint ||
     profile.theme_selection_policy?.default_theme_hint
   );
+}
+
+export function getPresentationSlidePatternSelectionPolicy(
+  profile: PresentationPreferenceProfile
+): PresentationSlidePatternSelectionPolicy | undefined {
+  return profile.slide_pattern_selection_policy;
+}
+
+export function getPresentationSlidePatternPackId(
+  profile: PresentationPreferenceProfile
+): string | undefined {
+  return profile.slide_pattern_selection_policy?.pack_id;
+}
+
+export function getPresentationDefaultSlidePatternId(
+  profile: PresentationPreferenceProfile
+): string | undefined {
+  return profile.slide_pattern_selection_policy?.default_pattern_id;
 }

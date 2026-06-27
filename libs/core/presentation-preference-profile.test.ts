@@ -4,6 +4,7 @@ import * as addFormatsModule from 'ajv-formats';
 import {
   compileSchemaFromPath,
   getPresentationBriefQuestions,
+  getPresentationSlidePatternSelectionPolicy,
   getPresentationThemeHint,
   safeReadFile,
   selectPresentationBriefQuestionSet,
@@ -53,5 +54,11 @@ describe('presentation-preference-profile schema', () => {
     ]);
     expect(getPresentationThemeHint(profile, 'internal_share')).toBe('internal_practical');
     expect(getPresentationThemeHint(profile, 'training')).toBe('training_structured');
+    expect(getPresentationSlidePatternSelectionPolicy(profile)).toEqual(
+      expect.objectContaining({
+        pack_id: 'slide-md-core',
+        default_pattern_id: 'key-message-single',
+      })
+    );
   });
 });

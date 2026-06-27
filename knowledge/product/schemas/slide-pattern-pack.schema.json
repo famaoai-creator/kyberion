@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/slide-pattern-pack.schema.json",
+  "title": "Slide Pattern Pack",
+  "description": "Reusable slide layout pattern catalog inspired by SLIDE.md. Patterns define content-area structure and constraints separately from theme tokens.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "pack_id", "source", "patterns"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["slide-pattern-pack"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "pack_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string" },
+        "revision": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pattern_id",
+          "category",
+          "summary",
+          "suitable_scenes",
+          "slide_types",
+          "semantic_types",
+          "structure",
+          "element_slots",
+          "renderer_hints"
+        ],
+        "properties": {
+          "pattern_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "cover",
+              "agenda",
+              "section",
+              "message",
+              "comparison",
+              "flow",
+              "diagram",
+              "card_grid",
+              "chart_data",
+              "table",
+              "kpi_summary",
+              "closing",
+              "action_items"
+            ]
+          },
+          "summary": { "type": "string", "minLength": 1 },
+          "suitable_scenes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "slide_types": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "semantic_types": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "deck_purposes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["proposal", "internal_share", "briefing", "marketing", "training", "comparison"]
+            },
+            "uniqueItems": true
+          },
+          "structure": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["layout"],
+            "properties": {
+              "layout": { "type": "string", "minLength": 1 }
+            }
+          },
+          "element_slots": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["slot_id", "role", "required"],
+              "properties": {
+                "slot_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9][a-z0-9_]*$"
+                },
+                "role": { "type": "string", "minLength": 1 },
+                "required": { "type": "boolean" },
+                "min_items": { "type": "integer", "minimum": 1 },
+                "max_items": { "type": "integer", "minimum": 1 },
+                "max_chars_per_item": { "type": "integer", "minimum": 1 },
+                "notes": { "type": "string" }
+              }
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["paired_item_counts_match", "requires_visual", "single_message"]
+                },
+                "slots": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "minItems": 1
+                },
+                "message": { "type": "string" }
+              }
+            }
+          },
+          "renderer_hints": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["layout_key", "body_zone"],
+            "properties": {
+              "layout_key": { "type": "string", "minLength": 1 },
+              "body_zone": {
+                "type": "string",
+                "enum": [
+                  "single-column",
+                  "two-column-callout",
+                  "two-column-risk",
+                  "timeline",
+                  "architecture-panel",
+                  "decision-cta"
+                ]
+              },
+              "media_kind": { "type": "string" },
+              "visual_treatment": { "type": "string" },
+              "fallback_pattern_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

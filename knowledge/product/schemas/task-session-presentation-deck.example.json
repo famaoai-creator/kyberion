@@ -30,6 +30,8 @@
   "payload": {
     "deck_purpose": "proposal",
     "slide_count_hint": 6,
-    "theme_hint": "executive concise"
+    "theme_hint": "executive concise",
+    "slide_pattern_pack_id": "slide-md-core",
+    "slide_pattern_id": "key-message-single"
   }
 }
