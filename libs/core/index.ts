@@ -1424,6 +1424,7 @@ export * from './slack-onboarding.js';
 export type * from './channel-surface-types.js';
 
 export * from './browser-conversation-session.js';
+export * from './peer-conversation.js';
 export * from './browser-distill-candidate.js';
 export * from './browser-extension-bridge.js';
 export * from './narrated-video-preference-profile.js';
