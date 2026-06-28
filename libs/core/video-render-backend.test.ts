@@ -4,6 +4,7 @@ import { pathResolver, platform as corePlatform } from '@agent/core';
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
   safeExistsSync: vi.fn(() => true),
+  safeStat: vi.fn(() => ({ size: 4096 })),
   safeMoveSync: vi.fn(),
   safeRmSync: vi.fn(),
 }));
@@ -14,6 +15,7 @@ vi.mock('./secure-io.js', async () => {
     ...actual,
     safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
+    safeStat: mocks.safeStat,
     safeMoveSync: mocks.safeMoveSync,
     safeRmSync: mocks.safeRmSync,
   };
@@ -24,7 +26,10 @@ describe('video render backend', () => {
     vi.clearAllMocks();
     vi.spyOn(corePlatform, 'getCapabilities').mockResolvedValue({ hasFFmpeg: true } as any);
     vi.spyOn(corePlatform, 'runMediaCommand').mockResolvedValue('');
-    mocks.safeExec.mockImplementation(() => '');
+    mocks.safeExec.mockImplementation((command: string) => {
+      if (command === 'ffprobe') return '0\n';
+      return '';
+    });
   });
 
   it('returns non-executed when backend rendering is disabled', async () => {
@@ -155,6 +160,9 @@ describe('video render backend', () => {
     mocks.safeExec.mockImplementation((command: string) => {
       if (command === 'npx') {
         throw new Error('hyperframes failed');
+      }
+      if (command === 'ffprobe') {
+        return '0\n';
       }
       return '';
     });

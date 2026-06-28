@@ -41,6 +41,18 @@ export interface OSDriver {
   runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string>;
 }
 
+function buildMacSpeakArgs(text: string, options?: { voice?: string; rate?: number }): string[] {
+  const args: string[] = [];
+  if (options?.voice) {
+    args.push('-v', options.voice);
+  }
+  if (options?.rate) {
+    args.push('-r', String(options.rate));
+  }
+  args.push(text);
+  return args;
+}
+
 /**
  * macOS Implementation
  */
@@ -89,14 +101,7 @@ class MacOSDriver implements OSDriver {
 
   async speak(text: string, options?: { voice?: string; rate?: number }): Promise<void> {
     if (!(await commandExists('say'))) return;
-    const args = [text];
-    if (options?.voice) {
-      args.push('-v', options.voice);
-    }
-    if (options?.rate) {
-      args.push('-r', String(options.rate));
-    }
-    await safeExec('say', args);
+    await safeExec('say', buildMacSpeakArgs(text, options));
   }
 
   async playSound(path: string): Promise<void> {
@@ -300,3 +305,4 @@ export function getPlatformDriver(): OSDriver {
 
 export const platform = getPlatformDriver();
 export const currentPlatform: Platform = os.platform() as Platform;
+export const __test__ = { buildMacSpeakArgs };

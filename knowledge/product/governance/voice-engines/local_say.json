@@ -14,6 +14,7 @@
         "playback": true,
         "artifact_formats": ["wav", "aiff"]
       },
+      "fallback_engine_id": "espeak_ng",
       "notes": "Uses OS-native speech engines through secure shell execution."
     }
   ]
