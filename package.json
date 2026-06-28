@@ -110,6 +110,8 @@
     "agent-runtime:status": "node dist/scripts/agent_runtime_supervisor_status.js",
     "agent-runtime:manage": "node dist/scripts/agent_runtime_manager.js",
     "peer:server": "node --import ./scripts/ts-loader.mjs scripts/peer_messaging_server.ts",
+    "peer:conversation-server": "node --import ./scripts/ts-loader.mjs scripts/peer_conversation_server.ts",
+    "peer:conversation": "node --import ./scripts/ts-loader.mjs scripts/peer_conversation.ts",
     "peer:send": "node --import ./scripts/ts-loader.mjs scripts/peer_messaging_send.ts",
     "work:coord": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
     "mission:orchestrator": "node dist/scripts/run_mission_orchestration_event_worker.js",

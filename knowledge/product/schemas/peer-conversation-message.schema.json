@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/peer-conversation-message.schema.json",
+  "title": "Peer Conversation Message Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "session_id",
+    "message_kind",
+    "topic",
+    "text",
+    "sender_peer_id",
+    "recipient_peer_id",
+    "created_at"
+  ],
+  "properties": {
+    "kind": { "type": "string", "enum": ["peer_conversation_message"] },
+    "session_id": { "type": "string", "minLength": 1 },
+    "message_kind": {
+      "type": "string",
+      "enum": ["open", "message", "reply", "handoff", "close", "status"]
+    },
+    "topic": { "type": "string", "minLength": 1 },
+    "text": { "type": "string" },
+    "sender_peer_id": { "type": "string", "minLength": 1 },
+    "recipient_peer_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string" },
+    "reply_to_message_id": { "type": "string" },
+    "related_work_item_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
