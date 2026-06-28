@@ -20,13 +20,15 @@ const RATE_LIMIT_MAX = 30;        // requests
 const RATE_LIMIT_WINDOW = 60000;  // 1 minute
 
 function getClientIP(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     || req.headers.get("x-real-ip")
-    || "unknown";
+    || req.ip
+    || "127.0.0.1";
+  return ip;
 }
 
 function isLoopback(ip: string): boolean {
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "unknown";
 }
 
 function checkRateLimit(ip: string): boolean {
