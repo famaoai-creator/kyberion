@@ -52,7 +52,7 @@
 | 音声生成 | [voice-generation-absorption-plan](../knowledge/product/architecture/voice-generation-absorption-plan.md) | 音声生成能力の吸収 | Phase 1 着手 |
 | レジストリ分割 | [REGISTRY_SPLIT_PLAN](./developer/REGISTRY_SPLIT_PLAN.md) | レジストリ群の分割 | 一覧表 |
 | サービス統合 | [service-integration-plan](./developer/architecture/service-integration-plan.md) | ローカルAI→通信/協働→検証/自動化 | Phase 1 現状 |
-| 意図学習 | [intent-learning-seed-cache-plan](./intent-learning-seed-cache-plan.md) | 意図学習のシードキャッシュ | Non-goals定義 |
+| 意図学習 | [stale-doc-cleanup-rationale](../knowledge/product/architecture/stale-doc-cleanup-rationale-2026-06.md) | 意図学習のシードキャッシュ整理と移行根拠 | Non-goals定義 |
 | Cowork連携 | [COWORK_INTEGRATION_PLAN](./COWORK_INTEGRATION_PLAN.md) | MCPサーバ/surface/承認/知識同期/プラグイン化(Phase 0–5) | 計画+パッチ提出済 |
 | 揮発ナレッジ | [VOLATILE_KNOWLEDGE_PLAN](./VOLATILE_KNOWLEDGE_PLAN.ja.md) | スコープ×寿命の揮発層（作業記憶・日次・週次・GC・昇格） | Phase 0監査済、Phase 1-5実装中 |
 
@@ -98,7 +98,7 @@
 ### 2.8 インフラ・連携
 - **REGISTRY_SPLIT_PLAN** — レジストリ群の分割計画。
 - **service-integration-plan** — ローカルAI基盤(現状)→通信/協働(Zoom/Teams scaffolding)→検証/自動化。
-- **intent-learning-seed-cache-plan** — 意図学習のシードキャッシュ。
+- **stale-doc-cleanup-rationale** — 意図学習のシードキャッシュ整理と Codex App の移行根拠。
 - **COWORK_INTEGRATION_PLAN** — Claude Cowork との密連携(MCPサーバ/surface/承認/知識同期/プラグイン化、Phase 0–5)。実装パッチ提出済・レビュー済。
 
 ### 2.9 揮発ナレッジ層（Working Memory）
