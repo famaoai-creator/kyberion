@@ -17,7 +17,9 @@ The goal is not to copy other products.
 The goal is to absorb the parts that improve first-use success, multimodal reach, reusable skills, durable collaboration, and governance.
 
 The supporting survey is documented in
-[`../external-wisdom/harness-landscape-scan-2026-05.md`](../external-wisdom/harness-landscape-scan-2026-05.md).
+[`../../public/external-wisdom/harness-landscape-scan-2026-05.md`](../../public/external-wisdom/harness-landscape-scan-2026-05.md).
+The Hermes-specific 2026-06 re-scan and implementation plan is documented in
+[`../../public/external-wisdom/hermes-agent-absorption-plan-2026-06.md`](../../public/external-wisdom/hermes-agent-absorption-plan-2026-06.md).
 
 ## 2. Design stance
 
@@ -69,6 +71,8 @@ Implementation targets:
 - one durable board per project or collaboration stream
 - named agents and explicit assignees
 - persistent comments and event history
+- task attempts / runs with structured handoff metadata
+- worker lanes that execute but do not own lifecycle truth
 - retry/block/unblock semantics
 - clean handoff from conversation to mission when work becomes durable
 

@@ -54,6 +54,33 @@
     "released_at": { "type": "string" },
     "claimed_by_peer_id": { "type": "string" },
     "claimed_by_user_id": { "type": "string" },
+    "current_attempt_id": { "type": "string" },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["attempt_id", "run_id", "status", "started_at"],
+        "properties": {
+          "attempt_id": { "type": "string" },
+          "run_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["running", "released", "completed", "blocked", "failed", "handed_off"]
+          },
+          "started_at": { "type": "string" },
+          "ended_at": { "type": "string" },
+          "actor_peer_id": { "type": "string" },
+          "actor_user_id": { "type": "string" },
+          "lease_id": { "type": "string" },
+          "summary": { "type": "string" },
+          "blocked_reason": { "type": "string" },
+          "failure_reason": { "type": "string" },
+          "trace_id": { "type": "string" },
+          "metadata": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
     "metadata": { "type": "object" }
   },
   "additionalProperties": true

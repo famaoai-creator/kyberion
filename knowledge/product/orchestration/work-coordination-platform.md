@@ -65,6 +65,10 @@ Mission-specific registration is separate from external import:
   - mission-local GitHub / Jira issue payload artifacts
 - The dispatch prompt should be assembled from a scoped mission context pack stored under `coordination/context-packs/**`.
 - When the ticket is linked to live GitHub / Jira targets, the result is also appended as a comment and the issue state is advanced when possible.
+- Each `WorkItem` keeps an attempt history, so retries, handoffs, and manual
+  closes remain visible instead of collapsing into one opaque status change.
+- Attempt history should distinguish `running`, `released`, `completed`,
+  `blocked`, `failed`, and `handed_off` outcomes.
 
 ## Board Types
 
