@@ -595,6 +595,10 @@
       "types": "./dist/openai-embedding-backend.d.ts",
       "default": "./dist/openai-embedding-backend.js"
     },
+    "./web-design-system": {
+      "types": "./dist/web-design-system.d.ts",
+      "default": "./dist/web-design-system.js"
+    },
     "./work-coordination-peer": {
       "types": "./dist/work-coordination-peer.d.ts",
       "default": "./dist/work-coordination-peer.js"

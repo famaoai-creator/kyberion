@@ -1,7 +1,28 @@
 "use client";
 
-import { Shield, Cpu, Radar, Bot, ActivitySquare, Wrench, PanelsTopLeft, ChevronDown, ChevronRight, ClipboardCheck, CalendarClock } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Shield,
+  Cpu,
+  Radar,
+  Bot,
+  ActivitySquare,
+  Wrench,
+  PanelsTopLeft,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  CalendarClock,
+  LayoutGrid,
+  Palette,
+  Type,
+  Ruler,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  composeWebDesignSystem,
+  DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
+  DEFAULT_CHRONOS_WEB_THEME_PACK,
+} from "../../../../../libs/core/web-design-system";
 import { A2UIRenderer } from "../components/A2UIComponentLibrary";
 import { FocusedOperatorView } from "../components/FocusedOperatorView";
 import { SovereignChat } from "../components/SovereignChat";
@@ -188,6 +209,11 @@ const STATUS_CARDS: StatusCard[] = [
   },
 ];
 
+const WEB_DESIGN_SYSTEM = composeWebDesignSystem(
+  DEFAULT_CHRONOS_WEB_THEME_PACK,
+  DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
+);
+
 export default function ChronosMirrorV2() {
   const locale = useChronosLocale();
   const [surface, setSurface] = useState<any>(null);
@@ -341,8 +367,14 @@ export default function ChronosMirrorV2() {
     return () => window.removeEventListener("keydown", handleScenarioHotkey);
   }, [handleScenarioOpen]);
 
+  const webTheme = WEB_DESIGN_SYSTEM.theme.theme;
+  const webLayout = WEB_DESIGN_SYSTEM.layout;
+
   return (
-    <main className="min-h-screen w-screen overflow-hidden bg-[#020617] text-white">
+    <main
+      className="min-h-screen w-screen overflow-hidden bg-[var(--kb-bg-main)] text-white"
+      style={WEB_DESIGN_SYSTEM.css_vars as CSSProperties}
+    >
       <div className="absolute inset-0 pointer-events-none opacity-60">
         <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-cyan-500/10 blur-[160px]" />
         <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-cyan-400/5 blur-[150px]" />
@@ -376,6 +408,72 @@ export default function ChronosMirrorV2() {
             </div>
           </div>
         </header>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr),minmax(0,0.85fr)]">
+          <div className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-white/42">
+              <span>{webTheme.name}</span>
+              <span className="text-white/20">·</span>
+              <span>{WEB_DESIGN_SYSTEM.design_system.pack_id}</span>
+              <span className="text-white/20">·</span>
+              <span>{webTheme.colors.accent}</span>
+            </div>
+            <div className="mt-4 max-w-3xl">
+              <h2 className="text-2xl font-semibold tracking-tight text-white/92 md:text-[2rem]">
+                Web site も PowerPoint と同じように、Theme と Structure を分けて組み立てる。
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200/68">
+                この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack`
+                でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。
+              </p>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {WEB_DESIGN_SYSTEM.section_order.map((sectionId) => (
+                <span
+                  key={sectionId}
+                  className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/68"
+                >
+                  {sectionId}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                <Palette size={12} />
+                Theme
+              </div>
+              <div className="mt-2 text-sm font-semibold text-white/90">{webTheme.name}</div>
+              <div className="mt-2 text-[11px] leading-6 text-cyan-50/72">{WEB_DESIGN_SYSTEM.theme.web.snapshot_summary}</div>
+            </div>
+            <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                <LayoutGrid size={12} />
+                Layout
+              </div>
+              <div className="mt-2 text-sm font-semibold text-white/90">{webLayout.grid_columns}-column grid</div>
+              <div className="mt-2 text-[11px] leading-6 text-slate-200/60">Container {webLayout.container_max_width}</div>
+            </div>
+            <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                <Type size={12} />
+                Typography
+              </div>
+              <div className="mt-2 text-sm font-semibold text-white/90">{webTheme.fonts.heading}</div>
+              <div className="mt-2 text-[11px] leading-6 text-slate-200/60">Body {webTheme.fonts.body}</div>
+            </div>
+            <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                <Ruler size={12} />
+                Surface
+              </div>
+              <div className="mt-2 text-sm font-semibold text-white/90">{webLayout.panel_radius} / {webLayout.surface_radius}</div>
+              <div className="mt-2 text-[11px] leading-6 text-slate-200/60">{webLayout.section_gap} section gap</div>
+            </div>
+          </div>
+        </section>
 
         <FirstRunBanner />
 

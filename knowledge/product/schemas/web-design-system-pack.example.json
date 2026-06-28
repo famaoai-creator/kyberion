@@ -1,0 +1,84 @@
+{
+  "kind": "web-design-system-pack",
+  "version": "1.0.0",
+  "pack_id": "chronos-command-surface",
+  "source": {
+    "name": "Kyberion Chronos Mirror v2",
+    "repository": "https://github.com/sho-ai-magic/kyberion",
+    "notes": "Web control-surface structure paired with a theme pack."
+  },
+  "theme_id": "chronos-sovereign-command",
+  "design_system_id": "chronos-command-surface",
+  "layout": {
+    "container_max_width": "1440px",
+    "grid_columns": 12,
+    "sidebar_width": "320px",
+    "panel_radius": "24px",
+    "surface_radius": "30px",
+    "section_gap": "24px",
+    "content_gap": "16px",
+    "hero_min_height": "240px",
+    "body_line_height": 1.55
+  },
+  "tokens": {
+    "button_radius": "999px",
+    "chip_radius": "999px",
+    "badge_radius": "12px",
+    "border_alpha": 0.1,
+    "surface_alpha": 0.8,
+    "muted_alpha": 0.62
+  },
+  "section_order": [
+    "hero",
+    "design-system",
+    "quick-actions",
+    "scenario-selector",
+    "operator-views",
+    "surface-cards",
+    "mission-cycle"
+  ],
+  "section_patterns": [
+    {
+      "section_id": "hero",
+      "category": "hero",
+      "summary": "Opening hero that explains the control surface and the active theme.",
+      "purpose": "Introduce the site and the current web design system.",
+      "layout_key": "hero-command-split",
+      "region_order": ["title", "supporting_copy", "actions", "signals"],
+      "slots": [
+        { "slot_id": "title", "role": "Primary title", "required": true, "max_items": 1, "max_chars_per_item": 42 },
+        { "slot_id": "supporting_copy", "role": "Supporting copy", "required": true, "max_items": 1, "max_chars_per_item": 120 },
+        { "slot_id": "actions", "role": "Primary actions", "required": false, "max_items": 3, "max_chars_per_item": 24 },
+        { "slot_id": "signals", "role": "Design system signals", "required": false, "max_items": 4, "max_chars_per_item": 24 }
+      ],
+      "constraints": [
+        { "kind": "single_message", "slots": ["title"], "message": "Keep the hero focused on one clear operating model." }
+      ]
+    },
+    {
+      "section_id": "design-system",
+      "category": "system",
+      "summary": "Shows the active theme, grid, spacing, and section order.",
+      "purpose": "Make the web design system visible rather than implicit.",
+      "layout_key": "supporting-grid",
+      "region_order": ["theme", "layout", "tokens", "sections"],
+      "slots": [
+        { "slot_id": "theme", "role": "Theme tokens", "required": true, "max_items": 1, "max_chars_per_item": 60 },
+        { "slot_id": "layout", "role": "Layout tokens", "required": true, "max_items": 1, "max_chars_per_item": 60 },
+        { "slot_id": "tokens", "role": "Surface tokens", "required": false, "max_items": 4, "max_chars_per_item": 30 },
+        { "slot_id": "sections", "role": "Section order", "required": true, "min_items": 3, "max_items": 7, "max_chars_per_item": 24 }
+      ]
+    },
+    {
+      "section_id": "quick-actions",
+      "category": "operations",
+      "summary": "Quick action rail for deterministic operator actions.",
+      "purpose": "Group actionable commands into intent-based bands.",
+      "layout_key": "action-rail",
+      "region_order": ["grouped_actions"],
+      "slots": [
+        { "slot_id": "grouped_actions", "role": "Action groups", "required": true, "min_items": 4, "max_items": 8, "max_chars_per_item": 28 }
+      ]
+    }
+  ]
+}
