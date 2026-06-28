@@ -364,7 +364,11 @@ function buildSessionRequest(draft, mode, tabId) {
 
 function nativeHostError(message) {
   if (/not found|forbidden|Access to the specified native messaging host/i.test(message || '')) {
-    return 'Native Messaging host (com.kyberion.browser_bridge) が見つかりません。native-host/README.md の手順で登録してください。';
+    return [
+      'Native Messaging host (com.kyberion.browser_bridge) が見つかりません。',
+      'Register it with: tools/adf-replay-extension/native-host/install.sh <CHROME_EXTENSION_ID>',
+      'Copy the extension ID from chrome://extensions after loading the unpacked extension for that machine.',
+    ].join(' ');
   }
   return message || 'Native Bridge との通信に失敗しました。';
 }
