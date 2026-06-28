@@ -8,8 +8,7 @@
  */
 
 import * as path from 'node:path';
-import { safeExec, safeReadFile } from '../libs/core/secure-io.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
+import { safeExec, safeReadFile, pathResolver } from '@agent/core';
 
 interface CheckResult {
   ok: boolean;
