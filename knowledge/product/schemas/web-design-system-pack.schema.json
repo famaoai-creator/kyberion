@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/web-design-system-pack.schema.json",
+  "title": "Web Design System Pack",
+  "description": "Reusable structural web design system that complements a web-theme-pack. Stores section patterns, layout scale, and control-surface tokens separately from color and typography tokens.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "pack_id", "source", "theme_id", "design_system_id", "layout", "tokens", "section_order", "section_patterns"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["web-design-system-pack"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "pack_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string" },
+        "revision": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "theme_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "container_max_width",
+        "grid_columns",
+        "sidebar_width",
+        "panel_radius",
+        "surface_radius",
+        "section_gap",
+        "content_gap",
+        "hero_min_height",
+        "body_line_height"
+      ],
+      "properties": {
+        "container_max_width": { "type": "string" },
+        "grid_columns": { "type": "number" },
+        "sidebar_width": { "type": "string" },
+        "panel_radius": { "type": "string" },
+        "surface_radius": { "type": "string" },
+        "section_gap": { "type": "string" },
+        "content_gap": { "type": "string" },
+        "hero_min_height": { "type": "string" },
+        "body_line_height": { "type": "number" }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["button_radius", "chip_radius", "badge_radius", "border_alpha", "surface_alpha", "muted_alpha"],
+      "properties": {
+        "button_radius": { "type": "string" },
+        "chip_radius": { "type": "string" },
+        "badge_radius": { "type": "string" },
+        "border_alpha": { "type": "number" },
+        "surface_alpha": { "type": "number" },
+        "muted_alpha": { "type": "number" }
+      }
+    },
+    "section_order": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "section_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section_id", "category", "summary", "purpose", "layout_key", "region_order", "slots"],
+        "properties": {
+          "section_id": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string", "minLength": 1 },
+          "layout_key": { "type": "string", "minLength": 1 },
+          "region_order": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "slots": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["slot_id", "role", "required"],
+              "properties": {
+                "slot_id": { "type": "string", "minLength": 1 },
+                "role": { "type": "string", "minLength": 1 },
+                "required": { "type": "boolean" },
+                "min_items": { "type": "number" },
+                "max_items": { "type": "number" },
+                "max_chars_per_item": { "type": "number" },
+                "notes": { "type": "string" }
+              }
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["single_message", "paired_item_counts_match", "balanced_copy", "requires_visual"]
+                },
+                "slots": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

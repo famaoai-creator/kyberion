@@ -37,6 +37,7 @@ The theme pack keeps those pieces together so `build-web-concept` can render aga
 3. `reasoning:synthesize`
 4. `media:save_brand_to_confidential`
 5. `build-web-concept` with `design_theme`
+6. preview the generated HTML locally
 
 ## Example
 

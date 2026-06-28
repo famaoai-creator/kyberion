@@ -13,7 +13,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="bg-black text-kyberion-gold antialiased overflow-hidden" suppressHydrationWarning>
+      <body
+        className="antialiased overflow-hidden"
+        style={{ backgroundColor: "var(--kb-bg-main)", color: "var(--kb-text-primary)" }}
+        suppressHydrationWarning
+      >
         {children}
       </body>
     </html>

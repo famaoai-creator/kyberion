@@ -1,9 +1,10 @@
 {
-  "pipeline_id": "build-web-concept",
-  "version": "2.0.0",
-  "description": "Generate and preview a web site prototype from a conceptual brief.",
-  "_migration_note": "v3: Delegates the HTML generation/open flow to the reusable html-web-preview fragment.",
   "action": "pipeline",
+  "pipeline_id": "build-web-concept-preview",
+  "version": "2.0.0",
+  "name": "Build Web Concept Preview",
+  "description": "Generate a self-contained HTML concept page from a brief and open it for immediate local review.",
+  "_migration_note": "v2: Delegates the HTML write/open flow to the reusable html-web-preview fragment.",
   "context": {
     "concept_brief": "Describe the site, audience, and main message here.",
     "design_theme": "",
