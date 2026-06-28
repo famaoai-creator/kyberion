@@ -148,6 +148,11 @@ Excel テンプレート群は次で管理する。
 
 テーマ / 外部デザインシステム / PPTX抽出の関係は [theme-and-design-system-reference.md](/Users/famao/kyberion/knowledge/public/procedures/media/theme-and-design-system-reference.md) を参照。
 
+Web サイト向けの theme / design system 分離は `web/` に集約する。
+
+- `web-theme-pack`: 既存サイトや HTML スナップショットから抽出した視覚資産
+- `web-design-system-pack`: サイトの構造、レイアウト、セクション順を再利用するための定義
+
 高密度な document profile 群は `media-templates/artifact-library/` に置き、directory scan で media resolver に統合する。
 
 - `kyberion-standard`: 汎用の標準テーマ

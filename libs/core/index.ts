@@ -108,6 +108,7 @@ export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
 export * from './calendar-workflow.js';
 export * from './presentation-slide-pattern.js';
+export * from './web-design-system.js';
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';

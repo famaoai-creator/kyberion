@@ -1,36 +1,28 @@
 {
   "pipeline_id": "build-web-concept",
   "version": "2.0.0",
-  "description": "Generate and build a web site prototype from a conceptual brief.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "description": "Generate and preview a web site prototype from a conceptual brief.",
+  "_migration_note": "v3: Delegates the HTML generation/open flow to the reusable html-web-preview fragment.",
   "action": "pipeline",
+  "context": {
+    "concept_brief": "Describe the site, audience, and main message here.",
+    "design_theme": "",
+    "output_path": "active/shared/tmp/preview/index.html",
+    "preview_label": "Web concept preview"
+  },
   "steps": [
     {
-      "id": "site-structure",
-      "role": "source",
-      "op": "reasoning:analyze",
-      "produces": { "channel": "site_html", "type": "HtmlContent" },
+      "id": "render_preview",
+      "role": "gate",
+      "op": "core:include",
       "params": {
-        "instruction": "Define and write a complete HTML document for a website based on this concept: {{concept_brief}}. Include landing page sections (Hero, Features, Pricing, Footer). If a design theme is provided, treat it as a web-theme-pack and reuse its palette, typography, spacing scale, layout grid, breakpoints, and hero structure directly in the HTML and CSS. Return a single self-contained HTML string.",
-        "context": ["{{design_theme}}"]
-      }
-    },
-    {
-      "id": "generate-code",
-      "role": "sink",
-      "op": "code:write_artifact",
-      "consumes": "site_html",
-      "params": {
-        "path": "active/shared/tmp/preview/index.html",
-        "content": "{{site_html}}"
-      }
-    },
-    {
-      "id": "preview",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "Web concept written to active/shared/tmp/preview/index.html"
+        "fragment": "fragments/html-web-preview.json",
+        "context": {
+          "html_brief": "{{concept_brief}}",
+          "design_system_brief": "{{design_theme}}",
+          "output_path": "{{output_path}}",
+          "preview_label": "{{preview_label}}"
+        }
       }
     }
   ]
