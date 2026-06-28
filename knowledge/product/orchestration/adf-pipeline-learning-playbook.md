@@ -533,6 +533,7 @@ The stable shape is:
 
 - one reasoning pass
 - one artifact write
+- one local preview/open step
 - one output target
 
 Why this is good:
@@ -540,7 +541,7 @@ Why this is good:
 - the concept brief is explicit
 - the design theme is optional but injectable
 - the runtime is simple enough to rerun and compare
-- the output is directly reviewable as HTML
+- the output is directly reviewable as HTML and opened immediately
 
 Representative pattern:
 
