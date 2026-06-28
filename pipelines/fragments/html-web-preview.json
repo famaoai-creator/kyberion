@@ -1,0 +1,49 @@
+{
+  "action": "pipeline",
+  "name": "html-web-preview-fragment",
+  "version": "2.0.0",
+  "description": "Generates a self-contained HTML document from a brief, writes it to disk, and opens it in the OS default handler for immediate review. Required context vars: html_brief, output_path. Optional: design_system_brief, preview_label.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "output_path": "active/shared/tmp/html-preview/index.html",
+    "preview_label": "HTML preview"
+  },
+  "steps": [
+    {
+      "id": "synthesize_html",
+      "role": "source",
+      "op": "reasoning:synthesize",
+      "produces": { "channel": "html_document", "type": "HtmlContent" },
+      "params": {
+        "instruction": "Write a complete, self-contained HTML document for the supplied brief. The output must be a single HTML string with inline CSS and minimal inline JS only if needed for interaction. Make it responsive, polished, and suitable for direct local preview. Treat any design system brief as the source of truth for palette, typography, spacing, layout rhythm, and component shape. Do not reference external assets, build tools, or frameworks.",
+        "context": ["{{html_brief}}", "{{design_system_brief}}"]
+      }
+    },
+    {
+      "id": "write_html",
+      "role": "sink",
+      "op": "code:write_artifact",
+      "consumes": "html_document",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{html_document}}"
+      }
+    },
+    {
+      "id": "open_html",
+      "role": "sink",
+      "op": "system:open_file",
+      "params": {
+        "path": "{{output_path}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[{{preview_label}}] written and opened at {{output_path}}"
+      }
+    }
+  ]
+}

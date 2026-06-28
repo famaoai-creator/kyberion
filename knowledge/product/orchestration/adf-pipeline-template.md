@@ -168,7 +168,7 @@ Before shipping a new pipeline from this template, confirm:
 | Template | Good example | What to copy |
 |---|---|---|
 | Browser extraction | `extract-brand-theme` | explicit open/capture/reason/write flow |
-| Concept to prototype | `build-web-concept` | one reasoning pass + one artifact write |
+| Concept to prototype | `build-web-concept` | one reasoning pass + one artifact write + open/preview |
 | Shared coordination | guided coordination flows | separate brief from execution |
 
 ---
