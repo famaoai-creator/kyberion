@@ -6,7 +6,8 @@
  * to `main` so merge commit subjects remain conventional too.
  */
 
-import { safeExec, pathResolver } from '@agent/core';
+import { safeExec } from '../libs/core/secure-io.js';
+import { pathResolver } from '../libs/core/path-resolver.js';
 import { checkTitle } from './check_pr_title.js';
 
 const MERGE_PULL_REQUEST_SUBJECT_RE = /^Merge pull request #\d+ from [^\s]+\/[^\s]+$/;
