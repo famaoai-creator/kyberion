@@ -23,6 +23,9 @@ export interface ProposalStorylineADF {
   toc?: {
     [k: string]: unknown;
   }[];
+  diagnostics?: {
+    [k: string]: unknown;
+  }[];
   slides: {
     id: string;
     title: string;

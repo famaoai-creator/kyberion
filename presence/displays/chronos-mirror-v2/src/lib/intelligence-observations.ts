@@ -1,9 +1,11 @@
 import {
   pathResolver,
+} from "@agent/core/path-resolver";
+import {
   safeExistsSync,
   safeReadFile,
   safeReaddir,
-} from "@agent/core/intelligence-primitives";
+} from "@agent/core/secure-io";
 
 export interface OrchestrationEventSummary {
   ts: string;
