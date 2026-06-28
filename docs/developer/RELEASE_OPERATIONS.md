@@ -44,6 +44,8 @@ We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 PRs must use one of these types. CI rejects PR titles that do not match the pattern. Pushes to `main` reject commit subjects that do not match the pattern, except for the default GitHub merge commit subject (`Merge pull request #...`) when a human uses the merge button.
 
+Before opening a PR locally, run the title through `pnpm run check:pr-title -- --title "<proposed title>"`. The repo also exposes `pnpm run pr:create -- --title "<proposed title>"` as a guarded publish wrapper that fails fast if the title is not conventional.
+
 ## Release cadence
 
 - **Patch (`0.x.y` → `0.x.y+1`)**: as needed, when a `fix:` lands.
