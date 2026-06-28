@@ -4,7 +4,7 @@ import {
   pathResolver,
   safeExistsSync,
   safeReadFile,
-} from "@agent/core/intelligence-primitives";
+} from "./intelligence-primitives";
 
 export interface AgentMessageSummary {
   ts: string;

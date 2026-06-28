@@ -3,7 +3,10 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
-import { resolveCapabilityBundleForIntent } from './capability-bundle-registry.js';
+import {
+  resolveCapabilityBundleForIntent,
+  resolveCapabilityBundlesForUtterance,
+} from './capability-bundle-registry.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -512,6 +515,19 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
   for (const candidate of sorted) {
     const bundle = resolveCapabilityBundleForIntent(candidate.intent_id);
     if (!bundle) continue;
+    bundleById.set(bundle.bundle_id, {
+      bundle_id: bundle.bundle_id,
+      status: bundle.status,
+      kind: bundle.kind,
+      summary: bundle.summary,
+      required_actuators: bundle.required_actuators || [],
+      intents: bundle.intents || [],
+      references: bundle.references || [],
+    });
+  }
+
+  for (const bundle of resolveCapabilityBundlesForUtterance(trimmed)) {
+    if (bundleById.has(bundle.bundle_id)) continue;
     bundleById.set(bundle.bundle_id, {
       bundle_id: bundle.bundle_id,
       status: bundle.status,

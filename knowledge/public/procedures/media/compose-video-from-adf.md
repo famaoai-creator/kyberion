@@ -42,6 +42,38 @@ Audio selection is currently deterministic:
 - prefer `audio.narration_ref` when present
 - otherwise mux `audio.music_ref`
 
+## 3.1 Story and narration flow
+
+Do not author composed video as plain HTML first. Start from the narrative
+contract and let the render target follow the story.
+
+Recommended order:
+
+1. choose the intent-specific route
+   - product launch / teaser
+   - website tour
+   - faceless explainer
+   - narrated intro or how-to
+2. write the narration first
+3. decompose the narration into beats and scene boundaries
+4. assign one clear visual job per beat
+5. render the scenes
+6. mux narration or music at the end
+
+Practical artifact split:
+
+- `video-content-brief` captures audience, promise, takeaway, and constraints
+- `storyboard` captures beat timing and shot intent
+- `narrated-video-brief` captures the script, narration, and design system
+- `video-composition-adf` captures the final render contract
+
+HyperFrames-style guidance is especially useful here:
+
+- use a dedicated `writer`/`copywriter` pass for the voiceover
+- use a dedicated `storyboarder` pass for the beat list
+- keep `voice-talent` or narration synthesis separate from the visual render
+- use the renderer only after the story structure is stable
+
 ## 4. Execution
 
 Example input:

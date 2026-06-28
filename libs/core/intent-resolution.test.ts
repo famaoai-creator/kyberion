@@ -129,6 +129,9 @@ describe('intent-resolution', () => {
     const videoPacket = resolveIntentResolutionPacket('動画を生成して');
     expect(videoPacket.selected_intent_id).toBe('generate-video');
     expect(videoPacket.selected_resolution?.shape).toBe('pipeline');
+    expect(
+      videoPacket.bundle_candidates?.map((bundle) => bundle.bundle_id)
+    ).toContain('video-generation-governed');
 
     const transcriptPacket = resolveIntentResolutionPacket('この音声を書き起こして');
     expect(transcriptPacket.selected_intent_id).toBe('transcribe-audio');
@@ -137,6 +140,18 @@ describe('intent-resolution', () => {
     const liveVoicePacket = resolveIntentResolutionPacket('ライブ音声で会話したい');
     expect(liveVoicePacket.selected_intent_id).toBe('live-voice');
     expect(liveVoicePacket.selected_resolution?.task_kind).toBe('voice_conversation');
+  });
+
+  it('surfaces recipe-style video bundles for explainer and ASCII utterances', () => {
+    const manimPacket = resolveIntentResolutionPacket('3Blue1Brownみたいな数学解説動画を作って');
+    expect(manimPacket.bundle_candidates?.map((bundle) => bundle.bundle_id)).toContain(
+      'manim-video-recipes-governed'
+    );
+
+    const asciiPacket = resolveIntentResolutionPacket('端末風のASCII動画を作って');
+    expect(asciiPacket.bundle_candidates?.map((bundle) => bundle.bundle_id)).toContain(
+      'ascii-video-recipes-governed'
+    );
   });
 
   it('resolves generic schedule adjustments as a first-class surface intent', () => {
