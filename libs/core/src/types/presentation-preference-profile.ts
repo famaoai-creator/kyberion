@@ -57,9 +57,9 @@ export interface PresentationPreferenceProfile {
       deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
       /**
        * @minItems 1
-       * @maxItems 3
+       * @maxItems 2
        */
-      questions: [string] | [string, string] | [string, string, string];
+      questions: [string] | [string, string];
       notes?: string;
     },
     ...{
@@ -67,9 +67,9 @@ export interface PresentationPreferenceProfile {
       deck_purposes: ('proposal' | 'internal_share' | 'briefing' | 'marketing' | 'training' | 'comparison')[];
       /**
        * @minItems 1
-       * @maxItems 3
+       * @maxItems 2
        */
-      questions: [string] | [string, string] | [string, string, string];
+      questions: [string] | [string, string];
       notes?: string;
     }[]
   ];

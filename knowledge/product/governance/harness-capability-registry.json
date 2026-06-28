@@ -353,6 +353,114 @@
       "notes": "Hermes Kanban is the durable multi-agent board pattern: named workers, persistent rows, and shared handoffs."
     },
     {
+      "capability_id": "provider.runtime.hermes_cron_scheduler",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "cron",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["scheduled-workflow", "no-agent-job", "context-chaining"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "knowledge/product/orchestration/schedule-delivery-protocol.md"
+      },
+      "status": "experimental",
+      "notes": "Hermes Cron is a useful reference for pinned scheduled jobs, no-agent checks, and wake-agent style gates."
+    },
+    {
+      "capability_id": "provider.runtime.hermes_hook_pipeline",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "hooks",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "capability"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["hook-management", "tool-interception", "context-injection"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "experimental",
+      "notes": "Hermes-style hooks are a reference for governed lifecycle interception, but Kyberion should keep explicit policy and receipts."
+    },
+    {
+      "capability_id": "provider.runtime.hermes_skill_bundle_registry",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "skills",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "capability"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["skill-bundle", "shared-procedure", "progressive-disclosure"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "experimental",
+      "notes": "Hermes skill bundles and external skill directories are a useful model for Kyberion capability bundles."
+    },
+    {
+      "capability_id": "provider.runtime.hermes_tool_routing",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "tool-gateway",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["tool-routing", "gateway-vs-direct", "cost-visibility"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "experimental",
+      "notes": "Hermes Tool Gateway is a useful per-tool routing reference, but Kyberion should keep the provider-neutral routing contract."
+    },
+    {
       "capability_id": "provider.runtime.openhands_control_plane",
       "source": {
         "type": "agent_runtime",

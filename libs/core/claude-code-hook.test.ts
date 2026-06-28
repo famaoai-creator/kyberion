@@ -14,6 +14,8 @@ vi.mock('./audit-chain.js', () => ({ auditChain: { record: (e: any) => recordSpy
 
 import {
   buildSessionStartContext,
+  buildStopContext,
+  buildUserPromptSubmitContext,
   evaluatePreToolUse,
   recordPostToolUse,
 } from './claude-code-hook.js';
@@ -72,5 +74,28 @@ describe('claude-code-hook — SessionStart', () => {
     expect(ctx).toContain('tier-guard');
     expect(ctx).toContain('audit chain');
     expect(ctx).toContain('/ky-baseline');
+  });
+});
+
+describe('claude-code-hook — UserPromptSubmit and Stop', () => {
+  it('summarizes the prompt and suggests the next Kyberion step', () => {
+    const ctx = buildUserPromptSubmitContext({
+      prompt: 'Presentation deck for a proposal. Please validate the slides and open a mission.',
+      cwd: '/repo',
+    });
+
+    expect(ctx).toContain('Prompt summary');
+    expect(ctx).toContain('presentation preference profile');
+    expect(ctx).toContain('mission');
+  });
+
+  it('summarizes stop events and nudges review completion', () => {
+    const ctx = buildStopContext({
+      reason: 'Stopping after the first draft and validation pass.',
+      cwd: '/repo',
+    });
+
+    expect(ctx).toContain('Stop summary');
+    expect(ctx).toContain('/ky-review');
   });
 });
