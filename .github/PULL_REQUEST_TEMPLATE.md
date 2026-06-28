@@ -55,7 +55,7 @@ N/A.
 - [ ] `pnpm validate` is green locally
 - [ ] Tests added (or existing tests updated)
 - [ ] CHANGELOG.md updated under `[Unreleased]` (for user-visible changes)
-- [ ] Commit titles follow [Conventional Commits](https://www.conventionalcommits.org/)
+- [ ] PR title and commit titles follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] Read [`docs/developer/EXTENSION_POINTS.md`](../docs/developer/EXTENSION_POINTS.md) if touching public surfaces
 
 ## Issue link
