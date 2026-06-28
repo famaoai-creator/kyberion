@@ -19,8 +19,11 @@ Use this catalog to exchange messages between Kyberion instances.
 ## Transport model
 
 - `peer:server` starts a Kyberion peer listener on an HTTP port.
+- `peer:conversation-server` starts a conversation-capable Kyberion peer listener.
 - `peer:send` resolves a peer from the catalog and sends a signed envelope.
+- `peer:conversation` opens, sends, lists, and closes peer conversation sessions.
 - Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/` and `active/shared/observability/peer-messaging/`.
+- Conversation sessions are stored under `active/shared/runtime/peer-conversations/` and `active/shared/observability/peer-conversations/`.
 - Message handling is synchronous on receipt: the recipient processes the envelope inside the HTTP request handler, then returns the ACK response only after the responder finishes.
 - The response body includes `processing_mode: "synchronous_on_receive"` and `processed_at` so operators can tell when handling completed.
 - There is no deferred queue in this transport yet; if the recipient needs to fan out into mission/A2A work, that happens from the responder logic after the message is accepted.
