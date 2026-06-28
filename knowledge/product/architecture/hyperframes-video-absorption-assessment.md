@@ -142,6 +142,41 @@ Kyberion should absorb this as a governed pipeline for:
 
 This maps naturally to Kyberion's intent -> plan -> execution -> evidence model.
 
+### 4.1 Storyboard and narration should come before HTML
+
+HyperFrames' own guidance is explicit: do not jump straight into HTML. Route the
+request through the intent-specific skill, then write the narration and break it
+into beats before you author the composition.
+
+The relevant pattern is:
+
+1. pick the right entry point, for example `/product-launch-video`,
+   `/website-to-video`, `/faceless-explainer`, or `/general-video`
+2. write the narration first
+3. turn narration into beat-by-beat storyboards
+4. assign a renderer that matches the style, such as `manim-video`,
+   `ascii-video`, motion graphics, or a website-capture route
+5. keep voiceover, scene timing, and final muxing as separate artifacts
+
+Hermes reinforces the same structure with explicit video roles:
+
+- `writer` / `copywriter` for the script and voiceover copy
+- `storyboarder` for the beat-by-beat shot list
+- `voice-talent` for narration audio
+- `cinematographer` / `renderer` for visual language and execution
+- `editor`, `audio-mixer`, and `reviewer` for final assembly and QA
+
+For Kyberion, the corresponding implementation shape should be:
+
+- `video-content-brief` or `narrated-video-brief` first
+- storyboard compiler second
+- narration artifact third
+- composed render bundle fourth
+- final mux and verification last
+
+That keeps HyperFrames-backed videos from collapsing into "just render an HTML
+page" and makes the narrative structure auditable.
+
 ### 5. Registry Pattern For Reusable Video Blocks
 
 HyperFrames has a practical registry model for examples, blocks, and components.

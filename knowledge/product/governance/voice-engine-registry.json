@@ -17,6 +17,21 @@
       "notes": "Uses OS-native speech engines through secure shell execution."
     },
     {
+      "engine_id": "espeak_ng",
+      "display_name": "espeak-ng TTS",
+      "kind": "native_local",
+      "provider": "espeak_ng",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "bridge_script": "libs/actuators/voice-actuator/scripts/espeak_ng_tts_bridge.py",
+      "supports": {
+        "list_voices": true,
+        "playback": true,
+        "artifact_formats": ["wav", "aiff"]
+      },
+      "notes": "Configured espeak-ng fallback with governed bridge script."
+    },
+    {
       "engine_id": "open_voice_clone",
       "display_name": "Open Voice Clone",
       "kind": "voice_clone_service",

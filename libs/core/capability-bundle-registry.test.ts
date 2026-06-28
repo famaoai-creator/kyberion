@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   loadCapabilityBundleRegistry,
   resolveCapabilityBundleForIntent,
+  resolveCapabilityBundlesForUtterance,
   summarizeRelevantCapabilityBundlesForIntentIdsCompact,
   summarizeRelevantCapabilityBundlesForIntentIds,
 } from './capability-bundle-registry.js';
@@ -37,6 +38,22 @@ describe('capability-bundle-registry', () => {
     );
     expect(resolveCapabilityBundleForIntent('meeting-operations')?.bundle_id).toBe(
       'meeting-operations-governed'
+    );
+  });
+
+  it('discovers conceptual video recipe bundles from utterance hints', () => {
+    const manimBundles = resolveCapabilityBundlesForUtterance(
+      '3Blue1Brownみたいな数学解説動画を作って'
+    );
+    expect(manimBundles.map((bundle) => bundle.bundle_id)).toContain(
+      'manim-video-recipes-governed'
+    );
+
+    const asciiBundles = resolveCapabilityBundlesForUtterance(
+      '端末風のASCII動画を作って'
+    );
+    expect(asciiBundles.map((bundle) => bundle.bundle_id)).toContain(
+      'ascii-video-recipes-governed'
     );
   });
 

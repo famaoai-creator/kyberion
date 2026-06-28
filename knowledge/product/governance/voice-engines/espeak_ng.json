@@ -3,19 +3,19 @@
   "default_engine_id": "local_say",
   "engines": [
     {
-      "engine_id": "local_say",
-      "display_name": "Local System TTS",
+      "engine_id": "espeak_ng",
+      "display_name": "espeak-ng TTS",
       "kind": "native_local",
-      "provider": "system_tts",
+      "provider": "espeak_ng",
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
+      "bridge_script": "libs/actuators/voice-actuator/scripts/espeak_ng_tts_bridge.py",
       "supports": {
         "list_voices": true,
         "playback": true,
         "artifact_formats": ["wav", "aiff"]
       },
-      "fallback_engine_id": "espeak_ng",
-      "notes": "Uses OS-native speech engines through secure shell execution."
+      "notes": "Configured espeak-ng fallback with governed bridge script."
     }
   ]
 }

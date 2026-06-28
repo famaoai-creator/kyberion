@@ -80,8 +80,8 @@ import {
   stopAgentRuntime,
   summarizeMissionSeedAssessment,
   updateDistillCandidateRecord,
-} from '@agent/core/intelligence-primitives';
-import { listWorkItems } from '@agent/core';
+} from '../../../lib/intelligence-primitives';
+import { listWorkItems } from '@agent/core/work-coordination';
 
 interface RuntimeTopologySurfaceInput {
   id: string;

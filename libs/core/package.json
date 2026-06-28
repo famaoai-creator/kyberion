@@ -598,6 +598,10 @@
     "./work-coordination-peer": {
       "types": "./dist/work-coordination-peer.d.ts",
       "default": "./dist/work-coordination-peer.js"
+    },
+    "./work-coordination": {
+      "types": "./dist/work-coordination.d.ts",
+      "default": "./dist/work-coordination.js"
     }
   },
   "dependencies": {
