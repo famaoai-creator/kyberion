@@ -81,6 +81,7 @@ import {
   summarizeMissionSeedAssessment,
   updateDistillCandidateRecord,
 } from '@agent/core/intelligence-primitives';
+import { listWorkItems } from '@agent/core';
 
 interface RuntimeTopologySurfaceInput {
   id: string;
@@ -286,6 +287,38 @@ interface NextActionSummary {
   approval_required: boolean;
 }
 
+interface WorkCoordinationItemSummary {
+  item_id: string;
+  title: string;
+  status: string;
+  priority: string;
+  project_id: string;
+  source_ref: string;
+  updated_at: string;
+  attempt_count: number;
+  current_attempt_id?: string;
+  current_attempt_status?: string;
+  current_attempt_started_at?: string;
+  current_attempt_summary?: string;
+  blocked_reason?: string;
+  failure_reason?: string;
+  claimed_by_peer_id?: string;
+  claimed_by_user_id?: string;
+}
+
+interface WorkCoordinationSummary {
+  total: number;
+  backlog: number;
+  ready: number;
+  inProgress: number;
+  blocked: number;
+  review: number;
+  done: number;
+  archived: number;
+  runningAttempts: number;
+  recentItems: WorkCoordinationItemSummary[];
+}
+
 function buildChronosNextActions(input: {
   pendingApprovals: number;
   missionSeeds: Array<{ promoted_mission_id?: string }>;
@@ -340,6 +373,78 @@ function buildChronosNextActions(input: {
   }
 
   return actions;
+}
+
+function collectWorkCoordinationSummary(): WorkCoordinationSummary {
+  const items = listWorkItems();
+  const summary: WorkCoordinationSummary = {
+    total: items.length,
+    backlog: 0,
+    ready: 0,
+    inProgress: 0,
+    blocked: 0,
+    review: 0,
+    done: 0,
+    archived: 0,
+    runningAttempts: 0,
+    recentItems: [],
+  };
+
+  for (const item of items) {
+    switch (item.status) {
+      case 'backlog':
+        summary.backlog += 1;
+        break;
+      case 'ready':
+        summary.ready += 1;
+        break;
+      case 'in_progress':
+        summary.inProgress += 1;
+        break;
+      case 'blocked':
+        summary.blocked += 1;
+        break;
+      case 'review':
+        summary.review += 1;
+        break;
+      case 'done':
+        summary.done += 1;
+        break;
+      case 'archived':
+        summary.archived += 1;
+        break;
+    }
+    const attempts = Array.isArray(item.attempts) ? item.attempts : [];
+    summary.runningAttempts += attempts.filter((attempt) => attempt.status === 'running').length;
+  }
+
+  summary.recentItems = items.slice(0, 6).map((item) => {
+    const attempts = Array.isArray(item.attempts) ? item.attempts : [];
+    const currentAttempt =
+      attempts.find((attempt) => attempt.run_id === item.current_attempt_id) ||
+      attempts[attempts.length - 1] ||
+      null;
+    return {
+      item_id: item.item_id,
+      title: item.title,
+      status: item.status,
+      priority: item.priority,
+      project_id: item.project_id,
+      source_ref: item.source_ref,
+      updated_at: item.updated_at,
+      attempt_count: attempts.length,
+      ...(item.current_attempt_id ? { current_attempt_id: item.current_attempt_id } : {}),
+      ...(currentAttempt?.status ? { current_attempt_status: currentAttempt.status } : {}),
+      ...(currentAttempt?.started_at ? { current_attempt_started_at: currentAttempt.started_at } : {}),
+      ...(currentAttempt?.summary ? { current_attempt_summary: currentAttempt.summary } : {}),
+      ...(currentAttempt?.blocked_reason ? { blocked_reason: currentAttempt.blocked_reason } : {}),
+      ...(currentAttempt?.failure_reason ? { failure_reason: currentAttempt.failure_reason } : {}),
+      ...(currentAttempt?.actor_peer_id ? { claimed_by_peer_id: currentAttempt.actor_peer_id } : {}),
+      ...(currentAttempt?.actor_user_id ? { claimed_by_user_id: currentAttempt.actor_user_id } : {}),
+    };
+  });
+
+  return summary;
 }
 
 function inferMissionSeedPromotionTargetKind(seed: {
@@ -1369,6 +1474,22 @@ export async function GET(req: NextRequest) {
     );
     const secretApprovals = collectPendingSecretApprovals();
     const pendingApprovals = collectPendingApprovals();
+    const workCoordination = safeCollect(
+      'collectWorkCoordinationSummary',
+      {
+        total: 0,
+        backlog: 0,
+        ready: 0,
+        inProgress: 0,
+        blocked: 0,
+        review: 0,
+        done: 0,
+        archived: 0,
+        runningAttempts: 0,
+        recentItems: [],
+      },
+      collectWorkCoordinationSummary
+    );
     const projects = listProjectRecords();
     const projectTracks = listProjectTrackRecords();
     const missionSeeds = listMissionSeedRecords();
@@ -1397,6 +1518,7 @@ export async function GET(req: NextRequest) {
       missionSeedAssessment,
       distillCandidates,
       memoryCandidates,
+      workCoordination,
       nextActions,
       serviceBindings,
       recentArtifacts,
