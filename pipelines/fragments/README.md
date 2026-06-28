@@ -47,6 +47,11 @@
 - **目的**: ブラウザ起動の前段を含めて Microsoft Teams の join ボタン押下までを一括で実行する。
 - **主要操作**: `core:include`, `browser:goto`, `browser:fill_ref`, `browser:click_ref`
 
+### 11. `html-web-preview.json`
+- **目的**: brief から self-contained HTML を生成し、ファイルに書き出して OS 既定のハンドラで即表示する。
+- **主要操作**: `reasoning:synthesize`, `code:write_artifact`, `system:open_file`
+- **用途**: Web の説明資料、概念ページ、操作デモの local preview。
+
 ## 使用方法
 
 メインのパイプライン JSON 内で、`wisdom:apply_fragment` 等の操作（またはオーケストレータによる展開）を通じて利用されます。

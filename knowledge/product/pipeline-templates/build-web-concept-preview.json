@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "build-web-concept-preview",
+  "version": "2.0.0",
+  "name": "Build Web Concept Preview",
+  "description": "Generate a self-contained HTML concept page from a brief and open it for immediate local review.",
+  "_migration_note": "v2: Delegates the HTML write/open flow to the reusable html-web-preview fragment.",
+  "context": {
+    "concept_brief": "Describe the site, audience, and main message here.",
+    "design_theme": "",
+    "output_path": "active/shared/tmp/preview/index.html",
+    "preview_label": "Web concept preview"
+  },
+  "steps": [
+    {
+      "id": "render_preview",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/html-web-preview.json",
+        "context": {
+          "html_brief": "{{concept_brief}}",
+          "design_system_brief": "{{design_theme}}",
+          "output_path": "{{output_path}}",
+          "preview_label": "{{preview_label}}"
+        }
+      }
+    }
+  ]
+}
