@@ -67,7 +67,12 @@ Orchestrator-ready bundle:
 Treat the `video-generation-adf` as the public contract and the embedded workflow only as a current backend strategy.  
 Do not let orchestration couple itself directly to Comfy node graphs.
 
+Hermes-style lesson: keep the generation surface, provider selection, and media
+delivery path separate. A backend swap should change policy and registry data,
+not the user-facing contract.
+
 ## 7. Related Surfaces
 
 - `generate-narrated-video` uses the narrated-video composition flow instead of this prompt-based video generation path.
 - `create-music-video-from-adf` intentionally keeps music-specific composition semantics out of this procedure.
+- Hermes absorption notes: [`hermes-agent-absorption-plan-2026-06.md`](/Users/famao/kyberion/knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md)

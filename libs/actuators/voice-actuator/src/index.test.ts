@@ -409,8 +409,8 @@ describe('voice actuator', () => {
       mode: 'speaker_verification',
     }));
     expect(mocks.safeExec).toHaveBeenCalledWith(
-      'espeak-ng',
-      expect.arrayContaining(['-v', 'ja', '-s', '260', '-w', expect.stringContaining('/tmp/voice-generation/'), 'hello world']),
+      'say',
+      expect.arrayContaining(['-v', 'Kyoko', '-r', '180', '-o', expect.stringContaining('/tmp/voice-generation/'), 'hello world']),
     );
     expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
     expect(mocks.withRetry).toHaveBeenCalled();
@@ -490,8 +490,8 @@ describe('voice actuator', () => {
     ]);
     expect(result.progress_packets.length).toBeGreaterThan(0);
     expect(mocks.safeExec).toHaveBeenCalledWith(
-      'espeak-ng',
-      ['-v', 'ja', '-s', '260', '-w', '/tmp/voice-generation/req-1.wav', 'hello world'],
+      'say',
+      ['-v', 'Kyoko', '-r', '180', '-o', '/tmp/voice-generation/req-1.wav', 'hello world'],
     );
     expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
     expect(mocks.withRetry).toHaveBeenCalled();
