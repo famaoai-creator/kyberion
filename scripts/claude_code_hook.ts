@@ -7,8 +7,10 @@
  * JSON to stdout.
  *
  *   node dist/scripts/claude_code_hook.js SessionStart  < event.json
+ *   node dist/scripts/claude_code_hook.js UserPromptSubmit < event.json
  *   node dist/scripts/claude_code_hook.js PreToolUse     < event.json
  *   node dist/scripts/claude_code_hook.js PostToolUse    < event.json
+ *   node dist/scripts/claude_code_hook.js Stop           < event.json
  *
  * Never blocks Claude Code on an internal error: on failure it exits 0 and (for
  * PreToolUse) fails open with an explanatory reason.
@@ -16,6 +18,8 @@
 
 import {
   buildSessionStartContext,
+  buildStopContext,
+  buildUserPromptSubmitContext,
   evaluatePreToolUse,
   recordPostToolUse,
 } from '@agent/core/claude-code-hook.js';
@@ -46,6 +50,14 @@ async function main(): Promise<void> {
       );
       return;
     }
+    case 'UserPromptSubmit': {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: buildUserPromptSubmitContext(payload) },
+        }),
+      );
+      return;
+    }
     case 'PreToolUse': {
       process.stdout.write(JSON.stringify(evaluatePreToolUse(payload)));
       return;
@@ -56,6 +68,14 @@ async function main(): Promise<void> {
       } catch {
         // audit is best-effort; never block the session
       }
+      return;
+    }
+    case 'Stop': {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'Stop', additionalContext: buildStopContext(payload) },
+        }),
+      );
       return;
     }
     default:

@@ -50,7 +50,6 @@ describe('presentation-preference-profile schema', () => {
     expect(getPresentationBriefQuestions(profile, 'marketing')).toEqual([
       '営業資料ですか、告知資料ですか?',
       'ブランド準拠の強さはどの程度必要ですか?',
-      '図解中心と写真中心のどちらが良いですか?',
     ]);
     expect(getPresentationThemeHint(profile, 'internal_share')).toBe('internal_practical');
     expect(getPresentationThemeHint(profile, 'training')).toBe('training_structured');

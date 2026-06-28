@@ -10,6 +10,7 @@ import {
   listBoardItems,
   listBoards,
   listCoordinationEvents,
+  listWorkItemAttempts,
   listWorkItems,
   releaseWorkItem,
   handoffWorkItem,
@@ -101,6 +102,11 @@ describe('work coordination', () => {
     expect(claimed.item.version).toBe(2);
     expect(claimed.item.status).toBe('in_progress');
     expect(claimed.item.lease_id).toBe(claimed.lease.lease_id);
+    expect(listWorkItemAttempts(item.item_id)).toHaveLength(1);
+    expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
+      status: 'running',
+      lease_id: claimed.lease.lease_id,
+    });
 
     expect(() =>
       claimWorkItem({
@@ -126,6 +132,14 @@ describe('work coordination', () => {
     expect(handed.item.status).toBe('in_progress');
     expect(handed.item.lease_id).toBe(handed.toLease.lease_id);
     expect(listCoordinationEvents().some((event) => event.event_type === 'item_handed_off')).toBe(true);
+    expect(listWorkItemAttempts(item.item_id)).toHaveLength(2);
+    expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
+      status: 'released',
+    });
+    expect(listWorkItemAttempts(item.item_id)[1]).toMatchObject({
+      status: 'running',
+      lease_id: handed.toLease.lease_id,
+    });
 
     const released = releaseWorkItem({
       itemId: handed.item.item_id,
@@ -138,6 +152,10 @@ describe('work coordination', () => {
 
     expect(released.item.status).toBe('ready');
     expect(released.item.lease_id).toBeUndefined();
+    expect(listWorkItemAttempts(item.item_id)).toHaveLength(2);
+    expect(listWorkItemAttempts(item.item_id)[1]).toMatchObject({
+      status: 'released',
+    });
   });
 
   it('updates items and clears leases for terminal statuses', () => {
@@ -164,6 +182,9 @@ describe('work coordination', () => {
     expect(updated.lease_id).toBeUndefined();
     expect(listWorkItems()[0].status).toBe('done');
     expect(listCoordinationEvents().some((event) => event.event_type === 'item_released' && event.item_id === item.item_id)).toBe(true);
+    expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
+      status: 'completed',
+    });
     expect(() =>
       releaseWorkItem({
         itemId: item.item_id,

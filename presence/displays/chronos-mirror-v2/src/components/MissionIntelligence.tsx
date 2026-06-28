@@ -15,6 +15,7 @@ import {
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
 interface MissionSummary {
   missionId: string;
@@ -147,6 +148,38 @@ interface MissionProgressSummary {
     sizeBytes: number;
     updatedAt: string;
   }>;
+}
+
+interface WorkCoordinationItemSummary {
+  item_id: string;
+  title: string;
+  status: string;
+  priority: string;
+  project_id: string;
+  source_ref: string;
+  updated_at: string;
+  attempt_count: number;
+  current_attempt_id?: string;
+  current_attempt_status?: string;
+  current_attempt_started_at?: string;
+  current_attempt_summary?: string;
+  blocked_reason?: string;
+  failure_reason?: string;
+  claimed_by_peer_id?: string;
+  claimed_by_user_id?: string;
+}
+
+interface WorkCoordinationSummary {
+  total: number;
+  backlog: number;
+  ready: number;
+  inProgress: number;
+  blocked: number;
+  review: number;
+  done: number;
+  archived: number;
+  runningAttempts: number;
+  recentItems: WorkCoordinationItemSummary[];
 }
 
 interface OwnerSummary {
@@ -832,6 +865,24 @@ function surfaceSummaryBadgeClass(tone: SurfaceSummary['controlTone']): string {
   return 'bg-yellow-500/10 text-yellow-200';
 }
 
+function workCoordinationStatusBadgeClass(status: string): string {
+  if (status === 'blocked') return 'bg-red-500/15 text-red-200';
+  if (status === 'in_progress') return 'bg-cyan-500/15 text-cyan-200';
+  if (status === 'review') return 'bg-amber-500/15 text-amber-100';
+  if (status === 'done' || status === 'archived') return 'bg-green-500/15 text-green-300';
+  if (status === 'ready') return 'bg-violet-500/15 text-violet-200';
+  return 'bg-white/10 text-white/65';
+}
+
+function formatWorkCoordinationAttemptLabel(item: WorkCoordinationItemSummary): string {
+  const parts: string[] = [];
+  if (item.current_attempt_status) parts.push(item.current_attempt_status);
+  if (item.current_attempt_summary) parts.push(item.current_attempt_summary);
+  if (item.blocked_reason) parts.push(`blocked: ${item.blocked_reason}`);
+  if (item.failure_reason) parts.push(`failed: ${item.failure_reason}`);
+  return parts.join(' · ');
+}
+
 interface IntelligencePayload {
   accessRole: 'readonly' | 'localadmin';
   activeMissions: MissionSummary[];
@@ -892,6 +943,7 @@ interface IntelligencePayload {
   recentEvents: OrchestrationEvent[];
   agentMessages: AgentMessageSummary[];
   a2aHandoffs: A2AHandoffSummary[];
+  workCoordination: WorkCoordinationSummary;
   controlActionCatalog: ControlActionCatalog;
   controlActionAvailability: ControlActionAvailability;
   controlActions: ControlActionSummary[];
@@ -1126,6 +1178,7 @@ export function MissionIntelligence({
           recentEvents?: OrchestrationEvent[];
           agentMessages?: AgentMessageSummary[];
           a2aHandoffs?: A2AHandoffSummary[];
+          workCoordination?: IntelligencePayload['workCoordination'];
           controlActions?: ControlActionSummary[];
           controlActionDetails?: Record<string, ControlActionDetail[]>;
           ownerSummaries?: OwnerSummary[];
@@ -1151,6 +1204,7 @@ export function MissionIntelligence({
                 a2aHandoffs: Array.isArray(payload.a2aHandoffs)
                   ? payload.a2aHandoffs
                   : current.a2aHandoffs,
+                workCoordination: payload.workCoordination || current.workCoordination,
                 controlActions: Array.isArray(payload.controlActions)
                   ? payload.controlActions
                   : current.controlActions,
@@ -1730,12 +1784,18 @@ export function MissionIntelligence({
 
   if (error) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="rounded-2xl border border-red-500/20 bg-red-950/10 px-6 py-5 text-center">
-          <div className="text-[11px] uppercase tracking-[0.25em] text-red-300/70">
-            Mission Intelligence
-          </div>
-          <div className="mt-2 text-sm text-red-200/80">{error}</div>
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="w-full max-w-xl">
+          <SurfaceStatusPanel
+            eyebrow="Mission Intelligence"
+            title="Unable to load mission intelligence"
+            detail={error}
+            tone="error"
+            actionLabel="Retry"
+            onAction={() => {
+              void refreshData();
+            }}
+          />
         </div>
       </div>
     );
@@ -1743,19 +1803,23 @@ export function MissionIntelligence({
 
   if (!mounted) {
     return (
-      <div className="rounded-[24px] border border-white/8 bg-black/20 px-5 py-5 text-[11px] uppercase tracking-[0.22em] text-white/40">
-        Loading mission intelligence...
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Mission Intelligence"
+        title="Loading mission intelligence"
+        detail="Chronos is fetching missions, runtime state, and the latest governance signals."
+        tone="neutral"
+      />
     );
   }
 
   if (!data) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="text-[11px] uppercase tracking-[0.25em] text-kyberion-gold/40">
-          {mt('chronos_mission_loading', 'Loading mission intelligence...')}
-        </div>
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Mission Intelligence"
+        title="Waiting for mission data"
+        detail={mt('chronos_mission_loading', 'Loading mission intelligence...')}
+        tone="neutral"
+      />
     );
   }
 
@@ -1983,6 +2047,19 @@ export function MissionIntelligence({
   const nextAction = data.nextActions?.[0] || null;
   const nextActions = Array.isArray(data.nextActions) ? data.nextActions : [];
   const memoryCandidateCount = (data.memoryCandidates || []).length;
+  const workCoordination: WorkCoordinationSummary =
+    data.workCoordination || {
+      total: 0,
+      backlog: 0,
+      ready: 0,
+      inProgress: 0,
+      blocked: 0,
+      review: 0,
+      done: 0,
+      archived: 0,
+      runningAttempts: 0,
+      recentItems: [],
+    };
 
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
@@ -2222,6 +2299,93 @@ export function MissionIntelligence({
           }
         />
       </div>
+
+      <Panel id="work-coordination" title="Work Coordination">
+        <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          This view shows durable work item state, including current attempts, to make handoff,
+          blocking, and completion visible before they turn into surprise fixes.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MiniSummaryCard
+            icon={<GitBranch size={13} />}
+            label="Total items"
+            value={workCoordination.total}
+            detail="Tracked work items across the coordination store"
+          />
+          <MiniSummaryCard
+            icon={<Activity size={13} />}
+            label="In progress"
+            value={workCoordination.inProgress}
+            detail="Items currently being worked on"
+          />
+          <MiniSummaryCard
+            icon={<AlertTriangle size={13} />}
+            label="Blocked"
+            value={workCoordination.blocked}
+            detail="Items with a declared block or failed attempt"
+          />
+          <MiniSummaryCard
+            icon={<Brain size={13} />}
+            label="Running attempts"
+            value={workCoordination.runningAttempts}
+            detail="Active execution attempts across all items"
+          />
+        </div>
+        <div className="mt-4 space-y-2">
+          {workCoordination.recentItems.length === 0 ? (
+            <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] text-white/45">
+              No work items have been imported into the coordination store yet.
+            </div>
+          ) : (
+            workCoordination.recentItems.map((item) => {
+              const attemptSummary = formatWorkCoordinationAttemptLabel(item);
+              return (
+                <div
+                  key={item.item_id}
+                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-semibold tracking-[0.04em] text-white/90">
+                        {item.title}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.18em] text-white/38">
+                        <span className="font-mono text-white/62">{item.item_id}</span>
+                        <span>{item.project_id}</span>
+                        <span>{item.source_ref}</span>
+                      </div>
+                    </div>
+                    <div
+                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${workCoordinationStatusBadgeClass(item.status)}`}
+                    >
+                      {item.status}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-[10px] text-white/55 sm:grid-cols-2">
+                    <div>
+                      priority: <span className="font-mono text-white/78">{item.priority}</span>
+                    </div>
+                    <div>
+                      attempts: <span className="font-mono text-white/78">{item.attempt_count}</span>
+                    </div>
+                    <div className="sm:col-span-2">
+                      updated:{' '}
+                      <span className="font-mono text-white/78">
+                        {new Date(item.updated_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  {attemptSummary ? (
+                    <div className="mt-2 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2 text-[10px] text-white/65">
+                      {attemptSummary}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </Panel>
 
       <section className="grid gap-4">
         <Panel id="next-actions" title="Recommended Next Actions">
@@ -2722,7 +2886,12 @@ export function MissionIntelligence({
                 </div>
                 <div className="space-y-2">
                   {data.runtimeTopology.owners.length === 0 ? (
-                    <div className="text-[10px] text-white/35">No managed owners discovered.</div>
+                    <SurfaceStatusPanel
+                      eyebrow="Owners"
+                      title="No managed owners discovered"
+                      detail="Owner records appear once runtimes are bound to a mission or surface."
+                      tone="neutral"
+                    />
                   ) : (
                     data.runtimeTopology.owners.map((owner) => (
                       <div
@@ -2754,7 +2923,12 @@ export function MissionIntelligence({
                 </div>
                 <div className="space-y-2">
                   {data.runtimeTopology.runtimes.length === 0 ? (
-                    <div className="text-[10px] text-white/35">No managed runtimes discovered.</div>
+                    <SurfaceStatusPanel
+                      eyebrow="Managed runtimes"
+                      title="No managed runtimes discovered"
+                      detail="Runtime records appear after an agent or surface registers with the control plane."
+                      tone="neutral"
+                    />
                   ) : (
                     data.runtimeTopology.runtimes.map((runtime) => (
                       <div
@@ -2985,9 +3159,12 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {data.projects.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                {mt('chronos_no_projects', 'No projects registered yet.')}
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="Projects"
+                title="No projects registered yet"
+                detail="Create the first project to anchor durable intent, bindings, and bootstrap work."
+                tone="warning"
+              />
             ) : (
               data.projects.map((project) => (
                 <div
@@ -4249,9 +4426,12 @@ export function MissionIntelligence({
         <Panel id="browser-sessions" title="Browser Session Oversight">
           <div className="space-y-3">
             {data.browserSessions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                No browser sessions recorded yet.
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="Browser Session Oversight"
+                title="No browser sessions recorded yet"
+                detail="Open a browser task or capture a session to populate the registry."
+                tone="neutral"
+              />
             ) : (
               data.browserSessions.map((session) => (
                 <div
@@ -4426,9 +4606,12 @@ export function MissionIntelligence({
         <Panel id="browser-conversation-sessions" title="Browser Tasks">
           <div className="space-y-3">
             {data.browserConversationSessions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                No browser tasks recorded yet.
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="Browser Tasks"
+                title="No browser tasks recorded yet"
+                detail="Start a task from the browser surface to capture guided confirmations and result state."
+                tone="neutral"
+              />
             ) : (
               data.browserConversationSessions.map((session) => (
                 <div
@@ -4931,12 +5114,12 @@ export function MissionIntelligence({
             </div>
             <div className="space-y-3">
               {!effectiveMissionId || missionThread.length === 0 ? (
-                <div className="text-[11px] italic text-kyberion-gold/30">
-                  {mt(
-                    'chronos_no_unified_mission_thread',
-                    'No thread yet.'
-                  )}
-                </div>
+                <SurfaceStatusPanel
+                  eyebrow="Selected Mission Thread"
+                  title="No thread yet"
+                  detail="Select a mission to inspect its unified message thread and handoffs."
+                  tone="info"
+                />
               ) : (
                 missionThread.map((entry, index) => (
                   <div
@@ -4984,12 +5167,12 @@ export function MissionIntelligence({
         <Panel title={mt('chronos_a2a_handoff_trail', 'A2A Handoff Trail')}>
           <div className="space-y-3">
             {filteredA2AHandoffs.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
-                {mt(
-                  'chronos_no_a2a_handoffs_for_filter',
-                  'No A2A handoffs observed for the current mission filter.'
-                )}
-              </div>
+              <SurfaceStatusPanel
+                eyebrow="A2A handoff trail"
+                title="No A2A handoffs observed for the current mission filter"
+                detail="Handoffs appear here once the selected mission exchanges prompts, tasks, or acknowledgements."
+                tone="neutral"
+              />
             ) : (
               filteredA2AHandoffs.map((handoff, index) => (
                 <div

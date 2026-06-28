@@ -19,6 +19,15 @@ function sseChunk(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
+function safeCollect<T>(label: string, fallback: T, collect: () => T): T {
+  try {
+    return collect();
+  } catch (err) {
+    console.warn(`[chronos-mirror-v2] ${label} failed`, err);
+    return fallback;
+  }
+}
+
 async function collectManagedRuntimeTopology() {
   const runtimeSupervisorClient = await import("@agent/core/agent-runtime-supervisor-client");
   const runtimeSnapshots = listAgentRuntimeSnapshots();
@@ -119,34 +128,48 @@ export async function GET(req: NextRequest) {
     start(controller) {
       const push = async () => {
         if (closed) return;
-        const agentMessages = collectAgentMessages();
-        const a2aHandoffs = collectA2AHandoffs();
-        const { managedRuntimes, surfaces, runtimeSummary } = await collectManagedRuntimeTopology();
+        const agentMessages = safeCollect("collectAgentMessages", [], collectAgentMessages);
+        const a2aHandoffs = safeCollect("collectA2AHandoffs", [], collectA2AHandoffs);
+        const runtimeTopology = await (async () => {
+          try {
+            return await collectManagedRuntimeTopology();
+          } catch (err) {
+            console.warn("[chronos-mirror-v2] collectManagedRuntimeTopology failed", err);
+            return {
+              managedRuntimes: [],
+              surfaces: [],
+              runtimeSummary: { total: 0, ready: 0, busy: 0, error: 0 },
+            };
+          }
+        })();
+        const { managedRuntimes, surfaces, runtimeSummary } = runtimeTopology;
         if (closed) return;
         const payload = {
           ts: new Date().toISOString(),
           accessRole,
-          recentEvents: collectRecentEvents(),
+          recentEvents: safeCollect("collectRecentEvents", [], collectRecentEvents),
           agentMessages,
           a2aHandoffs,
-          secretApprovals: listApprovalRequests({ kind: "secret_mutation", status: "pending" }).slice(0, 20).map((request) => ({
-            id: request.id,
-            title: request.title,
-            summary: request.summary,
-            storageChannel: request.storageChannel,
-            requestedAt: request.requestedAt,
-            requestedBy: request.requestedBy,
-            serviceId: request.target?.serviceId || "unknown",
-            secretKey: request.target?.secretKey || "unknown",
-            mutation: request.target?.mutation || "set",
-            riskLevel: request.risk?.level || "medium",
-            requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-            pendingRoles: request.workflow?.approvals.filter((approval) => approval.status === "pending").map((approval) => approval.role) || [],
-          })),
-          controlActions: collectControlActions(),
-          controlActionDetails: collectControlActionDetails(),
-          ownerSummaries: collectOwnerSummaries(),
-          browserSessions: collectBrowserSessions(),
+          secretApprovals: safeCollect("listApprovalRequests", [], () => (
+            listApprovalRequests({ kind: "secret_mutation", status: "pending" }).slice(0, 20).map((request) => ({
+              id: request.id,
+              title: request.title,
+              summary: request.summary,
+              storageChannel: request.storageChannel,
+              requestedAt: request.requestedAt,
+              requestedBy: request.requestedBy,
+              serviceId: request.target?.serviceId || "unknown",
+              secretKey: request.target?.secretKey || "unknown",
+              mutation: request.target?.mutation || "set",
+              riskLevel: request.risk?.level || "medium",
+              requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+              pendingRoles: request.workflow?.approvals.filter((approval) => approval.status === "pending").map((approval) => approval.role) || [],
+            }))
+          )),
+          controlActions: safeCollect("collectControlActions", [], collectControlActions),
+          controlActionDetails: safeCollect("collectControlActionDetails", {}, collectControlActionDetails),
+          ownerSummaries: safeCollect("collectOwnerSummaries", [], collectOwnerSummaries),
+          browserSessions: safeCollect("collectBrowserSessions", [], collectBrowserSessions),
           runtime: runtimeSummary,
           runtimeTopology: buildRuntimeTopology({
             surfaces,

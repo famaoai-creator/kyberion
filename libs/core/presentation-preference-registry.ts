@@ -52,7 +52,6 @@ const FALLBACK_REGISTRY: PresentationPreferenceRegistry = {
           questions: [
             '誰に見せる資料ですか?',
             '最終的に何を決めたいですか?',
-            '何枚くらいでまとめたいですか?',
           ],
         },
       ],

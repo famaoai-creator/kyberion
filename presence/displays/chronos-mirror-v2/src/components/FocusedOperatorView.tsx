@@ -6,6 +6,7 @@ import { findLatestMissionHandoff, type MissionAssetCategory } from "../lib/miss
 import { buildAttentionItems, type AttentionItem } from "../lib/operator-console";
 import { buildRuntimeTopologyGraph } from "../lib/runtime-topology";
 import { resolveChronosLocale, uxText } from "../lib/ux-vocabulary";
+import { SurfaceStatusPanel } from "./SurfaceStatusPanel";
 import { TraceViewer } from "./TraceViewer";
 
 export type FocusedViewId =
@@ -517,26 +518,38 @@ export function FocusedOperatorView({
 
   if (!mounted) {
     return (
-      <div className="rounded-[24px] border border-white/8 bg-black/20 px-5 py-5 text-[11px] uppercase tracking-[0.22em] text-white/40">
-        Loading focused operator view...
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Focused Operator View"
+        title="Loading focused operator view"
+        detail="Chronos is resolving the current mission, runtime, and surface context."
+        tone="neutral"
+      />
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-[24px] border border-red-500/20 bg-red-950/10 px-5 py-5">
-        <div className="text-[10px] uppercase tracking-[0.28em] text-red-300/70">Focused Operator View</div>
-        <div className="mt-2 text-sm text-red-100/80">{error}</div>
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Focused Operator View"
+        title="Unable to load focused operator view"
+        detail={error}
+        tone="error"
+        actionLabel="Retry"
+        onAction={() => {
+          window.location.reload();
+        }}
+      />
     );
   }
 
   if (!data) {
     return (
-      <div className="rounded-[24px] border border-white/8 bg-black/20 px-5 py-5 text-[11px] uppercase tracking-[0.22em] text-white/40">
-        Loading focused operator view...
-      </div>
+      <SurfaceStatusPanel
+        eyebrow="Focused Operator View"
+        title="Waiting for operator data"
+        detail="The view will populate once the control plane snapshot is available."
+        tone="neutral"
+      />
     );
   }
 
@@ -564,9 +577,12 @@ export function FocusedOperatorView({
       {viewId === "needs-attention" && (
         <div className="grid gap-3">
           {attentionItems.length === 0 ? (
-            <div className="rounded-2xl border border-emerald-300/10 bg-emerald-400/[0.04] px-4 py-4 text-[11px] text-emerald-100/70">
-              No immediate operator intervention is recommended.
-            </div>
+            <SurfaceStatusPanel
+              eyebrow="Needs attention"
+              title="No immediate operator intervention is recommended"
+              detail="The current snapshot does not show a blocking surface or mission issue."
+              tone="success"
+            />
           ) : attentionItems.map((item) => (
             <div key={item.id} className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
               <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">{item.title}</div>
@@ -678,7 +694,12 @@ export function FocusedOperatorView({
                       </div>
                       <div className="mt-2 grid gap-2">
                         {(progress?.generatedAssets || []).filter((asset) => assetFilter === "all" || asset.category === assetFilter).length === 0 ? (
-                          <span className="text-[10px] text-white/38">No generated assets discovered yet.</span>
+                          <SurfaceStatusPanel
+                            eyebrow="Generated assets"
+                            title="No generated assets discovered yet"
+                            detail="Assets will appear here once the mission produces deliverables, artifacts, or evidence."
+                            tone="neutral"
+                          />
                         ) : (progress?.generatedAssets || [])
                           .filter((asset) => assetFilter === "all" || asset.category === assetFilter)
                           .map((asset) => (
@@ -791,7 +812,14 @@ export function FocusedOperatorView({
                   );
                   if (!session) {
                     return (
-                      <div className="mt-2 text-[10px] text-white/38">Select a session to inspect its details.</div>
+                      <div className="mt-2">
+                        <SurfaceStatusPanel
+                          eyebrow="Selected session"
+                          title="Select a session to inspect its details"
+                          detail="The session list on the left determines which runtime, process, and action trail appear here."
+                          tone="info"
+                        />
+                      </div>
                     );
                   }
                   return (
@@ -851,7 +879,12 @@ export function FocusedOperatorView({
               </div>
             </div>
             {runtimeGraph.nodes.length === 0 ? (
-              <div className="mt-4 text-[10px] text-white/35">No managed owners or runtime flow observed yet.</div>
+              <SurfaceStatusPanel
+                eyebrow="Runtime graph"
+                title="No managed owners or runtime flow observed yet"
+                detail="The graph populates after a mission binds owners, managed runtimes, or surface links."
+                tone="neutral"
+              />
             ) : (
               <div className="mt-4 space-y-4">
                 <div className="overflow-x-auto rounded-xl border border-white/6 bg-white/[0.03] p-3">
@@ -959,7 +992,12 @@ export function FocusedOperatorView({
               <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">surface runtimes</div>
               <div className="mt-3 space-y-2">
                 {data.runtimeTopology.surfaces.length === 0 ? (
-                  <div className="text-[10px] text-white/35">No surfaces registered for topology.</div>
+                  <SurfaceStatusPanel
+                    eyebrow="Surface runtimes"
+                    title="No surfaces registered for topology"
+                    detail="Surface records appear once the control plane has live runtime attachments."
+                    tone="neutral"
+                  />
                 ) : data.runtimeTopology.surfaces.map((surface) => (
                   <div key={surface.id} className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
                     <div className="text-[10px] font-mono text-white/78">{surface.id}</div>
@@ -974,7 +1012,12 @@ export function FocusedOperatorView({
               <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">owners</div>
               <div className="mt-3 space-y-2">
                 {data.runtimeTopology.owners.length === 0 ? (
-                  <div className="text-[10px] text-white/35">No managed owners discovered.</div>
+                  <SurfaceStatusPanel
+                    eyebrow="Owners"
+                    title="No managed owners discovered"
+                    detail="Owner records appear once runtimes are bound to a mission or surface."
+                    tone="neutral"
+                  />
                 ) : data.runtimeTopology.owners.map((owner) => (
                   <div key={`${owner.type}:${owner.id}`} className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
                     <div className="text-[10px] font-mono text-white/78">{owner.id}</div>
@@ -988,10 +1031,15 @@ export function FocusedOperatorView({
             <div className="grid gap-4 lg:col-span-2">
               <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">managed runtimes</div>
-                <div className="mt-3 space-y-2">
-                  {data.runtimeTopology.runtimes.length === 0 ? (
-                    <div className="text-[10px] text-white/35">No managed runtimes discovered.</div>
-                  ) : data.runtimeTopology.runtimes.map((runtime) => (
+              <div className="mt-3 space-y-2">
+                {data.runtimeTopology.runtimes.length === 0 ? (
+                  <SurfaceStatusPanel
+                    eyebrow="Managed runtimes"
+                    title="No managed runtimes discovered"
+                    detail="Runtime records appear after an agent or surface registers with the control plane."
+                    tone="neutral"
+                  />
+                ) : data.runtimeTopology.runtimes.map((runtime) => (
                     <div key={runtime.agentId} className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-[10px] font-mono text-white/80">{runtime.agentId}</div>
@@ -1004,10 +1052,15 @@ export function FocusedOperatorView({
               </div>
               <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">recent flow</div>
-                <div className="mt-3 space-y-2">
-                  {data.runtimeTopology.flows.length === 0 ? (
-                    <div className="text-[10px] text-white/35">No recent flow observed.</div>
-                  ) : data.runtimeTopology.flows.map((flow) => (
+              <div className="mt-3 space-y-2">
+                {data.runtimeTopology.flows.length === 0 ? (
+                  <SurfaceStatusPanel
+                    eyebrow="Recent flow"
+                    title="No recent flow observed"
+                    detail="Flow edges appear once runtimes exchange A2A events or surface links."
+                    tone="neutral"
+                  />
+                ) : data.runtimeTopology.flows.map((flow) => (
                     <div key={flow.id} className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-3">
                       <div className="text-[10px] font-mono text-white/80">{flow.from} → {flow.to}</div>
                       <div className="mt-1 text-[9px] text-white/45">{flow.kind} · count {flow.count}</div>

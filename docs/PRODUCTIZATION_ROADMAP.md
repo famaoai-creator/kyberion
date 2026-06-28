@@ -320,6 +320,9 @@ knowledge/
 
 Hermes Agent の分析で見えた「Kyberion に取り込むと実際に効く」知見は、以下のように整理する。
 この節は、単なる比較表ではなく、**採用済み・既存代替・今後の評価対象**をロードマップ上で明示するための記録でもある。
+2026-06 の再調査では、Kanban の run/attempt 履歴、worker lane、cron、hooks、plugin / skill bundle、tool routing まで含めた吸収計画を
+[`knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md`](../knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md)
+に分離した。
 
 | 類別 | Hermes 側の知見 | Kyberion の扱い | 現状 |
 |---|---|---|---|

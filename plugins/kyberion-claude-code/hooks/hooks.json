@@ -10,6 +10,16 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT/../../dist/scripts/claude_code_hook.js\" UserPromptSubmit"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit",
@@ -17,6 +27,16 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PLUGIN_ROOT/../../dist/scripts/claude_code_hook.js\" PreToolUse"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT/../../dist/scripts/claude_code_hook.js\" Stop"
           }
         ]
       }
