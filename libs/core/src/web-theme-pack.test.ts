@@ -20,12 +20,15 @@ describe('web theme pack schema', () => {
 
   it('threads the web design theme into the web concept pipeline', () => {
     const pipeline = JSON.parse(safeReadFile(path.resolve(process.cwd(), 'knowledge/product/pipeline-templates/build-web-concept.json'), { encoding: 'utf8' }) as string);
-    const siteStructure = pipeline.steps?.find((step: any) => step.id === 'site-structure');
+    const renderPreview = pipeline.steps?.find((step: any) => step.id === 'render_preview');
+    const includeParams = renderPreview?.params || {};
 
-    expect(siteStructure?.params?.context).toEqual(['{{design_theme}}']);
-    expect(String(siteStructure?.params?.instruction || '')).toContain('web-theme-pack');
-    expect(String(siteStructure?.params?.instruction || '')).toContain('spacing scale');
-    expect(String(siteStructure?.params?.instruction || '')).toContain('layout grid');
+    expect(renderPreview?.op).toBe('core:include');
+    expect(includeParams?.fragment).toBe('fragments/html-web-preview.json');
+    expect(includeParams?.context?.html_brief).toBe('{{concept_brief}}');
+    expect(includeParams?.context?.design_system_brief).toBe('{{design_theme}}');
+    expect(includeParams?.context?.output_path).toBe('{{output_path}}');
+    expect(String(includeParams?.context?.preview_label || '')).toBe('{{preview_label}}');
   });
 
   it('routes web imports through the web theme pack branch', () => {
