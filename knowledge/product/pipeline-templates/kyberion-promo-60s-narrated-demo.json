@@ -1,0 +1,167 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "kyberion-promo-60s-narrated-demo",
+  "version": "2.0.0",
+  "name": "Kyberion Promo 60s Narrated Demo",
+  "description": "Produce a one-minute promo video that presents Kyberion as a governed execution layer with clearer scene changes and a more natural Japanese narration track.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "MSN-KYBERION-PROMO-VIDEO-60S",
+    "mission_evidence_dir": "active/missions/confidential/MSN-KYBERION-PROMO-VIDEO-60S/evidence",
+    "narration_path": "active/missions/confidential/MSN-KYBERION-PROMO-VIDEO-60S/evidence/kyberion-promo-60s-narration.aiff",
+    "video_output_path": "active/shared/tmp/video-composition/kyberion-promo-60s-demo/output.mp4",
+    "video_bundle_dir": "active/shared/tmp/video-composition/kyberion-promo-60s-demo",
+    "content_brief_path": "active/missions/confidential/MSN-KYBERION-PROMO-VIDEO-60S/evidence/kyberion-promo-60s-content-brief.json",
+    "profile_id": "operator-ja-default",
+    "video_slug": "kyberion-promo-60s",
+    "voice_script": "Kyberion は、運用の意図を、そのまま見せられる成果物に変えます。\n\n最初に brief を受け取り、価値の軸、証拠、CTA を先に決めます。ここで重要なのは、見た目を盛ることではなく、何を伝えるかを固定することです。\n\n次に、シーンごとの役割を分けます。見出し、比較、証拠、アウトロを切り替えながら、画面の流れだけでなく、根拠まで一緒に伝えます。\n\n最後に、配信や LP にそのまま使える promo package として仕上げます。Kyberion なら、説明を資産に変えられます。",
+    "hook_text": "Kyberion は、運用の意図を、そのまま見せられる成果物に変えます。",
+    "feature_text": "まず brief で価値・証拠・CTA を固定し、次に scene ごとの役割で画面を切り替えます。",
+    "cta_text": "Kyberion を使えば、説明で終わらない promo package をそのまま配信できます。"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎬 [KYBERION-PROMO-60S] Starting narrated demo for mission {{mission_id}}"
+      }
+    },
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/narrated-video-preflight.json" }
+    },
+    {
+      "id": "write_voice_action",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-promo-60s-voice.json",
+        "content": {
+          "action": "generate_voice",
+          "request_id": "kyberion-promo-60s-video-audio",
+          "text": "{{voice_script}}",
+          "profile_ref": { "profile_id": "{{profile_id}}" },
+          "engine": { "engine_id": "local_say" },
+          "rendering": { "language": "ja", "chunking": { "max_chunk_chars": 4000, "crossfade_ms": 50, "preserve_paralinguistic_tags": true } },
+          "delivery": { "mode": "artifact", "format": "aiff", "artifact_path": "{{narration_path}}", "emit_progress_packets": true },
+          "routing": { "personal_voice_mode": "allow_fallback" }
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "generate_voice",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "voice_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-60s-voice.json"
+      }
+    },
+    {
+      "id": "write_content_brief",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{content_brief_path}}",
+        "content": {
+          "kind": "video-content-brief",
+          "version": "1.0.0",
+          "title": "Kyberion Promo: One Minute of Value, Proof, and CTA",
+          "audience": "teams evaluating whether Kyberion can turn operational intent into reusable evidence-backed output",
+          "objective": "convert a fixed launch brief into a renderable one-minute promo package",
+          "distribution_channel": "youtube",
+          "content_type": "promo",
+          "presentation_mode": "promo",
+          "promise": "Kyberion turns operational intent into governed execution and artifact-backed outputs",
+          "desired_takeaway": "the viewer can recognize value quickly and move to the next step",
+          "constraints": ["lead with value, not with setup", "show proof explicitly", "keep the CTA short and direct", "make the visual beats feel distinct"],
+          "proof_points": ["value is clear in the first beat", "scene changes are obvious across the middle beats", "CTA is explicit at the end"],
+          "content_requirements": ["show the main value proposition", "show evidence or outputs", "show a concise CTA", "use different visual templates across beats"],
+          "fixed_inputs": { "customer": "teams needing auditable mission workflows", "use_case": "launching a governable demo asset", "message": "Kyberion turns operational intent into governed execution and artifact-backed outputs" },
+          "tone": "direct, energetic, promotional",
+          "language": "ja",
+          "duration_sec": 60,
+          "design_system_ref": { "system_id": "operator-ja-default", "brand_name": "Kyberion", "theme": "kyberion-standard", "background_color": "#08101e", "layout_family": "promo-spot", "motion_profile": "value-punch", "fps": 30 }
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "write_video_action",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-promo-60s-video.json",
+        "content": {
+          "action": "create_narrated_video_from_content_brief",
+          "params": {
+            "video_content_brief": {
+              "kind": "video-content-brief",
+              "version": "1.0.0",
+              "title": "Kyberion Promo: One Minute of Value, Proof, and CTA",
+              "audience": "teams evaluating whether Kyberion can turn operational intent into reusable evidence-backed output",
+              "objective": "convert a fixed launch brief into a renderable one-minute promo package",
+              "distribution_channel": "youtube",
+              "content_type": "promo",
+              "presentation_mode": "promo",
+              "promise": "Kyberion turns operational intent into governed execution and artifact-backed outputs",
+              "desired_takeaway": "the viewer can recognize value quickly and move to the next step",
+              "constraints": ["lead with value, not with setup", "show proof explicitly", "keep the CTA short and direct", "make the visual beats feel distinct"],
+              "proof_points": ["value is clear in the first beat", "scene changes are obvious across the middle beats", "CTA is explicit at the end"],
+              "content_requirements": ["show the main value proposition", "show evidence or outputs", "show a concise CTA", "use different visual templates across beats"],
+              "fixed_inputs": { "customer": "teams needing auditable mission workflows", "use_case": "launching a governable demo asset", "message": "Kyberion turns operational intent into governed execution and artifact-backed outputs" },
+              "tone": "direct, energetic, promotional",
+              "language": "ja",
+              "duration_sec": 60,
+              "design_system_ref": { "system_id": "operator-ja-default", "brand_name": "Kyberion", "theme": "kyberion-standard", "background_color": "#08101e", "layout_family": "promo-spot", "motion_profile": "value-punch", "fps": 30 }
+            },
+            "narration_artifact_ref": "{{narration_path}}",
+            "output": { "format": "mp4", "target_path": "{{video_output_path}}", "bundle_dir": "{{video_bundle_dir}}", "await_completion": true, "duration_sec": 60, "fps": 30 }
+          },
+          "format": "json"
+        }
+      }
+    },
+    {
+      "id": "generate_video",
+      "role": "source",
+      "op": "system:shell",
+      "consumes": "voice_result",
+      "produces": { "channel": "video_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-60s-video.json"
+      }
+    },
+    {
+      "id": "validate",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/narrated-video-validate.json" }
+    },
+    {
+      "id": "write_completion_note",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["preflight_result", "voice_result", "video_result", "verify_result", "frame_extract_result", "blackframe_result", "duration_alignment_result"],
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-promo-60s-summary.md",
+        "content": "# Kyberion Promo 60s Narrated Demo\n\n## Scenario flow\n1. Receive a fixed launch brief with audience, value, proof, and CTA already decided.\n2. Convert the brief into a promo-oriented content brief and storyboard.\n3. Generate narration and compose the scene bundle.\n4. Render, verify, extract key frames, and reject black-frame output.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-promo-60s-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n- `{{frame_extract_result}}`\n- `{{blackframe_result}}`\n- `{{duration_alignment_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-promo-60s-narrated-demo.json`\n",
+        "format": "text"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["voice_result", "video_result", "verify_result"],
+      "params": {
+        "message": "🏁 [KYBERION-PROMO-60S] Narrated demo complete. Voice: {{voice_result}} Video: {{video_result}} Verify: {{verify_result}}"
+      }
+    }
+  ]
+}

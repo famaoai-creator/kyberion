@@ -1,14 +1,17 @@
 import {
   compileNarratedVideoBriefToCompositionADF,
+  compileVideoCompositionADF,
   compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief,
   getVideoCompositionTemplateRegistry,
   getVideoRenderRuntimePolicy,
   pathResolver,
+  renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync,
   safeExec,
   safeExistsSync,
   safeReadFile,
+  safeStat,
   withRetry,
   writeVideoCompositionBundle,
 } from '@agent/core';
@@ -184,6 +187,17 @@ async function createNarratedIntroMovie(params: {
     job_id: params.job_id,
     bundle_dir: params.bundle_dir,
   });
+  if (execution.rendered_output_path && execution.backend_rendering_enabled) {
+    const requiresRepair = !(await isRenderableVideoArtifact(execution.rendered_output_path));
+    if (requiresRepair) {
+      const repairedPlan = compileVideoCompositionADF(adf as any);
+      await renderNarratedFallbackVideo(
+        repairedPlan,
+        execution.rendered_output_path,
+        new Error('backend render returned an invalid artifact'),
+      );
+    }
+  }
   return {
     status: execution.status,
     kind: 'narrated_intro_movie_run',
@@ -244,6 +258,53 @@ async function verifyRenderedVideoArtifact(params: {
     has_video: Boolean(videoProbe),
     output: artifactPath,
   };
+}
+
+async function isRenderableVideoArtifact(artifactPath: string): Promise<boolean> {
+  if (!artifactPath || !safeExistsSync(artifactPath)) {
+    return false;
+  }
+
+  try {
+    if (safeStat(artifactPath).size < 1024) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  try {
+    const hasVideo = safeExec('ffprobe', [
+      '-v',
+      'error',
+      '-select_streams',
+      'v:0',
+      '-show_entries',
+      'stream=index',
+      '-of',
+      'csv=p=0',
+      artifactPath,
+    ]).trim();
+    if (!hasVideo) {
+      return false;
+    }
+
+    const hasAudio = safeExec('ffprobe', [
+      '-v',
+      'error',
+      '-select_streams',
+      'a:0',
+      '-show_entries',
+      'stream=index',
+      '-of',
+      'csv=p=0',
+      artifactPath,
+    ]).trim();
+
+    return Boolean(hasAudio);
+  } catch {
+    return false;
+  }
 }
 
 async function getVideoCompositionJobStatus(params: { job_id?: string }) {
@@ -538,4 +599,3 @@ export async function dispatchDecisionOp(
     ctx: exportAs ? { ...ctx, [exportAs]: result } : { ...ctx, last_video_result: result },
   };
 }
-

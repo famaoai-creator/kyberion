@@ -78,6 +78,76 @@ export function resolveCapabilityBundleForIntent(
   return matched[0] || null;
 }
 
+function normalizeBundleDiscoveryText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim();
+}
+
+function matchesAnyPattern(text: string, patterns: string[]): boolean {
+  if (!text) return false;
+  return patterns.some((pattern) => text.includes(pattern));
+}
+
+export function resolveCapabilityBundlesForUtterance(utterance: string): CapabilityBundleEntry[] {
+  const normalized = normalizeBundleDiscoveryText(utterance);
+  if (!normalized) return [];
+
+  const registry = loadCapabilityBundleRegistry();
+  const bundles: CapabilityBundleEntry[] = [];
+  const byId = new Map(registry.bundles.map((bundle) => [bundle.bundle_id, bundle] as const));
+  const add = (bundleId: string) => {
+    const bundle = byId.get(bundleId);
+    if (bundle && !bundles.some((entry) => entry.bundle_id === bundle.bundle_id)) {
+      bundles.push(bundle);
+    }
+  };
+
+  if (
+    matchesAnyPattern(normalized, [
+      'manim',
+      '3blue1brown',
+      'math animation',
+      'algorithm visualization',
+      'algorithm animation',
+      'equation derivation',
+      'paper explainer',
+      'architecture diagram',
+      'technical explainer',
+      'visual explanation',
+      '解説',
+      '説明',
+      '図解',
+      '数学',
+    ])
+  ) {
+    add('manim-video-recipes-governed');
+  }
+
+  if (
+    matchesAnyPattern(normalized, [
+      'ascii',
+      'ascii video',
+      'text art',
+      'terminal style',
+      'terminal-style',
+      'matrix style',
+      'retro text',
+      'audio visualizer',
+      'character art',
+      '文字アート',
+      'テキストアート',
+      '端末',
+    ])
+  ) {
+    add('ascii-video-recipes-governed');
+  }
+
+  return bundles;
+}
+
 export function summarizeRelevantCapabilityBundlesForIntentIds(
   intentIds: string[]
 ): string {

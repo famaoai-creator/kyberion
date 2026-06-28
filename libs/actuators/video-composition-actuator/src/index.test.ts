@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   }),
   safeExec: vi.fn(() => '1'),
   safeExistsSync: vi.fn(() => true),
+  safeStat: vi.fn(() => ({ size: 4096 })),
   withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   getVideoCompositionTemplateRegistry: vi.fn(() => ({
     version: 'test',
@@ -37,7 +38,28 @@ const mocks = vi.hoisted(() => ({
     version: '1.0.0',
     composition: { duration_sec: 9, fps: 30, width: 1920, height: 1080 },
     scenes: [],
-    output: { format: 'mp4' },
+    output: { format: 'mp4', await_completion: true },
+  })),
+  compileVideoCompositionADF: vi.fn(() => ({
+    kind: 'video-composition-render-plan',
+    version: '1.0.0',
+    composition_id: 'demo',
+    source_kind: 'video-composition-adf',
+    title: 'Kyberion',
+    duration_sec: 9,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    background_color: '#07111f',
+    output_format: 'mp4',
+    bundle_dir: '/tmp/video-composition',
+    index_html: '/tmp/video-composition/index.html',
+    scenes: [
+      { scene_id: 'hook', role: 'hook', start_sec: 0, duration_sec: 3, template_id: 'basic-title-card', template_display_name: 'Basic Title Card', output_html: 'compositions/hook.html', required_content_fields: ['headline'], content: { headline: 'Intent to Execution' }, asset_refs: [] },
+      { scene_id: 'feature', role: 'feature', start_sec: 3, duration_sec: 3, template_id: 'promo-spot', template_display_name: 'Promo Spot', output_html: 'compositions/feature.html', required_content_fields: ['headline'], content: { headline: 'Structure first' }, asset_refs: [] },
+      { scene_id: 'cta', role: 'cta', start_sec: 6, duration_sec: 3, template_id: 'logo-outro', template_display_name: 'Logo Outro', output_html: 'compositions/cta.html', required_content_fields: ['headline'], content: { headline: 'Ship it' }, asset_refs: [] },
+    ],
+    artifact_refs: [],
   })),
   compileVideoContentBriefToStoryboard: vi.fn(() => ({
     kind: 'video-storyboard',
@@ -52,10 +74,20 @@ const mocks = vi.hoisted(() => ({
     narration: { artifact_ref: 'active/shared/exports/narration.aiff' },
     design_system: { brand_name: 'Kyberion' },
   })),
+  renderNarratedFallbackVideo: vi.fn(async () => ({
+    executed: true,
+    backend: 'ffmpeg_fallback',
+    output_path: '/tmp/video-composition/output.mp4',
+  })),
   renderVideoCompositionBundleAsync: vi.fn(async () => ({
     executed: true,
     backend: 'hyperframes_cli',
     output_path: '/tmp/video-composition/output.mp4',
+    artifact_refs: [
+      '/tmp/video-composition/index.html',
+      '/tmp/video-composition/render-plan.json',
+      '/tmp/video-composition/output.mp4',
+    ],
   })),
   writeVideoCompositionBundle: vi.fn(() => ({
     artifact_refs: [
@@ -72,13 +104,16 @@ vi.mock('@agent/core', async () => {
     compileSchemaFromPath: mocks.compileSchemaFromPath,
     safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
+    safeStat: mocks.safeStat,
     withRetry: mocks.withRetry,
     getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
     getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
     compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
+    compileVideoCompositionADF: mocks.compileVideoCompositionADF,
     compileVideoContentBriefToStoryboard: mocks.compileVideoContentBriefToStoryboard,
     compileVideoStoryboardToNarratedVideoBrief: mocks.compileVideoStoryboardToNarratedVideoBrief,
     safeReadFile: mocks.safeReadFile,
+    renderNarratedFallbackVideo: mocks.renderNarratedFallbackVideo,
     renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
     writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
   };
@@ -244,6 +279,71 @@ describe('video-composition-actuator', () => {
     expect(result.execution).toEqual(expect.objectContaining({
       status: 'succeeded',
     }));
+  });
+
+  it('repairs invalid rendered output with fallback video', async () => {
+    vi.mocked(mocks.getVideoRenderRuntimePolicy).mockImplementation(() => ({
+      version: 'test',
+      queue: { concurrency: 1, cancellation: 'queued_or_running' },
+      progress: { throttle_ms: 0, min_percent_delta: 0, emit_heartbeat: true },
+      bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
+      render: { allowed_output_formats: ['mp4'], enable_backend_rendering: true, backend: 'hyperframes_cli', quality: 'standard', command_timeout_ms: 300000 },
+    }));
+    vi.mocked(mocks.safeExec).mockImplementation((command: string) => {
+      if (command === 'ffprobe') {
+        return '';
+      }
+      return '1';
+    });
+    vi.mocked(mocks.safeStat).mockReturnValue({ size: 128 } as any);
+
+    try {
+      const { handleAction } = await import('./index.js');
+      const result = await handleAction({
+        action: 'create_narrated_intro_movie',
+        params: {
+          narrated_video_brief: {
+            kind: 'narrated-video-brief',
+            version: '1.0.0',
+            script: {
+              hook: 'Intent to Execution',
+              feature: 'Contracts connect planning and execution.',
+              cta: 'Operate with Kyberion.',
+            },
+            narration: {
+              artifact_ref: 'active/shared/exports/narration.aiff',
+            },
+            design_system: {
+              brand_name: 'Kyberion',
+            },
+          },
+        },
+      } as any);
+
+      expect(mocks.renderNarratedFallbackVideo).toHaveBeenCalled();
+      expect(mocks.compileVideoCompositionADF).toHaveBeenCalled();
+      expect(result.execution).toEqual(expect.objectContaining({
+        status: 'succeeded',
+      }));
+    } finally {
+      vi.mocked(mocks.getVideoRenderRuntimePolicy).mockImplementation(() => ({
+        version: 'test',
+        queue: { concurrency: 1, cancellation: 'queued_or_running' },
+        progress: { throttle_ms: 0, min_percent_delta: 0, emit_heartbeat: true },
+        bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
+        render: { allowed_output_formats: ['mp4'], enable_backend_rendering: false, backend: 'none', quality: 'standard', command_timeout_ms: 300000 },
+      }));
+      vi.mocked(mocks.safeExec).mockImplementation((command: string, args: any[]) => {
+        if (command === 'ffprobe' && Array.isArray(args) && args.includes('a:0')) {
+          return '0';
+        }
+        if (command === 'ffprobe' && Array.isArray(args) && args.includes('v:0')) {
+          return '1';
+        }
+        return '1';
+      });
+      vi.mocked(mocks.safeStat).mockReturnValue({ size: 4096 } as any);
+    }
   });
 
   it('verifies rendered video artifacts with audio and video streams', async () => {
