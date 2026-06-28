@@ -22,6 +22,191 @@
       "summary": "Default repository bootstrap binding for new web service projects."
     },
     {
+      "id": "google-workspace-workspace",
+      "service_id": "google-workspace",
+      "service_type": "google-workspace",
+      "binding_id": "google-workspace:default:workspace",
+      "scope": "workspace",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "send_message",
+        "create_event",
+        "create_doc"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(gmail|calendar|drive|docs|sheets|meet|google workspace)\\b"
+        }
+      ],
+      "summary": "Default Google Workspace binding for mail, calendar, docs, and drive workflows."
+    },
+    {
+      "id": "m365-workspace",
+      "service_id": "m365",
+      "service_type": "m365",
+      "binding_id": "m365:default:workspace",
+      "scope": "workspace",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "send_message",
+        "create_event",
+        "create_doc"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(outlook|teams|sharepoint|onedrive|microsoft 365|m365)\\b"
+        }
+      ],
+      "summary": "Default Microsoft 365 binding for email, calendar, and collaboration workflows."
+    },
+    {
+      "id": "jira-project",
+      "service_id": "jira",
+      "service_type": "jira",
+      "binding_id": "jira:default:project",
+      "scope": "project",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "create_issue",
+        "update_issue",
+        "add_comment"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(jira|issue tracker|ticket)\\b"
+        }
+      ],
+      "summary": "Default Jira binding for issue tracking and ticket workflows."
+    },
+    {
+      "id": "linear-project",
+      "service_id": "linear",
+      "service_type": "linear",
+      "binding_id": "linear:default:project",
+      "scope": "project",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "create_issue",
+        "update_issue",
+        "add_comment"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(linear|backlog|project issue)\\b"
+        }
+      ],
+      "summary": "Default Linear binding for product issue tracking workflows."
+    },
+    {
+      "id": "confluence-knowledge-base",
+      "service_id": "confluence",
+      "service_type": "confluence",
+      "binding_id": "confluence:default:knowledge-base",
+      "scope": "workspace",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "create_page",
+        "update_page",
+        "search"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(confluence|wiki|runbook|knowledge base)\\b"
+        }
+      ],
+      "summary": "Default Confluence binding for documentation and runbook workflows."
+    },
+    {
+      "id": "notion-knowledge-base",
+      "service_id": "notion",
+      "service_type": "notion",
+      "binding_id": "notion:default:knowledge-base",
+      "scope": "workspace",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "create_page",
+        "update_page",
+        "search"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(notion|doc workspace|workspace docs)\\b"
+        }
+      ],
+      "summary": "Default Notion binding for lightweight knowledge and project notes."
+    },
+    {
+      "id": "discord-community",
+      "service_id": "discord",
+      "service_type": "discord",
+      "binding_id": "discord:default:community",
+      "scope": "community",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "post_message"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(discord|community server|server)\\b"
+        }
+      ],
+      "summary": "Default Discord binding for community and support-channel workflows."
+    },
+    {
+      "id": "telegram-channel",
+      "service_id": "telegram",
+      "service_type": "telegram",
+      "binding_id": "telegram:default:channel",
+      "scope": "channel",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "post_message"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(telegram|bot|channel|group)\\b"
+        }
+      ],
+      "summary": "Default Telegram binding for lightweight broadcast and bot workflows."
+    },
+    {
+      "id": "zendesk-support",
+      "service_id": "zendesk",
+      "service_type": "zendesk",
+      "binding_id": "zendesk:default:support",
+      "scope": "support",
+      "target": "default",
+      "allowed_actions": [
+        "read",
+        "create_ticket",
+        "update_ticket",
+        "add_comment"
+      ],
+      "utterance_patterns": [
+        {
+          "type": "regex",
+          "value": "\\b(zendesk|support desk|help desk|customer support)\\b"
+        }
+      ],
+      "summary": "Default Zendesk binding for customer support workflows."
+    },
+    {
       "id": "slack-workspace",
       "service_id": "slack",
       "service_type": "slack",
