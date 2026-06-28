@@ -150,6 +150,38 @@ interface MissionProgressSummary {
   }>;
 }
 
+interface WorkCoordinationItemSummary {
+  item_id: string;
+  title: string;
+  status: string;
+  priority: string;
+  project_id: string;
+  source_ref: string;
+  updated_at: string;
+  attempt_count: number;
+  current_attempt_id?: string;
+  current_attempt_status?: string;
+  current_attempt_started_at?: string;
+  current_attempt_summary?: string;
+  blocked_reason?: string;
+  failure_reason?: string;
+  claimed_by_peer_id?: string;
+  claimed_by_user_id?: string;
+}
+
+interface WorkCoordinationSummary {
+  total: number;
+  backlog: number;
+  ready: number;
+  inProgress: number;
+  blocked: number;
+  review: number;
+  done: number;
+  archived: number;
+  runningAttempts: number;
+  recentItems: WorkCoordinationItemSummary[];
+}
+
 interface OwnerSummary {
   ts: string;
   mission_id: string;
@@ -833,6 +865,24 @@ function surfaceSummaryBadgeClass(tone: SurfaceSummary['controlTone']): string {
   return 'bg-yellow-500/10 text-yellow-200';
 }
 
+function workCoordinationStatusBadgeClass(status: string): string {
+  if (status === 'blocked') return 'bg-red-500/15 text-red-200';
+  if (status === 'in_progress') return 'bg-cyan-500/15 text-cyan-200';
+  if (status === 'review') return 'bg-amber-500/15 text-amber-100';
+  if (status === 'done' || status === 'archived') return 'bg-green-500/15 text-green-300';
+  if (status === 'ready') return 'bg-violet-500/15 text-violet-200';
+  return 'bg-white/10 text-white/65';
+}
+
+function formatWorkCoordinationAttemptLabel(item: WorkCoordinationItemSummary): string {
+  const parts: string[] = [];
+  if (item.current_attempt_status) parts.push(item.current_attempt_status);
+  if (item.current_attempt_summary) parts.push(item.current_attempt_summary);
+  if (item.blocked_reason) parts.push(`blocked: ${item.blocked_reason}`);
+  if (item.failure_reason) parts.push(`failed: ${item.failure_reason}`);
+  return parts.join(' · ');
+}
+
 interface IntelligencePayload {
   accessRole: 'readonly' | 'localadmin';
   activeMissions: MissionSummary[];
@@ -893,6 +943,7 @@ interface IntelligencePayload {
   recentEvents: OrchestrationEvent[];
   agentMessages: AgentMessageSummary[];
   a2aHandoffs: A2AHandoffSummary[];
+  workCoordination: WorkCoordinationSummary;
   controlActionCatalog: ControlActionCatalog;
   controlActionAvailability: ControlActionAvailability;
   controlActions: ControlActionSummary[];
@@ -1127,6 +1178,7 @@ export function MissionIntelligence({
           recentEvents?: OrchestrationEvent[];
           agentMessages?: AgentMessageSummary[];
           a2aHandoffs?: A2AHandoffSummary[];
+          workCoordination?: IntelligencePayload['workCoordination'];
           controlActions?: ControlActionSummary[];
           controlActionDetails?: Record<string, ControlActionDetail[]>;
           ownerSummaries?: OwnerSummary[];
@@ -1152,6 +1204,7 @@ export function MissionIntelligence({
                 a2aHandoffs: Array.isArray(payload.a2aHandoffs)
                   ? payload.a2aHandoffs
                   : current.a2aHandoffs,
+                workCoordination: payload.workCoordination || current.workCoordination,
                 controlActions: Array.isArray(payload.controlActions)
                   ? payload.controlActions
                   : current.controlActions,
@@ -1994,6 +2047,19 @@ export function MissionIntelligence({
   const nextAction = data.nextActions?.[0] || null;
   const nextActions = Array.isArray(data.nextActions) ? data.nextActions : [];
   const memoryCandidateCount = (data.memoryCandidates || []).length;
+  const workCoordination: WorkCoordinationSummary =
+    data.workCoordination || {
+      total: 0,
+      backlog: 0,
+      ready: 0,
+      inProgress: 0,
+      blocked: 0,
+      review: 0,
+      done: 0,
+      archived: 0,
+      runningAttempts: 0,
+      recentItems: [],
+    };
 
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
@@ -2233,6 +2299,93 @@ export function MissionIntelligence({
           }
         />
       </div>
+
+      <Panel id="work-coordination" title="Work Coordination">
+        <div className="mb-4 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] leading-5 text-white/52">
+          This view shows durable work item state, including current attempts, to make handoff,
+          blocking, and completion visible before they turn into surprise fixes.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MiniSummaryCard
+            icon={<GitBranch size={13} />}
+            label="Total items"
+            value={workCoordination.total}
+            detail="Tracked work items across the coordination store"
+          />
+          <MiniSummaryCard
+            icon={<Activity size={13} />}
+            label="In progress"
+            value={workCoordination.inProgress}
+            detail="Items currently being worked on"
+          />
+          <MiniSummaryCard
+            icon={<AlertTriangle size={13} />}
+            label="Blocked"
+            value={workCoordination.blocked}
+            detail="Items with a declared block or failed attempt"
+          />
+          <MiniSummaryCard
+            icon={<Brain size={13} />}
+            label="Running attempts"
+            value={workCoordination.runningAttempts}
+            detail="Active execution attempts across all items"
+          />
+        </div>
+        <div className="mt-4 space-y-2">
+          {workCoordination.recentItems.length === 0 ? (
+            <div className="rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] text-white/45">
+              No work items have been imported into the coordination store yet.
+            </div>
+          ) : (
+            workCoordination.recentItems.map((item) => {
+              const attemptSummary = formatWorkCoordinationAttemptLabel(item);
+              return (
+                <div
+                  key={item.item_id}
+                  className="rounded-xl border border-white/5 bg-black/20 px-4 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-semibold tracking-[0.04em] text-white/90">
+                        {item.title}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.18em] text-white/38">
+                        <span className="font-mono text-white/62">{item.item_id}</span>
+                        <span>{item.project_id}</span>
+                        <span>{item.source_ref}</span>
+                      </div>
+                    </div>
+                    <div
+                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${workCoordinationStatusBadgeClass(item.status)}`}
+                    >
+                      {item.status}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-[10px] text-white/55 sm:grid-cols-2">
+                    <div>
+                      priority: <span className="font-mono text-white/78">{item.priority}</span>
+                    </div>
+                    <div>
+                      attempts: <span className="font-mono text-white/78">{item.attempt_count}</span>
+                    </div>
+                    <div className="sm:col-span-2">
+                      updated:{' '}
+                      <span className="font-mono text-white/78">
+                        {new Date(item.updated_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  {attemptSummary ? (
+                    <div className="mt-2 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-2 text-[10px] text-white/65">
+                      {attemptSummary}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </Panel>
 
       <section className="grid gap-4">
         <Panel id="next-actions" title="Recommended Next Actions">

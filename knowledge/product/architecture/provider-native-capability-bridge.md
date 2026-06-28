@@ -52,12 +52,17 @@ The current ecosystem is converging on the same shape from different directions:
 - browser-use is making CDP-first browser attach and session persistence easy for any agent loop.
 
 The detailed comparison lives in
-[`../external-wisdom/harness-landscape-scan-2026-05.md`](../external-wisdom/harness-landscape-scan-2026-05.md).
+[`../../public/external-wisdom/harness-landscape-scan-2026-05.md`](../../public/external-wisdom/harness-landscape-scan-2026-05.md).
+The Hermes-specific follow-up plan lives in
+[`../../public/external-wisdom/hermes-agent-absorption-plan-2026-06.md`](../../public/external-wisdom/hermes-agent-absorption-plan-2026-06.md).
 
 ## Kyberion Absorption Plan
 
 The implementation plan is tracked in
 [`harness-adoption-plan-2026-05.md`](./harness-adoption-plan-2026-05.md).
+Hermes-derived board, hook, cron, plugin, skill-bundle, and tool-routing work is
+expanded in
+[`../../public/external-wisdom/hermes-agent-absorption-plan-2026-06.md`](../../public/external-wisdom/hermes-agent-absorption-plan-2026-06.md).
 
 The short version is:
 
