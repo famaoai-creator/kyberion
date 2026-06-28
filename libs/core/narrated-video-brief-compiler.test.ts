@@ -137,11 +137,87 @@ describe('narrated video brief compiler', () => {
     });
 
     expect(adf.scenes).toHaveLength(3);
-    expect(adf.scenes[0].template_ref.template_id).toBe('promo-spot');
-    expect(adf.scenes[1].template_ref.template_id).toBe('promo-spot');
+    expect(adf.scenes[0].template_ref.template_id).toBe('basic-title-card');
+    expect(adf.scenes[1].template_ref.template_id).toBe('howto-guide');
     expect(adf.scenes[2].template_ref.template_id).toBe('logo-outro');
     expect(adf.scenes[1].content.semantic).toBe('process');
     expect(adf.scenes[1].content.body).toBe('Turn it into a plan.');
+  });
+
+  it('uses mixed template families for promo storyboards', () => {
+    const adf = compileNarratedVideoBriefToCompositionADF({
+      kind: 'narrated-video-brief',
+      version: '1.0.0',
+      language: 'ja',
+      storyboard: {
+        kind: 'video-storyboard',
+        version: '1.0.0',
+        content_type: 'promo',
+        presentation_mode: 'promo',
+        format: { width: 1920, height: 1080 },
+        title: 'Promo backed',
+        beats: [
+          {
+            beat_id: 'hook',
+            title: 'Hook',
+            start_sec: 0,
+            duration_sec: 12,
+            role: 'hook',
+            semantic: 'hook',
+            message: 'Lead with value.',
+            visual_direction: 'Lead with the hook.',
+          },
+          {
+            beat_id: 'value',
+            title: 'Value',
+            start_sec: 12,
+            duration_sec: 12,
+            role: 'feature',
+            semantic: 'value',
+            message: 'Show the benefit.',
+            visual_direction: 'Show the benefit.',
+          },
+          {
+            beat_id: 'proof',
+            title: 'Proof',
+            start_sec: 24,
+            duration_sec: 12,
+            role: 'proof',
+            semantic: 'proof',
+            message: 'Show the evidence.',
+            visual_direction: 'Show the evidence.',
+          },
+          {
+            beat_id: 'cta',
+            title: 'CTA',
+            start_sec: 36,
+            duration_sec: 12,
+            role: 'cta',
+            semantic: 'cta',
+            message: 'Ask for action.',
+            visual_direction: 'Ask for action.',
+          },
+        ],
+      },
+      script: {
+        hook: 'Intent',
+        feature: 'Value',
+        cta: 'Action',
+      },
+      narration: {
+        artifact_ref: 'active/shared/exports/narration.aiff',
+      },
+      design_system: {
+        brand_name: 'Kyberion',
+      },
+    });
+
+    expect(adf.scenes.map((scene) => scene.template_ref.template_id)).toEqual([
+      'basic-title-card',
+      'promo-spot',
+      'split-highlight',
+      'logo-outro',
+    ]);
   });
 
   it('compiles vtuber storyboards into stage-oriented scenes', () => {

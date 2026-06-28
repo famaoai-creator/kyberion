@@ -3,6 +3,7 @@ import {
   createVirtualAudioOutputPlaybackBridge,
   createVirtualDeviceInventoryBridge,
   getVoiceEngineRecord,
+  getVoiceEngineRegistry,
   getVoiceProfileRecord,
   getVoiceRuntimePolicy,
   getVoiceTtsLanguageConfig,
@@ -15,6 +16,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeStat,
   splitVoiceTextIntoChunks,
   withRetry,
   VoiceGenerationRuntime,
@@ -254,7 +256,130 @@ async function renderWithEspeakNg(
   return artifactPath;
 }
 
-function renderNativeArtifact(
+function renderWithSay(
+  text: string,
+  options: {
+    requestId: string;
+    voice: string;
+    rate: number;
+    format: VoiceArtifactFormat;
+    outputPath?: string;
+  },
+): string {
+  const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+  const artifactDir = path.dirname(artifactPath);
+  safeMkdir(artifactDir, { recursive: true });
+  safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
+  return artifactPath;
+}
+
+async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean> {
+  if (!artifactPath || !safeExistsSync(artifactPath)) {
+    return false;
+  }
+
+  try {
+    if (safeStat(artifactPath).size < 1024) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  try {
+    const durationText = safeExec('ffprobe', [
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      artifactPath,
+    ]).trim();
+    const duration = Number(durationText);
+    return Number.isFinite(duration) && duration > 0;
+  } catch {
+    return false;
+  }
+}
+
+function resolveVoiceArtifactCandidates(
+  requestedEngineId: string,
+  format: VoiceArtifactFormat,
+): Array<ReturnType<typeof getVoiceEngineRecord>> {
+  const registry = getVoiceEngineRegistry();
+  const visited = new Set<string>();
+  const candidates: Array<ReturnType<typeof getVoiceEngineRecord>> = [];
+
+  const addCandidate = (engine?: ReturnType<typeof getVoiceEngineRecord>): void => {
+    if (!engine || visited.has(engine.engine_id)) return;
+    visited.add(engine.engine_id);
+    if (engine.status !== 'active') return;
+    if (!engine.platforms.includes('any') && !engine.platforms.includes(process.platform as any)) return;
+    if (!engine.supports.artifact_formats.includes(format)) return;
+    candidates.push(engine);
+  };
+
+  let current = getVoiceEngineRecord(requestedEngineId);
+  while (current && !visited.has(current.engine_id)) {
+    addCandidate(current);
+    if (!current.fallback_engine_id) break;
+    current = getVoiceEngineRecord(current.fallback_engine_id);
+  }
+
+  addCandidate(getVoiceEngineRecord(registry.default_engine_id));
+  for (const engine of registry.engines) {
+    addCandidate(engine);
+  }
+
+  return candidates;
+}
+
+async function renderVoiceArtifactWithEngine(
+  text: string,
+  options: {
+    requestId: string;
+    voice: string;
+    rate: number;
+    language: string;
+    format: VoiceArtifactFormat;
+    outputPath?: string;
+    profile?: any;
+  },
+  engine: ReturnType<typeof getVoiceEngineRecord>,
+): Promise<string> {
+  const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+  if (engine.bridge_script) {
+    await runPythonTtsBridge(engine.bridge_script, text, artifactPath, options.language, options.profile);
+    return artifactPath;
+  }
+
+  if (process.platform === 'darwin') {
+    const rendered = renderWithSay(text, {
+      requestId: options.requestId,
+      voice: options.voice,
+      rate: options.rate,
+      format: options.format,
+      outputPath: options.outputPath,
+    });
+    if (await isRenderableAudioArtifact(rendered)) {
+      return rendered;
+    }
+    throw new Error(`say produced an invalid audio artifact: ${rendered}`);
+  }
+
+  if (process.platform === 'linux') {
+    if (options.format !== 'wav') {
+      throw new Error(`linux native artifact rendering supports only wav, received ${options.format}`);
+    }
+    safeExec('espeak', ['-s', String(options.rate), '-w', artifactPath, text]);
+    return artifactPath;
+  }
+
+  throw new Error(`native artifact rendering is unsupported on ${process.platform}`);
+}
+
+async function renderNativeArtifact(
   text: string,
   options: {
     requestId: string;
@@ -267,7 +392,7 @@ function renderNativeArtifact(
     outputPath?: string;
     profile?: any;
   },
-): string | Promise<string> {
+): Promise<string> {
   if (!options.supportsFormats.includes(options.format)) {
     throw new Error(`Voice engine ${options.engineId} does not support artifact format ${options.format}`);
   }
@@ -275,41 +400,31 @@ function renderNativeArtifact(
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });
 
-  const engineRecord = getVoiceEngineRecord(options.engineId);
-  if (engineRecord && engineRecord.bridge_script) {
-    return withRetry(async () => {
-      await runPythonTtsBridge(engineRecord.bridge_script, text, artifactPath, options.language, options.profile);
-      return artifactPath;
-    }, buildRetryOptions());
+  const candidates = resolveVoiceArtifactCandidates(options.engineId, options.format);
+  if (candidates.length === 0) {
+    throw new Error(`No configured voice engine can render artifact format ${options.format} on ${process.platform}`);
   }
 
-  if (process.platform === 'darwin') {
-    return withRetry(async () => {
-      if (hasEspeakNg()) {
-        return renderWithEspeakNg(text, {
-          requestId: options.requestId,
-          language: options.language,
-          rate: options.rate,
-          format: options.format,
-          outputPath: options.outputPath,
-        });
-      }
-      safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
-      return artifactPath;
-    }, buildRetryOptions());
-  }
-
-  if (process.platform === 'linux') {
-    if (options.format !== 'wav') {
-      throw new Error(`linux native artifact rendering supports only wav, received ${options.format}`);
+  let lastError: unknown;
+  for (const engine of candidates) {
+    try {
+      const rendered = await withRetry(async () => {
+        const renderedPath = await renderVoiceArtifactWithEngine(text, options, engine);
+        if (await isRenderableAudioArtifact(renderedPath)) {
+          return renderedPath;
+        }
+        throw new Error(`voice engine ${engine.engine_id} produced an invalid audio artifact: ${renderedPath}`);
+      }, buildRetryOptions());
+      return rendered;
+    } catch (error) {
+      lastError = error;
+      logger.warn(`[VOICE] configured engine ${engine.engine_id} failed for artifact rendering: ${error instanceof Error ? error.message : String(error)}`);
     }
-    return withRetry(async () => {
-      safeExec('espeak', ['-s', String(options.rate), '-w', artifactPath, text]);
-      return artifactPath;
-    }, buildRetryOptions());
   }
 
-  throw new Error(`native artifact rendering is unsupported on ${process.platform}`);
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Configured voice engines failed to render a valid audio artifact for ${options.engineId}`);
 }
 
 async function performPlayback(
@@ -388,8 +503,9 @@ async function renderVoicePlaybackSource(
   options: { language: string; voice: string; rate: number; engineId: string; profile?: any },
 ): Promise<string> {
   const playbackRequestId = `${randomUUID()}-playback`;
-  const playbackFormat: VoiceArtifactFormat = process.platform === 'darwin'
-    ? (hasEspeakNg() ? 'wav' : 'aiff')
+  const playbackEngine = resolveVoiceEngineForPlatform(options.engineId);
+  const playbackFormat: VoiceArtifactFormat = playbackEngine.supports.artifact_formats.includes('aiff')
+    ? 'aiff'
     : 'wav';
   return renderNativeArtifact(text, {
     requestId: playbackRequestId,
@@ -398,7 +514,7 @@ async function renderVoicePlaybackSource(
     language: options.language,
     format: playbackFormat,
     engineId: options.engineId,
-    supportsFormats: resolveVoiceEngineForPlatform(options.engineId).supports.artifact_formats,
+    supportsFormats: playbackEngine.supports.artifact_formats,
     profile: options.profile,
   });
 }

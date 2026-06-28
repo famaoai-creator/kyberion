@@ -3,7 +3,7 @@ import {
   safeExistsSync,
   safeReadFile,
   safeWriteFile,
-} from "@agent/core/intelligence-primitives";
+} from "./intelligence-primitives";
 
 type BrowserSessionControlAction = "close_browser_session" | "restart_browser_session";
 

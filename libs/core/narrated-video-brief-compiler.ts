@@ -251,6 +251,18 @@ function selectTemplateId(
     if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
       return 'logo-outro';
     }
+    if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') {
+      return 'howto-guide';
+    }
+    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact') {
+      return 'split-highlight';
+    }
+    if (role === 'hook') {
+      return 'basic-title-card';
+    }
+    if (role === 'feature') {
+      return 'promo-spot';
+    }
     return 'promo-spot';
   }
   if (presentationMode === 'vtuber') {

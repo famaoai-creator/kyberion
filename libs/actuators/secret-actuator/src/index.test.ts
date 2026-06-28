@@ -72,9 +72,10 @@ describe('secret-actuator: governed mutation', () => {
 
     // Verify that the mission controller was called to create and finish the mission
     expect(mocks.safeExec).toHaveBeenCalledWith(
-      'pnpm',
+      'node',
       expect.arrayContaining([
-        'tsx',
+        '--import',
+        'scripts/ts-loader.mjs',
         expect.stringContaining('mission_controller.ts'),
         'create',
         expect.stringContaining('MSN-SEC-'),
@@ -110,8 +111,8 @@ describe('secret-actuator: governed mutation', () => {
 
     // Mission controller should NOT be called
     expect(mocks.safeExec).not.toHaveBeenCalledWith(
-      'pnpm',
-      expect.arrayContaining(['tsx', expect.stringContaining('mission_controller.ts')])
+      'node',
+      expect.arrayContaining(['--import', 'scripts/ts-loader.mjs', expect.stringContaining('mission_controller.ts')])
     );
 
     // Verify ledger record uses the existing mission ID

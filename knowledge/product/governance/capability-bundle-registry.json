@@ -72,6 +72,29 @@
       ]
     },
     {
+      "bundle_id": "manim-video-recipes-governed",
+      "status": "conceptual",
+      "kind": "capability-bundle",
+      "summary": "Reusable Manim-style explainer video recipes for math, algorithm, architecture, and paper explainers.",
+      "required_actuators": ["video-composition-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/compose-video-from-adf.md",
+        "knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md",
+        "knowledge/product/architecture/hyperframes-video-absorption-assessment.md"
+      ]
+    },
+    {
+      "bundle_id": "ascii-video-recipes-governed",
+      "status": "conceptual",
+      "kind": "capability-bundle",
+      "summary": "Reusable ASCII and terminal-style video recipes for text art, audio-reactive visualizers, and retro motion graphics.",
+      "required_actuators": ["video-composition-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md",
+        "knowledge/product/architecture/hyperframes-video-absorption-assessment.md"
+      ]
+    },
+    {
       "bundle_id": "meeting-operations-governed",
       "status": "active",
       "kind": "capability-bundle",

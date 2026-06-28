@@ -5,6 +5,7 @@ Canonical per-engine registry entries for the voice engine catalog.
 Each file must contain exactly one `engines` entry and must match the file name:
 
 - `local_say.json`
+- `espeak_ng.json`
 - `open_voice_clone.json`
 - `mlx_audio_qwen3.json`
 - `kokoro.json`

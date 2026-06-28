@@ -127,8 +127,8 @@ async function withGovernedMutation(
   if (isEphemeral) {
     logger.info(`🛡️ [SECRET-GUARD] No active mission found. Auto-wrapping mutation in ephemeral mission: ${missionId}`);
     try {
-      safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'create', missionId, 'personal', 'kyberion', 'governance', '"Ephemeral Secret Mutation"', 'Unknown', '--is-ephemeral']);
-      safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'start', missionId, 'personal']);
+      safeExec('node', ['--import', 'scripts/ts-loader.mjs', 'scripts/mission_controller.ts', 'create', missionId, 'personal', 'kyberion', 'governance', '"Ephemeral Secret Mutation"', 'Unknown', '--is-ephemeral']);
+      safeExec('node', ['--import', 'scripts/ts-loader.mjs', 'scripts/mission_controller.ts', 'start', missionId, 'personal']);
     } catch (err) {
       logger.warn(`Failed to create ephemeral mission: ${err}`);
     }
@@ -154,7 +154,7 @@ async function withGovernedMutation(
   } finally {
     if (isEphemeral) {
       try {
-        safeExec('pnpm', ['tsx', 'scripts/mission_controller.ts', 'finish', missionId]);
+        safeExec('node', ['--import', 'scripts/ts-loader.mjs', 'scripts/mission_controller.ts', 'finish', missionId]);
       } catch (err) {
         logger.warn(`Failed to finish ephemeral mission: ${err}`);
       }
@@ -217,4 +217,3 @@ async function deleteSecret(params: any, platform: string) {
 function listSecrets(params: { service: string }): { status: string; entries: RegistryEntry[] } {
   return coreListSecrets(params.service);
 }
-

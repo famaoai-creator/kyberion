@@ -61,4 +61,29 @@ The response contains:
 - final rendered video artifact when backend rendering is enabled
 - audio-muxed MP4/MOV/WebM when `narration_ref` is present and the renderer can run
 
+## 6. Story and narration discipline
+
+This procedure should not be used as a shortcut to "write HTML and render it."
+Follow the same structure HyperFrames uses for production videos:
+
+- write the narration or voiceover copy first
+- split it into beats and scene responsibilities
+- keep storyboard and narration separate from render code
+- choose the renderer after the narrative structure is stable
+- validate that the visuals appear slightly before the narration reaches the
+  same idea
+- for Japanese promo narration on macOS, prefer the native `say` path with a clearly intelligible voice such as `Kyoko`; treat `espeak-ng` as fallback only
+
+That means the usual Kyberion flow should be:
+
+1. build or choose a `video-content-brief`
+2. compile it to a storyboard
+3. synthesize narration
+4. compile `narrated-video-brief`
+5. render `video-composition-adf`
+6. mux and verify the final artifact
+
+This is the composed-video equivalent of HyperFrames' `writer`,
+`storyboarder`, `voice-talent`, `renderer`, and `editor` roles.
+
 When backend rendering is enabled and `await_completion` is omitted, `execution.status` will default to `queued`.

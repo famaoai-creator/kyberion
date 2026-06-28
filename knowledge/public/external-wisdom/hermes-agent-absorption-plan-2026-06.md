@@ -213,6 +213,47 @@ Kyberion should model:
 
 This belongs in provider/actuator policy and execution receipts, not inside ADF.
 
+### 3.9 Video generation as a capability bundle, not a backend
+
+Hermes' most useful video pattern is not a single renderer. It is a compact
+surface that separates:
+
+- the user-facing intent
+- the selected provider or backend
+- the production recipe or skill
+- the final media delivery path
+
+In practice, Hermes treats video as a first-class capability in three ways:
+
+- `video_generate` is a single tool surface with backend-agnostic routing
+- providers are registered dynamically and selected from configuration
+- generated media is delivered through the same attachment-routing layer as
+  other artifacts
+
+Kyberion should absorb that shape directly, but keep the contract split
+explicit:
+
+- `video-generation-adf` for prompt-driven generated clips
+- `narrated-video-brief` / `video-composition-adf` for composed or narrated
+  videos
+- capability bundles or skills for repeatable video recipes such as manim-style
+  explainers or ASCII video
+
+Implementation targets:
+
+- keep the public contract provider-neutral
+- move provider choice into registries and policy, not into the ADF
+- keep delivery routing aware of `video` as a native attachment type
+- keep skill bundles as the place for repeatable production recipes
+
+Exit criteria:
+
+- a video request can be resolved without knowing the concrete backend at
+  authoring time
+- composed/narrated video stays separate from prompt-driven generation
+- delivery surfaces treat video as a native artifact rather than a text-only
+  link
+
 ## 4. Do Not Copy These Parts
 
 Do not copy:
