@@ -109,7 +109,7 @@ function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
     {
       name: 'Style-Bert-VITS2 server',
       ok: false,
-      detail: 'Manual setup required — see docs/developer/VOICE_FIRST_WIN.md (TODO: tier-2 install guide)',
+      detail: 'Manual setup required — see docs/developer/VOICE_FIRST_WIN.md (Tier 1 → Tier 2 section)',
     },
   ];
 }
@@ -169,7 +169,7 @@ function nextStepsForTier(tier: Tier, prereqsOk: boolean): string[] {
     case 2:
       return [
         'Tier 2 (local) is configured.',
-        'Pull the Style-Bert-VITS2 model + start its local server (see docs/developer/VOICE_FIRST_WIN.md, tier-2 install guide TBD).',
+        'Follow docs/developer/VOICE_FIRST_WIN.md for the Tier 1 → Tier 2 path, then start the Style-Bert-VITS2 local server.',
         'Pull the Whisper model (`pip install openai-whisper`).',
         'Run `pnpm chronos:dev` and verify presence surface routes through local voice.',
       ];
