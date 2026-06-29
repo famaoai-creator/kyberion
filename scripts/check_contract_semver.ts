@@ -241,9 +241,17 @@ function buildBaseline(actuators: ActuatorFingerprint[]): BaselineFile {
   };
 }
 
+function printUsage(): void {
+  console.log('Usage: pnpm check:contract-semver [--rebaseline]');
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const rebaseline = args.includes('--rebaseline');
+  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+    printUsage();
+    return;
+  }
 
   const manifests = listActuatorManifests().map(readManifest).filter(m => m.actuator_id && m.version);
   const fingerprints = manifests.map(fingerprint);
