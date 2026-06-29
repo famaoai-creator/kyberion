@@ -23,12 +23,17 @@ interface TaskInitArgs {
   answersFile?: string;
   answersJson?: string;
   printTemplate?: boolean;
+  help?: boolean;
 }
 
 function parseArgs(argv: string[]): TaskInitArgs {
   const args = [...argv];
   const parsed: TaskInitArgs = { answers: {} };
 
+  if (args.length > 0 && (args[0] === 'help' || args[0] === '--help' || args[0] === '-h')) {
+    parsed.help = true;
+    return parsed;
+  }
   if (args.length > 0 && !args[0].startsWith('--')) {
     parsed.scenarioId = args.shift();
   }
@@ -47,6 +52,11 @@ function parseArgs(argv: string[]): TaskInitArgs {
   }
 
   return parsed;
+}
+
+function printUsage(): void {
+  console.log('Usage: pnpm task:init <scenario-id> [--answers-json <json>] [--answers-file <path>]');
+  console.log('  pnpm task:init <scenario-id> --print-template');
 }
 
 function resolveScenarioDir(): string {
@@ -119,8 +129,13 @@ function buildProfile(scenario: TaskScenario, answers: Record<string, unknown>) 
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
+  if (args.help) {
+    printUsage();
+    return;
+  }
   if (!args.scenarioId) {
-    throw new Error('Usage: pnpm task:init <scenario-id> [--answers-json <json>] [--answers-file <path>]');
+    printUsage();
+    throw new Error('Missing scenario id');
   }
 
   const scenario = loadScenarioById(args.scenarioId);
