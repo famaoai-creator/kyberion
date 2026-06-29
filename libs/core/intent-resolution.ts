@@ -550,3 +550,50 @@ export function resolveIntentResolutionPacket(utterance: string): IntentResoluti
     bundle_candidates: [...bundleById.values()],
   };
 }
+
+/**
+ * Resolver convergence (GAP1): choose the intent to drive execution.
+ *
+ * `resolveIntentResolutionPacket` is the canonical Stage-1 resolver. When it
+ * produced a confident selection (`selected_intent_id` is only set when the top
+ * candidate clears `selected_confidence_threshold`), execution should run off
+ * THAT decision — passing the intent_id makes `compileIntent` hit its exact-ID
+ * match (confidence 1.0) instead of independently re-resolving the raw utterance
+ * (which previously let the two resolvers disagree). Falls back to the raw
+ * utterance when there is no confident selection, preserving prior behavior.
+ */
+export function chooseExecutionIntent(
+  packet: Pick<IntentResolutionPacket, 'selected_intent_id'>,
+  rawIntent: string,
+): string {
+  return packet.selected_intent_id || rawIntent;
+}
+
+/**
+ * Improvement-loop (④→①) closure: pull accumulated lessons — feedback-loop trace
+ * hints (ingested into the knowledge index by `knowledge-index._scanProductTier`)
+ * and promoted memory — relevant to an intent, so the next execution is biased by
+ * what past runs learned. This is the *consumption* side of the learning loop:
+ * capture (runFeedbackLoop → hints → knowledge-index) was already wired; this makes
+ * the captured knowledge actually reach the next execution instead of only being
+ * searchable on demand via the MCP tool.
+ *
+ * Best-effort and non-blocking: any failure in the knowledge subsystem yields `[]`
+ * so intent execution is never blocked by a hint lookup. Uses a dynamic import to
+ * avoid a load-time dependency cycle with the knowledge index.
+ */
+export async function gatherImprovementHints(
+  intent: string,
+  options: { maxResults?: number } = {},
+): Promise<Array<{ topic: string; hint: string; confidence: number }>> {
+  const topic = (intent ?? '').trim();
+  if (!topic) return [];
+  try {
+    const mod = await import('./src/knowledge-index.js');
+    const index = await mod.buildKnowledgeIndex();
+    const hints = await mod.queryKnowledgeHybrid(index, topic, { maxResults: options.maxResults ?? 5 });
+    return hints.map((h) => ({ topic: h.topic, hint: h.hint, confidence: h.confidence }));
+  } catch {
+    return [];
+  }
+}

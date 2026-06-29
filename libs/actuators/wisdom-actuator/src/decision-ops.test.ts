@@ -10,6 +10,7 @@ import {
   pptxDiff,
   evaluateSimulationQuality,
   evaluateEnsembleConvergence,
+  dispatchDecisionOp,
 } from './decision-ops.js';
 
 const TMP_ROOT = 'active/shared/tmp/decision-ops-tests';
@@ -364,5 +365,19 @@ describe('evaluateEnsembleConvergence (IP-4)', () => {
     ];
     const report = evaluateEnsembleConvergence({ runs });
     expect(report.threshold).toBe(0.6);
+  });
+});
+
+describe("dispatchDecisionOp 'distill' (memory-distillation op)", () => {
+  it('is handled and emits non-empty lessons into the produces channel', async () => {
+    // run_pipeline bridges produces.channel → params.export_as; simulate that.
+    const result = await dispatchDecisionOp(
+      'distill',
+      { scope: 'recent_missions', export_as: 'lessons_learned' },
+      {},
+    );
+    expect(result.handled).toBe(true);
+    expect(typeof result.ctx.lessons_learned).toBe('string');
+    expect((result.ctx.lessons_learned as string).length).toBeGreaterThan(0);
   });
 });

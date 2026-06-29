@@ -21,8 +21,11 @@ import {
   buildStopContext,
   buildUserPromptSubmitContext,
   evaluatePreToolUse,
+  recordCliUsage,
   recordPostToolUse,
+  summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook.js';
+import { rawExistsSync, rawReadTextFile } from '@agent/core/fs-primitives.js';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
@@ -71,6 +74,15 @@ async function main(): Promise<void> {
       return;
     }
     case 'Stop': {
+      // Capture this CLI session's token usage into metrics (best-effort).
+      try {
+        const transcriptPath = typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
+        if (transcriptPath && rawExistsSync(transcriptPath)) {
+          recordCliUsage(summarizeTranscriptUsage(rawReadTextFile(transcriptPath)));
+        }
+      } catch {
+        // usage capture is best-effort; never block session close
+      }
       process.stdout.write(
         JSON.stringify({
           hookSpecificOutput: { hookEventName: 'Stop', additionalContext: buildStopContext(payload) },
