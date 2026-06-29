@@ -147,6 +147,8 @@ export interface CompileUserIntentFlowInput {
   trackId?: string;
   trackName?: string;
   tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+  tenantSlug?: string;
   serviceBindings?: string[];
   runtimeContext?: Record<string, unknown>;
   resolutionPacket?: IntentResolutionPacket;
@@ -560,11 +562,33 @@ function toExecutionBriefSeed(
   };
 }
 
+function resolveTenantId(input: CompileUserIntentFlowInput): string | undefined {
+  const runtime = input.runtimeContext || {};
+  const candidates = [
+    input.tenantId,
+    input.tenantSlug,
+    typeof runtime.tenant_id === 'string' ? runtime.tenant_id : undefined,
+    typeof runtime.tenantId === 'string' ? runtime.tenantId : undefined,
+    typeof runtime.tenant_slug === 'string' ? runtime.tenant_slug : undefined,
+    typeof runtime.tenantSlug === 'string' ? runtime.tenantSlug : undefined,
+    process.env.KYBERION_TENANT,
+    process.env.KYBERION_CUSTOMER,
+  ];
+  return candidates.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
+}
+
+function resolveIntentPacketForInput(input: CompileUserIntentFlowInput): IntentResolutionPacket {
+  return resolveIntentResolutionPacket(input.text, {
+    tier: input.tier,
+    tenantId: resolveTenantId(input),
+  });
+}
+
 function buildFallbackIntentContract(
   input: CompileUserIntentFlowInput,
   executionBrief?: ActuatorExecutionBrief
 ): IntentContract {
-  const packet = resolveIntentResolutionPacket(input.text);
+  const packet = resolveIntentPacketForInput(input);
   const selectedPlatformId =
     typeof input.runtimeContext?.platform_id === 'string'
       ? input.runtimeContext.platform_id
@@ -739,7 +763,7 @@ function buildFallbackIntentContract(
 }
 
 function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
-  const packet = input.resolutionPacket || resolveIntentResolutionPacket(input.text);
+  const packet = input.resolutionPacket || resolveIntentPacketForInput(input);
   return [
     'You are the Kyberion Execution Brief Compiler.',
     'First infer a shared guided-coordination brief, then derive a governed execution brief before any contract or work-loop compilation.',
@@ -818,7 +842,7 @@ function buildIntentContractPrompt(
   executionBrief: ActuatorExecutionBrief
 ): string {
   const policy = loadIntentPolicy();
-  const packet = input.resolutionPacket || resolveIntentResolutionPacket(input.text);
+  const packet = input.resolutionPacket || resolveIntentPacketForInput(input);
   const bundleIntentIds = packet.candidates.map((candidate) => candidate.intent_id);
   return [
     'You are the Kyberion Intent Contract Compiler.',
@@ -906,7 +930,7 @@ function buildWorkLoopPrompt(
   contract: IntentContract
 ): string {
   const policy = loadIntentPolicy();
-  const packet = input.resolutionPacket || resolveIntentResolutionPacket(input.text);
+  const packet = input.resolutionPacket || resolveIntentPacketForInput(input);
   const bundleIntentIds = packet.candidates.map((candidate) => candidate.intent_id);
   return [
     'You are the Kyberion Work Loop Compiler.',
@@ -1379,7 +1403,7 @@ export async function compileUserIntentFlow(
   input: CompileUserIntentFlowInput,
   options: LlmCompileOptions = {}
 ): Promise<UserIntentFlow> {
-  const resolutionPacket = input.resolutionPacket || resolveIntentResolutionPacket(input.text);
+  const resolutionPacket = input.resolutionPacket || resolveIntentPacketForInput(input);
   const resolvedInput = {
     ...input,
     resolutionPacket,

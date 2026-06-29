@@ -1,7 +1,7 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -13,6 +13,8 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/standard-intents.schema.json');
 const INTENT_RESOLUTION_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-resolution-policy.schema.json');
+const PERSONAL_INTENT_OVERLAY_PATH = pathResolver.knowledge('personal/orchestration/intent-catalog.json');
+const CONFIDENTIAL_INTENT_OVERLAY_DIR = 'confidential';
 
 export type StandardIntentDefinition = {
   id?: string;
@@ -89,6 +91,14 @@ export interface IntentResolutionPacket {
   bundle_candidates?: IntentResolutionBundleCandidate[];
 }
 
+export type IntentResolutionTier = 'personal' | 'confidential' | 'public';
+
+export interface IntentResolutionOptions {
+  tier?: IntentResolutionTier;
+  tenantId?: string;
+  overlayPaths?: string[];
+}
+
 type CatalogScoringPolicy = {
   exact_intent_id_confidence: number;
   keyword_base_confidence: number;
@@ -127,6 +137,7 @@ let intentDomainOntologyCache: Map<string, IntentDomainOntologyEntry> | null = n
 let standardIntentValidateFn: ValidateFunction | null = null;
 let intentResolutionPolicyCache: IntentResolutionPolicyFile | null = null;
 let intentResolutionPolicyValidateFn: ValidateFunction | null = null;
+const resolvedIntentCatalogCache = new Map<string, StandardIntentDefinition[]>();
 
 function ensureStandardIntentValidator(): ValidateFunction {
   if (standardIntentValidateFn) return standardIntentValidateFn;
@@ -151,6 +162,122 @@ export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   }
   standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
   return standardIntentCache;
+}
+
+function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[] {
+  if (!safeExistsSync(filePath)) return [];
+  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { intents?: StandardIntentDefinition[] };
+  const validate = ensureStandardIntentValidator();
+  if (!validate(parsed)) {
+    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    throw new Error(`Invalid intent catalog overlay at ${filePath}: ${errors}`);
+  }
+  return Array.isArray(parsed.intents) ? parsed.intents : [];
+}
+
+function sanitizePathSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function defaultTenantId(): string | undefined {
+  const tenant = process.env.KYBERION_TENANT?.trim() || process.env.KYBERION_CUSTOMER?.trim() || '';
+  return tenant || undefined;
+}
+
+function buildIntentOverlayPaths(options: IntentResolutionOptions): string[] {
+  const paths: string[] = [];
+  if (options.tier === 'personal') {
+    paths.push(PERSONAL_INTENT_OVERLAY_PATH);
+  } else if (options.tier === 'confidential') {
+    paths.push(PERSONAL_INTENT_OVERLAY_PATH);
+    const tenantId = sanitizePathSegment(options.tenantId || defaultTenantId() || '');
+    if (tenantId) {
+      paths.push(pathResolver.knowledge(`${CONFIDENTIAL_INTENT_OVERLAY_DIR}/${tenantId}/orchestration/intent-catalog.json`));
+    }
+  }
+
+  for (const candidate of options.overlayPaths || []) {
+    const normalized = candidate.trim();
+    if (normalized && !paths.includes(normalized)) paths.push(normalized);
+  }
+  return paths;
+}
+
+function mergeIntentDefinition(
+  base: StandardIntentDefinition,
+  overlay: StandardIntentDefinition,
+): StandardIntentDefinition {
+  const merged: StandardIntentDefinition = { ...base, ...overlay };
+  if (base.surface_examples || overlay.surface_examples) {
+    merged.surface_examples = Array.from(new Set([...(base.surface_examples || []), ...(overlay.surface_examples || [])]));
+  }
+  if (base.trigger_keywords || overlay.trigger_keywords) {
+    merged.trigger_keywords = Array.from(new Set([...(base.trigger_keywords || []), ...(overlay.trigger_keywords || [])]));
+  }
+  if (base.outcome_ids || overlay.outcome_ids) {
+    merged.outcome_ids = Array.from(new Set([...(base.outcome_ids || []), ...(overlay.outcome_ids || [])]));
+  }
+  if (base.plan_outline || overlay.plan_outline) {
+    merged.plan_outline = Array.from(new Set([...(base.plan_outline || []), ...(overlay.plan_outline || [])]));
+  }
+  if (base.intake_requirements || overlay.intake_requirements) {
+    merged.intake_requirements = Array.from(new Set([...(base.intake_requirements || []), ...(overlay.intake_requirements || [])]));
+  }
+  if (base.pipeline || overlay.pipeline) {
+    merged.pipeline = [...(base.pipeline || []), ...(overlay.pipeline || [])];
+  }
+  if (base.resolution || overlay.resolution) {
+    merged.resolution = { ...(base.resolution || {}), ...(overlay.resolution || {}) };
+  }
+  return merged;
+}
+
+function resolvedCatalogCacheKey(options: IntentResolutionOptions): string {
+  return JSON.stringify({
+    tier: options.tier || 'public',
+    tenantId: sanitizePathSegment(options.tenantId || defaultTenantId() || ''),
+    overlayPaths: [...new Set(options.overlayPaths || [])].sort(),
+  });
+}
+
+export function loadResolvedStandardIntentCatalog(
+  options: IntentResolutionOptions = {},
+): StandardIntentDefinition[] {
+  const cacheKey = resolvedCatalogCacheKey(options);
+  const cached = resolvedIntentCatalogCache.get(cacheKey);
+  if (cached) return cached;
+
+  const baseCatalog = loadStandardIntentCatalog();
+  const overlayPaths = buildIntentOverlayPaths(options);
+  if (overlayPaths.length === 0) {
+    resolvedIntentCatalogCache.set(cacheKey, baseCatalog);
+    return baseCatalog;
+  }
+
+  const mergedById = new Map<string, StandardIntentDefinition>();
+  for (const intent of baseCatalog) {
+    if (intent.id) mergedById.set(intent.id, intent);
+  }
+  for (const overlayPath of overlayPaths) {
+    for (const overlayIntent of loadIntentCatalogFromPath(overlayPath)) {
+      const overlayId = overlayIntent.id?.trim();
+      if (!overlayId) continue;
+      const existing = mergedById.get(overlayId);
+      if (!existing) continue;
+      mergedById.set(overlayId, mergeIntentDefinition(existing, overlayIntent));
+    }
+  }
+
+  const resolved = baseCatalog.map((intent) => {
+    if (!intent.id) return intent;
+    return mergedById.get(intent.id) || intent;
+  });
+  resolvedIntentCatalogCache.set(cacheKey, resolved);
+  return resolved;
 }
 
 function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
@@ -470,11 +597,14 @@ function inferSelectedParameters(
   };
 }
 
-export function resolveIntentResolutionPacket(utterance: string): IntentResolutionPacket {
+export function resolveIntentResolutionPacket(
+  utterance: string,
+  options: IntentResolutionOptions = {},
+): IntentResolutionPacket {
   const trimmed = utterance.trim();
   const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
   const ontology = loadIntentDomainOntology();
-  const surfaceIntents = loadStandardIntentCatalog().filter((intent) => {
+  const surfaceIntents = loadResolvedStandardIntentCatalog(options).filter((intent) => {
     if (!intent.id) return false;
     const ontologyEntry = ontology.get(intent.id);
     if (ontologyEntry) return ontologyEntry.exposed_to_surface !== false;
