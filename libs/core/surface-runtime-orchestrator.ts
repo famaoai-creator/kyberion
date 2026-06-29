@@ -15,6 +15,7 @@ import {
 } from './agent-runtime-supervisor-client.js';
 import { compileUserIntentFlow, formatClarificationPacket, formatClarificationPacketConcise } from './intent-contract.js';
 import { logger } from './core.js';
+import { validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
   resolveFallbackLocationCoordinates,
   resolveFallbackLocationSummary,
@@ -1821,5 +1822,23 @@ export async function runSurfaceConversation(
 export async function runSurfaceMessageConversation(
   input: SurfaceConversationMessageInput
 ): Promise<SurfaceConversationResult> {
-  return runSurfaceConversation(buildSurfaceConversationInput(input));
+  const result = await runSurfaceConversation(buildSurfaceConversationInput(input));
+  // Enforce the surface UX contract on the outbound user-facing text. This is
+  // the single chokepoint for all surface responses; validation is non-blocking
+  // (a violation is logged and attached to the result, never dropped) so a
+  // contract miss surfaces for review without breaking delivery. Previously
+  // validateSurfaceUxContract was implemented + tested but never invoked.
+  try {
+    const text = (result as { text?: unknown })?.text;
+    if (typeof text === 'string' && text.trim()) {
+      const verdict = validateSurfaceUxContract({ text });
+      if (!verdict.valid) {
+        logger.warn(`[UX_CONTRACT] surface response violates contract: ${verdict.violations.join('; ')}`);
+      }
+      (result as { uxContract?: unknown }).uxContract = verdict;
+    }
+  } catch {
+    // Never block delivery on the contract check itself.
+  }
+  return result;
 }
