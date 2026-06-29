@@ -25,7 +25,7 @@ import {
   recordPostToolUse,
   summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook.js';
-import { rawExistsSync, rawReadTextFile } from '../libs/core/fs-primitives.js';
+import { rawExistsSync, rawReadTextFile } from '@agent/core/fs-primitives.js';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
