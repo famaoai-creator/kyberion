@@ -116,6 +116,7 @@ import {
   normalizeFontFamily,
 } from './media-diagram-render-helpers.js';
 import { createMediaReportPipelineHelpers } from './media-report-pipeline-helpers.js';
+import { projectXlsxDesign } from './xlsx-extract-projection.js';
 import {
   createMediaSpreadsheetPipelineHelpers,
   columnNumberToLetter,
@@ -686,7 +687,20 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
     case 'xlsx_extract': {
       const xlsxPath = path.resolve(rootDir, resolve(params.path));
       const xlsxDesign = await xlsxUtils.distillXlsxDesign(xlsxPath);
-      return { ...ctx, [params.export_as || 'last_xlsx_design']: xlsxDesign };
+      // Token-efficient projection: when a sheet/range/values_only filter is given,
+      // emit a slim values-only structure (no styles) so a downstream reasoning step
+      // receives a fraction of the payload. Default (no filters) = full design unchanged.
+      const wantProjection =
+        params.values_only === true || params.sheet !== undefined || params.range !== undefined;
+      const output = wantProjection
+        ? projectXlsxDesign(xlsxDesign, {
+            sheet: params.sheet !== undefined ? resolve(params.sheet) : undefined,
+            range: params.range !== undefined ? resolve(params.range) : undefined,
+            valuesOnly: params.values_only !== false,
+            skipZero: params.skip_zero === true,
+          })
+        : xlsxDesign;
+      return { ...ctx, [params.export_as || 'last_xlsx_design']: output };
     }
     case 'docx_extract': {
       const docxPath = path.resolve(rootDir, resolve(params.path));

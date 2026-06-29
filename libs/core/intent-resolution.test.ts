@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
+  chooseExecutionIntent,
   loadStandardIntentCatalog,
   normalizeForTriggerMatch,
   resolveIntentResolutionPacket,
@@ -292,5 +293,14 @@ describe('normalizeForTriggerMatch', () => {
 
   it('returns empty string for empty input', () => {
     expect(normalizeForTriggerMatch('')).toBe('');
+  });
+});
+
+describe('chooseExecutionIntent (GAP1 resolver convergence)', () => {
+  it('returns the packet selected_intent_id when present (canonical decision drives execution)', () => {
+    expect(chooseExecutionIntent({ selected_intent_id: 'attendance.approve' }, 'please approve attendance')).toBe('attendance.approve');
+  });
+  it('falls back to the raw utterance when no confident selection', () => {
+    expect(chooseExecutionIntent({ selected_intent_id: undefined }, 'do something vague')).toBe('do something vague');
   });
 });

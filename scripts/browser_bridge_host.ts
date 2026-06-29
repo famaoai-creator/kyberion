@@ -38,6 +38,9 @@ import {
   safeReadFile,
   safeWriteFile,
   safeMkdir,
+  auditChain,
+  createDistillCandidateRecord,
+  saveDistillCandidateRecord,
   validateBrowserExtensionReceipt,
   validateBrowserExtensionRecording,
   validateBrowserExtensionSessionRequest,
@@ -170,13 +173,57 @@ function handleSubmitReceipt(message: any): HostResponse {
   }
   // Persist the receipt as durable evidence so execution is auditable after the
   // fact (OP-H3). The mission lifecycle may later relocate/aggregate these.
+  const receipt = result.value;
   const persisted = withExecutionContext('surface_runtime', () =>
-    persistBrowserExtensionReceipt(result.value),
+    persistBrowserExtensionReceipt(receipt),
   );
   if (persisted.errors.length > 0) {
     return { ok: false, error: persisted.errors.join('; ') };
   }
-  return { ok: true, status: 'recorded', receipt_id: result.value.receipt_id, evidence_path: persisted.path };
+
+  // GAP4 (option C): route the execution into the existing governed flows so a
+  // browser automation is no longer an audit silo — WITHOUT creating a mission
+  // (zero mission-store churn, fully reversible). (1) record it on the
+  // hash-chained audit trail (which Chronos surfaces), and (2) for a successful
+  // run, seed a distill-candidate so the procedure can enter the memory/promotion
+  // loop. Both are best-effort enrichment; never fail the receipt on them.
+  withExecutionContext('surface_runtime', () => {
+    try {
+      auditChain.record({
+        agentId: 'browser-bridge',
+        action: 'browser_execution',
+        operation: `browser:execute:${receipt.recording_id}`,
+        result: receipt.status === 'completed' ? 'completed' : receipt.status === 'blocked' ? 'denied' : 'failed',
+        reason: receipt.summary || `Browser execution ${receipt.status} on ${receipt.origin}`,
+        metadata: {
+          receipt_id: receipt.receipt_id,
+          origin: receipt.origin,
+          recording_id: receipt.recording_id,
+          lease_id: receipt.lease_id,
+          evidence_ref: persisted.path,
+        },
+      });
+    } catch { /* audit enrichment is best-effort */ }
+
+    if (receipt.status === 'completed') {
+      try {
+        saveDistillCandidateRecord(
+          createDistillCandidateRecord({
+            source_type: 'task_session',
+            tier: 'confidential',
+            title: `Browser procedure on ${receipt.origin}`,
+            summary: receipt.summary || `Completed browser automation on ${receipt.origin}`,
+            status: 'proposed',
+            target_kind: 'sop_candidate',
+            evidence_refs: [persisted.path || `receipt:${receipt.receipt_id}`],
+            metadata: { surface: 'browser-extension', origin: receipt.origin, recording_id: receipt.recording_id },
+          }),
+        );
+      } catch { /* distill enrichment is best-effort */ }
+    }
+  });
+
+  return { ok: true, status: 'recorded', receipt_id: receipt.receipt_id, evidence_path: persisted.path };
 }
 
 async function handleDispatchProcedure(message: any): Promise<HostResponse> {
@@ -410,7 +457,23 @@ function handleSaveProcedureDelta(message: any): HostResponse {
     deltaRecordingRef: deltaRef,
     reason,
   });
-  const path = withExecutionContext('surface_runtime', () => saveProcedureDelta(delta));
+  const path = withExecutionContext('surface_runtime', () => {
+    const saved = saveProcedureDelta(delta);
+    // Make self-repair deltas observable on the governed audit feed (the same
+    // mechanism Chronos surfaces) — previously they were written but invisible
+    // above the CLI. Best-effort; never fails the delta save.
+    try {
+      auditChain.record({
+        agentId: 'browser-bridge',
+        action: 'procedure_self_repair',
+        operation: `browser:repair:${procedureId}`,
+        result: 'completed',
+        reason: `Self-repair delta captured (${reason}) at step ${anchorStepIndex}`,
+        metadata: { procedure_id: procedureId, reason, anchor_step_index: anchorStepIndex, delta_path: saved },
+      });
+    } catch { /* audit enrichment is best-effort */ }
+    return saved;
+  });
   return { ok: true, status: 'delta_saved', reason, delta_path: path };
 }
 
