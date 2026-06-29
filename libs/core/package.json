@@ -115,6 +115,14 @@
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
+    "./fs-primitives": {
+      "types": "./dist/fs-primitives.d.ts",
+      "default": "./dist/fs-primitives.js"
+    },
+    "./fs-primitives.js": {
+      "types": "./dist/fs-primitives.d.ts",
+      "default": "./dist/fs-primitives.js"
+    },
     "./governance": {
       "types": "./dist/governance.d.ts",
       "default": "./dist/governance.js"
