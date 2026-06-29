@@ -73,7 +73,18 @@ async function main() {
   if (argv.input && safeExistsSync(resolveAdfInputPath(argv.input as string))) {
     context = readJsonInput(argv.input as string);
   }
-  const packet = resolveIntentResolutionPacket(intent);
+  const tier = (context as any)?.tier as 'personal' | 'confidential' | 'public' | undefined;
+  const tenantId =
+    (context as any)?.tenant_id ||
+    (context as any)?.tenantId ||
+    (context as any)?.tenant_slug ||
+    (context as any)?.tenantSlug ||
+    process.env.KYBERION_TENANT ||
+    process.env.KYBERION_CUSTOMER;
+  const packet = resolveIntentResolutionPacket(intent, {
+    tier,
+    tenantId: typeof tenantId === 'string' ? tenantId : undefined,
+  });
   const runtimeContext = {
     ...(packet.selected_parameters || {}),
     ...(context as Record<string, unknown>),
@@ -95,7 +106,8 @@ async function main() {
         projectName: (context as any)?.project_name,
         trackId: (context as any)?.track_id,
         trackName: (context as any)?.track_name,
-        tier: (context as any)?.tier,
+        tier,
+        tenantId: typeof tenantId === 'string' ? tenantId : undefined,
         serviceBindings: Array.isArray((context as any)?.service_bindings)
           ? (context as any).service_bindings
           : [],
@@ -114,7 +126,7 @@ async function main() {
       projectName: (context as any)?.project_name,
       trackId: (context as any)?.track_id,
       trackName: (context as any)?.track_name,
-      tier: (context as any)?.tier,
+      tier,
       serviceBindings: Array.isArray((context as any)?.service_bindings)
         ? (context as any).service_bindings
         : [],
