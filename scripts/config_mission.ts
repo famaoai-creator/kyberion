@@ -340,8 +340,21 @@ async function cmdApply(argv: string[]): Promise<void> {
 // Entry point
 // ---------------------------------------------------------------------------
 
+function printUsage(): void {
+  console.error('Usage: pnpm config-mission <list|create|status|apply> [options]');
+  console.error('  pnpm config-mission help');
+  console.error('  pnpm config-mission create --preset <id> --tenant <slug> [--input key=value ...]');
+  console.error('  pnpm config-mission status --tenant <slug> [--id <cfg-id>]');
+  console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
+}
+
 async function main(): Promise<void> {
   const [,, command, ...rest] = process.argv;
+
+  if (!command || command === 'help' || command === '--help' || command === '-h') {
+    printUsage();
+    process.exit(command ? 0 : 2);
+  }
 
   switch (command) {
     case 'list':
@@ -358,7 +371,7 @@ async function main(): Promise<void> {
       break;
     default:
       console.error(`Unknown command: ${command ?? '(none)'}`);
-      console.error('Usage: pnpm config-mission <list|create|status|apply> [options]');
+      printUsage();
       process.exit(1);
   }
 }
