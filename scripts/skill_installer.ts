@@ -32,6 +32,11 @@ function checkBinary(bin: string): boolean {
   }
 }
 
+function printUsage(): void {
+  console.log(chalk.bold.cyan('\n📦 [KYBERION] Interactive Skill Installer\n'));
+  console.log('Usage: pnpm skill:install <bundle-id>');
+}
+
 async function installPackage(type: 'brew' | 'pip', name: string): Promise<boolean> {
   console.log(chalk.yellow(`\n⚡ Installing ${name} via ${type}...`));
   try {
@@ -49,11 +54,17 @@ async function installPackage(type: 'brew' | 'pip', name: string): Promise<boole
 }
 
 async function runInstaller() {
-  console.log(chalk.bold.cyan('\n📦 [KYBERION] Interactive Skill Installer\n'));
-
   const registry = loadCapabilityBundleRegistry();
   const args = process.argv.slice(2);
   let targetBundleId = args[0];
+
+  if (targetBundleId === '--help' || targetBundleId === '-h') {
+    printUsage();
+    rl.close();
+    process.exit(0);
+  }
+
+  console.log(chalk.bold.cyan('\n📦 [KYBERION] Interactive Skill Installer\n'));
 
   if (!targetBundleId) {
     console.log(chalk.white('Available Skill Bundles:'));

@@ -13,12 +13,17 @@ interface Args {
   ref: string;
   input: string;
   output?: string;
+  help?: boolean;
 }
 
 function parseArgs(argv: string[] = process.argv.slice(2)): Args {
   let ref = '';
   let input = 'CHANGELOG.md';
   let output: string | undefined;
+
+  if (argv.includes('--help') || argv.includes('-h')) {
+    return { ref: '', input, output, help: true };
+  }
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -36,6 +41,10 @@ function parseArgs(argv: string[] = process.argv.slice(2)): Args {
   }
 
   return { ref, input, output };
+}
+
+function printUsage(): void {
+  console.log('Usage: pnpm extract-changelog-section --ref <tag-or-version> [--input CHANGELOG.md] [--output <file>]');
 }
 
 function normalizeRef(ref: string): string {
@@ -76,6 +85,10 @@ function extractReleaseSection(changelog: string, ref: string): string {
 
 function main(): void {
   const args = parseArgs();
+  if (args.help) {
+    printUsage();
+    return;
+  }
   const changelogPath = pathResolver.rootResolve(args.input);
   if (!safeExistsSync(changelogPath)) {
     throw new Error(`CHANGELOG not found: ${path.relative(pathResolver.rootDir(), changelogPath)}`);
