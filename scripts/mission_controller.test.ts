@@ -93,6 +93,26 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['start', 'MSN-2B']);
   });
 
+  it('treats --help and -h as boolean flags instead of positional arguments', () => {
+    const longHelpArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-HELP',
+      '--help',
+    ]);
+    const shortHelpArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-HELP',
+      '-h',
+    ]);
+
+    expect(longHelpArgs).toEqual(['create', 'MSN-HELP']);
+    expect(shortHelpArgs).toEqual(['create', 'MSN-HELP']);
+  });
+
   it('treats checkpoint --mission-id as a named option instead of a positional argument', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',
