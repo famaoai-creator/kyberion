@@ -13,10 +13,15 @@ interface LegacySlackKickoffInput {
   proposal?: Record<string, unknown>;
 }
 
+function printUsage(): void {
+  logger.info('Usage: run_slack_mission_kickoff <job-path>');
+}
+
 async function main() {
   const jobPath = process.argv[2];
-  if (!jobPath) {
-    throw new Error('Missing orchestration job path argument');
+  if (!jobPath || jobPath === '--help' || jobPath === '-h') {
+    printUsage();
+    process.exit(jobPath ? 0 : 2);
   }
 
   const input = readJsonFile<LegacySlackKickoffInput>(jobPath);
