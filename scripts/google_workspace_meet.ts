@@ -3,8 +3,14 @@ import { buildSafeExecEnv, safeExec, safeExistsSync, safeReadFile } from '@agent
 
 type ArgMap = Record<string, string | boolean>;
 
-function parseArgs(argv: string[]): { command: string; args: ArgMap } {
+function printUsage(): void {
+  console.log('Usage: pnpm google-workspace-meet -- <create> [options]');
+  console.log('  pnpm google-workspace-meet -- create --json \'{"summary":"Planning"}\'');
+}
+
+function parseArgs(argv: string[]): { command: string; args: ArgMap; help: boolean } {
   const normalized = argv[0] === '--' ? argv.slice(1) : argv;
+  const help = normalized[0] === '--help' || normalized[0] === '-h';
   const command = normalized[0] && !normalized[0].startsWith('--') ? normalized[0] : 'create';
   const rest = normalized[0] && !normalized[0].startsWith('--') ? normalized.slice(1) : normalized;
   const args: ArgMap = {};
@@ -19,7 +25,7 @@ function parseArgs(argv: string[]): { command: string; args: ArgMap } {
     args[current] = next;
     index += 1;
   }
-  return { command, args };
+  return { command, args, help };
 }
 
 function getString(args: ArgMap, key: string, fallback = ''): string {
@@ -46,9 +52,15 @@ function readPayload(args: ArgMap): Record<string, unknown> {
 }
 
 async function main(): Promise<void> {
-  const { command, args } = parseArgs(process.argv.slice(2));
+  const { command, args, help } = parseArgs(process.argv.slice(2));
+
+  if (help || command === 'help') {
+    printUsage();
+    return;
+  }
 
   if (command !== 'create') {
+    printUsage();
     throw new Error(`unknown command '${command}' (expected create)`);
   }
 

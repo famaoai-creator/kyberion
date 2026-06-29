@@ -158,9 +158,18 @@ export async function pruneStimuli(): Promise<void> {
   }
 }
 
+function printUsage(): void {
+  console.log('Usage: pnpm presence-controller <resolve|perceive|prune> [args]');
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const action = args[0];
+
+  if (!action || action === '--help' || action === '-h' || action === 'help') {
+    printUsage();
+    return;
+  }
 
   if (action === 'resolve') {
     const ts = args[1];

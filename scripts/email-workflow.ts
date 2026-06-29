@@ -27,6 +27,17 @@ function parseArgs(argv: string[]): { command: string; args: ArgMap } {
   return { command, args };
 }
 
+function printHelp(): void {
+  console.log('Usage: npm run email:workflow -- <status|draft|latest-draft|deliver|archive-inbox> [options]');
+  console.log('');
+  console.log('Commands:');
+  console.log('  status        Check email auth readiness');
+  console.log('  draft         Generate an email draft from triage text');
+  console.log('  latest-draft  Show the latest email draft artifact');
+  console.log('  deliver       Deliver or draft an email');
+  console.log('  archive-inbox Organize the inbox with filters');
+}
+
 function getString(args: ArgMap, key: string, fallback = ''): string {
   const value = args[key];
   return typeof value === 'string' ? value : fallback;
@@ -43,6 +54,11 @@ function readTextFileIfExists(filePath: string): string {
 
 async function main() {
   const { command, args } = parseArgs(process.argv.slice(2));
+
+  if (command === 'help' || command === '--help' || command === '-h') {
+    printHelp();
+    return;
+  }
 
   if (command === 'status') {
     console.log(JSON.stringify(readGwsAuthStatus(), null, 2));

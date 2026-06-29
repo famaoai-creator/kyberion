@@ -10,12 +10,18 @@
 
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
 
+function printUsage(): void {
+  console.log('Usage: pnpm knowledge:cowork-sync -- [--direction cowork-to-kyberion|kyberion-to-cowork|both] [--paths <paths...>] [--max-hints <n>]');
+}
+
 function parseArgs(argv: string[]): {
   direction: 'cowork-to-kyberion' | 'kyberion-to-cowork' | 'both';
   paths: string[];
   maxHints: number;
+  help: boolean;
 } {
   const args = argv.slice(2);
+  const help = args.includes('--help') || args.includes('-h') || args.includes('help');
   let direction: 'cowork-to-kyberion' | 'kyberion-to-cowork' | 'both' = 'both';
   const paths: string[] = [];
   let maxHints = 50;
@@ -35,10 +41,15 @@ function parseArgs(argv: string[]): {
     }
   }
 
-  return { direction, paths, maxHints };
+  return { direction, paths, maxHints, help };
 }
 
-const { direction, paths, maxHints } = parseArgs(process.argv);
+const { direction, paths, maxHints, help } = parseArgs(process.argv);
+
+if (help) {
+  printUsage();
+  process.exit(0);
+}
 
 const result = runCoworkKnowledgeSync({
   direction,

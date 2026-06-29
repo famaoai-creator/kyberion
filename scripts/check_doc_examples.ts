@@ -118,9 +118,17 @@ function evaluate(block: CodeBlock): BlockResult {
   return { block, status: 'not-tagged' };
 }
 
+function printUsage(): void {
+  console.log('Usage: pnpm check:doc-examples [--list]');
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const listMode = args.includes('--list');
+  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+    printUsage();
+    return;
+  }
   const files = listMarkdownFiles(DOCS_DIRS);
   const allBlocks = files.flatMap(parseCodeBlocks);
 

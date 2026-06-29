@@ -234,9 +234,17 @@ function writeReport(report: AuditReport): void {
   safeWriteFile(REPORT_PATH, JSON.stringify(report, null, 2) + '\n', { encoding: 'utf8' });
 }
 
+function printUsage(): void {
+  console.log('Usage: pnpm license:audit [--check]');
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const checkMode = args.includes('--check');
+  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+    printUsage();
+    return;
+  }
 
   console.log('🔍 Scanning third-party licenses...');
   const packages = gatherPackages();

@@ -45,8 +45,21 @@ interface UpgradeReport {
   config_path: string;
 }
 
+function printUsage(): void {
+  console.log('Usage: voice_upgrade --tier {0|1|2}');
+  console.log('');
+  console.log('Examples:');
+  console.log('  pnpm voice:upgrade-cloud');
+  console.log('  pnpm voice:upgrade-local');
+  console.log('  pnpm voice:upgrade --tier 0');
+}
+
 function parseArgs(): Tier {
   const args = process.argv.slice(2);
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage();
+    process.exit(0);
+  }
   const tierIdx = args.indexOf('--tier');
   if (tierIdx >= 0 && args[tierIdx + 1]) {
     const t = parseInt(args[tierIdx + 1], 10);
@@ -56,7 +69,8 @@ function parseArgs(): Tier {
   // Inferred from script alias (set by package.json scripts).
   if (process.env.KYBERION_VOICE_UPGRADE_ALIAS === 'cloud') return 1;
   if (process.env.KYBERION_VOICE_UPGRADE_ALIAS === 'local') return 2;
-  throw new Error('Usage: voice_upgrade --tier {0|1|2}');
+  printUsage();
+  throw new Error('Missing --tier');
 }
 
 async function checkTier0(): Promise<{ name: string; ok: boolean; detail?: string }[]> {
