@@ -75,8 +75,16 @@ export function checkPullRequestTitle(input: { title?: string; eventPath?: strin
   return checkTitle(readCurrentCommitSubject(), 'HEAD commit subject');
 }
 
+function printUsage(): void {
+  console.log('Usage: pnpm check:pr-title [--title <title>] [--event-path <path>] [--json]');
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  if (args.includes('--help') || args.includes('-h') || args.includes('help')) {
+    printUsage();
+    return;
+  }
   let title: string | undefined;
   let eventPath: string | undefined;
   let json = false;

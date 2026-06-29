@@ -1045,7 +1045,7 @@ async function main(): Promise<void> {
     .parseSync();
   const positional = (argv._ || []).map((value) => String(value));
   const [surface, action, ...rest] = positional;
-  if (!surface || surface === 'help' || surface === '--help') {
+  if (!surface || surface === 'help' || surface === '--help' || surface === '-h') {
     printHelp();
     return;
   }

@@ -19,6 +19,7 @@ type TaskRunArgs = {
   scenarioId?: string;
   profile?: string;
   dryRun: boolean;
+  help?: boolean;
 };
 
 type TaskRunOptions = {
@@ -53,6 +54,10 @@ function parseArgs(argv: string[]): TaskRunArgs {
   const args = [...argv];
   const parsed: TaskRunArgs = { dryRun: true };
 
+  if (args.length > 0 && (args[0] === 'help' || args[0] === '--help' || args[0] === '-h')) {
+    parsed.help = true;
+    return parsed;
+  }
   if (args.length > 0 && !args[0].startsWith('--')) {
     parsed.scenarioId = args.shift();
   }
@@ -67,6 +72,10 @@ function parseArgs(argv: string[]): TaskRunArgs {
   }
 
   return parsed;
+}
+
+function printUsage(): void {
+  console.log('Usage: pnpm task:run <scenario-id> [--profile <path>] [--dry-run]');
 }
 
 function resolveProfilePath(scenario: TaskScenario, override?: string, options: TaskRunOptions = {}): string {
@@ -149,8 +158,13 @@ export function describeTaskRun(scenarioId: string, profileOverride?: string, op
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
+  if (args.help) {
+    printUsage();
+    return;
+  }
   if (!args.scenarioId) {
-    throw new Error('Usage: pnpm task:run <scenario-id> [--profile <path>] [--dry-run]');
+    printUsage();
+    throw new Error('Missing scenario id');
   }
 
   const plan = describeTaskRun(args.scenarioId, args.profile);
