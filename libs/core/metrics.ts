@@ -17,14 +17,90 @@ const DEFAULT_METRICS_DIR = pathResolver.resolve('work/metrics');
 const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
-const COST_TABLE: Record<string, { prompt: number; completion: number }> = {
-  'gpt-4o': { prompt: 0.005 / 1000, completion: 0.015 / 1000 },
-  'gpt-4o-mini': { prompt: 0.00015 / 1000, completion: 0.0006 / 1000 },
-  'claude-3-5-sonnet': { prompt: 0.003 / 1000, completion: 0.015 / 1000 },
-  'gemini-1.5-pro': { prompt: 0.00125 / 1000, completion: 0.00375 / 1000 },
-  'gemini-1.5-flash': { prompt: 0.000075 / 1000, completion: 0.0003 / 1000 },
-  'default': { prompt: 0.001 / 1000, completion: 0.003 / 1000 },
+interface CostRate { prompt: number; completion: number }
+interface ModelCostRegistry {
+  models: Record<string, CostRate>;
+  aliases?: Record<string, string>;
+  default: CostRate;
+}
+
+// Model pricing is data, not code: it lives in a knowledge-tier registry so models
+// can be added / repriced without a source change or redeploy. The file is the
+// source of truth; this small built-in fallback is used only when it is
+// absent/invalid. All rates are per-1k tokens.
+const COST_REGISTRY_PATH = pathResolver.resolve('knowledge/product/governance/model-cost-registry.json');
+const FALLBACK_COST_REGISTRY: ModelCostRegistry = {
+  models: {
+    'claude-opus-4-8': { prompt: 0.015, completion: 0.075 },
+    'claude-sonnet-4-6': { prompt: 0.003, completion: 0.015 },
+    'gpt-4o': { prompt: 0.005, completion: 0.015 },
+  },
+  aliases: { opus: 'claude-opus-4-8', sonnet: 'claude-sonnet-4-6' },
+  default: { prompt: 0.001, completion: 0.003 },
 };
+
+let _cachedCostRegistry: ModelCostRegistry | null = null;
+
+function isCostRate(value: any): value is CostRate {
+  return value && typeof value.prompt === 'number' && typeof value.completion === 'number';
+}
+
+/** Load (and cache) the model-cost registry from the knowledge tier, with fallback. */
+export function loadModelCostRegistry(): ModelCostRegistry {
+  if (_cachedCostRegistry) return _cachedCostRegistry;
+  try {
+    if (safeExistsSync(COST_REGISTRY_PATH)) {
+      const parsed = JSON.parse(safeReadFile(COST_REGISTRY_PATH, { encoding: 'utf8' }) as string);
+      if (parsed && typeof parsed.models === 'object' && isCostRate(parsed.default)) {
+        const models: Record<string, CostRate> = {};
+        for (const [id, rate] of Object.entries(parsed.models)) {
+          if (isCostRate(rate)) models[id] = rate as CostRate;
+        }
+        _cachedCostRegistry = { models, aliases: parsed.aliases ?? {}, default: parsed.default };
+        return _cachedCostRegistry;
+      }
+    }
+  } catch {
+    // fall through to the built-in fallback
+  }
+  _cachedCostRegistry = FALLBACK_COST_REGISTRY;
+  return _cachedCostRegistry;
+}
+
+/** Test/hot-reload hook: drop the cached registry so the next call re-reads the file. */
+export function resetModelCostRegistryCache(): void {
+  _cachedCostRegistry = null;
+}
+
+function resolvePer1kRate(reg: ModelCostRegistry, model: string): CostRate {
+  const id = (model || '').trim();
+  if (!id) return reg.default;
+  if (reg.models[id]) return reg.models[id];
+  if (reg.aliases?.[id] && reg.models[reg.aliases[id]]) return reg.models[reg.aliases[id]];
+  // Versioned ids (claude-opus-4-8-YYYYMMDD, gemini-2.0-flash-exp) never exact-match:
+  // take the longest model-id or alias contained in the given id.
+  const lower = id.toLowerCase();
+  const candidates = [...Object.keys(reg.models), ...Object.keys(reg.aliases ?? {})].sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const key of candidates) {
+    if (lower.includes(key.toLowerCase())) {
+      const target = reg.models[key] ? key : reg.aliases?.[key];
+      if (target && reg.models[target]) return reg.models[target];
+    }
+  }
+  return reg.default;
+}
+
+/**
+ * Resolve per-TOKEN rates for a model id from the knowledge-tier cost registry.
+ * Registry stores per-1k rates; returned rates are per-token (÷1000) for direct
+ * multiplication by token counts in `record()`.
+ */
+export function resolveCostRates(model: string): CostRate {
+  const perK = resolvePer1kRate(loadModelCostRegistry(), model);
+  return { prompt: perK.prompt / 1000, completion: perK.completion / 1000 };
+}
 
 export interface MetricsOptions {
   metricsDir?: string;
@@ -105,7 +181,7 @@ export class MetricsCollector {
       agg.totalTokens += (pTokens + cTokens);
 
       const model = extra.model || 'default';
-      const rates = COST_TABLE[model] || COST_TABLE['default'];
+      const rates = resolveCostRates(model);
       const cost = (pTokens * rates.prompt) + (cTokens * rates.completion);
       agg.totalCostUSD += cost;
       extra.cost_usd = Math.round(cost * 100000) / 100000;

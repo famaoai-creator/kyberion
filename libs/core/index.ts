@@ -472,8 +472,7 @@ export {
 export * as orchestrator from './orchestrator.js';
 export { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 
-// Domain Engines (Moved to @agent/shared-*)
-// export * as excelUtils from './excel-utils.js';
+// Domain Engines (excel distiller moved to @agent/shared-media)
 export * as pptxUtils from './src/pptx-utils.js';
 export * as xlsxUtils from './src/xlsx-utils.js';
 export * as docxUtils from './src/docx-utils.js';

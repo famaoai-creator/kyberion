@@ -6,6 +6,8 @@ import {
   logger,
   safeExistsSync,
   resolveIntentResolutionPacket,
+  chooseExecutionIntent,
+  gatherImprovementHints,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
@@ -189,7 +191,22 @@ async function main() {
   }
 
   try {
-    const result = await resolveAndExecuteIntent(intent, runtimeContext);
+    // GAP1 convergence: drive execution off the canonical resolver's confident
+    // selection (packet) rather than re-resolving the raw utterance separately.
+    const executionIntent = chooseExecutionIntent(packet, intent);
+    // Improvement loop (④→①): surface accumulated lessons (feedback-loop hints +
+    // promoted memory, ingested into the knowledge index) into the execution
+    // context so past learning biases this run. Best-effort; never blocks.
+    const improvementHints = await gatherImprovementHints(executionIntent);
+    const executionContext = improvementHints.length
+      ? { ...runtimeContext, knowledge_hints: improvementHints }
+      : runtimeContext;
+    if (improvementHints.length) {
+      logger.info(
+        `🧠 [GATEWAY] Applied ${improvementHints.length} learned hint(s) from the knowledge base to the execution context.`,
+      );
+    }
+    const result = await resolveAndExecuteIntent(executionIntent, executionContext);
     console.log(JSON.stringify(result, null, 2));
     logger.success(`✅ [GATEWAY] Goal achieved for intent: ${intent}`);
   } catch (err: any) {

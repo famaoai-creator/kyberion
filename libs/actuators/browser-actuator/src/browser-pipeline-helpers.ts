@@ -671,6 +671,33 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         op: 'evaluate',
         tab_id: runtime.activeTabId,
       });
+    case 'query_elements': {
+      // Count visible elements matching a selector (and optional text). Result is
+      // stored to `export_as` so a `while`/`if` condition can read it — the
+      // declarative equivalent of "is there still a button to process?".
+      const selector = resolve(params.selector || '*');
+      const textMatch =
+        params.text != null ? String(resolve(params.text))
+        : params.text_match != null ? String(resolve(params.text_match))
+        : null;
+      const exact = params.exact === true;
+      const count = await page.evaluate(
+        (args: { selector: string; textMatch: string | null; exact: boolean }) => {
+          const els = Array.from(document.querySelectorAll(args.selector)) as HTMLElement[];
+          const visible = els.filter((el) => el.offsetParent !== null);
+          if (args.textMatch == null) return visible.length;
+          return visible.filter((el) => {
+            const label = (el.textContent || (el as HTMLInputElement).value || '').trim();
+            return args.exact ? label === args.textMatch : label.includes(args.textMatch);
+          }).length;
+        },
+        { selector, textMatch, exact },
+      );
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'element_count']: count },
+        { kind: 'capture', op: 'query_elements', tab_id: runtime.activeTabId, selector },
+      );
+    }
     case 'passkey_credentials': {
       const credentials = await getVirtualPasskeyCredentials(runtime, page);
       return browserRuntimeHelpers.recordBrowserAction({
@@ -788,6 +815,36 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
         await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
       return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'click', tab_id: runtime.activeTabId, selector: resolve(params.selector) });
+    case 'click_first_match': {
+      // Click the first VISIBLE element matching any of the fallback selectors
+      // (optionally constrained by text). Declarative resilience against UIs that
+      // vary their markup (the equivalent of try-these-selectors-in-order).
+      const selectors = (Array.isArray(params.selectors) ? params.selectors : [params.selector])
+        .filter(Boolean)
+        .map((sel: string) => resolve(sel));
+      const text = params.text != null ? String(resolve(params.text)) : null;
+      const exact = params.exact === true;
+      const clicked = await page.evaluate(
+        (args: { selectors: string[]; text: string | null; exact: boolean }) => {
+          for (const selector of args.selectors) {
+            const els = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+            for (const el of els) {
+              if (el.offsetParent === null) continue; // visible only
+              const label = (el.textContent || (el as HTMLInputElement).value || '').trim();
+              if (args.text != null && !(args.exact ? label === args.text : label.includes(args.text))) continue;
+              el.click();
+              return label || selector;
+            }
+          }
+          return null;
+        },
+        { selectors, text, exact },
+      );
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'clicked_match']: clicked },
+        { kind: 'apply', op: 'click_first_match', tab_id: runtime.activeTabId, text: clicked ?? '(none)' },
+      );
+    }
     case 'fill':
       await withRetry(async () => {
         await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 });

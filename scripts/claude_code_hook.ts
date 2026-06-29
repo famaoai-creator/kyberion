@@ -16,12 +16,18 @@
  * PreToolUse) fails open with an explanatory reason.
  */
 
+// `node:fs` is used only to read the external Claude Code transcript artifact
+// (outside the repo, so it cannot pass secure-io's project-root read guard). All
+// governed I/O (the metrics write) still goes through @agent/core.
+import { existsSync, readFileSync } from 'node:fs';
 import {
   buildSessionStartContext,
   buildStopContext,
   buildUserPromptSubmitContext,
   evaluatePreToolUse,
+  recordCliUsage,
   recordPostToolUse,
+  summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook.js';
 
 async function readStdin(): Promise<string> {
@@ -71,6 +77,15 @@ async function main(): Promise<void> {
       return;
     }
     case 'Stop': {
+      // Capture this CLI session's token usage into metrics (best-effort).
+      try {
+        const transcriptPath = typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
+        if (transcriptPath && existsSync(transcriptPath)) {
+          recordCliUsage(summarizeTranscriptUsage(readFileSync(transcriptPath, 'utf8')));
+        }
+      } catch {
+        // usage capture is best-effort; never block session close
+      }
       process.stdout.write(
         JSON.stringify({
           hookSpecificOutput: { hookEventName: 'Stop', additionalContext: buildStopContext(payload) },

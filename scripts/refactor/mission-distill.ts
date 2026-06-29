@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import { z } from 'zod';
 import {
+  enqueueMemoryPromotionCandidate,
   ledger,
   logger,
   pathResolver,
@@ -303,6 +304,29 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
 
   await saveState(upperId, state);
   await syncProjectLedgerIfLinked(upperId, rootDir);
+
+  // Auto-enqueue the distilled wisdom into the memory-promotion queue so the
+  // mission-closure path of the corporate-memory loop (execute → distill →
+  // promote) advances without manual operator glue. Higher tiers require human
+  // ratification before promotion.
+  try {
+    const tier: 'public' | 'confidential' | 'personal' =
+      state.tier === 'confidential' ? 'confidential' : state.tier === 'personal' ? 'personal' : 'public';
+    enqueueMemoryPromotionCandidate({
+      candidate_id: `mem-${upperId}-${dateSlug}`,
+      source_type: 'mission',
+      source_ref: upperId,
+      proposed_memory_kind: 'heuristic',
+      summary: `Distilled wisdom from mission ${upperId}`,
+      evidence_refs: [path.join(outputDir, wisdomFileName)],
+      sensitivity_tier: tier,
+      ratification_required: tier !== 'public',
+      status: 'queued',
+      queued_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn(`⚠️ Failed to enqueue memory promotion candidate for ${upperId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   ledger.record('MISSION_DISTILL', {
     mission_id: upperId,

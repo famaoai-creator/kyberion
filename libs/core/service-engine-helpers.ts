@@ -1,4 +1,5 @@
 import { classifyError } from './error-classifier.js';
+import { logger } from './core.js';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
@@ -59,12 +60,36 @@ export function mergeParamsWithConnection(connection: Record<string, any>, param
   return merged;
 }
 
-export function resolveVars(input: string | undefined, vars: Record<string, any>): string {
+/**
+ * Substitute `{{var}}` placeholders from `vars`. Resolution is **recursive but bounded**:
+ * the string is re-scanned up to `maxDepth` passes so indirect references unwrap (e.g. a
+ * context var that itself holds `{{env.X}}`), stopping at a fixpoint (a pass that changes
+ * nothing). Infinite-loop safety:
+ *  - unknown keys are left as their literal `{{key}}` → they produce no progress, so they
+ *    can never drive an endless loop;
+ *  - cyclic / self references (`a→b→a`, `a→a`) are bounded by `maxDepth` and warn once.
+ */
+export function resolveVars(
+  input: string | undefined,
+  vars: Record<string, any>,
+  maxDepth = 8,
+): string {
   if (!input) return '';
-  return input.replace(/{{(.*?)}}/g, (_, key) => {
-    const value = vars[key.trim()];
-    return value !== undefined ? String(value) : `{{${key}}}`;
-  });
+  let out = input;
+  for (let pass = 0; pass < maxDepth; pass++) {
+    const next = out.replace(/{{(.*?)}}/g, (match, key) => {
+      const value = vars[key.trim()];
+      return value !== undefined ? String(value) : match; // unknown → keep literal (no progress)
+    });
+    if (next === out) return out; // fixpoint: nothing left to resolve
+    out = next;
+  }
+  if (/{{.*?}}/.test(out)) {
+    logger.warn(
+      `[resolveVars] max expansion depth (${maxDepth}) reached without converging — possible variable cycle. Unresolved: "${out.slice(0, 120)}"`,
+    );
+  }
+  return out;
 }
 
 export function resolveTemplateValue(input: any, vars: Record<string, any>): any {
