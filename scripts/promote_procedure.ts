@@ -56,8 +56,18 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+function printUsage(): void {
+  process.stderr.write(
+    '[promote-procedure] Usage: node dist/scripts/promote_procedure.js --recording <path> --procedure-id <id> --intent-phrases <json> [--status active|deprecated] [--mission-id <id>]\n',
+  );
+}
+
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
+  if (args.help === 'true') {
+    printUsage();
+    process.exit(0);
+  }
 
   const recordingRef = args['recording'];
   const procedureId = args['procedure-id'];
