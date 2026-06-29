@@ -1,14 +1,27 @@
 import AjvModule from 'ajv';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   loadStandardIntentCatalog,
+  loadResolvedStandardIntentCatalog,
   normalizeForTriggerMatch,
   resolveIntentResolutionPacket,
 } from './intent-resolution.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
+const INTENT_OVERLAY_TEST_ROOT = pathResolver.sharedTmp('intent-resolution-overlay-tests');
+
+function writeIntentOverlayCatalog(filePath: string, intents: Array<Record<string, unknown>>): void {
+  safeMkdir(path.dirname(filePath), { recursive: true });
+  safeWriteFile(filePath, JSON.stringify({ version: '1.0.0', intents }, null, 2));
+}
+
+function resetIntentOverlayTestRoot(): void {
+  safeRmSync(INTENT_OVERLAY_TEST_ROOT, { recursive: true, force: true });
+}
 
 describe('intent-resolution', () => {
   it('resolves implemented task-session and bootstrap intents from their first surface examples', () => {
@@ -266,6 +279,77 @@ describe('intent-resolution', () => {
         candidate.reasons.includes('service operation heuristic')
       )
     ).toBe(true);
+  });
+
+  it('applies personal and confidential intent overlays when resolving surface input', () => {
+    resetIntentOverlayTestRoot();
+    const baseGenerateReport = loadStandardIntentCatalog().find((intent) => intent.id === 'generate-report');
+    const baseBootstrapProject = loadStandardIntentCatalog().find((intent) => intent.id === 'bootstrap-project');
+    expect(baseGenerateReport, 'missing base generate-report intent').toBeTruthy();
+    expect(baseBootstrapProject, 'missing base bootstrap-project intent').toBeTruthy();
+    const generateReport = baseGenerateReport!;
+    const bootstrapProject = baseBootstrapProject!;
+
+    const personalOverlayPath = path.join(
+      INTENT_OVERLAY_TEST_ROOT,
+      'personal/orchestration/intent-catalog.json',
+    );
+    const confidentialOverlayPath = path.join(
+      INTENT_OVERLAY_TEST_ROOT,
+      'confidential/acme/orchestration/intent-catalog.json',
+    );
+
+    try {
+      writeIntentOverlayCatalog(personalOverlayPath, [
+        {
+          ...generateReport,
+          trigger_keywords: [...(generateReport.trigger_keywords || []), 'personal memo'],
+        },
+      ]);
+      writeIntentOverlayCatalog(confidentialOverlayPath, [
+        {
+          ...bootstrapProject,
+          trigger_keywords: [...(bootstrapProject.trigger_keywords || []), 'confidential dossier'],
+        },
+      ]);
+
+      const resolvedCatalog = loadResolvedStandardIntentCatalog({
+        tier: 'confidential',
+        tenantId: 'acme',
+        overlayPaths: [personalOverlayPath, confidentialOverlayPath],
+      });
+      expect(
+        resolvedCatalog.find((intent) => intent.id === 'generate-report')?.trigger_keywords || []
+      ).toContain('personal memo');
+      expect(
+        resolvedCatalog.find((intent) => intent.id === 'bootstrap-project')?.trigger_keywords || []
+      ).toContain('confidential dossier');
+
+      const personalPacket = resolveIntentResolutionPacket('personal memo をまとめて', {
+        tier: 'personal',
+        overlayPaths: [personalOverlayPath],
+      });
+      expect(personalPacket.selected_intent_id).toBe('generate-report');
+
+      const confidentialFallbackPacket = resolveIntentResolutionPacket('personal memo をまとめて', {
+        tier: 'confidential',
+        tenantId: 'acme',
+        overlayPaths: [personalOverlayPath, confidentialOverlayPath],
+      });
+      expect(confidentialFallbackPacket.selected_intent_id).toBe('generate-report');
+
+      const confidentialPacket = resolveIntentResolutionPacket('confidential dossier をまとめて', {
+        tier: 'confidential',
+        tenantId: 'acme',
+        overlayPaths: [personalOverlayPath, confidentialOverlayPath],
+      });
+      expect(confidentialPacket.selected_intent_id).toBe('bootstrap-project');
+
+      const publicPacket = resolveIntentResolutionPacket('personal memo をまとめて');
+      expect(publicPacket.selected_intent_id).not.toBe('generate-report');
+    } finally {
+      resetIntentOverlayTestRoot();
+    }
   });
 });
 
