@@ -163,6 +163,8 @@ export const BOOLEAN_FLAGS = new Set([
   '--force',
   '--execute',
   '--dry-run',
+  '--help',
+  '-h',
   '--json',
   '--summary',
   '--compact',
