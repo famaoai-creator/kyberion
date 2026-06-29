@@ -330,6 +330,16 @@ function _scanProductTier(
     _loadJsonHints(hintsDir, knowledgeBase, 'product', undefined, hints);
   }
 
+  // Closes the ④→① arc of the intent loop: hints auto-extracted from execution
+  // traces (persisted by runFeedbackLoop → libs/core/src/feedback-loop.ts) are
+  // ingested here so trace-derived lessons re-enter resolution / mission context
+  // via queryKnowledge. Without this the feedback loop only ever writes, never
+  // reads back (the "溜まるだけで参照されない" failure the concept warns of).
+  const feedbackHintsDir = pathResolver.shared('runtime/feedback-loop/hints');
+  if (safeExistsSync(feedbackHintsDir)) {
+    _loadJsonHints(feedbackHintsDir, knowledgeBase, 'product', undefined, hints);
+  }
+
   // Scan declared domains; fall back to full product root when using TIER1_SUBDIRS default
   if (domains !== TIER1_SUBDIRS) {
     for (const domain of domains) {

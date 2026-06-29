@@ -1,0 +1,56 @@
+{
+  "pipeline_id": "excel-data-analysis",
+  "version": "1.0.0",
+  "name": "Excel Data Analysis (generic)",
+  "description": "Generic template: governed-extract an .xlsx (media:xlsx_extract — full-column scan, no openpyxl, audited) and analyze it with the reasoning backend. Replaces ad-hoc per-file inspection scripts. Override the context vars — at minimum `xlsx_path` and `analysis_instruction`.",
+  "_usage": "1) Stage the workbook somewhere readable (e.g. active/shared/tmp/input.xlsx; for a confidential file keep it in/under the appropriate tier and run with the matching persona/scope). 2) Set context.analysis_instruction to your question, and context.sheet/range to narrow the data (smaller payload = fewer tokens). 3) Run: pnpm pipeline --input <this file>. The reasoning step needs an authed backend (ANTHROPIC_API_KEY, or run inside a Claude Code session where claude-agent inherits auth).",
+  "_notes": "Cell values may be stored as strings (e.g. '4,727,440'); the reasoning step reads them natively. values_only=true drops styles (~90%+ payload cut); set sheet to one name to skip others; range is A1 (e.g. 'C1:AF80') or row-only ('55:66').",
+  "action": "pipeline",
+  "context": {
+    "xlsx_path": "active/shared/tmp/input.xlsx",
+    "sheet": "",
+    "range": "",
+    "analysis_instruction": "このExcelを分析し、要点を日本語のMarkdownでまとめてください。入力は sheets[].rows[].cells[列文字].value 形式（値のみ、style除去済み）。0/空セルはノイズとして扱い、必要な集計・傾向・異常値を抽出すること。（←ここを目的に合わせて具体化してください）",
+    "report_path": "active/shared/tmp/excel-analysis-report.md"
+  },
+  "steps": [
+    {
+      "id": "extract-workbook",
+      "role": "source",
+      "op": "media:xlsx_extract",
+      "produces": { "channel": "xlsx_data", "type": "XlsxDesign" },
+      "comment": "values_only でstyleを落とし、sheet/range で対象を絞る → reasoning に渡るペイロードを最小化（トークン効率）。",
+      "params": {
+        "path": "{{xlsx_path}}",
+        "sheet": "{{sheet}}",
+        "range": "{{range}}",
+        "values_only": true,
+        "export_as": "xlsx_data"
+      }
+    },
+    {
+      "id": "analyze",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": ["xlsx_data"],
+      "produces": { "channel": "analysis_report", "type": "AnalysisResult" },
+      "params": {
+        "instruction": "{{analysis_instruction}}",
+        "context": ["{{xlsx_data}}"]
+      }
+    },
+    {
+      "id": "save-report",
+      "role": "sink",
+      "op": "media:write_file",
+      "consumes": "analysis_report",
+      "params": { "path": "{{report_path}}", "from": "analysis_report" }
+    },
+    {
+      "id": "log-done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "📊 [EXCEL ANALYSIS] {{xlsx_path}} を分析し {{report_path}} に出力しました。" }
+    }
+  ]
+}

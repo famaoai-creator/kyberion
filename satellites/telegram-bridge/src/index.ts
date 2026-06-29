@@ -266,8 +266,18 @@ export async function handleTelegramUpdate(
     return { ok: true, ignored: true, reason: 'bot_message' };
   }
 
-  const allowedUserIds = ['8936171950'];
+  // Config-driven allowlist (was a hardcoded personal user id). Comma-separated
+  // TELEGRAM_ALLOWED_USER_IDS. Default-deny when unset: refuse all senders with a
+  // clear configuration hint rather than silently locking to one baked-in id.
+  const allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
   const senderId = String(message.from?.id || '');
+  if (allowedUserIds.length === 0) {
+    logger.warn('⚠️ [TelegramBridge] TELEGRAM_ALLOWED_USER_IDS is not set — denying all senders. Set it to a comma-separated list of authorized Telegram user ids.');
+    return { ok: true, ignored: true, reason: 'allowlist_unconfigured' };
+  }
   if (!allowedUserIds.includes(senderId)) {
     logger.warn(`⚠️ [TelegramBridge] Ignored unauthorized message from sender: ${senderId}`);
     return { ok: true, ignored: true, reason: 'unauthorized_sender' };
