@@ -105,6 +105,7 @@ async function main() {
         trackId: (context as any)?.track_id,
         trackName: (context as any)?.track_name,
         tier,
+        tenantId: typeof tenantId === 'string' ? tenantId : undefined,
         serviceBindings: Array.isArray((context as any)?.service_bindings)
           ? (context as any).service_bindings
           : [],
