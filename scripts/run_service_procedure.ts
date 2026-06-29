@@ -36,6 +36,12 @@ function parseArgs(argv: string[]): Record<string, string> {
   return out;
 }
 
+function printUsage(): void {
+  process.stdout.write(
+    '[run-service-procedure] Usage: node dist/scripts/run_service_procedure.js --procedure-id <id> --inputs <json> [--mission-id <id>]\n',
+  );
+}
+
 function fail(message: string): never {
   process.stderr.write(`[run-service-procedure] ${message}\n`);
   process.exit(1);
@@ -43,6 +49,10 @@ function fail(message: string): never {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  if (args.help === 'true') {
+    printUsage();
+    process.exit(0);
+  }
   const procedureId = args['procedure-id'];
   if (!procedureId) fail('--procedure-id is required');
 
