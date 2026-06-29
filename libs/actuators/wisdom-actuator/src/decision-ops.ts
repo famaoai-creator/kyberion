@@ -26,6 +26,7 @@ import {
   TenantRateLimitExceededError,
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
+  listDistillCandidateRecords,
   recordActionItem,
   listActionItems,
   listOthersPending,
@@ -2084,6 +2085,38 @@ export async function dispatchDecisionOp(
         title: resolved('title'),
       });
       return { handled: true, ctx: assign(result) };
+    }
+
+    case 'distill': {
+      // Memory distillation (intent-loop ⑤→⑥): summarize recently distilled
+      // knowledge into operational lessons. Used by
+      // pipelines/fragments/memory-distillation.json, whose sink writes the
+      // result (channel "lessons_learned") into HINTS.md. Previously this op had
+      // no handler and the pipeline silently produced nothing.
+      const scope = resolved('scope') || 'recent_missions';
+      const limit = Number(resolved('limit')) || 20;
+      // Source the most recent distilled-knowledge candidates directly (newest
+      // first). Topic-relevance search is the wrong tool for a "recent" scope —
+      // it needs a query and returns nothing for the empty topic this op uses.
+      const seenLesson = new Set<string>();
+      const records = listDistillCandidateRecords()
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+        .filter((r) => {
+          const key = `${r.title || ''}|${r.summary || ''}`;
+          if (seenLesson.has(key)) return false;
+          seenLesson.add(key);
+          return true;
+        })
+        .slice(0, limit);
+      const body = records.length === 0
+        ? '_(no distilled lessons available yet — run missions and `mission_controller distill` to populate)_'
+        : records
+            .map((r) => `- **${r.title || r.candidate_id}** (${r.target_kind || 'lesson'}, ${r.status}) — ${r.summary || ''}`)
+            .join('\n');
+      const markdown = `_Distilled from ${records.length} recent lesson(s) (scope: ${scope}), generated ${nowIso()}._\n\n${body}`;
+      // run_pipeline bridges produces.channel → params.export_as, so `assign`
+      // lands this markdown at the declared channel (e.g. "lessons_learned").
+      return { handled: true, ctx: assign(markdown) };
     }
 
     case 'inject_prior_knowledge': {

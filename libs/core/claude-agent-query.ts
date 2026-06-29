@@ -18,6 +18,41 @@
 
 import { query, type CanUseTool, type McpServerConfig, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
+import { metrics } from './metrics.js';
+
+/** Pull billable token counts from a result message's `usage` block (defensive). */
+function extractUsageTokens(message: unknown): { prompt_tokens: number; completion_tokens: number } {
+  const usage = ((message as { usage?: Record<string, number> })?.usage) ?? {};
+  return {
+    prompt_tokens: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+    completion_tokens: usage.output_tokens ?? 0,
+  };
+}
+
+/**
+ * Record a claude-agent sub-agent call into the metrics collector so completed
+ * reasoning is attributed by component + model with token/cost aggregation.
+ * Best-effort: never throws into the reasoning path.
+ */
+function recordClaudeAgentMetrics(
+  label: string,
+  model: string,
+  durationMs: number,
+  status: 'success' | 'error',
+  message: unknown,
+  totalCostUsd: number,
+): void {
+  try {
+    metrics.record(label, durationMs, status, {
+      model,
+      agent: 'claude-agent',
+      usage: extractUsageTokens(message),
+      sdk_cost_usd: totalCostUsd,
+    });
+  } catch {
+    // metrics is best-effort; never disrupt reasoning
+  }
+}
 
 export interface ClaudeAgentQueryParams<T> {
   systemPrompt: string;
@@ -29,6 +64,8 @@ export interface ClaudeAgentQueryParams<T> {
   abortController?: AbortController;
   /** Additional options passed through to query(). */
   extraOptions?: Partial<Options>;
+  /** Metrics component label for usage attribution. Default 'reasoning:claude-agent'. */
+  metricsLabel?: string;
 }
 
 export interface ClaudeAgentQueryResult<T> {
@@ -80,15 +117,18 @@ export async function runClaudeAgentQuery<T>(
   };
 
   const iterator = query({ prompt: params.userPrompt, options });
+  const startedAt = Date.now();
 
   let structured: unknown;
   let sessionId = '';
   let totalCostUsd = 0;
   let numTurns = 0;
   let lastError: unknown;
+  let resultMessage: unknown;
 
   for await (const message of iterator) {
     if (message.type === 'result') {
+      resultMessage = message;
       if (message.subtype === 'success') {
         structured = (message as { structured_output?: unknown }).structured_output;
         sessionId = (message as { session_id?: string }).session_id ?? '';
@@ -103,6 +143,15 @@ export async function runClaudeAgentQuery<T>(
       lastError = (message as any).error;
     }
   }
+
+  recordClaudeAgentMetrics(
+    params.metricsLabel ?? 'reasoning:claude-agent',
+    String(options.model ?? 'opus'),
+    Date.now() - startedAt,
+    lastError ? 'error' : 'success',
+    resultMessage,
+    totalCostUsd,
+  );
 
   if (lastError) {
     throw new ClaudeAgentQueryError(
@@ -151,6 +200,8 @@ export interface ClaudeAgentTaskParams {
   /** Multi-turn budget for the agentic loop. Defaults to 8. */
   maxTurns?: number;
   extraOptions?: Partial<Options>;
+  /** Metrics component label for usage attribution. Default 'reasoning:claude-agent-task'. */
+  metricsLabel?: string;
 }
 
 export interface ClaudeAgentTaskResult {
@@ -180,15 +231,18 @@ export async function runClaudeAgentTask(params: ClaudeAgentTaskParams): Promise
   };
 
   const iterator = query({ prompt: params.userPrompt, options });
+  const startedAt = Date.now();
 
   let text = '';
   let sessionId = '';
   let totalCostUsd = 0;
   let numTurns = 0;
   let lastError: unknown;
+  let resultMessage: unknown;
 
   for await (const message of iterator) {
     if (message.type === 'result') {
+      resultMessage = message;
       if (message.subtype === 'success') {
         text = (message as { result?: string }).result ?? '';
         sessionId = (message as { session_id?: string }).session_id ?? '';
@@ -203,6 +257,15 @@ export async function runClaudeAgentTask(params: ClaudeAgentTaskParams): Promise
       lastError = (message as any).error;
     }
   }
+
+  recordClaudeAgentMetrics(
+    params.metricsLabel ?? 'reasoning:claude-agent-task',
+    String(options.model ?? 'opus'),
+    Date.now() - startedAt,
+    lastError ? 'error' : 'success',
+    resultMessage,
+    totalCostUsd,
+  );
 
   if (lastError) {
     throw new ClaudeAgentQueryError('[claude-agent-query] agentic sub-agent returned error', 'agent_error', lastError);

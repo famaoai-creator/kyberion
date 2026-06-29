@@ -1,4 +1,5 @@
 import { auditChain } from './audit-chain.js';
+import { metrics } from './metrics.js';
 import { detectTier, validateWritePermission } from './tier-guard.js';
 
 /**
@@ -173,6 +174,67 @@ export function buildStopContext(input: Record<string, unknown> = {}): string {
     'If code or knowledge changed, run /ky-review before ending the work.',
     'If the task is incomplete, checkpoint the mission instead of leaving it implicit.',
   ].join('\n');
+}
+
+export interface CliUsageSummary {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  turns: number;
+}
+
+/**
+ * Parse a Claude Code transcript (JSONL) and sum token usage across assistant
+ * turns. Pure (no I/O) so it is unit-testable; the transcript file read happens in
+ * the hook script boundary (it is an external Claude Code artifact, not repo/tier
+ * content, so it cannot go through secure-io's project-root read guard).
+ */
+export function summarizeTranscriptUsage(transcriptText: string): CliUsageSummary | null {
+  if (!transcriptText) return null;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let turns = 0;
+  let model = '';
+  for (const line of transcriptText.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let obj: any;
+    try {
+      obj = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    const msg = obj?.message;
+    const usage = msg?.usage;
+    if (usage && (typeof usage.input_tokens === 'number' || typeof usage.output_tokens === 'number')) {
+      inputTokens += (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
+      outputTokens += usage.output_tokens ?? 0;
+      turns += 1;
+      if (typeof msg.model === 'string' && msg.model) model = msg.model;
+    }
+  }
+  if (turns === 0) return null;
+  return { model: model || 'unknown', inputTokens, outputTokens, turns };
+}
+
+/**
+ * Record front-CLI (Claude Code) token usage into the metrics collector under the
+ * `claude-code-cli` component, attributed by model. Best-effort. Returns whether a
+ * record was written.
+ */
+export function recordCliUsage(summary: CliUsageSummary | null): boolean {
+  if (!summary) return false;
+  try {
+    metrics.record('claude-code-cli', 0, 'success', {
+      model: summary.model,
+      agent: 'claude-code-cli',
+      turns: summary.turns,
+      usage: { prompt_tokens: summary.inputTokens, completion_tokens: summary.outputTokens },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function describeToolInput(tool: string, toolInput: Record<string, unknown> = {}): Record<string, unknown> {
