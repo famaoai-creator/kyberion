@@ -11,87 +11,103 @@
  *     manifest.json
  *     package.json
  *     src/index.ts
+ *     schemas/<name>-action.schema.json
  *     examples/README.md
  *
  * Pattern from Paper2Any's `dfa create` scaffolding CLI (Apache 2.0).
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  classifyError,
+  createStandardYargs,
+  formatClassification,
+  logger,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-function kebab(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
-function pascal(s: string) { return s.split(/[-_\s]+/).map(w => w[0]?.toUpperCase() + w.slice(1)).join(''); }
-function scream(s: string) { return s.toUpperCase().replace(/-/g, '_'); }
-
-const args = process.argv.slice(2);
-if (args.length === 0 || args[0].startsWith('-')) {
-  console.error('Usage: pnpm create:actuator <name> [--desc "description"]');
-  process.exit(1);
+function kebab(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-const rawName = args[0];
-const descIdx = args.indexOf('--desc');
-const description = descIdx !== -1 ? (args[descIdx + 1] ?? '') : `${pascal(rawName)} actuator for Kyberion`;
-
-const name = kebab(rawName.replace(/-actuator$/, ''));     // strip -actuator suffix if present
-const fullName = `${name}-actuator`;
-const pascalName = pascal(name);
-const envName = scream(name);
-const outDir = path.join(ROOT, 'libs', 'actuators', fullName);
-
-if (fs.existsSync(outDir)) {
-  console.error(`✗ Directory already exists: ${outDir}`);
-  process.exit(1);
+function pascal(s: string): string {
+  return s
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join('');
 }
 
-// ── Templates ────────────────────────────────────────────────────────────────
+function scream(s: string): string {
+  return s.toUpperCase().replace(/-/g, '_');
+}
 
-const MANIFEST = JSON.stringify({
-  actuator_id: fullName,
-  version: '1.0.0',
-  description,
-  contract_schema: `schemas/${name}-action.schema.json`,
-  resilience_tier: 'adaptive_retry',
-  recovery_policy: {
-    fallback_strategy: 'sequential_alternatives',
-    retry: { maxRetries: 2, initialDelayMs: 500, maxDelayMs: 10000, factor: 2, jitter: true },
-    retryable_categories: ['network', 'timeout', 'resource_unavailable'],
-  },
-  capabilities: [
-    { op: 'execute', schema_ref: `schemas/${name}-action.schema.json`, platforms: ['darwin', 'linux', 'win32'] },
-  ],
-}, null, 2);
+export interface ActuatorScaffoldInput {
+  name: string;
+  description?: string;
+  rootDir?: string;
+}
 
-const PACKAGE = JSON.stringify({
-  name: `@actuator/${name}`,
-  version: '1.0.0',
-  type: 'module',
-  description,
-  main: `../../../dist/libs/actuators/${fullName}/src/index.js`,
-  types: `../../../dist/libs/actuators/${fullName}/src/index.d.ts`,
-  scripts: {
-    build: 'tsc -p ../../../tsconfig.actuators.json',
-    test: 'vitest run',
-  },
-  dependencies: {
-    '@agent/core': 'workspace:*',
-    chalk: '^5.3.0',
-    yargs: '^17.7.2',
-  },
-}, null, 2);
+export interface ActuatorScaffoldResult {
+  outDir: string;
+  files: string[];
+  name: string;
+  description: string;
+}
 
-const INDEX_TS = `import {
-  logger,
-  safeReadFile,
-  safeWriteFile,
-  safeExistsSync,
-  pathResolver,
-  resolveVars,
-  classifyError,
-} from '@agent/core';
+function buildManifest(fullName: string, description: string, name: string): string {
+  return JSON.stringify(
+    {
+      actuator_id: fullName,
+      version: '1.0.0',
+      description,
+      contract_schema: `schemas/${name}-action.schema.json`,
+      resilience_tier: 'adaptive_retry',
+      recovery_policy: {
+        fallback_strategy: 'sequential_alternatives',
+        retry: { maxRetries: 2, initialDelayMs: 500, maxDelayMs: 10000, factor: 2, jitter: true },
+        retryable_categories: ['network', 'timeout', 'resource_unavailable'],
+      },
+      capabilities: [
+        { op: 'execute', schema_ref: `schemas/${name}-action.schema.json`, platforms: ['darwin', 'linux', 'win32'] },
+      ],
+    },
+    null,
+    2,
+  );
+}
+
+function buildPackage(description: string, name: string, fullName: string): string {
+  return JSON.stringify(
+    {
+      name: `@actuator/${name}`,
+      version: '1.0.0',
+      type: 'module',
+      description,
+      main: `../../../dist/libs/actuators/${fullName}/src/index.js`,
+      types: `../../../dist/libs/actuators/${fullName}/src/index.d.ts`,
+      scripts: {
+        build: 'tsc -p ../../../tsconfig.actuators.json',
+        test: 'vitest run',
+      },
+      dependencies: {
+        '@agent/core': 'workspace:*',
+        chalk: '^5.3.0',
+        yargs: '^17.7.2',
+      },
+    },
+    null,
+    2,
+  );
+}
+
+function buildIndexTs(fullName: string, pascalName: string): string {
+  return `import { logger, classifyError } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 // ── Op dispatch ─────────────────────────────────────────────────────────────
@@ -126,9 +142,18 @@ async function opExecute(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  // TODO: implement
+  const currentState = typeof ctx.state === 'object' && ctx.state !== null ? ctx.state as Record<string, unknown> : {};
   logger.info(\`[${fullName}] execute: \${JSON.stringify(params)}\`);
-  return { ...ctx };
+  return {
+    ...ctx,
+    actuator_id: '${fullName}',
+    last_operation: 'execute',
+    received_params: params,
+    state: {
+      ...currentState,
+      updated_at: new Date().toISOString(),
+    },
+  };
 }
 
 // ── CLI entry point ─────────────────────────────────────────────────────────
@@ -144,8 +169,35 @@ if (process.argv[1]?.endsWith('index.js') || process.argv[1]?.endsWith('index.ts
   console.log(JSON.stringify(result.ctx, null, 2));
 }
 `;
+}
 
-const EXAMPLES_README = `# ${pascalName} Actuator — Examples
+function buildSchema(pascalName: string): string {
+  return JSON.stringify(
+    {
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      title: `${pascalName}Action`,
+      type: 'object',
+      required: ['op'],
+      properties: {
+        op: {
+          type: 'string',
+          enum: ['execute'],
+        },
+        params: {
+          type: 'object',
+          description: 'Arbitrary execute parameters passed to the actuator scaffold.',
+          additionalProperties: true,
+        },
+      },
+      additionalProperties: true,
+    },
+    null,
+    2,
+  );
+}
+
+function buildExamplesReadme(pascalName: string, name: string, envName: string): string {
+  return `# ${pascalName} Actuator — Examples
 
 See [CAPABILITIES_GUIDE.md](../../../../CAPABILITIES_GUIDE.md) for the full actuator catalog.
 
@@ -169,25 +221,90 @@ Register any required secrets via \`secret:set\` before running:
 { "op": "secret:set", "params": { "key": "${envName}_API_KEY", "value": "your-key-here" } }
 \`\`\`
 `;
+}
 
-// ── Write files ──────────────────────────────────────────────────────────────
+export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorScaffoldResult {
+  const rawName = input.name.trim();
+  if (!rawName) {
+    throw new Error('Missing actuator name');
+  }
 
-fs.mkdirSync(path.join(outDir, 'src'), { recursive: true });
-fs.mkdirSync(path.join(outDir, 'examples'), { recursive: true });
+  const name = kebab(rawName.replace(/-actuator$/, ''));
+  const fullName = `${name}-actuator`;
+  const pascalName = pascal(name);
+  const envName = scream(name);
+  const description = input.description?.trim() || `${pascalName} actuator for Kyberion`;
+  const rootDir = input.rootDir || ROOT;
+  const outDir = path.join(rootDir, 'libs', 'actuators', fullName);
 
-fs.writeFileSync(path.join(outDir, 'manifest.json'), MANIFEST + '\n');
-fs.writeFileSync(path.join(outDir, 'package.json'), PACKAGE + '\n');
-fs.writeFileSync(path.join(outDir, 'src', 'index.ts'), INDEX_TS);
-fs.writeFileSync(path.join(outDir, 'examples', 'README.md'), EXAMPLES_README);
+  if (safeExistsSync(outDir)) {
+    throw new Error(`Directory already exists: ${outDir}`);
+  }
 
-console.log(`\n✓ Scaffolded ${fullName} at libs/actuators/${fullName}/\n`);
-console.log('  Files created:');
-console.log(`    manifest.json          — actuator metadata and capabilities`);
-console.log(`    package.json           — workspace package`);
-console.log(`    src/index.ts           — op dispatch + CLI entry point`);
-console.log(`    examples/README.md     — copy-paste pipeline snippets`);
-console.log(`\nNext steps:`);
-console.log(`  1. Add your ops to src/index.ts`);
-console.log(`  2. Create schemas/${name}-action.schema.json`);
-console.log(`  3. Add an entry to CAPABILITIES_GUIDE.md`);
-console.log(`  4. Run: pnpm build\n`);
+  safeMkdir(path.join(outDir, 'src'));
+  safeMkdir(path.join(outDir, 'examples'));
+  safeMkdir(path.join(outDir, 'schemas'));
+
+  safeWriteFile(path.join(outDir, 'manifest.json'), `${buildManifest(fullName, description, name)}\n`);
+  safeWriteFile(path.join(outDir, 'package.json'), `${buildPackage(description, name, fullName)}\n`);
+  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName));
+  safeWriteFile(path.join(outDir, 'schemas', `${name}-action.schema.json`), `${buildSchema(pascalName)}\n`);
+  safeWriteFile(path.join(outDir, 'examples', 'README.md'), buildExamplesReadme(pascalName, name, envName));
+
+  return {
+    outDir,
+    files: [
+      'manifest.json',
+      'package.json',
+      'src/index.ts',
+      `schemas/${name}-action.schema.json`,
+      'examples/README.md',
+    ],
+    name: fullName,
+    description,
+  };
+}
+
+function parseCliArgs(): ActuatorScaffoldInput {
+  const argv = createStandardYargs()
+    .option('name', { type: 'string', describe: 'Actuator name' })
+    .option('desc', { type: 'string', describe: 'Human-readable description' })
+    .parseSync();
+
+  const positional = argv._.map(String).filter(Boolean);
+  const name = (argv.name as string | undefined) || positional[0];
+  if (!name || name.startsWith('-')) {
+    throw new Error('Usage: pnpm create:actuator <name> [--desc "description"]');
+  }
+
+  return {
+    name,
+    description: typeof argv.desc === 'string' ? argv.desc : undefined,
+  };
+}
+
+async function main(): Promise<void> {
+  try {
+    const scaffold = createActuatorScaffold(parseCliArgs());
+    logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
+    console.log('  Files created:');
+    for (const file of scaffold.files) {
+      console.log(`    ${file}`);
+    }
+    console.log('\nNext steps:');
+    console.log('  1. Implement the actuator-specific op logic in src/index.ts');
+    console.log('  2. Replace the schema stub with the real contract');
+    console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
+    console.log('  4. Run: pnpm build');
+  } catch (err: any) {
+    logger.error(formatClassification(classifyError(err)));
+    process.exit(1);
+  }
+}
+
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+
+if (entrypoint && modulePath === entrypoint) {
+  await main();
+}
