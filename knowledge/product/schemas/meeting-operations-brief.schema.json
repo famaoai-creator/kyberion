@@ -94,6 +94,58 @@
         "may_track_action_items": { "type": "boolean" }
       }
     },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport_mode", "items", "questions"],
+      "properties": {
+        "transport_mode": {
+          "type": "string",
+          "enum": ["transcribe_first", "realtime_voice"]
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "state", "reason"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "browser",
+                  "audio",
+                  "ffmpeg",
+                  "stt",
+                  "tts",
+                  "voice_profile",
+                  "voice_consent",
+                  "camera",
+                  "screen_share"
+                ]
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "required",
+                  "recommended",
+                  "optional",
+                  "blocked_by_authority",
+                  "not_needed"
+                ]
+              },
+              "reason": { "type": "string", "minLength": 1 },
+              "setup_hint": { "type": "string" }
+            }
+          }
+        },
+        "questions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "own_tasks": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }

@@ -1,0 +1,159 @@
+{
+  "version": "1.0.0",
+  "transport_modes": {
+    "speaking_allowed": "realtime_voice",
+    "speaking_blocked": "transcribe_first"
+  },
+  "base_items": [
+    {
+      "kind": "browser",
+      "state": "required",
+      "reason": "Meeting participation always starts with a verified browser join backend.",
+      "setup_hint": "Use the meeting-browser-driver with a valid meeting URL."
+    },
+    {
+      "kind": "audio",
+      "state": "required",
+      "reason": "The runtime needs a virtual audio bus to listen to the meeting and route audio back if speaking is enabled.",
+      "setup_hint": "Use BlackHole on macOS or PulseAudio null sink on Linux."
+    },
+    {
+      "kind": "ffmpeg",
+      "state": "required",
+      "reason": "Audio bus negotiation and device probing depend on ffmpeg.",
+      "setup_hint": "Install ffmpeg before launching the meeting flow."
+    },
+    {
+      "kind": "stt",
+      "state": "required",
+      "reason": "The meeting flow listens first and extracts a transcript for follow-up work.",
+      "setup_hint": "Set `KYBERION_STT_COMMAND` or use the stub transcript path for dry runs."
+    }
+  ],
+  "speaking": {
+    "explicit_patterns": [
+      "speak",
+      "talk",
+      "voice",
+      "tts",
+      "読み上げ",
+      "発話",
+      "喋",
+      "リアルタイム音声",
+      "live audio"
+    ],
+    "allowed_items": [
+      {
+        "kind": "tts",
+        "state": "required",
+        "reason": "This profile allows speaking, so a TTS path is required.",
+        "setup_hint": "Set `KYBERION_TTS_COMMAND` and verify the chosen voice profile before joining."
+      },
+      {
+        "kind": "voice_profile",
+        "state": "required",
+        "reason": "Speaking uses a promoted runtime voice profile.",
+        "setup_hint": "Select an active voice profile id from the registry."
+      },
+      {
+        "kind": "voice_consent",
+        "state": "required",
+        "reason": "Speaking into a meeting requires mission-scoped voice consent.",
+        "setup_hint": "Create or verify `evidence/voice-consent.json` for the active mission."
+      }
+    ],
+    "blocked_items": [
+      {
+        "kind": "tts",
+        "state": "blocked_by_authority",
+        "reason": "Speaking was requested, but the current profile does not grant automatic speaking authority.",
+        "setup_hint": "Ask for an explicit authority boundary or rerun with a speaking-enabled profile."
+      },
+      {
+        "kind": "voice_profile",
+        "state": "blocked_by_authority",
+        "reason": "A speaking request cannot proceed until speaking authority is granted.",
+        "setup_hint": "Choose the runtime voice profile only after the speaking boundary is explicit."
+      },
+      {
+        "kind": "voice_consent",
+        "state": "blocked_by_authority",
+        "reason": "Voice consent is only needed once speaking is actually authorized.",
+        "setup_hint": "Record mission-scoped voice consent after the speaking boundary is approved."
+      }
+    ]
+  },
+  "camera": {
+    "explicit_patterns": [
+      "camera",
+      "webcam",
+      "video",
+      "video on",
+      "video-on",
+      "顔出し",
+      "映像",
+      "画面共有"
+    ],
+    "recommended_roles": ["facilitator", "planner", "decision_maker"],
+    "recommended_purposes": ["planning", "decision", "facilitation", "workshop", "incident"],
+    "required_item": {
+      "kind": "camera",
+      "state": "required",
+      "reason": "The request explicitly mentions camera or video participation.",
+      "setup_hint": "Select a host camera or virtual camera backend before joining."
+    },
+    "recommended_item": {
+      "kind": "camera",
+      "state": "recommended",
+      "reason": "This meeting may benefit from visible participation, but camera is not mandatory unless explicitly requested.",
+      "setup_hint": "Enable a virtual camera only if the meeting will be video-on."
+    },
+    "not_needed_item": {
+      "kind": "camera",
+      "state": "not_needed",
+      "reason": "No camera/video signal was present in the request, so audio-only participation is sufficient."
+    }
+  },
+  "screen_share": {
+    "explicit_patterns": [
+      "screen share",
+      "share screen",
+      "screen-share",
+      "画面共有"
+    ],
+    "recommended_patterns": [
+      "presentation",
+      "deck",
+      "slides",
+      "demo",
+      "walkthrough",
+      "資料",
+      "スライド",
+      "デモ"
+    ],
+    "recommended_roles": ["facilitator", "planner", "executor"],
+    "recommended_purposes": ["planning", "decision", "facilitation", "workshop", "incident", "review"],
+    "required_item": {
+      "kind": "screen_share",
+      "state": "required",
+      "reason": "The request explicitly mentions screen sharing.",
+      "setup_hint": "Prepare screen-sharing permissions or a screen capture bridge before the meeting starts."
+    },
+    "recommended_item": {
+      "kind": "screen_share",
+      "state": "recommended",
+      "reason": "The agenda looks presentation-heavy, so screen sharing may become useful.",
+      "setup_hint": "Have screen-sharing permissions ready if a slide or demo handoff appears."
+    },
+    "not_needed_item": {
+      "kind": "screen_share",
+      "state": "not_needed",
+      "reason": "No screen-sharing signal was present in the request."
+    }
+  },
+  "questions": {
+    "camera_recommended": "Will this meeting be video-on, or should Kyberion stay audio-only?",
+    "screen_share_recommended": "Will screen sharing or slides be needed?",
+    "speaking_blocked": "Should Kyberion be allowed to speak in this meeting?"
+  }
+}

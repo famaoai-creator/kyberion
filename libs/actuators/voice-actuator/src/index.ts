@@ -454,6 +454,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
           supportsFormats: engine.supports.artifact_formats,
           outputPath: input.delivery?.artifact_path,
           profile,
+          requireVoiceClone: requiresPersonalVoice,
         });
         artifactRefs = [artifactRef];
       }
@@ -472,6 +473,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             rate: defaults.rate,
             engineId: engine.engine_id,
             profile,
+            requireVoiceClone: requiresPersonalVoice,
           }, artifactRefs[0]);
           speaker_verification.push({
             playback_source_path: artifactRefs[0],
@@ -497,6 +499,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             rate: defaults.rate,
             engineId: engine.engine_id,
             profile,
+            requireVoiceClone: requiresPersonalVoice,
           });
           speaker_verification.push({
             chunk_index: index,
@@ -518,6 +521,11 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   });
 
   const finalPacket = await waitForVoiceJob(runtime, jobId);
+  if (requiresPersonalVoice && finalPacket.status !== 'completed') {
+    throw new Error(
+      `[VOICE] personal voice generation failed with required learned-voice engine ${engine.engine_id}: ${finalPacket.message || finalPacket.status}`,
+    );
+  }
   return {
     status: finalPacket.status === 'completed' ? 'succeeded' : finalPacket.status,
     request_id: jobId,

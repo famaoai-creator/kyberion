@@ -143,10 +143,22 @@ describe('tier-guard tenant scope (IP-1)', () => {
     process.env.KYBERION_CUSTOMER = 'story-demo';
     const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/pipeline-step.json');
+    const voiceProfileTarget = path.join(
+      ROOT,
+      'knowledge/product/governance/voice-profiles/test-profile.json',
+    );
+    const personalVoiceProfileOverlay = path.join(
+      ROOT,
+      'knowledge/personal/voice/profile-registry.json',
+    );
+    const unrelatedPersonalTarget = path.join(ROOT, 'knowledge/personal/other/private.json');
 
     withExecutionContext('run_pipeline', () => {
+      expect(validateReadPermission(personalVoiceProfileOverlay).allowed).toBe(true);
+      expect(validateReadPermission(unrelatedPersonalTarget).allowed).toBe(false);
       expect(validateWritePermission(traceTarget).allowed).toBe(true);
       expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+      expect(validateWritePermission(voiceProfileTarget).allowed).toBe(true);
     }, 'unknown');
   });
 
