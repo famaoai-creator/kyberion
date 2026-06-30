@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "ui-voice-browser-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify UI, voice, browser, and meeting runtime readiness before a voice/browser smoke flow.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "pnpm service:preflight -- --service voice && pnpm doctor --runtime browser && pnpm service:preflight -- --service meeting && echo ok"
+        }
+      }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ Generate a governed music artifact from a human-readable `music-generation-adf` 
 ## 2. Dependencies
 - **Actuator**: `media-generation-actuator`
 - **Runtime**: local ComfyUI with ACE-Step models available
+- **Preflight**: `pnpm service:preflight -- --service media-generation` for local runtime availability before submit
 - **Schema**: [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/music-generation-adf.schema.json)
 
 ## 3. Contract Shape
@@ -30,6 +31,7 @@ Example input:
 Run:
 
 ```bash
+pnpm service:preflight -- --service media-generation
 node dist/libs/actuators/media-generation-actuator/src/index.js \
   --input libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json
 ```
@@ -37,6 +39,7 @@ node dist/libs/actuators/media-generation-actuator/src/index.js \
 Long-running job submission:
 
 ```bash
+pnpm service:preflight -- --service media-generation
 node dist/libs/actuators/media-generation-actuator/src/index.js \
   --input libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json
 ```
@@ -81,3 +84,7 @@ Reasoning and orchestration should speak `music-generation-adf`; backend-specifi
 
 For recurring work, do not overload `generation-job` with cron semantics.  
 Use `generation-schedule` to describe the trigger and `generation-job` for each concrete execution.
+
+For a full music-video production flow that reuses the generated music artifact, see:
+
+- [`produce-music-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-music-video.md)

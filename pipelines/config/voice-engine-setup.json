@@ -5,6 +5,17 @@
   "description": "Registers a voice engine in the voice-engine-registry and optionally creates a tenant voice profile.",
   "steps": [
     {
+      "id": "preflight_runtime",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-runtime-preflight.json",
+        "context": {
+          "sample_path": "{{input.operator_voice_sample_path}}"
+        }
+      }
+    },
+    {
       "id": "preflight_inputs",
       "role": "gate",
       "op": "system:assert",

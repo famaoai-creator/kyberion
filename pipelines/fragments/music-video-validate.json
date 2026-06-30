@@ -1,8 +1,8 @@
 {
   "action": "pipeline",
-  "name": "narrated-video-validate-fragment",
+  "name": "music-video-validate-fragment",
   "version": "1.0.0",
-  "description": "Reusable fragment: validate a narrated video artifact — checks file presence, audio stream, black frames, key-frame extraction, and audio/video duration alignment. Required context vars: narration_path, video_output_path, video_bundle_dir, mission_evidence_dir, video_slug (used for frame output dir and ffmpeg intermediate filenames).",
+  "description": "Reusable fragment: validate a music video artifact — checks file presence, audio stream, black frames, key-frame extraction, and audio/video duration alignment. Required context vars: music_path, video_output_path, video_bundle_dir, mission_evidence_dir, video_slug (used for frame output dir and ffmpeg intermediate filenames).",
   "steps": [
     {
       "id": "validate_outputs",
@@ -10,7 +10,7 @@
       "op": "system:shell",
       "produces": { "channel": "verify_result", "type": "ShellResult" },
       "params": {
-        "cmd": "test -f {{narration_path}} || { echo 'missing narration artifact: {{narration_path}}'; exit 1; } && test -f {{video_output_path}} || { echo 'missing video artifact: {{video_output_path}}'; exit 1; } && test -f {{video_bundle_dir}}/index.html || { echo 'missing video bundle index: {{video_bundle_dir}}/index.html'; exit 1; } && test -f {{video_bundle_dir}}/render-plan.json || { echo 'missing video bundle render plan: {{video_bundle_dir}}/render-plan.json'; exit 1; } && test -n \"$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 {{video_output_path}})\" || { echo 'missing audio stream in rendered video'; exit 1; } && echo 'outputs verified with audio-muxed mp4'"
+        "cmd": "test -f {{music_path}} || { echo 'missing music artifact: {{music_path}}'; exit 1; } && test -f {{video_output_path}} || { echo 'missing video artifact: {{video_output_path}}'; exit 1; } && test -f {{video_bundle_dir}}/index.html || { echo 'missing video bundle index: {{video_bundle_dir}}/index.html'; exit 1; } && test -f {{video_bundle_dir}}/render-plan.json || { echo 'missing video bundle render plan: {{video_bundle_dir}}/render-plan.json'; exit 1; } && test -n \"$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 {{video_output_path}})\" || { echo 'missing audio stream in rendered video'; exit 1; } && echo 'outputs verified with audio-muxed mp4'"
       }
     },
     {
@@ -37,7 +37,7 @@
       "op": "system:shell",
       "produces": { "channel": "duration_alignment_result", "type": "ShellResult" },
       "params": {
-        "cmd": "video_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{video_output_path}}) && audio_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{narration_path}}) && awk -v v=\"$video_duration\" -v a=\"$audio_duration\" 'BEGIN { diff = v - a; if (diff < 0) diff = -diff; if (diff > 5.0) { printf(\"duration mismatch: video=%s audio=%s\\n\", v, a); exit 1; } printf(\"duration aligned: video=%s audio=%s\\n\", v, a); }'"
+        "cmd": "video_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{video_output_path}}) && music_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{music_path}}) && awk -v v=\"$video_duration\" -v a=\"$music_duration\" 'BEGIN { diff = v - a; if (diff < 0) diff = -diff; if (diff > 1.0) { printf(\"duration mismatch: video=%s music=%s\\n\", v, a); exit 1; } printf(\"duration aligned: video=%s music=%s\\n\", v, a); }'"
       }
     }
   ]

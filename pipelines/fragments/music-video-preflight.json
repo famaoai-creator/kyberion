@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "music-video-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify that ffmpeg, ffprobe, media-generation-actuator, video-composition-actuator, and the local media service runtime are available before starting a music-video production pipeline.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && test -f dist/libs/actuators/media-generation-actuator/src/index.js && test -f dist/libs/actuators/video-composition-actuator/src/index.js && pnpm service:preflight -- --service media-generation && echo ok"
+        }
+      }
+    }
+  ]
+}

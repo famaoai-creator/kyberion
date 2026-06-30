@@ -419,7 +419,12 @@ for (const step of steps) {
               typeof value === 'string' ? String(resolveVars(value, ctx)) : String(value),
             ]),
           ) as Record<string, string>;
-          const output = safeExec(shellBin, ['-c', cmd], { cwd: rootDir, env }).trim();
+          const timeoutMs = typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined;
+          const output = safeExec(shellBin, ['-c', cmd], {
+            cwd: rootDir,
+            env,
+            ...(timeoutMs ? { timeoutMs } : {}),
+          }).trim();
           if (params.export_as && typeof params.export_as === 'string') {
             ctx = { ...ctx, [params.export_as]: output };
           }

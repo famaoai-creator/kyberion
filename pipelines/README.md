@@ -11,6 +11,7 @@ pipelines/
 knowledge/product/pipeline-templates/
                   ← Canonical user-facing pipeline patterns (parameterized, no personal data)
                     Tenants instantiate these into their own namespace before running.
+                    See `knowledge/product/pipeline-templates/README.md` for the preflight requirement.
 ```
 
 **Scope rule:**

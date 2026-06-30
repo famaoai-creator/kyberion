@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "pipeline_id": "kyberion-vtuber-narrated-demo",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "name": "Kyberion VTuber Narrated Demo",
   "description": "Produce a vtuber-style video that presents Kyberion as a live operator persona with on-air cues, chat, and demo beats.",
   "context": {
@@ -13,7 +13,7 @@
     "content_brief_path": "active/missions/confidential/MSN-KYBERION-VTUBER-VIDEO/evidence/kyberion-vtuber-content-brief.json",
     "profile_id": "operator-ja-default",
     "video_slug": "kyberion-vtuber",
-    "voice_script": "こんにちは！KyberionのVTuberオペレーターです。Kyberionは、あなたの『曖昧な指示』を受け取ると、まず『意図の合意』を行い、検証可能な『活動定義契約』に変換します。その後、安全なサンドボックス環境で自動的にタスクを実行し、すべての実行ログ and 成果物の系統関係を『エビデンス』として記録します。完璧な透明性と再現性を、今すぐ体験しましょう！",
+    "voice_script": "こんにちは！自律オペレーターのKyberionです。Kyberionは、曖昧な指示を受け取ると、まず人間と入念な『意図の合意』を行い、検証可能な『活動定義契約』に変換します。これにより、予期せぬ挙動を未然に防ぐことが可能です。合意の後、安全なサンドボックス環境で自動的にタスクを実行し、すべての実行ログと成果物の系統関係を『エビデンス』として記録します。さらに自動品質ゲートによるマルチレイヤー検証を行うことで、作成されたコードや成果物の信頼性と安全性を100%保証します。完璧な透明性と極めて高い再現性を備えた、新しい自律型ミッション実行プロセスを、あなたも体験してみませんか？さあ、Kyberionを動かして、今すぐ新しい自律オペレーションを始めましょう！",
     "hook_text": "Kyberionは曖昧な指示をそのまま実行しません。",
     "feature_text": "必ず意図を合意し、検証可能な計画に変換してから、安全なサンドボックスで実行します。",
     "cta_text": "さあ、Kyberionを動かして自律オペレーションを始めましょう！"
@@ -23,7 +23,7 @@
       "id": "log_start",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "🎬 [KYBERION-VTUBER] Starting narrated demo for mission {{mission_id}}" }
+      "params": { "message": "🎬 [KYBERION-VTUBER] Starting narrated 60s demo for mission {{mission_id}}" }
     },
     {
       "id": "preflight",
@@ -46,7 +46,10 @@
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "voice_result", "type": "ShellResult" },
-      "params": { "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json" }
+      "params": {
+        "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json",
+        "timeout_ms": 120000
+      }
     },
     {
       "id": "write_content_brief",
@@ -87,7 +90,7 @@
           },
           "tone": "live, conversational, reactive",
           "language": "ja",
-          "duration_sec": 31.86,
+          "duration_sec": 60.0,
           "design_system_ref": {
             "system_id": "operator-ja-default",
             "brand_name": "Kyberion Admin",
@@ -96,7 +99,14 @@
             "layout_family": "vtuber-stage",
             "motion_profile": "on-air",
             "fps": 15,
-            "hero_path": "active/shared/assets/kyberion_vtuber_avatar.jpg"
+            "hero_path": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
+            "avatar_assets": {
+              "focus-center": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
+              "split-left": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+              "fullscreen-demo": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+              "split-right": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_smile.jpg",
+              "default": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg"
+            }
           }
         },
         "format": "json"
@@ -144,7 +154,7 @@
               },
               "tone": "live, conversational, reactive",
               "language": "ja",
-              "duration_sec": 31.86,
+              "duration_sec": 60.0,
               "design_system_ref": {
                 "system_id": "operator-ja-default",
                 "brand_name": "Kyberion Admin",
@@ -153,7 +163,14 @@
                 "layout_family": "vtuber-stage",
                 "motion_profile": "on-air",
                 "fps": 15,
-                "hero_path": "active/shared/assets/kyberion_vtuber_avatar.jpg"
+                "hero_path": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
+                "avatar_assets": {
+                  "focus-center": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
+                  "split-left": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+                  "fullscreen-demo": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+                  "split-right": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_smile.jpg",
+                  "default": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg"
+                }
               }
             },
             "narration_artifact_ref": "{{narration_path}}",
@@ -162,7 +179,7 @@
               "target_path": "{{video_output_path}}",
               "bundle_dir": "{{video_bundle_dir}}",
               "await_completion": true,
-              "duration_sec": 31.86,
+              "duration_sec": 60.0,
               "fps": 15
             }
           },
@@ -178,7 +195,7 @@
       "produces": { "channel": "video_result", "type": "ShellResult" },
       "params": {
         "cmd": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-video.json",
-        "timeout_ms": 300000
+        "timeout_ms": 600000
       }
     },
     {

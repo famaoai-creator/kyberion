@@ -13,6 +13,17 @@
   },
   "steps": [
     {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-runtime-preflight.json",
+        "context": {
+          "python_bin": "{{python_bin}}",
+          "sample_dir": "knowledge/personal/voice/samples/{{profile_id}}"
+        }
+      }
+    },
+    {
       "role": "sink",
       "op": "system:log",
       "params": {

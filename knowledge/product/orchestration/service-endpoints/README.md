@@ -9,6 +9,7 @@ Each file in this directory is the canonical definition for one service endpoint
 - `service-presets/*.json` define the operation templates for each service endpoint; endpoints answer "which service is canonical", presets answer "how to call it".
 - `service-actuator` consumes both endpoint and preset catalogs to resolve auth, routing, CLI/API/MCP execution, and reconciliation.
 - `tool-runtime` manages executable availability for CLI-backed presets, while `service-runtime` manages the lifecycle of long-lived local services such as ComfyUI.
+- `service-preflight` should combine endpoint auth inspection, runtime probe, and bridge health checks when a service needs an execution-time readiness gate.
 - `voice` and `whisper` are canonical service endpoints for synthesis / transcription; `vision` is a compatibility alias for `media-generation`.
 - `comfyui` is the canonical local image-generation service endpoint and is additionally governed by the service runtime abstraction for availability and managed location tracking.
 - `knowledge/product/orchestration/service-endpoints.json` remains a compatibility snapshot.

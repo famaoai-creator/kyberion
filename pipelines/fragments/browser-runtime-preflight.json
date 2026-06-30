@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "browser-runtime-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify the browser/Playwright runtime is ready before browser-centric flows.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "pnpm doctor --runtime browser"
+        }
+      }
+    }
+  ]
+}
