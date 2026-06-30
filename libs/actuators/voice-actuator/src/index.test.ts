@@ -101,10 +101,25 @@ const mocks = vi.hoisted(() => ({
     rate: 180,
   })),
   safeExec: vi.fn(() => ''),
-  safeExistsSync: vi.fn((path: string) => String(path).includes('espeak-ng')),
+  safeExistsSync: vi.fn((path: string) => String(path).includes('espeak-ng') || String(path).includes('/tmp/voice-generation/')),
+  safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
+  getWritableVoiceProfileRegistryForTier: vi.fn(() => ({
+    registryPath: '/tmp/personal-voice-profile-registry.json',
+    registry: {
+      version: 'test',
+      default_profile_id: '',
+      profiles: [],
+    },
+  })),
+  materializeVoiceProfileSampleRefs: vi.fn(() => [
+    '/tmp/runtime/voice-profiles/user-ja-voice/s1.wav',
+    '/tmp/runtime/voice-profiles/user-ja-voice/s2.wav',
+    '/tmp/runtime/voice-profiles/user-ja-voice/s3.wav',
+  ]),
+  writeVoiceProfileRegistry: vi.fn(),
   withRetry: vi.fn(async (fn: () => Promise<any>) => fn()),
   getVoiceSampleIngestionPolicy: vi.fn(() => ({
     version: 'test',
@@ -295,9 +310,13 @@ vi.mock('@agent/core', async () => {
     getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
     safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
+    safeStat: mocks.safeStat,
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
+    getWritableVoiceProfileRegistryForTier: mocks.getWritableVoiceProfileRegistryForTier,
+    materializeVoiceProfileSampleRefs: mocks.materializeVoiceProfileSampleRefs,
+    writeVoiceProfileRegistry: mocks.writeVoiceProfileRegistry,
     withRetry: mocks.withRetry,
     getVoiceSampleIngestionPolicy: mocks.getVoiceSampleIngestionPolicy,
     validateVoiceProfileRegistration: mocks.validateVoiceProfileRegistration,
@@ -385,6 +404,10 @@ describe('voice actuator', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.safeExec.mockImplementation((command: string) => {
+      if (command === 'ffprobe') return '1.2';
+      return '';
+    });
   });
 
   afterEach(() => {
@@ -616,6 +639,42 @@ describe('voice actuator', () => {
     }));
     expect(mocks.safeMkdir).toHaveBeenCalledWith('/tmp/voice-profile-registration', { recursive: true });
     expect(mocks.safeWriteFile).toHaveBeenCalled();
+  });
+
+  it('upserts personal profiles into the tier-local writable registry only', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'register_voice_profile',
+      request_id: 'reg-upsert-1',
+      profile: {
+        profile_id: 'user-ja-voice',
+        display_name: 'User JA',
+        tier: 'personal',
+        languages: ['ja'],
+        default_engine_id: 'open_voice_clone',
+      },
+      samples: [
+        { sample_id: 's1', path: 'active/shared/tmp/sample-1.wav', language: 'ja' },
+        { sample_id: 's2', path: 'active/shared/tmp/sample-2.wav', language: 'ja' },
+        { sample_id: 's3', path: 'active/shared/tmp/sample-3.wav', language: 'ja' },
+      ],
+      policy: { allow_update: true },
+    } as any);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'succeeded',
+      action: 'register_voice_profile',
+      request_id: 'reg-upsert-1',
+      upserted: true,
+    }));
+    expect(mocks.getWritableVoiceProfileRegistryForTier).toHaveBeenCalledWith('personal');
+    expect(mocks.writeVoiceProfileRegistry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        default_profile_id: 'user-ja-voice',
+        profiles: [expect.objectContaining({ profile_id: 'user-ja-voice', tier: 'personal' })],
+      }),
+      '/tmp/personal-voice-profile-registry.json',
+    );
   });
 
   it('collects voice samples into governed staging', async () => {

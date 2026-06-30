@@ -83,5 +83,35 @@ describe('meeting-operations-profile', () => {
     expect(brief.primary_role).toBe('facilitator');
     expect(brief.follow_up_channel).toBe('task_session');
     expect(brief.exit_conditions).toContain('Agenda is complete');
+    expect(brief.environment?.transport_mode).toBe('transcribe_first');
+    expect(brief.environment?.items.find((item) => item.kind === 'audio')?.state).toBe('required');
+    expect(brief.environment?.items.find((item) => item.kind === 'camera')?.state).toBe('recommended');
+    expect(brief.environment?.questions).toContain('Will this meeting be video-on, or should Kyberion stay audio-only?');
+  });
+
+  it('marks speaking prerequisites when the profile allows live speech', () => {
+    const speakingProfile: MeetingOperationsProfile = {
+      ...profile,
+      facilitation_policy: {
+        ...profile.facilitation_policy,
+        ask_before_speaking: false,
+      },
+    };
+
+    const brief = buildMeetingOperationsBrief(
+      {
+        meeting_title: 'Incident response call',
+        meeting_url: 'https://example.microsoft.com/teams/join/abc',
+        platform: 'teams',
+        purpose: 'incident',
+        agenda: ['Status', 'Live voice'],
+        desired_outcomes: ['Speak during the meeting if needed'],
+      },
+      speakingProfile
+    );
+
+    expect(brief.environment?.transport_mode).toBe('realtime_voice');
+    expect(brief.environment?.items.find((item) => item.kind === 'tts')?.state).toBe('required');
+    expect(brief.environment?.items.find((item) => item.kind === 'voice_consent')?.state).toBe('required');
   });
 });

@@ -7,6 +7,12 @@
   "labels": ["smoke", "ui", "voice", "browser", "consent"],
   "steps": [
     {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/ui-voice-browser-preflight.json" }
+    },
+    {
       "id": "presence-studio-health-surface",
       "role": "source",
       "op": "system:read_file",

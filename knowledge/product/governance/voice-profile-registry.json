@@ -3,16 +3,34 @@
   "default_profile_id": "operator-ja-default",
   "profiles": [
     {
-      "profile_id": "operator-ja-default",
-      "display_name": "Operator Japanese Default",
-      "tier": "public",
+      "profile_id": "my-voice-v1",
+      "display_name": "市村 Voice v1",
+      "tier": "personal",
       "languages": [
         "ja"
       ],
-      "sample_refs": [],
-      "default_engine_id": "local_say",
+      "sample_refs": [
+        "active/shared/runtime/voice-profiles/my-voice-v1/sample-01.wav"
+      ],
+      "default_engine_id": "mlx_audio_qwen3",
       "status": "active",
-      "notes": "Default narrated operator output profile for Japanese."
+      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
+    },
+    {
+      "profile_id": "my-voice-v2",
+      "display_name": "市村 Voice v2",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "default_engine_id": "mlx_audio_qwen3",
+      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline.",
+      "sample_refs": [
+        "/Users/famao/kyberion/active/shared/runtime/voice-profiles/my-voice-v2/sample-01.wav",
+        "/Users/famao/kyberion/active/shared/runtime/voice-profiles/my-voice-v2/sample-02.wav",
+        "/Users/famao/kyberion/active/shared/runtime/voice-profiles/my-voice-v2/sample-03.wav"
+      ],
+      "status": "active"
     },
     {
       "profile_id": "operator-en-default",
@@ -27,18 +45,16 @@
       "notes": "Default narrated operator output profile for English."
     },
     {
-      "profile_id": "my-voice-v1",
-      "display_name": "市村 Voice v1",
-      "tier": "personal",
+      "profile_id": "operator-ja-default",
+      "display_name": "Operator Japanese Default",
+      "tier": "public",
       "languages": [
         "ja"
       ],
-      "sample_refs": [
-        "active/shared/runtime/voice-profiles/my-voice-v1/sample-01.wav"
-      ],
-      "default_engine_id": "mlx_audio_qwen3",
+      "sample_refs": [],
+      "default_engine_id": "local_say",
       "status": "active",
-      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
+      "notes": "Default narrated operator output profile for Japanese."
     },
     {
       "profile_id": "shadow-multilingual-clone",

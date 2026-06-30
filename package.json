@@ -94,6 +94,8 @@
     "deps:check:browser": "node dist/scripts/dependency_resolver.js --actuator browser",
     "deps:check:voice": "node dist/scripts/dependency_resolver.js --actuator voice",
     "deps:check:media": "node dist/scripts/dependency_resolver.js --actuator media-generation",
+    "media:preflight": "node dist/scripts/media_runtime_preflight.js",
+    "service:preflight": "node dist/scripts/service_preflight.js",
     "generate-index": "node dist/scripts/cli.js list > /dev/null",
     "cli": "node dist/scripts/cli.js",
     "cli:preview": "node dist/scripts/cli.js preview",

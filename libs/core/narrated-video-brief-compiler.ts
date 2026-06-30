@@ -20,6 +20,8 @@ export interface NarratedVideoBrief {
     brand_name: string;
     theme_tokens?: {
       background_color?: string;
+      css_vars?: Record<string, string>;
+      layout_variant?: string;
     };
     assets?: {
       logo_path?: string;
@@ -35,6 +37,7 @@ export interface NarratedVideoBrief {
     target_path?: string;
     bundle_dir?: string;
     await_completion?: boolean;
+    detached_background?: boolean;
   };
 }
 
@@ -42,9 +45,12 @@ export function compileNarratedVideoBriefToCompositionADF(brief: NarratedVideoBr
   const storyboard = brief.storyboard;
   const totalDuration = clampDuration(brief.timing?.duration_sec || (storyboard ? sumStoryboardDuration(storyboard) : 9));
   const fps = clampFps(brief.timing?.fps || 30);
-  const background = brief.design_system.theme_tokens?.background_color || '#07111f';
+  const background = brief.design_system.theme_tokens?.background_color
+    || storyboard?.design_system_ref?.background_color
+    || '#07111f';
   const format = brief.output?.format || 'mp4';
   const title = brief.title || `${brief.design_system.brand_name} Intro`;
+  const compositionFormat = storyboard?.format || resolveDefaultCompositionFormat();
 
   const scenes = storyboard?.beats?.length
     ? buildStoryboardScenes(brief, storyboard)
@@ -58,8 +64,9 @@ export function compileNarratedVideoBriefToCompositionADF(brief: NarratedVideoBr
     composition: {
       duration_sec: totalDuration,
       fps,
-      width: 1920,
-      height: 1080,
+      width: compositionFormat.width,
+      height: compositionFormat.height,
+      aspect_ratio: compositionFormat.aspect_ratio,
       background_color: background,
     },
     audio: {
@@ -72,6 +79,7 @@ export function compileNarratedVideoBriefToCompositionADF(brief: NarratedVideoBr
       bundle_dir: brief.output?.bundle_dir,
       emit_progress_packets: true,
       await_completion: brief.output?.await_completion,
+      detached_background: brief.output?.detached_background,
     },
   };
 }
@@ -80,13 +88,14 @@ function buildStoryboardScenes(brief: NarratedVideoBrief, storyboard: VideoStory
   return storyboard.beats.map((beat, index) => {
     const role = normalizeSceneRole(beat.role || beat.semantic);
     const templateId = selectTemplateId(storyboard.presentation_mode, role, beat.semantic, index, storyboard.beats.length);
+    const layoutVariant = resolveSceneLayoutVariant(storyboard.presentation_mode, role, beat.semantic, index, storyboard.beats.length, beat.layout_variant);
     return {
       scene_id: beat.beat_id,
       role,
       start_sec: beat.start_sec,
       duration_sec: beat.duration_sec,
       template_ref: { template_id: templateId },
-      content: buildStoryboardSceneContent(brief, storyboard, beat, index),
+      content: buildStoryboardSceneContent(brief, storyboard, beat, index, layoutVariant),
       asset_refs: buildStoryboardAssetRefs(brief, beat, role),
     };
   });
@@ -97,6 +106,7 @@ function buildStoryboardSceneContent(
   storyboard: VideoStoryboard,
   beat: VideoStoryboard['beats'][number],
   index: number,
+  layoutVariant: string,
 ): Record<string, unknown> {
   const presentationMode = storyboard.presentation_mode || 'howto';
   const content: Record<string, unknown> = {
@@ -110,9 +120,11 @@ function buildStoryboardSceneContent(
     role: beat.role,
     beat_index: index + 1,
     presentation_mode: presentationMode,
+    layout_variant: layoutVariant,
     layout_family: typeof beat.design_token_hints?.layout_family === 'string'
       ? beat.design_token_hints.layout_family
       : undefined,
+    design_system_vars: storyboard.design_system_ref?.css_vars || brief.design_system.theme_tokens?.css_vars || {},
   };
   if (beat.semantic === 'process' || beat.semantic === 'steps' || beat.semantic === 'demo') {
     content.visual_steps = deriveProcessSteps(storyboard);
@@ -155,12 +167,17 @@ function buildStoryboardAssetRefs(
   const assets: VideoCompositionAssetRef[] = [];
   const hero = brief.design_system.assets?.hero_path;
   const logo = brief.design_system.assets?.logo_path;
-  if (hero && (role === 'feature' || beat.semantic === 'demo' || beat.semantic === 'process')) {
-    assets.push({
-      asset_id: `${beat.beat_id}-hero`,
-      path: hero,
-      role: 'supporting',
-    });
+  const isVtuber = brief.storyboard?.presentation_mode === 'vtuber';
+
+  if (hero) {
+    const isVtuberStage = isVtuber && beat.role !== 'cta' && beat.role !== 'outro' && beat.semantic !== 'cta' && beat.semantic !== 'validation';
+    if (role === 'feature' || beat.semantic === 'demo' || beat.semantic === 'process' || isVtuberStage) {
+      assets.push({
+        asset_id: `${beat.beat_id}-hero`,
+        path: hero,
+        role: 'supporting',
+      });
+    }
   }
   if (logo && (role === 'cta' || role === 'outro' || beat.semantic === 'validation')) {
     assets.push({
@@ -194,6 +211,8 @@ function buildLegacyScenes(brief: NarratedVideoBrief, totalDuration: number): Vi
         eyebrow: brief.design_system.brand_name,
         headline: brief.script.hook,
         body: `Narrated in ${brief.language || 'default language'}.`,
+        layout_variant: brief.design_system.theme_tokens?.layout_variant || 'split-left',
+        design_system_vars: brief.design_system.theme_tokens?.css_vars || {},
       },
       asset_refs: buildSceneAssets(brief, 'hook'),
     },
@@ -206,6 +225,8 @@ function buildLegacyScenes(brief: NarratedVideoBrief, totalDuration: number): Vi
       content: {
         headline: 'From brief to scene plan',
         body: brief.script.feature,
+        layout_variant: brief.design_system.theme_tokens?.layout_variant || 'split-left',
+        design_system_vars: brief.design_system.theme_tokens?.css_vars || {},
       },
       asset_refs: buildSceneAssets(brief, 'feature'),
     },
@@ -218,6 +239,8 @@ function buildLegacyScenes(brief: NarratedVideoBrief, totalDuration: number): Vi
       content: {
         headline: brief.design_system.brand_name,
         body: brief.script.cta,
+        layout_variant: brief.design_system.theme_tokens?.layout_variant || 'split-right',
+        design_system_vars: brief.design_system.theme_tokens?.css_vars || {},
       },
       asset_refs: buildSceneAssets(brief, 'outro'),
     },
@@ -300,6 +323,43 @@ function buildSceneAssets(brief: NarratedVideoBrief, scene: 'hook' | 'feature' |
     });
   }
   return assets;
+}
+
+function resolveSceneLayoutVariant(
+  presentationMode: VideoStoryboard['presentation_mode'] | undefined,
+  role: VideoCompositionSceneRole,
+  semantic?: string,
+  index?: number,
+  total?: number,
+  fallback?: string,
+): string {
+  if (typeof fallback === 'string' && fallback.trim()) {
+    return fallback;
+  }
+  if (presentationMode === 'vtuber') {
+    if (role === 'hook' || semantic === 'hook') return 'focus-center';
+    if (semantic === 'demo' || semantic === 'process' || semantic === 'steps') return 'fullscreen-demo';
+    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+      return 'split-right';
+    }
+    return 'split-left';
+  }
+  if (presentationMode === 'promo') {
+    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+      return 'split-right';
+    }
+    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact') return 'fullscreen-demo';
+    return 'split-left';
+  }
+  return fallback || 'split-left';
+}
+
+function resolveDefaultCompositionFormat(): { width: number; height: number; aspect_ratio: string } {
+  return {
+    width: 1920,
+    height: 1080,
+    aspect_ratio: '16:9',
+  };
 }
 
 function clampDuration(value: number): number {

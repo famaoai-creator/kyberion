@@ -32,6 +32,25 @@ export interface MeetingOperationsBrief {
     may_assign_action_items?: boolean;
     may_track_action_items?: boolean;
   };
+  environment?: {
+    transport_mode: 'transcribe_first' | 'realtime_voice';
+    items: Array<{
+      kind:
+        | 'browser'
+        | 'audio'
+        | 'ffmpeg'
+        | 'stt'
+        | 'tts'
+        | 'voice_profile'
+        | 'voice_consent'
+        | 'camera'
+        | 'screen_share';
+      state: 'required' | 'recommended' | 'optional' | 'blocked_by_authority' | 'not_needed';
+      reason: string;
+      setup_hint?: string;
+    }>;
+    questions: string[];
+  };
   own_tasks?: string[];
   tracking_expectations?: string[];
   exit_conditions: string[];

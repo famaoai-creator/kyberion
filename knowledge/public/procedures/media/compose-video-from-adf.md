@@ -111,6 +111,23 @@ When backend rendering is enabled and `await_completion` is omitted, the actuato
 `get_video_composition_job_status` includes `diagnostics` (e.g., cancellation reason, backend exit signal/code).
 `diagnostics` also includes lifecycle fields: `created_at`, `started_at`, `finished_at`, `duration_ms`, `terminal_status`.
 
+For the full production flow, including narration preparation and deferred collection, see:
+
+- [`produce-narrated-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-narrated-video.md)
+
+### 4.1 Background submit/collect pattern
+
+For long renders, prefer a two-step flow:
+
+1. submit the render with `await_completion = false`
+2. persist the returned `job_id` and `job_ticket_path`
+3. do other work or wait separately
+4. call `await_video_composition_job` later with the same `job_id`
+5. validate the final artifact once the job completes
+
+The actuator now writes a job ticket to the bundle directory as `job-state.json`.
+That ticket is useful for later collection steps and for operator recovery if a render was submitted earlier in the same mission.
+
 ## 5. Expected Output
 
 - bundle artifact refs

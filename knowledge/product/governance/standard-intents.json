@@ -355,7 +355,7 @@
       "execution_profile_id": "audio-transcribe-default",
       "outcome_ids": ["artifact:transcript"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["書き起こし", "transcribe", "transcript", "stt", "音声"],
+      "trigger_keywords": ["書き起こし", "transcribe", "transcript", "stt"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
@@ -1306,6 +1306,8 @@
         "自分の声をクローンして",
         "声の登録をして",
         "クローンボイスを作って",
+        "私の音声を学習して利用できるようにして",
+        "私の声を学習して使えるようにして",
         "Clone my voice"
       ],
       "plan_outline": [
@@ -1316,7 +1318,7 @@
       ],
       "outcome_ids": ["voice_profile_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["クローン", "録音", "register", "clone", "voice clone", "使えるようにして", "声を使えるようにして", "自分の声"],
+      "trigger_keywords": ["クローン", "録音", "register", "clone", "voice clone", "使えるようにして", "声を使えるようにして", "自分の声", "学習", "利用できるように", "私の音声", "私の声"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
