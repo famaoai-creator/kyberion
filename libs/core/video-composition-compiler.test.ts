@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
 import { compileVideoCompositionADF, writeVideoCompositionBundle } from './video-composition-compiler.js';
 import type { VideoCompositionADF } from './video-composition-contract.js';
 
@@ -290,5 +290,90 @@ describe('video composition compiler', () => {
 
     expect(safeReadFile(`${promoDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain('Promo spot');
     expect(safeReadFile(`${vtuberDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain('LIVE');
+  });
+
+  it('sanitizes unsafe scene ids before writing bundle artifacts and runtime keys', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/scene-id-safety');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Scene id safety',
+      composition: {
+        duration_sec: 4,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'foo/../bar<script>',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 4,
+          template_ref: { template_id: 'basic-title-card' },
+          content: {
+            headline: 'Safe scene keys',
+            body: 'Scene ids are normalized before they hit the filesystem.',
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+      },
+    };
+
+    writeVideoCompositionBundle(adf);
+    expect(safeExistsSync(`${bundleDir}/compositions/foo-bar-script.html`)).toBe(true);
+    const html = safeReadFile(`${bundleDir}/compositions/foo-bar-script.html`, { encoding: 'utf8' }) as string;
+    expect(html).toContain('window.__timelines["foo-bar-script"]');
+    expect(html).not.toContain('foo/../bar<script>');
+  });
+
+  it('stages avatar_assets declared in scene content for vtuber rendering', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/avatar-assets');
+    const avatarPath = pathResolver.sharedTmp('video-composition-bundle-tests/assets/avatar-smile.png');
+    safeWriteFile(avatarPath, 'avatar-bytes');
+
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Avatar assets',
+      composition: {
+        duration_sec: 4,
+        fps: 30,
+        width: 1280,
+        height: 720,
+        background_color: '#090814',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 4,
+          template_ref: { template_id: 'vtuber-stage' },
+          content: {
+            headline: 'Live avatar',
+            body: 'Use the scene-specific avatar asset.',
+            presentation_mode: 'vtuber',
+            layout_variant: 'focus-center',
+            avatar_assets: {
+              default: avatarPath,
+            },
+          },
+        },
+      ],
+      output: {
+        format: 'mp4',
+        bundle_dir: bundleDir,
+      },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' }) as string;
+    expect(html).toContain('../assets/avatar-smile.png');
+    expect(safeExistsSync(`${bundleDir}/assets/avatar-smile.png`)).toBe(true);
   });
 });

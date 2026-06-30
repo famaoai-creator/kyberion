@@ -230,7 +230,7 @@ describe('narrated video brief compiler', () => {
         version: '1.0.0',
         content_type: 'vtuber',
         presentation_mode: 'vtuber',
-        format: { width: 1920, height: 1080 },
+        format: { width: 1280, height: 720, aspect_ratio: '16:9' },
         title: 'Live stage',
         beats: [
           {
@@ -281,5 +281,10 @@ describe('narrated video brief compiler', () => {
     expect(adf.scenes[0].template_ref.template_id).toBe('vtuber-stage');
     expect(adf.scenes[1].template_ref.template_id).toBe('vtuber-stage');
     expect(adf.scenes[1].content.chat_messages).toBeDefined();
+    expect(adf.composition.width).toBe(1280);
+    expect(adf.composition.height).toBe(720);
+    expect(adf.composition.aspect_ratio).toBe('16:9');
+    expect(adf.scenes[0].content.layout_variant).toBe('focus-center');
+    expect(adf.scenes[2].content.layout_variant).toBe('fullscreen-demo');
   });
 });
