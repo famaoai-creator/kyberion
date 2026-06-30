@@ -11,6 +11,16 @@
   },
   "steps": [
     {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-runtime-preflight.json",
+        "context": {
+          "sample_dir": "knowledge/personal/voice/samples/{{profile_id}}"
+        }
+      }
+    },
+    {
       "role": "sink",
       "op": "system:log",
       "params": { "message": "⚡ ゼロショット・クローニング (profile={{profile_id}}, provider={{provider}}) を開始します。" }

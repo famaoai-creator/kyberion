@@ -13,6 +13,25 @@ const mocks = vi.hoisted(() => ({
   })),
   safeReadFile: vi.fn(() => '{"recovery_policy": {}}'),
   getVoiceEngineRecord: vi.fn((engineId?: string) => {
+    if (engineId === 'mlx_audio_qwen3') {
+      return {
+        engine_id: 'mlx_audio_qwen3',
+        display_name: 'mlx-audio Qwen3-TTS (ICL Voice Clone)',
+        kind: 'voice_clone_service',
+        provider: 'mlx_audio',
+        status: 'active',
+        platforms: ['darwin'],
+        bridge_script: 'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py',
+        supports: {
+          list_voices: false,
+          playback: true,
+          artifact_formats: ['wav'],
+          voice_clone: true,
+          icl_ref_audio: true,
+        },
+        fallback_engine_id: 'local_say',
+      };
+    }
     if (engineId === 'espeak_ng') {
       return {
         engine_id: 'espeak_ng',
@@ -48,6 +67,23 @@ const mocks = vi.hoisted(() => ({
     version: 'test',
     default_engine_id: 'local_say',
     engines: [
+      {
+        engine_id: 'mlx_audio_qwen3',
+        display_name: 'mlx-audio Qwen3-TTS (ICL Voice Clone)',
+        kind: 'voice_clone_service',
+        provider: 'mlx_audio',
+        status: 'active',
+        platforms: ['darwin'],
+        bridge_script: 'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py',
+        supports: {
+          list_voices: false,
+          playback: true,
+          artifact_formats: ['wav'],
+          voice_clone: true,
+          icl_ref_audio: true,
+        },
+        fallback_engine_id: 'local_say',
+      },
       {
         engine_id: 'local_say',
         display_name: 'Local System TTS',
@@ -149,5 +185,37 @@ describe('voice runtime helpers', () => {
     expect(mocks.safeExec.mock.calls.some(([command]) => command === 'say')).toBe(true);
     expect(mocks.safeExecResult).toHaveBeenCalled();
     expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('configured engine local_say failed'));
+  });
+
+  it('does not fall back to non-clone engines when learned voice is required', async () => {
+    const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
+
+    mocks.safeExecResult.mockReturnValueOnce({
+      status: 1,
+      stdout: '',
+      stderr: 'mlx failed',
+      error: null,
+    });
+
+    await expect(renderNativeArtifact('学習済み音声だけを使います。', {
+      requestId: 'strict-clone-test',
+      voice: 'Kyoko',
+      rate: 170,
+      language: 'ja',
+      format: 'wav',
+      engineId: 'mlx_audio_qwen3',
+      supportsFormats: ['wav'],
+      outputPath: '/tmp/strict-clone-test.wav',
+      requireVoiceClone: true,
+      profile: {
+        profile_id: 'my-voice-v2',
+        sample_refs: ['/tmp/ref.wav'],
+      },
+    })).rejects.toThrow('mlx_audio_tts_bridge.py failed');
+
+    expect(mocks.safeExec).not.toHaveBeenCalledWith(
+      'say',
+      expect.arrayContaining(['学習済み音声だけを使います。']),
+    );
   });
 });

@@ -1,0 +1,288 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/meeting-environment-policy.schema.json",
+  "title": "Meeting Environment Policy",
+  "description": "Policy for deterministic meeting environment preflight, including transport mode, required devices, and prompt questions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "transport_modes",
+    "base_items",
+    "speaking",
+    "camera",
+    "screen_share",
+    "questions"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transport_modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speaking_allowed", "speaking_blocked"],
+      "properties": {
+        "speaking_allowed": {
+          "type": "string",
+          "const": "realtime_voice"
+        },
+        "speaking_blocked": {
+          "type": "string",
+          "const": "transcribe_first"
+        }
+      }
+    },
+    "base_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "speaking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["explicit_patterns", "allowed_items", "blocked_items"],
+      "properties": {
+        "explicit_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allowed_items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        },
+        "blocked_items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explicit_patterns",
+        "recommended_roles",
+        "recommended_purposes",
+        "required_item",
+        "recommended_item",
+        "not_needed_item"
+      ],
+      "properties": {
+        "explicit_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recommended_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recommended_roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+          }
+        },
+        "recommended_purposes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+          }
+        },
+        "required_item": {
+          "$ref": "#/$defs/camera-item"
+        },
+        "recommended_item": {
+          "$ref": "#/$defs/camera-item"
+        },
+        "not_needed_item": {
+          "$ref": "#/$defs/camera-item"
+        }
+      }
+    },
+    "screen_share": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explicit_patterns",
+        "recommended_patterns",
+        "recommended_roles",
+        "recommended_purposes",
+        "required_item",
+        "recommended_item",
+        "not_needed_item"
+      ],
+      "properties": {
+        "explicit_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recommended_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recommended_roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["planner", "facilitator", "scribe", "executor", "decision_maker", "tracker"]
+          }
+        },
+        "recommended_purposes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+          }
+        },
+        "required_item": {
+          "$ref": "#/$defs/screen-share-item"
+        },
+        "recommended_item": {
+          "$ref": "#/$defs/screen-share-item"
+        },
+        "not_needed_item": {
+          "$ref": "#/$defs/screen-share-item"
+        }
+      }
+    },
+    "questions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["camera_recommended", "screen_share_recommended", "speaking_blocked"],
+      "properties": {
+        "camera_recommended": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen_share_recommended": {
+          "type": "string",
+          "minLength": 1
+        },
+        "speaking_blocked": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "state", "reason"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "browser",
+            "audio",
+            "ffmpeg",
+            "stt",
+            "tts",
+            "voice_profile",
+            "voice_consent",
+            "camera",
+            "screen_share"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "required",
+            "recommended",
+            "optional",
+            "blocked_by_authority",
+            "not_needed"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "setup_hint": {
+          "type": "string"
+        }
+      }
+    },
+    "camera-item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "state", "reason"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "camera"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["required", "recommended", "not_needed"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "setup_hint": {
+          "type": "string"
+        }
+      }
+    },
+    "screen-share-item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "state", "reason"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "screen_share"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["required", "recommended", "not_needed"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "setup_hint": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

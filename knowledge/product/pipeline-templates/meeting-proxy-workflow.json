@@ -24,6 +24,11 @@
   },
   "steps": [
     {
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/live-voice-preflight.json" }
+    },
+    {
       "role": "sink",
       "op": "system:log",
       "params": {

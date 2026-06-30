@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "voice-runtime-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify the local voice runtime bridges are present and, when provided, the reference sample directory contains usable audio files before starting a voice learning or cloning flow.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "pnpm service:preflight -- --service voice && python_bin=\"{{python_bin}}\"; if [ -z \"$python_bin\" ]; then python_bin=python3; fi; command -v \"$python_bin\" >/dev/null && test -f libs/actuators/voice-actuator/scripts/voice_learning_bridge.py && test -f libs/actuators/voice-actuator/scripts/zero_shot_bridge.py && test -f libs/actuators/voice-actuator/scripts/record_bridge.py && if [ -n \"{{sample_path}}\" ]; then test -f \"{{sample_path}}\"; fi && if [ -n \"{{sample_dir}}\" ]; then test -d \"{{sample_dir}}\" && find \"{{sample_dir}}\" -maxdepth 1 -type f \\( -name '*.wav' -o -name '*.mp3' \\) | grep -q .; fi && echo ok"
+        }
+      }
+    }
+  ]
+}

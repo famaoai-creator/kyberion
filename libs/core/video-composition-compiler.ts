@@ -81,9 +81,8 @@ export function writeVideoCompositionBundle(
     const scenePath = path.join(plan.bundle_dir, scene.output_html);
     safeWriteFile(scenePath, sceneSource);
 
-    if (policy.bundle.copy_declared_assets) {
-      copySceneAssets(plan.bundle_dir, scene.asset_refs);
-    }
+    // Always copy declared assets to ensure relative paths work correctly in Puppeteer
+    copySceneAssets(plan.bundle_dir, scene.asset_refs);
   }
 
   safeWriteFile(plan.index_html, renderBundleIndexHtml(plan, adf));
@@ -96,6 +95,7 @@ export function writeVideoCompositionBundle(
 function compileScene(scene: VideoCompositionScene, adf: VideoCompositionADF): CompiledVideoCompositionScene {
   const template = getVideoCompositionTemplateRecord(scene.template_ref?.template_id);
   const role = scene.role || 'generic';
+  const sceneKey = safeSceneKey(scene.scene_id);
   if (template.status !== 'active') {
     throw new Error(`Template ${template.template_id} is not active`);
   }
@@ -119,14 +119,17 @@ function compileScene(scene: VideoCompositionScene, adf: VideoCompositionADF): C
     duration_sec: scene.duration_sec,
     template_id: template.template_id,
     template_display_name: template.display_name,
-    output_html: path.join('compositions', `${scene.scene_id}.html`),
+    output_html: path.join('compositions', `${sceneKey}.html`),
     required_content_fields: template.required_content_fields,
     content: { ...scene.content },
-    asset_refs: (scene.asset_refs || []).map((asset) => ({ ...asset })),
+    asset_refs: mergeSceneAssetRefs(scene.asset_refs || [], extractAvatarAssetRefs(scene)),
   };
 }
 
 function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositionScene): string {
+  const sceneKey = safeSceneKey(scene.scene_id);
+  const sceneCssVars = renderSceneCssVars(scene, adf);
+  const layoutVariant = sceneLayoutVariant(scene);
   // Templates declare `headline` (and sometimes `title`) as the
   // canonical content field — basic-title-card / split-highlight both
   // ship `headline` in their `required_content_fields`. Older ADFs
@@ -136,6 +139,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   const body = sceneText(scene, 'body');
   const eyebrow = sceneText(scene, 'eyebrow');
   const supporting = resolveAsset(scene.asset_refs, 'supporting');
+  const avatar = resolveAvatarAsset(scene, supporting);
   const visualSteps = Array.isArray(scene.content.visual_steps)
     ? scene.content.visual_steps
         .map((step: any, index: number) => ({
@@ -195,7 +199,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     seek: (time) => { console.log('[HF] seek', time); }
   };
   window.__timelines = window.__timelines || {};
-  window.__timelines["${scene.scene_id}"] = __hfTimeline;
+  window.__timelines["${sceneKey}"] = __hfTimeline;
 </script>`;
 
   if (scene.template_id === 'howto-guide') {
@@ -205,20 +209,14 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     <meta charset="utf-8">
     <title>${escapeHtml(title || scene.scene_id)}</title>
     <style>
-      :root {
-        --bg: #07111f;
-        --panel: rgba(15, 23, 42, 0.88);
-        --accent: #60a5fa;
-        --text: #f8fafc;
-        --subtext: #94a3b8;
-      }
+      ${sceneCssVars}
       * { box-sizing: border-box; }
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
         background: radial-gradient(circle at top left, rgba(59,130,246,0.16), transparent 32%), var(--bg);
         color: var(--text);
       }
@@ -352,8 +350,8 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
     </style>
   </head>
-  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
-    <div class="composition-root" data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+  <body data-composition-id="${sceneKey}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+    <div class="composition-root" data-composition-id="${sceneKey}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
       <div class="frame">
         <div>
           ${eyebrow ? `<div class="eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
@@ -387,14 +385,15 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     <meta charset="utf-8">
     <title>${escapeHtml(title || scene.scene_id)}</title>
     <style>
+      ${sceneCssVars}
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: radial-gradient(circle at top right, rgba(249,115,22,0.18), transparent 30%), #060913;
-        color: white;
+        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+        background: radial-gradient(circle at top right, rgba(249,115,22,0.18), transparent 30%), var(--bg, #060913);
+        color: var(--text, white);
       }
       .shell {
         width: 100%;
@@ -481,8 +480,8 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       @keyframes fadeIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
     </style>
   </head>
-  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
-    <div class="composition-root" data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+  <body data-composition-id="${sceneKey}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+    <div class="composition-root" data-composition-id="${sceneKey}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
       <div class="shell">
         <div>
           <div class="kicker">Promo spot</div>
@@ -515,23 +514,84 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   if (scene.template_id === 'vtuber-stage') {
     const chatMessages = Array.isArray(scene.content.chat_messages) ? scene.content.chat_messages : [];
     const stageNotes = Array.isArray(scene.content.stage_notes) ? scene.content.stage_notes : [];
+
+    const pageScript = `<script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const animElements = [
+          { el: document.querySelector('.avatar'), delay: 0, duration: 1.0 },
+          { el: document.querySelector('.panel'), delay: 0.2, duration: 1.2 }
+        ];
+        document.querySelectorAll('.bubble').forEach((bubble, idx) => {
+          animElements.push({ el: bubble, delay: 0.6 + idx * 0.4, duration: 0.8 });
+        });
+        document.querySelectorAll('.tag').forEach((tag, idx) => {
+          animElements.push({ el: tag, delay: 1.2 + idx * 0.2, duration: 0.6 });
+        });
+
+        function performSeek(time) {
+          animElements.forEach(item => {
+            if (!item.el) return;
+            let elapsed = time - item.delay;
+            if (elapsed < 0) elapsed = 0;
+            if (elapsed > item.duration) elapsed = item.duration;
+            item.el.style.animationDelay = \`-\${elapsed}s\`;
+          });
+        }
+
+        function waitForImages() {
+          const imgs = Array.from(document.querySelectorAll('img'));
+          const promises = imgs.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          });
+          return Promise.all(promises);
+        }
+
+        const __hfTimeline = {
+          duration: () => ${scene.duration_sec},
+          time: () => 0,
+          pause: () => {},
+          play: () => {},
+          seek: (time) => { performSeek(time); },
+          totalTime: (time) => { performSeek(time); },
+          isPlaying: () => false,
+          setPlaybackRate: () => {},
+          getPlaybackRate: () => 1,
+        };
+        window.__hf = {
+          duration: ${scene.duration_sec},
+          seek: (time) => { performSeek(time); }
+        };
+        window.__timelines = window.__timelines || {};
+        window.__timelines["${sceneKey}"] = __hfTimeline;
+
+        waitForImages().then(() => {
+          performSeek(0);
+        });
+      });
+    </script>`;
+
     return `<!doctype html>
 <html lang="ja">
   <head>
     <meta charset="utf-8">
     <title>${escapeHtml(title || scene.scene_id)}</title>
     <style>
+      ${sceneCssVars}
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
         background:
           radial-gradient(circle at top left, rgba(34,197,94,0.14), transparent 24%),
           radial-gradient(circle at bottom right, rgba(59,130,246,0.18), transparent 28%),
-          #050714;
-        color: white;
+          var(--bg, #050714);
+        color: var(--text, white);
       }
       .stage {
         width: 100%;
@@ -542,8 +602,24 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         padding: 48px;
         align-items: stretch;
       }
+      .stage.stage--focus-center {
+        grid-template-columns: 1fr;
+        align-items: center;
+      }
+      .stage.stage--focus-center .avatar {
+        min-height: 58%;
+      }
+      .stage.stage--focus-center .panel {
+        min-height: 30%;
+      }
+      .stage.stage--split-right {
+        grid-template-columns: 1.22fr 0.78fr;
+      }
+      .stage.stage--fullscreen-demo {
+        grid-template-columns: 0.58fr 1.42fr;
+      }
       .avatar {
-        border-radius: 32px;
+        border-radius: var(--radius-panel, 32px);
         background: linear-gradient(180deg, rgba(15,23,42,0.96), rgba(7,17,31,0.9));
         border: 1px solid rgba(148,163,184,0.14);
         box-shadow: 0 36px 90px rgba(0,0,0,0.45);
@@ -564,6 +640,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         border: 1px solid rgba(248,113,113,0.2);
         font-size: 12px;
         letter-spacing: 0.22em;
+        z-index: 10;
       }
       .avatar-circle {
         width: 240px;
@@ -577,6 +654,12 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         font-size: 56px;
         font-weight: 900;
         letter-spacing: -0.06em;
+        overflow: hidden;
+      }
+      .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
       .avatar-meta {
         position: absolute;
@@ -604,7 +687,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         box-shadow: 0 0 16px rgba(34,197,94,0.5);
       }
       .panel {
-        border-radius: 32px;
+        border-radius: var(--radius-panel, 32px);
         background: linear-gradient(180deg, rgba(15,23,42,0.95), rgba(7,17,31,0.94));
         border: 1px solid rgba(148,163,184,0.14);
         box-shadow: 0 36px 90px rgba(0,0,0,0.45);
@@ -662,16 +745,57 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         border: 1px solid rgba(34,197,94,0.18);
         font-size: 14px;
       }
-      @keyframes breathe { from { transform: scale(1); } to { transform: scale(1.02); } }
-      .avatar-circle { animation: breathe 4s ease-in-out infinite alternate; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+      /* Animation Seeking */
+      @keyframes slideInLeft {
+        from { transform: translateX(-100px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideInRight {
+        from { transform: translateX(100px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes popIn {
+        0% { transform: scale(0.8); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes bubbleAppear {
+        0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+        100% { transform: scale(1) translateY(0); opacity: 1; }
+      }
+      @keyframes breathe {
+        from { transform: scale(1); }
+        to { transform: scale(1.03); }
+      }
+
+      .avatar {
+        animation: slideInLeft 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-play-state: paused;
+      }
+      .avatar-circle {
+        animation: breathe 4s ease-in-out infinite alternate;
+      }
+      .panel {
+        animation: slideInRight 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-play-state: paused;
+      }
+      .bubble {
+        animation: bubbleAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-play-state: paused;
+      }
+      .tag {
+        animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        animation-play-state: paused;
+      }
     </style>
   </head>
-  <body data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
-    <div class="composition-root" data-composition-id="${scene.scene_id}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
-      <div class="stage">
+  <body data-composition-id="${sceneKey}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+    <div class="composition-root" data-composition-id="${sceneKey}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+      <div class="stage stage--${escapeHtml(layoutVariant)}">
         <div class="avatar">
-          <div class="avatar-circle">${escapeHtml((eyebrow || 'K').slice(0, 1))}</div>
+          <div class="avatar-circle">
+            ${avatar ? `<img src="../assets/${escapeHtml(path.basename(avatar.path))}" alt="avatar" class="avatar-img">` : escapeHtml((eyebrow || 'K').slice(0, 1))}
+          </div>
           <div class="avatar-meta">
             <div class="persona-line">${escapeHtml(eyebrow || 'Kyberion')}</div>
             <div class="body">${escapeHtml(body)}</div>
@@ -689,7 +813,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         </div>
       </div>
     </div>
-    ${hfScript}
+    ${pageScript}
   </body>
 </html>`;
   }
@@ -701,19 +825,14 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     <meta charset="utf-8">
     <title>${escapeHtml(title || scene.scene_id)}</title>
     <style>
-      :root { 
-        --bg: #070912;
-        --accent: #3b82f6;
-        --text: #f8fafc;
-        --subtext: #94a3b8;
-      }
+      ${sceneCssVars}
       * { box-sizing: border-box; }
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
         background: var(--bg);
         color: var(--text);
       }
@@ -835,7 +954,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     </style>
   </head>
   <body
-    data-composition-id="${scene.scene_id}"
+    data-composition-id="${sceneKey}"
     data-width="${adf.composition.width}"
     data-height="${adf.composition.height}"
     data-duration="${scene.duration_sec}"
@@ -843,7 +962,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   >
     <div
       class="composition-root"
-      data-composition-id="${scene.scene_id}"
+      data-composition-id="${sceneKey}"
       data-width="${adf.composition.width}"
       data-height="${adf.composition.height}"
       data-duration="${scene.duration_sec}"
@@ -873,18 +992,19 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     <meta charset="utf-8">
     <title>Outro</title>
     <style>
+      ${sceneCssVars}
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         background:
           radial-gradient(circle at top, rgba(59,130,246,0.22), transparent 38%),
-          linear-gradient(180deg, #050814 0%, #0b1224 100%);
-        color: white;
+          linear-gradient(180deg, var(--bg, #050814) 0%, #0b1224 100%);
+        color: var(--text, white);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: 'Inter', sans-serif;
+        font-family: var(--font-sans, 'Inter', sans-serif);
         overflow: hidden;
       }
       .center {
@@ -912,7 +1032,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     </style>
   </head>
   <body
-    data-composition-id="${scene.scene_id}"
+    data-composition-id="${sceneKey}"
     data-width="${adf.composition.width}"
     data-height="${adf.composition.height}"
     data-duration="${scene.duration_sec}"
@@ -920,7 +1040,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   >
     <div
       class="composition-root"
-      data-composition-id="${scene.scene_id}"
+      data-composition-id="${sceneKey}"
       data-width="${adf.composition.width}"
       data-height="${adf.composition.height}"
       data-duration="${scene.duration_sec}"
@@ -943,16 +1063,17 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     <meta charset="utf-8">
     <title>Scene</title>
     <style>
+      ${sceneCssVars}
       body {
         margin: 0;
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
-        background: #070912;
-        color: white;
+        background: var(--bg, #070912);
+        color: var(--text, white);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: 'Inter', sans-serif;
+        font-family: var(--font-sans, 'Inter', sans-serif);
         text-align: center;
       }
       .hero-text {
@@ -963,7 +1084,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     </style>
   </head>
   <body
-    data-composition-id="${scene.scene_id}"
+    data-composition-id="${sceneKey}"
     data-width="${adf.composition.width}"
     data-height="${adf.composition.height}"
     data-duration="${scene.duration_sec}"
@@ -971,7 +1092,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   >
     <div
       class="composition-root"
-      data-composition-id="${scene.scene_id}"
+      data-composition-id="${sceneKey}"
       data-width="${adf.composition.width}"
       data-height="${adf.composition.height}"
       data-duration="${scene.duration_sec}"
@@ -987,224 +1108,96 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
 }
 
 function renderBundleIndexHtml(plan: VideoCompositionRenderPlan, adf: VideoCompositionADF): string {
-  const presentationMode = String(plan.scenes[0]?.content?.presentation_mode || 'howto');
-  const sceneCards = plan.scenes
-    .map((scene, index) => {
-      const ordinal = String(index + 1).padStart(2, '0');
-      const range = `${scene.start_sec.toFixed(2)}s - ${(scene.start_sec + scene.duration_sec).toFixed(2)}s`;
-      return `<article class="scene-card">
-        <div class="scene-card__ordinal">${ordinal}</div>
-        <div class="scene-card__body">
-          <div class="scene-card__title">${escapeHtml(scene.scene_id)}</div>
-          <div class="scene-card__meta">${escapeHtml(scene.template_display_name)} • ${range}</div>
-        </div>
-      </article>`;
+  const iframeContainers = plan.scenes
+    .map((scene) => {
+      const sceneKey = safeSceneKey(scene.scene_id);
+      return `<iframe id="scene-frame-${sceneKey}" src="${scene.output_html}" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none; display:none; overflow:hidden;" scrolling="no"></iframe>`;
     })
     .join('\n');
-  const processSteps = (presentationMode === 'promo'
-    ? [
-        { title: 'Value spike', body: 'Lead with the promise and the strongest benefit.' },
-        { title: 'Proof block', body: 'Back the promise with evidence, references, and outcome cards.' },
-        { title: 'CTA lockup', body: 'End with a decisive action and clear next step.' },
-      ]
-    : presentationMode === 'vtuber'
-      ? [
-          { title: 'On-air cue', body: 'Open with the live persona and immediate viewer context.' },
-          { title: 'Persona beat', body: 'Show the character, voice, and community-facing tone.' },
-          { title: 'Live demo', body: 'Demonstrate the action with chat and stage framing.' },
-        ]
-      : [
-          {
-            title: 'Brief intake',
-            body: 'Audience, use case, and constraints are already decided before production starts.',
-          },
-          {
-            title: 'Content plan',
-            body: 'The agreed brief is translated into hook, feature, and outro content.',
-          },
-          {
-            title: 'Render package',
-            body: 'The governed bundle is rendered and muxed into the final mp4 artifact.',
-          },
-        ])
-    .map((step, index) => `<div class="process-step">
-      <span>${String(index + 1).padStart(2, '0')}</span>
-      <strong>${escapeHtml(step.title)}</strong>
-      <small>${escapeHtml(step.body)}</small>
-    </div>`).join('');
+  const scenes = plan.scenes.map((scene) => ({
+    scene_id: scene.scene_id,
+    scene_key: safeSceneKey(scene.scene_id),
+    start_sec: scene.start_sec,
+    duration_sec: scene.duration_sec,
+  }));
+
+  const scriptContent = `
+    const scenes = ${JSON.stringify(scenes)};
+
+    function performSeek(time) {
+      scenes.forEach((scene) => {
+        const frame = document.getElementById("scene-frame-" + scene.scene_key);
+        if (!frame) return;
+        const relativeTime = time - scene.start_sec;
+        if (time >= scene.start_sec && time < scene.start_sec + scene.duration_sec) {
+          frame.style.display = "block";
+          try {
+            const win = frame.contentWindow;
+            if (win && win.__timelines && win.__timelines[scene.scene_key]) {
+              win.__timelines[scene.scene_key].seek(relativeTime);
+            } else if (win && win.__hf && typeof win.__hf.seek === 'function') {
+              win.__hf.seek(relativeTime);
+            }
+          } catch(e) {
+            console.error("error seeking child iframe:", e);
+          }
+        } else {
+          frame.style.display = "none";
+        }
+      });
+    }
+
+    const __hfTimeline = {
+      duration: () => ${plan.duration_sec},
+      time: () => 0,
+      pause: () => {},
+      play: () => {},
+      seek: (time) => { performSeek(time); },
+      totalTime: (time) => { performSeek(time); },
+      isPlaying: () => false,
+      setPlaybackRate: () => {},
+      getPlaybackRate: () => 1,
+    };
+    window.__hf = {
+      duration: ${plan.duration_sec},
+      seek: (time) => { performSeek(time); }
+    };
+    window.__timelines = window.__timelines || {};
+    window.__timelines["${plan.composition_id}"] = __hfTimeline;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      performSeek(0);
+    });
+  `;
+
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <title>${escapeHtml(plan.title)}</title>
     <style>
-      body {
+      html, body {
         margin: 0;
-        padding: 48px;
-        background: #09111f;
-        color: #e2e8f0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 0;
+        width: ${plan.width}px;
+        height: ${plan.height}px;
+        background: ${plan.background_color || '#09111f'};
+        overflow: hidden;
       }
-      .shell { max-width: 1180px; margin: 0 auto; }
-      .hero {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 28px;
-        align-items: start;
-      }
-      h1 { margin: 0 0 10px 0; font-size: 58px; line-height: 1.02; letter-spacing: -0.04em; }
-      .meta { color: #94a3b8; margin-bottom: 20px; }
-      .mode-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 14px;
-        border-radius: 999px;
-        margin-bottom: 18px;
-        background: rgba(59,130,246,0.12);
-        border: 1px solid rgba(59,130,246,0.16);
-        color: #bfdbfe;
-        font-size: 13px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-      .mode-badge::before {
-        content: '';
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: #60a5fa;
-      }
-      .lede {
-        margin: 0 0 28px 0;
-        font-size: 18px;
-        line-height: 1.7;
-        color: #cbd5e1;
-        max-width: 760px;
-      }
-      .process {
-        display: grid;
-        gap: 14px;
-        padding: 22px;
-        border-radius: 24px;
-        background: rgba(15,23,42,0.92);
-        border: 1px solid rgba(148,163,184,0.16);
-        box-shadow: 0 30px 80px rgba(0,0,0,0.28);
-      }
-      .process-step {
-        display: grid;
-        grid-template-columns: 56px 1fr;
-        gap: 14px;
-        align-items: center;
-        padding: 16px 18px;
-        border-radius: 18px;
-        background: rgba(7, 17, 31, 0.72);
-        border: 1px solid rgba(148,163,184,0.12);
-      }
-      .process-step span {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 52px;
-        height: 52px;
-        border-radius: 16px;
-        background: rgba(59,130,246,0.16);
-        color: #93c5fd;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-      }
-      .process-step strong { font-size: 18px; display: block; margin-bottom: 2px; }
-      .process-step small { color: #94a3b8; line-height: 1.5; }
-      .scene-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
-        margin-top: 26px;
-      }
-      .scene-card {
-        display: flex;
-        gap: 14px;
-        padding: 18px;
-        border-radius: 20px;
-        background: rgba(15,23,42,0.88);
-        border: 1px solid rgba(148,163,184,0.16);
-      }
-      .scene-card__ordinal {
-        width: 44px;
-        height: 44px;
-        border-radius: 14px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(96,165,250,0.14);
-        color: #bfdbfe;
-        font-weight: 800;
-      }
-      .scene-card__title { font-weight: 700; margin-bottom: 3px; }
-      .scene-card__meta { color: #94a3b8; font-size: 14px; line-height: 1.5; }
-      a { color: #93c5fd; }
-      code { color: #cbd5e1; }
-      .note {
-        margin-top: 32px;
-        padding: 16px 20px;
-        border-radius: 14px;
-        background: rgba(15,23,42,0.92);
-        border: 1px solid rgba(148,163,184,0.2);
+      #viewport {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
       }
     </style>
   </head>
-  <body
-    data-composition-id="${plan.composition_id}"
-    data-width="${plan.width}"
-    data-height="${plan.height}"
-    data-duration="${plan.duration_sec}"
-    data-start="0"
-  >
-    <div
-      class="shell"
-      data-composition-id="${plan.composition_id}"
-      data-width="${plan.width}"
-      data-height="${plan.height}"
-      data-duration="${plan.duration_sec}"
-      data-start="0"
-    >
-      <div class="hero">
-        <div>
-          <div class="mode-badge">${escapeHtml(presentationMode)}</div>
-          <h1>${escapeHtml(plan.title)}</h1>
-          <div class="meta">${plan.width}x${plan.height} • ${plan.fps}fps • ${plan.duration_sec}s • ${escapeHtml(plan.output_format)} • mode ${escapeHtml(presentationMode)}</div>
-          <p class="lede">This bundle is the render-ready output of a fixed brief. The content is not a generic product pitch: it is a deterministic transformation from approved audience and messaging inputs into a narrated scene plan.</p>
-          <div class="scene-grid">
-            ${sceneCards}
-          </div>
-        </div>
-        <div class="process">
-          ${processSteps}
-        </div>
-      </div>
-      <div class="note">
-        <strong>Audio refs:</strong> <code>${escapeHtml(JSON.stringify(adf.audio || {}, null, 0))}</code><br>
-        When backend rendering is enabled, narration will be muxed into the final output artifact.
-      </div>
+  <body data-composition-id="${plan.composition_id}" data-width="${plan.width}" data-height="${plan.height}" data-duration="${plan.duration_sec}" data-start="0">
+    <div id="viewport" data-composition-id="${plan.composition_id}">
+      ${iframeContainers}
     </div>
     <script>
-      const __hfTimeline = {
-        duration: () => ${plan.duration_sec},
-        time: () => 0,
-        pause: () => {},
-        play: () => {},
-        seek: (time) => { console.log('[HF] root seek to', time); },
-        totalTime: (time) => { console.log('[HF] root totalTime to', time); },
-        isPlaying: () => false,
-        setPlaybackRate: () => {},
-        getPlaybackRate: () => 1,
-      };
-      window.__hf = {
-        duration: ${plan.duration_sec},
-        seek: (time) => { console.log('[HF] root seek to', time); }
-      };
-      window.__timelines = window.__timelines || {};
-      window.__timelines["${plan.composition_id}"] = __hfTimeline;
+      ${scriptContent}
     </script>
   </body>
 </html>`;
@@ -1260,8 +1253,108 @@ function sceneText(scene: CompiledVideoCompositionScene, key: string): string {
   return String(scene.content?.[key] || '');
 }
 
+function sceneLayoutVariant(scene: CompiledVideoCompositionScene): string {
+  return sanitizeCssClass(String(scene.content?.layout_variant || scene.content?.layout_family || 'default'));
+}
+
+function renderSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoCompositionADF): string {
+  const vars = extractSceneCssVars(scene, adf);
+  const lines = Object.entries(vars)
+    .map(([key, value]) => `      ${key}: ${value};`)
+    .join('\n');
+  return `:root {\n${lines}\n    }`;
+}
+
+function extractSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoCompositionADF): Record<string, string> {
+  const contentVars = scene.content?.design_system_vars;
+  const background = adf.composition.background_color || '#07111f';
+  const defaultVars: Record<string, string> = {
+    '--bg': background,
+    '--panel': 'rgba(15, 23, 42, 0.88)',
+    '--accent': '#60a5fa',
+    '--text': '#f8fafc',
+    '--subtext': '#94a3b8',
+    '--font-sans': '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+    '--radius-panel': '32px',
+    '--radius-surface': '24px',
+  };
+  if (!contentVars || typeof contentVars !== 'object') {
+    return defaultVars;
+  }
+  const normalized = Object.entries(contentVars as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (typeof value === 'string' && value.trim()) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+  return {
+    ...defaultVars,
+    '--bg': normalized['--kb-bg-main'] || normalized['--bg'] || defaultVars['--bg'],
+    '--panel': normalized['--kb-panel-bg'] || normalized['--panel'] || defaultVars['--panel'],
+    '--accent': normalized['--kb-accent'] || normalized['--accent'] || defaultVars['--accent'],
+    '--text': normalized['--kb-text-primary'] || normalized['--text'] || defaultVars['--text'],
+    '--subtext': normalized['--kb-text-secondary'] || normalized['--subtext'] || defaultVars['--subtext'],
+    '--font-sans': normalized['--kb-font-sans'] || normalized['--font-sans'] || defaultVars['--font-sans'],
+    '--radius-panel': normalized['--kb-panel-radius'] || normalized['--radius-panel'] || defaultVars['--radius-panel'],
+    '--radius-surface': normalized['--kb-surface-radius'] || normalized['--radius-surface'] || defaultVars['--radius-surface'],
+  };
+}
+
 function resolveAsset(assetRefs: VideoCompositionAssetRef[], role: VideoCompositionAssetRef['role']): VideoCompositionAssetRef | undefined {
   return assetRefs.find((asset) => asset.role === role) || assetRefs[0];
+}
+
+function mergeSceneAssetRefs(
+  declaredAssetRefs: VideoCompositionAssetRef[],
+  inferredAssetRefs: VideoCompositionAssetRef[],
+): VideoCompositionAssetRef[] {
+  const seen = new Set<string>();
+  const merged: VideoCompositionAssetRef[] = [];
+  for (const asset of [...declaredAssetRefs, ...inferredAssetRefs]) {
+    const key = `${asset.role || 'asset'}:${asset.path}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ ...asset });
+  }
+  return merged;
+}
+
+function extractAvatarAssetRefs(scene: VideoCompositionScene): VideoCompositionAssetRef[] {
+  const avatarAssets = scene.content?.avatar_assets;
+  if (!avatarAssets || typeof avatarAssets !== 'object') {
+    return [];
+  }
+  return Object.entries(avatarAssets as Record<string, unknown>)
+    .filter(([, value]) => typeof value === 'string' && value.trim())
+    .map(([key, value]) => ({
+      asset_id: `${safeSceneKey(scene.scene_id)}-avatar-${safeSceneKey(key)}`,
+      path: String(value),
+      role: 'supporting' as const,
+    }));
+}
+
+function resolveAvatarAsset(
+  scene: CompiledVideoCompositionScene,
+  supporting?: VideoCompositionAssetRef,
+): VideoCompositionAssetRef | undefined {
+  const avatarAssets = scene.content?.avatar_assets;
+  if (avatarAssets && typeof avatarAssets === 'object') {
+    const variantKey = String(scene.content?.layout_variant || scene.content?.semantic || scene.role || '').toLowerCase();
+    const candidate = [
+      (avatarAssets as Record<string, unknown>)[variantKey],
+      (avatarAssets as Record<string, unknown>)[scene.role as string],
+      (avatarAssets as Record<string, unknown>)[String(scene.content?.semantic || '').toLowerCase()],
+      (avatarAssets as Record<string, unknown>)['default'],
+    ].find((value) => typeof value === 'string' && value.trim());
+    if (typeof candidate === 'string') {
+      return {
+        asset_id: `${safeSceneKey(scene.scene_id)}-avatar`,
+        path: candidate,
+        role: 'supporting',
+      };
+    }
+  }
+  return supporting;
 }
 
 function safeAssetName(assetPath: string): string {
@@ -1270,6 +1363,14 @@ function safeAssetName(assetPath: string): string {
     throw new Error(`Invalid asset path: ${assetPath}`);
   }
   return fileName;
+}
+
+function safeSceneKey(value: string): string {
+  return slugify(String(value || 'scene'));
+}
+
+function sanitizeCssClass(value: string): string {
+  return safeSceneKey(value);
 }
 
 function slugify(input: string): string {

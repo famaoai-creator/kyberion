@@ -12,6 +12,13 @@
   },
   "steps": [
     {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-runtime-preflight.json"
+      }
+    },
+    {
       "role": "sink",
       "op": "system:log",
       "params": {

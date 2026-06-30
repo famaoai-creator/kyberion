@@ -380,7 +380,7 @@ function resolveBodyZoneKey(semanticType: string, designSystemId: string | undef
 }
 
 function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) {
-  const themeColors = theme?.colors || {};
+  const themeColors = resolveThemeColors(theme);
   const primaryHex  = (themeColors.primary    || '#3867D6').replace('#', '');
   const accentHex   = (themeColors.accent     || '#0070C0').replace('#', '');
   const textHex     = (themeColors.text       || '#000000').replace('#', '');
@@ -841,7 +841,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const outputFormat = resolve(params.output_format) || pattern?.media_actuator_config?.engine || 'pptx';
 
       if (outputFormat === 'pptx') {
-        const themeColors = theme?.colors || {};
+        const themeColors = resolveThemeColors(theme);
         const themePack = ctx.active_theme_pack || null;
         const activeMaster = ctx.active_pptx_master || themePack?.pptx?.master;
         const canvas = ctx.active_canvas || themePack?.pptx?.canvas || { w: 10, h: 5.625 };
@@ -1135,6 +1135,40 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       logger.warn(`[MEDIA_TRANSFORM] Unknown transform op: ${op}`);
       return ctx;
   }
+}
+
+function resolveThemeColors(theme: any): Record<string, string> {
+  const cssVars = {
+    ...(theme?.css_vars || {}),
+    ...(theme?.theme?.css_vars || {}),
+  };
+  const colors = {
+    ...(theme?.colors || {}),
+    ...(theme?.theme?.colors || {}),
+  };
+  const mappedFromCssVars = {
+    background: cssVarHex(cssVars['--kb-bg-main']),
+    primary: cssVarHex(cssVars['--kb-panel-bg']) || cssVarHex(cssVars['--kb-bg-main']),
+    secondary: cssVarHex(cssVars['--kb-warning']),
+    accent: cssVarHex(cssVars['--kb-accent']),
+    text: cssVarHex(cssVars['--kb-text-primary']),
+  };
+  return Object.entries(mappedFromCssVars).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (value) acc[key] = value;
+    return acc;
+  }, { ...colors });
+}
+
+function cssVarHex(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  const hex = trimmed.match(/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+  if (hex) return trimmed;
+  const rgba = trimmed.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i);
+  if (!rgba) return undefined;
+  const channels = rgba.slice(1, 4).map((entry) => Math.max(0, Math.min(255, Number(entry))));
+  if (channels.some((entry) => !Number.isFinite(entry))) return undefined;
+  return `#${channels.map((entry) => entry.toString(16).padStart(2, '0')).join('')}`;
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {

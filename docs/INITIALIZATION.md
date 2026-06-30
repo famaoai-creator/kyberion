@@ -89,6 +89,16 @@ pnpm onboard
 - **物理的変化**:
   - まだ実体の変更は行いません。設定不足の候補だけが要約されます。
 
+### Service Preflight
+- **実行コマンド**: `pnpm service:preflight -- --service <service-id>`
+- **目的**: 実行直前に、特定の service が今使えるかを確認します。`services:setup` が「準備」、`service:preflight` が「実行可否」です。
+- **使いどころ**:
+  - `voice` / `meeting` のように bridge health を持つもの
+  - `media-generation` のように local runtime に依存するもの
+  - `google-workspace` のように auth と CLI health を合わせて見たいもの
+- **補足**:
+  - `pnpm services:setup` が未完でも `service:preflight` は実行できますが、auth が不足していれば失敗します。
+
 ### Stage 6: Reasoning Backend Setup
 - **実行コマンド**: `pnpm reasoning:setup`
 - **目的**: `claude-cli` / `gemini-cli` / `codex-cli` / `anthropic` / `nemotron-api` / `local` / `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します。
@@ -100,6 +110,15 @@ pnpm onboard
 - **目的**: `surface` / `service` / `reasoning` / `doctor` の readiness を一度に確認し、初期セットアップの抜けをまとめて潰します。
 - **物理的変化**:
   - まだ実体の変更は行いません。まとめた readiness summary が表示されます。
+
+### Media Runtime Preflight
+- **実行コマンド**: `pnpm service:preflight -- --service media-generation`
+- **補助コマンド**: `pnpm media:preflight`
+- **目的**: `media-generation` 系の実装や MV パイプラインを開始する前に、ローカルの ComfyUI サービス runtime が試行可能かを確認します。
+- **使いどころ**:
+  - `pnpm service:preflight -- --service media-generation` が通るなら、`media-generation` の runtime 側前提は少なくとも到達可能です。
+  - `pnpm media:preflight` は同じ runtime の簡易確認として使えます。
+  - 失敗した場合は `pnpm services:setup` とあわせて、ComfyUI の起動・プロビジョニング・接続先の確認を進めます。
 
 ### Stage 8: Runtime Surface Reconciliation
 - **実行コマンド**: `pnpm surfaces:reconcile`

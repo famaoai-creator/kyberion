@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "default_profile_id": "shadow-multilingual-clone",
+  "default_profile_id": "operator-ja-default",
   "profiles": [
     {
       "profile_id": "shadow-multilingual-clone",
