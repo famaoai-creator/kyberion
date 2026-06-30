@@ -275,7 +275,7 @@ export function resolveMeetingParticipationVoiceProfile(input: {
     const explicit = registry.profiles.find((profile) => profile.profile_id === requestedProfileId);
     if (!explicit) {
       throw new Error(
-        `[participate-cli] requested voice profile '${requestedProfileId}' is not present in the active registry. Available profiles: ${registry.profiles.map((profile) => profile.profile_id).join(', ') || '(none)'}`,
+        `[participate-cli] requested voice profile '${requestedProfileId}' is not present in the active registry.`,
       );
     }
     return explicit;
@@ -288,6 +288,13 @@ export function resolveMeetingParticipationVoiceProfile(input: {
     throw new Error('[participate-cli] no active voice profile is available in the registry');
   }
   return defaultProfile;
+}
+
+export function shouldResolveMeetingParticipationVoiceProfile(input: {
+  runtimePlan: ReturnType<typeof resolveMeetingParticipationRuntimePlan>;
+  voiceProfileId?: string;
+}): boolean {
+  return input.runtimePlan.require_voice_profile || Boolean(input.voiceProfileId?.trim());
 }
 
 async function main(): Promise<void> {
@@ -373,12 +380,13 @@ async function main(): Promise<void> {
       display_name: String(argv['display-name']),
     };
     const validatedTarget = prepareMeetingTarget(target);
-    const voiceProfile = resolveMeetingParticipationVoiceProfile({
-      voiceProfileId: typeof argv['voice-profile-id'] === 'string' ? String(argv['voice-profile-id']) : undefined,
-    });
-    if (runtimePlan.require_voice_profile && voiceProfile.status !== 'active') {
+    const requestedVoiceProfileId = typeof argv['voice-profile-id'] === 'string' ? String(argv['voice-profile-id']) : undefined;
+    const voiceProfile = shouldResolveMeetingParticipationVoiceProfile({ runtimePlan, voiceProfileId: requestedVoiceProfileId })
+      ? resolveMeetingParticipationVoiceProfile({ voiceProfileId: requestedVoiceProfileId })
+      : null;
+    if (runtimePlan.require_voice_profile && voiceProfile?.status !== 'active') {
       throw new Error(
-        `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires an active voice profile, but '${voiceProfile.profile_id}' is ${voiceProfile.status}`,
+        `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires an active voice profile, but '${voiceProfile?.profile_id ?? 'none'}' is ${voiceProfile?.status ?? 'missing'}`,
       );
     }
 
@@ -433,13 +441,13 @@ async function main(): Promise<void> {
     });
 
     logger.info(
-      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile.profile_id})`,
+      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile?.profile_id ?? 'not_required'})`,
     );
 
     const report = await coordinator.run(validatedTarget, {
       mission_id: missionId,
       max_minutes: Number(argv['max-minutes']),
-      voice_profile_id: voiceProfile.profile_id,
+      voice_profile_id: voiceProfile?.profile_id ?? '',
       audio_format: FORMAT,
       require_recording_consent: runtimePlan.require_recording_consent,
       require_voice_consent: runtimePlan.require_voice_consent,

@@ -11,6 +11,7 @@ vi.mock('./customer-resolver.js', () => ({
 }));
 
 import {
+  getWritableVoiceProfileRegistryForTier,
   getVoiceProfileRecord,
   getVoiceProfileRegistry,
   listVoiceProfiles,
@@ -231,5 +232,34 @@ describe('voice profile registry', () => {
     expect(registry.default_profile_id).toBe('me-ja');
     expect(getVoiceProfileRecord().profile_id).toBe('me-ja');
     expect(registry.profiles.some((profile) => profile.profile_id === 'me-ja')).toBe(true);
+  });
+
+  it('returns the personal overlay alone for personal-tier writes', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Personal Japanese',
+            tier: 'personal',
+            languages: ['ja'],
+            sample_refs: ['active/shared/tmp/sample-01.wav'],
+            default_engine_id: 'open_voice_clone',
+            status: 'active',
+          },
+        ],
+      }),
+    );
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const writable = getWritableVoiceProfileRegistryForTier('personal');
+    expect(writable.registryPath).toBe(overlayPath);
+    expect(writable.registry.default_profile_id).toBe('me-ja');
+    expect(writable.registry.profiles.map((profile) => profile.profile_id)).toEqual(['me-ja']);
+    expect(writable.registry.profiles.some((profile) => profile.profile_id === 'operator-ja-default')).toBe(false);
   });
 });

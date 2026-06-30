@@ -5,6 +5,7 @@ import {
   evaluateMeetingBootstrapGate,
   prepareMeetingTarget,
   resolveMeetingParticipationVoiceProfile,
+  shouldResolveMeetingParticipationVoiceProfile,
 } from './meeting_participate.js';
 import { resolveMeetingParticipationRuntimePlan } from '@agent/core';
 
@@ -134,6 +135,18 @@ describe('meeting_participate bootstrap gate', () => {
     expect(profile.profile_id).toBe('operator-ja-default');
   });
 
+  it('does not require voice profile registry resolution for transcribe-only runs', () => {
+    const transcribeFirst = resolveMeetingParticipationRuntimePlan({ transport_mode: 'transcribe_first' });
+    const realtimeVoice = resolveMeetingParticipationRuntimePlan({ transport_mode: 'realtime_voice' });
+
+    expect(shouldResolveMeetingParticipationVoiceProfile({ runtimePlan: transcribeFirst })).toBe(false);
+    expect(shouldResolveMeetingParticipationVoiceProfile({
+      runtimePlan: transcribeFirst,
+      voiceProfileId: 'operator-ja-default',
+    })).toBe(true);
+    expect(shouldResolveMeetingParticipationVoiceProfile({ runtimePlan: realtimeVoice })).toBe(true);
+  });
+
   it('rejects an explicit voice profile that is missing from the registry', () => {
     expect(() =>
       resolveMeetingParticipationVoiceProfile({
@@ -153,6 +166,6 @@ describe('meeting_participate bootstrap gate', () => {
           ],
         },
       }),
-    ).toThrow(/not present in the active registry/);
+    ).toThrow(/not present in the active registry\.$/);
   });
 });

@@ -158,6 +158,57 @@ export function getVoiceProfileRegistryPath(): string {
   return getRegistryPath();
 }
 
+function emptyRegistry(defaultProfileId = ''): VoiceProfileRegistry {
+  return {
+    version: '1.0.0',
+    default_profile_id: defaultProfileId,
+    profiles: [],
+  };
+}
+
+function readRegistryFileIfPresent(registryPath: string, label: string): VoiceProfileRegistry | null {
+  if (!safeExistsSync(registryPath)) return null;
+  return readRegistryFile(registryPath, label);
+}
+
+function loadBaseVoiceProfileRegistry(): VoiceProfileRegistry {
+  const registryPath = getRegistryPath();
+  const useCanonicalDirectory = !process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim() || registryPath === DEFAULT_REGISTRY_PATH;
+  const registryDir = useCanonicalDirectory ? getRegistryDir() : null;
+
+  if (!safeExistsSync(registryPath)) {
+    return (useCanonicalDirectory ? loadRegistryDirectory(registryDir || getRegistryDir()) : null) || FALLBACK_REGISTRY;
+  }
+
+  let parsed: VoiceProfileRegistry;
+  try {
+    parsed = readRegistryFile(registryPath, 'voice profile registry');
+  } catch (error: any) {
+    logger.warn(`[VOICE_PROFILE_REGISTRY] Failed to load base registry at ${registryPath}: ${error.message}`);
+    return FALLBACK_REGISTRY;
+  }
+
+  return (useCanonicalDirectory ? loadRegistryDirectory(registryDir || getRegistryDir(), parsed.default_profile_id) : null) || parsed;
+}
+
+export function getWritableVoiceProfileRegistryForTier(tier: VoiceProfileRecord['tier']): {
+  registry: VoiceProfileRegistry;
+  registryPath: string;
+} {
+  if (tier === 'personal' && !process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH?.trim()) {
+    const registryPath = getPersonalVoiceProfileRegistryPath();
+    return {
+      registry: readRegistryFileIfPresent(registryPath, 'personal voice profile registry') || emptyRegistry(),
+      registryPath,
+    };
+  }
+
+  return {
+    registry: loadBaseVoiceProfileRegistry(),
+    registryPath: getRegistryPath(),
+  };
+}
+
 function resolveVoiceProfileSampleStoreDir(profileId: string, tier: VoiceProfileRecord['tier']): string | null {
   const normalizedProfileId = String(profileId || '').trim();
   if (!normalizedProfileId) {
