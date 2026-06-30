@@ -156,6 +156,13 @@ describe('intent-resolution', () => {
     expect(liveVoicePacket.selected_resolution?.task_kind).toBe('voice_conversation');
   });
 
+  it('routes voice-learning requests to clone-my-voice rather than transcription', () => {
+    const packet = resolveIntentResolutionPacket('私の音声を学習して利用できるようにしてください');
+    expect(packet.selected_intent_id).toBe('clone-my-voice');
+    expect(packet.selected_resolution?.shape).toBe('pipeline');
+    expect(packet.selected_resolution?.result_shape).toBe('summary');
+  });
+
   it('surfaces recipe-style video bundles for explainer and ASCII utterances', () => {
     const manimPacket = resolveIntentResolutionPacket('3Blue1Brownみたいな数学解説動画を作って');
     expect(manimPacket.bundle_candidates?.map((bundle) => bundle.bundle_id)).toContain(
@@ -286,10 +293,13 @@ describe('intent-resolution', () => {
     resetIntentOverlayTestRoot();
     const baseGenerateReport = loadStandardIntentCatalog().find((intent) => intent.id === 'generate-report');
     const baseBootstrapProject = loadStandardIntentCatalog().find((intent) => intent.id === 'bootstrap-project');
+    const baseMeetingOperations = loadStandardIntentCatalog().find((intent) => intent.id === 'meeting-operations');
     expect(baseGenerateReport, 'missing base generate-report intent').toBeTruthy();
     expect(baseBootstrapProject, 'missing base bootstrap-project intent').toBeTruthy();
+    expect(baseMeetingOperations, 'missing base meeting-operations intent').toBeTruthy();
     const generateReport = baseGenerateReport!;
     const bootstrapProject = baseBootstrapProject!;
+    const meetingOperations = baseMeetingOperations!;
 
     const personalOverlayPath = path.join(
       INTENT_OVERLAY_TEST_ROOT,
@@ -299,12 +309,23 @@ describe('intent-resolution', () => {
       INTENT_OVERLAY_TEST_ROOT,
       'confidential/acme/orchestration/intent-catalog.json',
     );
+    const meetingOverlayPath = path.join(
+      INTENT_OVERLAY_TEST_ROOT,
+      'personal/orchestration/meeting-operations.intent-catalog.json',
+    );
 
     try {
       writeIntentOverlayCatalog(personalOverlayPath, [
         {
           ...generateReport,
           trigger_keywords: [...(generateReport.trigger_keywords || []), 'personal memo'],
+        },
+      ]);
+      writeIntentOverlayCatalog(meetingOverlayPath, [
+        {
+          ...meetingOperations,
+          trigger_keywords: [...(meetingOperations.trigger_keywords || []), 'zqxvmeetingoverlay'],
+          execution_profile_id: 'meeting-operations-google-meet-realtime-voice',
         },
       ]);
       writeIntentOverlayCatalog(confidentialOverlayPath, [
@@ -325,26 +346,41 @@ describe('intent-resolution', () => {
       expect(
         resolvedCatalog.find((intent) => intent.id === 'bootstrap-project')?.trigger_keywords || []
       ).toContain('confidential dossier');
-
       const personalPacket = resolveIntentResolutionPacket('personal memo をまとめて', {
         tier: 'personal',
-        overlayPaths: [personalOverlayPath],
+        overlayPaths: [personalOverlayPath, meetingOverlayPath],
       });
       expect(personalPacket.selected_intent_id).toBe('generate-report');
+
+      const personalMeetingPacket = resolveIntentResolutionPacket('zqxvmeetingoverlay を使って会議に参加して', {
+        tier: 'personal',
+        overlayPaths: [personalOverlayPath, meetingOverlayPath],
+      });
+      expect(personalMeetingPacket.selected_intent_id).toBe('meeting-operations');
+      expect(
+        personalMeetingPacket.bundle_candidates?.some((bundle) => bundle.bundle_id === 'meeting-operations-governed')
+      ).toBe(true);
 
       const confidentialFallbackPacket = resolveIntentResolutionPacket('personal memo をまとめて', {
         tier: 'confidential',
         tenantId: 'acme',
-        overlayPaths: [personalOverlayPath, confidentialOverlayPath],
+        overlayPaths: [personalOverlayPath, confidentialOverlayPath, meetingOverlayPath],
       });
       expect(confidentialFallbackPacket.selected_intent_id).toBe('generate-report');
 
       const confidentialPacket = resolveIntentResolutionPacket('confidential dossier をまとめて', {
         tier: 'confidential',
         tenantId: 'acme',
-        overlayPaths: [personalOverlayPath, confidentialOverlayPath],
+        overlayPaths: [personalOverlayPath, confidentialOverlayPath, meetingOverlayPath],
       });
       expect(confidentialPacket.selected_intent_id).toBe('bootstrap-project');
+
+      const confidentialMeetingPacket = resolveIntentResolutionPacket('zqxvmeetingoverlay の会議に参加して', {
+        tier: 'confidential',
+        tenantId: 'acme',
+        overlayPaths: [personalOverlayPath, confidentialOverlayPath, meetingOverlayPath],
+      });
+      expect(confidentialMeetingPacket.selected_intent_id).toBe('meeting-operations');
 
       const publicPacket = resolveIntentResolutionPacket('personal memo をまとめて');
       expect(publicPacket.selected_intent_id).not.toBe('generate-report');

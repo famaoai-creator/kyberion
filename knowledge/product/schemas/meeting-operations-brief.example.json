@@ -29,6 +29,63 @@
     "may_assign_action_items": true,
     "may_track_action_items": true
   },
+  "environment": {
+    "transport_mode": "realtime_voice",
+    "items": [
+      {
+        "kind": "browser",
+        "state": "required",
+        "reason": "Meeting participation always starts with a verified browser join backend.",
+        "setup_hint": "Use the meeting-browser-driver with a valid meeting URL."
+      },
+      {
+        "kind": "audio",
+        "state": "required",
+        "reason": "The runtime needs a virtual audio bus to listen to the meeting and route audio back if speaking is enabled.",
+        "setup_hint": "Use BlackHole on macOS or PulseAudio null sink on Linux."
+      },
+      {
+        "kind": "ffmpeg",
+        "state": "required",
+        "reason": "Audio bus negotiation and device probing depend on ffmpeg.",
+        "setup_hint": "Install ffmpeg before launching the meeting flow."
+      },
+      {
+        "kind": "stt",
+        "state": "required",
+        "reason": "The meeting flow listens first and extracts a transcript for follow-up work.",
+        "setup_hint": "Set KYBERION_STT_COMMAND or use the stub transcript path for dry runs."
+      },
+      {
+        "kind": "tts",
+        "state": "required",
+        "reason": "This profile allows speaking, so a TTS path is required.",
+        "setup_hint": "Set KYBERION_TTS_COMMAND and verify the chosen voice profile before joining."
+      },
+      {
+        "kind": "voice_profile",
+        "state": "required",
+        "reason": "Speaking uses a promoted runtime voice profile.",
+        "setup_hint": "Select an active voice profile id from the registry."
+      },
+      {
+        "kind": "voice_consent",
+        "state": "required",
+        "reason": "Speaking into a meeting requires mission-scoped voice consent.",
+        "setup_hint": "Create or verify evidence/voice-consent.json for the active mission."
+      },
+      {
+        "kind": "camera",
+        "state": "recommended",
+        "reason": "This meeting may benefit from visible participation, but camera is not mandatory unless explicitly requested.",
+        "setup_hint": "Enable a virtual camera only if the meeting will be video-on."
+      }
+    ],
+    "questions": [
+      "Will this meeting be video-on, or should Kyberion stay audio-only?",
+      "Will screen sharing or slides be needed?"
+    ]
+  },
   "own_tasks": ["Prepare the agenda", "Summarize the meeting"],
   "tracking_expectations": ["Track all owner/deadline pairs until closed"],
   "exit_conditions": [

@@ -24,6 +24,13 @@ Keep two layers distinct inside the shared coordination flow:
 2. Role layer: whether Kyberion should act as planner, facilitator, scribe, executor, decision-maker, or tracker.
 
 Use `meeting-operations-profile` to store the reusable role hints, the first questions Kyberion should ask, and the guardrails for speaking, joining, and tracking.
+Use `meeting-environment-policy.json` to keep device, transport, and consent decisions editable without code changes.
+Use `meeting_participate`'s runtime plan options to make the live execution path fail closed:
+
+- `--transport-mode transcribe_first` means listen-first participation. STT is required, TTS is optional, and voice consent is not needed unless speech is actually enabled elsewhere.
+- `--transport-mode realtime_voice` means full duplex participation. Real audio, streaming STT, streaming TTS, voice profile, recording consent, and voice consent are all required.
+- `--dry-run` disables hard prerequisites for validation and tests, but does not represent a live meeting run.
+- `--voice-profile-id` defaults to the active registry's default profile. If you pass one explicitly, it must exist in the registry before the meeting starts.
 
 ## Preflight
 
@@ -33,6 +40,7 @@ Before joining or speaking, decide which brief questions and role to use.
 2. Pick the brief question set that matches the meeting purpose.
 3. Pick the role set that matches the same purpose and authority.
 4. Ask only the first 1-3 questions that would materially change the meeting brief or authority boundary.
+5. Let the brief's `environment` block, driven by `meeting-environment-policy.json`, decide audio, camera, screen-share, STT, TTS, and consent prerequisites deterministically.
 
 Good fits for this preflight include planning meetings, status updates, decision meetings, workshops, incidents, one-on-ones, and reviews.
 
@@ -61,7 +69,7 @@ Where `meeting-request.json` should provide the governed meeting context, for ex
 3. Brief draft: create a meeting brief with purpose, participants, outcomes, and exit conditions.
 4. Role selection: choose the role hint from the profile, or ask if the choice is unclear.
 5. Join preparation: verify the meeting URL, platform, and join authority.
-6. Facilitation: join, listen, and speak only within the authority boundary.
+6. Facilitation: join, listen, and speak only within the authority boundary and the selected transport mode.
 7. Action items: extract items, assign owners when authorized, and record deadlines.
 8. Tracking: push follow-ups into the configured tracking channel and keep them open until closed.
 9. Review: propose reusable preference updates for `knowledge/personal/` only when the user approves.

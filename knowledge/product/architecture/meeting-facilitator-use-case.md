@@ -46,6 +46,9 @@ Before stage 1 starts, Kyberion now compiles a meeting brief from the
 requested purpose and the stored `meeting-operations-profile`. That
 brief decides the initial role hint, the authority boundary, and the
 first clarification questions when the meeting request is underspecified.
+The same brief now also carries a deterministic `environment` plan so
+audio, camera, screen-sharing, STT, TTS, and voice-consent prerequisites
+are decided in one place instead of by ad hoc branching later.
 
 After every run, a summary is printed:
 
