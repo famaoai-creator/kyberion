@@ -1,0 +1,16 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "pdf_split",
+      "params": {
+        "path": "active/shared/tmp/media/input.pdf",
+        "password": "{{env.PDF_PASSWORD}}",
+        "out_dir": "active/shared/tmp/media/pdf-pages",
+        "prefix": "page",
+        "export_as": "pdf_pages"
+      }
+    }
+  ]
+}

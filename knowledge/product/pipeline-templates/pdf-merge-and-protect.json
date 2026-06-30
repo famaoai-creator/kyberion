@@ -1,0 +1,62 @@
+{
+  "pipeline_id": "pdf-merge-and-protect",
+  "version": "1.0.0",
+  "name": "PDF: Merge → Title → Encrypt (protected deliverable)",
+  "description": "複数のPDFを1つに結合し、タイトル(メタデータ)を付与し、パスワード保護(AES-256)した配布用PDFを生成する。media-actuator の pypdf backend op (pdf_merge → pdf_metadata → pdf_encrypt) を連結する複合テンプレート。",
+  "_usage": "1) 結合したいPDFを context.pdf_a / pdf_b に指定（3つ以上なら最初の merge ステップの inputs 配列に追記）。2) パスワードは環境変数で渡す: PDF_USER_PASSWORD（開封用）, PDF_OWNER_PASSWORD（権限用、省略時は user と同じ）。3) 実行: PDF_USER_PASSWORD='...' pnpm pipeline --input <this file>。",
+  "_notes": "前提: python3 -m pip install 'pypdf[crypto]'（pdf_encrypt の AES-256 に cryptography が必要）。各ステップの出力パスは前段の {{channel.out}}（repo-relative）で連結。中間ファイルは work_dir に残る。出力(出力先 output_path)は機微なら active/shared/tmp ではなく vault/ 等の保護tierへ。パスワードは step params で {{env.*}} を直接参照し op の stdin 経由で渡る（argv非表示）。シェル履歴やverbose traceに残さないため、より厳密には secret-actuator 経由を推奨。",
+  "action": "pipeline",
+  "context": {
+    "pdf_a": "active/shared/tmp/media/part-a.pdf",
+    "pdf_b": "active/shared/tmp/media/part-b.pdf",
+    "title": "Combined Document",
+    "work_dir": "active/shared/tmp/pdf-merge-and-protect",
+    "output_path": "active/shared/tmp/pdf-merge-and-protect/protected.pdf"
+  },
+  "steps": [
+    {
+      "id": "merge",
+      "role": "source",
+      "op": "media:pdf_merge",
+      "produces": { "channel": "merged", "type": "PdfResult" },
+      "params": {
+        "inputs": ["{{pdf_a}}", "{{pdf_b}}"],
+        "out": "{{work_dir}}/merged.pdf",
+        "export_as": "merged"
+      }
+    },
+    {
+      "id": "set-title",
+      "role": "transform",
+      "op": "media:pdf_metadata",
+      "consumes": ["merged"],
+      "produces": { "channel": "titled", "type": "PdfResult" },
+      "params": {
+        "path": "{{merged.out}}",
+        "set": { "Title": "{{title}}" },
+        "out": "{{work_dir}}/titled.pdf",
+        "export_as": "titled"
+      }
+    },
+    {
+      "id": "encrypt",
+      "role": "transform",
+      "op": "media:pdf_encrypt",
+      "consumes": ["titled"],
+      "produces": { "channel": "packaged", "type": "PdfResult" },
+      "params": {
+        "path": "{{titled.out}}",
+        "user_password": "{{env.PDF_USER_PASSWORD}}",
+        "owner_password": "{{env.PDF_OWNER_PASSWORD}}",
+        "out": "{{output_path}}",
+        "export_as": "packaged"
+      }
+    },
+    {
+      "id": "log-done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🔐 [PDF] Merged → titled → encrypted: {{output_path}} ({{packaged.count}} pages)" }
+    }
+  ]
+}

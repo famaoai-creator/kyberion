@@ -7,6 +7,11 @@ import { rawExistsSync, rawMkdirp, rawReadTextFile } from './fs-primitives.js';
  */
 
 function findProjectRoot(startDir: string): string {
+  // (d) Explicit override wins — robust for sub-directory / non-standard cwd execution.
+  const envRoot = process.env.KYBERION_ROOT;
+  if (envRoot && rawExistsSync(path.join(envRoot, 'package.json'))) {
+    return path.resolve(envRoot);
+  }
   let current = startDir;
   while (current !== path.parse(current).root) {
     if (
@@ -327,6 +332,30 @@ export function rootResolve(relativePath: string) {
   return path.isAbsolute(relativePath) ? relativePath : path.join(PROJECT_ROOT_DIR, relativePath);
 }
 
+/**
+ * (a) Convert an absolute path under the project root to a portable, repo-relative path.
+ * Call this BEFORE persisting any path into a registry / ADF / JSON so stored paths never
+ * embed a machine-specific prefix (e.g. a `<home>/<user>/...` absolute path). A path that is
+ * already relative, or absolute but OUTSIDE the project root, is returned unchanged.
+ */
+export function toRepoRelative(targetPath: string): string {
+  if (!targetPath || !path.isAbsolute(targetPath)) return targetPath;
+  const rel = path.relative(PROJECT_ROOT_DIR, targetPath);
+  return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : targetPath;
+}
+
+/**
+ * (b) Normalize a stored path for portability. Relativizes an absolute path that lives
+ * under the project root; flags a foreign absolute path (outside the root) so callers can
+ * warn instead of silently persisting a machine-specific path. Relative paths pass through.
+ */
+export function normalizeStoredPath(targetPath: string): { path: string; foreign: boolean } {
+  if (!targetPath || !path.isAbsolute(targetPath)) return { path: targetPath, foreign: false };
+  const rel = path.relative(PROJECT_ROOT_DIR, targetPath);
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return { path: rel, foreign: false };
+  return { path: targetPath, foreign: true };
+}
+
 // Named export for older scripts that import * as pathResolver
 export const pathResolver = {
   rootDir: () => PROJECT_ROOT_DIR,
@@ -362,4 +391,6 @@ export const pathResolver = {
   volatile,
   resolve,
   rootResolve,
+  toRepoRelative,
+  normalizeStoredPath,
 };

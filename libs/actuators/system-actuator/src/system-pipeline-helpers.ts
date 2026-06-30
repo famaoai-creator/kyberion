@@ -201,6 +201,7 @@ const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
   'list_service_runtimes',
   'control_media_devices',
   'collect_artifacts',
+  'resolve_path',
   'sample_traces',
   'vision_consult',
   'test_screen_stream',
@@ -1008,6 +1009,44 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'camera_injection_test']: injectionResult,
       };
+    }
+    case 'resolve_path': {
+      // Pure (no-I/O) path resolution so pipelines/ADF never embed a machine-specific
+      // prefix. Modes mirror pathResolver: `resolve`/domain helpers expand a portable
+      // input to a machine-local absolute path (runtime use only); `to_relative`/`normalize`
+      // collapse an absolute path back to a portable repo-relative path (safe to persist).
+      const mode = typeof params.mode === 'string' ? params.mode.trim() : 'resolve';
+      const input = params.path !== undefined ? String(resolve(params.path)) : '';
+      let result: unknown;
+      switch (mode) {
+        case 'resolve':
+          result = pathResolver.resolve(input);
+          break;
+        case 'to_relative':
+          result = pathResolver.toRepoRelative(input);
+          break;
+        case 'normalize':
+          result = pathResolver.normalizeStoredPath(input);
+          break;
+        case 'shared':
+          result = pathResolver.shared(input);
+          break;
+        case 'knowledge':
+          result = pathResolver.knowledge(input);
+          break;
+        case 'active':
+          result = pathResolver.active(input);
+          break;
+        case 'tmp':
+          result = pathResolver.shared(input ? `tmp/${input}` : 'tmp');
+          break;
+        case 'vault':
+          result = pathResolver.vault(input);
+          break;
+        default:
+          throw new Error(`resolve_path: unsupported mode "${mode}" (expected resolve|to_relative|normalize|shared|knowledge|active|tmp|vault)`);
+      }
+      return { ...ctx, [params.export_as || 'resolved_path']: result };
     }
     default:
       throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
