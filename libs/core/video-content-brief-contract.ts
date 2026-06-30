@@ -1,5 +1,10 @@
 import type { NarratedVideoBrief } from './narrated-video-brief-compiler.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
+import {
+  composeWebDesignSystem,
+  DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
+  DEFAULT_CHRONOS_WEB_THEME_PACK,
+} from './web-design-system.js';
 
 export type VideoPresentationMode = 'howto' | 'promo' | 'vtuber';
 
@@ -17,6 +22,11 @@ export interface VideoContentBrief {
   constraints: string[];
   proof_points: string[];
   content_requirements?: string[];
+  format?: {
+    width?: number;
+    height?: number;
+    aspect_ratio?: string;
+  };
   fixed_inputs?: {
     customer?: string;
     use_case?: string;
@@ -35,6 +45,7 @@ export interface VideoContentBrief {
     logo_path?: string;
     hero_path?: string;
     fps?: number;
+    css_vars?: Record<string, string>;
   };
 }
 
@@ -54,6 +65,7 @@ export interface VideoStoryboardBeat {
   asset_refs?: string[];
   asset_requirements?: string[];
   design_token_hints?: Record<string, unknown>;
+  layout_variant?: string;
 }
 
 export interface VideoStoryboard {
@@ -69,6 +81,7 @@ export interface VideoStoryboard {
   format: {
     width: number;
     height: number;
+    aspect_ratio?: string;
   };
   audio_direction?: string;
   design_system_ref?: VideoContentBrief['design_system_ref'];
@@ -92,6 +105,7 @@ export interface VideoStoryboardToNarratedBriefOptions {
     target_path?: string;
     bundle_dir?: string;
     await_completion?: boolean;
+    detached_background?: boolean;
   };
 }
 
@@ -120,12 +134,17 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
   const background = brief.design_system_ref.background_color || modeDefaults.background_color;
   const layoutFamily = brief.design_system_ref.layout_family || modeDefaults.layout_family;
   const motionProfile = brief.design_system_ref.motion_profile || modeDefaults.motion_profile;
+  const format = resolveStoryboardFormat(brief.format);
 
   let startSec = 0;
   const beats = beatPlan.map((entry, index) => {
     const duration = index === beatPlan.length - 1
       ? roundTo2(Math.max(0.1, durationSec - startSec))
       : durations[index];
+    const designTokenHints = entry.designTokenHints(brief);
+    const layoutVariant = typeof designTokenHints.layout_variant === 'string'
+      ? designTokenHints.layout_variant
+      : inferLayoutVariant(presentationMode, entry.role, entry.semantic, index, beatPlan.length);
     const beat: VideoStoryboardBeat = {
       beat_id: entry.id,
       title: entry.title(brief),
@@ -141,7 +160,8 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
       caption_intent: entry.captionIntent(brief),
       asset_refs: resolveAssetRefs(brief, entry),
       asset_requirements: entry.assetRequirements(brief),
-      design_token_hints: entry.designTokenHints(brief),
+      design_token_hints: designTokenHints,
+      layout_variant: layoutVariant,
     };
     startSec += duration;
     return beat;
@@ -157,7 +177,7 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
     presentation_mode: presentationMode,
     promise: brief.promise,
     desired_takeaway: brief.desired_takeaway,
-    format: { width: 1920, height: 1080 },
+    format,
     audio_direction: brief.tone
       ? `${brief.tone} narration for ${brief.audience}`
       : `${presentationMode} narration for ${brief.audience}`,
@@ -166,6 +186,7 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
       background_color: background,
       layout_family: layoutFamily,
       motion_profile: motionProfile,
+      css_vars: buildVideoDesignCssVars(background, layoutFamily, motionProfile, brief.design_system_ref),
     },
     beats,
   };
@@ -224,6 +245,7 @@ export function compileVideoStoryboardToNarratedVideoBrief(
       target_path: options.output?.target_path,
       bundle_dir: options.output?.bundle_dir,
       await_completion: options.output?.await_completion,
+      detached_background: options.output?.detached_background,
     },
   };
 }
@@ -307,6 +329,100 @@ function getModeDefaults(mode: VideoPresentationMode): { layout_family: string; 
   };
 }
 
+function buildVideoDesignCssVars(
+  backgroundColor: string,
+  layoutFamily: string,
+  motionProfile: string,
+  designSystemRef: VideoContentBrief['design_system_ref'],
+): Record<string, string> {
+  const baseVars = composeWebDesignSystem(DEFAULT_CHRONOS_WEB_THEME_PACK, DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK).css_vars;
+  const palette = derivePalette(backgroundColor, layoutFamily);
+  return {
+    ...baseVars,
+    '--kb-bg-main': backgroundColor,
+    '--kb-panel-bg': palette.panelBg,
+    '--kb-accent': palette.accent,
+    '--kb-warning': palette.warning,
+    '--kb-text-primary': palette.textPrimary,
+    '--kb-text-secondary': palette.textSecondary,
+    '--kb-font-sans': designSystemRef.brand_name ? '"Inter", -apple-system, BlinkMacSystemFont, sans-serif' : '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+    '--kb-panel-radius': layoutFamily === 'vtuber-stage' ? '32px' : '24px',
+    '--kb-surface-radius': layoutFamily === 'vtuber-stage' ? '30px' : '24px',
+    '--kb-section-gap': layoutFamily === 'vtuber-stage' ? '28px' : '24px',
+    '--kb-content-gap': motionProfile === 'guided-step' ? '18px' : '16px',
+    '--kb-glow-cyan': `0 0 24px ${palette.glow}`,
+    ...designSystemRef.css_vars,
+  };
+}
+
+function derivePalette(backgroundColor: string, layoutFamily: string): {
+  panelBg: string;
+  accent: string;
+  warning: string;
+  textPrimary: string;
+  textSecondary: string;
+  glow: string;
+} {
+  if (layoutFamily === 'promo-spot') {
+    return {
+      panelBg: 'rgba(15, 23, 42, 0.9)',
+      accent: '#f59e0b',
+      warning: '#fb7185',
+      textPrimary: '#f8fafc',
+      textSecondary: 'rgba(248, 250, 252, 0.72)',
+      glow: 'rgba(245, 158, 11, 0.42)',
+    };
+  }
+  if (layoutFamily === 'vtuber-stage') {
+    return {
+      panelBg: 'rgba(15, 23, 42, 0.92)',
+      accent: '#60a5fa',
+      warning: '#22c55e',
+      textPrimary: '#f8fafc',
+      textSecondary: 'rgba(226, 232, 240, 0.78)',
+      glow: 'rgba(96, 165, 250, 0.44)',
+    };
+  }
+  return {
+    panelBg: 'rgba(15, 23, 42, 0.86)',
+    accent: '#3b82f6',
+    warning: '#94a3b8',
+    textPrimary: '#f8fafc',
+    textSecondary: 'rgba(148, 163, 184, 0.86)',
+    glow: 'rgba(59, 130, 246, 0.34)',
+  };
+}
+
+function resolveStoryboardFormat(format?: VideoContentBrief['format']): { width: number; height: number; aspect_ratio: string } {
+  const width = clampDimension(format?.width || 1920);
+  const height = clampDimension(format?.height || 1080);
+  const aspectRatio = normalizeAspectRatio(format?.aspect_ratio || `${width}:${height}`) || `${width}:${height}`;
+  return { width, height, aspect_ratio: aspectRatio };
+}
+
+function inferLayoutVariant(
+  presentationMode: VideoPresentationMode,
+  role: VideoCompositionSceneRole,
+  semantic: string,
+  index: number,
+  total: number,
+): string {
+  if (presentationMode === 'vtuber') {
+    if (role === 'hook' || semantic === 'hook') return 'focus-center';
+    if (semantic === 'demo' || semantic === 'process' || semantic === 'steps') return 'fullscreen-demo';
+    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || index === total - 1) return 'split-right';
+    return 'split-left';
+  }
+  if (presentationMode === 'promo') {
+    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || index === total - 1) return 'split-right';
+    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact') return 'fullscreen-demo';
+    return 'split-left';
+  }
+  if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') return 'split-left';
+  if (role === 'outro' || semantic === 'cta' || semantic === 'validation') return 'split-right';
+  return 'split-left';
+}
+
 function createBeatEntry(
   id: string,
   title: string,
@@ -385,4 +501,20 @@ function roundTo2(value: number): number {
 
 function capitalize(value: string): string {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function clampDimension(value: number): number {
+  return Math.max(320, Math.min(7680, Math.round(value)));
+}
+
+function normalizeAspectRatio(value: string): string | undefined {
+  const normalized = String(value || '').trim();
+  if (!normalized) return undefined;
+  if (/^\d+:\d+$/.test(normalized)) return normalized;
+  const match = normalized.match(/^(\d+(?:\.\d+)?)[xX](\d+(?:\.\d+)?)$/);
+  if (!match) return undefined;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return undefined;
+  return `${Math.round(width)}:${Math.round(height)}`;
 }

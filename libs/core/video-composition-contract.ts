@@ -39,6 +39,7 @@ export interface VideoCompositionADF {
     bundle_dir?: string;
     emit_progress_packets?: boolean;
     await_completion?: boolean;
+    detached_background?: boolean;
   };
 }
 

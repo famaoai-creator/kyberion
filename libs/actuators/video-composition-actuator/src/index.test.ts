@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => '1'),
   safeExistsSync: vi.fn(() => true),
   safeStat: vi.fn(() => ({ size: 4096 })),
+  safeMkdir: vi.fn(),
+  safeWriteFile: vi.fn(),
   withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   getVideoCompositionTemplateRegistry: vi.fn(() => ({
     version: 'test',
@@ -105,6 +107,8 @@ vi.mock('@agent/core', async () => {
     safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
     safeStat: mocks.safeStat,
+    safeMkdir: mocks.safeMkdir,
+    safeWriteFile: mocks.safeWriteFile,
     withRetry: mocks.withRetry,
     getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
     getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
@@ -130,6 +134,8 @@ describe('video-composition-actuator', () => {
       return '{}';
     });
     vi.mocked(mocks.safeExistsSync).mockImplementation(() => true);
+    vi.mocked(mocks.safeWriteFile).mockImplementation(() => undefined);
+    vi.mocked(mocks.safeMkdir).mockImplementation(() => undefined);
     vi.mocked(mocks.safeExec).mockImplementation((command: string, args: any[]) => {
       if (command === 'ffprobe' && Array.isArray(args) && args.includes('a:0')) {
         return '0';
@@ -501,8 +507,13 @@ describe('video-composition-actuator', () => {
       status: 'queued',
       await_completion: false,
       output_format: 'mp4',
+      job_ticket_path: expect.stringContaining('/tmp/video-composition/job-state.json'),
     }));
     expect(typeof queued.job_id).toBe('string');
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining('/tmp/video-composition/job-state.json'),
+      expect.stringContaining(`"job_id": "${queued.job_id}"`),
+    );
 
     const queue = await handleAction({
       action: 'get_video_composition_queue',
