@@ -61,6 +61,41 @@ export function mergeParamsWithConnection(connection: Record<string, any>, param
 }
 
 /**
+ * Resolve an inline path token of the form `@domain[:subPath]` to an absolute, machine-local
+ * path via {@link pathResolver}. Used so templates can reference repo locations portably
+ * (`{{@shared:tmp/run.json}}`, `{{@knowledge:product/x.md}}`, `{{@root}}`) without hard-coding a
+ * machine-specific prefix. Returns `undefined` for an unknown domain so the caller keeps the
+ * literal token (no silent wrong resolution).
+ *
+ * NOTE: the result is an ABSOLUTE, machine-local path — fine for runtime use (feeding an op or
+ * tool), but it must NOT be persisted. Use `system:resolve_path`'s `to_relative`/`normalize`
+ * (or `pathResolver.toRepoRelative`) before storing a path.
+ */
+function resolvePathToken(token: string): string | undefined {
+  const trimmed = token.slice(1).trim(); // drop leading '@'
+  const sepIdx = trimmed.indexOf(':');
+  const domain = (sepIdx >= 0 ? trimmed.slice(0, sepIdx) : trimmed).trim();
+  const subPath = sepIdx >= 0 ? trimmed.slice(sepIdx + 1).trim() : '';
+  switch (domain) {
+    case 'root':
+      return subPath ? pathResolver.rootResolve(subPath) : pathResolver.rootDir();
+    case 'knowledge':
+      return pathResolver.knowledge(subPath);
+    case 'active':
+      return pathResolver.active(subPath);
+    case 'shared':
+      return pathResolver.shared(subPath);
+    case 'tmp':
+      // Build under shared/tmp without triggering sharedTmp()'s mkdir side effect.
+      return pathResolver.shared(subPath ? `tmp/${subPath}` : 'tmp');
+    case 'vault':
+      return pathResolver.vault(subPath);
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Substitute `{{var}}` placeholders from `vars`. Resolution is **recursive but bounded**:
  * the string is re-scanned up to `maxDepth` passes so indirect references unwrap (e.g. a
  * context var that itself holds `{{env.X}}`), stopping at a fixpoint (a pass that changes
@@ -68,6 +103,9 @@ export function mergeParamsWithConnection(connection: Record<string, any>, param
  *  - unknown keys are left as their literal `{{key}}` → they produce no progress, so they
  *    can never drive an endless loop;
  *  - cyclic / self references (`a→b→a`, `a→a`) are bounded by `maxDepth` and warn once.
+ *
+ * Inline path tokens (`{{@domain:subPath}}`) resolve to machine-local absolute paths via
+ * {@link resolvePathToken} so templates stay portable across machines.
  */
 export function resolveVars(
   input: string | undefined,
@@ -78,7 +116,12 @@ export function resolveVars(
   let out = input;
   for (let pass = 0; pass < maxDepth; pass++) {
     const next = out.replace(/{{(.*?)}}/g, (match, key) => {
-      const value = vars[key.trim()];
+      const trimmedKey = key.trim();
+      if (trimmedKey.startsWith('@')) {
+        const resolved = resolvePathToken(trimmedKey);
+        return resolved !== undefined ? resolved : match; // unknown domain → keep literal
+      }
+      const value = vars[trimmedKey];
       return value !== undefined ? String(value) : match; // unknown → keep literal (no progress)
     });
     if (next === out) return out; // fixpoint: nothing left to resolve
@@ -97,7 +140,12 @@ export function resolveTemplateValue(input: any, vars: Record<string, any>): any
     const trimmed = input.trim();
     const wholeVarMatch = trimmed.match(/^{{\s*([^}]+)\s*}}$/);
     if (wholeVarMatch) {
-      const value = vars[wholeVarMatch[1].trim()];
+      const token = wholeVarMatch[1].trim();
+      if (token.startsWith('@')) {
+        const resolved = resolvePathToken(token);
+        return resolved !== undefined ? resolved : input;
+      }
+      const value = vars[token];
       return value !== undefined ? value : input;
     }
     return resolveVars(input, vars);

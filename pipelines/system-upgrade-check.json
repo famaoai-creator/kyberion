@@ -41,7 +41,7 @@
             "op": "system:shell",
             "produces": { "channel": "create_result", "type": "ShellResult" },
             "params": {
-              "cmd": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development /knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'"
+              "cmd": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'"
             }
           },
           { "role": "sink", "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: node dist/scripts/mission_controller.js start MSN-SYS-UPGRADE-{{remote_hash}}" } },

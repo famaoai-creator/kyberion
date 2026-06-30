@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import { evaluateCondition, getPathValue, resolveVars, resolveWriteArtifactSpec } from './logic-utils.js';
+import { pathResolver } from '../path-resolver.js';
 
 describe('logic-utils', () => {
   const ctx = {
@@ -37,6 +39,27 @@ describe('logic-utils', () => {
     const numCtx = { count: 42 };
     expect(resolveVars('{{count}}', numCtx)).toBe(42);
     expect(resolveVars('{{missing|0}}', numCtx)).toBe('0');
+  });
+
+  it('resolveVars resolves inline @domain path tokens to machine-local paths', () => {
+    expect(resolveVars('{{@root}}', ctx)).toBe(pathResolver.rootDir());
+    expect(resolveVars('{{@knowledge:product/x.md}}', ctx)).toBe(pathResolver.knowledge('product/x.md'));
+    expect(resolveVars('{{@shared:tmp/run.json}}', ctx)).toBe(pathResolver.shared('tmp/run.json'));
+    expect(resolveVars('{{@tmp:run.json}}', ctx)).toBe(pathResolver.shared('tmp/run.json'));
+  });
+
+  it('resolveVars interpolates @domain path tokens within a larger string', () => {
+    expect(resolveVars('input={{@knowledge:a.json}}', ctx)).toBe(`input=${pathResolver.knowledge('a.json')}`);
+  });
+
+  it('resolveVars keeps an unknown @domain token literal', () => {
+    expect(resolveVars('{{@nope:x}}', ctx)).toBe('{{@nope:x}}');
+  });
+
+  it('resolveVars produces absolute, in-repo path-token results', () => {
+    const resolved = resolveVars('{{@active:missions}}', ctx) as string;
+    expect(path.isAbsolute(resolved)).toBe(true);
+    expect(resolved.startsWith(pathResolver.rootDir())).toBe(true);
   });
 
   it('resolves multi-var strings that start AND end with {{ }} correctly', () => {
