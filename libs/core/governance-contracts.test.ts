@@ -54,6 +54,69 @@ const CASES: GovernanceSchemaCase[] = [
     },
   },
   {
+    name: 'meeting-environment-policy',
+    schemaPath: 'knowledge/product/schemas/meeting-environment-policy.schema.json',
+    dataPath: 'knowledge/product/governance/meeting-environment-policy.json',
+    invalidPayload: {
+      version: '1.0.0',
+      transport_modes: {
+        speaking_allowed: 'realtime_voice',
+        speaking_blocked: 'transcribe_first',
+      },
+      base_items: [],
+      speaking: {
+        explicit_patterns: [],
+        allowed_items: [],
+        blocked_items: [],
+      },
+      camera: {
+        explicit_patterns: [],
+        recommended_roles: [],
+        recommended_purposes: [],
+        required_item: {
+          kind: 'camera',
+          state: 'required',
+          reason: 'x',
+        },
+        recommended_item: {
+          kind: 'camera',
+          state: 'recommended',
+          reason: 'x',
+        },
+        not_needed_item: {
+          kind: 'camera',
+          state: 'not_needed',
+          reason: 'x',
+        },
+      },
+      screen_share: {
+        explicit_patterns: [],
+        recommended_roles: [],
+        recommended_purposes: [],
+        required_item: {
+          kind: 'screen_share',
+          state: 'required',
+          reason: 'x',
+        },
+        recommended_item: {
+          kind: 'screen_share',
+          state: 'recommended',
+          reason: 'x',
+        },
+        not_needed_item: {
+          kind: 'screen_share',
+          state: 'not_needed',
+          reason: 'x',
+        },
+      },
+      questions: {
+        camera_recommended: 'x',
+        screen_share_recommended: 'x',
+        speaking_blocked: 'x',
+      },
+    },
+  },
+  {
     name: 'active-surfaces',
     schemaPath: 'knowledge/product/schemas/runtime-surface-manifest.schema.json',
     dataPath: 'knowledge/product/governance/active-surfaces.json',

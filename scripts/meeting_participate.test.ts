@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { TraceContext } from '@agent/core';
-import { evaluateMeetingBootstrapGate, prepareMeetingTarget } from './meeting_participate.js';
+import {
+  assertMeetingParticipationRuntime,
+  evaluateMeetingBootstrapGate,
+  prepareMeetingTarget,
+  resolveMeetingParticipationVoiceProfile,
+} from './meeting_participate.js';
+import { resolveMeetingParticipationRuntimePlan } from '@agent/core';
 
 describe('meeting_participate bootstrap gate', () => {
   it('records a failed gate in trace and returns not ready', async () => {
@@ -74,5 +80,79 @@ describe('meeting_participate bootstrap gate', () => {
         platform: 'auto',
       } as any),
     ).toThrow(/unsupported meeting URL/i);
+  });
+
+  it('fails closed when realtime voice is requested without real bridges', () => {
+    const plan = resolveMeetingParticipationRuntimePlan({ transport_mode: 'realtime_voice' });
+
+    expect(() =>
+      assertMeetingParticipationRuntime({
+        runtimePlan: plan,
+        bus: { bus_id: 'stub' },
+        busProbe: { available: true },
+        stt: { bridge_id: 'stub' },
+        tts: { bridge_id: 'stub' },
+      }),
+    ).toThrow(/requires a real audio bus/);
+  });
+
+  it('allows dry-run plans to proceed with stubbed runtime pieces', () => {
+    const plan = resolveMeetingParticipationRuntimePlan({
+      transport_mode: 'realtime_voice',
+      dry_run: true,
+    });
+
+    expect(() =>
+      assertMeetingParticipationRuntime({
+        runtimePlan: plan,
+        bus: { bus_id: 'stub' },
+        busProbe: { available: false, reason: 'not installed' },
+        stt: { bridge_id: 'stub' },
+        tts: { bridge_id: 'stub' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('resolves the registry default voice profile when none is provided', () => {
+    const profile = resolveMeetingParticipationVoiceProfile({
+      registry: {
+        version: 'test',
+        default_profile_id: 'operator-ja-default',
+        profiles: [
+          {
+            profile_id: 'operator-ja-default',
+            display_name: 'Operator Japanese Default',
+            tier: 'public',
+            languages: ['ja'],
+            default_engine_id: 'local_say',
+            status: 'active',
+          },
+        ],
+      },
+    });
+
+    expect(profile.profile_id).toBe('operator-ja-default');
+  });
+
+  it('rejects an explicit voice profile that is missing from the registry', () => {
+    expect(() =>
+      resolveMeetingParticipationVoiceProfile({
+        voiceProfileId: 'operator-default-v1',
+        registry: {
+          version: 'test',
+          default_profile_id: 'operator-ja-default',
+          profiles: [
+            {
+              profile_id: 'operator-ja-default',
+              display_name: 'Operator Japanese Default',
+              tier: 'public',
+              languages: ['ja'],
+              default_engine_id: 'local_say',
+              status: 'active',
+            },
+          ],
+        },
+      }),
+    ).toThrow(/not present in the active registry/);
   });
 });

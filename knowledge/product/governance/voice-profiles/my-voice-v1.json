@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "default_profile_id": "my-voice-v1",
+  "default_profile_id": "operator-ja-default",
   "profiles": [
     {
       "profile_id": "my-voice-v1",

@@ -30,6 +30,7 @@ import {
   getMeetingJoinDriver,
   getStreamingSttBridge,
   getStreamingTtsBridge,
+  getVoiceProfileRegistry,
   installShellStreamingSttBridgeFromEnv,
   installShellStreamingTtsBridgeFromEnv,
   loadEnvironmentManifest,
@@ -46,6 +47,7 @@ import {
   type MeetingTarget,
   type TranscriptChunk,
   getReasoningBackend,
+  resolveMeetingParticipationRuntimePlan,
   validateMeetingTarget,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -237,6 +239,57 @@ export async function evaluateMeetingBootstrapGate(
   }
 }
 
+export function assertMeetingParticipationRuntime(input: {
+  runtimePlan: ReturnType<typeof resolveMeetingParticipationRuntimePlan>;
+  bus: { bus_id: string };
+  busProbe: { available: boolean; reason?: string };
+  stt: { bridge_id: string };
+  tts: { bridge_id: string };
+}): void {
+  const { runtimePlan, bus, busProbe, stt, tts } = input;
+  if (runtimePlan.require_real_audio_bus && (bus.bus_id === 'stub' || !busProbe.available)) {
+    throw new Error(
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires a real audio bus, but bus='${bus.bus_id}' probe='${busProbe.reason ?? 'unavailable'}'`,
+    );
+  }
+  if (runtimePlan.require_streaming_stt && stt.bridge_id === 'stub') {
+    throw new Error(
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming STT, but only the stub bridge is registered. Set KYBERION_STT_COMMAND or register a real bridge.`,
+    );
+  }
+  if (runtimePlan.require_streaming_tts && tts.bridge_id === 'stub') {
+    throw new Error(
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming TTS, but only the stub bridge is registered. Set KYBERION_TTS_COMMAND or register a real bridge.`,
+    );
+  }
+}
+
+export function resolveMeetingParticipationVoiceProfile(input: {
+  voiceProfileId?: string;
+  registry?: ReturnType<typeof getVoiceProfileRegistry>;
+} = {}) {
+  const registry = input.registry ?? getVoiceProfileRegistry();
+  const requestedProfileId = input.voiceProfileId?.trim();
+
+  if (requestedProfileId) {
+    const explicit = registry.profiles.find((profile) => profile.profile_id === requestedProfileId);
+    if (!explicit) {
+      throw new Error(
+        `[participate-cli] requested voice profile '${requestedProfileId}' is not present in the active registry. Available profiles: ${registry.profiles.map((profile) => profile.profile_id).join(', ') || '(none)'}`,
+      );
+    }
+    return explicit;
+  }
+
+  const defaultProfile =
+    registry.profiles.find((profile) => profile.profile_id === registry.default_profile_id) ||
+    registry.profiles.find((profile) => profile.status === 'active');
+  if (!defaultProfile) {
+    throw new Error('[participate-cli] no active voice profile is available in the registry');
+  }
+  return defaultProfile;
+}
+
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('mission', { type: 'string', demandOption: true })
@@ -246,9 +299,15 @@ async function main(): Promise<void> {
     .option('passcode', { type: 'string' })
     .option('display-name', { type: 'string', default: 'Kyberion' })
     .option('persona', { type: 'string', default: 'an attentive meeting participant' })
-    .option('voice-profile-id', { type: 'string', default: 'operator-default-v1' })
+    .option('voice-profile-id', { type: 'string' })
     .option('driver', { type: 'string', default: 'browser-playwright' })
     .option('audio-bus', { type: 'string' })
+    .option('transport-mode', {
+      type: 'string',
+      choices: ['transcribe_first', 'realtime_voice'] as const,
+      default: 'transcribe_first',
+    })
+    .option('dry-run', { type: 'boolean', default: false })
     .option('microphone-device', { type: 'string' })
     .option('speaker-device', { type: 'string' })
     .option('camera-device', { type: 'string' })
@@ -298,6 +357,14 @@ async function main(): Promise<void> {
     installShellStreamingSttBridgeFromEnv();
     installShellStreamingTtsBridgeFromEnv();
 
+    const runtimePlan = resolveMeetingParticipationRuntimePlan({
+      transport_mode: argv['transport-mode'] as 'transcribe_first' | 'realtime_voice' | undefined,
+      dry_run: Boolean(argv['dry-run']),
+    });
+    logger.info(
+      `[participate-cli] runtime plan transport=${runtimePlan.transport_mode} dry_run=${runtimePlan.dry_run} real_audio_bus=${runtimePlan.require_real_audio_bus} stt=${runtimePlan.require_streaming_stt} tts=${runtimePlan.require_streaming_tts} voice_profile=${runtimePlan.require_voice_profile}`,
+    );
+
     const target: MeetingTarget = {
       url: String(argv['meeting-url']),
       platform: (argv.platform as MeetingTarget['platform']) ?? 'auto',
@@ -306,6 +373,14 @@ async function main(): Promise<void> {
       display_name: String(argv['display-name']),
     };
     const validatedTarget = prepareMeetingTarget(target);
+    const voiceProfile = resolveMeetingParticipationVoiceProfile({
+      voiceProfileId: typeof argv['voice-profile-id'] === 'string' ? String(argv['voice-profile-id']) : undefined,
+    });
+    if (runtimePlan.require_voice_profile && voiceProfile.status !== 'active') {
+      throw new Error(
+        `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires an active voice profile, but '${voiceProfile.profile_id}' is ${voiceProfile.status}`,
+      );
+    }
 
     const driver = await loadDriver(String(argv.driver), {
       headed: Boolean(argv.headed),
@@ -343,26 +418,31 @@ async function main(): Promise<void> {
         bus_id: bus.bus_id,
       });
     }
+    const stt = getStreamingSttBridge();
+    const tts = getStreamingTtsBridge();
+    assertMeetingParticipationRuntime({ runtimePlan, bus, busProbe, stt, tts });
 
     const coordinator = new MeetingParticipationCoordinator({
       driver,
       bus,
-      stt: getStreamingSttBridge(),
-      tts: getStreamingTtsBridge(),
+      stt,
+      tts,
       vad: new EnergyVad(),
       agent: new ReasoningBackendAgent(missionId, String(argv.persona)),
       trace,
     });
 
     logger.info(
-      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform})`,
+      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile.profile_id})`,
     );
 
     const report = await coordinator.run(validatedTarget, {
       mission_id: missionId,
       max_minutes: Number(argv['max-minutes']),
-      voice_profile_id: String(argv['voice-profile-id']),
+      voice_profile_id: voiceProfile.profile_id,
       audio_format: FORMAT,
+      require_recording_consent: runtimePlan.require_recording_consent,
+      require_voice_consent: runtimePlan.require_voice_consent,
     });
     logger.info('');
     logger.info(`📋 Participation report:`);

@@ -101,7 +101,8 @@ const mocks = vi.hoisted(() => ({
     rate: 180,
   })),
   safeExec: vi.fn(() => ''),
-  safeExistsSync: vi.fn((path: string) => String(path).includes('espeak-ng')),
+  safeExistsSync: vi.fn((path: string) => String(path).includes('espeak-ng') || String(path).includes('/tmp/voice-generation/')),
+  safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   safeReadFile: vi.fn(),
@@ -295,6 +296,7 @@ vi.mock('@agent/core', async () => {
     getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
     safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
+    safeStat: mocks.safeStat,
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
     safeReadFile: mocks.safeReadFile,
@@ -385,6 +387,10 @@ describe('voice actuator', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.safeExec.mockImplementation((command: string) => {
+      if (command === 'ffprobe') return '1.2';
+      return '';
+    });
   });
 
   afterEach(() => {
