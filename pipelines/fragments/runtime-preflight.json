@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "name": "runtime-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: run a supplied shell preflight command and emit a standard preflight_result channel.",
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "preflight_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "{{preflight_cmd}}"
+      }
+    }
+  ]
+}

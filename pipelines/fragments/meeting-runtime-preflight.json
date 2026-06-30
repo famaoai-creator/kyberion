@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "meeting-runtime-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify meeting participation prerequisites before meeting-centric flows.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "pnpm service:preflight -- --service meeting && pnpm doctor --runtime browser"
+        }
+      }
+    }
+  ]
+}

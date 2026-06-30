@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "live-voice-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify the live voice and meeting runtime surfaces are present before a live voice flow.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "pnpm service:preflight -- --service voice && pnpm service:preflight -- --service meeting && command -v say >/dev/null && echo ok"
+        }
+      }
+    }
+  ]
+}

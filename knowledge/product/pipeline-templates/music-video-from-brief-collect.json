@@ -1,0 +1,78 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "music-video-from-brief-collect",
+  "version": "1.0.0",
+  "description": "Music-video production collect phase: read the durable job ticket, wait for completion, and validate the final artifact.",
+  "context": {
+    "mission_id": "MSN-KYBERION-MUSIC-VIDEO",
+    "mission_evidence_dir": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence",
+    "music_path": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence/kyberion-music-video-track.mp3",
+    "video_output_path": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence/kyberion-music-video.mp4",
+    "video_bundle_dir": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence/video-composition/kyberion-music-video",
+    "video_slug": "kyberion-music-video"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🎬 [KYBERION-MUSIC-VIDEO] Collecting previously submitted render for mission {{mission_id}}" }
+    },
+    {
+      "id": "read_job_ticket",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "video_job_ticket_raw", "type": "ReadResult" },
+      "params": {
+        "path": "{{video_bundle_dir}}/job-state.json"
+      }
+    },
+    {
+      "id": "parse_job_ticket",
+      "role": "transform",
+      "op": "core:transform",
+      "consumes": "video_job_ticket_raw",
+      "produces": { "channel": "video_job_ticket", "type": "JsonData" },
+      "params": {
+        "input": "{{video_job_ticket_raw}}",
+        "script": "const raw = typeof input === 'string' ? input : JSON.stringify(input); return JSON.parse(raw);"
+      }
+    },
+    {
+      "id": "await_video",
+      "role": "source",
+      "op": "video-composition:await_video_composition_job",
+      "consumes": "video_job_ticket",
+      "produces": { "channel": "video_result", "type": "VideoCompositionJobResult" },
+      "params": {
+        "job_id": "{{video_job_ticket.job_id}}",
+        "job_ticket_path": "{{video_bundle_dir}}/job-state.json",
+        "timeout_ms": 1800000
+      }
+    },
+    {
+      "id": "validate",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/music-video-validate.json" }
+    },
+    {
+      "id": "write_completion_note",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["video_result", "verify_result", "frame_extract_result", "blackframe_result", "duration_alignment_result"],
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-music-video-summary.md",
+        "content": "# Kyberion Music Video\n\n## Scenario flow\n1. Generate the music track as a governed artifact.\n2. Submit the video render as a background job and persist the ticket.\n3. Collect the final packet later by reading the bundle job ticket.\n4. Render, verify, extract key frames, and reject black-frame output.\n\n## Output artifacts\n- Music: `{{music_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Job ticket: `{{video_bundle_dir}}/job-state.json`\n- Key frames: `{{mission_evidence_dir}}/kyberion-music-video-frames/`\n\n## Validation\n- `{{video_result}}`\n- `{{verify_result}}`\n- `{{frame_extract_result}}`\n- `{{blackframe_result}}`\n- `{{duration_alignment_result}}`\n\n## Next command\n- `pnpm pipeline --input knowledge/product/pipeline-templates/music-video-from-brief-collect.json`\n",
+        "format": "text"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["video_result", "verify_result"],
+      "params": { "message": "🏁 [KYBERION-MUSIC-VIDEO] Background render collected. Video: {{video_result}} Verify: {{verify_result}}" }
+    }
+  ]
+}
