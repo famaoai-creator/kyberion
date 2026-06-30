@@ -5,11 +5,12 @@
   "description": "声のクローン作成パイプライン。3サンプルを録音・トランスクリプト登録し、mlx_audio_qwen3 エンジンでの ICL クローンプロフィールを作成する。収録直後の staging は active/shared/tmp/voice-samples/<profile_id>/、登録後の参照先は active/shared/runtime/voice-profiles/<profile_id>/ に移る。必須 context vars: profile_id, display_name。オプション: duration_sec (default 12), language (default ja)。モデルダウンロード済みであること（HuggingFace 接続が必要、初回のみ）。",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
-    "profile_id": "my-voice-v1",
-    "display_name": "市村 Voice v1",
+    "profile_id": "operator-personal-voice-v1",
+    "display_name": "Operator Personal Voice v1",
     "duration_sec": 12,
     "language": "ja",
-    "script_display_hold_ms": 7000
+    "script_display_hold_ms": 7000,
+    "allow_update": false
   },
   "steps": [
     {
@@ -361,7 +362,7 @@
           { "sample_id": "sample-02", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav", "language": "{{language}}" },
           { "sample_id": "sample-03", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav", "language": "{{language}}" }
         ],
-        "policy": { "allow_update": true }
+        "policy": { "allow_update": "{{allow_update}}" }
       }
     },
     {
