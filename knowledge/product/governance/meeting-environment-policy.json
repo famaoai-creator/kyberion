@@ -87,12 +87,10 @@
     "explicit_patterns": [
       "camera",
       "webcam",
-      "video",
       "video on",
       "video-on",
       "顔出し",
-      "映像",
-      "画面共有"
+      "映像"
     ],
     "recommended_roles": ["facilitator", "planner", "decision_maker"],
     "recommended_purposes": ["planning", "decision", "facilitation", "workshop", "incident"],

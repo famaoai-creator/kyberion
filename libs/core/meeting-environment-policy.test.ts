@@ -114,4 +114,24 @@ describe('meeting-environment-policy', () => {
     expect(environment.items.find((item) => item.kind === 'tts')?.state).toBe('required');
     expect(environment.items.find((item) => item.kind === 'voice_consent')?.state).toBe('required');
   });
+
+  it('does not treat screen sharing as a camera request', () => {
+    const policy = loadMeetingEnvironmentPolicy();
+    const environment = resolveMeetingEnvironment(
+      {
+        meeting_title: 'Review call',
+        meeting_url: 'https://example.microsoft.com/teams/join/abc',
+        platform: 'teams',
+        purpose: 'status_update',
+        agenda: ['画面共有で資料を確認する'],
+        desired_outcomes: ['Review the shared material'],
+      },
+      profile,
+      'scribe',
+      policy,
+    );
+
+    expect(environment.items.find((item) => item.kind === 'screen_share')?.state).toBe('required');
+    expect(environment.items.find((item) => item.kind === 'camera')?.state).not.toBe('required');
+  });
 });
