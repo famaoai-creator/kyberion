@@ -179,9 +179,9 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('See also:');
   lines.push('');
   lines.push('- Source manifests: `libs/actuators/*/manifest.json`');
-  lines.push(`- Compatibility snapshot: [global_actuator_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH)})`);
-  lines.push(`- [legacy_component_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`);
-  lines.push(`- [component-lifecycle-inventory.md](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), REPORT_PATH)})`);
+  lines.push(`- Compatibility snapshot: [global_actuator_index.json](${path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH)})`);
+  lines.push(`- [legacy_component_index.json](${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`);
+  lines.push(`- [component-lifecycle-inventory.md](${path.relative(pathResolver.rootDir(), REPORT_PATH)})`);
   lines.push('');
   return `${lines.join('\n')}\n`;
 }
@@ -213,7 +213,7 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push('');
   lines.push('## Legacy Review Queue');
   lines.push('');
-  lines.push(`- Source of truth: [legacy_component_index.json](/Users/famao/kyberion/${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`);
+  lines.push(`- Source of truth: [legacy_component_index.json](${path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH)})`);
   lines.push(`- Count: ${legacy.length}`);
   lines.push('');
   for (const component of legacy) {

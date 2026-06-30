@@ -1,0 +1,15 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "pdf_extract_range",
+      "params": {
+        "path": "active/shared/tmp/media/input.pdf",
+        "pages": "1-3,7",
+        "out": "active/shared/tmp/media/subset.pdf",
+        "export_as": "pdf_extract"
+      }
+    }
+  ]
+}
