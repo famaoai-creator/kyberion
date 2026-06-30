@@ -1,0 +1,170 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "music-video-from-brief-submit",
+  "version": "1.0.0",
+  "description": "Music-video production submit phase: generate the music artifact, submit the video render as a background job, and persist the ticket for later collection.",
+  "context": {
+    "mission_id": "MSN-KYBERION-MUSIC-VIDEO",
+    "mission_evidence_dir": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence",
+    "music_path": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence/kyberion-music-video-track.mp3",
+    "video_output_path": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence/kyberion-music-video.mp4",
+    "video_bundle_dir": "active/missions/confidential/MSN-KYBERION-MUSIC-VIDEO/evidence/video-composition/kyberion-music-video",
+    "video_slug": "kyberion-music-video",
+    "profile_id": "operator-ja-default"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🎬 [KYBERION-MUSIC-VIDEO] Submitting music video render for mission {{mission_id}}" }
+    },
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/music-video-preflight.json" }
+    },
+    {
+      "id": "generate_music",
+      "role": "source",
+      "op": "media-generation:submit_generation",
+      "produces": { "channel": "music_job", "type": "GenerationJob" },
+      "params": {
+        "action": "generate_music",
+        "params": {
+          "music_adf": {
+            "kind": "music-generation-adf",
+            "version": "1.0.0",
+            "intent": "music_video_theme_track",
+            "style": {
+              "genre": "pop",
+              "mood": ["uplifting", "driving", "confident"],
+              "vocal": {
+                "presence": true,
+                "gender": "female",
+                "language": "ja"
+              }
+            },
+            "composition": {
+              "duration_sec": 120,
+              "bpm": 120,
+              "time_signature": "4",
+              "key": "A major"
+            },
+            "lyrics": {
+              "mode": "provided",
+              "text": "[Verse]\nKyberion が動き出す"
+            },
+            "arrangement": {
+              "instruments": ["drums", "bass", "electric_guitar", "synth_pad"],
+              "mix_traits": ["anthemic", "clean", "high_energy"]
+            },
+            "output": {
+              "format": "mp3",
+              "filename_prefix": "KyberionMusicVideoTrack",
+              "target_path": "{{music_path}}",
+              "await_completion": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "wait_music",
+      "role": "source",
+      "op": "media-generation:wait_generation_job",
+      "consumes": "music_job",
+      "produces": { "channel": "music_job_waited", "type": "GenerationJob" },
+      "params": {
+        "job_id": "{{music_job.job_id}}",
+        "timeout_ms": 1800000
+      }
+    },
+    {
+      "id": "collect_music",
+      "role": "source",
+      "op": "media-generation:collect_generation_artifact",
+      "consumes": "music_job_waited",
+      "produces": { "channel": "music_result", "type": "GenerationJob" },
+      "params": {
+        "job_id": "{{music_job.job_id}}",
+        "target_path": "{{music_path}}"
+      }
+    },
+    {
+      "id": "submit_video",
+      "role": "source",
+      "op": "video-composition:prepare_video_composition",
+      "produces": { "channel": "video_submit_result", "type": "VideoCompositionJobResult" },
+      "params": {
+        "video_composition_adf": {
+          "kind": "video-composition-adf",
+          "version": "1.0.0",
+          "intent": "music-driven video from a governed audio reference",
+          "title": "Kyberion Music Video Demo",
+          "composition": {
+            "duration_sec": 120,
+            "fps": 30,
+            "width": 1920,
+            "height": 1080,
+            "background_color": "#07111f"
+          },
+          "audio": {
+            "music_ref": "{{music_path}}"
+          },
+          "scenes": [
+            {
+              "scene_id": "hook",
+              "role": "hook",
+              "start_sec": 0,
+              "duration_sec": 24,
+              "template_ref": { "template_id": "basic-title-card" },
+              "content": {
+                "eyebrow": "Kyberion",
+                "headline": "Music-driven video, no shell branching",
+                "body": "The music track is selected explicitly and carried through the governed render boundary."
+              }
+            },
+            {
+              "scene_id": "feature",
+              "role": "feature",
+              "start_sec": 24,
+              "duration_sec": 72,
+              "template_ref": { "template_id": "split-highlight" },
+              "content": {
+                "headline": "Audio stays separate",
+                "body": "The music generator and the video renderer keep their own contracts, then mux at the end."
+              }
+            },
+            {
+              "scene_id": "outro",
+              "role": "outro",
+              "start_sec": 96,
+              "duration_sec": 24,
+              "template_ref": { "template_id": "logo-outro" },
+              "content": {
+                "headline": "Governed muxing",
+                "body": "The final artifact still passes through the same video verification step."
+              }
+            }
+          ],
+          "output": {
+            "format": "mp4",
+            "target_path": "{{video_output_path}}",
+            "bundle_dir": "{{video_bundle_dir}}",
+            "emit_progress_packets": true,
+            "await_completion": false,
+            "detached_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🏁 [KYBERION-MUSIC-VIDEO] Background render submitted. Job ticket is in {{video_bundle_dir}}/job-state.json" }
+    }
+  ]
+}

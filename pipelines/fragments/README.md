@@ -52,6 +52,34 @@
 - **主要操作**: `reasoning:synthesize`, `code:write_artifact`, `system:open_file`
 - **用途**: Web の説明資料、概念ページ、操作デモの local preview。
 
+### 12. `runtime-preflight.json`
+- **目的**: 渡された shell preflight command を実行し、標準の `preflight_result` を返す共通ラッパー。
+- **主要操作**: `system:shell`
+
+### 13. `voice-runtime-preflight.json`
+- **目的**: voice service と voice bridge / sample 前提をまとめて確認する。
+- **主要操作**: `core:include`, `system:shell`
+
+### 14. `music-video-preflight.json`
+- **目的**: media-generation service とローカル media runtime の前提をまとめて確認する。
+- **主要操作**: `core:include`, `system:shell`
+
+### 15. `browser-runtime-preflight.json`
+- **目的**: browser / Playwright runtime の前提をまとめて確認する。
+- **主要操作**: `core:include`, `system:shell`
+
+### 16. `meeting-runtime-preflight.json`
+- **目的**: meeting service と browser runtime の前提をまとめて確認する。
+- **主要操作**: `core:include`, `system:shell`
+
+### 17. `live-voice-preflight.json`
+- **目的**: live voice と meeting runtime の前提をまとめて確認する。
+- **主要操作**: `core:include`, `system:shell`
+
+### 18. `ui-voice-browser-preflight.json`
+- **目的**: UI / voice / browser / meeting のスモーク実行前に必要条件をまとめて確認する。
+- **主要操作**: `core:include`, `system:shell`
+
 ## 使用方法
 
 メインのパイプライン JSON 内で、`wisdom:apply_fragment` 等の操作（またはオーケストレータによる展開）を通じて利用されます。

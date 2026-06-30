@@ -11,10 +11,15 @@ Execute a governed music-video flow that:
 
 This procedure is for the common music-video case where the visual story is driven by the song rather than by narration.
 
+For the end-to-end operator flow, including music generation, render submission, deferred collection, and validation, use:
+
+- [`produce-music-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-music-video.md)
+
 ## 2. Dependencies
 
 - **Actuator**: `media-generation-actuator`
 - **Actuator**: `video-composition-actuator`
+- **Preflight**: `pnpm service:preflight -- --service media-generation`
 - **Schemas**:
   - [`music-generation-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/music-generation-adf.schema.json)
   - [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-composition-adf.schema.json)
@@ -42,6 +47,7 @@ Suggested flow:
 2. Define the video brief and compile the scene plan.
 3. Copy the music artifact path into `video-composition-adf.audio.music_ref`.
 4. Render the composed video bundle.
+5. Use `pnpm service:preflight -- --service media-generation` before submit when the render depends on local media runtime availability.
 
 For pipeline-first runs, the simplest execution path is to call `video-composition:prepare_video_composition` with a fully formed `video-composition-adf` that already references `audio.music_ref`. That keeps audio generation and video rendering on separate contracts while avoiding shell-side mux branching.
 
