@@ -99,7 +99,8 @@
         "target_path": { "type": "string", "minLength": 1 },
         "bundle_dir": { "type": "string", "minLength": 1 },
         "emit_progress_packets": { "type": "boolean" },
-        "await_completion": { "type": "boolean" }
+        "await_completion": { "type": "boolean" },
+        "detached_background": { "type": "boolean" }
       }
     }
   }

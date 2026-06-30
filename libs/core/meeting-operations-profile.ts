@@ -1,5 +1,6 @@
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
 import type { MeetingOperationsBrief } from './src/types/meeting-operations-brief.js';
+import { resolveMeetingEnvironment } from './meeting-environment-policy.js';
 
 export type MeetingPurpose =
   | 'planning'
@@ -101,6 +102,7 @@ export function buildMeetingOperationsBrief(
     'Action items are recorded',
     'Authority boundary is respected',
   ];
+  const environment = resolveMeetingEnvironment(input, profile, primaryRole);
   return {
     kind: 'meeting-operations-brief',
     version: '1.0.0',
@@ -127,6 +129,7 @@ export function buildMeetingOperationsBrief(
       : {}),
     exit_conditions: exitConditions,
     follow_up_channel: profile.tracking_policy.default_follow_up_channel,
+    environment,
     ...(input.notes ? { notes: input.notes } : {}),
   };
 }

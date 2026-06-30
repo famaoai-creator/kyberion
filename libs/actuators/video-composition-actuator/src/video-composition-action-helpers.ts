@@ -1,20 +1,28 @@
 import {
+  spawn,
+  type ChildProcessWithoutNullStreams,
+} from 'node:child_process';
+import {
   compileNarratedVideoBriefToCompositionADF,
   compileVideoCompositionADF,
   compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief,
   getVideoCompositionTemplateRegistry,
   getVideoRenderRuntimePolicy,
+  logger,
   pathResolver,
   renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync,
   safeExec,
   safeExistsSync,
+  safeMkdir,
   safeReadFile,
   safeStat,
+  safeWriteFile,
   withRetry,
   writeVideoCompositionBundle,
 } from '@agent/core';
+import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { VideoCompositionADF } from '@agent/core';
 import {
@@ -81,6 +89,56 @@ interface VideoCompositionJobDiagnostics {
   backend_cancelled?: boolean;
   backend_timed_out?: boolean;
   last_error?: string;
+}
+
+interface VideoCompositionJobTicket {
+  job_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  bundle_dir: string;
+  output_format: string;
+  output_target_path?: string;
+  await_completion: boolean;
+  detached_background?: boolean;
+  backend_rendering_enabled: boolean;
+  backend_render_backend: string;
+  artifact_refs?: string[];
+  rendered_output_path?: string;
+  diagnostics?: VideoCompositionJobDiagnostics | null;
+}
+
+const DETACHED_WORKER_SCRIPT = pathResolver.rootResolve('dist/libs/actuators/video-composition-actuator/src/index.js');
+
+function writeVideoCompositionJobTicket(ticketPath: string, ticket: VideoCompositionJobTicket): void {
+  safeMkdir(path.dirname(ticketPath), { recursive: true });
+  safeWriteFile(ticketPath, JSON.stringify(ticket, null, 2));
+}
+
+function readVideoCompositionJobTicket(ticketPath: string): VideoCompositionJobTicket | null {
+  if (!safeExistsSync(ticketPath)) return null;
+  try {
+    return JSON.parse(String(safeReadFile(ticketPath, { encoding: 'utf8' }))) as VideoCompositionJobTicket;
+  } catch {
+    return null;
+  }
+}
+
+function spawnDetachedVideoCompositionWorker(inputPath: string): ChildProcessWithoutNullStreams | null {
+  if (!safeExistsSync(DETACHED_WORKER_SCRIPT)) {
+    return null;
+  }
+  const child = spawn(process.execPath, [DETACHED_WORKER_SCRIPT, '--input', inputPath], {
+    cwd: pathResolver.rootDir(),
+    env: {
+      ...process.env,
+      KYBERION_VIDEO_RENDER_RUN_MODE: 'in-process',
+    },
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+  return child;
 }
 
 runtime.subscribe((packet) => {
@@ -156,6 +214,7 @@ async function createNarratedVideoFromContentBrief(params: {
       target_path: params.output?.target_path as string | undefined,
       bundle_dir: params.output?.bundle_dir as string | undefined || params.bundle_dir,
       await_completion: params.output?.await_completion as boolean | undefined,
+      detached_background: params.output?.detached_background as boolean | undefined,
     },
   });
   const execution = await createNarratedIntroMovie({
@@ -307,11 +366,23 @@ async function isRenderableVideoArtifact(artifactPath: string): Promise<boolean>
   }
 }
 
-async function getVideoCompositionJobStatus(params: { job_id?: string }) {
+async function getVideoCompositionJobStatus(params: { job_id?: string; job_ticket_path?: string }) {
   const jobId = String(params.job_id || '');
   if (!jobId) throw new Error('get_video_composition_job_status requires params.job_id');
   const packet = runtime.getPacket(jobId);
   if (!packet) {
+    const ticketPath = params.job_ticket_path ? pathResolver.rootResolve(String(params.job_ticket_path)) : null;
+    const ticket = ticketPath ? readVideoCompositionJobTicket(ticketPath) : null;
+    if (ticket) {
+      return {
+        status: 'succeeded',
+        job_id: jobId,
+        packet: ticket,
+        progress_packets: packetHistory.get(jobId) || [],
+        diagnostics: jobDiagnostics.get(jobId) || null,
+        job_ticket_path: ticketPath,
+      };
+    }
     return {
       status: 'not_found',
       job_id: jobId,
@@ -329,10 +400,48 @@ async function getVideoCompositionJobStatus(params: { job_id?: string }) {
   };
 }
 
-async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: number }) {
+async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: number; job_ticket_path?: string }) {
   const jobId = String(params.job_id || '');
   if (!jobId) throw new Error('await_video_composition_job requires params.job_id');
   const timeoutMs = normalizeAwaitTimeoutMs(params.timeout_ms);
+  const ticketPath = params.job_ticket_path ? pathResolver.rootResolve(String(params.job_ticket_path)) : null;
+
+  if (ticketPath) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const livePacket = runtime.getPacket(jobId);
+      if (livePacket && ['completed', 'failed', 'cancelled'].includes(livePacket.status)) {
+        return {
+          status: livePacket.status === 'completed' ? 'succeeded' : livePacket.status,
+          job_id: jobId,
+          packet: livePacket,
+          diagnostics: jobDiagnostics.get(jobId) || null,
+          progress_packets: packetHistory.get(jobId) || [],
+          job_ticket_path: ticketPath,
+        };
+      }
+      const ticket = readVideoCompositionJobTicket(ticketPath);
+      if (ticket && ['completed', 'failed', 'cancelled'].includes(ticket.status)) {
+        return {
+          status: ticket.status === 'completed' ? 'succeeded' : ticket.status,
+          job_id: jobId,
+          packet: ticket,
+          diagnostics: jobDiagnostics.get(jobId) || null,
+          progress_packets: packetHistory.get(jobId) || [],
+          job_ticket_path: ticketPath,
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return {
+      status: 'timeout',
+      job_id: jobId,
+      timeout_ms: timeoutMs,
+      packet: runtime.getPacket(jobId) || readVideoCompositionJobTicket(ticketPath),
+      diagnostics: jobDiagnostics.get(jobId) || null,
+      job_ticket_path: ticketPath,
+    };
+  }
   const packet = await waitForRenderJob(runtime, jobId, timeoutMs, true);
   if (!packet) {
     return {
@@ -341,6 +450,7 @@ async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: 
       timeout_ms: timeoutMs,
       packet: runtime.getPacket(jobId),
       diagnostics: jobDiagnostics.get(jobId) || null,
+      job_ticket_path: ticketPath,
     };
   }
   return {
@@ -349,6 +459,7 @@ async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: 
     packet,
     diagnostics: jobDiagnostics.get(jobId) || null,
     progress_packets: packetHistory.get(jobId) || [],
+    job_ticket_path: ticketPath || undefined,
   };
 }
 
@@ -392,36 +503,113 @@ async function prepareVideoComposition(params: {
   const policy = getVideoRenderRuntimePolicy();
   const jobId = String(params.job_id || randomUUID());
   const awaitCompletion = resolveAwaitCompletion(adf, policy);
+  const bundlePreview = compileVideoCompositionADF(adf, { bundleDir: params.bundle_dir });
+  const jobTicketPath = path.join(bundlePreview.bundle_dir, 'job-state.json');
+  const runMode = String(process.env.KYBERION_VIDEO_RENDER_RUN_MODE || 'foreground');
+  const detachedBackground = adf.output?.detached_background === true
+    && awaitCompletion === false
+    && policy.render.enable_backend_rendering
+    && runMode !== 'in-process';
   upsertJobDiagnostics(jobId, { created_at: new Date().toISOString() });
+  writeVideoCompositionJobTicket(jobTicketPath, {
+    job_id: jobId,
+    status: 'queued',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    bundle_dir: bundlePreview.bundle_dir,
+    output_format: adf.output.format,
+    output_target_path: adf.output.target_path,
+    await_completion: awaitCompletion,
+    detached_background: adf.output?.detached_background,
+    backend_rendering_enabled: policy.render.enable_backend_rendering,
+    backend_render_backend: policy.render.backend,
+    diagnostics: jobDiagnostics.get(jobId) || null,
+  });
+
+  if (detachedBackground) {
+    const requestPath = path.join(bundlePreview.bundle_dir, 'job-request.json');
+    const requestPayload = {
+      action: 'prepare_video_composition',
+      params: {
+        video_composition_adf: {
+          ...adf,
+          output: {
+            ...adf.output,
+            await_completion: false,
+            detached_background: false,
+          },
+        },
+        job_id: jobId,
+        bundle_dir: bundlePreview.bundle_dir,
+      },
+    };
+    safeWriteFile(requestPath, JSON.stringify(requestPayload, null, 2));
+    const child = spawnDetachedVideoCompositionWorker(requestPath);
+    if (!child) {
+      logger.warn(`[VIDEO_COMPOSITION] Detached worker unavailable, falling back to in-process queue for ${jobId}`);
+    } else {
+      return {
+        status: 'queued',
+        job_id: jobId,
+        job_ticket_path: jobTicketPath,
+        await_completion: false,
+        await_completion_reason: 'detached background worker launched',
+        packet: runtime.getPacket(jobId),
+        queue: runtime.getQueueSnapshot(),
+        diagnostics: jobDiagnostics.get(jobId) || null,
+        output_format: adf.output.format,
+        output_target_path: adf.output.target_path,
+        backend_rendering_enabled: policy.render.enable_backend_rendering,
+        backend_render_backend: policy.render.backend,
+        bundle_dir: bundlePreview.bundle_dir,
+        detached_background: true,
+      };
+    }
+  }
 
   runtime.enqueue({
     jobId,
     async run(api) {
-      const totalSteps = policy.render.enable_backend_rendering ? 5 : 4;
-      api.report({
-        status: 'validating_contract',
-        progress: { current: 1, total: totalSteps, percent: (1 / totalSteps) * 100, unit: 'steps' },
-        message: 'validated video composition contract',
-      });
-      api.report({
-        status: 'resolving_templates',
-        progress: { current: 2, total: totalSteps, percent: (2 / totalSteps) * 100, unit: 'steps' },
-        message: `resolved ${adf.scenes.length} scene template(s)`,
-      });
-      api.report({
-        status: 'assembling_bundle',
-        progress: { current: 3, total: totalSteps, percent: (3 / totalSteps) * 100, unit: 'steps' },
-        message: 'assembling deterministic composition bundle',
-      });
+      try {
+        const totalSteps = policy.render.enable_backend_rendering ? 5 : 4;
+        api.report({
+          status: 'validating_contract',
+          progress: { current: 1, total: totalSteps, percent: (1 / totalSteps) * 100, unit: 'steps' },
+          message: 'validated video composition contract',
+        });
+        api.report({
+          status: 'resolving_templates',
+          progress: { current: 2, total: totalSteps, percent: (2 / totalSteps) * 100, unit: 'steps' },
+          message: `resolved ${adf.scenes.length} scene template(s)`,
+        });
+        api.report({
+          status: 'assembling_bundle',
+          progress: { current: 3, total: totalSteps, percent: (3 / totalSteps) * 100, unit: 'steps' },
+          message: 'assembling deterministic composition bundle',
+        });
 
-      const plan = await withRetry(
-        async () => writeVideoCompositionBundle(adf, { bundleDir: params.bundle_dir }),
-        buildRetryOptions(DEFAULT_VIDEO_RETRY),
-      );
-      let artifactRefs = [...plan.artifact_refs];
-      let backendOutputPath: string | undefined;
+        const plan = await withRetry(
+          async () => writeVideoCompositionBundle(adf, { bundleDir: bundlePreview.bundle_dir }),
+          buildRetryOptions(DEFAULT_VIDEO_RETRY),
+        );
+        let artifactRefs = [...plan.artifact_refs];
+        let backendOutputPath: string | undefined;
+        writeVideoCompositionJobTicket(jobTicketPath, {
+          job_id: jobId,
+          status: 'running',
+          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          bundle_dir: plan.bundle_dir,
+          output_format: adf.output.format,
+          output_target_path: adf.output.target_path,
+          await_completion: awaitCompletion,
+          backend_rendering_enabled: policy.render.enable_backend_rendering,
+          backend_render_backend: policy.render.backend,
+          artifact_refs: artifactRefs,
+          diagnostics: jobDiagnostics.get(jobId) || null,
+        });
 
-      if (policy.render.enable_backend_rendering) {
+        if (policy.render.enable_backend_rendering) {
         if (api.isCancelled()) throw new Error('video composition job cancelled');
         api.report({
           status: 'rendering',
@@ -459,6 +647,21 @@ async function prepareVideoComposition(params: {
           backendOutputPath = backendResult.output_path;
           artifactRefs = [...artifactRefs, backendOutputPath];
         }
+        writeVideoCompositionJobTicket(jobTicketPath, {
+          job_id: jobId,
+          status: 'completed',
+          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          bundle_dir: plan.bundle_dir,
+          output_format: adf.output.format,
+          output_target_path: adf.output.target_path,
+          await_completion: awaitCompletion,
+          backend_rendering_enabled: policy.render.enable_backend_rendering,
+          backend_render_backend: policy.render.backend,
+          artifact_refs: artifactRefs,
+          rendered_output_path: backendOutputPath,
+          diagnostics: jobDiagnostics.get(jobId) || null,
+        });
 
         if (api.isCancelled()) throw new Error('video composition job cancelled');
         api.report({
@@ -469,16 +672,48 @@ async function prepareVideoComposition(params: {
             : (backendResult.reason || 'backend skipped'),
           artifact_refs: artifactRefs,
         });
-      } else {
-        api.report({
-          status: 'rendering',
-          progress: { current: 4, total: totalSteps, percent: 100, unit: 'steps' },
-          message: 'bundle prepared; backend rendering remains disabled by policy',
-          artifact_refs: artifactRefs,
-        });
-      }
+        } else {
+          api.report({
+            status: 'rendering',
+            progress: { current: 4, total: totalSteps, percent: 100, unit: 'steps' },
+            message: 'bundle prepared; backend rendering remains disabled by policy',
+            artifact_refs: artifactRefs,
+          });
+        }
 
-      return { artifactRefs, backendOutputPath };
+        writeVideoCompositionJobTicket(jobTicketPath, {
+          job_id: jobId,
+          status: 'completed',
+          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          bundle_dir: plan.bundle_dir,
+          output_format: adf.output.format,
+          output_target_path: adf.output.target_path,
+          await_completion: awaitCompletion,
+          backend_rendering_enabled: policy.render.enable_backend_rendering,
+          backend_render_backend: policy.render.backend,
+          artifact_refs: artifactRefs,
+          rendered_output_path: backendOutputPath,
+          diagnostics: jobDiagnostics.get(jobId) || null,
+        });
+
+        return { artifactRefs, backendOutputPath };
+      } catch (error: any) {
+        writeVideoCompositionJobTicket(jobTicketPath, {
+          job_id: jobId,
+          status: api.isCancelled() ? 'cancelled' : 'failed',
+          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          bundle_dir: bundlePreview.bundle_dir,
+          output_format: adf.output.format,
+          output_target_path: adf.output.target_path,
+          await_completion: awaitCompletion,
+          backend_rendering_enabled: policy.render.enable_backend_rendering,
+          backend_render_backend: policy.render.backend,
+          diagnostics: jobDiagnostics.get(jobId) || null,
+        });
+        throw error;
+      }
     },
   });
 
@@ -486,6 +721,7 @@ async function prepareVideoComposition(params: {
     return {
       status: 'queued',
       job_id: jobId,
+      job_ticket_path: jobTicketPath,
       await_completion: false,
       await_completion_reason: policy.render.enable_backend_rendering
         ? 'backend rendering enabled: default asynchronous mode'
@@ -494,8 +730,11 @@ async function prepareVideoComposition(params: {
       queue: runtime.getQueueSnapshot(),
       diagnostics: jobDiagnostics.get(jobId) || null,
       output_format: adf.output.format,
+      output_target_path: adf.output.target_path,
       backend_rendering_enabled: policy.render.enable_backend_rendering,
       backend_render_backend: policy.render.backend,
+      bundle_dir: bundlePreview.bundle_dir,
+      detached_background: false,
     };
   }
 

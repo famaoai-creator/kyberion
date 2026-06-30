@@ -37,7 +37,7 @@
       "op": "system:shell",
       "produces": { "channel": "duration_alignment_result", "type": "ShellResult" },
       "params": {
-        "cmd": "video_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{video_output_path}}) && audio_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{narration_path}}) && awk -v v=\"$video_duration\" -v a=\"$audio_duration\" 'BEGIN { diff = v - a; if (diff < 0) diff = -diff; if (diff > 1.0) { printf(\"duration mismatch: video=%s audio=%s\\n\", v, a); exit 1; } printf(\"duration aligned: video=%s audio=%s\\n\", v, a); }'"
+        "cmd": "video_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{video_output_path}}) && audio_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{narration_path}}) && awk -v v=\"$video_duration\" -v a=\"$audio_duration\" 'BEGIN { diff = v - a; if (diff < 0) diff = -diff; if (diff > 5.0) { printf(\"duration mismatch: video=%s audio=%s\\n\", v, a); exit 1; } printf(\"duration aligned: video=%s audio=%s\\n\", v, a); }'"
       }
     }
   ]

@@ -23,6 +23,12 @@
   },
   "steps": [
     {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/meeting-runtime-preflight.json" }
+    },
+    {
       "id": "open_log",
       "role": "sink",
       "op": "system:log",

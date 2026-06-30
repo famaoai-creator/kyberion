@@ -45,6 +45,15 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 7680 },
+        "height": { "type": "integer", "minimum": 320, "maximum": 7680 },
+        "aspect_ratio": { "type": "string", "pattern": "^\\d+:\\d+$" }
+      }
+    },
     "fixed_inputs": {
       "type": "object",
       "additionalProperties": false,
@@ -70,7 +79,12 @@
         "motion_profile": { "type": "string", "minLength": 1 },
         "logo_path": { "type": "string", "minLength": 1 },
         "hero_path": { "type": "string", "minLength": 1 },
-        "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+        "fps": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "css_vars": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 },
+          "propertyNames": { "pattern": "^--[A-Za-z0-9_-]+$" }
+        }
       }
     }
   }

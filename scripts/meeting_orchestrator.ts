@@ -227,6 +227,19 @@ async function main(): Promise<void> {
       logger.info(`   - ${q}`);
     }
   }
+  if (meetingBrief.environment) {
+    logger.info(`   environment transport: ${meetingBrief.environment.transport_mode}`);
+    logger.info(`   environment decisions:`);
+    for (const item of meetingBrief.environment.items) {
+      logger.info(`   - [${item.state}] ${item.kind}: ${item.reason}`);
+    }
+    if (meetingBrief.environment.questions.length > 0) {
+      logger.info(`   environment follow-up questions:`);
+      for (const q of meetingBrief.environment.questions.slice(0, 3)) {
+        logger.info(`   - ${q}`);
+      }
+    }
+  }
 
   if (!options.skipFacilitate) {
     if (!options.meetingUrl) {

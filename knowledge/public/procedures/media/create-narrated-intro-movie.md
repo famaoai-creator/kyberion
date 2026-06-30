@@ -87,3 +87,13 @@ This is the composed-video equivalent of HyperFrames' `writer`,
 `storyboarder`, `voice-talent`, `renderer`, and `editor` roles.
 
 When backend rendering is enabled and `await_completion` is omitted, `execution.status` will default to `queued`.
+When you want a longer render to survive operator attention shifts, use the background pattern from
+[`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md):
+
+- submit with `await_completion: false`
+- persist the returned `job_id` and `job_ticket_path`
+- collect later with `await_video_composition_job`
+
+For the end-to-end operator workflow, including brief capture, narration, submit, collect, and validation, use:
+
+- [`produce-narrated-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-narrated-video.md)

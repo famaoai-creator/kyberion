@@ -1,0 +1,44 @@
+{
+  "action": "pipeline",
+  "name": "music-video-validate-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: validate a music video artifact — checks file presence, audio stream, black frames, key-frame extraction, and audio/video duration alignment. Required context vars: music_path, video_output_path, video_bundle_dir, mission_evidence_dir, video_slug (used for frame output dir and ffmpeg intermediate filenames).",
+  "steps": [
+    {
+      "id": "validate_outputs",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "verify_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "test -f {{music_path}} || { echo 'missing music artifact: {{music_path}}'; exit 1; } && test -f {{video_output_path}} || { echo 'missing video artifact: {{video_output_path}}'; exit 1; } && test -f {{video_bundle_dir}}/index.html || { echo 'missing video bundle index: {{video_bundle_dir}}/index.html'; exit 1; } && test -f {{video_bundle_dir}}/render-plan.json || { echo 'missing video bundle render plan: {{video_bundle_dir}}/render-plan.json'; exit 1; } && test -n \"$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 {{video_output_path}})\" || { echo 'missing audio stream in rendered video'; exit 1; } && echo 'outputs verified with audio-muxed mp4'"
+      }
+    },
+    {
+      "id": "extract_key_frames",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "frame_extract_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "mkdir -p {{mission_evidence_dir}}/{{video_slug}}-frames && ffmpeg -y -i {{video_output_path}} -vf \"select='eq(n,0)'\" -vframes 1 {{mission_evidence_dir}}/{{video_slug}}-frames/frame-000.png && ffmpeg -y -ss 00:00:06 -i {{video_output_path}} -vframes 1 {{mission_evidence_dir}}/{{video_slug}}-frames/frame-001.png && ffmpeg -y -ss 00:00:11 -i {{video_output_path}} -vframes 1 {{mission_evidence_dir}}/{{video_slug}}-frames/frame-002.png && echo 'key frames extracted'"
+      }
+    },
+    {
+      "id": "validate_blackframe",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "blackframe_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "if ffmpeg -hide_banner -i {{video_output_path}} -vf blackdetect=d=0.5:pic_th=0.98:pix_th=0.10 -an -f null - 2>&1 | grep -q 'black_start'; then echo 'black frame detected'; exit 1; fi && echo 'black-frame check passed'"
+      }
+    },
+    {
+      "id": "validate_duration_alignment",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "duration_alignment_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "video_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{video_output_path}}) && music_duration=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 {{music_path}}) && awk -v v=\"$video_duration\" -v a=\"$music_duration\" 'BEGIN { diff = v - a; if (diff < 0) diff = -diff; if (diff > 1.0) { printf(\"duration mismatch: video=%s music=%s\\n\", v, a); exit 1; } printf(\"duration aligned: video=%s music=%s\\n\", v, a); }'"
+      }
+    }
+  ]
+}

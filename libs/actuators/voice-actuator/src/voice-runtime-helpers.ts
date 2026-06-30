@@ -306,6 +306,7 @@ async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean>
 function resolveVoiceArtifactCandidates(
   requestedEngineId: string,
   format: VoiceArtifactFormat,
+  options: { requireVoiceClone?: boolean } = {},
 ): Array<ReturnType<typeof getVoiceEngineRecord>> {
   const registry = getVoiceEngineRegistry();
   const visited = new Set<string>();
@@ -317,6 +318,7 @@ function resolveVoiceArtifactCandidates(
     if (engine.status !== 'active') return;
     if (!engine.platforms.includes('any') && !engine.platforms.includes(process.platform as any)) return;
     if (!engine.supports.artifact_formats.includes(format)) return;
+    if (options.requireVoiceClone && (!engine.supports.voice_clone || !engine.supports.icl_ref_audio)) return;
     candidates.push(engine);
   };
 
@@ -391,6 +393,7 @@ async function renderNativeArtifact(
     supportsFormats: VoiceArtifactFormat[];
     outputPath?: string;
     profile?: any;
+    requireVoiceClone?: boolean;
   },
 ): Promise<string> {
   if (!options.supportsFormats.includes(options.format)) {
@@ -400,9 +403,12 @@ async function renderNativeArtifact(
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });
 
-  const candidates = resolveVoiceArtifactCandidates(options.engineId, options.format);
+  const candidates = resolveVoiceArtifactCandidates(options.engineId, options.format, {
+    requireVoiceClone: options.requireVoiceClone,
+  });
   if (candidates.length === 0) {
-    throw new Error(`No configured voice engine can render artifact format ${options.format} on ${process.platform}`);
+    const cloneRequirement = options.requireVoiceClone ? ' with learned-voice support' : '';
+    throw new Error(`No configured voice engine${cloneRequirement} can render artifact format ${options.format} on ${process.platform}`);
   }
 
   let lastError: unknown;
@@ -429,7 +435,7 @@ async function renderNativeArtifact(
 
 async function performPlayback(
   text: string,
-  options: { language: string; voice: string; rate: number; engineId: string; profile?: any },
+  options: { language: string; voice: string; rate: number; engineId: string; profile?: any; requireVoiceClone?: boolean },
   playbackSourcePath?: string,
 ): Promise<{
   bridge_id?: string;
@@ -500,7 +506,7 @@ async function performPlayback(
 
 async function renderVoicePlaybackSource(
   text: string,
-  options: { language: string; voice: string; rate: number; engineId: string; profile?: any },
+  options: { language: string; voice: string; rate: number; engineId: string; profile?: any; requireVoiceClone?: boolean },
 ): Promise<string> {
   const playbackRequestId = `${randomUUID()}-playback`;
   const playbackEngine = resolveVoiceEngineForPlatform(options.engineId);
@@ -516,6 +522,7 @@ async function renderVoicePlaybackSource(
     engineId: options.engineId,
     supportsFormats: playbackEngine.supports.artifact_formats,
     profile: options.profile,
+    requireVoiceClone: options.requireVoiceClone,
   });
 }
 

@@ -1,0 +1,101 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "kyberion-vtuber-narrated-demo-submit",
+  "version": "2.0.0",
+  "name": "Kyberion VTuber Narrated Demo Submit",
+  "description": "Submit the vtuber narrated demo render as a background job and persist the job ticket for later collection.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "context": {
+    "mission_id": "MSN-KYBERION-VTUBER-VIDEO",
+    "mission_evidence_dir": "active/missions/confidential/MSN-KYBERION-VTUBER-VIDEO/evidence",
+    "narration_path": "active/missions/confidential/MSN-KYBERION-VTUBER-VIDEO/evidence/kyberion-vtuber-narration.aiff",
+    "video_output_path": "active/missions/confidential/MSN-KYBERION-VTUBER-VIDEO/evidence/kyberion-vtuber-demo.mp4",
+    "video_bundle_dir": "active/missions/confidential/MSN-KYBERION-VTUBER-VIDEO/evidence/video-composition/kyberion-vtuber-demo",
+    "content_brief_path": "active/missions/confidential/MSN-KYBERION-VTUBER-VIDEO/evidence/kyberion-vtuber-content-brief.json",
+    "profile_id": "operator-ja-default",
+    "video_slug": "kyberion-vtuber",
+    "voice_script": "この動画では、Kyberion がライブの人格として brief を受け取り、オンエア感のある stage と chat を使ってデモを進める流れを示します。",
+    "hook_text": "Kyberion は、ただ説明するだけではなく、オンエアで動く。",
+    "feature_text": "persona を立て、会話の温度を保ち、画面上で demo と chat を往復します。",
+    "cta_text": "最後に、視聴者に向けた次のアクションを短く明示します。"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🎬 [KYBERION-VTUBER] Submitting background render for mission {{mission_id}}" }
+    },
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/narrated-video-preflight.json" }
+    },
+    {
+      "id": "write_voice_action",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/kyberion-vtuber-voice.json",
+        "content": { "action": "generate_voice", "request_id": "kyberion-vtuber-video-audio", "text": "{{voice_script}}", "profile_ref": { "profile_id": "{{profile_id}}" }, "engine": { "engine_id": "local_say" }, "rendering": { "language": "ja", "chunking": { "max_chunk_chars": 4000, "crossfade_ms": 50, "preserve_paralinguistic_tags": true } }, "delivery": { "mode": "artifact", "format": "aiff", "artifact_path": "{{narration_path}}", "emit_progress_packets": true }, "routing": { "personal_voice_mode": "allow_fallback" } },
+        "format": "json"
+      }
+    },
+    {
+      "id": "generate_voice",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "voice_result", "type": "ShellResult" },
+      "params": { "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json" }
+    },
+    {
+      "id": "write_content_brief",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{content_brief_path}}",
+        "content": { "kind": "video-content-brief", "version": "1.0.0", "title": "Kyberion VTuber: Persona, Demo, CTA", "audience": "operators and live viewers who want to see Kyberion presented as a responsive on-air persona", "objective": "convert a fixed live-demo brief into a renderable vtuber-style video package", "distribution_channel": "live-stream", "content_type": "vtuber", "presentation_mode": "vtuber", "promise": "Kyberion can present itself as a live operator persona without losing the governed workflow", "desired_takeaway": "the viewer sees the persona, the demo, and the next action clearly", "constraints": ["keep the stage feeling live", "show chat and persona cues", "do not over-polish the live show feel"], "proof_points": ["persona is visible", "workflow is demonstrated", "community prompt is explicit"], "content_requirements": ["show persona cue", "show on-air context", "show live demo and chat", "show community CTA"], "fixed_inputs": { "customer": "live viewers and operators", "use_case": "streamed demonstration of governable operations", "message": "Kyberion narrates the work while the workflow stays auditable" }, "tone": "live, conversational, reactive", "language": "ja", "duration_sec": 25, "design_system_ref": { "system_id": "operator-ja-default", "brand_name": "Kyberion", "theme": "kyberion-standard", "background_color": "#090814", "layout_family": "vtuber-stage", "motion_profile": "on-air", "fps": 30 } },
+        "format": "json"
+      }
+    },
+    {
+      "id": "submit_video",
+      "role": "source",
+      "op": "video-composition:create_narrated_video_from_content_brief",
+      "consumes": "voice_result",
+      "produces": { "channel": "video_submit_result", "type": "NarratedVideoRunResult" },
+      "params": {
+        "video_content_brief": {
+          "kind": "video-content-brief",
+          "version": "1.0.0",
+          "title": "Kyberion VTuber: Persona, Demo, CTA",
+          "audience": "operators and live viewers who want to see Kyberion presented as a responsive on-air persona",
+          "objective": "convert a fixed live-demo brief into a renderable vtuber-style video package",
+          "distribution_channel": "live-stream",
+          "content_type": "vtuber",
+          "presentation_mode": "vtuber",
+          "promise": "Kyberion can present itself as a live operator persona without losing the governed workflow",
+          "desired_takeaway": "the viewer sees the persona, the demo, and the next action clearly",
+          "constraints": ["keep the stage feeling live", "show chat and persona cues", "do not over-polish the live show feel"],
+          "proof_points": ["persona is visible", "workflow is demonstrated", "community prompt is explicit"],
+          "content_requirements": ["show persona cue", "show on-air context", "show live demo and chat", "show community CTA"],
+          "fixed_inputs": { "customer": "live viewers and operators", "use_case": "streamed demonstration of governable operations", "message": "Kyberion narrates the work while the workflow stays auditable" },
+          "tone": "live, conversational, reactive",
+          "language": "ja",
+          "duration_sec": 25,
+          "design_system_ref": { "system_id": "operator-ja-default", "brand_name": "Kyberion", "theme": "kyberion-standard", "background_color": "#090814", "layout_family": "vtuber-stage", "motion_profile": "on-air", "fps": 30 }
+        },
+        "narration_artifact_ref": "{{narration_path}}",
+        "output": { "format": "mp4", "target_path": "{{video_output_path}}", "bundle_dir": "{{video_bundle_dir}}", "await_completion": false, "detached_background": true, "duration_sec": 25, "fps": 30 }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "video_submit_result",
+      "params": { "message": "🏁 [KYBERION-VTUBER] Background render submitted. Job ticket is in {{video_bundle_dir}}/job-state.json" }
+    }
+  ]
+}

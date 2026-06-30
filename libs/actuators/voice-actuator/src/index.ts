@@ -6,7 +6,7 @@ import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
   getVoiceProfileRecord,
-  getVoiceProfileRegistry,
+  getWritableVoiceProfileRegistryForTier,
   materializeVoiceProfileSampleRefs,
   getVoiceRuntimePolicy,
   getVoiceTtsLanguageConfig,
@@ -454,6 +454,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
           supportsFormats: engine.supports.artifact_formats,
           outputPath: input.delivery?.artifact_path,
           profile,
+          requireVoiceClone: requiresPersonalVoice,
         });
         artifactRefs = [artifactRef];
       }
@@ -472,6 +473,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             rate: defaults.rate,
             engineId: engine.engine_id,
             profile,
+            requireVoiceClone: requiresPersonalVoice,
           }, artifactRefs[0]);
           speaker_verification.push({
             playback_source_path: artifactRefs[0],
@@ -497,6 +499,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
             rate: defaults.rate,
             engineId: engine.engine_id,
             profile,
+            requireVoiceClone: requiresPersonalVoice,
           });
           speaker_verification.push({
             chunk_index: index,
@@ -518,6 +521,11 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   });
 
   const finalPacket = await waitForVoiceJob(runtime, jobId);
+  if (requiresPersonalVoice && finalPacket.status !== 'completed') {
+    throw new Error(
+      `[VOICE] personal voice generation failed with required learned-voice engine ${engine.engine_id}: ${finalPacket.message || finalPacket.status}`,
+    );
+  }
   return {
     status: finalPacket.status === 'completed' ? 'succeeded' : finalPacket.status,
     request_id: jobId,
@@ -572,7 +580,7 @@ async function registerVoiceProfile(input: {
 
   // Direct upsert: update existing profile's sample_refs in registry
   if (input.policy?.allow_update) {
-    const registry = getVoiceProfileRegistry();
+    const { registry, registryPath } = getWritableVoiceProfileRegistryForTier(input.profile.tier);
     const sampleRefs = materializeVoiceProfileSampleRefs(input.profile, input.samples);
     const existing = registry.profiles.find((p) => p.profile_id === input.profile.profile_id);
     const updated = existing
@@ -581,7 +589,13 @@ async function registerVoiceProfile(input: {
     const nextProfiles = existing
       ? registry.profiles.map((p) => (p.profile_id === input.profile.profile_id ? updated : p))
       : [...registry.profiles, updated];
-    writeVoiceProfileRegistry({ ...registry, profiles: nextProfiles });
+    const nextDefaultProfileId = nextProfiles.some((profile) => profile.profile_id === registry.default_profile_id)
+      ? registry.default_profile_id
+      : updated.profile_id;
+    writeVoiceProfileRegistry(
+      { ...registry, default_profile_id: nextDefaultProfileId, profiles: nextProfiles },
+      registryPath,
+    );
     logger.info(`[VOICE] ${existing ? 'updated' : 'created'} profile ${input.profile.profile_id} with ${sampleRefs.length} sample(s)`);
     return {
       status: 'succeeded',

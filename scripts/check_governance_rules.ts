@@ -27,6 +27,11 @@ const CHECKS: GovernanceRuleCheck[] = [
     dataPath: 'knowledge/product/governance/reasoning-level-policy.json',
   },
   {
+    id: 'meeting-environment-policy',
+    schemaPath: 'knowledge/product/schemas/meeting-environment-policy.schema.json',
+    dataPath: 'knowledge/product/governance/meeting-environment-policy.json',
+  },
+  {
     id: 'intent-resolution-policy',
     schemaPath: 'knowledge/product/schemas/intent-resolution-policy.schema.json',
     dataPath: 'knowledge/product/governance/intent-resolution-policy.json',

@@ -5,10 +5,12 @@
   "description": "声のクローン作成パイプライン。3サンプルを録音・トランスクリプト登録し、mlx_audio_qwen3 エンジンでの ICL クローンプロフィールを作成する。収録直後の staging は active/shared/tmp/voice-samples/<profile_id>/、登録後の参照先は active/shared/runtime/voice-profiles/<profile_id>/ に移る。必須 context vars: profile_id, display_name。オプション: duration_sec (default 12), language (default ja)。モデルダウンロード済みであること（HuggingFace 接続が必要、初回のみ）。",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
-    "profile_id": "my-voice-v1",
-    "display_name": "市村 Voice v1",
+    "profile_id": "operator-personal-voice-v1",
+    "display_name": "Operator Personal Voice v1",
     "duration_sec": 12,
-    "language": "ja"
+    "language": "ja",
+    "script_display_hold_ms": 7000,
+    "allow_update": false
   },
   "steps": [
     {
@@ -26,8 +28,14 @@
       "params": {
         "condition": { "from": "sox_health.available", "operator": "eq", "value": false },
         "then": [
-          { "id": "error_no_sox", "role": "sink", "op": "system:log", "params": { "message": "[clone-my-voice] sox が見つかりません。brew install sox を実行してください。" } },
-          { "id": "halt_missing_sox", "role": "sink", "op": "system:shell", "params": { "cmd": "exit 1" } }
+          {
+            "id": "warn_no_sox",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "[clone-my-voice] sox が見つかりません。record_bridge.py が ffmpeg にフォールバックして続行します。"
+            }
+          }
         ]
       }
     },
@@ -38,13 +46,44 @@
       "params": { "path": "active/shared/tmp/voice-samples/{{profile_id}}" }
     },
     {
-      "id": "generate_cue_audio",
-      "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "cue_gen", "type": "ExecResult" },
+      "id": "write_recording_panel",
+      "role": "sink",
+      "op": "system:write_artifact",
       "params": {
-        "command": "say",
-        "args": ["-v", "Eddy (Japanese (Japan))", "-o", "active/shared/tmp/voice-cue.aiff", "録音を開始します。どうぞ"]
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md",
+        "content": "# 声のクローン録音ガイド\n\n- profile: `{{profile_id}}`\n- 表示保持: `{{script_display_hold_ms}}ms`\n- 録音開始の合図が出るまで、ここを見ながら待機してください。\n- 合図のあとに、読み上げを開始してください。\n\n## sample 1/3\n「こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。」\n\n## sample 2/3\n「Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。」\n\n## sample 3/3\n「本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。」\n"
+      }
+    },
+    {
+      "id": "open_recording_panel",
+      "role": "sink",
+      "op": "open_file",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md"
+      }
+    },
+    {
+      "id": "focus_recording_panel",
+      "role": "sink",
+      "op": "activate_application",
+      "params": {
+        "application": "Visual Studio Code"
+      }
+    },
+    {
+      "id": "settle_recording_panel",
+      "role": "sink",
+      "op": "wait",
+      "params": {
+        "duration_ms": 500
+      }
+    },
+    {
+      "id": "log_recording_panel",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] 録音ガイドを active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md に書き出して開きました。必要ならこのファイルを見ながら進めてください。"
       }
     },
     {
@@ -58,11 +97,57 @@
       }
     },
     {
-      "id": "cue_sample1",
-      "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "cue1", "type": "ExecResult" },
-      "params": { "command": "afplay", "args": ["active/shared/tmp/voice-cue.aiff"] }
+      "id": "persist_sample1_script",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.prompt.txt",
+        "content": "録音 1/3\n表示保持: {{script_display_hold_ms}}ms\n\nこの原稿を読み上げてください。\n「こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。」"
+      }
+    },
+    {
+      "id": "log_sample1_prompt",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] sample-01 原稿\n保存先: active/shared/tmp/voice-samples/{{profile_id}}/sample-01.prompt.txt\n表示保持: {{script_display_hold_ms}}ms\n\nこんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。"
+      }
+    },
+    {
+      "id": "hold_sample1_prompt",
+      "role": "sink",
+      "op": "system:wait",
+      "params": { "duration_ms": 7000 }
+    },
+    {
+      "id": "dialog_sample1_prompt",
+      "role": "sink",
+      "op": "run_applescript",
+      "params": {
+        "script": "display dialog \"録音 1/3\n\nこんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。\n\nこのダイアログを閉じたら、録音開始の合図が続きます。\" buttons {\"OK\"} default button \"OK\" with title \"声のクローン録音\""
+      }
+    },
+    {
+      "id": "speak_sample1_cue",
+      "role": "sink",
+      "op": "system:voice",
+      "params": {
+        "text": "録音 1。いまから話してください。"
+      }
+    },
+    {
+      "id": "announce_sample1_recording",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] sample-01 録音開始。ここから {{duration_sec}} 秒間、原稿を読み上げてください。"
+      }
+    },
+    {
+      "id": "settle_sample1_recording",
+      "role": "sink",
+      "op": "system:wait",
+      "params": { "duration_ms": 2000 }
     },
     {
       "id": "record_sample1",
@@ -95,11 +180,57 @@
       }
     },
     {
-      "id": "cue_sample2",
-      "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "cue2", "type": "ExecResult" },
-      "params": { "command": "afplay", "args": ["active/shared/tmp/voice-cue.aiff"] }
+      "id": "persist_sample2_script",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.prompt.txt",
+        "content": "録音 2/3\n表示保持: {{script_display_hold_ms}}ms\n\nこの原稿を読み上げてください。\n「Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。」"
+      }
+    },
+    {
+      "id": "log_sample2_prompt",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] sample-02 原稿\n保存先: active/shared/tmp/voice-samples/{{profile_id}}/sample-02.prompt.txt\n表示保持: {{script_display_hold_ms}}ms\n\nKyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。"
+      }
+    },
+    {
+      "id": "hold_sample2_prompt",
+      "role": "sink",
+      "op": "system:wait",
+      "params": { "duration_ms": 7000 }
+    },
+    {
+      "id": "dialog_sample2_prompt",
+      "role": "sink",
+      "op": "run_applescript",
+      "params": {
+        "script": "display dialog \"録音 2/3\n\nKyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。\n\nこのダイアログを閉じたら、録音開始の合図が続きます。\" buttons {\"OK\"} default button \"OK\" with title \"声のクローン録音\""
+      }
+    },
+    {
+      "id": "speak_sample2_cue",
+      "role": "sink",
+      "op": "system:voice",
+      "params": {
+        "text": "録音 2。いまから話してください。"
+      }
+    },
+    {
+      "id": "announce_sample2_recording",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] sample-02 録音開始。ここから {{duration_sec}} 秒間、原稿を読み上げてください。"
+      }
+    },
+    {
+      "id": "settle_sample2_recording",
+      "role": "sink",
+      "op": "system:wait",
+      "params": { "duration_ms": 2000 }
     },
     {
       "id": "record_sample2",
@@ -132,11 +263,57 @@
       }
     },
     {
-      "id": "cue_sample3",
-      "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "cue3", "type": "ExecResult" },
-      "params": { "command": "afplay", "args": ["active/shared/tmp/voice-cue.aiff"] }
+      "id": "persist_sample3_script",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.prompt.txt",
+        "content": "録音 3/3\n表示保持: {{script_display_hold_ms}}ms\n\nこの原稿を読み上げてください。\n「本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。」"
+      }
+    },
+    {
+      "id": "log_sample3_prompt",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] sample-03 原稿\n保存先: active/shared/tmp/voice-samples/{{profile_id}}/sample-03.prompt.txt\n表示保持: {{script_display_hold_ms}}ms\n\n本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。"
+      }
+    },
+    {
+      "id": "hold_sample3_prompt",
+      "role": "sink",
+      "op": "system:wait",
+      "params": { "duration_ms": 7000 }
+    },
+    {
+      "id": "dialog_sample3_prompt",
+      "role": "sink",
+      "op": "run_applescript",
+      "params": {
+        "script": "display dialog \"録音 3/3\n\n本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。\n\nこのダイアログを閉じたら、録音開始の合図が続きます。\" buttons {\"OK\"} default button \"OK\" with title \"声のクローン録音\""
+      }
+    },
+    {
+      "id": "speak_sample3_cue",
+      "role": "sink",
+      "op": "system:voice",
+      "params": {
+        "text": "録音 3。いまから話してください。"
+      }
+    },
+    {
+      "id": "announce_sample3_recording",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[clone-my-voice] sample-03 録音開始。ここから {{duration_sec}} 秒間、原稿を読み上げてください。"
+      }
+    },
+    {
+      "id": "settle_sample3_recording",
+      "role": "sink",
+      "op": "system:wait",
+      "params": { "duration_ms": 2000 }
     },
     {
       "id": "record_sample3",
@@ -185,7 +362,7 @@
           { "sample_id": "sample-02", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav", "language": "{{language}}" },
           { "sample_id": "sample-03", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav", "language": "{{language}}" }
         ],
-        "policy": { "allow_update": true }
+        "policy": { "allow_update": "{{allow_update}}" }
       }
     },
     {

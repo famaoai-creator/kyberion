@@ -404,6 +404,59 @@ describe('media-actuator pdf to pptx bridge', () => {
     );
   });
 
+  it('maps WebDesignSystem css vars into generated PPTX theme colors', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        active_theme: {
+          name: 'CSS Var Theme',
+          colors: {
+            primary: '#111111',
+            secondary: '#222222',
+            accent: '#333333',
+            background: '#ffffff',
+            text: '#000000',
+          },
+          css_vars: {
+            '--kb-bg-main': '#101827',
+            '--kb-panel-bg': 'rgb(31, 41, 55)',
+            '--kb-accent': '#ff3366',
+            '--kb-warning': '#f59e0b',
+            '--kb-text-primary': '#f8fafc',
+          },
+        },
+        active_pattern: {
+          pattern_id: 'css-var-pptx',
+          content_data: [
+            {
+              id: 'hero',
+              title: 'CSS variables',
+              body: ['Theme vars drive PPTX colors.'],
+              semantic_type: 'hero',
+            },
+          ],
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'merge_content',
+          params: { output_format: 'pptx' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.last_pptx_design.theme).toEqual(
+      expect.objectContaining({
+        dk1: '1f2937',
+        dk2: 'f59e0b',
+        lt1: '101827',
+        accent1: 'ff3366',
+      }),
+    );
+  });
+
   it('loads confidential pptx theme packs with heritage when applying a registered theme', async () => {
     const tenantSlug = '__pptx_theme_pack_test';
     const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
