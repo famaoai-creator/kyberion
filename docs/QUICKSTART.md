@@ -42,12 +42,14 @@ If you only want the shortest path to a visible result, start here.
 The first-win path is intentionally staged:
 
 - 30 seconds: `pnpm doctor` shows whether the local runtime is ready and what value boundary is currently blocked
+- 60 seconds: `pnpm setup:report --persona first-time-user` tells you which surface to use next and whether auth/setup is still blocking it
 - 5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`
 - optional voice path: `pnpm pipeline --input pipelines/voice-hello.json`
 - 15 minutes: skim sections 4-10, then open `pipelines/verify-session.json`, `CAPABILITIES_GUIDE.md`, and `docs/developer/EXTENSION_POINTS.md` to understand the structure
 
 ```bash
 pnpm doctor
+pnpm setup:report --persona first-time-user
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
@@ -81,6 +83,12 @@ Useful local surfaces:
 
 - `Chronos`: `http://127.0.0.1:3000`
 - `Presence Studio`: usually `http://127.0.0.1:3031`
+
+If you are unsure which one matters for your goal, `pnpm setup:report --persona first-time-user` is the canonical entry guide:
+
+- `Chronos` for runtime visibility and operator control
+- `Presence Studio + voice-hub` for conversational voice/browser demos
+- `Slack` when you want threaded remote interaction and auth is ready
 
 ## 4. Use Kyberion By Asking For Outcomes
 

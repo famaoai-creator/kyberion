@@ -14,11 +14,11 @@
  */
 
 import { auditChain } from '@agent/core';
-import { getTenantScope } from './data.js';
+import { getTenantScope } from './data';
 
 export interface MosReadEvent {
   page: string;
-  resource_kind: 'mission_list' | 'mission_detail' | 'audit' | 'health' | 'knowledge' | 'intent_snapshots';
+  resource_kind: 'mission_list' | 'mission_detail' | 'audit' | 'health' | 'knowledge' | 'intent_snapshots' | 'surface_directory';
   resource_id?: string;
   result_count?: number;
 }
