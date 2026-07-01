@@ -5,6 +5,7 @@ const mockListTools = vi.fn().mockResolvedValue({ tools: [] });
 const mockCallTool = vi.fn().mockResolvedValue({ content: [] });
 const mockConnect = vi.fn().mockResolvedValue(undefined);
 const mockClose = vi.fn().mockResolvedValue(undefined);
+const mockTransportCtor = vi.fn();
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   const Client = vi.fn(function (this: any) {
@@ -17,7 +18,8 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
 });
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
-  const StdioClientTransport = vi.fn(function (this: any) {
+  const StdioClientTransport = vi.fn(function (this: any, options: any) {
+    mockTransportCtor(options);
     this.close = mockClose;
   });
   return { StdioClientTransport };
@@ -60,5 +62,25 @@ describe('executeMcp()', () => {
   it('実行後にtransport.close()を呼び出す', async () => {
     await executeMcp('node', ['server.js'], { action: 'list_tools' });
     expect(mockClose).toHaveBeenCalledOnce();
+  });
+
+  it('env指定時はstdio transportへ子プロセス環境を渡す', async () => {
+    await executeMcp(
+      'node',
+      ['server.js'],
+      { action: 'list_tools' },
+      { env: { CLIENT_ID: 'cid', CLIENT_SECRET: 'secret', REDIRECT_URI: undefined } },
+    );
+
+    expect(mockTransportCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'node',
+        args: ['server.js'],
+        env: {
+          CLIENT_ID: 'cid',
+          CLIENT_SECRET: 'secret',
+        },
+      }),
+    );
   });
 });

@@ -28,6 +28,8 @@ This document provides a comprehensive bilingual catalog of all external service
 | **`slack`** | Messaging | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | Slack channel messaging, notifications, and interactive Socket Mode gateway. | Slack チャネル送信、ステータス通知、Socket Mode ゲートウェイ連携。 |
 | **`discord`** | Messaging | `DISCORD_TOKEN`, `DISCORD_WEBHOOK_URL` | Discord channel messaging, notifications, and webhook triggers. | Discord チャネルメッセージ送信、ステータス通知、ウェブフック連携。 |
 | **`telegram`** | Messaging | `TELEGRAM_TOKEN` | Telegram Bot API messaging, channel post, and incoming updates retrieve. | Telegram Bot API を介したチャットメッセージ送受信、チャンネル投稿。 |
+| **`xapi`** | Messaging / Research | `XAPI_CLIENT_ID`, `XAPI_CLIENT_SECRET`, optional `XAPI_REDIRECT_URI` | Official X hosted MCP bridge via `xurl`, enabling post search, user lookup, bookmarks, trends, news, and other X tools from Kyberion. | `xurl` 経由で公式 X hosted MCP を接続し、投稿検索、ユーザー参照、ブックマーク、トレンド、ニュースなどの X ツールを Kyberion から利用。 |
+| **`x-docs`** | Research / Documentation | None | Official hosted MCP server for X documentation, guides, and API references at `https://docs.x.com/mcp`. | `https://docs.x.com/mcp` の公式 hosted MCP を使って、X のドキュメント、ガイド、API リファレンスを参照。 |
 | **`notion`** | Workspace | `NOTION_API_KEY` | Notion database CRUD, page creation, and knowledge base syncing. | Notion データベース操作、Wiki ページの自動起票、ナレッジ同期。 |
 | **`confluence`** | Workspace | `CONFLUENCE_DOMAIN`, `CONFLUENCE_TOKEN` | Confluence wiki page authoring, design spec syncing, and knowledge retrieval. | Confluence Wiki ページの自動作成、仕様書や設計情報のドキュメント同期。 |
 | **`google-workspace`** | Workspace | OAuth Credentials (`client_id`, `client_secret`) | Google Docs, Drive, Sheets, Slides, Gmail, Calendar, and Meet operations via API/CLI. | Google ドキュメント、スプレッドシート、スライド、Gmail、Calendar、Meet の CLI/API 連携。 |
@@ -65,6 +67,8 @@ The platform supports multiple reachability patterns through `service-actuator`:
 4.  **MCP (Model Context Protocol) / MCPツール連携**
     *   Direct tool reachability exposing specialized capabilities from MCP servers.
     *   外部の MCP サーバーが提供する専門ツールをエージェントに直接露出させる連携。
+    *   `xapi` はこのモードで `https://api.x.com/mcp` を `xurl` の stdio bridge 経由で利用します。
+    *   `x-docs` はこのモードで `https://docs.x.com/mcp` へ Streamable HTTP で直接接続します。
 5.  **OAUTH (OAuth 2.0 Auth Broker) / OAuth自動認可**
     *   Managed token acquisition, automatic refresh loops, and secure vault updates.
     *   認可コード交換、トークンの自動リフレッシュ、セキュアなキーチェーン格納。

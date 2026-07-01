@@ -1,0 +1,32 @@
+{
+  "service_id": "x-docs",
+  "name": "X Documentation MCP Presets",
+  "description": "Official hosted MCP server for X documentation at docs.x.com/mcp.",
+  "auth_strategy": "none",
+  "setup_hint": "No local auth is required. Kyberion connects directly to https://docs.x.com/mcp over the MCP Streamable HTTP transport.",
+  "operations": {
+    "list_tools": {
+      "type": "mcp",
+      "url": "https://docs.x.com/mcp",
+      "mcp_action": "list_tools",
+      "description": "List the X documentation MCP tools."
+    },
+    "list_resources": {
+      "type": "mcp",
+      "url": "https://docs.x.com/mcp",
+      "mcp_action": "list_resources",
+      "description": "List X documentation MCP resources."
+    },
+    "call_tool": {
+      "type": "mcp",
+      "url": "https://docs.x.com/mcp",
+      "tool_name": "{{tool_name}}",
+      "payload_template": "{{arguments}}",
+      "description": "Invoke an X documentation MCP tool by name with structured arguments.",
+      "parameters": {
+        "tool_name": { "required": true, "type": "string" },
+        "arguments": { "required": false, "type": "object" }
+      }
+    }
+  }
+}

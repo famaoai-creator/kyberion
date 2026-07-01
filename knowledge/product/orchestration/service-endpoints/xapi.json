@@ -1,0 +1,15 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "xapi": {
+      "preset_path": "knowledge/product/orchestration/service-presets/xapi.json",
+      "allow_unsafe_cli": true,
+      "intent_aliases": ["social-post-search", "x-search", "twitter-search"],
+      "credential_suffixes": {
+        "clientId": ["CLIENT_ID"],
+        "clientSecret": ["CLIENT_SECRET"],
+        "redirectUri": ["REDIRECT_URI"]
+      }
+    }
+  }
+}
