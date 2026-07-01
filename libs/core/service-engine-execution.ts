@@ -179,7 +179,7 @@ export async function executeServicePresetAlternative(
   if (input.alt.type === 'api') {
     const result = await withRetry(async () => {
       const baseUrl = resolveVars(
-        input.alt.base_url || input.preset.base_url || input.serviceConfig.base_url || runtimeVars.base_url,
+        input.alt.base_url || input.preset.base_url || input.serviceConfig.base_url || input.mergedParams.base_url,
         runtimeVars,
       );
       if (!baseUrl) {
