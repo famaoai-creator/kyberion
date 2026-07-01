@@ -81,6 +81,7 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('reasoning-backend');
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reasoning-backend'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm setup:report --persona first-time-user'));
   });
 
   it('expands the meeting runtime preset to the meeting participation manifest', async () => {
@@ -128,6 +129,7 @@ describe('run_doctor', () => {
 
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Next Action: Bootstrap meeting-participation-runtime'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm setup:report --persona first-time-user'));
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });
