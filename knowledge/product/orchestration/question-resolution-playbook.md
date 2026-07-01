@@ -34,6 +34,7 @@ The canonical sources are:
 - `knowledge/product/governance/question-resolution-policy.json`
 - intent catalog intake requirements in `knowledge/product/governance/standard-intents.json`
 - existing coordination profiles such as meeting, presentation, booking, and narrated video profiles
+- [`AIDLC Integration Process`](./aidlc-integration-process.md)
 
 The code layer merges these sources at runtime.
 
@@ -55,4 +56,3 @@ That keeps the loop:
 If a question does not change the work shape, do not ask it in preflight.
 If the same question keeps reappearing, encode it in the policy layer rather
 than copying it into every surface.
-
