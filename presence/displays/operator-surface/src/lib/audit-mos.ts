@@ -14,7 +14,7 @@
  */
 
 import { auditChain } from '@agent/core';
-import { getTenantScope } from './data';
+import { getTenantScope } from './data.js';
 
 export interface MosReadEvent {
   page: string;

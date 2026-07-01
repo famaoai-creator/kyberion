@@ -3,7 +3,7 @@ import {
   getSurfaceDirectory,
   getSurfaceDirectorySummary,
   getSurfaceScenarioGuide,
-} from '../src/lib/data';
+} from '../src/lib/data.js';
 
 describe('operator surface directory', () => {
   it('exposes canonical managed surfaces with auth and scenario metadata', () => {
