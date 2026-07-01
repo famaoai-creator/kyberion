@@ -67,6 +67,34 @@ OAuth broker を利用するサービスでは、認可コード交換後に `ac
 
 ローカル callback は `oauth-callback-surface` が受けます。標準では `http://127.0.0.1:8787/oauth/callback` を使うので、OAuth provider 側の redirect URI にこの値を登録してください。
 
+### X API MCP (`xapi`)
+
+X 連携は接続ファイルではなく、まず環境変数で app credentials を渡します。Kyberion は `xurl` bridge を `stdio` MCP として起動し、`XAPI_CLIENT_ID` / `XAPI_CLIENT_SECRET` / `XAPI_REDIRECT_URI` を子プロセスへ注入します。
+
+```bash
+export XAPI_CLIENT_ID="your-x-app-client-id"
+export XAPI_CLIENT_SECRET="your-x-app-client-secret"
+export XAPI_REDIRECT_URI="http://localhost:8080/callback"
+```
+
+前提:
+
+- X Developer Portal で OAuth 2.0 を有効化した app を作成する
+- redirect URI として `http://localhost:8080/callback` を登録する
+- 初回は `npx -y @xdevplatform/xurl auth oauth2 --headless` または Kyberion の `xapi:auth_status` / `xapi:list_tools` 実行時に認証を完了する
+
+任意で `knowledge/personal/connections/xapi.json` に運用メモを置いても構いませんが、`client_secret` などの認証本体は引き続き環境変数で管理してください。
+
+### X Docs MCP (`x-docs`)
+
+X ドキュメント用 MCP は `https://docs.x.com/mcp` へ Kyberion から直接接続します。ローカルの app 登録や OAuth は不要です。
+
+用途:
+
+- X API の仕様確認
+- ガイド / チュートリアル参照
+- 利用可能な docs-side MCP tools / resources の列挙
+
 ## 2. 安全性の保証
 
 `knowledge/personal/` は `.gitignore` により Git 管理から除外されています。ここに置かれた情報は外部に流出しません。
