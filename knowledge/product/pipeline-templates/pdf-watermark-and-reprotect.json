@@ -1,0 +1,64 @@
+{
+  "pipeline_id": "pdf-watermark-and-reprotect",
+  "version": "1.0.0",
+  "name": "PDF: Unlock → Stamp/Watermark → Re-encrypt",
+  "description": "パスワード保護PDFを復号し、スタンプPDF（透かし/「CONFIDENTIAL」等）を各ページに重ね、再度パスワード保護して出力する。配布前に透かしを入れて再保護する用途。media-actuator の pypdf backend op (pdf_remove_password → pdf_stamp → pdf_encrypt) を連結。",
+  "_usage": "1) context.source_pdf に保護PDF、context.stamp_pdf に1ページの透かしPDFを指定。2) パスワードは環境変数: PDF_PASSWORD（入力復号用）, PDF_USER_PASSWORD / PDF_OWNER_PASSWORD（出力保護用）。3) context.pages で重ねる対象ページを指定（既定 all）。4) 実行: PDF_PASSWORD='...' PDF_USER_PASSWORD='...' pnpm pipeline --input <this file>。",
+  "_notes": "前提: python3 -m pip install 'pypdf[crypto]'（pdf_encrypt の AES-256 に cryptography が必要）。stamp_pdf は透かし画像/テキストを1ページPDF化したもの（既存の pdf_render 等で生成可）。中間ファイルは work_dir に残る。パスワードは step params で {{env.*}} を直接参照し op の stdin 経由で渡る（argv非表示）。シェル履歴やverbose traceに残さないため、より厳密には secret-actuator 経由を推奨。",
+  "action": "pipeline",
+  "context": {
+    "source_pdf": "active/shared/tmp/media/protected.pdf",
+    "stamp_pdf": "active/shared/tmp/media/confidential-stamp.pdf",
+    "pages": "all",
+    "work_dir": "active/shared/tmp/pdf-watermark-and-reprotect",
+    "output_path": "active/shared/tmp/pdf-watermark-and-reprotect/stamped-protected.pdf"
+  },
+  "steps": [
+    {
+      "id": "unlock",
+      "role": "source",
+      "op": "media:pdf_remove_password",
+      "produces": { "channel": "unlocked", "type": "PdfResult" },
+      "params": {
+        "path": "{{source_pdf}}",
+        "password": "{{env.PDF_PASSWORD}}",
+        "out": "{{work_dir}}/unlocked.pdf",
+        "export_as": "unlocked"
+      }
+    },
+    {
+      "id": "stamp",
+      "role": "transform",
+      "op": "media:pdf_stamp",
+      "consumes": ["unlocked"],
+      "produces": { "channel": "stamped", "type": "PdfResult" },
+      "params": {
+        "path": "{{unlocked.out}}",
+        "stamp": "{{stamp_pdf}}",
+        "pages": "{{pages}}",
+        "out": "{{work_dir}}/stamped.pdf",
+        "export_as": "stamped"
+      }
+    },
+    {
+      "id": "reprotect",
+      "role": "transform",
+      "op": "media:pdf_encrypt",
+      "consumes": ["stamped"],
+      "produces": { "channel": "protected", "type": "PdfResult" },
+      "params": {
+        "path": "{{stamped.out}}",
+        "user_password": "{{env.PDF_USER_PASSWORD}}",
+        "owner_password": "{{env.PDF_OWNER_PASSWORD}}",
+        "out": "{{output_path}}",
+        "export_as": "protected"
+      }
+    },
+    {
+      "id": "log-done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🔏 [PDF] Unlocked → stamped ({{pages}}) → re-encrypted: {{output_path}} ({{protected.count}} pages)" }
+    }
+  ]
+}

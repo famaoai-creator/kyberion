@@ -165,3 +165,21 @@ In `intent-routing-map.json`:
 Output paths must be within the project root. Use `active/shared/tmp/` or `active/shared/exports/` as staging areas.
 
 `[ROLE_VIOLATION]` errors mean the active persona/role does not have access to the requested path. Check `knowledge/product/governance/security-policy.json`.
+
+---
+
+## Path Conventions — write portable, machine-independent paths
+
+**Default: write paths as repo-relative.** A relative path like `active/shared/tmp/run.json` or `knowledge/product/x.md` is already portable across machines — it is resolved against the project root at runtime (actuator ops relativize against root, and `system:exec` / `system:shell` run with `cwd` = project root). You almost never need an absolute path in a pipeline.
+
+**Never do:**
+- **Machine-absolute paths** — `/Users/<name>/...`, `/home/<user>/...`, `C:\Users\...`. These break the moment the pipeline runs on another machine. The governance lint (`pnpm check:governance-rules`) fails the build on these in committed `knowledge/`, `libs/`, `scripts/`.
+- **Leading-slash "repo" paths** — `/knowledge/personal/x.md` is an *absolute* path pointing at the filesystem root (`/knowledge/...`), **not** the repo. Drop the leading slash: `knowledge/personal/x.md`. (This was a real bug fixed in `system-upgrade-check.json`.)
+
+**When you genuinely need an absolute path at runtime** (e.g. a value handed to an external tool that does not inherit `cwd` = root), resolve it at runtime instead of hardcoding it — keep the source portable:
+- **Inline path tokens** in any `{{...}}`-templated field: `{{@root}}`, `{{@knowledge:product/x.md}}`, `{{@shared:tmp/run.json}}`, `{{@active:missions}}`, `{{@tmp:run.json}}`, `{{@vault:...}}`. Each expands to a machine-local absolute path at run time. Unknown domains are left literal.
+- **`system:resolve_path` op** (pure, no I/O) — `mode`: `resolve` | `shared` | `knowledge` | `active` | `tmp` | `vault` to expand, and `to_relative` | `normalize` to collapse back.
+
+**Never persist a resolved absolute path.** Tokens / `resolve_path` expand to a machine-local absolute path — fine for transient use this run, but if you write it into a context file, registry, or artifact you have re-introduced a machine-specific path. Before storing a path, collapse it with `system:resolve_path` (`mode: to_relative` or `normalize`) — or `pathResolver.toRepoRelative()` in code — so what lands on disk stays repo-relative.
+
+`KYBERION_ROOT` overrides project-root detection when a pipeline runs from a non-standard working directory.
