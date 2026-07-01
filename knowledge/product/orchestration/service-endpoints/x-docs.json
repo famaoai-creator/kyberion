@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "x-docs": {
+      "preset_path": "knowledge/product/orchestration/service-presets/x-docs.json",
+      "intent_aliases": ["x-documentation", "x-api-docs", "x-mcp-docs"]
+    }
+  }
+}

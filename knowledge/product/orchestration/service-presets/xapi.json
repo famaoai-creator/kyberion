@@ -1,0 +1,62 @@
+{
+  "service_id": "xapi",
+  "name": "X API MCP Presets",
+  "description": "Official X hosted MCP server reached through the xurl stdio bridge.",
+  "auth_strategy": "session",
+  "setup_hint": "Set XAPI_CLIENT_ID and XAPI_CLIENT_SECRET, register http://localhost:8080/callback on your X app (or set XAPI_REDIRECT_URI), then run auth_status or auth_oauth2_headless once before using list_tools/call_tool.",
+  "allow_unsafe_cli": true,
+  "operations": {
+    "auth_status": {
+      "type": "cli",
+      "command": "npx",
+      "args": ["-y", "@xdevplatform/xurl", "auth", "status"],
+      "env": {
+        "CLIENT_ID": "{{clientId}}",
+        "CLIENT_SECRET": "{{clientSecret}}",
+        "REDIRECT_URI": "{{redirectUri}}"
+      },
+      "health_check": "npx -y @xdevplatform/xurl auth status",
+      "description": "Check whether xurl has a usable X OAuth session cached for MCP use."
+    },
+    "auth_oauth2_headless": {
+      "type": "cli",
+      "command": "npx",
+      "args": ["-y", "@xdevplatform/xurl", "auth", "oauth2", "--headless"],
+      "env": {
+        "CLIENT_ID": "{{clientId}}",
+        "CLIENT_SECRET": "{{clientSecret}}",
+        "REDIRECT_URI": "{{redirectUri}}"
+      },
+      "description": "Bootstrap the xurl OAuth session on a headless machine using X's out-of-band login flow."
+    },
+    "list_tools": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@xdevplatform/xurl", "mcp", "https://api.x.com/mcp"],
+      "env": {
+        "CLIENT_ID": "{{clientId}}",
+        "CLIENT_SECRET": "{{clientSecret}}",
+        "REDIRECT_URI": "{{redirectUri}}"
+      },
+      "mcp_action": "list_tools",
+      "description": "List the official X MCP tools currently exposed through the hosted xapi bridge."
+    },
+    "call_tool": {
+      "type": "mcp",
+      "command": "npx",
+      "args": ["-y", "@xdevplatform/xurl", "mcp", "https://api.x.com/mcp"],
+      "env": {
+        "CLIENT_ID": "{{clientId}}",
+        "CLIENT_SECRET": "{{clientSecret}}",
+        "REDIRECT_URI": "{{redirectUri}}"
+      },
+      "tool_name": "{{tool_name}}",
+      "payload_template": "{{arguments}}",
+      "description": "Invoke any official X MCP tool by name with a structured arguments object.",
+      "parameters": {
+        "tool_name": { "required": true, "type": "string" },
+        "arguments": { "required": false, "type": "object" }
+      }
+    }
+  }
+}
