@@ -43,6 +43,9 @@ import {
   type ExecutionBriefSeed,
 } from './execution-brief.js';
 import {
+  resolveQuestionInteractionPacket,
+} from './question-resolver.js';
+import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
   type ExecutionShape,
@@ -1070,61 +1073,18 @@ function buildClarificationPacket(
   executionBrief?: ActuatorExecutionBrief
 ): OperatorInteractionPacket | undefined {
   if (!contract.clarification_needed) return undefined;
-  const briefQuestions = executionBrief?.clarification_questions || [];
-  const primaryQuestion =
-    briefQuestions[0] ||
-    (contract.required_inputs[0]
-      ? {
-          id: contract.required_inputs[0],
-          question: `Please provide ${contract.required_inputs[0].replace(/_/g, ' ')}.`,
-          reason: 'The request cannot be executed safely without this input.',
-        }
-      : undefined);
-  const questions = primaryQuestion
-    ? [
-        {
-          id: primaryQuestion.id || contract.required_inputs[0] || 'missing_input_1',
-          question: primaryQuestion.question,
-          reason: primaryQuestion.reason,
-        },
-      ]
-    : [];
-  return {
-    kind: 'operator-interaction-packet',
-    interaction_type: 'clarification',
-    headline: 'More context is required before execution',
-    summary: contract.goal.summary,
-    execution_brief_summary: executionBrief?.user_facing_summary || executionBrief?.summary,
-    confidence: contract.confidence,
-    questions,
-    suggested_response_style: 'clarify-first',
-    llm_touchpoints: [
-      {
-        stage: 'execution_brief',
-        purpose: 'Extract the request into a governed execution brief',
-        output_contract: 'actuator-execution-brief',
-      },
-      {
-        stage: 'intent_contract',
-        purpose: 'Resolve the request into a governed execution contract',
-        output_contract: 'intent-contract',
-      },
-      {
-        stage: 'work_loop',
-        purpose: 'Produce the governed execution and planning context',
-        output_contract: 'organization-work-loop',
-      },
-    ],
-    next_actions: [
-      {
-        id: 'provide_missing_inputs',
-        action: 'Provide the missing inputs and recompile the execution contract.',
-        next_action_type: 'clarify',
-        priority: 'now',
-      },
-    ],
-    readiness: 'needs_clarification',
-  };
+  return resolveQuestionInteractionPacket(
+    {
+      text: contract.source_text,
+      intentId: contract.intent_id,
+      executionShape: contract.resolution.execution_shape as any,
+      requiredInputs: contract.required_inputs,
+      confidence: contract.confidence,
+      executionBrief,
+    },
+    'More context is required before execution',
+    contract.goal.summary
+  );
 }
 
 export function formatClarificationPacket(packet: OperatorInteractionPacket): string {

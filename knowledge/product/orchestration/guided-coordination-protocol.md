@@ -91,6 +91,9 @@ These profiles hold recurring defaults such as question sets, style hints, routi
 Keep preflight short.
 Ask only the questions that materially change the work shape, the authority boundary, or the highest-risk choice.
 
+The shared `QuestionResolver` compiles those questions from intent requirements,
+clarification policy, and reusable domain profiles.
+
 Preflight should decide:
 
 - whether the request can proceed
@@ -134,4 +137,3 @@ When a new repeated workflow appears, ask first:
 4. Can the workflow be expressed as one more specialization instead of a new one-off path?
 
 If the answer is yes, extend the shared protocol rather than creating a new bespoke flow.
-

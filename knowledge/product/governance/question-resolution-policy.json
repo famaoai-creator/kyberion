@@ -1,0 +1,171 @@
+{
+  "version": "1.0.0",
+  "defaults": {
+    "max_questions_per_turn": 3,
+    "min_confidence_to_skip": 0.55,
+    "always_ask_for": [
+      "goal_or_target",
+      "approval_boundary",
+      "execution_scope"
+    ]
+  },
+  "intent_rules": [
+    {
+      "id": "meeting-operations-core",
+      "intent_id": "meeting-operations",
+      "shapes": ["task_session"],
+      "max_questions_per_turn": 3,
+      "always_ask_for": ["meeting_url", "meeting_role_boundary", "meeting_purpose"],
+      "source_label": "meeting-operations intake",
+      "questions": [
+        {
+          "id": "meeting_purpose",
+          "question": "What is the meeting trying to decide or accomplish?",
+          "reason": "The role set and facilitation depth depend on the meeting purpose.",
+          "default_assumption": "Decision/support tracking meeting",
+          "impact": "Selects the brief question set and whether Kyberion should facilitate or only track."
+        },
+        {
+          "id": "meeting_url",
+          "question": "What is the meeting URL?",
+          "reason": "Live meeting execution needs a concrete join target.",
+          "impact": "Binds the browser or meeting runtime to the correct session."
+        },
+        {
+          "id": "meeting_role_boundary",
+          "question": "Should Kyberion facilitate, speak, or only transcribe and track?",
+          "reason": "The authority boundary controls whether the runtime may join, speak, or remain read-only.",
+          "default_assumption": "Transcribe and track only",
+          "impact": "Determines which runtime capabilities are required."
+        }
+      ],
+      "rationale": "Meeting work is governed by a narrow set of questions that decide role, authority boundary, and join target."
+    },
+    {
+      "id": "schedule-coordination-core",
+      "intent_id": "schedule-coordination",
+      "shapes": ["task_session"],
+      "max_questions_per_turn": 3,
+      "always_ask_for": ["schedule_scope", "date_range", "fixed_constraints", "calendar_action_boundary"],
+      "source_label": "schedule coordination intake",
+      "questions": [
+        {
+          "id": "schedule_scope",
+          "question": "Which calendar scope should Kyberion work on?",
+          "reason": "Kyberion needs to know whether this is a personal, project, or shared calendar change.",
+          "default_assumption": "Current active calendar scope",
+          "impact": "Determines which calendar binding and policies are in scope."
+        },
+        {
+          "id": "date_range",
+          "question": "What date range should be inspected or changed?",
+          "reason": "The target window is required before a calendar action can be planned safely.",
+          "impact": "Constrains the agenda or reschedule search."
+        },
+        {
+          "id": "calendar_action_boundary",
+          "question": "Should Kyberion only inspect, or is it allowed to mutate the calendar?",
+          "reason": "Read-only and write actions must not be conflated.",
+          "default_assumption": "Inspect only",
+          "impact": "Controls whether the flow remains diagnostic or becomes state-changing."
+        }
+      ],
+      "rationale": "Calendar work should clarify scope and mutation boundary before any scheduling action."
+    },
+    {
+      "id": "generate-presentation-core",
+      "intent_id": "generate-presentation",
+      "shapes": ["task_session", "pipeline"],
+      "max_questions_per_turn": 3,
+      "always_ask_for": ["deck_purpose", "audience", "source_material"],
+      "source_label": "presentation preflight",
+      "questions": [
+        {
+          "id": "deck_purpose",
+          "question": "What is the deck for?",
+          "reason": "The purpose determines the narrative structure and the level of polish.",
+          "default_assumption": "Proposal deck",
+          "impact": "Selects the slide pattern and content framing."
+        },
+        {
+          "id": "audience",
+          "question": "Who is the primary audience?",
+          "reason": "Audience expectations shape the tone and density of the deck.",
+          "default_assumption": "Internal decision makers",
+          "impact": "Controls the visual tone and depth of explanation."
+        },
+        {
+          "id": "source_material",
+          "question": "What source material should the deck be based on?",
+          "reason": "Kyberion should not invent a presentation when a source artifact exists.",
+          "default_assumption": "No source material yet",
+          "impact": "Selects whether the flow is transformation or greenfield generation."
+        }
+      ],
+      "rationale": "Presentation work should bind purpose, audience, and source material before generation."
+    },
+    {
+      "id": "generate-narrated-video-core",
+      "intent_id": "generate-narrated-video",
+      "shapes": ["pipeline"],
+      "max_questions_per_turn": 3,
+      "always_ask_for": ["video_purpose", "source_material", "voice_profile"],
+      "source_label": "narrated video preflight",
+      "questions": [
+        {
+          "id": "video_purpose",
+          "question": "What is the video for?",
+          "reason": "The narrative shape depends on whether this is a tutorial, announcement, or report.",
+          "default_assumption": "Tutorial / walkthrough",
+          "impact": "Selects the video tone and composition pattern."
+        },
+        {
+          "id": "source_material",
+          "question": "What should the narration be based on?",
+          "reason": "A source artifact keeps the generated script grounded.",
+          "default_assumption": "A brief or slide deck",
+          "impact": "Controls whether the pipeline can reuse existing assets."
+        },
+        {
+          "id": "voice_profile",
+          "question": "Which voice profile should be used for narration?",
+          "reason": "The speech synthesis route changes based on the selected voice profile.",
+          "default_assumption": "Active default voice profile",
+          "impact": "Binds the TTS path and whether a promoted clone voice is required."
+        }
+      ],
+      "rationale": "Narrated video work must bind purpose, source material, and voice before rendering."
+    },
+    {
+      "id": "lifestyle-booking-core",
+      "intent_id": "lifestyle-booking",
+      "shapes": ["task_session"],
+      "max_questions_per_turn": 3,
+      "always_ask_for": ["booking_path_preference", "booking_category", "date_range"],
+      "source_label": "booking preflight",
+      "questions": [
+        {
+          "id": "booking_category",
+          "question": "What kind of booking or reservation is this?",
+          "reason": "The booking category determines the preflight question set and site selection rules.",
+          "default_assumption": "Restaurant booking",
+          "impact": "Selects the category-specific reservation path."
+        },
+        {
+          "id": "date_range",
+          "question": "What date or time window should be used?",
+          "reason": "The search scope must be bound before comparing options.",
+          "impact": "Constrains the search and reservation target."
+        },
+        {
+          "id": "booking_path_preference",
+          "question": "Should Kyberion optimize for fastest, cheapest, or highest-confidence booking path?",
+          "reason": "The path preference controls how aggressively Kyberion filters options.",
+          "default_assumption": "Highest-confidence path",
+          "impact": "Determines the site selection and comparison heuristic."
+        }
+      ],
+      "rationale": "Booking work should clarify category, time window, and path preference before searching."
+    }
+  ]
+}
