@@ -12,6 +12,14 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(() => true),
   safeReaddir: vi.fn(() => []),
   safeStat: vi.fn(() => ({ isFile: () => true })),
+  mcpConnect: vi.fn().mockResolvedValue(undefined),
+  mcpCallTool: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] }),
+  mcpListTools: vi.fn().mockResolvedValue({ tools: [{ name: 'search_posts' }] }),
+  mcpListResources: vi.fn().mockResolvedValue({ resources: [{ uri: 'https://docs.x.com/docs/intro' }] }),
+  mcpClose: vi.fn().mockResolvedValue(undefined),
+  mcpTransportCtor: vi.fn(),
+  mcpHttpClose: vi.fn().mockResolvedValue(undefined),
+  mcpHttpTransportCtor: vi.fn(),
 }));
 
 vi.mock('./index.js', async () => {
@@ -54,6 +62,32 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+  const Client = vi.fn(function (this: any) {
+    this.connect = mocks.mcpConnect;
+    this.callTool = mocks.mcpCallTool;
+    this.listTools = mocks.mcpListTools;
+    this.listResources = mocks.mcpListResources;
+  });
+  return { Client };
+});
+
+vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
+  const StdioClientTransport = vi.fn(function (this: any, options: any) {
+    mocks.mcpTransportCtor(options);
+    this.close = mocks.mcpClose;
+  });
+  return { StdioClientTransport };
+});
+
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
+  const StreamableHTTPClientTransport = vi.fn(function (this: any, url: URL, options: any) {
+    mocks.mcpHttpTransportCtor({ url: String(url), options });
+    this.close = mocks.mcpHttpClose;
+  });
+  return { StreamableHTTPClientTransport };
+});
+
 describe('executeServicePreset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,6 +119,13 @@ describe('executeServicePreset', () => {
         notion: { preset_path: 'p.json', base_url: 'https://api.notion.com/v1' },
         canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
         youtube: { preset_path: 'knowledge/product/orchestration/service-presets/youtube.json' },
+        xapi: {
+          preset_path: 'knowledge/product/orchestration/service-presets/xapi.json',
+          allow_unsafe_cli: true,
+        },
+        'x-docs': {
+          preset_path: 'knowledge/product/orchestration/service-presets/x-docs.json',
+        },
       },
     });
   });
@@ -254,6 +295,122 @@ describe('executeServicePreset', () => {
     await expect(
       executeServicePreset('vision', 'capture_screen', { output: '/tmp/screen.jpg' }, 'none')
     ).resolves.toBe('/tmp/screen.jpg');
+  });
+
+  it('passes secret-guard OAuth env into stdio MCP bridges', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.resolveServiceBinding.mockReturnValue({
+      serviceId: 'xapi',
+      authMode: 'secret-guard',
+      clientId: 'x-client-id',
+      clientSecret: 'x-client-secret',
+      redirectUri: 'http://localhost:8080/callback',
+    });
+    mocks.checkBinary.mockResolvedValue(true);
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('xapi.json')) {
+        return JSON.stringify({
+          operations: {
+            call_tool: {
+              type: 'mcp',
+              command: 'npx',
+              args: ['-y', '@xdevplatform/xurl', 'mcp', 'https://api.x.com/mcp'],
+              env: {
+                CLIENT_ID: '{{clientId}}',
+                CLIENT_SECRET: '{{clientSecret}}',
+                REDIRECT_URI: '{{redirectUri}}',
+              },
+              tool_name: '{{tool_name}}',
+              payload_template: '{{arguments}}',
+            },
+          },
+        });
+      }
+      return '';
+    });
+
+    await executeServicePreset(
+      'xapi',
+      'call_tool',
+      { tool_name: 'search_posts', arguments: { query: 'kyberion' } },
+      'secret-guard',
+    );
+
+    expect(mocks.mcpTransportCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'npx',
+        args: ['-y', '@xdevplatform/xurl', 'mcp', 'https://api.x.com/mcp'],
+        env: {
+          CLIENT_ID: 'x-client-id',
+          CLIENT_SECRET: 'x-client-secret',
+          REDIRECT_URI: 'http://localhost:8080/callback',
+        },
+      }),
+    );
+    expect(mocks.mcpCallTool).toHaveBeenCalledWith({
+      name: 'search_posts',
+      arguments: { query: 'kyberion' },
+    });
+  });
+
+  it('connects to hosted MCP docs over Streamable HTTP', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('x-docs.json')) {
+        return JSON.stringify({
+          operations: {
+            call_tool: {
+              type: 'mcp',
+              url: 'https://docs.x.com/mcp',
+              tool_name: '{{tool_name}}',
+              payload_template: '{{arguments}}',
+            },
+          },
+        });
+      }
+      return '';
+    });
+
+    await executeServicePreset(
+      'x-docs',
+      'call_tool',
+      { tool_name: 'search_docs', arguments: { query: 'bookmarks timeline' } },
+      'none',
+    );
+
+    expect(mocks.mcpHttpTransportCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://docs.x.com/mcp',
+      }),
+    );
+    expect(mocks.mcpCallTool).toHaveBeenCalledWith({
+      name: 'search_docs',
+      arguments: { query: 'bookmarks timeline' },
+    });
+  });
+
+  it('lists resources from hosted MCP docs over Streamable HTTP', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('x-docs.json')) {
+        return JSON.stringify({
+          operations: {
+            list_resources: {
+              type: 'mcp',
+              url: 'https://docs.x.com/mcp',
+              mcp_action: 'list_resources',
+            },
+          },
+        });
+      }
+      return '';
+    });
+
+    await expect(
+      executeServicePreset('x-docs', 'list_resources', {}, 'none'),
+    ).resolves.toEqual({ resources: [{ uri: 'https://docs.x.com/docs/intro' }] });
+
+    expect(mocks.mcpListResources).toHaveBeenCalledOnce();
   });
 
   it('preserves structured values in CLI templates', async () => {
