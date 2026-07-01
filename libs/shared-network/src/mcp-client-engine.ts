@@ -12,10 +12,24 @@ export interface McpActionRequest {
   arguments?: Record<string, any>;
 }
 
-export async function executeMcp(command: string, args: string[], actionRequest: McpActionRequest) {
+function buildChildEnv(env?: Record<string, unknown>): Record<string, string> | undefined {
+  if (!env || typeof env !== 'object') return undefined;
+  const entries = Object.entries(env)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => [key, String(value)] as const);
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+export async function executeMcp(
+  command: string,
+  args: string[],
+  actionRequest: McpActionRequest,
+  options?: { env?: Record<string, unknown> },
+) {
   const transport = new StdioClientTransport({
     command,
     args,
+    env: buildChildEnv(options?.env),
     stderr: "inherit",
   });
 
