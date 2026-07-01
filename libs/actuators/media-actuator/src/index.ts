@@ -8,6 +8,7 @@ import {
   safeLstat,
   safeStat,
   safeExec,
+  safeExecResult,
   derivePipelineStatus,
   pathResolver,
   pptxUtils,
@@ -665,6 +666,80 @@ async function handleAction(input: MediaAction) {
   });
 }
 
+function assertInProjectRoot(filePath: string, label: string): string {
+  const rootDir = pathResolver.rootDir();
+  const relative = path.relative(rootDir, filePath);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`${label}: path must stay under the Kyberion project root: ${filePath}`);
+  }
+  return filePath;
+}
+
+function resolvePdfPath(value: any, resolve: Function, label: string): string {
+  const rootDir = pathResolver.rootDir();
+  const resolved = path.resolve(rootDir, resolve(value));
+  return assertInProjectRoot(resolved, label);
+}
+
+function resolvePdfOutPath(params: any, resolve: Function, command: string): string {
+  return params.out
+    ? resolvePdfPath(params.out, resolve, `pdf_${command} out`)
+    : pathResolver.sharedTmp(`pdf-ops/${command}-${Date.now()}.pdf`);
+}
+
+function resolvePdfOutDir(params: any, resolve: Function, prefix: string): string {
+  return params.out_dir
+    ? resolvePdfPath(params.out_dir, resolve, 'pdf_split out_dir')
+    : pathResolver.sharedTmp(`pdf-pages/${prefix}-${Date.now()}`);
+}
+
+function sanitizePdfFilenamePrefix(value: string): string {
+  return path.basename(value).replace(/[\\/]+/g, '-').replace(/[^a-zA-Z0-9._-]+/g, '-') || 'page';
+}
+
+function runPdfOpsBridge(
+  command: string,
+  cliArgs: string[],
+  passwords: Record<string, string | undefined>,
+  timeoutMs?: number,
+): any {
+  const rootDir = pathResolver.rootDir();
+  const bridge = pathResolver.rootResolve('libs/actuators/media-actuator/scripts/pdf_ops_bridge.py');
+  const pythonBin = process.env.KYBERION_PYTHON || 'python3';
+  const cleanedPw: Record<string, string> = {};
+  for (const [key, value] of Object.entries(passwords)) {
+    if (value !== undefined && value !== null && value !== '') cleanedPw[key] = String(value);
+  }
+  const execResult = safeExecResult(pythonBin, [bridge, '--command', command, ...cliArgs], {
+    cwd: rootDir,
+    input: `${JSON.stringify(cleanedPw)}\n`,
+    timeoutMs: timeoutMs || 120000,
+  });
+  if (execResult.error && (execResult.status === null || execResult.status === undefined)) {
+    throw new Error(`pdf_${command}: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON.`);
+  }
+  let parsed: any = {};
+  try { parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}'); } catch { parsed = {}; }
+  if (execResult.status !== 0 || !parsed.ok) {
+    const detail = parsed.error || (execResult.stderr || '').trim() || `python exited with status ${execResult.status}`;
+    throw new Error(`pdf_${command} failed: ${detail}`);
+  }
+  return parsed;
+}
+
+const PDF_PYPDF_OPS = new Set([
+  'pdf_split',
+  'pdf_merge',
+  'pdf_extract_range',
+  'pdf_delete_pages',
+  'pdf_reorder',
+  'pdf_rotate',
+  'pdf_remove_password',
+  'pdf_encrypt',
+  'pdf_metadata',
+  'pdf_stamp',
+]);
+
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
@@ -718,6 +793,175 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       }
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
     }
+    case 'pdf_split': {
+      // Split a (optionally password-protected) PDF into one file per page.
+      // Backed by the pypdf bridge: it decrypts with the supplied password and
+      // copies each page losslessly (object graph preserved). The password is
+      // passed on stdin — never argv — so it cannot leak via the process list.
+      // params: { path, password?, out_dir?, prefix?, pad?, timeout_ms?, export_as? }
+      const inputPath = resolvePdfPath(params.path, resolve, 'pdf_split path');
+      if (!safeExistsSync(inputPath)) {
+        throw new Error(`pdf_split: input PDF not found: ${resolve(params.path)}`);
+      }
+      const defaultPrefix = path.basename(inputPath).replace(/\.pdf$/i, '') || 'page';
+      const prefix = sanitizePdfFilenamePrefix(params.prefix ? String(resolve(params.prefix)) : defaultPrefix);
+      const outDirAbs = resolvePdfOutDir(params, resolve, prefix);
+      const pad = Number.isInteger(params.pad) ? params.pad : 3;
+      const password = params.password !== undefined && params.password !== null
+        ? String(resolve(params.password))
+        : '';
+      const bridge = pathResolver.rootResolve('libs/actuators/media-actuator/scripts/pdf_split_bridge.py');
+      const pythonBin = process.env.KYBERION_PYTHON || 'python3';
+      const execResult = safeExecResult(pythonBin, [
+        bridge,
+        '--input', inputPath,
+        '--out-dir', outDirAbs,
+        '--prefix', prefix,
+        '--pad', String(pad),
+      ], {
+        cwd: rootDir,
+        input: `${password}\n`, // password via stdin only; never on argv
+        timeoutMs: params.timeout_ms || 120000,
+      });
+      if (execResult.error && (execResult.status === null || execResult.status === undefined)) {
+        throw new Error(`pdf_split: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON.`);
+      }
+      let parsed: any = {};
+      try { parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}'); } catch { parsed = {}; }
+      if (execResult.status !== 0 || !parsed.ok) {
+        const detail = parsed.error || (execResult.stderr || '').trim() || `python exited with status ${execResult.status}`;
+        throw new Error(`pdf_split failed: ${detail}`);
+      }
+      // Return repo-relative paths so the result stays portable if persisted downstream.
+      const pages = (Array.isArray(parsed.pages) ? parsed.pages : []).map((p: string) => pathResolver.toRepoRelative(p));
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_pages']: {
+          count: parsed.count ?? pages.length,
+          out_dir: pathResolver.toRepoRelative(parsed.out_dir || outDirAbs),
+          pages,
+        },
+      };
+    }
+    case 'pdf_merge': {
+      const inputs = (Array.isArray(params.inputs) ? params.inputs : [])
+        .map((p: any) => resolvePdfPath(p, resolve, 'pdf_merge input'));
+      if (inputs.length < 2) {
+        throw new Error('pdf_merge: "inputs" must list at least two PDF paths');
+      }
+      const outAbs = resolvePdfOutPath(params, resolve, 'merge');
+      const result = runPdfOpsBridge('merge', [
+        '--inputs', inputs.join(path.delimiter),
+        '--out', outAbs,
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_merge']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs),
+      } };
+    }
+    case 'pdf_extract_range': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_extract_range path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_extract_range: input not found: ${resolve(params.path)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'extract');
+      const result = runPdfOpsBridge('extract_range', [
+        '--input', inputAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all')),
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_extract']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), pages: result.pages,
+      } };
+    }
+    case 'pdf_delete_pages': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_delete_pages path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_delete_pages: input not found: ${resolve(params.path)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'delete');
+      const result = runPdfOpsBridge('delete_pages', [
+        '--input', inputAbs, '--out', outAbs, '--delete', String(resolve(params.delete ?? '')),
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_delete_pages']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), deleted: result.deleted,
+      } };
+    }
+    case 'pdf_reorder': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_reorder path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_reorder: input not found: ${resolve(params.path)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'reorder');
+      const result = runPdfOpsBridge('reorder', [
+        '--input', inputAbs, '--out', outAbs, '--order', String(resolve(params.order ?? '')),
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_reorder']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), order: result.order,
+      } };
+    }
+    case 'pdf_rotate': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_rotate path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_rotate: input not found: ${resolve(params.path)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'rotate');
+      const angle = Number.isInteger(params.angle) ? params.angle : 90;
+      const result = runPdfOpsBridge('rotate', [
+        '--input', inputAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all')), '--angle', String(angle),
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_rotate']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), rotated: result.rotated, angle: result.angle,
+      } };
+    }
+    case 'pdf_remove_password': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_remove_password path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_remove_password: input not found: ${resolve(params.path)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'unlocked');
+      const result = runPdfOpsBridge('remove_password', [
+        '--input', inputAbs, '--out', outAbs,
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_unlocked']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs),
+      } };
+    }
+    case 'pdf_encrypt': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_encrypt path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_encrypt: input not found: ${resolve(params.path)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'encrypted');
+      const result = runPdfOpsBridge('encrypt', [
+        '--input', inputAbs, '--out', outAbs,
+      ], {
+        password: params.password ? String(resolve(params.password)) : undefined,
+        user_password: params.user_password ? String(resolve(params.user_password)) : undefined,
+        owner_password: params.owner_password ? String(resolve(params.owner_password)) : undefined,
+      }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_encrypted']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs),
+      } };
+    }
+    case 'pdf_metadata': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_metadata path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_metadata: input not found: ${resolve(params.path)}`);
+      const setObj = params.set && typeof params.set === 'object'
+        ? Object.fromEntries(Object.entries(params.set).map(([k, v]) => [k, typeof v === 'string' ? resolve(v) : v]))
+        : undefined;
+      const cliArgs = ['--input', inputAbs];
+      if (setObj) {
+        cliArgs.push('--set', JSON.stringify(setObj));
+        cliArgs.push('--out', resolvePdfOutPath(params, resolve, 'metadata'));
+      }
+      const result = runPdfOpsBridge('metadata', cliArgs, {
+        password: params.password ? String(resolve(params.password)) : undefined,
+      }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_metadata']: {
+        metadata: result.metadata,
+        ...(result.out ? { out: pathResolver.toRepoRelative(result.out) } : {}),
+        ...(result.count !== undefined ? { count: result.count } : {}),
+      } };
+    }
+    case 'pdf_stamp': {
+      const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_stamp path');
+      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_stamp: input not found: ${resolve(params.path)}`);
+      const stampAbs = resolvePdfPath(params.stamp, resolve, 'pdf_stamp stamp');
+      if (!safeExistsSync(stampAbs)) throw new Error(`pdf_stamp: stamp PDF not found: ${resolve(params.stamp)}`);
+      const outAbs = resolvePdfOutPath(params, resolve, 'stamped');
+      const result = runPdfOpsBridge('stamp', [
+        '--input', inputAbs, '--stamp', stampAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all')),
+      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
+      return { ...ctx, [params.export_as || 'pdf_stamp']: {
+        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), stamped: result.stamped,
+      } };
+    }
     case 'document_digest': {
       // Extract a document and return concise LLM-friendly Markdown.
       // Supports: pdf, pptx, xlsx, docx (auto-detected from extension).
@@ -769,6 +1013,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
 
 async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
+  if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
   switch (op) {
     case 'pdf_to_pptx_design': {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
@@ -1173,6 +1418,7 @@ function cssVarHex(value: unknown): string | undefined {
 
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
+  if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
   switch (op) {
     case 'mermaid_render': {
       const outPath = path.resolve(rootDir, resolve(params.path));

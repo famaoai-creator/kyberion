@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "steps": [
+    {
+      "type": "capture",
+      "op": "pdf_merge",
+      "params": {
+        "inputs": [
+          "active/shared/tmp/media/a.pdf",
+          "active/shared/tmp/media/b.pdf"
+        ],
+        "out": "active/shared/tmp/media/combined.pdf",
+        "export_as": "pdf_merge"
+      }
+    }
+  ]
+}

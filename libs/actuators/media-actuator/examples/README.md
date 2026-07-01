@@ -55,3 +55,51 @@ node dist/libs/actuators/media-actuator/src/index.js --input libs/actuators/medi
   canonical な `document-brief` から PDF レポートを生成する。`document / report / pdf` で区別する
 - `document-brief-invoice-pdf.json`:
   canonical な `document-brief` から請求書 PDF を生成する。区別は `artifact_family / document_type / document_profile / render_target / layout_template_id` で行う
+- `pdf-split-pages.json`:
+  パスワード付き PDF を復号し、1ページずつ別ファイルへロスレス分割する（`pdf_split` op / pypdf backend）。パスワードは実行時に `PDF_PASSWORD` 環境変数で注入し、出力パスは repo-relative で返る
+
+### `pdf_split` の前提
+
+`pdf_split` op は pypdf に依存します。利用前に対象 python 環境へインストールしてください:
+
+```bash
+python3 -m pip install pypdf      # または venv に入れて KYBERION_PYTHON で指定
+```
+
+実行例（パスワードは argv に出さず環境変数経由）:
+
+```bash
+PDF_PASSWORD='＜PDFのパスワード＞' \
+  node dist/libs/actuators/media-actuator/src/index.js \
+  --input libs/actuators/media-actuator/examples/pdf-split-pages.json
+```
+
+params: `path`（入力PDF）, `password?`（`{{env.PDF_PASSWORD}}` や secret 参照可）, `out_dir?`（既定 `active/shared/tmp/pdf-pages/...`）, `prefix?`, `pad?`, `timeout_ms?`, `export_as?`。パスワードは stdin 経由で pypdf に渡され、プロセス引数には現れません。
+
+### PDF ページ操作 op 一覧（pypdf backend）
+
+`pdf_split` と同じ pypdf ブリッジ方式の op です。パスワードは stdin の JSON 経由で渡され argv に出ません。出力パスは repo-relative で返ります。すべて `capture` / `transform` / `sink` の各 role で呼べます。
+
+| op | 主な params | 概要 |
+|---|---|---|
+| `pdf_merge` | `inputs: string[]`, `out?` | 複数PDFを1つに結合（順序は配列順） |
+| `pdf_extract_range` | `path`, `pages`, `out?` | 指定ページのみ抽出（`pages` は 1始まり指定: `"1-3,7,10-"` / `"all"`） |
+| `pdf_delete_pages` | `path`, `delete`, `out?` | 指定ページを削除して残りを出力 |
+| `pdf_reorder` | `path`, `order`, `out?` | `order` の順にページを並べ替え |
+| `pdf_rotate` | `path`, `pages?`(all), `angle?`(90), `out?` | 指定ページを 90 の倍数で回転 |
+| `pdf_remove_password` | `path`, `password`, `out?` | 復号してパスワードを外した1ファイルを出力 |
+| `pdf_encrypt` | `path`, `user_password`, `owner_password?`, `password?`, `out?` | パスワード保護コピーを出力（AES-256） |
+| `pdf_metadata` | `path`, `set?`(object), `out?` | メタデータ読み取り（`set`+`out` で書き換えコピー出力） |
+| `pdf_stamp` | `path`, `stamp`, `pages?`(all), `out?` | スタンプPDFの1ページ目を指定ページに重ね合わせ |
+
+共通: `password?`（暗号化入力の復号用）, `out?`（未指定時は `active/shared/tmp/pdf-ops/<command>-<ts>.pdf`）, `timeout_ms?`, `export_as?`。`python` は `KYBERION_PYTHON || python3`。入力・出力パスは Kyberion project root 内に制限されます。
+
+**前提パッケージ:**
+
+```bash
+python3 -m pip install pypdf            # 全 op に必要
+python3 -m pip install cryptography     # pdf_encrypt（AES-256）や AES 暗号化PDFの復号に必要
+# まとめて: python3 -m pip install "pypdf[crypto]"
+```
+
+例: `pdf-extract-range.json`（ページ抽出）, `pdf-merge.json`（結合）を参照。

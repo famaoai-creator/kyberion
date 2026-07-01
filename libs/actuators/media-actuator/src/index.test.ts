@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdmZip from 'adm-zip';
 import AjvModule from 'ajv';
@@ -2249,4 +2250,212 @@ describe('media-actuator pdf to pptx bridge', () => {
     ).toBe(true);
   });
 
+});
+
+describe('media-actuator pdf_split (pypdf bridge)', () => {
+  // The op shells out to python + pypdf. Use the same interpreter the op uses
+  // (KYBERION_PYTHON override, else python3) and skip the suite when pypdf is
+  // unavailable, so CI without the dependency stays green.
+  const pythonBin = process.env.KYBERION_PYTHON || 'python3';
+  const pypdfAvailable = (() => {
+    try {
+      return spawnSync(pythonBin, ['-c', 'import pypdf'], { timeout: 15000 }).status === 0;
+    } catch {
+      return false;
+    }
+  })();
+
+  const testRoot = path.resolve(process.cwd(), 'active/shared/tmp/__pdf_split_test');
+  const fixturePath = path.join(testRoot, 'enc.pdf');
+  const PASSWORD = 's3cret-pw';
+
+  beforeEach(() => {
+    if (!pypdfAvailable) return;
+    safeRmSync(testRoot, { recursive: true, force: true });
+    safeMkdir(testRoot, { recursive: true });
+    // Build a 3-page password-protected PDF fixture with pypdf.
+    const build = spawnSync(pythonBin, ['-c', [
+      'import sys',
+      'from pypdf import PdfWriter',
+      'w = PdfWriter()',
+      '[w.add_blank_page(width=200, height=200) for _ in range(3)]',
+      'w.encrypt(sys.argv[2])',
+      'w.write(sys.argv[1])',
+    ].join('\n'), fixturePath, PASSWORD], { timeout: 30000 });
+    expect(build.status, build.stderr?.toString()).toBe(0);
+    expect(safeExistsSync(fixturePath)).toBe(true);
+  });
+
+  afterEach(() => {
+    safeRmSync(testRoot, { recursive: true, force: true });
+  });
+
+  it.runIf(pypdfAvailable)('splits a password-protected PDF into one file per page', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'pdf_split', params: {
+        path: 'active/shared/tmp/__pdf_split_test/enc.pdf',
+        password: PASSWORD,
+        out_dir: 'active/shared/tmp/__pdf_split_test/pages',
+        prefix: 'enc',
+        export_as: 'pdf_pages',
+      } }],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    const out = result.context.pdf_pages as any;
+    expect(out.count).toBe(3);
+    // Paths are returned repo-relative (portable), not machine-absolute.
+    expect(out.out_dir).toBe('active/shared/tmp/__pdf_split_test/pages');
+    expect(out.pages).toEqual([
+      'active/shared/tmp/__pdf_split_test/pages/enc-001.pdf',
+      'active/shared/tmp/__pdf_split_test/pages/enc-002.pdf',
+      'active/shared/tmp/__pdf_split_test/pages/enc-003.pdf',
+    ]);
+    for (const rel of out.pages) {
+      expect(safeExistsSync(path.resolve(process.cwd(), rel))).toBe(true);
+    }
+  });
+
+  it.runIf(pypdfAvailable)('fails clearly on an incorrect password', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'pdf_split', params: {
+        path: 'active/shared/tmp/__pdf_split_test/enc.pdf',
+        password: 'wrong-password',
+        out_dir: 'active/shared/tmp/__pdf_split_test/pages',
+        export_as: 'pdf_pages',
+      } }],
+    } as any);
+
+    expect(result.status).toBe('failed');
+  });
+
+  it('rejects a missing input PDF before invoking the bridge', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'capture', op: 'pdf_split', params: {
+        path: 'active/shared/tmp/__pdf_split_test/does-not-exist.pdf',
+        export_as: 'pdf_pages',
+      } }],
+    } as any);
+
+    expect(result.status).toBe('failed');
+  });
+});
+
+describe('media-actuator PDF page ops (pypdf bridge)', () => {
+  const pythonBin = process.env.KYBERION_PYTHON || 'python3';
+  const probe = (code: string) => {
+    try { return spawnSync(pythonBin, ['-c', code], { timeout: 15000 }).status === 0; }
+    catch { return false; }
+  };
+  const pypdfAvailable = probe('import pypdf');
+  const cryptoAvailable = probe('import cryptography');
+
+  const testRoot = path.resolve(process.cwd(), 'active/shared/tmp/__pdf_ops_test');
+  const rel = (name: string) => `active/shared/tmp/__pdf_ops_test/${name}`;
+  const abs = (name: string) => path.join(testRoot, name);
+
+  beforeEach(() => {
+    if (!pypdfAvailable) return;
+    safeRmSync(testRoot, { recursive: true, force: true });
+    safeMkdir(testRoot, { recursive: true });
+    const build = spawnSync(pythonBin, ['-c', [
+      'import sys',
+      'from pypdf import PdfWriter',
+      'w = PdfWriter()',
+      '[w.add_blank_page(width=200, height=200) for _ in range(5)]',
+      'w.write(sys.argv[1])',
+      's = PdfWriter(); s.add_blank_page(width=200, height=200); s.write(sys.argv[2])',
+    ].join('\n'), abs('five.pdf'), abs('stamp.pdf')], { timeout: 30000 });
+    expect(build.status, build.stderr?.toString()).toBe(0);
+  });
+
+  afterEach(() => {
+    safeRmSync(testRoot, { recursive: true, force: true });
+  });
+
+  const runOp = (op: string, params: Record<string, unknown>, type: 'capture' | 'transform' = 'capture') => handleAction({
+    action: 'pipeline',
+    steps: [{ type, op, params: { export_as: 'r', ...params } }],
+  } as any);
+
+  it.runIf(pypdfAvailable)('pdf_extract_range keeps only the selected pages', async () => {
+    const res = await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '2-4', out: rel('range.pdf') });
+    expect(res.status).toBe('succeeded');
+    expect(res.context.r).toMatchObject({ count: 3, out: rel('range.pdf'), pages: [2, 3, 4] });
+    expect(safeExistsSync(abs('range.pdf'))).toBe(true);
+  });
+
+  it.runIf(pypdfAvailable)('pdf_delete_pages drops the selected pages', async () => {
+    const res = await runOp('pdf_delete_pages', { path: rel('five.pdf'), delete: '1,5', out: rel('del.pdf') });
+    expect(res.status).toBe('succeeded');
+    expect(res.context.r).toMatchObject({ count: 3, deleted: [1, 5] });
+  });
+
+  it.runIf(pypdfAvailable)('pdf_reorder rewrites pages in the given order', async () => {
+    const res = await runOp('pdf_reorder', { path: rel('five.pdf'), order: '5,4,3,2,1', out: rel('rev.pdf') });
+    expect(res.status).toBe('succeeded');
+    expect(res.context.r).toMatchObject({ count: 5, order: [5, 4, 3, 2, 1] });
+  });
+
+  it.runIf(pypdfAvailable)('pdf_rotate rotates the selected pages', async () => {
+    const res = await runOp('pdf_rotate', { path: rel('five.pdf'), pages: '1-2', angle: 90, out: rel('rot.pdf') });
+    expect(res.status).toBe('succeeded');
+    expect(res.context.r).toMatchObject({ count: 5, rotated: [1, 2], angle: 90 });
+  });
+
+  it.runIf(pypdfAvailable)('pdf_merge concatenates multiple PDFs from a transform step', async () => {
+    await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '1-2', out: rel('a.pdf') });
+    await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '3-5', out: rel('b.pdf') });
+    const res = await runOp('pdf_merge', { inputs: [rel('a.pdf'), rel('b.pdf')], out: rel('merged.pdf') }, 'transform');
+    expect(res.status).toBe('succeeded');
+    expect(res.context.r).toMatchObject({ count: 5, out: rel('merged.pdf') });
+  });
+
+  it.runIf(pypdfAvailable)('pdf_metadata writes then reads back metadata', async () => {
+    const write = await runOp('pdf_metadata', { path: rel('five.pdf'), set: { Title: 'Hello', Author: 'Kyberion' }, out: rel('meta.pdf') });
+    expect(write.status).toBe('succeeded');
+    const read = await runOp('pdf_metadata', { path: rel('meta.pdf') });
+    expect(read.status).toBe('succeeded');
+    expect((read.context.r as any).metadata['/Title']).toBe('Hello');
+    expect((read.context.r as any).metadata['/Author']).toBe('Kyberion');
+  });
+
+  it.runIf(pypdfAvailable)('pdf_stamp overlays a stamp onto the selected pages', async () => {
+    const res = await runOp('pdf_stamp', { path: rel('five.pdf'), stamp: rel('stamp.pdf'), pages: 'all', out: rel('stamped.pdf') });
+    expect(res.status).toBe('succeeded');
+    expect(res.context.r).toMatchObject({ count: 5, stamped: [1, 2, 3, 4, 5] });
+  });
+
+  it.runIf(pypdfAvailable && cryptoAvailable)('pdf_encrypt then pdf_remove_password round-trips', async () => {
+    const enc = await runOp('pdf_encrypt', { path: rel('five.pdf'), user_password: 'u1', owner_password: 'o1', out: rel('enc.pdf') });
+    expect(enc.status).toBe('succeeded');
+    const dec = await runOp('pdf_remove_password', { path: rel('enc.pdf'), password: 'u1', out: rel('dec.pdf') });
+    expect(dec.status).toBe('succeeded');
+    expect((dec.context.r as any).count).toBe(5);
+  });
+
+  it.runIf(pypdfAvailable)('pdf_merge rejects fewer than two inputs', async () => {
+    const res = await runOp('pdf_merge', { inputs: [rel('five.pdf')], out: rel('x.pdf') });
+    expect(res.status).toBe('failed');
+  });
+
+  it('rejects a missing input before invoking the bridge', async () => {
+    const res = await runOp('pdf_extract_range', { path: rel('nope.pdf'), pages: '1', out: rel('x.pdf') });
+    expect(res.status).toBe('failed');
+  });
+
+  it('rejects outputs outside the project root', async () => {
+    safeMkdir(testRoot, { recursive: true });
+    safeWriteFile(abs('five.pdf'), 'not a real pdf');
+    const res = await runOp('pdf_extract_range', {
+      path: rel('five.pdf'),
+      pages: '1',
+      out: '/tmp/kyberion-outside.pdf',
+    });
+    expect(res.status).toBe('failed');
+    expect(res.results[0].error).toContain('path must stay under the Kyberion project root');
+  });
 });
