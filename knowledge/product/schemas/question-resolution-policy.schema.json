@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/question-resolution-policy.schema.json",
+  "title": "Question Resolution Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults", "intent_rules"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_questions_per_turn", "min_confidence_to_skip", "always_ask_for"],
+      "properties": {
+        "max_questions_per_turn": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_confidence_to_skip": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "always_ask_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "intent_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/intentRule"
+      }
+    }
+  },
+  "$defs": {
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "reason"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_input": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default_assumption": {
+          "type": "string"
+        },
+        "impact": {
+          "type": "string"
+        }
+      }
+    },
+    "intentRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent_id"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "intent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shapes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["direct_reply", "task_session", "mission", "project_bootstrap", "pipeline"]
+          }
+        },
+        "max_questions_per_turn": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_confidence_to_skip": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "always_ask_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/question"
+          }
+        },
+        "source_label": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

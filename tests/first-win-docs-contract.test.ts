@@ -16,6 +16,7 @@ describe('First-win documentation contract', () => {
     expect(readme).toContain('15 minutes: read the Quickstart structure map');
     expect(readme).toContain('pnpm pipeline --input pipelines/voice-hello.json');
     expect(readme).toContain('pnpm pipeline --input pipelines/verify-session.json');
+    expect(readme).toContain('pnpm setup:report --persona first-time-user');
     expect(readme).toContain('docs/developer/EXTENSION_POINTS.md');
   });
 
@@ -24,6 +25,7 @@ describe('First-win documentation contract', () => {
     expect(quickstart).toContain('30 seconds: `pnpm doctor` shows whether the local runtime is ready');
     expect(quickstart).toContain('5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`');
     expect(quickstart).toContain('15 minutes: skim sections 4-10');
+    expect(quickstart).toContain('pnpm setup:report --persona first-time-user');
     expect(quickstart).toContain('CAPABILITIES_GUIDE.md');
     expect(quickstart).toContain('docs/developer/EXTENSION_POINTS.md');
   });

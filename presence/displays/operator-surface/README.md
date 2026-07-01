@@ -15,6 +15,7 @@ Strategy: [`knowledge/product/architecture/operator-surface-strategy.md`](../../
 | `/missions/:id` | Mission detail: history, checkpoints, evidence, copy-able commands |
 | `/audit` | Audit-chain timeline (filtered by tenant) |
 | `/health` | Mission counts, recent audit volume, override events |
+| `/surfaces` | Read-only surface concierge: auth boundary, runtime state, scenario fit, next command |
 | `/intent-snapshots` | Placeholder for the diff view (full implementation deferred) |
 | `/knowledge` | Public-tier knowledge browser |
 
