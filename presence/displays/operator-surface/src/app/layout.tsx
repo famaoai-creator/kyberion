@@ -39,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/" style={{ color: '#8ec3ff' }}>Missions</a>
             <a href="/audit" style={{ color: '#8ec3ff' }}>Audit</a>
             <a href="/health" style={{ color: '#8ec3ff' }}>Health</a>
+            <a href="/surfaces" style={{ color: '#8ec3ff' }}>Surfaces</a>
             <a href="/intent-snapshots" style={{ color: '#8ec3ff' }}>Intent Snapshots</a>
             <a href="/knowledge" style={{ color: '#8ec3ff' }}>Knowledge</a>
           </nav>

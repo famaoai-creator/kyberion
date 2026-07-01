@@ -61,12 +61,50 @@ describe('setup report', () => {
     expect(report.reasoning).toEqual({ must: 0, should: 1, nice: 2 });
     expect(report.doctor.totalMissing).toBe(3);
     expect(report.services.summary.authMissing).toBe(0);
+    expect(report.recommendedSurfaces).toHaveLength(3);
   });
 
   it('compresses first-time-user setup output into concise next steps', async () => {
     mocks.setupSurfaces.mockResolvedValue({
       status: 'ok',
-      rows: [],
+      rows: [
+        {
+          surface: 'chronos-mirror-v2',
+          enabled: 'enabled',
+          auth: 'n/a',
+          strategy: 'host-managed',
+          secrets: '',
+          cli: '',
+          hint: 'Host-managed surface or no preset path.',
+        },
+        {
+          surface: 'presence-studio',
+          enabled: 'enabled',
+          auth: 'n/a',
+          strategy: 'host-managed',
+          secrets: '',
+          cli: '',
+          hint: 'Host-managed surface or no preset path.',
+        },
+        {
+          surface: 'voice-hub',
+          enabled: 'enabled',
+          auth: 'n/a',
+          strategy: 'host-managed',
+          secrets: '',
+          cli: '',
+          hint: 'Host-managed surface or no preset path.',
+        },
+        {
+          surface: 'slack-bridge',
+          enabled: 'enabled',
+          auth: 'missing',
+          strategy: 'bearer',
+          secrets: 'SLACK_ACCESS_TOKEN',
+          cli: '',
+          hint: 'Set one of: SLACK_ACCESS_TOKEN',
+        },
+      ],
       summary: { total: 2, ready: 0, missing: 1, disabled: 1, hostManaged: 0 },
     });
     mocks.setupServices.mockResolvedValue({
@@ -94,6 +132,22 @@ describe('setup report', () => {
     expect(report.surfaces.summary.missing).toBe(1);
     expect(report.services.summary.authMissing).toBe(1);
     expect(report.doctor.totalMissing).toBe(2);
+    expect(report.recommendedSurfaces).toHaveLength(3);
+    expect(report.recommendedSurfaces[0]).toMatchObject({
+      title: 'Chronos control surface',
+      readiness: 'ready',
+      suggestedCommand: 'pnpm chronos:dev',
+    });
+    expect(report.recommendedSurfaces[1]).toMatchObject({
+      title: 'Presence Studio + voice path',
+      readiness: 'ready',
+      suggestedCommand: 'pnpm pipeline --input pipelines/voice-hello.json',
+    });
+    expect(report.recommendedSurfaces[2]).toMatchObject({
+      title: 'Slack thread surface',
+      readiness: 'needs_setup',
+      suggestedCommand: 'pnpm surfaces:setup',
+    });
     expect(report.nextActions).toHaveLength(3);
     expect(report.nextActions[0]).toMatchObject({
       title: 'Reconcile surface readiness',

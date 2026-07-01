@@ -78,6 +78,9 @@ async function main(): Promise<void> {
 
   if (report.totalMissing === 0) {
     console.log('All required capabilities are satisfied.');
+    if (!argv.manifest && !argv.runtime && !argv.all) {
+      console.log('Want the right surface next? Run `pnpm setup:report --persona first-time-user` for a recommended surface guide.');
+    }
     process.exit(0);
   }
 
@@ -91,6 +94,7 @@ async function main(): Promise<void> {
     ? ' or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps'
     : '';
   console.log(`Next step: run \`pnpm env:bootstrap --manifest <id> --apply\` for missing must/should items${meetingHint}.`);
+  console.log('Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.');
   const firstMissingSummary = report.summaries.find((summary) => summary.counts.must + summary.counts.should > 0);
   if (firstMissingSummary) {
     const nextAction = buildNextAction({

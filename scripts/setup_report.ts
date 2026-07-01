@@ -8,11 +8,22 @@ import { formatSetupSummaryLine } from './setup-report.js';
 
 type SetupPersona = 'operator' | 'first-time-user';
 
+type SurfaceRecommendation = {
+  id: 'chronos' | 'voice-first-win' | 'messaging';
+  title: string;
+  whenToUse: string;
+  surfaces: string[];
+  readiness: 'ready' | 'needs_setup' | 'unavailable';
+  reason: string;
+  suggestedCommand: string;
+};
+
 type SetupReport = {
   surfaces: Awaited<ReturnType<typeof setupSurfaces>>;
   services: Awaited<ReturnType<typeof setupServices>>;
   reasoning: { must: number; should: number; nice: number };
   doctor: Awaited<ReturnType<typeof collectDoctorReport>>;
+  recommendedSurfaces: SurfaceRecommendation[];
   nextActions: ReturnType<typeof buildNextAction>[];
 };
 
@@ -28,10 +39,11 @@ export async function runSetupReportWithPersona(options: {
   const services = await setupServices({ quiet });
   const reasoning = await runReasoningSetup();
   const doctor = await collectDoctorReport({});
+  const recommendedSurfaces = buildRecommendedSurfaces({ surfaces, doctor });
 
   const nextActions = buildFirstTimeUserNextActions({ surfaces, services, doctor });
 
-  return { surfaces, services, reasoning, doctor, nextActions };
+  return { surfaces, services, reasoning, doctor, recommendedSurfaces, nextActions };
 }
 
 function buildFirstTimeUserNextActions(report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor'>): Array<ReturnType<typeof buildNextAction>> {
@@ -72,6 +84,99 @@ function buildFirstTimeUserNextActions(report: Pick<SetupReport, 'surfaces' | 's
   return actions.slice(0, 4);
 }
 
+function buildRecommendedSurfaces(report: Pick<SetupReport, 'surfaces' | 'doctor'>): SurfaceRecommendation[] {
+  const rows = report.surfaces.rows || [];
+  const rowById = new Map(rows.map((row: any) => [row.surface, row]));
+  const doctorByManifest = new Map(report.doctor.summaries.map((summary) => [summary.manifestId, summary]));
+
+  const chronos = rowById.get('chronos-mirror-v2');
+  const voiceHub = rowById.get('voice-hub');
+  const presenceStudio = rowById.get('presence-studio');
+  const slack = rowById.get('slack-bridge');
+  const meetingDoctor = doctorByManifest.get('meeting-participation-runtime');
+
+  const chronosReadiness: SurfaceRecommendation['readiness'] =
+    chronos?.enabled === 'enabled'
+      ? chronos.auth === 'missing'
+        ? 'needs_setup'
+        : 'ready'
+      : 'unavailable';
+
+  const voiceReadiness: SurfaceRecommendation['readiness'] =
+    voiceHub?.enabled === 'enabled' && presenceStudio?.enabled === 'enabled'
+      ? meetingDoctor && (meetingDoctor.counts.must + meetingDoctor.counts.should > 0)
+        ? 'needs_setup'
+        : 'ready'
+      : 'unavailable';
+
+  const messagingReadiness: SurfaceRecommendation['readiness'] =
+    slack?.enabled === 'enabled'
+      ? slack.auth === 'ready'
+        ? 'ready'
+        : 'needs_setup'
+      : 'unavailable';
+
+  return [
+    {
+      id: 'chronos',
+      title: 'Chronos control surface',
+      whenToUse: 'Open this first when you want to see what Kyberion is running and which runtime needs attention.',
+      surfaces: ['chronos-mirror-v2'],
+      readiness: chronosReadiness,
+      reason:
+        chronosReadiness === 'ready'
+          ? 'The local control UI is enabled, so this is the best entry point for system visibility.'
+          : chronosReadiness === 'needs_setup'
+            ? 'The control UI exists, but surface readiness still needs setup or repair before it is trustworthy.'
+            : 'The control UI is disabled in the current manifest, so this is not your immediate first surface.',
+      suggestedCommand:
+        chronosReadiness === 'ready'
+          ? 'pnpm chronos:dev'
+          : chronosReadiness === 'needs_setup'
+            ? 'pnpm surfaces:reconcile'
+            : 'pnpm surfaces:status',
+    },
+    {
+      id: 'voice-first-win',
+      title: 'Presence Studio + voice path',
+      whenToUse: 'Use this when you want a conversational surface with transcript and browser/voice feedback.',
+      surfaces: ['presence-studio', 'voice-hub'],
+      readiness: voiceReadiness,
+      reason:
+        voiceReadiness === 'ready'
+          ? 'The voice surfaces are enabled and doctor did not report meeting/browser runtime gaps.'
+          : voiceReadiness === 'needs_setup'
+            ? 'The voice surfaces exist, but doctor still sees browser, voice, or consent gaps that will block the first voice win.'
+            : 'The required voice surfaces are not all enabled right now.',
+      suggestedCommand:
+        voiceReadiness === 'ready'
+          ? 'pnpm pipeline --input pipelines/voice-hello.json'
+          : voiceReadiness === 'needs_setup'
+            ? 'pnpm doctor --runtime browser'
+            : 'pnpm surfaces:status',
+    },
+    {
+      id: 'messaging',
+      title: 'Slack thread surface',
+      whenToUse: 'Use this when you want remote, threaded conversation and follow-up in Slack.',
+      surfaces: ['slack-bridge'],
+      readiness: messagingReadiness,
+      reason:
+        messagingReadiness === 'ready'
+          ? 'Slack auth is ready, so Kyberion can accept and return work in the same thread.'
+          : messagingReadiness === 'needs_setup'
+            ? 'Slack is the right messaging surface, but its auth is not ready yet.'
+            : 'Slack is disabled, so messaging work should stay in terminal or Chronos for now.',
+      suggestedCommand:
+        messagingReadiness === 'ready'
+          ? 'pnpm surfaces:start --surface slack-bridge'
+          : messagingReadiness === 'needs_setup'
+            ? 'pnpm surfaces:setup'
+            : 'pnpm surfaces:status',
+    },
+  ];
+}
+
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('json', { type: 'boolean', default: false })
@@ -95,6 +200,15 @@ async function main(): Promise<void> {
   ]));
 
   if (argv.persona === 'first-time-user') {
+    console.log('Recommended surfaces:');
+    for (const surface of report.recommendedSurfaces) {
+      console.log(`- ${surface.title} [${surface.readiness}]`);
+      console.log(`  use when: ${surface.whenToUse}`);
+      console.log(`  surfaces: ${surface.surfaces.join(', ')}`);
+      console.log(`  why now: ${surface.reason}`);
+      console.log(`  try: ${surface.suggestedCommand}`);
+    }
+    console.log('');
     console.log('First-time user next actions:');
     for (const action of report.nextActions) {
       for (const line of formatNextAction(action)) {
