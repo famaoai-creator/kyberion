@@ -602,7 +602,18 @@ const pathResolver = {
   shared: vi.fn((p = '') => `/tmp/kyberion/active/shared/${String(p).replace(/^\/+/, '')}`),
   knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
   active: vi.fn((p = '') => `/tmp/kyberion/active/${String(p).replace(/^\/+/, '')}`),
-  resolve: vi.fn((p = '') => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
+  vault: vi.fn((p = '') => `/tmp/kyberion/.vault/${String(p).replace(/^\/+/, '')}`),
+  resolve: vi.fn((p = '') => (String(p).startsWith('/') ? String(p) : `/tmp/kyberion/${String(p)}`)),
+  toRepoRelative: vi.fn((p = '') =>
+    String(p).startsWith('/tmp/kyberion/') ? String(p).slice('/tmp/kyberion/'.length) : String(p),
+  ),
+  normalizeStoredPath: vi.fn((p = '') =>
+    String(p).startsWith('/tmp/kyberion/')
+      ? { path: String(p).slice('/tmp/kyberion/'.length), foreign: false }
+      : String(p).startsWith('/')
+        ? { path: String(p), foreign: true }
+        : { path: String(p), foreign: false },
+  ),
 };
 
 vi.mock('@agent/core', () => ({
@@ -1635,6 +1646,69 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(result.status).toBe('succeeded');
       expect((result.context.sz as any).width).toBe(1920);
       expect((result.context.sz as any).height).toBe(1080);
+    });
+
+    it('resolve_path: resolves a repo-relative path to a machine-local absolute path', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'resolve', path: 'knowledge/x.md', export_as: 'p' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.p).toBe('/tmp/kyberion/knowledge/x.md');
+    });
+
+    it('resolve_path: to_relative collapses an absolute path back to repo-relative (portable)', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'to_relative', path: '/tmp/kyberion/scripts/run.ts', export_as: 'p' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.p).toBe('scripts/run.ts');
+    });
+
+    it('resolve_path: normalize flags a foreign absolute path without rewriting it', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'normalize', path: '/opt/elsewhere/data.json', export_as: 'p' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.p).toEqual({ path: '/opt/elsewhere/data.json', foreign: true });
+    });
+
+    it('resolve_path: domain modes resolve under the project root', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          { type: 'capture', op: 'resolve_path', params: { mode: 'shared', path: 'tmp/run.json', export_as: 'shared_p' } },
+          { type: 'capture', op: 'resolve_path', params: { mode: 'tmp', path: 'run.json', export_as: 'tmp_p' } },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.shared_p).toBe('/tmp/kyberion/active/shared/tmp/run.json');
+      expect(result.context.tmp_p).toBe('/tmp/kyberion/active/shared/tmp/run.json');
+    });
+
+    it('resolve_path: rejects an unsupported mode', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'bogus', path: 'x', export_as: 'p' } }],
+      } as any);
+
+      expect(result.status).toBe('failed');
     });
 
     it('list_input_devices: returns input inventory', async () => {

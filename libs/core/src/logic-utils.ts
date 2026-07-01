@@ -1,8 +1,40 @@
 import { logger } from '../core.js';
+import { pathResolver } from '../path-resolver.js';
 
 /**
  * Logic Utilities for ADF and Pipeline Processing.
  */
+
+/**
+ * Resolve an inline path token `@domain[:subPath]` to a machine-local absolute path via
+ * {@link pathResolver}, so pipelines/ADF can reference repo locations portably
+ * (`{{@shared:tmp/run.json}}`, `{{@knowledge:product/x.md}}`, `{{@root}}`). Returns `undefined`
+ * for an unknown domain so the caller keeps the literal token. The result is absolute and
+ * machine-local — fine for runtime use, but do not persist it (use `system:resolve_path`'s
+ * `to_relative`/`normalize` before storing).
+ */
+function resolvePathToken(token: string): string | undefined {
+  const trimmed = token.slice(1).trim(); // drop leading '@'
+  const sepIdx = trimmed.indexOf(':');
+  const domain = (sepIdx >= 0 ? trimmed.slice(0, sepIdx) : trimmed).trim();
+  const subPath = sepIdx >= 0 ? trimmed.slice(sepIdx + 1).trim() : '';
+  switch (domain) {
+    case 'root':
+      return subPath ? pathResolver.rootResolve(subPath) : pathResolver.rootDir();
+    case 'knowledge':
+      return pathResolver.knowledge(subPath);
+    case 'active':
+      return pathResolver.active(subPath);
+    case 'shared':
+      return pathResolver.shared(subPath);
+    case 'tmp':
+      return pathResolver.shared(subPath ? `tmp/${subPath}` : 'tmp');
+    case 'vault':
+      return pathResolver.vault(subPath);
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Resolves variables in a string or object using the provided context.
@@ -36,15 +68,25 @@ export function resolveVars(val: any, ctx: any): any {
   // Uses [^{}]+ to avoid false matches on strings like "{{a}} / {{b}}" which start AND end with {{ }}
   const singleVarMatch = val.match(/^\{\{([^{}]+)\}\}$/);
   if (singleVarMatch) {
-    const [varName, defaultValue] = singleVarMatch[1].split('|').map((s) => s.trim());
+    const token = singleVarMatch[1].trim();
+    if (token.startsWith('@')) {
+      const resolved = resolvePathToken(token);
+      return resolved !== undefined ? resolved : val; // unknown domain → keep literal
+    }
+    const [varName, defaultValue] = token.split('|').map((s) => s.trim());
     const current = getPathValue(ctx, varName);
     if (current !== undefined) return current;
     return defaultValue !== undefined ? defaultValue : '';
   }
 
   // Multi-variable or mixed string: "Hello {{name|World}}" → interpolated string
-  return val.replace(/{{(.*?)}}/g, (_, p) => {
-    const [varName, defaultValue] = p.split('|').map((s: string) => s.trim());
+  return val.replace(/{{(.*?)}}/g, (match, p) => {
+    const token = String(p).trim();
+    if (token.startsWith('@')) {
+      const resolved = resolvePathToken(token);
+      return resolved !== undefined ? resolved : match; // unknown domain → keep literal
+    }
+    const [varName, defaultValue] = token.split('|').map((s: string) => s.trim());
     const current = getPathValue(ctx, varName);
     if (current !== undefined) {
       return typeof current === 'object' ? JSON.stringify(current) : String(current);

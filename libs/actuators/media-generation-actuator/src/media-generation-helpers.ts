@@ -31,7 +31,8 @@ export type PromptGenerationRequest = {
 };
 
 const DEFAULT_COMFY_BASE_URL = process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188';
-const DEFAULT_COMFY_OUTPUT_DIR = process.env.KYBERION_COMFY_OUTPUT_DIR || '/Users/famaoai/Documents/comfy/ComfyUI/output';
+// External, operator-configured ComfyUI output dir; KYBERION_COMFY_OUTPUT_DIR overrides this default.
+const DEFAULT_COMFY_OUTPUT_DIR = process.env.KYBERION_COMFY_OUTPUT_DIR || '/Users/famaoai/Documents/comfy/ComfyUI/output'; // governance-allow-abs-path
 const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'canceled']);
 const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-generation-actuator/manifest.json');

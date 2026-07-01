@@ -1,6 +1,6 @@
 import * as AjvModule from 'ajv';
 import * as path from 'node:path';
-import { loadActuatorManifestCatalog, pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
+import { loadActuatorManifestCatalog, pathResolver, safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import { fileURLToPath } from 'node:url';
 
@@ -1608,12 +1608,93 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
 
 }
 
+// ── (c) Machine-absolute path lint ────────────────────────────────────────
+// Committed config/code must not embed a machine-specific filesystem prefix
+// (e.g. a `<home>/<user>/...` absolute path) — those break the moment the repo
+// runs on another machine. Paths should be repo-relative and resolved at runtime via
+// pathResolver / the `system:resolve_path` op. A line may opt out with the
+// inline marker `governance-allow-abs-path` (e.g. this scanner's own pattern,
+// or a test fixture that intentionally asserts on an absolute path).
+
+const MACHINE_ABS_PATH_RE = /(?:\/Users\/|\/home\/[A-Za-z0-9._-]+\/|\/private\/(?:var\/folders|tmp)\/|[A-Za-z]:\\Users\\)/; // governance-allow-abs-path
+const ABS_PATH_ALLOW_MARKER = 'governance-allow-abs-path';
+// Roots to scan and the extensions that matter in each. Only authored sources are
+// scanned: `.json` config and `.ts` code. Generated `.js`/`.d.ts`/`.map` mirrors are
+// skipped (they duplicate their `.ts` source), as are gitignored tiers and build output.
+const ABS_PATH_SCAN_ROOTS: Array<{ root: string; extensions: string[] }> = [
+  { root: 'knowledge', extensions: ['.json'] },
+  { root: 'libs', extensions: ['.ts', '.json'] },
+  { root: 'scripts', extensions: ['.ts', '.json'] },
+];
+const ABS_PATH_SKIP_DIRS = new Set([
+  'node_modules', 'dist', 'build', 'coverage', '.git',
+  'personal', 'confidential', // gitignored knowledge tiers
+  'examples', // demonstration scripts legitimately reference a developer's local output paths
+]);
+// JSON cannot carry an inline allow marker, so documented per-file exemptions live here.
+// Each entry must reference a path that is intentionally machine-specific and not a repo path.
+const ABS_PATH_ALLOWLIST = new Set<string>([
+  // External, operator-configured ComfyUI runtime install (not a repo path); the actuator
+  // already prefers KYBERION_COMFY_* env overrides. Follow-up: template these via {{env.*}}.
+  'knowledge/product/orchestration/service-presets/media-generation.json',
+  'knowledge/product/orchestration/service-presets/vision.json',
+]);
+
+function scanFileForAbsolutePaths(absPath: string, relPath: string, violations: string[]) {
+  // Skip test fixtures — they legitimately carry machine-shaped strings and aren't runtime config.
+  if (/\.(test|spec)\.[tj]s$/.test(relPath)) return;
+  let content: string;
+  try {
+    content = safeReadFile(absPath, { encoding: 'utf8' }) as string;
+  } catch {
+    return;
+  }
+  if (!MACHINE_ABS_PATH_RE.test(content)) return; // fast path: most files have none
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes(ABS_PATH_ALLOW_MARKER)) continue;
+    if (MACHINE_ABS_PATH_RE.test(line)) {
+      violations.push(`machine-absolute-path: ${relPath}:${i + 1} embeds a machine-specific path; use a repo-relative path + pathResolver (or mark the line with ${ABS_PATH_ALLOW_MARKER})`);
+    }
+  }
+}
+
+function findMachineAbsolutePathViolations(violations: string[]) {
+  // Self-skip by basename: import.meta.url resolves to the compiled dist/.js, so a
+  // path-equality check against the on-disk .ts source would miss. Match either form.
+  const scannerBase = path.basename(fileURLToPath(import.meta.url)).replace(/\.[tj]s$/, '');
+  const walk = (absDir: string, extensions: string[]) => {
+    let entries: string[];
+    try { entries = safeReaddir(absDir); } catch { return; }
+    for (const entry of entries) {
+      if (entry.startsWith('.') || ABS_PATH_SKIP_DIRS.has(entry)) continue;
+      const absEntry = path.join(absDir, entry);
+      let stat: ReturnType<typeof safeStat>;
+      try { stat = safeStat(absEntry); } catch { continue; }
+      if (stat.isDirectory()) {
+        walk(absEntry, extensions);
+      } else if (extensions.some((ext) => entry.endsWith(ext))) {
+        const rel = path.relative(pathResolver.rootDir(), absEntry);
+        if (path.basename(entry).replace(/\.[tj]s$/, '') === scannerBase) continue; // don't flag the scanner itself
+        if (ABS_PATH_ALLOWLIST.has(rel)) continue; // documented per-file exemption
+        scanFileForAbsolutePaths(absEntry, rel, violations);
+      }
+    }
+  };
+  for (const { root, extensions } of ABS_PATH_SCAN_ROOTS) {
+    const absRoot = pathResolver.rootResolve(root);
+    if (safeExistsSync(absRoot)) walk(absRoot, extensions);
+  }
+}
+
 export function main() {
   const violations: string[] = [];
   for (const check of CHECKS) {
     validateRuleFile(check, violations);
   }
   validateActuatorCatalogDirectoryConsistency(violations);
+  findMachineAbsolutePathViolations(violations);
   for (const deterministicCatalog of findDeterministicCatalogViolations()) {
     violations.push(
       `governance-catalog: deterministic catalog must be removed or migrated (${deterministicCatalog})`
