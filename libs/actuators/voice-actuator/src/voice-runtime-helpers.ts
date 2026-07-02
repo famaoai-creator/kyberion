@@ -11,6 +11,7 @@ import {
   pathResolver,
   resolveVoiceBackend,
   resolveVoiceEngineForPlatform,
+  resolveManagedToolPythonBin,
   safeExec,
   safeExecResult,
   safeExistsSync,
@@ -84,7 +85,12 @@ export function buildRetryOptions(override?: Record<string, any>) {
 }
 
 function resolvePythonBin(): string {
+  if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
   if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const managedWhisperPython = resolveManagedToolPythonBin('mlx_whisper');
+  if (managedWhisperPython) return managedWhisperPython;
+  const managedAudioPython = resolveManagedToolPythonBin('mlx_audio');
+  if (managedAudioPython) return managedAudioPython;
   const venvPython = pathResolver.rootResolve('.venv/bin/python3');
   if (safeExistsSync(venvPython)) return venvPython;
   return 'python3';
