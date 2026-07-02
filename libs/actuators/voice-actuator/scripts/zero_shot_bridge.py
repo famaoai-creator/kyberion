@@ -243,8 +243,8 @@ def _health() -> dict:
             "macos_say": os.path.exists("/usr/bin/say"),
         },
         "install_hints": {
-            "cosyvoice2": "pip install mlx-audio  # then: mlx-audio pulls CosyVoice2 on first use",
-            "fish_speech": "pip install mlx-audio  # then: mlx-audio pulls Fish Speech on first use",
+            "cosyvoice2": "pnpm voice:setup --apply  # governed mlx-audio runtime; CosyVoice2 assets download on first use",
+            "fish_speech": "pnpm voice:setup --apply  # governed mlx-audio runtime; Fish Speech assets download on first use",
         },
     }
 
@@ -263,7 +263,10 @@ def _list_devices() -> dict:
             "blackhole_found": any("BlackHole" in d["name"] for d in devs),
         }
     except ImportError:
-        return {"status": "unavailable", "error": "sounddevice not installed — pip install sounddevice"}
+        return {
+            "status": "unavailable",
+            "error": "sounddevice not installed in the selected Python runtime. Install it into KYBERION_PYTHON_BIN / KYBERION_PYTHON if device listing is required.",
+        }
 
 
 # ---------------------------------------------------------------------------

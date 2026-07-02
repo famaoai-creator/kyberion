@@ -2,19 +2,21 @@
  * MLX Embedding Backend — Apple Silicon / macOS implementation.
  *
  * Calls scripts/mlx_embed.py via Python subprocess using the mlx-embeddings
- * package (pip install mlx-embeddings). Only available on macOS with Apple
- * Silicon; `isMlxAvailable()` returns false on other platforms.
+ * package from the resolved Kyberion Python runtime. Only available on macOS
+ * with Apple Silicon; `isMlxAvailable()` returns false on other platforms.
  *
  * Env vars:
  *   KYBERION_MLX_EMBED_MODEL — HuggingFace model id
  *                              (default: mlx-community/multilingual-e5-large-instruct, 1024d)
- *   KYBERION_PYTHON_BIN      — Python binary override (default: .venv/bin/python3 → python3)
+ *   KYBERION_PYTHON_BIN      — Python binary override
+ *   KYBERION_PYTHON          — Legacy Python override
  */
 
 import * as fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { rootResolve } from './path-resolver.js';
+import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import type { EmbeddingBackend } from './embedding-backend.js';
 
 const DEFAULT_MODEL = 'mlx-community/multilingual-e5-large-instruct';
@@ -39,7 +41,12 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
     this.dimensions = options.dimensions ?? DEFAULT_DIMS;
     this.scriptPath = rootResolve('scripts/mlx_embed.py');
 
-    const candidate = options.pythonBin ?? rootResolve('.venv/bin/python3');
+    const candidate = options.pythonBin
+      ?? process.env.KYBERION_PYTHON_BIN
+      ?? process.env.KYBERION_PYTHON
+      ?? resolveManagedToolPythonBin('mlx_audio')
+      ?? resolveManagedToolPythonBin('mlx_whisper')
+      ?? rootResolve('.venv/bin/python3');
     this.pythonBin = fs.existsSync(candidate) ? candidate : 'python3';
   }
 

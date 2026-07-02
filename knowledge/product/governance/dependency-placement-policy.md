@@ -19,6 +19,7 @@ Kyberion separates dependency placement by lifecycle, ownership, and persistence
 | Managed service runtimes | service-runtime registry | `active/shared/runtime/service-runtimes/<service-id>/` | service-runtime policy + registry |
 | Runtime state / receipts | runtime layer | `active/shared/runtime/**/state.json` and readiness receipts | runtime layer / `env:bootstrap` |
 | Shared caches | runtime policy | `active/shared/tmp/*-cache/` | runtime layer |
+| Large downloaded models / assets | owning tool or service runtime | `active/shared/runtime/tool-runtimes/<tool-id>/models/` or `active/shared/runtime/service-runtimes/<service-id>/models/` | governed bootstrap / runtime layer |
 | Temporary working files | pipeline / mission | `active/shared/tmp/` or mission evidence dirs | pipeline / mission controller |
 | Secrets / credentials | connection tiers | `knowledge/personal/`, customer overlays, or secret guard | service binding flow |
 
@@ -52,6 +53,12 @@ These may exist temporarily for backward compatibility, but they are migration d
    - Use `pnpm env:bootstrap --manifest <id>` for environment prerequisites.
    - Use runtime registries and service presets for long-lived tools and services.
    - Do not embed step-by-step package-manager commands inside reusable product-tier presets unless the artifact is explicitly marked as legacy migration guidance.
+
+5. Large runtime data must be separated by mutability.
+   - Re-downloadable caches belong under `active/shared/tmp/*-cache/`.
+   - Long-lived model weights, checkpoints, and other pinned assets belong under the owning managed runtime root, typically `.../models/`.
+   - Environment variables such as `HF_HOME`, `TRANSFORMERS_CACHE`, `TORCH_HOME`, and similar per-tool caches should be redirected into these governed roots rather than user-home defaults when a surface formalizes them.
+   - Product-tier docs should describe the category and owner, not tell operators to pick arbitrary directories.
 
 ## Legacy Compatibility
 
