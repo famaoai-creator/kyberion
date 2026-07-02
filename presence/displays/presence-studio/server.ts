@@ -30,7 +30,12 @@ import {
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getPresenceAvatarProfile,
+  buildSurfaceLauncherNextActions,
+  buildSurfaceLauncherRecommendations,
   getSurfaceAgentCatalogEntry,
+  getSurfaceDirectory,
+  getSurfaceDirectorySummary,
+  getSurfaceScenarioGuide,
   listAgentRuntimeSnapshots,
   listApprovalRequests,
   listArtifactRecords,
@@ -41,8 +46,8 @@ import {
   listProjectTrackRecords,
   listServiceBindingRecords,
   listTaskSessions,
-  listSurfaceAsyncRequests,
-  listSurfaceNotifications,
+  listSurfaceAsyncRequestsAcrossChannels,
+  listSurfaceNotificationsAcrossChannels,
   listSurfaceAgentCatalog,
   logger,
   pathResolver,
@@ -69,6 +74,7 @@ import {
   readGwsAuthStatus,
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
+import { collectDoctorReport } from '../../../scripts/run_doctor.js';
 
 type Client = express.Response;
 
@@ -77,6 +83,42 @@ interface SurfaceSnapshot {
   title?: string;
   components: Array<{ id: string; type: string; props?: Record<string, unknown> }>;
   data: Record<string, unknown>;
+}
+
+let surfaceLauncherCache:
+  | {
+      fetchedAt: number;
+      payload: Record<string, unknown>;
+    }
+  | null = null;
+
+async function loadSurfaceLauncherPayload(): Promise<Record<string, unknown>> {
+  const now = Date.now();
+  if (surfaceLauncherCache && now - surfaceLauncherCache.fetchedAt < 15_000) {
+    return surfaceLauncherCache.payload;
+  }
+
+  const rows = getSurfaceDirectory();
+  const summary = getSurfaceDirectorySummary();
+  const doctor = await collectDoctorReport({ runtime: 'meeting' });
+  const payload = {
+    ok: true,
+    summary,
+    rows,
+    scenarios: getSurfaceScenarioGuide(),
+    recommendations: buildSurfaceLauncherRecommendations({
+      rows,
+      doctorSummaries: doctor.summaries,
+    }),
+    nextActions: buildSurfaceLauncherNextActions({
+      summary,
+      rows,
+      doctorSummaries: doctor.summaries,
+    }),
+    doctor,
+  };
+  surfaceLauncherCache = { fetchedAt: now, payload };
+  return payload;
 }
 
 function inferProjectIdForApprovalRecord(record: any): string | undefined {
@@ -836,15 +878,23 @@ app.get('/api/distill-candidates', (_req, res) => {
 app.get('/api/async-requests', (_req, res) => {
   res.json({
     ok: true,
-    items: listSurfaceAsyncRequests('presence'),
+    items: listSurfaceAsyncRequestsAcrossChannels().slice(0, 20),
   });
 });
 
 app.get('/api/notifications', (_req, res) => {
   res.json({
     ok: true,
-    items: listSurfaceNotifications('presence'),
+    items: listSurfaceNotificationsAcrossChannels().slice(0, 20),
   });
+});
+
+app.get('/api/surface-launcher', async (_req, res) => {
+  try {
+    res.json(await loadSurfaceLauncherPayload());
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
 });
 
 app.get('/api/approvals', (_req, res) => {
