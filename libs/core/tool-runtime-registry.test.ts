@@ -10,6 +10,7 @@ import {
   markToolRuntimeInstalled,
   listToolRuntimeInventory,
   probeToolRuntime,
+  resolveManagedToolPythonBin,
   resetToolRuntimeRegistryCache,
 } from './tool-runtime-registry.js';
 import { resetToolRuntimePolicyCache } from './tool-runtime-policy.js';
@@ -347,5 +348,13 @@ describe('tool runtime registry', () => {
     expect(stt.selected_action).toBe('install');
     expect(stt.selected_backend?.command).toBe('uv');
     expect(stt.managed_env_path).toContain('tool-runtimes/mlx-whisper');
+  });
+
+  it('resolves the managed python binary when present on disk', () => {
+    const runtimeRoot = path.join(managedRoot, 'tool-runtimes', 'mlx-audio', 'bin');
+    safeMkdir(runtimeRoot, { recursive: true });
+    safeWriteFile(path.join(runtimeRoot, 'python'), '', { encoding: 'utf8' });
+
+    expect(resolveManagedToolPythonBin('mlx_audio')).toBe(path.join(runtimeRoot, 'python'));
   });
 });

@@ -67,8 +67,8 @@ pnpm onboard
   個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
 
 ### Python Runtime Resolution
-- Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → `.venv/bin/python3` → `python3` の順で解決されます。
-- `.venv/bin/python3` は repo-local の実行環境候補であり、学習済み音声データや中間生成物の置き場ではありません。
+- Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) → `.venv/bin/python3` → `python3` の順で解決されます。
+- `.venv/bin/python3` は legacy compatibility 用の repo-local 実行環境候補であり、新規標準ではありません。
 - 音声サンプルやプロモート後の voice profile データは `active/shared/tmp/` または `active/shared/runtime/voice-profiles/<profile_id>/` に置きます。
 
 ### Stage 4: Runtime Surface Setup

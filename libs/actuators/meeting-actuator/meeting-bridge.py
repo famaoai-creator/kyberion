@@ -51,8 +51,34 @@ ALLOWED_HOSTS = {
     "meet":  ("meet.google.com",),
 }
 
-DEFAULT_PYTHON_BIN = str(ROOT / ".venv/bin/python3")
 DEFAULT_DISPLAY_NAME = "Kyberion Agent"
+
+
+def _resolve_default_python_bin():
+    env_candidates = [
+        os.environ.get("KYBERION_PYTHON_BIN"),
+        os.environ.get("KYBERION_PYTHON"),
+    ]
+    managed_candidates = [
+        ROOT / "active/shared/runtime/tool-runtimes/mlx-audio/bin/python",
+        ROOT / "active/shared/runtime/tool-runtimes/mlx-audio/bin/python3",
+        ROOT / "active/shared/runtime/tool-runtimes/mlx-whisper/bin/python",
+        ROOT / "active/shared/runtime/tool-runtimes/mlx-whisper/bin/python3",
+    ]
+    legacy_candidates = [
+        ROOT / ".venv/bin/python3",
+    ]
+
+    for candidate in env_candidates:
+        if candidate:
+            return candidate
+    for candidate in managed_candidates + legacy_candidates:
+        if Path(candidate).exists():
+            return str(candidate)
+    return "python3"
+
+
+DEFAULT_PYTHON_BIN = _resolve_default_python_bin()
 
 
 def _err(message, **extra):
