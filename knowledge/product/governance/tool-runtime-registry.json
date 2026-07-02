@@ -56,7 +56,7 @@
         "description": "Re-check the Playwright runtime after browser bootstrap."
       },
       "managed_env_subpath": "tool-runtimes/playwright",
-      "notes": "Node runtime example: trial via npx, managed browser bootstrap via pnpm exec playwright install chromium."
+      "notes": "Node runtime example: trial via npx, managed browser bootstrap through the Playwright runtime installer."
     },
     {
       "tool_id": "ffmpeg",
