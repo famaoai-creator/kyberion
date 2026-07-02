@@ -136,6 +136,40 @@
       .first-run-banner.hidden {
         display: none;
       }
+      .first-run-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .first-run-card {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 10px 12px;
+        background: rgba(9, 11, 16, 0.36);
+      }
+      .first-run-card strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .first-run-meta {
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .first-run-actions-list {
+        margin-top: 12px;
+        display: grid;
+        gap: 8px;
+      }
+      .first-run-action {
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .first-run-action code {
+        color: #ffd27b;
+      }
       .first-run-icon {
         font-size: 20px;
         line-height: 1;
@@ -690,8 +724,11 @@
         <div class="first-run-body">
           <div class="first-run-eyebrow">First Run</div>
           <div class="first-run-title">
-            <span class="first-run-sub">No live surface activity yet. Try voice or browser.</span>
+            <span class="first-run-sub">No live surface activity yet. Choose the surface that fits the work and fix blocked setup first.</span>
           </div>
+          <div id="first-run-summary" class="first-run-meta">Loading surface readiness…</div>
+          <div id="first-run-surfaces" class="first-run-grid"></div>
+          <div id="first-run-next" class="first-run-actions-list"></div>
           <div class="first-run-actions">
             <button class="button" id="first-run-voice" type="button">Try Voice</button>
             <button class="button button-ghost" id="first-run-browser" type="button">Prepare Browser</button>
@@ -1018,7 +1055,12 @@
           const stimuliCount = (state && Array.isArray(state.recentStimuli) ? state.recentStimuli.length : 0)
             || (health && typeof health.recentStimuli === "number" ? health.recentStimuli : 0);
           if (stimuliCount > 0) return;
-          banner.classList.remove("hidden");
+          Promise.resolve(surfaceLauncherPayload || fetch("/api/surface-launcher").then((r) => r.json()).catch(() => null))
+            .then((payload) => {
+              surfaceLauncherPayload = payload || surfaceLauncherPayload;
+              renderFirstRunLauncher(surfaceLauncherPayload);
+              banner.classList.remove("hidden");
+            });
         });
       }
       const firstRunCloseBtn = document.getElementById("first-run-close");
@@ -1189,6 +1231,10 @@
       const EMAIL_AUTH_STATUS_KEY = "presence-studio.email-auth-status.v1";
       const firstRunVoiceBtn = document.getElementById("first-run-voice");
       const firstRunBrowserBtn = document.getElementById("first-run-browser");
+      const firstRunSummaryEl = document.getElementById("first-run-summary");
+      const firstRunSurfacesEl = document.getElementById("first-run-surfaces");
+      const firstRunNextEl = document.getElementById("first-run-next");
+      let surfaceLauncherPayload = null;
       let recognition = null;
       let isListening = false;
       let isNativeListening = false;
@@ -1970,6 +2016,54 @@
         }
       }
 
+      function renderFirstRunLauncher(payload) {
+        if (!firstRunSummaryEl || !firstRunSurfacesEl || !firstRunNextEl) return;
+        if (!payload || payload.ok === false) {
+          firstRunSummaryEl.textContent = "Surface readiness could not be loaded. Use `pnpm setup:report --persona first-time-user` in the terminal.";
+          firstRunSurfacesEl.innerHTML = "";
+          firstRunNextEl.innerHTML = "";
+          return;
+        }
+
+        const summary = payload.summary || {};
+        const rows = Array.isArray(payload.rows) ? payload.rows : [];
+        const recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
+        const nextActions = Array.isArray(payload.nextActions) ? payload.nextActions : [];
+
+        firstRunSummaryEl.textContent =
+          `${summary.running || 0} running, ${summary.auth_missing || 0} auth missing, ${summary.blocked || 0} blocked surfaces.`;
+
+        const recommendedRows = recommendations
+          .map((recommendation) => ({
+            recommendation,
+            rows: rows.filter((row) => Array.isArray(recommendation.surfaces) && recommendation.surfaces.includes(row.id)),
+          }))
+          .slice(0, 3);
+
+        firstRunSurfacesEl.innerHTML = recommendedRows.map(({ recommendation, rows: matchedRows }) => {
+          const blocked = matchedRows.flatMap((row) => Array.isArray(row.blocked_by) ? row.blocked_by : []);
+          const bestFor = matchedRows.map((row) => row.best_for).filter(Boolean).join(" / ");
+          const nextCommand = recommendation.suggestedCommand || (matchedRows[0] && matchedRows[0].next_command) || "pnpm surfaces:status";
+          return (
+            `<div class="first-run-card">
+              <strong>${escapeHtml(recommendation.title || "Surface")}</strong>
+              <div class="first-run-meta">${escapeHtml(recommendation.whenToUse || bestFor || "")}</div>
+              <div class="first-run-meta">surfaces: ${escapeHtml((recommendation.surfaces || []).join(", "))}</div>
+              <div class="first-run-meta">readiness: ${escapeHtml(recommendation.readiness || "unknown")}${blocked.length ? ` · blocked by ${escapeHtml(blocked.join(", "))}` : ""}</div>
+              <div class="first-run-meta">try: <code>${escapeHtml(nextCommand)}</code></div>
+            </div>`
+          );
+        }).join("");
+
+        firstRunNextEl.innerHTML = nextActions.slice(0, 3).map((action) => (
+          `<div class="first-run-action">
+            <strong>${escapeHtml(action.title || "Next action")}</strong><br />
+            ${escapeHtml(action.reason || "")}<br />
+            <code>${escapeHtml(action.suggested_command || "pnpm setup:report --persona first-time-user")}</code>
+          </div>`
+        )).join("");
+      }
+
       function renderChips(items) {
         if (!items || items.length === 0) return `<div class="small">None</div>`;
         return `<div class="chips">${items.map((item) => `<span class="chip">${String(item).replace(/</g, "&lt;")}</span>`).join("")}</div>`;
@@ -2581,12 +2675,12 @@
 
         renderList(asyncRequestsEl, asyncRequests || [], (item) =>
           `<div class="row"><strong>${item.request_id}</strong><span class="mono">${item.status}</span></div>
-           <div class="small">${item.receiver_agent_id} · ${(item.query || "").replace(/</g, "&lt;")}</div>`
+           <div class="small">${(item.surface || "presence").replace(/</g, "&lt;")} · ${item.receiver_agent_id} · ${(item.query || "").replace(/</g, "&lt;")}</div>`
         );
 
         renderList(notificationsEl, notifications || [], (item) =>
           `<div class="row"><strong>${item.title || item.notification_id}</strong><span class="mono">${item.status}</span></div>
-           <div class="small">${(item.text || "").replace(/</g, "&lt;")}</div>`
+           <div class="small">${(item.surface || "presence").replace(/</g, "&lt;")} · ${(item.text || "").replace(/</g, "&lt;")}</div>`
         );
 
         renderTaskSessions();

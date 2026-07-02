@@ -36,6 +36,7 @@ import {
   extractSurfaceBlocks,
   getSurfaceAgentCatalogEntry,
   getSurfaceAsyncRequest,
+  formatSurfaceRecoveryAction,
   getVoiceTtsLanguageConfig,
   getVoiceProfileRecord,
   getActiveBrowserConversationSession,
@@ -56,6 +57,7 @@ import {
   saveServiceBindingRecord,
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
+  buildSurfaceAsyncAcceptedReply,
   loadSurfaceManifest,
   loadSurfaceState,
   logger,
@@ -1620,8 +1622,16 @@ async function tryBuildLocationReply(userText: string): Promise<string | null> {
   const fallback = await resolveFallbackLocationSummary();
   if (fallback === 'unknown location') {
     return isJapanese
-      ? 'この surface では現在地の共有がまだありません。ブラウザの位置情報許可を与えると答えられます。'
-      : 'This surface does not have a current location yet. Allow browser location access and I can answer that.';
+      ? formatSurfaceRecoveryAction({
+          reason: 'この surface では現在地の共有がまだありません。',
+          next_step: 'Presence Studio を開いてブラウザの位置情報許可を与えてください。',
+          fallback: '位置情報が不要なら、このまま一般的な案内に切り替えます。',
+        }, 'ja')
+      : formatSurfaceRecoveryAction({
+          reason: 'This surface does not have a current location yet.',
+          next_step: 'Open Presence Studio and allow browser location access.',
+          fallback: 'If location is not required, I can continue with general guidance.',
+        }, 'en');
   }
 
   return isJapanese
@@ -4014,10 +4024,7 @@ function buildAsyncAcceptedReply(
   receiver: 'chronos-mirror' | 'nerve-agent',
   language: 'ja' | 'en'
 ): string {
-  if (language === 'ja') {
-    return `依頼を受け付けました。${receiver} に回しています。リクエストIDは ${requestId} です。完了したらこの surface に通知します。`;
-  }
-  return `Accepted. Routing this to ${receiver}. The request id is ${requestId}. I will notify this surface when it completes.`;
+  return buildSurfaceAsyncAcceptedReply({ requestId, receiver, language });
 }
 
 function getAsyncDelegationTimeoutMs(receiver: 'chronos-mirror' | 'nerve-agent'): number {

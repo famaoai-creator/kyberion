@@ -1403,6 +1403,7 @@ export * from './channel-directory.js';
 export * from './tool-loop-guardrail.js';
 export * from './surface-ingress-contract.js';
 export * from './surface-interaction-model.js';
+export * from './surface-ux.js';
 export * from './surface-provider-manifest.js';
 export * from './surface-query-overlay-catalog.js';
 export * from './surface-provider-manifest-catalog.js';
