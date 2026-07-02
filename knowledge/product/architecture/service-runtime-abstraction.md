@@ -3,12 +3,14 @@ title: Service Runtime Abstraction
 category: Architecture
 tags: [runtime, service, comfyui, provision, install, policy]
 importance: 7
-last_updated: 2026-06-04
+last_updated: 2026-07-02
 ---
 
 # Service Runtime Abstraction
 
 Kyberion treats long-lived services such as ComfyUI as governed runtime entities instead of ad hoc host processes.
+
+Canonical placement rules for managed services live in [`../governance/dependency-placement-policy.md`](../governance/dependency-placement-policy.md).
 
 ## Core Idea
 

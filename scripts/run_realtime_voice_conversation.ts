@@ -9,6 +9,7 @@ import {
   getSpeechToTextBridge,
   installReasoningBackends,
   pathResolver,
+  resolveManagedToolPythonBin,
   runRealtimeVoiceConversationTurn,
   safeExistsSync,
   safeMkdir,
@@ -43,7 +44,14 @@ export interface RealtimeVoiceConversationLoopDeps {
 }
 
 function resolvePythonBin(env: NodeJS.ProcessEnv = process.env): string {
-  const candidates = [env.KYBERION_PYTHON_BIN, env.KYBERION_PYTHON, '.venv/bin/python3', 'python3'];
+  const candidates = [
+    env.KYBERION_PYTHON_BIN,
+    env.KYBERION_PYTHON,
+    resolveManagedToolPythonBin('mlx_whisper'),
+    resolveManagedToolPythonBin('mlx_audio'),
+    '.venv/bin/python3',
+    'python3',
+  ];
   for (const candidate of candidates) {
     const value = String(candidate || '').trim();
     if (!value) continue;

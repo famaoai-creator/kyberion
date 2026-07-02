@@ -3,7 +3,7 @@ title: Kyberion Deployment Runbook
 category: Operator
 tags: [deployment, install, runbook, fde]
 importance: 9
-last_updated: 2026-05-07
+last_updated: 2026-07-02
 ---
 
 # Kyberion Deployment Runbook
@@ -33,7 +33,9 @@ For: Founders, FDE engineers running Kyberion on their own laptop, single-user p
 ```bash
 # Apple Silicon (arm64) is the primary CI target. Intel works but is less tested.
 # Required:
-brew install node@24 pnpm git
+brew install node@24 git
+corepack enable
+corepack prepare pnpm@10 --activate
 node --version   # must be >= 24.0.0
 pnpm --version   # must be >= 10.x
 
@@ -80,6 +82,12 @@ pnpm doctor                 # preflight: must, should, nice
 pnpm dashboard              # visual status
 ```
 
+For optional heavy capabilities, prefer governed bootstrap manifests over manual package-manager steps:
+
+```bash
+pnpm env:bootstrap --manifest meeting-participation-runtime
+```
+
 ### 1.6 Run
 
 For interactive use:
@@ -120,7 +128,8 @@ sudo apt-get update
 sudo apt-get install -y curl git build-essential
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
-sudo npm install -g pnpm@10
+corepack enable
+corepack prepare pnpm@10 --activate
 
 # Optional (only for actuators that need them)
 sudo apt-get install -y python3.11 python3-pip ffmpeg tesseract-ocr
@@ -315,7 +324,7 @@ Mission state is forward-compatible by design (additive fields only). If a major
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| `pnpm doctor` reports Playwright missing | browser-actuator dependency | `pnpm exec playwright install chromium` |
+| `pnpm doctor` reports Playwright missing | browser-actuator dependency | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force` |
 | `pnpm onboard` says "no reasoning backend" | No CLI/API key configured | Set `ANTHROPIC_API_KEY`, `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
 | Mission stuck in `active` after process crash | Stale lock | Lock has PID-based stale detection; next command auto-recovers |
 | `Trace persisted path` empty in pipeline output | Persistence policy denied | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars |

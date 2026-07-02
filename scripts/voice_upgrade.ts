@@ -183,8 +183,8 @@ function nextStepsForTier(tier: Tier, prereqsOk: boolean): string[] {
     case 2:
       return [
         'Tier 2 (local) is configured.',
+        'Run `pnpm voice:setup --apply` to install governed mlx-audio / mlx-whisper runtimes.',
         'Follow docs/developer/VOICE_FIRST_WIN.md for the Tier 1 → Tier 2 path, then start the Style-Bert-VITS2 local server.',
-        'Pull the Whisper model (`pip install openai-whisper`).',
         'Run `pnpm chronos:dev` and verify presence surface routes through local voice.',
       ];
   }

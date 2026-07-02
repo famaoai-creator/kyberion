@@ -3,7 +3,7 @@ title: Tool Runtime Abstraction
 category: Architecture
 tags: [runtime, package-manager, uvx, npx, venv, install, policy]
 importance: 7
-last_updated: 2026-06-04
+last_updated: 2026-07-02
 ---
 
 # Tool Runtime Abstraction
@@ -20,6 +20,8 @@ The user-facing intent is about the tool outcome:
 - pin a tool version and its managed location
 
 The runtime layer resolves the concrete backend and path handling.
+
+Canonical placement rules for these runtimes live in [`../governance/dependency-placement-policy.md`](../governance/dependency-placement-policy.md).
 
 ## Layers
 
@@ -54,7 +56,7 @@ The registry is intentionally not limited to Python tools:
 - `playwright`
   - Node / browser runtime example
   - Trial probe through `npx playwright --version`
-  - Managed browser bootstrap through `pnpm exec playwright install chromium`
+  - Managed browser bootstrap through the runtime layer or `pnpm env:bootstrap --manifest meeting-participation-runtime`
 - `ffmpeg`
   - System media toolkit example
   - Trial probe through `ffmpeg -version`
@@ -70,11 +72,11 @@ The registry is intentionally not limited to Python tools:
 - `mlx_audio`
   - Apple Silicon TTS engine dependency example
   - Trial probe through `python3 -c "import mlx_audio"`
-  - Install through `uv pip install mlx-audio`
+  - Install through the managed runtime registry into `active/shared/runtime/tool-runtimes/mlx-audio/`
 - `mlx_whisper`
   - Apple Silicon STT engine dependency example
   - Trial probe through `python3 -c "import mlx_whisper"`
-  - Install through `uv pip install mlx-whisper`
+  - Install through the managed runtime registry into `active/shared/runtime/tool-runtimes/mlx-whisper/`
 
 ## Design Rule
 

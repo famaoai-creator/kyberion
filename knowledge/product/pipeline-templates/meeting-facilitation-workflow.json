@@ -17,7 +17,7 @@
     "language": "ja",
     "operator_label": "Operator",
     "attendees": [],
-    "python_bin": ".venv/bin/python3",
+    "python_bin": "python3",
     "screenshot_path": "active/shared/tmp/meeting-facilitation-screenshot.png",
     "transcript_path": "active/shared/tmp/meeting-transcript.txt"
   },

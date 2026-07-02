@@ -4,7 +4,7 @@
   "name": "PDF: Unlock → Extract range (shareable excerpt)",
   "description": "パスワード保護されたPDFを復号し、指定ページだけを抜き出した「パスワードなしの抜粋PDF」を生成する。保護レポートから共有用の一部ページだけを切り出す用途。media-actuator の pypdf backend op (pdf_remove_password → pdf_extract_range) を連結。",
   "_usage": "1) context.source_pdf に保護PDFを指定。2) パスワードは環境変数 PDF_PASSWORD で渡す。3) context.pages に抜き出すページを 1始まりで指定（例 '1-3,7,10-' / 'all'）。4) 実行: PDF_PASSWORD='...' pnpm pipeline --input <this file>。",
-  "_notes": "前提: python3 -m pip install pypdf（AES暗号化PDFの復号には cryptography も必要: 'pypdf[crypto]'）。抜粋PDFはパスワードなしになるため、共有範囲に注意。出力が機微なら output_path を保護tier(vault/ 等)へ。パスワードは step params で {{env.PDF_PASSWORD}} を直接参照し op の stdin 経由で渡る（argv非表示）。シェル履歴やverbose traceに残さないため、より厳密には secret-actuator 経由を推奨。",
+  "_notes": "前提: media-actuator の PDF runtime を `pnpm env:bootstrap` または managed runtime policy で満たしておくこと。抜粋PDFはパスワードなしになるため、共有範囲に注意。出力が機微なら output_path を保護tier(vault/ 等)へ。パスワードは step params で {{env.PDF_PASSWORD}} を直接参照し op の stdin 経由で渡る（argv非表示）。シェル履歴やverbose traceに残さないため、より厳密には secret-actuator 経由を推奨。",
   "action": "pipeline",
   "context": {
     "source_pdf": "active/shared/tmp/media/protected.pdf",
