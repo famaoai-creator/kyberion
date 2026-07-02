@@ -94,6 +94,7 @@ import {
   formatClarificationPacket,
   resolveFallbackLocationCoordinates,
   resolveFallbackLocationSummary,
+  resolveManagedToolPythonBin,
   listenNativeSpeech,
   resolveVoiceTaskDistillTargetKind,
   resolveVoiceTaskProfile,
@@ -108,6 +109,18 @@ interface VoiceHubRecord {
   source_id: string;
   intent: string;
   ts: string;
+}
+
+function resolveVoiceHubPythonBin(): string {
+  if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
+  if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const managedWhisperPython = resolveManagedToolPythonBin('mlx_whisper');
+  if (managedWhisperPython) return managedWhisperPython;
+  const managedAudioPython = resolveManagedToolPythonBin('mlx_audio');
+  if (managedAudioPython) return managedAudioPython;
+  const legacyVenvPython = pathResolver.rootResolve('.venv/bin/python3');
+  if (safeExistsSync(legacyVenvPython)) return legacyVenvPython;
+  return 'python3';
 }
 
 function buildIntentPatternHint(
@@ -1095,7 +1108,7 @@ async function speakReplyManaged(text: string): Promise<void> {
     const bridgeScript = pathResolver.rootResolve(
       'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'
     );
-    const pythonBin = process.env.KYBERION_PYTHON || (safeExistsSync(pathResolver.rootResolve('.venv/bin/python3')) ? pathResolver.rootResolve('.venv/bin/python3') : 'python3');
+    const pythonBin = resolveVoiceHubPythonBin();
     
     const samples = voiceProfile.sample_refs || [];
     const refAudio = samples.length > 0 ? pathResolver.rootResolve(samples[0]) : undefined;
