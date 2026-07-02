@@ -126,7 +126,7 @@ export function installPythonVoiceBridgeIfAvailable(
     voiceBridgePath: bridgePath,
     audioOutputDir,
     language: env.KYBERION_VOICE_LANGUAGE ?? 'ja',
-    pythonBin: env.KYBERION_PYTHON_BIN ?? 'python3',
+    pythonBin: env.KYBERION_PYTHON_BIN ?? env.KYBERION_PYTHON ?? 'python3',
     blackholePath: blackholePath ?? undefined,
     playThroughBlackhole,
   });

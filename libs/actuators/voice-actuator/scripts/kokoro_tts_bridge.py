@@ -88,7 +88,7 @@ def _check_health() -> dict:
         return {
             "status": "unavailable",
             "error": str(e),
-            "install_hint": "pip install kokoro soundfile",
+            "install_hint": "Install kokoro and soundfile into the runtime selected by KYBERION_PYTHON_BIN / KYBERION_PYTHON.",
         }
 
 

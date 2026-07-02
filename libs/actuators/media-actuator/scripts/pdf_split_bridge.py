@@ -39,7 +39,7 @@ def main() -> None:
     except ImportError:
         _fail(
             "pypdf_missing",
-            "pypdf is not installed. Install it with: python3 -m pip install pypdf",
+            "pypdf is not installed in the selected Python runtime. Set KYBERION_PYTHON_BIN / KYBERION_PYTHON to a runtime with pypdf available.",
             3,
         )
 
