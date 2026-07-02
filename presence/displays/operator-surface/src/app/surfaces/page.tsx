@@ -1,4 +1,5 @@
 import {
+  buildSurfaceLauncherRecommendations,
   getSurfaceDirectory,
   getSurfaceDirectorySummary,
   getSurfaceScenarioGuide,
@@ -24,6 +25,7 @@ export default async function SurfacesPage() {
   const rows = getSurfaceDirectory();
   const summary = getSurfaceDirectorySummary();
   const scenarios = getSurfaceScenarioGuide();
+  const recommendations = buildSurfaceLauncherRecommendations({ rows });
   const scope = getTenantScope();
   emitMosRead({ page: '/surfaces', resource_kind: 'surface_directory', result_count: rows.length });
 
@@ -41,6 +43,7 @@ export default async function SurfacesPage() {
         <StatCard label="Auth required" value={summary.auth_required} accent="#ffd57e" />
         <StatCard label="Auth missing" value={summary.auth_missing} accent="#ff8fa3" />
         <StatCard label="Stale runtimes" value={summary.stale} accent="#c08eff" />
+        <StatCard label="Blocked surfaces" value={summary.blocked} accent="#ffad66" />
       </div>
 
       <h2 style={{ marginTop: 28, marginBottom: 12 }}>Scenario guide</h2>
@@ -65,6 +68,29 @@ export default async function SurfacesPage() {
         ))}
       </div>
 
+      <h2 style={{ marginTop: 28, marginBottom: 12 }}>Recommended right now</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+        {recommendations.map((recommendation) => (
+          <article
+            key={recommendation.id}
+            style={{
+              background: '#15171c',
+              border: '1px solid #2a2c33',
+              borderRadius: 8,
+              padding: '14px 16px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+              <strong>{recommendation.title}</strong>
+              <StatusPill text={recommendation.readiness} color={recommendation.readiness === 'ready' ? '#9be3a8' : recommendation.readiness === 'needs_setup' ? '#ffd57e' : '#9aa0aa'} />
+            </div>
+            <p style={{ color: '#c9ced6', fontSize: 13, marginBottom: 6 }}>{recommendation.whenToUse}</p>
+            <p style={{ color: '#9aa0aa', fontSize: 12, marginTop: 0 }}>{recommendation.reason}</p>
+            <code style={{ color: '#8ec3ff', fontSize: 12 }}>{recommendation.suggestedCommand}</code>
+          </article>
+        ))}
+      </div>
+
       <h2 style={{ marginTop: 28, marginBottom: 12 }}>Runtime directory</h2>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -74,6 +100,7 @@ export default async function SurfacesPage() {
               <th style={th}>Runtime</th>
               <th style={th}>Auth</th>
               <th style={th}>Use cases</th>
+              <th style={th}>Best for / blocked</th>
               <th style={th}>Next command</th>
             </tr>
           </thead>
@@ -131,6 +158,14 @@ export default async function SurfacesPage() {
                         {useCase}
                       </span>
                     ))}
+                  </div>
+                </td>
+                <td style={td}>
+                  <div style={{ color: '#c9ced6', fontSize: 12 }}>{row.best_for}</div>
+                  <div style={{ color: '#77808d', fontSize: 12, marginTop: 6 }}>
+                    {row.blocked_by.length > 0
+                      ? `blocked by: ${row.blocked_by.join(', ')}`
+                      : 'blocked by: none'}
                   </div>
                 </td>
                 <td style={td}>
