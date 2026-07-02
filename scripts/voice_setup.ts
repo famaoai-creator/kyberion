@@ -6,8 +6,8 @@ import {
   markToolRuntimeInstalled,
   pathResolver,
   probeToolRuntime,
-  resolveManagedToolPythonBin,
   safeExecResult,
+  safeExistsSync,
   safeMkdir,
 } from '@agent/core';
 
@@ -32,6 +32,27 @@ function resolveManagedPythonPath(managedEnvPath: string): string {
   return path.join(managedEnvPath, 'bin', 'python');
 }
 
+function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
+  if (process.platform === 'win32') {
+    return [
+      path.join(managedEnvPath, 'Scripts', 'python.exe'),
+      path.join(managedEnvPath, 'Scripts', 'python3.exe'),
+    ];
+  }
+  return [
+    path.join(managedEnvPath, 'bin', 'python'),
+    path.join(managedEnvPath, 'bin', 'python3'),
+  ];
+}
+
+function resolveManagedPythonBin(toolId: VoiceToolId): string | null {
+  const resolution = probeToolRuntime(toolId, 'installed');
+  for (const candidate of resolveManagedPythonCandidates(resolution.managed_env_path)) {
+    if (safeExistsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   const resolution = probeToolRuntime(toolId, 'approved_install');
   const backend = resolution.install_backend;
@@ -41,7 +62,7 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
       managedEnvPath: resolution.managed_env_path,
       installed: false,
       installAction: 'manual',
-      pythonBin: resolveManagedToolPythonBin(toolId),
+      pythonBin: resolveManagedPythonBin(toolId),
       status: 'unsupported',
       detail: `No install backend registered for ${toolId}.`,
     };
@@ -108,20 +129,20 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     notes: `Installed via registered backend into ${resolution.managed_env_path}`,
   });
   return {
-    toolId,
-    managedEnvPath: resolution.managed_env_path,
-    installed: true,
-    installAction: 'applied',
-    pythonBin: resolveManagedToolPythonBin(toolId),
-    status: 'ready',
-    detail: `Installed via ${backend.command}`,
-  };
+      toolId,
+      managedEnvPath: resolution.managed_env_path,
+      installed: true,
+      installAction: 'applied',
+      pythonBin: resolveManagedPythonBin(toolId),
+      status: 'ready',
+      detail: `Installed via ${backend.command}`,
+    };
 }
 
 function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   const installedResolution = probeToolRuntime(toolId, 'installed');
   const approvedResolution = probeToolRuntime(toolId, 'approved_install');
-  const pythonBin = resolveManagedToolPythonBin(toolId);
+  const pythonBin = resolveManagedPythonBin(toolId);
   const supported = installedResolution.tool.platforms.includes('any')
     || installedResolution.tool.platforms.includes(process.platform as any);
   if (!supported) {
