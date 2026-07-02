@@ -20,7 +20,7 @@
         "icl_ref_audio": true
       },
       "fallback_engine_id": "local_say",
-      "notes": "8-bit quantized Qwen3-TTS 1.7B via mlx-audio. ICL voice cloning using ref_audio + ref_text — no fine-tuning required. Requires Apple Silicon (M1+) and: pip install mlx-audio mlx-whisper. Shadow until governance promotion."
+      "notes": "8-bit quantized Qwen3-TTS 1.7B via mlx-audio. ICL voice cloning using ref_audio + ref_text — no fine-tuning required. Requires Apple Silicon (M1+) and governed tool-runtime entries for mlx-audio and mlx-whisper. Shadow until governance promotion."
     }
   ]
 }

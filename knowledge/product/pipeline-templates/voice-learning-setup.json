@@ -9,7 +9,7 @@
     "profile_id": "operator-default-v1",
     "test_text": "こんにちは、私は {{persona_name}} のデジタルプロファイルです。学習した音声でミーティングに参加する準備が整いました。",
     "provider": "local",
-    "python_bin": ".venv/bin/python3"
+    "python_bin": "python3"
   },
   "steps": [
     {

@@ -281,7 +281,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     } catch (err: any) {
       return {
         available: false,
-        reason: `playwright is not installed in this workspace. \`pnpm add -w playwright && pnpm exec playwright install chromium\`. (${err?.message ?? err})`,
+        reason: `Playwright Chromium runtime is unavailable. Run \`pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force\`. (${err?.message ?? err})`,
       };
     }
   }

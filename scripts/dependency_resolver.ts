@@ -100,7 +100,7 @@ const PLAYWRIGHT_BROWSER: Dependency = {
       tryExec('ls "$(npx playwright install --dry-run chromium 2>&1 | grep -o \'/.*chromium[^\\n]*\')" 2>/dev/null').ok;
     return { ok: true, version: result.stdout, detail: alreadyInstalled ? 'installed' : 'may need install' };
   },
-  installCommand: 'npx playwright install chromium',
+  installCommand: 'pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force',
   installSizeHint: '~200 MB, ~30s',
   fallbackMode: 'browser-actuator unavailable',
 };
@@ -158,7 +158,7 @@ const WHISPER: Dependency = {
     if (r2.ok) return { ok: true, version: `faster-whisper ${r2.stdout}` };
     return { ok: false, detail: 'neither whisper CLI nor faster_whisper python module found' };
   },
-  installCommand: 'pip3 install faster-whisper',
+  installCommand: 'pnpm voice:setup --apply',
   fallbackMode: 'voice transcription unavailable; use cloud STT',
 };
 
@@ -209,7 +209,7 @@ const PNPM: Dependency = {
     const r = checkBinary('pnpm');
     return { ok: r.ok, version: r.version, detail: r.ok ? undefined : 'pnpm not in PATH' };
   },
-  installCommand: 'npm install -g pnpm',
+  installCommand: 'corepack enable && corepack prepare pnpm@10 --activate',
 };
 
 const DEPENDENCY_BY_ID: Record<string, Dependency> = {

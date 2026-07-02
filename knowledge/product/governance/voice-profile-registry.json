@@ -26,9 +26,9 @@
       "default_engine_id": "mlx_audio_qwen3",
       "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline.",
       "sample_refs": [
-        "/Users/famao/kyberion/active/shared/runtime/voice-profiles/my-voice-v2/sample-01.wav",
-        "/Users/famao/kyberion/active/shared/runtime/voice-profiles/my-voice-v2/sample-02.wav",
-        "/Users/famao/kyberion/active/shared/runtime/voice-profiles/my-voice-v2/sample-03.wav"
+        "active/shared/runtime/voice-profiles/my-voice-v2/sample-01.wav",
+        "active/shared/runtime/voice-profiles/my-voice-v2/sample-02.wav",
+        "active/shared/runtime/voice-profiles/my-voice-v2/sample-03.wav"
       ],
       "status": "active"
     },

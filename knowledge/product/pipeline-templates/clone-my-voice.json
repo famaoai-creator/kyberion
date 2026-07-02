@@ -155,7 +155,7 @@
       "op": "system:exec",
       "produces": { "channel": "record1", "type": "RecordingResult" },
       "params": {
-        "command": ".venv/bin/python3",
+        "command": "python3",
         "args": ["libs/actuators/voice-actuator/scripts/record_bridge.py", "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav\"}}"],
         "timeout_ms": 25000
       }
@@ -238,7 +238,7 @@
       "op": "system:exec",
       "produces": { "channel": "record2", "type": "RecordingResult" },
       "params": {
-        "command": ".venv/bin/python3",
+        "command": "python3",
         "args": ["libs/actuators/voice-actuator/scripts/record_bridge.py", "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav\"}}"],
         "timeout_ms": 25000
       }
@@ -321,7 +321,7 @@
       "op": "system:exec",
       "produces": { "channel": "record3", "type": "RecordingResult" },
       "params": {
-        "command": ".venv/bin/python3",
+        "command": "python3",
         "args": ["libs/actuators/voice-actuator/scripts/record_bridge.py", "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav\"}}"],
         "timeout_ms": 25000
       }

@@ -168,7 +168,7 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
         description: 'Re-check the Playwright runtime after browser bootstrap.',
       },
       managed_env_subpath: 'tool-runtimes/playwright',
-      notes: 'Node runtime example: trial via npx, managed browser bootstrap via pnpm exec playwright install chromium.',
+      notes: 'Node runtime example: trial via npx, managed browser bootstrap through the Playwright runtime installer.',
     },
     {
       tool_id: 'ffmpeg',
@@ -341,6 +341,19 @@ function backendIsAvailable(backend: ToolRuntimeBackendCommand | null | undefine
 function resolveManagedEnvPath(tool: ToolRuntimeRecord): string {
   const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
   return path.join(resolveToolRuntimeRoot(getToolRuntimePolicy()), subPath);
+}
+
+function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
+  if (process.platform === 'win32') {
+    return [
+      path.join(managedEnvPath, 'Scripts', 'python.exe'),
+      path.join(managedEnvPath, 'Scripts', 'python3.exe'),
+    ];
+  }
+  return [
+    path.join(managedEnvPath, 'bin', 'python'),
+    path.join(managedEnvPath, 'bin', 'python3'),
+  ];
 }
 
 function normalizeToolId(toolId?: string): string {
@@ -583,6 +596,14 @@ export function resolveToolRuntimeAction(toolId?: string, requestedMode: ToolRun
 
 export function resolveToolRuntimeCommand(toolId?: string, requestedMode: ToolRuntimeMode = 'trial'): ToolRuntimeBackendCommand | null {
   return probeToolRuntime(toolId, requestedMode).selected_backend;
+}
+
+export function resolveManagedToolPythonBin(toolId?: string): string | null {
+  const resolution = probeToolRuntime(toolId, 'installed');
+  for (const candidate of resolveManagedPythonCandidates(resolution.managed_env_path)) {
+    if (safeExistsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 export function listToolRuntimeInventory(

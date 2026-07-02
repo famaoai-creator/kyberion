@@ -119,6 +119,7 @@ const mocks = vi.hoisted(() => ({
     rate: 170,
   })),
   withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  resolveManagedToolPythonBin: vi.fn(() => null),
   logger: {
     warn: vi.fn(),
     info: vi.fn(),
@@ -141,6 +142,7 @@ vi.mock('@agent/core', async () => {
     safeStat: mocks.safeStat,
     getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
     withRetry: mocks.withRetry,
+    resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
   };
 });
 

@@ -13,8 +13,8 @@
       "install": {
         "operator_confirmed": true,
         "command": "pnpm",
-        "args": ["add", "-w", "playwright"],
-        "instruction": "After install, run `pnpm exec playwright install chromium` to download the browser binary. Operator confirmation required because this writes to the workspace package manifest.",
+        "args": ["exec", "playwright", "install", "chromium"],
+        "instruction": "Downloads the Chromium binary used by the browser meeting driver into the governed workspace runtime.",
         "docs_url": "https://playwright.dev/docs/intro",
         "retry_after_install": true
       }
