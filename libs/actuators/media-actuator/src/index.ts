@@ -705,7 +705,7 @@ function runPdfOpsBridge(
 ): any {
   const rootDir = pathResolver.rootDir();
   const bridge = pathResolver.rootResolve('libs/actuators/media-actuator/scripts/pdf_ops_bridge.py');
-  const pythonBin = process.env.KYBERION_PYTHON || 'python3';
+  const pythonBin = resolvePdfBridgePythonBin();
   const cleanedPw: Record<string, string> = {};
   for (const [key, value] of Object.entries(passwords)) {
     if (value !== undefined && value !== null && value !== '') cleanedPw[key] = String(value);
@@ -716,7 +716,9 @@ function runPdfOpsBridge(
     timeoutMs: timeoutMs || 120000,
   });
   if (execResult.error && (execResult.status === null || execResult.status === undefined)) {
-    throw new Error(`pdf_${command}: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON.`);
+    throw new Error(
+      `pdf_${command}: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON_BIN / KYBERION_PYTHON.`,
+    );
   }
   let parsed: any = {};
   try { parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}'); } catch { parsed = {}; }
@@ -739,6 +741,14 @@ const PDF_PYPDF_OPS = new Set([
   'pdf_metadata',
   'pdf_stamp',
 ]);
+
+function resolvePdfBridgePythonBin(): string {
+  if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
+  if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
+  const legacyVenvPython = pathResolver.rootResolve('.venv/bin/python3');
+  if (safeExistsSync(legacyVenvPython)) return legacyVenvPython;
+  return 'python3';
+}
 
 async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
@@ -811,7 +821,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         ? String(resolve(params.password))
         : '';
       const bridge = pathResolver.rootResolve('libs/actuators/media-actuator/scripts/pdf_split_bridge.py');
-      const pythonBin = process.env.KYBERION_PYTHON || 'python3';
+      const pythonBin = resolvePdfBridgePythonBin();
       const execResult = safeExecResult(pythonBin, [
         bridge,
         '--input', inputPath,
@@ -824,7 +834,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         timeoutMs: params.timeout_ms || 120000,
       });
       if (execResult.error && (execResult.status === null || execResult.status === undefined)) {
-        throw new Error(`pdf_split: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON.`);
+        throw new Error(
+          `pdf_split: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON_BIN / KYBERION_PYTHON.`,
+        );
       }
       let parsed: any = {};
       try { parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}'); } catch { parsed = {}; }

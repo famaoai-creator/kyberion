@@ -25,7 +25,7 @@ def _check_health() -> dict:
         return {
             "status": "unavailable",
             "error": "mlx_whisper not installed",
-            "install_hint": "pip install mlx-whisper",
+            "install_hint": "pnpm voice:setup --apply",
         }
 
 
@@ -45,8 +45,8 @@ def _transcribe(params: dict) -> dict:
     except ImportError:
         return {
             "status": "error",
-            "error": "mlx_whisper not installed — run: pip install mlx-whisper",
-            "install_hint": "pip install mlx-whisper",
+            "error": "mlx_whisper not installed — run: pnpm voice:setup --apply",
+            "install_hint": "pnpm voice:setup --apply",
         }
 
     try:

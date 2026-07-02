@@ -152,7 +152,7 @@
       "id": "pdf-split-pages",
       "title": "Split a (password-protected) PDF into one file per page",
       "path": "libs/actuators/media-actuator/examples/pdf-split-pages.json",
-      "description": "Decrypts a password-protected PDF (password supplied at runtime via PDF_PASSWORD) and splits it losslessly into one file per page via the pypdf bridge. Requires pypdf (python3 -m pip install pypdf).",
+      "description": "Decrypts a password-protected PDF (password supplied at runtime via PDF_PASSWORD) and splits it losslessly into one file per page via the pypdf bridge. Requires pypdf in the runtime selected by KYBERION_PYTHON_BIN / KYBERION_PYTHON.",
       "tags": ["pdf", "split", "decrypt", "password", "pypdf", "example"]
     },
     {

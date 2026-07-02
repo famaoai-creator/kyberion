@@ -249,7 +249,11 @@ def main():
     try:
         from pypdf import PdfReader, PdfWriter  # noqa: F401  (import probe)
     except ImportError:
-        _fail("pypdf_missing", "pypdf is not installed. Install it with: python3 -m pip install pypdf", 3)
+        _fail(
+            "pypdf_missing",
+            "pypdf is not installed in the selected Python runtime. Set KYBERION_PYTHON_BIN / KYBERION_PYTHON to a runtime with pypdf available.",
+            3,
+        )
 
     pw = _read_stdin_passwords()
 

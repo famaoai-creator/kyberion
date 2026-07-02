@@ -14,7 +14,7 @@
     "display_name": "Kyberion Agent",
     "listen_duration_sec": 1800,
     "language": "ja",
-    "python_bin": ".venv/bin/python3",
+    "python_bin": "python3",
     "screenshot_path": "active/shared/tmp/meeting-proxy-screenshot.png",
     "transcript_output": "active/shared/tmp/meeting-proxy-transcript.txt",
     "action_items_output": "active/shared/tmp/meeting-proxy-action-items.json",
