@@ -60,7 +60,8 @@ class PolicyEngineImpl {
 
   loadFromFile(filePath?: string): void {
     const root = pathResolver.rootDir();
-    const policyPath = filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
+    const policyPath =
+      filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
 
     if (!safeExistsSync(policyPath)) {
       logger.warn(`[POLICY_ENGINE] Policy file not found: ${policyPath}`);
@@ -78,6 +79,13 @@ class PolicyEngineImpl {
 
   evaluate(context: PolicyContext): PolicyDecision {
     if (this.policies.length === 0) this.loadFromFile();
+    if (this.policies.length === 0) {
+      return {
+        allowed: false,
+        action: 'deny',
+        message: 'Policy engine has no loaded policies; failing closed.',
+      };
+    }
 
     const decisions: { policy: string; rule: PolicyRule; result: boolean }[] = [];
 
@@ -88,7 +96,7 @@ class PolicyEngineImpl {
         if (rule.condition_field) {
           const condMet = this.evalOperator(
             context[rule.condition_field],
-            rule.condition_operator as any || 'eq',
+            (rule.condition_operator as any) || 'eq',
             rule.condition_value
           );
           if (!condMet) continue;
@@ -133,11 +141,15 @@ class PolicyEngineImpl {
     const allowed = winner.rule.action === 'allow' || winner.rule.action === 'audit';
 
     if (winner.rule.action === 'audit') {
-      logger.info(`[POLICY_AUDIT] ${winner.policy}: ${winner.rule.message || 'action audited'} (agent: ${context.agentId})`);
+      logger.info(
+        `[POLICY_AUDIT] ${winner.policy}: ${winner.rule.message || 'action audited'} (agent: ${context.agentId})`
+      );
     }
 
     if (!allowed) {
-      logger.warn(`[POLICY_DENIED] ${winner.policy}: ${winner.rule.message || 'action denied'} (agent: ${context.agentId}, op: ${context.operation})`);
+      logger.warn(
+        `[POLICY_DENIED] ${winner.policy}: ${winner.rule.message || 'action denied'} (agent: ${context.agentId}, op: ${context.operation})`
+      );
     }
 
     return {
@@ -151,14 +163,22 @@ class PolicyEngineImpl {
 
   private evalOperator(fieldValue: any, operator: PolicyRule['operator'], ruleValue: any): boolean {
     switch (operator) {
-      case 'eq': return fieldValue === ruleValue;
-      case 'ne': return fieldValue !== ruleValue;
-      case 'gt': return Number(fieldValue) > Number(ruleValue);
-      case 'lt': return Number(fieldValue) < Number(ruleValue);
-      case 'gte': return Number(fieldValue) >= Number(ruleValue);
-      case 'lte': return Number(fieldValue) <= Number(ruleValue);
-      case 'in': return Array.isArray(ruleValue) && ruleValue.includes(fieldValue);
-      case 'contains': return typeof fieldValue === 'string' && fieldValue.includes(String(ruleValue));
+      case 'eq':
+        return fieldValue === ruleValue;
+      case 'ne':
+        return fieldValue !== ruleValue;
+      case 'gt':
+        return Number(fieldValue) > Number(ruleValue);
+      case 'lt':
+        return Number(fieldValue) < Number(ruleValue);
+      case 'gte':
+        return Number(fieldValue) >= Number(ruleValue);
+      case 'lte':
+        return Number(fieldValue) <= Number(ruleValue);
+      case 'in':
+        return Array.isArray(ruleValue) && ruleValue.includes(fieldValue);
+      case 'contains':
+        return typeof fieldValue === 'string' && fieldValue.includes(String(ruleValue));
       case 'matches': {
         try {
           const pattern = String(ruleValue);
@@ -168,9 +188,12 @@ class PolicyEngineImpl {
             return false;
           }
           return new RegExp(pattern).test(String(fieldValue || ''));
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       }
-      default: return false;
+      default:
+        return false;
     }
   }
 
@@ -181,7 +204,7 @@ class PolicyEngineImpl {
     const windowMs = rule.rate_limit.window_seconds * 1000;
 
     let counter = this.rateLimitCounters.get(key);
-    if (!counter || (now - counter.windowStart) > windowMs) {
+    if (!counter || now - counter.windowStart > windowMs) {
       counter = { count: 0, windowStart: now };
     }
     counter.count++;
@@ -267,7 +290,11 @@ function parseYamlValue(raw: string): any {
   if (raw === 'false') return false;
   if (!isNaN(Number(raw)) && raw !== '') return Number(raw);
   if (raw.startsWith('[') && raw.endsWith(']')) {
-    return raw.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    return raw
+      .slice(1, -1)
+      .split(',')
+      .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+      .filter(Boolean);
   }
   if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
   if (raw.startsWith("'") && raw.endsWith("'")) return raw.slice(1, -1);

@@ -428,9 +428,7 @@ describe('intent-contract compiler', () => {
 
     expect(flow.source).toBe('llm');
     expect(flow.intentContract.intent_id).toBe('speak-with-my-voice');
-    expect(flow.intentContract.execution_profile_id).toBe(
-      'voice-speak-with-my-voice-local-say'
-    );
+    expect(flow.intentContract.execution_profile_id).toBe('voice-speak-with-my-voice-local-say');
     expect(flow.intentContract.capability_bundle_id).toBe('voice-speech-governed');
   });
 
@@ -774,7 +772,8 @@ describe('intent-contract compiler', () => {
   });
 
   it('emits trace metadata for successful llm compilation and fallback paths', async () => {
-    const events: Array<{ name: string; attributes?: Record<string, string | number | boolean> }> = [];
+    const events: Array<{ name: string; attributes?: Record<string, string | number | boolean> }> =
+      [];
     const trace = {
       addEvent(name: string, attributes?: Record<string, string | number | boolean>) {
         events.push({ name, attributes });
@@ -916,7 +915,7 @@ describe('intent-contract compiler', () => {
     expect(events[0]?.attributes?.source).toBe('llm');
     expect(events[0]?.attributes?.fallback_reason).toBe('none');
     expect(events[0]?.attributes?.reasoning_level).toBe(llmFlow.reasoningDecision?.level);
-    expect(events[0]?.attributes?.recommended_model_id).toBe('openai:gpt-5.4');
+    expect(events[0]?.attributes?.recommended_model_id).toBe('openai:gpt-5.5');
     expect(events[0]?.attributes?.model_route_status).toBe('shadow');
 
     events.length = 0;

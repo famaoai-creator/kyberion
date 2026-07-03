@@ -1,7 +1,14 @@
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeReadFile, safeRmSync, saveProjectRecord, saveProjectTrackRecord } from '@agent/core';
+import {
+  pathResolver,
+  safeReadFile,
+  safeRmSync,
+  saveProjectRecord,
+  saveProjectTrackRecord,
+} from '@agent/core';
+import * as killSwitch from '@agent/core/kill-switch';
 import {
   assertCanGrantMissionAuthority,
   extractMissionControllerPositionalArgs,
@@ -13,6 +20,7 @@ import {
   resolveMissionStartCreateInputFromArgv,
   validateMissionStartCreateInput,
 } from './mission_controller.js';
+import * as missionControllerRouter from './refactor/mission-controller-router.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -239,6 +247,25 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['start', 'MSN-5']);
   });
 
+  it('starts kill-switch monitoring from the mission controller entrypoint', async () => {
+    const startSpy = vi.spyOn(killSwitch.killSwitch, 'startMonitor');
+    const routerSpy = vi
+      .spyOn(missionControllerRouter, 'runMissionControllerAction')
+      .mockResolvedValue(undefined as any);
+    const originalArgv = process.argv.slice();
+    process.argv = ['node', 'dist/scripts/mission_controller.js', 'help'];
+
+    try {
+      await main();
+      expect(startSpy).toHaveBeenCalled();
+      expect(routerSpy).toHaveBeenCalled();
+    } finally {
+      process.argv = originalArgv;
+      startSpy.mockRestore();
+      routerSpy.mockRestore();
+    }
+  });
+
   it('treats --routing-decision as a named option instead of a positional argument', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',
@@ -383,8 +410,12 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('--org <ORG>');
     expect(help).toContain('--summary');
     expect(help).toContain('organization-discovery [--json]');
-    expect(help).toContain('organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]');
-    expect(help).toContain('organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]');
+    expect(help).toContain(
+      'organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]'
+    );
+    expect(help).toContain(
+      'organization-profiles [--json] [--organization-id <ORG>] [--active-only] [--ready-only] [--missing-only] [--source <customer|public>] [--summary]'
+    );
     expect(help).toContain('organization-profile [--json] [--organization-id <ORG>] [--summary]');
     expect(help).toContain('organization-profiles --json --summary');
     expect(help).toContain('organization-profile --json --summary');
@@ -430,7 +461,12 @@ describe('mission_controller argument parsing', () => {
     const originalArgv = process.argv;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery', '--json'];
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-discovery',
+      '--json',
+    ];
 
     try {
       await main();
@@ -449,7 +485,12 @@ describe('mission_controller argument parsing', () => {
     const originalArgv = process.argv;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-profiles', '--json'];
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-profiles',
+      '--json',
+    ];
 
     try {
       await main();
@@ -470,7 +511,12 @@ describe('mission_controller argument parsing', () => {
     const originalArgv = process.argv;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery', '--json'];
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-discovery',
+      '--json',
+    ];
 
     try {
       await main();
@@ -550,19 +596,21 @@ describe('mission_controller argument parsing', () => {
       const ajv = new Ajv({ allErrors: true });
       addFormats(ajv);
       const profileSchema = JSON.parse(
-        safeReadFile(
-          pathResolver.knowledge('product/schemas/organization-profile.schema.json'),
-          { encoding: 'utf8' },
-        ) as string,
+        safeReadFile(pathResolver.knowledge('product/schemas/organization-profile.schema.json'), {
+          encoding: 'utf8',
+        }) as string
       );
-      ajv.addSchema(profileSchema, 'https://kyberion.local/schemas/organization-profile.schema.json');
+      ajv.addSchema(
+        profileSchema,
+        'https://kyberion.local/schemas/organization-profile.schema.json'
+      );
       const validate = ajv.compile(
         JSON.parse(
           safeReadFile(
             pathResolver.knowledge('product/schemas/organization-profile-report.schema.json'),
-            { encoding: 'utf8' },
-          ) as string,
-        ),
+            { encoding: 'utf8' }
+          ) as string
+        )
       );
       expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
     } finally {
@@ -576,7 +624,12 @@ describe('mission_controller argument parsing', () => {
     const originalArgv = process.argv;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-catalogs', '--json'];
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-catalogs',
+      '--json',
+    ];
 
     try {
       await main();
@@ -592,9 +645,9 @@ describe('mission_controller argument parsing', () => {
         JSON.parse(
           safeReadFile(
             pathResolver.knowledge('product/schemas/organization-catalog-report.schema.json'),
-            { encoding: 'utf8' },
-          ) as string,
-        ),
+            { encoding: 'utf8' }
+          ) as string
+        )
       );
       expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
     } finally {
@@ -608,7 +661,12 @@ describe('mission_controller argument parsing', () => {
     const originalArgv = process.argv;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    process.argv = ['node', 'dist/scripts/mission_controller.js', 'organization-discovery', '--summary'];
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'organization-discovery',
+      '--summary',
+    ];
 
     try {
       await main();
@@ -631,7 +689,9 @@ describe('mission_controller argument parsing', () => {
     const report = buildOrganizationDiscoveryReport();
 
     expect(report.title).toBe('Organization Discovery');
-    expect(report.summary).toContain('organization selection, inventory, and template overlay inspection');
+    expect(report.summary).toContain(
+      'organization selection, inventory, and template overlay inspection'
+    );
     expect(report.documents).toHaveLength(3);
     expect(report.documents.map((doc) => doc.name)).toEqual([
       'Organization Selection Guide',
@@ -677,12 +737,15 @@ describe('mission_controller argument parsing', () => {
       JSON.parse(
         safeReadFile(
           pathResolver.knowledge('product/schemas/organization-discovery-report.schema.json'),
-          { encoding: 'utf8' },
-        ) as string,
-      ),
+          { encoding: 'utf8' }
+        ) as string
+      )
     );
 
-    expect(validate(buildOrganizationDiscoveryReport()), JSON.stringify(validate.errors || [])).toBe(true);
+    expect(
+      validate(buildOrganizationDiscoveryReport()),
+      JSON.stringify(validate.errors || [])
+    ).toBe(true);
   });
 
   it('accepts the canonical organization discovery example', () => {
@@ -692,15 +755,15 @@ describe('mission_controller argument parsing', () => {
       JSON.parse(
         safeReadFile(
           pathResolver.knowledge('product/schemas/organization-discovery-report.schema.json'),
-          { encoding: 'utf8' },
-        ) as string,
-      ),
+          { encoding: 'utf8' }
+        ) as string
+      )
     );
     const example = JSON.parse(
       safeReadFile(
         pathResolver.knowledge('product/schemas/organization-discovery-report.example.json'),
-        { encoding: 'utf8' },
-      ) as string,
+        { encoding: 'utf8' }
+      ) as string
     );
 
     expect(validate(example), JSON.stringify(validate.errors || [])).toBe(true);

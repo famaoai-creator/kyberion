@@ -13,7 +13,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `android-actuator`           | Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search)                                                                                         | 1.1.0   |  1  | `-`                                | `schemas/mobile-device-pipeline.schema.json`                     | `libs/actuators/android-actuator`           |
 | `approval-actuator`          | Human approval request state transitions and decision handling                                                                                                                                                     | 1.0.0   |  4  | `-`                                | `schemas/approval-action.schema.json`                            | `libs/actuators/approval-actuator`          |
 | `artifact-actuator`          | Governed Artifact and Delivery Pack Manager                                                                                                                                                                        | 1.0.0   |  4  | `-`                                | `schemas/artifact-action.schema.json`                            | `libs/actuators/artifact-actuator`          |
-| `blockchain-actuator`        | Immutable Ledger Anchoring System                                                                                                                                                                                  | 1.0.0   |  2  | `-`                                | `schemas/blockchain-action.schema.json`                          | `libs/actuators/blockchain-actuator`        |
+| `blockchain-actuator`        | Local Ledger Anchoring Simulation                                                                                                                                                                                  | 1.1.0   |  3  | `-`                                | `schemas/blockchain-action.schema.json`                          | `libs/actuators/blockchain-actuator`        |
 | `browser-actuator`           | Pipeline-driven Playwright browser execution and session artifact actuator                                                                                                                                         | 1.1.0   |  2  | `-`                                | `schemas/browser-pipeline.schema.json`                           | `libs/actuators/browser-actuator`           |
 | `calendar-actuator`          | macOS Calendar.app integration using JXA for cross-account schedule coordination                                                                                                                                   | 1.0.0   |  3  | `-`                                | `schemas/calendar-action.schema.json`                            | `libs/actuators/calendar-actuator`          |
 | `code-actuator`              | ADF-driven code analysis and refactoring pipeline engine                                                                                                                                                           | 2.2.0   |  3  | `bin:semgrep, os:darwin, os:linux` | `schemas/code-pipeline.schema.json`                              | `libs/actuators/code-actuator`              |
@@ -123,19 +123,6 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | :------ | :------------------------- |
 | `if`    | system-actuator control op |
 | `while` | system-actuator control op |
-
-### Capability boundaries
-
-| Use case                                 | Use actuator                 | Notes                                                     |
-| :--------------------------------------- | :--------------------------- | :-------------------------------------------------------- |
-| Screen capture / screen state inspection | `system-actuator`            | Default choice for live OS capture and input-state reads. |
-| Document rendering / artifact formatting | `media-actuator`             | Deterministic document and asset generation.              |
-| Image, video, music generation           | `media-generation-actuator`  | Generative media output and capture-assisted workflows.   |
-| Narration video composition              | `video-composition-actuator` | Composed video bundles with narration and scene assembly. |
-| Image / scene perception                 | `vision-actuator`            | Perception facade; delegates generation elsewhere.        |
-| One-shot OS command execution            | `system-actuator`            | Short-lived host actions, diagnostics, and toggles.       |
-| Long-lived process supervision           | `process-actuator`           | Managed runtime lifecycle and restartable services.       |
-| Interactive terminal / PTY               | `terminal-actuator`          | PTY-backed interactive shell sessions.                    |
 
 See also:
 

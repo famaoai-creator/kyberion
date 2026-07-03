@@ -23,6 +23,7 @@ import {
   formatNextAction,
   runJanitor,
   checkActuatorCapabilities,
+  killSwitch,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -825,6 +826,7 @@ export async function main() {
   // Bootstrap reasoning + voice backends before any actuator dispatch.
   installReasoningBackends();
   installPythonVoiceBridgeIfAvailable();
+  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
 
   // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
   // The pipeline's `||` fallback only fires on non-zero exit codes, not SIGINT.

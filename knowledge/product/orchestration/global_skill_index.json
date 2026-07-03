@@ -1,7 +1,7 @@
 {
   "v": "3.0.0",
   "t": 29,
-  "u": "2026-07-02T15:44:26.735Z",
+  "u": "2026-07-03T11:29:27.353Z",
   "s": [
     {
       "n": "agent-actuator",
@@ -38,10 +38,10 @@
     {
       "n": "blockchain-actuator",
       "path": "libs/actuators/blockchain-actuator",
-      "d": "Immutable Ledger Anchoring System",
+      "d": "Local Ledger Anchoring Simulation",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 2
+      "version": "1.1.0",
+      "capability_count": 3
     },
     {
       "n": "browser-actuator",

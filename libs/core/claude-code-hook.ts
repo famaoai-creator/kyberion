@@ -1,5 +1,6 @@
 import { auditChain } from './audit-chain.js';
 import { metrics } from './metrics.js';
+import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { detectTier, validateWritePermission } from './tier-guard.js';
 
 /**
@@ -69,16 +70,24 @@ function truncate(value: string, max: number): string {
 }
 
 function normalizePrompt(value: unknown): string {
-  return String(value || '').replace(/\s+/g, ' ').trim();
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function classifyPromptIntent(prompt: string): string[] {
   const normalized = prompt.toLowerCase();
   const hints: string[] = [];
-  if (/presentation|slide|deck|proposal/.test(normalized)) hints.push('Use the presentation preference profile and keep pattern selection separate from theme selection.');
-  if (/mission|scope|task|implement|build|fix/.test(normalized)) hints.push('Start or update a Kyberion mission before changing code.');
-  if (/review|pr|pull request|validate|test/.test(normalized)) hints.push('Run the validation path first, then /ky-review after the work is stable.');
-  if (/voice|audio|meeting|slack/.test(normalized)) hints.push('Prefer the governed actuator or plugin surface instead of ad hoc shell work.');
+  if (/presentation|slide|deck|proposal/.test(normalized))
+    hints.push(
+      'Use the presentation preference profile and keep pattern selection separate from theme selection.'
+    );
+  if (/mission|scope|task|implement|build|fix/.test(normalized))
+    hints.push('Start or update a Kyberion mission before changing code.');
+  if (/review|pr|pull request|validate|test/.test(normalized))
+    hints.push('Run the validation path first, then /ky-review after the work is stable.');
+  if (/voice|audio|meeting|slack/.test(normalized))
+    hints.push('Prefer the governed actuator or plugin surface instead of ad hoc shell work.');
   return hints.slice(0, 3);
 }
 
@@ -110,6 +119,17 @@ function pre(decision: PermissionDecision, reason: string): PreToolUseHookOutput
  */
 export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput {
   const tool = input.tool_name ?? '';
+  if (tool === 'Bash') {
+    const command = String(input.tool_input?.command ?? input.tool_input?.cmd ?? '').trim();
+    const decision = evaluateShellCommandPolicy(command);
+    if (decision.verdict !== 'allow') {
+      return pre(
+        'deny',
+        `${decision.reason} ${command ? `Command: ${command}` : 'Bash command was not provided.'}`
+      );
+    }
+    return pre('allow', 'Kyberion shell-command policy: Bash command allowed.');
+  }
   if (!FILE_WRITE_TOOLS.has(tool)) {
     return pre('allow', 'No Kyberion gate applies to this tool.');
   }
@@ -121,7 +141,7 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
       return pre(
         'deny',
         `Kyberion tier-guard blocked a write into the ${tier} tier: ${verdict.reason ?? 'not authorized'}. ` +
-          'Use a Kyberion mission / the kyberion.* MCP tools, or configure KYBERION_PERSONA + authority.',
+          'Use a Kyberion mission / the kyberion.* MCP tools, or configure KYBERION_PERSONA + authority.'
       );
     }
   }
@@ -155,7 +175,9 @@ export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}
   return [
     'Kyberion captured the user prompt for coordination.',
     `Prompt summary: ${summary}`,
-    ...(hints.length ? ['Next-step hints:', ...hints.map((hint) => `- ${hint}`)] : ['Next-step hints: keep the work inside the shared coordination brief.']),
+    ...(hints.length
+      ? ['Next-step hints:', ...hints.map((hint) => `- ${hint}`)]
+      : ['Next-step hints: keep the work inside the shared coordination brief.']),
     'If this becomes scoped work, start a Kyberion mission; if it is closing work, run /ky-review.',
   ].join('\n');
 }
@@ -206,7 +228,10 @@ export function summarizeTranscriptUsage(transcriptText: string): CliUsageSummar
     }
     const msg = obj?.message;
     const usage = msg?.usage;
-    if (usage && (typeof usage.input_tokens === 'number' || typeof usage.output_tokens === 'number')) {
+    if (
+      usage &&
+      (typeof usage.input_tokens === 'number' || typeof usage.output_tokens === 'number')
+    ) {
       inputTokens += (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
       outputTokens += usage.output_tokens ?? 0;
       turns += 1;
@@ -237,7 +262,10 @@ export function recordCliUsage(summary: CliUsageSummary | null): boolean {
   }
 }
 
-function describeToolInput(tool: string, toolInput: Record<string, unknown> = {}): Record<string, unknown> {
+function describeToolInput(
+  tool: string,
+  toolInput: Record<string, unknown> = {}
+): Record<string, unknown> {
   if (tool === 'Bash') {
     return { command: truncate(String(toolInput.command ?? ''), 300) };
   }
@@ -252,7 +280,10 @@ function describeToolInput(tool: string, toolInput: Record<string, unknown> = {}
  * Record a completed Claude Code tool execution into the audit chain.
  * Returns `{ recorded: false }` for tools we don't audit.
  */
-export function recordPostToolUse(input: PostToolUseInput): { recorded: boolean; entryId?: string } {
+export function recordPostToolUse(input: PostToolUseInput): {
+  recorded: boolean;
+  entryId?: string;
+} {
   const tool = input.tool_name ?? '';
   if (!AUDITED_TOOLS.has(tool)) return { recorded: false };
 

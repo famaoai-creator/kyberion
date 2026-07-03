@@ -2,11 +2,35 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./tier-guard.js', () => ({
   detectTier: (p: string) =>
-    p.includes('knowledge/personal') ? 'personal' : p.includes('knowledge/confidential') ? 'confidential' : 'public',
+    p.includes('knowledge/personal')
+      ? 'personal'
+      : p.includes('knowledge/confidential')
+        ? 'confidential'
+        : 'public',
   validateWritePermission: (p: string) =>
-    p.includes('knowledge/personal') ? { allowed: false, reason: 'not authorized' } : { allowed: true },
+    p.includes('knowledge/personal')
+      ? { allowed: false, reason: 'not authorized' }
+      : { allowed: true },
 }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn(() => ({ id: 'AUD-1' })) } }));
+vi.mock('./shell-command-policy.js', () => ({
+  evaluateShellCommandPolicy: (command: string) =>
+    command.includes('pnpm install')
+      ? {
+          verdict: 'require_approval',
+          command,
+          executable: 'pnpm',
+          args: ['install'],
+          reason: 'Shell command requires approval under Kyberion governance.',
+        }
+      : {
+          verdict: 'allow',
+          command,
+          executable: 'ls',
+          args: [],
+          reason: 'Allowed by shell command policy.',
+        },
+}));
 
 import {
   GOVERNED_AGENT_ALLOWED_TOOLS,
@@ -26,7 +50,11 @@ describe('claude-agent-governance — canUseTool gate', () => {
   });
 
   it('allows governed kyberion.* MCP tools', async () => {
-    const r = await gate('mcp__kyberion__kyberion.pipeline.run', { input: 'pipelines/x.json' }, opts);
+    const r = await gate(
+      'mcp__kyberion__kyberion.pipeline.run',
+      { input: 'pipelines/x.json' },
+      opts
+    );
     expect(r.behavior).toBe('allow');
   });
 
@@ -39,8 +67,11 @@ describe('claude-agent-governance — canUseTool gate', () => {
     expect(allowed.behavior).toBe('allow');
   });
 
-  it('allows Bash (audited) and denies unknown tools (least privilege)', async () => {
+  it('policy-gates Bash and denies unknown tools (least privilege)', async () => {
     expect((await gate('Bash', { command: 'ls' }, opts)).behavior).toBe('allow');
+    const denied = await gate('Bash', { command: 'pnpm install' }, opts);
+    expect(denied.behavior).toBe('deny');
+    if (denied.behavior === 'deny') expect(denied.message).toContain('approval');
     const unknown = await gate('SomeRandomTool', {}, opts);
     expect(unknown.behavior).toBe('deny');
   });

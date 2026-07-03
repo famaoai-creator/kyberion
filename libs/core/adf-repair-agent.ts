@@ -10,7 +10,10 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { validate, loadSchema } from './validate.js';
+import { pathResolver } from './path-resolver.js';
 import { tryRepairJson, repairJsonString } from './json-repair.js';
+import { validatePipelineGuardrails } from './adf-guardrails.js';
+import { validatePipelineAdf } from './pipeline-contract.js';
 import {
   completeDelegatedTaskTrace,
   startDelegatedTaskTrace,
@@ -51,6 +54,29 @@ export async function validateAndRepairAdf(
     }
   }
 
+  if (schemaName === 'pipeline-adf') {
+    try {
+      const pipeline = validatePipelineAdf(parsed);
+      const guardrails = validatePipelineGuardrails(pipeline as any, adfPath);
+      if (!guardrails.ok) {
+        const errors = guardrails.findings
+          .filter((finding) => finding.severity === 'error')
+          .map((finding) => `${finding.path}: ${finding.message}`);
+        logger.warn(
+          `[adf-repair] Guardrail validation failed for ${adfPath}. Errors: ${errors.length}.`
+        );
+        return {
+          repaired: false,
+          errors,
+          report: `ADF guardrails failed: ${errors.join('; ')}`,
+        };
+      }
+      return { repaired: false };
+    } catch (err: any) {
+      return attemptSubagentRepair(adfPath, schemaName, '', [err.message]);
+    }
+  }
+
   // 2. Schema validation
   const validation = validate(parsed, schemaName);
   if (validation.valid) {
@@ -88,7 +114,15 @@ async function attemptSubagentRepair(
   // Load the actual schema so the LLM has ground truth, not just error messages
   let schemaContent = '(schema not available)';
   try {
-    schemaContent = JSON.stringify(loadSchema(schemaName), null, 2);
+    if (schemaName === 'pipeline-adf') {
+      schemaContent = String(
+        safeReadFile(pathResolver.knowledge('product/schemas/pipeline-adf.schema.json'), {
+          encoding: 'utf8',
+        })
+      );
+    } else {
+      schemaContent = JSON.stringify(loadSchema(schemaName), null, 2);
+    }
   } catch {
     /* non-fatal — proceed without it */
   }

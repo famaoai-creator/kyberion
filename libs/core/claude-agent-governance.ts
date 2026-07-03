@@ -3,6 +3,7 @@ import type { CanUseTool, McpServerConfig, PermissionResult } from '@anthropic-a
 import { pathResolver } from './path-resolver.js';
 import { auditChain } from './audit-chain.js';
 import { evaluatePreToolUse } from './claude-code-hook.js';
+import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 
 /**
  * Direction B: make the claude-agent SDK sub-agent a *governed Kyberion citizen*
@@ -13,7 +14,7 @@ import { evaluatePreToolUse } from './claude-code-hook.js';
  *    sub-agent so it reuses governed pipelines/actuators/knowledge.
  *  - `createKyberionCanUseTool` — a `canUseTool` gate: read-only + kyberion.* tools
  *    pass; file writes are tier-guarded (same kernel as Direction A's PreToolUse);
- *    Bash is allowed+audited; everything else is denied (least privilege).
+ *    Bash is policy-gated and audited; everything else is denied (least privilege).
  *  - `buildGovernedAgentSystemPrompt` — injects the deterministic-first / tier rules
  *    plus mission & knowledge context.
  */
@@ -56,6 +57,11 @@ function auditAgentTool(toolName: string, input: Record<string, unknown>): void 
   }
 }
 
+function extractShellCommand(input: Record<string, unknown> = {}): string {
+  const value = input.command ?? input.cmd ?? input.shell_command ?? input.prompt;
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function summarizeInput(input: Record<string, unknown> = {}): Record<string, unknown> {
   const fp = input.file_path ?? input.notebook_path ?? input.path;
   if (typeof fp === 'string') return { file_path: fp };
@@ -79,24 +85,36 @@ export function createKyberionCanUseTool(): CanUseTool {
     }
 
     if (FILE_WRITE_TOOLS.has(toolName)) {
-      const decision = evaluatePreToolUse({ tool_name: toolName, tool_input: input }).hookSpecificOutput;
+      const decision = evaluatePreToolUse({
+        tool_name: toolName,
+        tool_input: input,
+      }).hookSpecificOutput;
       if (decision.permissionDecision === 'deny') return deny(decision.permissionDecisionReason);
       auditAgentTool(toolName, input);
       return allow(input);
     }
 
     if (toolName === 'Bash') {
+      const command = extractShellCommand(input);
+      const decision = evaluateShellCommandPolicy(command);
+      if (decision.verdict !== 'allow') {
+        return deny(
+          `${decision.reason} ${command ? `Command: ${command}` : 'Bash command was not provided.'}`
+        );
+      }
       auditAgentTool(toolName, input);
       return allow(input);
     }
 
-    return deny(`Kyberion governance: tool "${toolName}" is not in the governed sub-agent allowlist.`);
+    return deny(
+      `Kyberion governance: tool "${toolName}" is not in the governed sub-agent allowlist.`
+    );
   };
 }
 
 /** Wire Kyberion's own MCP server (the kyberion.* surface) into the sub-agent. */
 export function buildKyberionMcpServerConfig(
-  repoRoot: string = pathResolver.rootDir(),
+  repoRoot: string = pathResolver.rootDir()
 ): Record<string, McpServerConfig> {
   return {
     kyberion: {

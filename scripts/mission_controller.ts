@@ -44,6 +44,7 @@ import {
   findMissionPath,
   missionEvidenceDir,
   validateWritePermission,
+  killSwitch,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -72,7 +73,10 @@ import {
   saveState,
   checkDependencies,
 } from './refactor/mission-state.js';
-import { resolveProjectLedgerJsonPath, resolveProjectLedgerPath } from './refactor/mission-project-ledger.js';
+import {
+  resolveProjectLedgerJsonPath,
+  resolveProjectLedgerPath,
+} from './refactor/mission-project-ledger.js';
 import {
   dispatchNextQueuedMission,
   enqueueMission as _enqueueMission,
@@ -127,12 +131,18 @@ async function distillMission(id: string): Promise<void> {
 }
 
 async function dispatchMissionTickets(id: string): Promise<void> {
-  const result = await missionSystem.dispatchMissionTickets(id, resolveMissionTicketDispatchOptionsFromArgv());
+  const result = await missionSystem.dispatchMissionTickets(
+    id,
+    resolveMissionTicketDispatchOptionsFromArgv()
+  );
   console.log(JSON.stringify(result, null, 2));
 }
 
 async function dispatchMissionWorkItems(id: string): Promise<void> {
-  const result = await missionSystem.dispatchMissionWorkItems(id, resolveMissionWorkItemDispatchOptionsFromArgv());
+  const result = await missionSystem.dispatchMissionWorkItems(
+    id,
+    resolveMissionWorkItemDispatchOptionsFromArgv()
+  );
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -158,7 +168,7 @@ function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'pr
     logger.info(
       filterStatus
         ? `No memory promotion candidates with status "${filterStatus}".`
-        : 'No memory promotion candidates in queue.',
+        : 'No memory promotion candidates in queue.'
     );
     return;
   }
@@ -168,7 +178,7 @@ function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'pr
   console.log('-'.repeat(header.length + 6));
   for (const row of rows) {
     console.log(
-      `${row.candidate_id.padEnd(30)} ${row.status.padEnd(10)} ${row.proposed_memory_kind.padEnd(20)} ${row.sensitivity_tier.padEnd(13)} ${row.source_ref}`,
+      `${row.candidate_id.padEnd(30)} ${row.status.padEnd(10)} ${row.proposed_memory_kind.padEnd(20)} ${row.sensitivity_tier.padEnd(13)} ${row.source_ref}`
     );
   }
   console.log('');
@@ -199,20 +209,16 @@ function approveMemoryCandidate(candidateId: string, note?: string) {
  * for `warn` severity; forbidden for `poor` unless tenant_risk_officer
  * documents it separately.
  */
-function acceptRubricOverride(
-  hypothesisOrBranchId: string,
-  reason?: string,
-  severity?: string,
-) {
+function acceptRubricOverride(hypothesisOrBranchId: string, reason?: string, severity?: string) {
   if (!hypothesisOrBranchId) {
     logger.error(
-      'Usage: mission_controller accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]',
+      'Usage: mission_controller accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]'
     );
     return;
   }
   if (!reason) {
     logger.error(
-      'accept-with-override requires --reason "<text>" — overrides without reasoning are not auditable.',
+      'accept-with-override requires --reason "<text>" — overrides without reasoning are not auditable.'
     );
     process.exitCode = 1;
     return;
@@ -226,8 +232,8 @@ function acceptRubricOverride(
   if (sev === 'poor') {
     logger.warn(
       "Override of 'poor' severity is not permitted by default per " +
-        "counterfactual-degradation-policy.json; only proceed if tenant_risk_officer " +
-        'has documented the exception.',
+        'counterfactual-degradation-policy.json; only proceed if tenant_risk_officer ' +
+        'has documented the exception.'
     );
   }
   const missionId = process.env.MISSION_ID || getOptionValue('--mission-id') || '';
@@ -249,7 +255,7 @@ function acceptRubricOverride(
     },
   });
   logger.success(
-    `✅ rubric.override_accepted recorded: ${entry.id} (severity=${sev}, branch=${hypothesisOrBranchId})`,
+    `✅ rubric.override_accepted recorded: ${entry.id} (severity=${sev}, branch=${hypothesisOrBranchId})`
   );
 }
 
@@ -273,10 +279,12 @@ function rejectMemoryCandidate(candidateId: string, note?: string) {
 function promoteMemoryCandidate(
   candidateId: string,
   executionRole: 'mission_controller' | 'chronos_gateway' = 'mission_controller',
-  note?: string,
+  note?: string
 ) {
   if (!candidateId) {
-    logger.error('Usage: mission_controller memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>]');
+    logger.error(
+      'Usage: mission_controller memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>]'
+    );
     return;
   }
   const result = promoteMemoryCandidateToKnowledge({
@@ -285,7 +293,7 @@ function promoteMemoryCandidate(
     ratificationNote: note,
   });
   logger.success(
-    `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`,
+    `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`
   );
 }
 
@@ -307,7 +315,9 @@ function promotePendingMemoryCandidates(input: {
   if (input.dryRun) {
     logger.info(`Dry run: ${pending.length} approved memory candidate(s) would be promoted.`);
     for (const row of pending) {
-      console.log(`- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) ${row.source_ref}`);
+      console.log(
+        `- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) ${row.source_ref}`
+      );
     }
     return;
   }
@@ -340,10 +350,19 @@ async function createMission(
   persona: string = 'worker',
   relationships: any = {},
   tenantSlug?: string,
-  organizationId?: string,
+  organizationId?: string
 ) {
   return withOrganizationContext(organizationId, () =>
-    missionSystem.create(id, tier, tenantId, missionType, visionRef, persona, relationships, tenantSlug),
+    missionSystem.create(
+      id,
+      tier,
+      tenantId,
+      missionType,
+      visionRef,
+      persona,
+      relationships,
+      tenantSlug
+    )
   );
 }
 
@@ -351,21 +370,25 @@ function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return { raw };
   }
 }
 
-function formatRoutingDecisionSummary(routingDecision: Record<string, unknown> | null): string | undefined {
+function formatRoutingDecisionSummary(
+  routingDecision: Record<string, unknown> | null
+): string | undefined {
   if (!routingDecision) return undefined;
   const mode = typeof routingDecision.mode === 'string' ? routingDecision.mode : 'unknown';
-  const owner = typeof routingDecision.owner === 'string' && routingDecision.owner.trim()
-    ? routingDecision.owner.trim()
-    : undefined;
-  const fanout = typeof routingDecision.fanout === 'string' && routingDecision.fanout !== 'none'
-    ? routingDecision.fanout
-    : undefined;
+  const owner =
+    typeof routingDecision.owner === 'string' && routingDecision.owner.trim()
+      ? routingDecision.owner.trim()
+      : undefined;
+  const fanout =
+    typeof routingDecision.fanout === 'string' && routingDecision.fanout !== 'none'
+      ? routingDecision.fanout
+      : undefined;
   const parts = [mode];
   if (owner) parts.push(`owner=${owner}`);
   if (fanout) parts.push(`fanout=${fanout}`);
@@ -375,7 +398,7 @@ function formatRoutingDecisionSummary(routingDecision: Record<string, unknown> |
 async function recordRoutingDecisionInMissionState(
   missionId: string,
   routingDecision: Record<string, unknown> | null,
-  event: 'CREATE' | 'START',
+  event: 'CREATE' | 'START'
 ): Promise<void> {
   if (!routingDecision) return;
   const targetId = missionId.toUpperCase();
@@ -408,10 +431,19 @@ async function startMission(
   visionRef?: string,
   relationships: any = {},
   tenantSlug?: string,
-  organizationId?: string,
+  organizationId?: string
 ) {
   await withOrganizationContext(organizationId, () =>
-    missionSystem.start(id, tier, persona, tenantId, missionType, visionRef, relationships, tenantSlug),
+    missionSystem.start(
+      id,
+      tier,
+      persona,
+      tenantId,
+      missionType,
+      visionRef,
+      relationships,
+      tenantSlug
+    )
   );
   const targetId = id.toUpperCase();
   const state = loadState(targetId);
@@ -454,25 +486,33 @@ async function finishMission(id: string, seal: boolean = false) {
 function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'): void {
   try {
     const upperId = id.toUpperCase();
-    const reportPath = pathResolver.shared(`runtime/reports/intent-contract-memory-sync-${upperId}-${stage}.json`);
+    const reportPath = pathResolver.shared(
+      `runtime/reports/intent-contract-memory-sync-${upperId}-${stage}.json`
+    );
     const exportDir = pathResolver.shared(`exports/intent-contract-memory-sync/${upperId}`);
-    safeExec(process.execPath, [
-      'dist/scripts/sync_intent_contract_memory.js',
-      '--report',
-      reportPath,
-      '--mission-id',
-      upperId,
-      '--stage',
-      stage,
-      '--persist-export',
-      '--export-dir',
-      exportDir,
-    ], {
-      cwd: ROOT_DIR,
-      timeoutMs: 20_000,
-      maxOutputMB: 5,
-    });
-    logger.info(`🧠 Intent-contract memory synced (${stage}) report=${path.relative(ROOT_DIR, reportPath)}`);
+    safeExec(
+      process.execPath,
+      [
+        'dist/scripts/sync_intent_contract_memory.js',
+        '--report',
+        reportPath,
+        '--mission-id',
+        upperId,
+        '--stage',
+        stage,
+        '--persist-export',
+        '--export-dir',
+        exportDir,
+      ],
+      {
+        cwd: ROOT_DIR,
+        timeoutMs: 20_000,
+        maxOutputMB: 5,
+      }
+    );
+    logger.info(
+      `🧠 Intent-contract memory synced (${stage}) report=${path.relative(ROOT_DIR, reportPath)}`
+    );
   } catch (error: any) {
     logger.warn(`⚠️ Intent-contract memory sync skipped (${stage}): ${error?.message || error}`);
   }
@@ -490,7 +530,9 @@ async function createCheckpoint(taskId: string, note: string, explicitMissionId?
       ...(explicitMissionId ? { mission_id: String(explicitMissionId) } : {}),
     });
     persistTrace(tc.finalize());
-  } catch (_) { /* non-critical */ }
+  } catch (_) {
+    /* non-critical */
+  }
   return result;
 }
 
@@ -511,7 +553,15 @@ async function recordEvidence(
   actorId?: string,
   actorType?: 'agent' | 'human' | 'service'
 ) {
-  const result = await missionSystem.recordEvidence(missionId, taskId, note, evidence, teamRole, actorId, actorType);
+  const result = await missionSystem.recordEvidence(
+    missionId,
+    taskId,
+    note,
+    evidence,
+    teamRole,
+    actorId,
+    actorType
+  );
   try {
     const tc = new TraceContext('mission:evidence', { missionId: missionId.toUpperCase() });
     const attrs: Record<string, string | number | boolean> = {
@@ -525,7 +575,9 @@ async function recordEvidence(
     if (evidence?.length) attrs.evidence_count = evidence.length;
     tc.addEvent('evidence.recorded', attrs);
     persistTrace(tc.finalize());
-  } catch (_) { /* non-critical */ }
+  } catch (_) {
+    /* non-critical */
+  }
   return result;
 }
 
@@ -578,19 +630,29 @@ function listOrganizationCatalogs(organizationId?: string, jsonOutput = false) {
     const summaryOnly = process.argv.includes('--summary') || process.argv.includes('--compact');
     const selectedOnly = process.argv.includes('--selected-only');
     const organizationProfile = loadOrganizationProfile();
-    const catalogs = listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
-    const selectedCatalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile) || 'default';
+    const catalogs =
+      listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
+    const selectedCatalogId =
+      resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile) || 'default';
     const requestedLabel = organizationId?.trim() || 'default';
     const organizationLabel = organizationProfile
       ? `${organizationProfile.name} (${organizationProfile.organization_id})`
       : 'default';
-    const filteredCatalogs = selectedOnly ? catalogs.filter((catalog) => catalog.selected) : catalogs;
+    const filteredCatalogs = selectedOnly
+      ? catalogs.filter((catalog) => catalog.selected)
+      : catalogs;
     const summary = {
       total_count: filteredCatalogs.length,
       selected_count: filteredCatalogs.filter((catalog) => catalog.selected).length,
       template_count: filteredCatalogs.reduce((acc, catalog) => acc + catalog.template_count, 0),
-      required_role_count: filteredCatalogs.reduce((acc, catalog) => acc + catalog.required_role_count, 0),
-      optional_role_count: filteredCatalogs.reduce((acc, catalog) => acc + catalog.optional_role_count, 0),
+      required_role_count: filteredCatalogs.reduce(
+        (acc, catalog) => acc + catalog.required_role_count,
+        0
+      ),
+      optional_role_count: filteredCatalogs.reduce(
+        (acc, catalog) => acc + catalog.optional_role_count,
+        0
+      ),
     };
 
     if (jsonOutput) {
@@ -619,12 +681,14 @@ function listOrganizationCatalogs(organizationId?: string, jsonOutput = false) {
       return;
     }
 
-    logger.info(`[organization] requested=${requestedLabel} resolved=${organizationLabel} selected=${selectedCatalogId || 'default'}`);
+    logger.info(
+      `[organization] requested=${requestedLabel} resolved=${organizationLabel} selected=${selectedCatalogId || 'default'}`
+    );
     if (selectedOnly) {
       logger.info('[organization] filters=selected-only');
     }
     logger.info(
-      `[organization] summary total=${summary.total_count} selected=${summary.selected_count} templates=${summary.template_count} required_roles=${summary.required_role_count} optional_roles=${summary.optional_role_count}`,
+      `[organization] summary total=${summary.total_count} selected=${summary.selected_count} templates=${summary.template_count} required_roles=${summary.required_role_count} optional_roles=${summary.optional_role_count}`
     );
     if (summaryOnly) {
       return;
@@ -638,7 +702,7 @@ function listOrganizationCatalogs(organizationId?: string, jsonOutput = false) {
       const templateIds = catalog.template_ids.length ? catalog.template_ids.join(', ') : '-';
       const marker = catalog.selected ? '*' : ' ';
       console.log(
-        `${marker.padEnd(4)} ${catalog.catalog_id.padEnd(20)} ${catalog.organization_id.padEnd(14)} ${String(catalog.template_count).padEnd(10)} ${String(catalog.required_role_count).padStart(4)} ${String(catalog.optional_role_count).padStart(4)} ${templateIds}`,
+        `${marker.padEnd(4)} ${catalog.catalog_id.padEnd(20)} ${catalog.organization_id.padEnd(14)} ${String(catalog.template_count).padEnd(10)} ${String(catalog.required_role_count).padStart(4)} ${String(catalog.optional_role_count).padStart(4)} ${templateIds}`
       );
     }
     console.log('');
@@ -660,10 +724,7 @@ function listOrganizationProfiles(organizationId?: string) {
     ? withOrganizationContext(organizationId, () => loadOrganizationProfile())
     : null;
   const selectedOrganizationId =
-    resolvedOrganizationProfile?.organization_id ||
-    organizationId ||
-    activeCustomer ||
-    'default';
+    resolvedOrganizationProfile?.organization_id || organizationId || activeCustomer || 'default';
   const rows: Array<{
     slug: string;
     active: boolean;
@@ -737,27 +798,39 @@ function listOrganizationProfiles(organizationId?: string) {
     ready: row.ready,
     organization_id: row.profile?.organization_id || row.slug,
     name: row.profile?.name || row.slug,
-    mission_default_template: row.profile?.mission_defaults?.default_team_template || row.profile?.team_defaults?.default_team_template || 'default',
-    team_default_template: row.profile?.team_defaults?.default_team_template || row.profile?.mission_defaults?.default_team_template || 'default',
+    mission_default_template:
+      row.profile?.mission_defaults?.default_team_template ||
+      row.profile?.team_defaults?.default_team_template ||
+      'default',
+    team_default_template:
+      row.profile?.team_defaults?.default_team_template ||
+      row.profile?.mission_defaults?.default_team_template ||
+      'default',
     team_template_catalog_id: row.profile?.team_defaults?.team_template_catalog_id || 'default',
     llm_default: row.profile?.llm?.default_profile || 'default',
     operating_principles_count: row.profile?.operating_principles?.length || 0,
   }));
 
   if (jsonOutput) {
-    console.log(JSON.stringify({
-      requested: requestedLabel,
-      resolved: resolvedOrganizationProfile
-        ? `${resolvedOrganizationProfile.name} (${resolvedOrganizationProfile.organization_id})`
-        : publicProfileLabel,
-      selected_organization_id: selectedOrganizationId,
-      active_only: activeOnly,
-      ready_only: readyOnly,
-      missing_only: missingOnly,
-      source_filter: sourceFilter || null,
-      summary,
-      profiles: jsonRows,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          requested: requestedLabel,
+          resolved: resolvedOrganizationProfile
+            ? `${resolvedOrganizationProfile.name} (${resolvedOrganizationProfile.organization_id})`
+            : publicProfileLabel,
+          selected_organization_id: selectedOrganizationId,
+          active_only: activeOnly,
+          ready_only: readyOnly,
+          missing_only: missingOnly,
+          source_filter: sourceFilter || null,
+          summary,
+          profiles: jsonRows,
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -769,11 +842,13 @@ function listOrganizationProfiles(organizationId?: string) {
         readyOnly ? 'ready-only' : null,
         missingOnly ? 'missing-only' : null,
         sourceFilter ? `source=${sourceFilter}` : null,
-      ].filter(Boolean).join(', ')}`,
+      ]
+        .filter(Boolean)
+        .join(', ')}`
     );
   }
   logger.info(
-    `[organization] summary total=${summary.total_count} ready=${summary.ready_count} missing=${summary.missing_count} customer=${summary.customer_count} public=${summary.public_count} active=${summary.active_count}`,
+    `[organization] summary total=${summary.total_count} ready=${summary.ready_count} missing=${summary.missing_count} customer=${summary.customer_count} public=${summary.public_count} active=${summary.active_count}`
   );
   if (summaryOnly) {
     return;
@@ -786,7 +861,7 @@ function listOrganizationProfiles(organizationId?: string) {
     const status = row.ready ? 'ready' : 'missing profile';
     const marker = row.active ? '*' : ' ';
     console.log(
-      `${marker.padEnd(4)} ${row.source.padEnd(10)} ${`${row.name} (${row.organization_id})`.padEnd(14)} ${row.team_default_template.padEnd(14)} ${row.team_template_catalog_id.padEnd(12)} ${row.llm_default.padEnd(10)} ${status}`,
+      `${marker.padEnd(4)} ${row.source.padEnd(10)} ${`${row.name} (${row.organization_id})`.padEnd(14)} ${row.team_default_template.padEnd(14)} ${row.team_template_catalog_id.padEnd(12)} ${row.llm_default.padEnd(10)} ${status}`
     );
   }
   console.log('');
@@ -811,18 +886,27 @@ function showOrganizationProfile(organizationId?: string, summaryOnly = false, j
         return;
       }
       logger.info(`[organization] requested=${requestedLabel} resolved=default selected=default`);
-      console.log(JSON.stringify({ organization_id: 'default', selected_catalog: 'default', profile: null }, null, 2));
+      console.log(
+        JSON.stringify(
+          { organization_id: 'default', selected_catalog: 'default', profile: null },
+          null,
+          2
+        )
+      );
       return;
     }
 
-    const selectedCatalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile) || 'default';
-    const catalogs = listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
+    const selectedCatalogId =
+      resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile) || 'default';
+    const catalogs =
+      listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
     const selectedCatalog = catalogs.find((catalog) => catalog.catalog_id === selectedCatalogId);
     const payload = {
       requested: requestedLabel,
       resolved: `${organizationProfile.name} (${organizationProfile.organization_id})`,
       selected_catalog: selectedCatalogId,
-      mission_default_template: organizationProfile.mission_defaults?.default_team_template || 'default',
+      mission_default_template:
+        organizationProfile.mission_defaults?.default_team_template || 'default',
       agent_profile: organizationProfile.mission_defaults?.default_agent_profile || 'default',
       team_default_template: organizationProfile.team_defaults?.default_team_template || 'default',
       lifecycle: organizationProfile.team_defaults?.default_lifecycle_template || 'default',
@@ -838,38 +922,42 @@ function showOrganizationProfile(organizationId?: string, summaryOnly = false, j
       return;
     }
     logger.info(
-      `[organization] requested=${requestedLabel} resolved=${organizationProfile.name} (${organizationProfile.organization_id}) selected=${selectedCatalogId}`,
+      `[organization] requested=${requestedLabel} resolved=${organizationProfile.name} (${organizationProfile.organization_id}) selected=${selectedCatalogId}`
     );
     logger.info(
       `[organization] mission_default_template=${payload.mission_default_template} ` +
         `agent_profile=${payload.agent_profile} ` +
-        `catalog=${selectedCatalogId} llm_default=${payload.llm_default}`,
+        `catalog=${selectedCatalogId} llm_default=${payload.llm_default}`
     );
     logger.info(
       `[organization] team_default_template=${payload.team_default_template} ` +
         `lifecycle=${payload.lifecycle} ` +
-        `max_parallel_missions=${payload.max_parallel_missions ?? 'n/a'}`,
+        `max_parallel_missions=${payload.max_parallel_missions ?? 'n/a'}`
     );
     logger.info(
       `[organization] template_catalogs=${payload.template_catalogs} ` +
-        `selected_catalog=${selectedCatalogId}`,
+        `selected_catalog=${selectedCatalogId}`
     );
     logger.info(
-      `[organization] selected_catalog_templates=${payload.selected_catalog_templates.length ? payload.selected_catalog_templates.join(', ') : '-'}`,
+      `[organization] selected_catalog_templates=${payload.selected_catalog_templates.length ? payload.selected_catalog_templates.join(', ') : '-'}`
     );
     if (payload.operating_principles.length) {
-      logger.info(
-        `[organization] operating_principles=${payload.operating_principles.length}`,
-      );
+      logger.info(`[organization] operating_principles=${payload.operating_principles.length}`);
     }
     if (summaryOnly) {
       return;
     }
-    console.log(JSON.stringify({
-      organization_id: organizationProfile.organization_id,
-      selected_catalog: selectedCatalogId,
-      profile: organizationProfile,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          organization_id: organizationProfile.organization_id,
+          selected_catalog: selectedCatalogId,
+          profile: organizationProfile,
+        },
+        null,
+        2
+      )
+    );
   });
 }
 
@@ -879,22 +967,27 @@ export function buildOrganizationDiscoveryReport() {
       name: 'Organization Selection Guide',
       path: 'knowledge/product/orchestration/organization-selection-guide.md',
       purpose: 'Select or switch the active organization context',
-      text_command: 'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --summary',
-      json_command: 'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --json --summary',
+      text_command:
+        'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --summary',
+      json_command:
+        'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --json --summary',
     },
     {
       name: 'Organization Discovery Reports',
       path: 'knowledge/product/orchestration/organization-discovery-reports.md',
       purpose: 'Inspect inventory, readiness, and template overlays',
       text_command: 'node dist/scripts/mission_controller.js organization-profiles --summary',
-      json_command: 'node dist/scripts/mission_controller.js organization-profiles --json --summary',
+      json_command:
+        'node dist/scripts/mission_controller.js organization-profiles --json --summary',
     },
     {
       name: 'Organization Discovery Copy/Paste',
       path: 'knowledge/product/orchestration/README.md',
       purpose: 'Copy the most common organization discovery commands',
-      text_command: 'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
-      json_command: 'node dist/scripts/mission_controller.js organization-catalogs --json --selected-only --summary',
+      text_command:
+        'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
+      json_command:
+        'node dist/scripts/mission_controller.js organization-catalogs --json --selected-only --summary',
     },
   ];
 
@@ -932,21 +1025,25 @@ export function buildOrganizationDiscoveryReport() {
     },
     {
       question: 'Which customer orgs are missing a profile?',
-      command: 'node dist/scripts/mission_controller.js organization-profiles --missing-only --summary',
+      command:
+        'node dist/scripts/mission_controller.js organization-profiles --missing-only --summary',
     },
     {
       question: 'Which team template overlays are active for this org?',
-      command: 'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
+      command:
+        'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
     },
     {
       question: 'Which organization profiles are ready to use?',
-      command: 'node dist/scripts/mission_controller.js organization-profiles --ready-only --summary',
+      command:
+        'node dist/scripts/mission_controller.js organization-profiles --ready-only --summary',
     },
   ];
 
   return {
     title: 'Organization Discovery',
-    summary: 'Operator entrypoint for organization selection, inventory, and template overlay inspection.',
+    summary:
+      'Operator entrypoint for organization selection, inventory, and template overlay inspection.',
     documents,
     examples,
     common_questions: commonQuestions,
@@ -962,7 +1059,9 @@ function showOrganizationDiscovery(jsonOutput = false, summaryOnly = false) {
   }
 
   logger.info('Organization Discovery');
-  logger.info('Use these entry points to switch organization context, inspect inventory, or copy commands.');
+  logger.info(
+    'Use these entry points to switch organization context, inspect inventory, or copy commands.'
+  );
   console.log('');
   for (const doc of report.documents) {
     console.log(`${doc.name}`);
@@ -1066,9 +1165,15 @@ function showReasoningBackendStatus() {
   console.log('');
   console.log('  Reasoning Backend:');
   console.log(`    Selected: ${selectedMode || process.env.KYBERION_REASONING_BACKEND || 'auto'}`);
-  console.log(`    Wisdom profile: ${process.env.KYBERION_WISDOM_LLM_PROFILE || 'distill policy default'}`);
+  console.log(
+    `    Wisdom profile: ${process.env.KYBERION_WISDOM_LLM_PROFILE || 'distill policy default'}`
+  );
   for (const provider of providers) {
-    const state = provider.installed ? (provider.healthy ? 'ready' : 'installed-unhealthy' ) : 'missing';
+    const state = provider.installed
+      ? provider.healthy
+        ? 'ready'
+        : 'installed-unhealthy'
+      : 'missing';
     const version = provider.version || 'n/a';
     console.log(`    ${provider.provider.padEnd(6)} ${state.padEnd(18)} ${version}`);
   }
@@ -1253,7 +1358,9 @@ async function staffMissionTeam(id: string, organizationId?: string) {
 }
 
 async function prewarmMissionTeam(id: string, teamRolesArg?: string, organizationId?: string) {
-  return withOrganizationContext(organizationId, () => missionSystem.prewarmMissionTeam(id, teamRolesArg));
+  return withOrganizationContext(organizationId, () =>
+    missionSystem.prewarmMissionTeam(id, teamRolesArg)
+  );
 }
 
 async function classifyMission(id: string, intentId?: string, taskType?: string): Promise<void> {
@@ -1277,7 +1384,11 @@ async function classifyMission(id: string, intentId?: string, taskType?: string)
   console.log(JSON.stringify({ mission_id: upperId, classification }, null, 2));
 }
 
-async function selectMissionWorkflow(id: string, intentId?: string, taskType?: string): Promise<void> {
+async function selectMissionWorkflow(
+  id: string,
+  intentId?: string,
+  taskType?: string
+): Promise<void> {
   if (!id) {
     logger.error('Usage: mission_controller workflow-select <MISSION_ID> [intent_id] [task_type]');
     return;
@@ -1307,9 +1418,15 @@ async function selectMissionWorkflow(id: string, intentId?: string, taskType?: s
   console.log(JSON.stringify({ mission_id: upperId, classification, workflow }, null, 2));
 }
 
-async function reviewWorkerOutput(id: string, result: 'verified' | 'rejected' = 'verified', note?: string): Promise<void> {
+async function reviewWorkerOutput(
+  id: string,
+  result: 'verified' | 'rejected' = 'verified',
+  note?: string
+): Promise<void> {
   if (!id) {
-    logger.error('Usage: mission_controller review-worker-output <MISSION_ID> [verified|rejected] [note]');
+    logger.error(
+      'Usage: mission_controller review-worker-output <MISSION_ID> [verified|rejected] [note]'
+    );
     return;
   }
   await verifyMission(id, result, note || `Worker output ${result} by operator review.`);
@@ -1352,15 +1469,18 @@ async function resolveGate(missionId: string, gateFile?: string): Promise<string
     return abs;
   }
   const files = safeReaddir(evidDir) as string[];
-  const gates = files.filter(f => f.endsWith('-gate.json'));
+  const gates = files.filter((f) => f.endsWith('-gate.json'));
   if (gates.length === 0) throw new Error(`No gate files found in ${evidDir}`);
-  if (gates.length > 1) throw new Error(`Multiple gates found — specify gate file: ${gates.join(', ')}`);
+  if (gates.length > 1)
+    throw new Error(`Multiple gates found — specify gate file: ${gates.join(', ')}`);
   return path.join(evidDir, gates[0]);
 }
 
 async function gatePass(missionId: string, gateFile?: string, note?: string): Promise<void> {
   if (!missionId) {
-    logger.error('Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json] [--note "..."]');
+    logger.error(
+      'Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json] [--note "..."]'
+    );
     return;
   }
   const gatePath = await resolveGate(missionId, gateFile);
@@ -1378,13 +1498,17 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     result: 'completed',
     metadata: { mission_id: missionId.toUpperCase(), gate_file: gatePath, note },
   });
-  logger.success(`✅ [GATE] ${path.basename(gatePath)} → passed (mission: ${missionId.toUpperCase()})`);
+  logger.success(
+    `✅ [GATE] ${path.basename(gatePath)} → passed (mission: ${missionId.toUpperCase()})`
+  );
   logger.info(`   Confirmed by: ${gate.confirmed_by} at ${gate.confirmed_at}`);
 }
 
 async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
   if (!missionId) {
-    logger.error('Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json] [--note "..."]');
+    logger.error(
+      'Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json] [--note "..."]'
+    );
     return;
   }
   const gatePath = await resolveGate(missionId, gateFile);
@@ -1402,7 +1526,9 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
     result: 'completed',
     metadata: { mission_id: missionId.toUpperCase(), gate_file: gatePath, note },
   });
-  logger.warn(`❌ [GATE] ${path.basename(gatePath)} → rejected (mission: ${missionId.toUpperCase()})`);
+  logger.warn(
+    `❌ [GATE] ${path.basename(gatePath)} → rejected (mission: ${missionId.toUpperCase()})`
+  );
   if (note) logger.info(`   Reason: ${note}`);
 }
 
@@ -1419,6 +1545,7 @@ export async function main() {
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
   }
+  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
 
   const positionalArgs = extractMissionControllerPositionalArgs(process.argv);
 

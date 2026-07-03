@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
 
-vi.mock('./secure-io.js', () => ({
-  safeExec: vi.fn(() => 'shell-ok'),
-  safeReadFile: vi.fn(() => 'file contents'),
-  safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
-  safeWriteFile: vi.fn(),
-}));
+vi.mock('./secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./secure-io.js')>();
+  return {
+    ...actual,
+    safeExec: vi.fn(() => 'shell-ok'),
+    safeReadFile: vi.fn(() => 'file contents'),
+    safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
+    safeWriteFile: vi.fn(),
+  };
+});
 
 describe('openrouter-backend', () => {
   afterEach(() => {
@@ -39,8 +43,8 @@ describe('openrouter-backend', () => {
             },
           ],
         }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
     );
 
     vi.stubGlobal('fetch', fetchMock);

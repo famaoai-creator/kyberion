@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./tier-guard.js', () => ({
   detectTier: (p: string) =>
-    p.includes('knowledge/personal') ? 'personal' : p.includes('knowledge/confidential') ? 'confidential' : 'public',
+    p.includes('knowledge/personal')
+      ? 'personal'
+      : p.includes('knowledge/confidential')
+        ? 'confidential'
+        : 'public',
   validateWritePermission: (p: string) =>
     p.includes('knowledge/personal')
       ? { allowed: false, reason: 'persona not authorized for personal tier' }
@@ -11,6 +15,24 @@ vi.mock('./tier-guard.js', () => ({
 
 const recordSpy = vi.fn((entry: any) => ({ id: 'AUD-TEST-1', ...entry }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: (e: any) => recordSpy(e) } }));
+vi.mock('./shell-command-policy.js', () => ({
+  evaluateShellCommandPolicy: (command: string) =>
+    command.includes('pnpm install')
+      ? {
+          verdict: 'require_approval',
+          command,
+          executable: 'pnpm',
+          args: ['install'],
+          reason: 'Shell command requires approval under Kyberion governance.',
+        }
+      : {
+          verdict: 'allow',
+          command,
+          executable: 'ls',
+          args: [],
+          reason: 'Allowed by shell command policy.',
+        },
+}));
 
 import {
   buildSessionStartContext,
@@ -21,13 +43,23 @@ import {
 } from './claude-code-hook.js';
 
 describe('claude-code-hook — PreToolUse tier-guard', () => {
-  it('allows non-file tools', () => {
+  it('policy-gates Bash commands', () => {
     const out = evaluatePreToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' } });
     expect(out.hookSpecificOutput.permissionDecision).toBe('allow');
+
+    const denied = evaluatePreToolUse({
+      tool_name: 'Bash',
+      tool_input: { command: 'pnpm install' },
+    });
+    expect(denied.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(denied.hookSpecificOutput.permissionDecisionReason).toContain('approval');
   });
 
   it('allows writes to ordinary source paths (public tier — not gated)', () => {
-    const out = evaluatePreToolUse({ tool_name: 'Write', tool_input: { file_path: 'libs/core/foo.ts' } });
+    const out = evaluatePreToolUse({
+      tool_name: 'Write',
+      tool_input: { file_path: 'libs/core/foo.ts' },
+    });
     expect(out.hookSpecificOutput.permissionDecision).toBe('allow');
   });
 
@@ -45,7 +77,11 @@ describe('claude-code-hook — PreToolUse tier-guard', () => {
 describe('claude-code-hook — PostToolUse audit', () => {
   it('records Write into the audit chain with tier metadata', () => {
     recordSpy.mockClear();
-    const res = recordPostToolUse({ tool_name: 'Write', tool_input: { file_path: 'knowledge/public/x.md' }, cwd: '/repo' });
+    const res = recordPostToolUse({
+      tool_name: 'Write',
+      tool_input: { file_path: 'knowledge/public/x.md' },
+      cwd: '/repo',
+    });
     expect(res.recorded).toBe(true);
     expect(res.entryId).toBe('AUD-TEST-1');
     const entry = recordSpy.mock.calls[0][0];
