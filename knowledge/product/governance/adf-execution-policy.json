@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "limits": {
+    "max_steps": 500,
+    "max_hooks_per_step": 8,
+    "max_foreach_items": 100,
+    "max_branch_depth": 16
+  },
+  "network": {
+    "allow_local_network": false
+  }
+}

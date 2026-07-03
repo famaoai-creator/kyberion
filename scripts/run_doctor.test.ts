@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual as any,
+    ...(actual as any),
     listEnvironmentManifestIds: mocks.listEnvironmentManifestIds,
     loadEnvironmentManifest: mocks.loadEnvironmentManifest,
     probeManifest: mocks.probeManifest,
@@ -22,7 +22,9 @@ vi.mock('@agent/core/cli-utils', () => ({
 }));
 
 describe('run_doctor', () => {
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => undefined as never) as any);
+  const exitSpy = vi
+    .spyOn(process, 'exit')
+    .mockImplementation(((code?: number) => undefined as never) as any);
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -63,7 +65,10 @@ describe('run_doctor', () => {
       }
       return [];
     });
-    mocks.listEnvironmentManifestIds.mockReturnValue(['kyberion-runtime-baseline', 'reasoning-backend']);
+    mocks.listEnvironmentManifestIds.mockReturnValue([
+      'kyberion-runtime-baseline',
+      'reasoning-backend',
+    ]);
   });
 
   afterEach(() => {
@@ -81,7 +86,10 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('reasoning-backend');
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reasoning-backend'));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm setup:report --persona first-time-user'));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('pnpm setup:report --persona first-time-user')
+    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
   });
 
   it('expands the meeting runtime preset to the meeting participation manifest', async () => {
@@ -127,9 +135,15 @@ describe('run_doctor', () => {
 
     await runDoctor();
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Next Action: Bootstrap meeting-participation-runtime'));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply'));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm setup:report --persona first-time-user'));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Next Action: Bootstrap meeting-participation-runtime')
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('pnpm env:bootstrap --manifest meeting-participation-runtime --apply')
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('pnpm setup:report --persona first-time-user')
+    );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

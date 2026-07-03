@@ -1,5 +1,12 @@
 import { logger } from './core.js';
-import { safeReadFile, safeWriteFile, safeAppendFileSync, safeExistsSync, safeMkdir } from './secure-io.js';
+import {
+  safeReadFile,
+  safeWriteFile,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+} from './secure-io.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -41,9 +48,11 @@ class AuditChainImpl {
   private lastHash: string = '0000000000000000000000000000000000000000000000000000000000000000';
   private entryCount: number = 0;
   private auditDir: string;
+  private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
   constructor() {
     this.auditDir = path.join(pathResolver.rootDir(), 'active', 'shared', 'logs', 'audit');
+    this.seedFromDisk();
   }
 
   /**
@@ -91,7 +100,9 @@ class AuditChainImpl {
         try {
           await forwarder.publish(entry);
         } catch (err: any) {
-          logger.warn(`[audit-chain] forwarder ${forwarder.name} threw for ${entry.id}: ${err?.message ?? err}`);
+          logger.warn(
+            `[audit-chain] forwarder ${forwarder.name} threw for ${entry.id}: ${err?.message ?? err}`
+          );
         }
       })
       .catch((err) => {
@@ -122,7 +133,10 @@ class AuditChainImpl {
   /**
    * Record an agent lifecycle event.
    */
-  recordLifecycle(agentId: string, event: 'spawn' | 'shutdown' | 'error' | 'delegation'): AuditEntry {
+  recordLifecycle(
+    agentId: string,
+    event: 'spawn' | 'shutdown' | 'error' | 'delegation'
+  ): AuditEntry {
     return this.record({
       agentId,
       action: 'lifecycle',
@@ -134,7 +148,12 @@ class AuditChainImpl {
   /**
    * Record a trust score change.
    */
-  recordTrustChange(agentId: string, oldScore: number, newScore: number, reason: string): AuditEntry {
+  recordTrustChange(
+    agentId: string,
+    oldScore: number,
+    newScore: number,
+    reason: string
+  ): AuditEntry {
     return this.record({
       agentId,
       action: 'trust_update',
@@ -150,34 +169,51 @@ class AuditChainImpl {
    * Returns the number of valid entries and any corrupted entry IDs.
    */
   verify(): { valid: number; corrupted: string[]; total: number } {
+    const files = this.listAuditFiles();
     const entries = this.loadAll();
     const corrupted: string[] = [];
     let prevHash = '0000000000000000000000000000000000000000000000000000000000000000';
+    let previousFileDate: string | null = null;
+    let invalidEntryCount = 0;
 
-    for (const entry of entries) {
-      if (entry.previousHash !== prevHash) {
-        corrupted.push(entry.id);
-        continue;
+    for (const fileName of files) {
+      const fileDate = this.extractAuditDate(fileName);
+      if (fileDate && previousFileDate && !this.isNextUtcDay(previousFileDate, fileDate)) {
+        corrupted.push(`audit-gap:${previousFileDate}->${fileDate}`);
       }
 
-      const hashInput = prevHash + JSON.stringify({ ...entry, currentHash: undefined });
-      const expectedHash = createHash('sha256').update(hashInput).digest('hex');
+      previousFileDate = fileDate ?? previousFileDate;
 
-      if (entry.currentHash !== expectedHash) {
-        corrupted.push(entry.id);
+      for (const entry of this.readAuditFileEntries(path.join(this.auditDir, fileName))) {
+        if (entry.previousHash !== prevHash) {
+          corrupted.push(entry.id);
+          invalidEntryCount++;
+          prevHash = entry.currentHash;
+          continue;
+        }
+
+        const hashInput = prevHash + JSON.stringify({ ...entry, currentHash: undefined });
+        const expectedHash = createHash('sha256').update(hashInput).digest('hex');
+
+        if (entry.currentHash !== expectedHash) {
+          corrupted.push(entry.id);
+          invalidEntryCount++;
+        }
+
+        prevHash = entry.currentHash;
       }
-
-      prevHash = entry.currentHash;
     }
 
     const result = {
-      valid: entries.length - corrupted.length,
+      valid: entries.length - invalidEntryCount,
       corrupted,
       total: entries.length,
     };
 
     if (corrupted.length > 0) {
-      logger.error(`[AUDIT_CHAIN] Integrity check failed: ${corrupted.length}/${entries.length} entries corrupted`);
+      logger.error(
+        `[AUDIT_CHAIN] Integrity check failed: ${corrupted.length}/${entries.length} entries corrupted`
+      );
     } else {
       logger.info(`[AUDIT_CHAIN] Integrity verified: ${entries.length} entries OK`);
     }
@@ -186,15 +222,60 @@ class AuditChainImpl {
   }
 
   /**
-   * Load all audit entries from the current day's file.
+   * Load all audit entries from every audit file in chronological order.
    */
   loadAll(): AuditEntry[] {
-    const filePath = this.getFilePath();
-    if (!safeExistsSync(filePath)) return [];
+    const entries: AuditEntry[] = [];
+    for (const fileName of this.listAuditFiles()) {
+      entries.push(...this.readAuditFileEntries(path.join(this.auditDir, fileName)));
+    }
+    return entries;
+  }
 
+  private seedFromDisk(): void {
+    const files = this.listAuditFiles();
+    if (files.length === 0) return;
+
+    const allEntries = files.flatMap((fileName) =>
+      this.readAuditFileEntries(path.join(this.auditDir, fileName))
+    );
+    if (allEntries.length === 0) return;
+
+    const lastEntry = allEntries[allEntries.length - 1];
+    if (lastEntry?.currentHash) {
+      this.lastHash = lastEntry.currentHash;
+    }
+    this.entryCount = allEntries.length;
+  }
+
+  private listAuditFiles(): string[] {
+    if (!safeExistsSync(this.auditDir)) return [];
+    return safeReaddir(this.auditDir)
+      .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  private extractAuditDate(fileName: string): string | null {
+    const match = fileName.match(AuditChainImpl.AUDIT_FILE_RE);
+    return match ? match[1] : null;
+  }
+
+  private isNextUtcDay(previous: string, current: string): boolean {
+    const previousDate = new Date(`${previous}T00:00:00.000Z`);
+    if (Number.isNaN(previousDate.getTime())) return true;
+    previousDate.setUTCDate(previousDate.getUTCDate() + 1);
+    return previousDate.toISOString().slice(0, 10) === current;
+  }
+
+  private readAuditFileEntries(filePath: string): AuditEntry[] {
+    if (!safeExistsSync(filePath)) return [];
     try {
       const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      return content.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+      return content
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
     } catch (_) {
       return [];
     }
@@ -220,7 +301,7 @@ class AuditChainImpl {
         const date = new Date().toISOString().slice(0, 10);
         safeAppendFileSync(
           path.join(tenantAuditDir, `audit-${date}.jsonl`),
-          JSON.stringify(entry) + '\n',
+          JSON.stringify(entry) + '\n'
         );
       } catch (err: any) {
         logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${entry.tenantSlug}: ${err.message}`);
@@ -247,7 +328,12 @@ function resolveCurrentTenantSlug(): string | undefined {
   // Walk up looking for a mission-state.json with tenant_slug.
   const candidates = [
     path.join(pathResolver.rootDir(), 'active/missions/personal', missionId, 'mission-state.json'),
-    path.join(pathResolver.rootDir(), 'active/missions/confidential', missionId, 'mission-state.json'),
+    path.join(
+      pathResolver.rootDir(),
+      'active/missions/confidential',
+      missionId,
+      'mission-state.json'
+    ),
     path.join(pathResolver.rootDir(), 'active/missions/public', missionId, 'mission-state.json'),
   ];
   for (const candidate of candidates) {

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
-import { 
-  detectTier, 
+import { ui } from './core.js';
+import {
+  detectTier,
   scanForConfidentialMarkers,
   wrapSkill,
   wrapSkillAsync,
@@ -12,13 +13,35 @@ import {
   KyberionError,
   ERROR_CODES,
   Cache,
-  rootDir
+  rootDir,
 } from './index.js';
 
+const originalArgv = process.argv.slice();
+const readlineMock = vi.hoisted(() => ({
+  createInterface: vi.fn(() => ({
+    question: (_prompt: string, cb: (answer: string) => void) => cb('y'),
+    close: vi.fn(),
+  })),
+}));
+
+vi.mock('node:readline', () => ({
+  createInterface: readlineMock.createInterface,
+}));
+
 describe('core library bundle', () => {
+  beforeEach(() => {
+    process.argv = [...originalArgv];
+  });
+
+  afterEach(() => {
+    process.argv = [...originalArgv];
+  });
+
   describe('tier-guard', () => {
     it('should detect public tier', () => {
-      const tier = detectTier(path.join(rootDir(), 'knowledge/product/orchestration/global_actuator_index.json'));
+      const tier = detectTier(
+        path.join(rootDir(), 'knowledge/product/orchestration/global_actuator_index.json')
+      );
       expect(tier).toBe('public');
     });
 
@@ -44,7 +67,9 @@ describe('core library bundle', () => {
     });
 
     it('should wrap synchronous skills with error format on throw', () => {
-      const result = wrapSkill('test-fail', () => { throw new Error('boom'); });
+      const result = wrapSkill('test-fail', () => {
+        throw new Error('boom');
+      });
       expect(result.status).toBe('error');
       expect(result.error.message).toBe('boom');
     });
@@ -100,7 +125,9 @@ describe('core library bundle', () => {
     });
 
     it('should serialize SkillError to JSON', () => {
-      const err = new KyberionError(ERROR_CODES.EXECUTION_ERROR, 'timeout', { context: { s: 't' } });
+      const err = new KyberionError(ERROR_CODES.EXECUTION_ERROR, 'timeout', {
+        context: { s: 't' },
+      });
       const json = err.toJSON();
       expect(json.code).toBe('E300');
       expect(json.retryable).toBe(true);
@@ -126,9 +153,23 @@ describe('core library bundle', () => {
       const cache = new Cache(10, 1000);
       cache.set('short', 1, 10);
       cache.set('long', 2, 500);
-      await new Promise(r => setTimeout(r, 25));
+      await new Promise((r) => setTimeout(r, 25));
       expect(cache.get('short')).toBeUndefined();
       expect(cache.get('long')).toBe(2);
+    });
+  });
+
+  describe('ui.confirm', () => {
+    it('auto-confirms non-destructive prompts when -y is present', async () => {
+      process.argv = ['node', 'test', '-y'];
+      await expect(ui.confirm('continue?')).resolves.toBe(true);
+      expect(readlineMock.createInterface).not.toHaveBeenCalled();
+    });
+
+    it('prompts for destructive operations even when -y is present', async () => {
+      process.argv = ['node', 'test', '-y'];
+      await expect(ui.confirm('delete everything?', { destructive: true })).resolves.toBe(true);
+      expect(readlineMock.createInterface).toHaveBeenCalled();
     });
   });
 });

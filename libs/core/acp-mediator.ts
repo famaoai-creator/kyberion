@@ -7,6 +7,7 @@ import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import { pathResolver } from './path-resolver.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 
 /** Whitelist environment variables passed to child agent processes */
 const ENV_WHITELIST = [
@@ -423,11 +424,13 @@ export class ACPMediator {
             }
           }
 
-          // Block explicitly dangerous operations
-          const dangerousPatterns = ['rm -rf', 'format', 'drop table', 'delete', 'eval(', 'exec('];
-          if (dangerousPatterns.some((p) => title.includes(p))) {
+          const shellDecision = evaluateShellCommandPolicy(title);
+          if (shellDecision.verdict === 'deny') {
             logger.error(`[ACP_PERMISSION] BLOCKED dangerous operation: ${title}`);
             return { outcome: 'denied' as const };
+          }
+          if (shellDecision.verdict === 'allow') {
+            return { outcome: 'approved' as const };
           }
 
           // Allow safe operations
@@ -449,8 +452,8 @@ export class ACPMediator {
             return { outcome: 'approved' as const };
           }
 
-          logger.info(`[ACP_PERMISSION] Approved: ${title}`);
-          return { outcome: 'approved' as const };
+          logger.warn(`[ACP_PERMISSION] Approval required: ${title}`);
+          return { outcome: 'denied' as const };
         },
         async readTextFile(params) {
           throw new Error('Not implemented');

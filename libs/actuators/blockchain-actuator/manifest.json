@@ -1,6 +1,6 @@
 {
   "actuator_id": "blockchain-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local Ledger Anchoring Simulation",
   "simulated": true,
   "contract_schema": "schemas/blockchain-action.schema.json",

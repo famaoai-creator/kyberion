@@ -106,4 +106,38 @@ describe('validateAndRepairAdf', () => {
     expect(result.errors?.join('\n')).toContain('action');
     expect(readFixture(filePath)).toBe(original);
   });
+
+  it('rejects pipeline ADF guardrail violations without delegating', async () => {
+    const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture(
+      'guardrail.json',
+      JSON.stringify(
+        {
+          steps: [
+            {
+              op: 'demo:step',
+              params: {},
+              hooks: {
+                before: [
+                  {
+                    type: 'command',
+                    cmd: 'rm -rf /',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+
+    const result = await validateAndRepairAdf(filePath, 'pipeline-adf');
+
+    expect(result.repaired).toBe(false);
+    expect(result.report).toContain('ADF guardrails failed');
+    expect(delegateTask).not.toHaveBeenCalled();
+  });
 });
