@@ -9,7 +9,12 @@ import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 
 export interface AnomalyIndicator {
-  type: 'rapid-fire' | 'frequency-spike' | 'trust-degradation' | 'action-drift' | 'policy-violations';
+  type:
+    | 'rapid-fire'
+    | 'frequency-spike'
+    | 'trust-degradation'
+    | 'action-drift'
+    | 'policy-violations';
   threshold: string;
 }
 
@@ -25,7 +30,9 @@ function loadAnomalyConfig(): TrustPolicyAnomalyDetection {
   if (_cachedAnomalyConfig) return _cachedAnomalyConfig;
   try {
     const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
-    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { anomaly_detection?: TrustPolicyAnomalyDetection };
+    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+      anomaly_detection?: TrustPolicyAnomalyDetection;
+    };
     _cachedAnomalyConfig = data.anomaly_detection ?? null;
   } catch (err) {
     const defaults: TrustPolicyAnomalyDetection = {
@@ -33,7 +40,11 @@ function loadAnomalyConfig(): TrustPolicyAnomalyDetection {
       policy_violations: { max_violations: 3, window_ms: 600000 },
       trust_degradation: { min_drop_percent: 15, window_ms: 3600000 },
     };
-    recordConfigFallback({ knowledgePath: 'product/governance/trust-policy.json', error: err, defaults: { anomaly_detection: defaults } });
+    recordConfigFallback({
+      knowledgePath: 'product/governance/trust-policy.json',
+      error: err,
+      defaults: { anomaly_detection: defaults },
+    });
     _cachedAnomalyConfig = defaults;
   }
   if (!_cachedAnomalyConfig) {
@@ -49,9 +60,18 @@ function loadAnomalyConfig(): TrustPolicyAnomalyDetection {
 export function getAnomalyConfig(): AnomalyIndicator[] {
   const cfg = loadAnomalyConfig();
   return [
-    { type: 'rapid-fire', threshold: `>${cfg.rapid_fire.max_actions} actions / ${cfg.rapid_fire.window_ms / 1000}s` },
-    { type: 'trust-degradation', threshold: `>=${cfg.trust_degradation.min_drop_percent}% drop in ${cfg.trust_degradation.window_ms / 3600000}h` },
-    { type: 'policy-violations', threshold: `>=${cfg.policy_violations.max_violations} violations in ${cfg.policy_violations.window_ms / 60000}min` },
+    {
+      type: 'rapid-fire',
+      threshold: `>${cfg.rapid_fire.max_actions} actions / ${cfg.rapid_fire.window_ms / 1000}s`,
+    },
+    {
+      type: 'trust-degradation',
+      threshold: `>=${cfg.trust_degradation.min_drop_percent}% drop in ${cfg.trust_degradation.window_ms / 3600000}h`,
+    },
+    {
+      type: 'policy-violations',
+      threshold: `>=${cfg.policy_violations.max_violations} violations in ${cfg.policy_violations.window_ms / 60000}min`,
+    },
   ];
 }
 
@@ -89,27 +109,37 @@ class KillSwitchImpl {
       const anomalyCfg = loadAnomalyConfig();
 
       // Rapid-fire
-      const recentActions = logs.filter(l => (now - l.ts) < anomalyCfg.rapid_fire.window_ms);
+      const recentActions = logs.filter((l) => now - l.ts < anomalyCfg.rapid_fire.window_ms);
       if (recentActions.length > anomalyCfg.rapid_fire.max_actions) {
-        anomalies.push(`rapid-fire: ${recentActions.length} actions in ${anomalyCfg.rapid_fire.window_ms / 1000}s`);
+        anomalies.push(
+          `rapid-fire: ${recentActions.length} actions in ${anomalyCfg.rapid_fire.window_ms / 1000}s`
+        );
       }
 
       // Policy violations
-      const recentViolations = logs.filter(l => l.policyViolation && (now - l.ts) < anomalyCfg.policy_violations.window_ms);
+      const recentViolations = logs.filter(
+        (l) => l.policyViolation && now - l.ts < anomalyCfg.policy_violations.window_ms
+      );
       if (recentViolations.length >= anomalyCfg.policy_violations.max_violations) {
-        anomalies.push(`policy-violations: ${recentViolations.length} in ${anomalyCfg.policy_violations.window_ms / 60000}min`);
+        anomalies.push(
+          `policy-violations: ${recentViolations.length} in ${anomalyCfg.policy_violations.window_ms / 60000}min`
+        );
       }
 
       // Trust degradation
       const trustRecord = trustEngine.getScore(agentId);
       if (trustRecord && trustRecord.history.length >= 2) {
-        const hourAgo = trustRecord.history.filter(h => (now - h.ts) < anomalyCfg.trust_degradation.window_ms);
+        const hourAgo = trustRecord.history.filter(
+          (h) => now - h.ts < anomalyCfg.trust_degradation.window_ms
+        );
         if (hourAgo.length >= 2) {
           const oldest = hourAgo[0].score;
           const newest = hourAgo[hourAgo.length - 1].score;
           const dropPercent = oldest > 0 ? ((oldest - newest) / oldest) * 100 : 0;
           if (dropPercent >= anomalyCfg.trust_degradation.min_drop_percent) {
-            anomalies.push(`trust-degradation: ${dropPercent.toFixed(1)}% drop in ${anomalyCfg.trust_degradation.window_ms / 3600000}h`);
+            anomalies.push(
+              `trust-degradation: ${dropPercent.toFixed(1)}% drop in ${anomalyCfg.trust_degradation.window_ms / 3600000}h`
+            );
           }
         }
       }
@@ -192,6 +222,10 @@ class KillSwitchImpl {
       clearInterval(this.monitorInterval);
       this.monitorInterval = null;
     }
+  }
+
+  isMonitoring(): boolean {
+    return this.monitorInterval !== null;
   }
 }
 

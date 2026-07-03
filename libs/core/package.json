@@ -635,6 +635,22 @@
       "types": "./dist/secure-io.d.ts",
       "default": "./dist/secure-io.js"
     },
+    "./shell-command-policy": {
+      "types": "./dist/shell-command-policy.d.ts",
+      "default": "./dist/shell-command-policy.js"
+    },
+    "./adf-guardrails": {
+      "types": "./dist/adf-guardrails.d.ts",
+      "default": "./dist/adf-guardrails.js"
+    },
+    "./egress-policy": {
+      "types": "./dist/egress-policy.d.ts",
+      "default": "./dist/egress-policy.js"
+    },
+    "./governance-status": {
+      "types": "./dist/governance-status.d.ts",
+      "default": "./dist/governance-status.js"
+    },
     "./shared-business-types": {
       "types": "./dist/shared-business-types.d.ts",
       "default": "./dist/shared-business-types.js"

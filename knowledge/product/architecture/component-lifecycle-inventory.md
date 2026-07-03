@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-07-02
+last_updated: 2026-07-03
 ---
 
 # Component Lifecycle Inventory
@@ -21,7 +21,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `android-actuator`: Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search) (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
 - `approval-actuator`: Human approval request state transitions and decision handling (4 ops, v1.0.0, schema schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
-- `blockchain-actuator`: Immutable Ledger Anchoring System (2 ops, v1.0.0, schema schemas/blockchain-action.schema.json)
+- `blockchain-actuator`: Local Ledger Anchoring Simulation (3 ops, v1.1.0, schema schemas/blockchain-action.schema.json)
 - `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.1.0, schema schemas/browser-pipeline.schema.json)
 - `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (3 ops, v2.2.0, schema schemas/code-pipeline.schema.json)

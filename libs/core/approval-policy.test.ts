@@ -34,18 +34,25 @@ describe('approval-policy', () => {
 
   it('prefers a customer policy overlay when one is active', async () => {
     const customerPolicyPath = pathResolver.sharedTmp(`customer-policy-${Date.now()}.json`);
-    safeWriteFile(customerPolicyPath, JSON.stringify({
-      defaults: { requires_approval: false },
-      rules: [
+    safeWriteFile(
+      customerPolicyPath,
+      JSON.stringify(
         {
-          id: 'customer-override',
-          intent_ids: ['inspect-service'],
-          when: { payload_field: 'operation', any_of: ['restart'] },
-          requires_approval: false,
-          missing_requirements: [],
+          defaults: { requires_approval: false },
+          rules: [
+            {
+              id: 'customer-override',
+              intent_ids: ['inspect-service'],
+              when: { payload_field: 'operation', any_of: ['restart'] },
+              requires_approval: false,
+              missing_requirements: [],
+            },
+          ],
         },
-      ],
-    }, null, 2));
+        null,
+        2
+      )
+    );
 
     mocks.customerRoot.mockReturnValue(customerPolicyPath);
     vi.resetModules();
@@ -56,5 +63,15 @@ describe('approval-policy', () => {
     });
     expect(result.requiresApproval).toBe(false);
     expect(result.matchedRuleId).toBe('customer-override');
+  });
+
+  it('fails closed for dangerous shell-style operations even without a matching rule', () => {
+    const result = resolveApprovalPolicy({
+      intentId: 'run_shell',
+      payload: { command: 'rm -rf /' },
+    });
+
+    expect(result.requiresApproval).toBe(true);
+    expect(result.matchedRuleId).toBe('fallback-dangerous-shell');
   });
 });

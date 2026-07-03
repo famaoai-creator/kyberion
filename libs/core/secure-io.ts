@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
+import { auditChain } from './audit-chain.js';
+import { killSwitch } from './kill-switch.js';
 
 /**
  * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
@@ -73,7 +75,7 @@ export interface SafeWriteOptions {
 }
 
 export function buildSafeExecEnv(
-  extraEnv: Record<string, string | undefined> = {},
+  extraEnv: Record<string, string | undefined> = {}
 ): NodeJS.ProcessEnv {
   // Use a string-indexed map locally; Next 15's global augmentation makes
   // `NODE_ENV` a required readonly field on `NodeJS.ProcessEnv`, which is
@@ -152,7 +154,11 @@ let _policyCheckInProgress = false;
 /**
  * Write a file safely using atomic operations (write to temp -> rename).
  */
-export function safeWriteFile(filePath: string, data: string | Buffer, options: SafeWriteOptions = {}): void {
+export function safeWriteFile(
+  filePath: string,
+  data: string | Buffer,
+  options: SafeWriteOptions = {}
+): void {
   const { mkdir = true } = options;
   const resolved = pathResolver.resolve(filePath);
 
@@ -173,12 +179,29 @@ export function safeWriteFile(filePath: string, data: string | Buffer, options: 
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
-        throw new Error(`[POLICY_BLOCKED] Write to ${resolved} denied: ${policyDecision.message || 'policy violation'}`);
+        killSwitch.logAction(
+          process.env.KYBERION_PERSONA || 'unknown',
+          `file_write:${resolved}:denied`,
+          true
+        );
+        auditChain.record({
+          agentId: process.env.KYBERION_PERSONA || 'unknown',
+          action: 'policy_violation',
+          operation: 'file_write',
+          result: 'failed',
+          reason: policyDecision.message || 'policy violation',
+          metadata: {
+            target_tier: detectTier(resolved),
+          },
+        });
+        throw new Error(
+          `[POLICY_BLOCKED] Write to ${resolved} denied: ${policyDecision.message || 'policy violation'}`
+        );
       }
     } catch (err: any) {
       // Only re-throw if it's an actual policy block, not a load/parse failure
       if (err?.message?.includes('[POLICY_BLOCKED]')) throw err;
-      // Policy engine unavailable (no policy file, parse error, etc.) — allow by default
+      throw new Error(`Policy engine unavailable for ${resolved}: ${err?.message || err}`);
     } finally {
       _policyCheckInProgress = false;
     }
@@ -201,8 +224,14 @@ export function safeWriteFile(filePath: string, data: string | Buffer, options: 
     fd = null;
     fs.renameSync(tempPath, resolved);
   } catch (err) {
-    if (fd !== null) try { fs.closeSync(fd); } catch (_) {}
-    if (fs.existsSync(tempPath)) try { fs.unlinkSync(tempPath); } catch (_) {}
+    if (fd !== null)
+      try {
+        fs.closeSync(fd);
+      } catch (_) {}
+    if (fs.existsSync(tempPath))
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (_) {}
     throw err;
   }
 }
@@ -210,7 +239,11 @@ export function safeWriteFile(filePath: string, data: string | Buffer, options: 
 /**
  * Append to a file safely.
  */
-export function safeAppendFileSync(filePath: string, data: string | Buffer, options: any = 'utf8'): void {
+export function safeAppendFileSync(
+  filePath: string,
+  data: string | Buffer,
+  options: any = 'utf8'
+): void {
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -258,7 +291,11 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
 /**
  * Create a symlink safely with permission validation.
  */
-export function safeSymlinkSync(targetPath: string, linkPath: string, type?: fs.symlink.Type): void {
+export function safeSymlinkSync(
+  targetPath: string,
+  linkPath: string,
+  type?: fs.symlink.Type
+): void {
   const resolvedTarget = pathResolver.resolve(targetPath);
   const resolvedLink = pathResolver.resolve(linkPath);
   const targetGuard = validateReadPermission(resolvedTarget);
@@ -279,7 +316,10 @@ export function safeSymlinkSync(targetPath: string, linkPath: string, type?: fs.
 /**
  * Remove a file or directory safely with permission validation.
  */
-export function safeRmSync(targetPath: string, options: fs.RmOptions = { recursive: true, force: true }): void {
+export function safeRmSync(
+  targetPath: string,
+  options: fs.RmOptions = { recursive: true, force: true }
+): void {
   const resolved = pathResolver.resolve(targetPath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -301,7 +341,10 @@ export function safeUnlinkSync(filePath: string): void {
 /**
  * Create a directory safely.
  */
-export function safeMkdir(dirPath: string, options: fs.MakeDirectoryOptions = { recursive: true }): void {
+export function safeMkdir(
+  dirPath: string,
+  options: fs.MakeDirectoryOptions = { recursive: true }
+): void {
   const resolved = pathResolver.resolve(dirPath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -328,10 +371,7 @@ export function safeOpenAppendFile(filePath: string): number {
  * Create a file exclusively. The open is atomic: it fails with EEXIST
  * when another process already owns the path.
  */
-export function safeCreateExclusiveFileSync(
-  filePath: string,
-  data: string | Buffer = '',
-): void {
+export function safeCreateExclusiveFileSync(filePath: string, data: string | Buffer = ''): void {
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -345,8 +385,12 @@ export function safeCreateExclusiveFileSync(
     fs.fsyncSync(fd);
     fs.closeSync(fd);
   } catch (err) {
-    try { fs.closeSync(fd); } catch (_) {}
-    try { fs.unlinkSync(resolved); } catch (_) {}
+    try {
+      fs.closeSync(fd);
+    } catch (_) {}
+    try {
+      fs.unlinkSync(resolved);
+    } catch (_) {}
     throw err;
   }
 }
@@ -379,7 +423,11 @@ export function safeExistsSync(filePath: string): boolean {
  * Execute a command safely and return the full result (stdout, stderr, exit code).
  * Unlike safeExec, this does NOT throw on non-zero exit codes.
  */
-export function safeExecResult(command: string, args: string[] = [], options: any = {}): {
+export function safeExecResult(
+  command: string,
+  args: string[] = [],
+  options: any = {}
+): {
   stdout: string;
   stderr: string;
   status: number | null;
@@ -455,7 +503,7 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
 
   try {
     const parsed = new URL(url);
-    
+
     // Protocol whitelist
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       throw new Error(`Unsupported protocol: ${parsed.protocol}`);
@@ -465,8 +513,9 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
     const hostname = parsed.hostname.toLowerCase();
     const normalizedHostname = hostname.replace(/^\[(.*)\]$/, '$1');
     const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::', '::1'];
-    
-    const allowLocal = options?.allowLocalNetwork === true || process.env.KYBERION_ALLOW_LOCAL_NETWORK === 'true';
+
+    const allowLocal =
+      options?.allowLocalNetwork === true || process.env.KYBERION_ALLOW_LOCAL_NETWORK === 'true';
 
     if (blockedHostnames.includes(normalizedHostname)) {
       if (allowLocal) return url;
@@ -474,7 +523,9 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
     }
 
     // Basic private IP range detection (IPv4)
-    if (/^(10\.|127\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(normalizedHostname)) {
+    if (
+      /^(10\.|127\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(normalizedHostname)
+    ) {
       if (allowLocal) return url;
       throw new Error(`Blocked URL: Private IP range (${hostname})`);
     }
@@ -538,7 +589,9 @@ export function safeReaddir(dirPath: string): string[] {
   const resolved = pathResolver.resolve(dirPath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`);
+    throw new Error(
+      `[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
+    );
   }
   return fs.readdirSync(resolved);
 }
@@ -550,7 +603,9 @@ export function safeStat(filePath: string): fs.Stats {
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`);
+    throw new Error(
+      `[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
+    );
   }
   return fs.statSync(resolved);
 }
@@ -562,7 +617,9 @@ export function safeLstat(filePath: string): fs.Stats {
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`);
+    throw new Error(
+      `[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
+    );
   }
   return fs.lstatSync(resolved);
 }
@@ -574,7 +631,9 @@ export function safeReadlink(filePath: string): string {
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
-    throw new Error(`[ROLE_VIOLATION] Role is NOT authorized to readlink path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`);
+    throw new Error(
+      `[ROLE_VIOLATION] Role is NOT authorized to readlink path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
+    );
   }
   return fs.readlinkSync(resolved);
 }

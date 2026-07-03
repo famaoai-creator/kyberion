@@ -1,0 +1,65 @@
+{
+  "version": "1",
+  "defaults": {
+    "require_approval_message": "Shell command requires approval under Kyberion governance.",
+    "deny_message": "Shell command is explicitly blocked by Kyberion governance."
+  },
+  "allowlist": [
+    {
+      "id": "read-only-fs",
+      "command_regex": [
+        "^(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*(?:ls|cat|grep|find|head|tail|pwd|which|type|sed|awk|rg)(?:\\s|$)"
+      ],
+      "reason": "Read-only shell inspection is allowed."
+    },
+    {
+      "id": "git-readonly",
+      "command_regex": [
+        "^git\\s+(?:status|log|diff|show|branch\\s+--show-current|rev-parse)(?:\\s|$)"
+      ],
+      "reason": "Read-only git inspection is allowed."
+    },
+    {
+      "id": "test-and-lint",
+      "command_regex": [
+        "^pnpm\\s+(?:lint|typecheck|test(?:[:\\w-]+)?|run\\s+(?:lint|typecheck|test(?:[:\\w-]+)?|build(?:[:\\w-]+)?))(?:\\s|$)",
+        "^pnpm\\s+exec\\s+vitest(?:\\s|$)"
+      ],
+      "reason": "Test and lint commands are allowed."
+    }
+  ],
+  "denylist": [
+    {
+      "id": "destructive-rm",
+      "command_regex": [
+        "(?:^|\\s)rm\\s+.*-rf(?:\\s|$)",
+        "(?:^|\\s)rm\\s+.*--recursive.*--force(?:\\s|$)",
+        "(?:^|\\s)rm\\s+.*--force.*--recursive(?:\\s|$)"
+      ],
+      "reason": "Recursive destructive deletion is blocked."
+    },
+    {
+      "id": "pipe-to-shell",
+      "command_regex": [
+        "\\|\\s*(?:sh|bash|zsh|fish|ksh)(?:\\s|$)",
+        "(?:^|\\s)(?:sh|bash|zsh|fish|ksh)\\s+-c\\s+.*(?:curl|wget)"
+      ],
+      "reason": "Piping untrusted output into a shell is blocked."
+    },
+    {
+      "id": "dangerous-binary-tools",
+      "executables": ["dd", "mkfs", "format", "fdisk"],
+      "reason": "Disk and filesystem destructive tools are blocked."
+    },
+    {
+      "id": "eval-exec",
+      "command_regex": ["\\beval\\b", "\\bexec\\s*\\("],
+      "reason": "Eval/exec style shell execution is blocked."
+    },
+    {
+      "id": "base64-decode",
+      "command_regex": ["\\bbase64\\s+-d\\b", "\\bbase64\\s+--decode\\b"],
+      "reason": "Base64 decode is blocked when used as shell obfuscation."
+    }
+  ]
+}
