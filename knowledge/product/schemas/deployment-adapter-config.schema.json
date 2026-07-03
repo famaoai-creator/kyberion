@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Deployment Adapter Config",
+  "type": "object",
+  "required": ["command"],
+  "properties": {
+    "command": { "type": "string", "minLength": 1 },
+    "shell": { "type": "string" },
+    "timeout_ms": { "type": "integer", "minimum": 1 },
+    "cwd": { "type": "string" },
+    "env": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
