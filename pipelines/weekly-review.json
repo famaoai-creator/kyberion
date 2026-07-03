@@ -8,6 +8,12 @@
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
   },
+  "schedule": {
+    "id": "weekly-review",
+    "cron": "0 7 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "steps": [
     {
       "id": "open_weekly",
@@ -16,6 +22,35 @@
       "produces": { "channel": "weekly_face", "type": "WeeklyOpenResult" },
       "params": {
         "export_as": "weekly_face"
+      }
+    },
+    {
+      "id": "reconcile_unhandled_intents",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "reconcile_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/reconcile_unhandled_intents.js",
+        "export_as": "reconcile_result"
+      }
+    },
+    {
+      "id": "log_unhandled_intents",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "reconcile_summary", "type": "ShellResult" },
+      "params": {
+        "cmd": "cat active/shared/tmp/unhandled-intent-last-run.summary.txt",
+        "export_as": "reconcile_summary"
+      }
+    },
+    {
+      "id": "emit_unhandled_intents_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reconcile_summary",
+      "params": {
+        "message": "{{reconcile_summary}}"
       }
     },
     {

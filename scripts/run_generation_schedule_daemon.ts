@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger, pathResolver } from '@agent/core';
 import { spawn } from 'node:child_process';
 
@@ -7,15 +8,11 @@ const SCHEDULE_TICK_ENTRY = pathResolver.rootResolve('dist/scripts/run_generatio
 
 async function main() {
   while (true) {
-    const child = spawn(
-      process.execPath,
-      [SCHEDULE_TICK_ENTRY, '--action', 'tick'],
-      {
-        cwd: ROOT_DIR,
-        env: process.env,
-        stdio: 'inherit',
-      },
-    );
+    const child = spawn(process.execPath, [SCHEDULE_TICK_ENTRY, '--action', 'tick'], {
+      cwd: ROOT_DIR,
+      env: process.env,
+      stdio: 'inherit',
+    });
 
     await new Promise<void>((resolve, reject) => {
       child.on('exit', (code) => {

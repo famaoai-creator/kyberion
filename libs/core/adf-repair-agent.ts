@@ -40,7 +40,9 @@ export async function validateAndRepairAdf(
     const lightweight = tryRepairJson(content);
     if (lightweight !== null) {
       const repairedStr = repairJsonString(content)!;
-      logger.info(`[adf-repair] Lightweight JSON repair succeeded for ${adfPath} — skipping subagent delegation`);
+      logger.info(
+        `[adf-repair] Lightweight JSON repair succeeded for ${adfPath} — skipping subagent delegation`
+      );
       safeWriteFile(adfPath, repairedStr, { encoding: 'utf8' });
       parsed = lightweight;
     } else {
@@ -55,8 +57,15 @@ export async function validateAndRepairAdf(
     return { repaired: false };
   }
 
-  logger.warn(`[adf-repair] Schema validation failed for ${adfPath}. Errors: ${validation.errors.length}. Delegating to sub-agent...`);
-  return attemptSubagentRepair(adfPath, schemaName, '', validation.errors.map(e => `${e.field}: ${e.message}`));
+  logger.warn(
+    `[adf-repair] Schema validation failed for ${adfPath}. Errors: ${validation.errors.length}. Delegating to sub-agent...`
+  );
+  return attemptSubagentRepair(
+    adfPath,
+    schemaName,
+    '',
+    validation.errors.map((e) => `${e.field}: ${e.message}`)
+  );
 }
 
 async function attemptSubagentRepair(
@@ -80,7 +89,9 @@ async function attemptSubagentRepair(
   let schemaContent = '(schema not available)';
   try {
     schemaContent = JSON.stringify(loadSchema(schemaName), null, 2);
-  } catch { /* non-fatal — proceed without it */ }
+  } catch {
+    /* non-fatal — proceed without it */
+  }
 
   // Classify errors to generate targeted repair hints
   const hints = buildRepairHints(validationErrors, parseError);
@@ -89,7 +100,7 @@ async function attemptSubagentRepair(
 The ADF file at '${adfPath}' is invalid and must be repaired.
 
 ## Errors
-${parseError ? `JSON Parse Error: ${parseError}\n` : ''}${validationErrors.length > 0 ? validationErrors.map(e => `- ${e}`).join('\n') : ''}
+${parseError ? `JSON Parse Error: ${parseError}\n` : ''}${validationErrors.length > 0 ? validationErrors.map((e) => `- ${e}`).join('\n') : ''}
 
 ## Repair Hints
 ${hints}
@@ -109,11 +120,23 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
 `.trim();
 
   try {
+    const originalContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
     const report = await backend.delegateTask(instruction, `ADF Repair: ${adfPath}`);
     logger.success(`[adf-repair] Sub-agent repair completed for ${adfPath}.`);
 
     // Re-verify after repair
-    const updatedContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
+    let updatedContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
+    if (updatedContent === originalContent) {
+      const returnedRepair = tryRepairJson(report);
+      if (returnedRepair !== null) {
+        const returnedValidation = validate(returnedRepair as Record<string, unknown>, schemaName);
+        if (returnedValidation.valid) {
+          const repairedStr = repairJsonString(report)!;
+          safeWriteFile(adfPath, repairedStr, { encoding: 'utf8' });
+          updatedContent = repairedStr;
+        }
+      }
+    }
     let updatedParsed: any;
     try {
       updatedParsed = JSON.parse(updatedContent);
@@ -135,7 +158,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       return { repaired: true, report };
     }
 
-    const finalErrors = finalValidation.errors.map(e => `${e.field}: ${e.message}`);
+    const finalErrors = finalValidation.errors.map((e) => `${e.field}: ${e.message}`);
     completeDelegatedTaskTrace(trace, {
       resultSummary: `repair completed but validation still failed: ${finalErrors.join('; ')}`,
     });
@@ -146,7 +169,11 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     };
   } catch (err: any) {
     completeDelegatedTaskTrace(trace, { error: err.message });
-    return { repaired: false, errors: [err.message], report: `Sub-agent repair failed: ${err.message}` };
+    return {
+      repaired: false,
+      errors: [err.message],
+      report: `Sub-agent repair failed: ${err.message}`,
+    };
   }
 }
 
@@ -161,30 +188,48 @@ function buildRepairHints(validationErrors: string[], parseError: string): strin
   }
 
   const hints: string[] = [];
-  const missing = validationErrors.filter(e => e.includes('Required field') && e.includes('missing'));
-  const typeMismatch = validationErrors.filter(e => e.includes('Expected type'));
-  const enumViolation = validationErrors.filter(e => e.includes('not in allowed values'));
-  const anyOfFail = validationErrors.filter(e => e.includes('anyOf'));
+  const missing = validationErrors.filter(
+    (e) => e.includes('Required field') && e.includes('missing')
+  );
+  const typeMismatch = validationErrors.filter((e) => e.includes('Expected type'));
+  const enumViolation = validationErrors.filter((e) => e.includes('not in allowed values'));
+  const anyOfFail = validationErrors.filter((e) => e.includes('anyOf'));
   const other = validationErrors.filter(
-    e => !missing.includes(e) && !typeMismatch.includes(e) && !enumViolation.includes(e) && !anyOfFail.includes(e)
+    (e) =>
+      !missing.includes(e) &&
+      !typeMismatch.includes(e) &&
+      !enumViolation.includes(e) &&
+      !anyOfFail.includes(e)
   );
 
   if (missing.length > 0) {
-    const fields = missing.map(e => e.replace('Required field "', '').replace('" is missing', '')).join(', ');
-    hints.push(`- MISSING REQUIRED FIELDS: Add ${fields}. Check the schema for their expected types and structure.`);
+    const fields = missing
+      .map((e) => e.replace('Required field "', '').replace('" is missing', ''))
+      .join(', ');
+    hints.push(
+      `- MISSING REQUIRED FIELDS: Add ${fields}. Check the schema for their expected types and structure.`
+    );
   }
   if (typeMismatch.length > 0) {
-    hints.push(`- TYPE MISMATCH: ${typeMismatch.map(e => e.split(': ')[1]).join('; ')}. Ensure values match the declared JSON type (string/number/boolean/array/object).`);
+    hints.push(
+      `- TYPE MISMATCH: ${typeMismatch.map((e) => e.split(': ')[1]).join('; ')}. Ensure values match the declared JSON type (string/number/boolean/array/object).`
+    );
   }
   if (enumViolation.length > 0) {
-    hints.push(`- ENUM VIOLATION: ${enumViolation.map(e => e.split(': ')[1]).join('; ')}. Replace with one of the allowed values listed in the error.`);
+    hints.push(
+      `- ENUM VIOLATION: ${enumViolation.map((e) => e.split(': ')[1]).join('; ')}. Replace with one of the allowed values listed in the error.`
+    );
   }
   if (anyOfFail.length > 0) {
-    hints.push(`- ALTERNATIVE REQUIRED FIELDS: The schema requires at least one of several field sets. Check the schema's anyOf block and supply one complete set.`);
+    hints.push(
+      `- ALTERNATIVE REQUIRED FIELDS: The schema requires at least one of several field sets. Check the schema's anyOf block and supply one complete set.`
+    );
   }
   if (other.length > 0) {
     hints.push(`- OTHER: ${other.join('; ')}`);
   }
 
-  return hints.length > 0 ? hints.join('\n') : '- Review the schema carefully and fix all structural/type mismatches.';
+  return hints.length > 0
+    ? hints.join('\n')
+    : '- Review the schema carefully and fix all structural/type mismatches.';
 }

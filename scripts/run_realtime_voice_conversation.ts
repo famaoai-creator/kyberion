@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
@@ -131,12 +132,16 @@ async function runRecorderTurn(input: {
   });
 
   if (exitCode !== 0) {
-    throw new Error(`Recorder bridge exited with code ${exitCode}${stderr ? `: ${stderr.trim()}` : ''}`);
+    throw new Error(
+      `Recorder bridge exited with code ${exitCode}${stderr ? `: ${stderr.trim()}` : ''}`
+    );
   }
 
   const parsed = parseTrailingJson(stdout);
   if (parsed.status !== 'success') {
-    throw new Error(`Recorder bridge error: ${parsed.message || parsed.error || JSON.stringify(parsed)}`);
+    throw new Error(
+      `Recorder bridge error: ${parsed.message || parsed.error || JSON.stringify(parsed)}`
+    );
   }
   return String(parsed.path || audioPath);
 }
@@ -156,7 +161,7 @@ function normalizeTurns(value: unknown): number | undefined {
 
 export async function runRealtimeVoiceConversationInteractive(
   options: RealtimeVoiceConversationCliOptions,
-  deps: RealtimeVoiceConversationLoopDeps = {},
+  deps: RealtimeVoiceConversationLoopDeps = {}
 ): Promise<void> {
   const runTurn = deps.runTurn ?? runRealtimeVoiceConversationTurn;
   const recordTurnAudio =
@@ -185,7 +190,7 @@ export async function runRealtimeVoiceConversationInteractive(
   const sttBridge = getSpeechToTextBridge();
   if (sttBridge.name === 'stub') {
     throw new Error(
-      'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.',
+      'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.'
     );
   }
 
@@ -194,7 +199,9 @@ export async function runRealtimeVoiceConversationInteractive(
     if (turnIndex > 0) {
       await promptForContinue('\nPress Enter to record the next turn, or Ctrl+C to stop. ');
     }
-    console.log(`\n=== Turn ${turnIndex + 1}${Number.isFinite(maxTurns) ? ` / ${maxTurns}` : ''} ===`);
+    console.log(
+      `\n=== Turn ${turnIndex + 1}${Number.isFinite(maxTurns) ? ` / ${maxTurns}` : ''} ===`
+    );
     const audioPath = await recordTurnAudio(turnIndex);
     const result = await runTurn({
       sessionId: options.sessionId,
@@ -237,7 +244,9 @@ async function runOneShotConversation(options: RealtimeVoiceConversationCliOptio
   console.log(JSON.stringify(result, null, 2));
 }
 
-export function parseRealtimeVoiceConversationCli(argv: Record<string, unknown>): RealtimeVoiceConversationCliOptions {
+export function parseRealtimeVoiceConversationCli(
+  argv: Record<string, unknown>
+): RealtimeVoiceConversationCliOptions {
   const sessionId = String(argv['session-id'] || '').trim();
   if (!sessionId) throw new Error('--session-id is required');
 
@@ -262,7 +271,8 @@ export function parseRealtimeVoiceConversationCli(argv: Record<string, unknown>)
     surfaceId: String(argv['surface-id'] || 'presence-studio'),
     sourceId: String(argv['source-id'] || 'local-mic'),
     deliveryMode: (argv['delivery-mode'] as DeliveryMode) || 'artifact_and_playback',
-    personalVoiceMode: (argv['personal-voice-mode'] as PersonalVoiceMode) || 'require_personal_voice',
+    personalVoiceMode:
+      (argv['personal-voice-mode'] as PersonalVoiceMode) || 'require_personal_voice',
     interactive,
     recordSeconds: Math.floor(recordSeconds),
     turns: normalizeTurns(argv.turns),

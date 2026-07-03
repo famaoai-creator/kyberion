@@ -23,9 +23,21 @@
       "types": "./dist/a2a-bridge.d.ts",
       "default": "./dist/a2a-bridge.js"
     },
+    "./agent-adapter": {
+      "types": "./dist/agent-adapter.d.ts",
+      "default": "./dist/agent-adapter.js"
+    },
+    "./agent-registry": {
+      "types": "./dist/agent-registry.d.ts",
+      "default": "./dist/agent-registry.js"
+    },
     "./acp-mediator": {
       "types": "./dist/acp-mediator.d.ts",
       "default": "./dist/acp-mediator.js"
+    },
+    "./agent-runtime-supervisor-client": {
+      "types": "./dist/agent-runtime-supervisor-client.d.ts",
+      "default": "./dist/agent-runtime-supervisor-client.js"
     },
     "./agent-lifecycle": {
       "types": "./dist/agent-lifecycle.d.ts",
@@ -59,6 +71,10 @@
       "types": "./dist/approval-cowork-adapter.d.ts",
       "default": "./dist/approval-cowork-adapter.js"
     },
+    "./approval-gate-summary": {
+      "types": "./dist/approval-gate-summary.d.ts",
+      "default": "./dist/approval-gate-summary.js"
+    },
     "./app-profiles": {
       "types": "./dist/app-profiles.d.ts",
       "default": "./dist/app-profiles.js"
@@ -71,6 +87,14 @@
       "types": "./dist/artifact-bundle.d.ts",
       "default": "./dist/artifact-bundle.js"
     },
+    "./artifact-record": {
+      "types": "./dist/artifact-record.d.ts",
+      "default": "./dist/artifact-record.js"
+    },
+    "./authority": {
+      "types": "./dist/authority.d.ts",
+      "default": "./dist/authority.js"
+    },
     "./blackhole-audio-bus": {
       "types": "./dist/blackhole-audio-bus.d.ts",
       "default": "./dist/blackhole-audio-bus.js"
@@ -82,6 +106,18 @@
     "./environment-capability-probes": {
       "types": "./dist/environment-capability-probes.d.ts",
       "default": "./dist/environment-capability-probes.js"
+    },
+    "./ledger": {
+      "types": "./dist/ledger.d.ts",
+      "default": "./dist/ledger.js"
+    },
+    "./memory-promotion-queue": {
+      "types": "./dist/memory-promotion-queue.d.ts",
+      "default": "./dist/memory-promotion-queue.js"
+    },
+    "./memory-promotion-workflow": {
+      "types": "./dist/memory-promotion-workflow.d.ts",
+      "default": "./dist/memory-promotion-workflow.js"
     },
     "./channel-surface": {
       "types": "./dist/channel-surface.d.ts",
@@ -96,6 +132,10 @@
       "default": "./dist/cowork-health-check.js"
     },
     "./cowork-knowledge-bridge": {
+      "types": "./dist/cowork-knowledge-bridge.d.ts",
+      "default": "./dist/cowork-knowledge-bridge.js"
+    },
+    "./cowork-knowledge-bridge.js": {
       "types": "./dist/cowork-knowledge-bridge.d.ts",
       "default": "./dist/cowork-knowledge-bridge.js"
     },
@@ -143,6 +183,10 @@
       "types": "./dist/email-workflow.d.ts",
       "default": "./dist/email-workflow.js"
     },
+    "./schema-loader": {
+      "types": "./dist/schema-loader.d.ts",
+      "default": "./dist/schema-loader.js"
+    },
     "./calendar-workflow": {
       "types": "./dist/calendar-workflow.d.ts",
       "default": "./dist/calendar-workflow.js"
@@ -171,6 +215,18 @@
       "types": "./dist/mission-team-plan-composer.d.ts",
       "default": "./dist/mission-team-plan-composer.js"
     },
+    "./mission-seed-assessment": {
+      "types": "./dist/mission-seed-assessment.d.ts",
+      "default": "./dist/mission-seed-assessment.js"
+    },
+    "./mission-seed-registry": {
+      "types": "./dist/mission-seed-registry.d.ts",
+      "default": "./dist/mission-seed-registry.js"
+    },
+    "./next-action-contract": {
+      "types": "./dist/next-action-contract.d.ts",
+      "default": "./dist/next-action-contract.js"
+    },
     "./mission-context-pack": {
       "types": "./dist/mission-context-pack.d.ts",
       "default": "./dist/mission-context-pack.js"
@@ -190,6 +246,22 @@
     "./os-automation-bridge": {
       "types": "./dist/os-automation-bridge.d.ts",
       "default": "./dist/os-automation-bridge.js"
+    },
+    "./project-registry": {
+      "types": "./dist/project-registry.d.ts",
+      "default": "./dist/project-registry.js"
+    },
+    "./project-track-registry": {
+      "types": "./dist/project-track-registry.d.ts",
+      "default": "./dist/project-track-registry.js"
+    },
+    "./promoted-memory": {
+      "types": "./dist/promoted-memory.d.ts",
+      "default": "./dist/promoted-memory.js"
+    },
+    "./sdlc-gate-readiness": {
+      "types": "./dist/sdlc-gate-readiness.d.ts",
+      "default": "./dist/sdlc-gate-readiness.js"
     },
     "./virtual-audio-device-bridge": {
       "types": "./dist/virtual-audio-device-bridge.d.ts",
@@ -219,9 +291,33 @@
       "types": "./dist/secret-bridge.d.ts",
       "default": "./dist/secret-bridge.js"
     },
+    "./service-binding-registry": {
+      "types": "./dist/service-binding-registry.d.ts",
+      "default": "./dist/service-binding-registry.js"
+    },
     "./secret-types": {
       "types": "./dist/secret-types.d.ts",
       "default": "./dist/secret-types.js"
+    },
+    "./surface-artifact-store": {
+      "types": "./dist/surface-artifact-store.d.ts",
+      "default": "./dist/surface-artifact-store.js"
+    },
+    "./surface-coordination-store": {
+      "types": "./dist/surface-coordination-store.d.ts",
+      "default": "./dist/surface-coordination-store.js"
+    },
+    "./inbound-inquiry-adapter": {
+      "types": "./dist/inbound-inquiry-adapter.d.ts",
+      "default": "./dist/inbound-inquiry-adapter.js"
+    },
+    "./lead-score": {
+      "types": "./dist/lead-score.d.ts",
+      "default": "./dist/lead-score.js"
+    },
+    "./mesh-hub-contract": {
+      "types": "./dist/mesh-hub-contract.d.ts",
+      "default": "./dist/mesh-hub-contract.js"
     },
     "./email-bridge": {
       "types": "./dist/email-bridge.d.ts",
@@ -258,6 +354,10 @@
     "./service-runtime-registry": {
       "types": "./dist/service-runtime-registry.d.ts",
       "default": "./dist/service-runtime-registry.js"
+    },
+    "./service-engine": {
+      "types": "./dist/service-engine.d.ts",
+      "default": "./dist/service-engine.js"
     },
     "./service-preset-registry": {
       "types": "./dist/service-preset-registry.d.ts",
@@ -467,6 +567,10 @@
       "types": "./dist/mission-distill-markdown-policy.d.ts",
       "default": "./dist/mission-distill-markdown-policy.js"
     },
+    "./distill-candidate-registry": {
+      "types": "./dist/distill-candidate-registry.d.ts",
+      "default": "./dist/distill-candidate-registry.js"
+    },
     "./mission-ledger-policy": {
       "types": "./dist/mission-ledger-policy.d.ts",
       "default": "./dist/mission-ledger-policy.js"
@@ -594,14 +698,6 @@
     "./mlx-embedding-backend": {
       "types": "./dist/mlx-embedding-backend.d.ts",
       "default": "./dist/mlx-embedding-backend.js"
-    },
-    "./ollama-embedding-backend": {
-      "types": "./dist/ollama-embedding-backend.d.ts",
-      "default": "./dist/ollama-embedding-backend.js"
-    },
-    "./openai-embedding-backend": {
-      "types": "./dist/openai-embedding-backend.d.ts",
-      "default": "./dist/openai-embedding-backend.js"
     },
     "./web-design-system": {
       "types": "./dist/web-design-system.d.ts",

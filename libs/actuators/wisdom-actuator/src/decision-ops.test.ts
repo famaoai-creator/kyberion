@@ -1,6 +1,14 @@
 import * as path from 'node:path';
 import { describe, expect, it, beforeEach } from 'vitest';
-import { safeMkdir, safeWriteFile, safeReadFile, pathResolver, safeExistsSync } from '@agent/core';
+import {
+  safeMkdir,
+  safeWriteFile,
+  safeReadFile,
+  pathResolver,
+  safeExistsSync,
+  resetReasoningBackend,
+  resetVoiceBridge,
+} from '@agent/core';
 import {
   stakeholderGridSort,
   emitDissentLog,
@@ -59,20 +67,52 @@ describe('emitDissentLog', () => {
     const out = tmpPath(`out-${Date.now()}-${Math.random()}.json`);
     sourceRel = src.rel;
     outRel = out.rel;
-    safeWriteFile(src.abs, JSON.stringify({
-      topic: 'whether to migrate DB',
-      hypotheses: [
-        { id: 'H1', content: 'migrate now', proposed_by: 'Visionary', survived: true, status: 'survived' },
-        { id: 'H2', content: 'delay 6 months', proposed_by: 'Auditor', survived: false, status: 'rejected', rejection_reason: 'cost', rejection_confidence: 'high' },
-        { id: 'H3', content: 'do nothing', proposed_by: 'Pragmatic', survived: false, status: 'rejected', rejection_reason: 'debt grows', revisit_triggers: ['vendor EOL'] },
-      ],
-    }));
+    safeWriteFile(
+      src.abs,
+      JSON.stringify({
+        topic: 'whether to migrate DB',
+        hypotheses: [
+          {
+            id: 'H1',
+            content: 'migrate now',
+            proposed_by: 'Visionary',
+            survived: true,
+            status: 'survived',
+          },
+          {
+            id: 'H2',
+            content: 'delay 6 months',
+            proposed_by: 'Auditor',
+            survived: false,
+            status: 'rejected',
+            rejection_reason: 'cost',
+            rejection_confidence: 'high',
+          },
+          {
+            id: 'H3',
+            content: 'do nothing',
+            proposed_by: 'Pragmatic',
+            survived: false,
+            status: 'rejected',
+            rejection_reason: 'debt grows',
+            revisit_triggers: ['vendor EOL'],
+          },
+        ],
+      })
+    );
   });
 
   it('captures only rejected hypotheses with full provenance', () => {
-    const result = emitDissentLog({ source_path: sourceRel, output_path: outRel, mission_id: 'TEST-M', topic: 'migration' });
+    const result = emitDissentLog({
+      source_path: sourceRel,
+      output_path: outRel,
+      mission_id: 'TEST-M',
+      topic: 'migration',
+    });
     expect(result.count).toBe(2);
-    const payload = JSON.parse(safeReadFile(pathResolver.rootResolve(outRel), { encoding: 'utf8' }) as string);
+    const payload = JSON.parse(
+      safeReadFile(pathResolver.rootResolve(outRel), { encoding: 'utf8' }) as string
+    );
     expect(payload.mission_id).toBe('TEST-M');
     expect(payload.dissents).toHaveLength(2);
     expect(payload.dissents[0]).toMatchObject({
@@ -85,9 +125,22 @@ describe('emitDissentLog', () => {
   });
 
   it('appends to an existing log when append flag is set', () => {
-    emitDissentLog({ source_path: sourceRel, output_path: outRel, mission_id: 'TEST-M', topic: 'first' });
-    emitDissentLog({ source_path: sourceRel, output_path: outRel, append: true, mission_id: 'TEST-M', topic: 'second' });
-    const payload = JSON.parse(safeReadFile(pathResolver.rootResolve(outRel), { encoding: 'utf8' }) as string);
+    emitDissentLog({
+      source_path: sourceRel,
+      output_path: outRel,
+      mission_id: 'TEST-M',
+      topic: 'first',
+    });
+    emitDissentLog({
+      source_path: sourceRel,
+      output_path: outRel,
+      append: true,
+      mission_id: 'TEST-M',
+      topic: 'second',
+    });
+    const payload = JSON.parse(
+      safeReadFile(pathResolver.rootResolve(outRel), { encoding: 'utf8' }) as string
+    );
     expect(payload.dissents).toHaveLength(4);
   });
 });
@@ -99,13 +152,16 @@ describe('computeReadinessMatrix + recommend', () => {
   beforeEach(() => {
     safeMkdir(pathResolver.rootResolve(visitsDir), { recursive: true });
     const write = (slug: string, stance: string) =>
-      safeWriteFile(pathResolver.rootResolve(`${visitsDir}/${slug}.json`), JSON.stringify({
-        person_slug: slug,
-        visited_at: new Date().toISOString(),
-        stance,
-        conditions: [],
-        dissent_signals: [],
-      }));
+      safeWriteFile(
+        pathResolver.rootResolve(`${visitsDir}/${slug}.json`),
+        JSON.stringify({
+          person_slug: slug,
+          visited_at: new Date().toISOString(),
+          stance,
+          conditions: [],
+          dissent_signals: [],
+        })
+      );
     write('a', 'support');
     write('b', 'support');
     write('c', 'conditional');
@@ -133,9 +189,14 @@ describe('computeReadinessMatrix + recommend', () => {
     const opposedMatrix = `${opposedDir}/readiness.json`;
     safeMkdir(pathResolver.rootResolve(opposedDir), { recursive: true });
     const write = (slug: string, stance: string) =>
-      safeWriteFile(pathResolver.rootResolve(`${opposedDir}/${slug}.json`), JSON.stringify({
-        person_slug: slug, visited_at: new Date().toISOString(), stance,
-      }));
+      safeWriteFile(
+        pathResolver.rootResolve(`${opposedDir}/${slug}.json`),
+        JSON.stringify({
+          person_slug: slug,
+          visited_at: new Date().toISOString(),
+          stance,
+        })
+      );
     write('x', 'oppose');
     write('y', 'oppose');
     write('z', 'neutral');
@@ -147,7 +208,11 @@ describe('computeReadinessMatrix + recommend', () => {
 describe('findSlidesByOwner', () => {
   const slides = [
     { slide_index: 1, concatenated: 'Cover page', text_runs: ['Cover', 'page'] },
-    { slide_index: 2, concatenated: 'Financials — owner_a', text_runs: ['Financials —', 'owner_a'] },
+    {
+      slide_index: 2,
+      concatenated: 'Financials — owner_a',
+      text_runs: ['Financials —', 'owner_a'],
+    },
     { slide_index: 3, concatenated: 'Clients — owner_a', text_runs: ['Clients —', 'owner_a'] },
     { slide_index: 4, concatenated: 'Reorg — owner_b', text_runs: ['Reorg —', 'owner_b'] },
   ];
@@ -165,10 +230,18 @@ describe('findSlidesByOwner', () => {
   });
 
   it('run_exact mode requires an exact <a:t> run, not substring', () => {
-    const substring = findSlidesByOwner({ slides, owner_labels: ['owner'], match_mode: 'substring' });
+    const substring = findSlidesByOwner({
+      slides,
+      owner_labels: ['owner'],
+      match_mode: 'substring',
+    });
     expect(substring.indices).toEqual([2, 3, 4]);
 
-    const runExact = findSlidesByOwner({ slides, owner_labels: ['owner'], match_mode: 'run_exact' });
+    const runExact = findSlidesByOwner({
+      slides,
+      owner_labels: ['owner'],
+      match_mode: 'run_exact',
+    });
     expect(runExact.indices).toEqual([]);
   });
 
@@ -213,13 +286,15 @@ describe('pptxDiff', () => {
 });
 
 describe('evaluateSimulationQuality', () => {
-  const mkBranch = (over: Partial<{
-    branch_id: string;
-    hypothesis_ref: string;
-    first_failure_mode: string | null;
-    first_success_mode: string | null;
-    terminated_at_step: number | null;
-  }> = {}) => ({
+  const mkBranch = (
+    over: Partial<{
+      branch_id: string;
+      hypothesis_ref: string;
+      first_failure_mode: string | null;
+      first_success_mode: string | null;
+      terminated_at_step: number | null;
+    }> = {}
+  ) => ({
     branch_id: over.branch_id ?? 'B-1',
     hypothesis_ref: over.hypothesis_ref ?? 'H-1',
     first_failure_mode: over.first_failure_mode ?? null,
@@ -233,7 +308,11 @@ describe('evaluateSimulationQuality', () => {
       branches: [
         mkBranch({ branch_id: 'B-1', first_failure_mode: 'cost too high', terminated_at_step: 3 }),
         mkBranch({ branch_id: 'B-2', first_success_mode: 'launched', terminated_at_step: 5 }),
-        mkBranch({ branch_id: 'B-3', first_failure_mode: 'compliance reject', terminated_at_step: 2 }),
+        mkBranch({
+          branch_id: 'B-3',
+          first_failure_mode: 'compliance reject',
+          terminated_at_step: 2,
+        }),
       ],
     });
     expect(report.severity).toBe('ok');
@@ -263,7 +342,12 @@ describe('evaluateSimulationQuality', () => {
     const report = evaluateSimulationQuality({
       goal: 'g',
       branches: [
-        mkBranch({ branch_id: 'B-1', first_failure_mode: 'x', first_success_mode: 'y', terminated_at_step: 1 }),
+        mkBranch({
+          branch_id: 'B-1',
+          first_failure_mode: 'x',
+          first_success_mode: 'y',
+          terminated_at_step: 1,
+        }),
       ],
     });
     expect(report.severity).toBe('poor');
@@ -273,10 +357,7 @@ describe('evaluateSimulationQuality', () => {
   it('warns when no branch reaches a terminal mode', () => {
     const report = evaluateSimulationQuality({
       goal: 'g',
-      branches: [
-        mkBranch({ branch_id: 'B-1' }),
-        mkBranch({ branch_id: 'B-2' }),
-      ],
+      branches: [mkBranch({ branch_id: 'B-1' }), mkBranch({ branch_id: 'B-2' })],
     });
     expect(report.severity).toBe('warn');
     expect(report.checks.find((c) => c.id === 'reaches_terminal_mode')!.passed).toBe(false);
@@ -374,10 +455,59 @@ describe("dispatchDecisionOp 'distill' (memory-distillation op)", () => {
     const result = await dispatchDecisionOp(
       'distill',
       { scope: 'recent_missions', export_as: 'lessons_learned' },
-      {},
+      {}
     );
     expect(result.handled).toBe(true);
     expect(typeof result.ctx.lessons_learned).toBe('string');
     expect((result.ctx.lessons_learned as string).length).toBeGreaterThan(0);
+  });
+});
+
+describe('reasoning_mode visibility', () => {
+  beforeEach(() => {
+    resetReasoningBackend();
+    resetVoiceBridge();
+  });
+
+  it('tags wisdom outputs as placeholder when the stub backend/bridge is used', async () => {
+    const fanoutOut = tmpPath(`fanout-${Date.now()}.json`).rel;
+    const roleplayOut = tmpPath(`roleplay-${Date.now()}.json`).rel;
+
+    const fanout = await dispatchDecisionOp(
+      'a2a_fanout',
+      {
+        personas: ['auditor', 'operator'],
+        min_hypotheses_per_persona: 1,
+        topic: 'scope check',
+        output_path: fanoutOut,
+        export_as: 'fanout',
+      },
+      {}
+    );
+    expect(fanout.handled).toBe(true);
+    expect(fanout.ctx.fanout.reasoning_mode).toBe('placeholder');
+    expect(
+      JSON.parse(safeReadFile(pathResolver.rootResolve(fanoutOut), { encoding: 'utf8' }) as string)
+        .reasoning_mode
+    ).toBe('placeholder');
+
+    const roleplay = await dispatchDecisionOp(
+      'a2a_roleplay',
+      {
+        persona: { identity: { label: 'counterparty' } },
+        objective: 'confirm requirements',
+        time_budget_minutes: 5,
+        output_path: roleplayOut,
+        export_as: 'roleplay',
+      },
+      {}
+    );
+    expect(roleplay.handled).toBe(true);
+    expect(roleplay.ctx.roleplay.reasoning_mode).toBe('placeholder');
+    expect(
+      JSON.parse(
+        safeReadFile(pathResolver.rootResolve(roleplayOut), { encoding: 'utf8' }) as string
+      ).reasoning_mode
+    ).toBe('placeholder');
   });
 });

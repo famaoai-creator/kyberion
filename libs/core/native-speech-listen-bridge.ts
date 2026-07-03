@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import { pathResolver } from './path-resolver.js';
 
@@ -22,13 +23,19 @@ export interface NativeSpeechListenResult {
 }
 
 export async function listenNativeSpeech(
-  request: NativeSpeechListenRequest,
+  request: NativeSpeechListenRequest
 ): Promise<NativeSpeechListenResult> {
   const scriptPath =
     request.scriptPath?.trim() || pathResolver.resolve('satellites/voice-hub/native-stt.swift');
 
   return new Promise((resolve, reject) => {
-    const args = [scriptPath, '--locale', request.locale, '--timeout', String(request.timeoutSeconds)];
+    const args = [
+      scriptPath,
+      '--locale',
+      request.locale,
+      '--timeout',
+      String(request.timeoutSeconds),
+    ];
     if (request.deviceId) {
       args.push('--device-id', request.deviceId);
     }
@@ -106,4 +113,3 @@ export async function listenNativeSpeech(
     });
   });
 }
-

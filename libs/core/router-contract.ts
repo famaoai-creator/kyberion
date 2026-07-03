@@ -1,4 +1,8 @@
-import { classifySurfaceQueryIntent, extractSurfaceKnowledgeQuery, extractSurfaceWebSearchQuery } from './surface-query.js';
+import {
+  classifySurfaceQueryIntent,
+  extractSurfaceKnowledgeQuery,
+  extractSurfaceWebSearchQuery,
+} from './surface-query.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
@@ -13,7 +17,18 @@ export interface SurfaceIntentResolution {
   queryText?: string;
   browserCommandKind?: 'open_site' | 'browser_step';
   pipelineId?: string;
-  missionAction?: 'create' | 'classify' | 'workflow' | 'compose_team' | 'prewarm_team' | 'delegate_task' | 'review_output' | 'handoff' | 'distill' | 'close' | 'inspect_state';
+  missionAction?:
+    | 'create'
+    | 'classify'
+    | 'workflow'
+    | 'compose_team'
+    | 'prewarm_team'
+    | 'delegate_task'
+    | 'review_output'
+    | 'handoff'
+    | 'distill'
+    | 'close'
+    | 'inspect_state';
 }
 
 interface IntentRoutingMap {
@@ -28,27 +43,47 @@ function loadIntentRoutingMap(): IntentRoutingMap {
   if (_cachedRoutingMap) return _cachedRoutingMap;
   try {
     const filePath = pathResolver.knowledge('product/governance/intent-routing-map.json');
-    _cachedRoutingMap = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentRoutingMap;
+    _cachedRoutingMap = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as IntentRoutingMap;
   } catch (err) {
-    const defaults = { pipeline_intent_map: {}, mission_intent_action_map: {}, direct_intent_commands: {} };
-    recordConfigFallback({ knowledgePath: 'product/governance/intent-routing-map.json', error: err, defaults });
+    const defaults = {
+      pipeline_intent_map: {},
+      mission_intent_action_map: {},
+      direct_intent_commands: {},
+    };
+    recordConfigFallback({
+      knowledgePath: 'product/governance/intent-routing-map.json',
+      error: err,
+      defaults,
+    });
     _cachedRoutingMap = defaults;
   }
   return _cachedRoutingMap;
 }
 
-function routeFamilyForIntent(intentId?: string, shape?: string): SurfaceIntentResolution['routeFamily'] {
+function routeFamilyForIntent(
+  intentId?: string,
+  shape?: string
+): SurfaceIntentResolution['routeFamily'] {
   if (shape === 'pipeline') return 'pipeline';
   if (shape === 'mission') return 'mission';
   if (shape === 'browser_session') return 'browser_session';
   if (shape === 'task_session') return 'task_session';
-  if (shape === 'direct_reply' || intentId === 'knowledge-query' || intentId === 'query-knowledge' || intentId === 'live-query') {
+  if (
+    shape === 'direct_reply' ||
+    intentId === 'knowledge-query' ||
+    intentId === 'query-knowledge' ||
+    intentId === 'live-query'
+  ) {
     return 'direct_reply';
   }
   return undefined;
 }
 
-export function resolveDirectIntentCommand(intentId?: string): { command: string; args: string[] } | null {
+export function resolveDirectIntentCommand(
+  intentId?: string
+): { command: string; args: string[] } | null {
   if (!intentId) return null;
   const { direct_intent_commands } = loadIntentRoutingMap();
   return direct_intent_commands[intentId] ?? null;
@@ -67,7 +102,10 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
-      routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'direct_reply'),
+      routeFamily: routeFamilyForIntent(
+        selectedIntentId,
+        packet.selected_resolution?.shape || 'direct_reply'
+      ),
       queryType: 'knowledge_search',
       queryText: extractSurfaceKnowledgeQuery(utterance) || utterance.trim(),
     };
@@ -78,13 +116,17 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
-      routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'direct_reply'),
+      routeFamily: routeFamilyForIntent(
+        selectedIntentId,
+        packet.selected_resolution?.shape || 'direct_reply'
+      ),
       queryType: queryType || 'web_search',
-      queryText: queryType === 'knowledge_search'
-        ? extractSurfaceKnowledgeQuery(utterance) || utterance.trim()
-        : queryType === 'web_search'
-          ? extractSurfaceWebSearchQuery(utterance) || utterance.trim()
-          : utterance.trim(),
+      queryText:
+        queryType === 'knowledge_search'
+          ? extractSurfaceKnowledgeQuery(utterance) || utterance.trim()
+          : queryType === 'web_search'
+            ? extractSurfaceWebSearchQuery(utterance) || utterance.trim()
+            : utterance.trim(),
     };
   }
 
@@ -92,7 +134,10 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
-      routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'browser_session'),
+      routeFamily: routeFamilyForIntent(
+        selectedIntentId,
+        packet.selected_resolution?.shape || 'browser_session'
+      ),
       browserCommandKind: 'open_site',
     };
   }
@@ -101,7 +146,10 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
-      routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'browser_session'),
+      routeFamily: routeFamilyForIntent(
+        selectedIntentId,
+        packet.selected_resolution?.shape || 'browser_session'
+      ),
       browserCommandKind: 'browser_step',
     };
   }
@@ -110,7 +158,7 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
-      routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'pipeline'),
+      routeFamily: routeFamilyForIntent(selectedIntentId, 'pipeline'),
       pipelineId: pipeline_intent_map[selectedIntentId],
     };
   }
@@ -119,7 +167,10 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,
-      routeFamily: routeFamilyForIntent(selectedIntentId, packet.selected_resolution?.shape || 'mission'),
+      routeFamily: routeFamilyForIntent(
+        selectedIntentId,
+        packet.selected_resolution?.shape || 'mission'
+      ),
       missionAction: mission_intent_action_map[selectedIntentId],
     };
   }

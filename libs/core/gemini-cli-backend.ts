@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Gemini CLI Backend — spawns the local `gemini` CLI in `-p -o json -y`
  * mode to run structured-output reasoning tasks.
@@ -7,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -32,7 +34,7 @@ import type {
 export interface GeminiCliBackendOptions {
   /** CLI binary. Defaults to `gemini` (resolved via PATH). */
   bin?: string;
-  /** Model alias. Defaults to 'gemini-2.0-flash-exp'. */
+  /** Model alias. Defaults to the centralized gemini-default runtime model. */
   model?: string;
   /** Per-call timeout. Defaults to 5 min. */
   timeoutMs?: number;
@@ -49,7 +51,7 @@ export class GeminiCliBackend implements ReasoningBackend {
 
   constructor(options: GeminiCliBackendOptions = {}) {
     this.bin = options.bin ?? 'gemini';
-    this.model = options.model ?? '';
+    this.model = options.model ?? resolveRuntimeModelId('gemini-default');
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
   }
@@ -62,7 +64,7 @@ export class GeminiCliBackend implements ReasoningBackend {
           proposed_by: z.string(),
           content: z.string(),
           status: z.enum(['pending', 'survived', 'rejected']).optional(),
-        }),
+        })
       ),
     });
     const result = await this.runStructured({
@@ -148,11 +150,11 @@ export class GeminiCliBackend implements ReasoningBackend {
         '  functional_requirements: array of { id, title, description, priority, source }',
         '  non_functional_requirements: array of { id, title, description, category }',
         '  constraints: array of { id, description }',
-      '  assumptions: array of { id, description }',
-      '  open_questions: array of { id, question }',
-      'Set open_questions[].blocking=true only when the unanswered item blocks the current MVP; otherwise omit it or set it false.',
-      'Do not convert interviewer follow-up questions into open questions unless the customer explicitly says the detail is unknown or blocking.',
-      'Return ONLY the JSON object. No markdown fences, no extra text.',
+        '  assumptions: array of { id, description }',
+        '  open_questions: array of { id, question }',
+        'Set open_questions[].blocking=true only when the unanswered item blocks the current MVP; otherwise omit it or set it false.',
+        'Do not convert interviewer follow-up questions into open questions unless the customer explicitly says the detail is unknown or blocking.',
+        'Return ONLY the JSON object. No markdown fences, no extra text.',
       ].join('\n'),
       userPrompt: input.sourceText,
       schema,
@@ -211,7 +213,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     // However, the caller expects a string result (the report).
     const stdout = await this.spawnCli(args);
     const lines = stdout.split('\n');
-    const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
     if (jsonStartIdx === -1) {
       return stdout.trim(); // Fallback if no JSON envelope at all
     }
@@ -243,10 +245,10 @@ export class GeminiCliBackend implements ReasoningBackend {
     ];
 
     const stdout = await this.spawnCli(args);
-    
+
     // Extract only the JSON part from stdout (Gemini CLI might print "YOLO mode enabled" etc)
     const lines = stdout.split('\n');
-    const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
+    const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
     if (jsonStartIdx === -1) {
       throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
     }
@@ -256,16 +258,21 @@ export class GeminiCliBackend implements ReasoningBackend {
     try {
       cliResult = JSON.parse(cleanStdout);
     } catch (err: any) {
-      throw new Error(`[gemini-cli] failed to parse CLI JSON output: ${err.message}. Raw: ${cleanStdout.slice(0, 500)}`);
+      throw new Error(
+        `[gemini-cli] failed to parse CLI JSON output: ${err.message}. Raw: ${cleanStdout.slice(0, 500)}`
+      );
     }
 
     const responseStr = cliResult.response;
     if (!responseStr) {
-      throw new Error(`[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`);
+      throw new Error(
+        `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
+      );
     }
 
     // Attempt to extract JSON from the response string (it might be wrapped in ```json ... ```)
-    const jsonMatch = responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
+    const jsonMatch =
+      responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
     const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
 
     try {
@@ -276,7 +283,9 @@ export class GeminiCliBackend implements ReasoningBackend {
       }
       return parsed.data;
     } catch (err: any) {
-      throw new Error(`[gemini-cli] failed to parse inner JSON: ${err.message}. Raw response: ${responseStr.slice(0, 500)}`);
+      throw new Error(
+        `[gemini-cli] failed to parse inner JSON: ${err.message}. Raw response: ${responseStr.slice(0, 500)}`
+      );
     }
   }
 
@@ -346,10 +355,13 @@ export class GeminiCliBackend implements ReasoningBackend {
 
 export function buildGeminiCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  modelOverride?: string,
+  modelOverride?: string
 ): GeminiCliBackend | null {
   const bin = env.KYBERION_GEMINI_CLI_BIN?.trim();
-  const model = modelOverride || env.KYBERION_GEMINI_CLI_MODEL?.trim();
+  const model =
+    modelOverride ||
+    env.KYBERION_GEMINI_CLI_MODEL?.trim() ||
+    resolveRuntimeModelId('gemini-default', env);
   const timeoutRaw = env.KYBERION_GEMINI_CLI_TIMEOUT?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const backend = new GeminiCliBackend({
@@ -357,7 +369,7 @@ export function buildGeminiCliBackendFromEnv(
     ...(model ? { model } : {}),
     ...(timeoutMs && !isNaN(timeoutMs) ? { timeoutMs } : {}),
   });
-  logger.info(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model ?? 'gemini-2.0-flash-exp'})`);
+  logger.info(`[gemini-cli] backend ready (bin=${bin ?? 'gemini'}, model=${model})`);
   return backend;
 }
 
@@ -369,7 +381,7 @@ export async function runGeminiCliQuery<T>(params: {
 }): Promise<T> {
   const backendOptions = params.options || {};
   const bin = backendOptions.bin ?? 'gemini';
-  const model = backendOptions.model ?? '';
+  const model = backendOptions.model ?? resolveRuntimeModelId('gemini-default');
   const timeoutMs = backendOptions.timeoutMs ?? 5 * 60 * 1000;
   const extraArgs = backendOptions.extraArgs ?? [];
 
@@ -420,7 +432,9 @@ export async function runGeminiCliQuery<T>(params: {
   const cliResult = JSON.parse(cleanStdout);
   const responseStr = cliResult.response;
   if (!responseStr) {
-    throw new Error(`[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`);
+    throw new Error(
+      `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
+    );
   }
   const jsonMatch = responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
   const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;

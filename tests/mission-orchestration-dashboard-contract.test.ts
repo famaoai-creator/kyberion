@@ -27,9 +27,13 @@ describe('mission orchestration dashboard contract', () => {
 
   it('shows mission intelligence in Chronos default view', () => {
     const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
-    const component = read('presence/displays/chronos-mirror-v2/src/components/MissionIntelligence.tsx');
+    const component = read(
+      'presence/displays/chronos-mirror-v2/src/components/MissionIntelligence.tsx'
+    );
     const route = read('presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts');
-    const streamRoute = read('presence/displays/chronos-mirror-v2/src/app/api/intelligence/stream/route.ts');
+    const streamRoute = read(
+      'presence/displays/chronos-mirror-v2/src/app/api/intelligence/stream/route.ts'
+    );
     const messageFeed = read('presence/displays/chronos-mirror-v2/src/lib/agent-message-feed.ts');
     const agentRoute = read('presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts');
 
@@ -168,7 +172,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(agentRoute).toContain('services-setup');
     expect(agentRoute).toContain('reasoning-setup');
     expect(agentRoute).toContain('import("@agent/core/core")');
-    expect(route).toContain("from '@agent/core/intelligence-primitives'");
+    expect(route).toContain("from '../../../lib/intelligence-primitives'");
     expect(route).toContain('emitMissionOrchestrationObservation');
   });
 

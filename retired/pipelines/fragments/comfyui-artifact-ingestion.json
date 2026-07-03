@@ -24,9 +24,12 @@
         "command": "node",
         "args": [
           "dist/scripts/ingest_external_artifacts.js",
-          "--source", "{{output_dir}}",
-          "--target", "active/shared/exports/media/ingested",
-          "--pattern", ".*\\.(mp3|wav|png|jpg)$"
+          "--source",
+          "{{output_dir}}",
+          "--target",
+          "active/shared/exports/media/ingested",
+          "--pattern",
+          ".*\\.(mp3|wav|png|jpg)$"
         ],
         "condition": "{{recent_files.output}} !== ''"
       }

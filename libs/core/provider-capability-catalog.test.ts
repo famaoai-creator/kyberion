@@ -26,11 +26,15 @@ vi.mock('./path-resolver.js', () => ({
 }));
 
 const CATALOG_PATH = '/repo/knowledge/product/orchestration/provider-capabilities.json';
+const FALLBACK_CATALOG_PATH =
+  '/repo/knowledge/product/orchestration/provider-capabilities.fallback.json';
 
 function claudeInstalled() {
   mocks.spawnSync.mockImplementation((cmd: string, args: string[]) => {
-    if (cmd === 'which' && args[0] === 'claude') return { status: 0, stdout: '/usr/bin/claude', stderr: '' };
-    if (cmd === 'claude' && args[0] === '--version') return { status: 0, stdout: 'claude 1.0.0', stderr: '' };
+    if (cmd === 'which' && args[0] === 'claude')
+      return { status: 0, stdout: '/usr/bin/claude', stderr: '' };
+    if (cmd === 'claude' && args[0] === '--version')
+      return { status: 0, stdout: 'claude 1.0.0', stderr: '' };
     return { status: 1, stdout: '', stderr: '' };
   });
   mocks.safeExistsSync.mockReturnValue(false);
@@ -61,6 +65,50 @@ describe('provider capability catalog (knowledge-driven)', () => {
           },
         });
       }
+      if (p === FALLBACK_CATALOG_PATH) {
+        return JSON.stringify({
+          version: '1.0',
+          providers: {
+            claude: {
+              models: ['sonnet', 'opus', 'haiku'],
+              capabilities: [
+                'reasoning',
+                'planning',
+                'coordination',
+                'analysis',
+                'review',
+                'code',
+                'long_context',
+                'structured_json',
+              ],
+              modelCapabilities: {
+                sonnet: [
+                  'reasoning',
+                  'planning',
+                  'coordination',
+                  'analysis',
+                  'review',
+                  'code',
+                  'long_context',
+                  'structured_json',
+                ],
+                opus: [
+                  'reasoning',
+                  'planning',
+                  'coordination',
+                  'analysis',
+                  'review',
+                  'code',
+                  'long_context',
+                  'structured_json',
+                  'deep_reasoning',
+                ],
+                haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
+              },
+            },
+          },
+        });
+      }
       throw new Error('ENOENT'); // disk cache miss
     });
 
@@ -75,6 +123,50 @@ describe('provider capability catalog (knowledge-driven)', () => {
     claudeInstalled();
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p === CATALOG_PATH) return '{ this is not json';
+      if (p === FALLBACK_CATALOG_PATH) {
+        return JSON.stringify({
+          version: '1.0',
+          providers: {
+            claude: {
+              models: ['sonnet', 'opus', 'haiku'],
+              capabilities: [
+                'reasoning',
+                'planning',
+                'coordination',
+                'analysis',
+                'review',
+                'code',
+                'long_context',
+                'structured_json',
+              ],
+              modelCapabilities: {
+                sonnet: [
+                  'reasoning',
+                  'planning',
+                  'coordination',
+                  'analysis',
+                  'review',
+                  'code',
+                  'long_context',
+                  'structured_json',
+                ],
+                opus: [
+                  'reasoning',
+                  'planning',
+                  'coordination',
+                  'analysis',
+                  'review',
+                  'code',
+                  'long_context',
+                  'structured_json',
+                  'deep_reasoning',
+                ],
+                haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
+              },
+            },
+          },
+        });
+      }
       throw new Error('ENOENT');
     });
 
@@ -89,7 +181,54 @@ describe('provider capability catalog (knowledge-driven)', () => {
     claudeInstalled();
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p === CATALOG_PATH) {
-        return JSON.stringify({ version: '1.0', providers: { claude: { models: 'not-an-array' } } });
+        return JSON.stringify({
+          version: '1.0',
+          providers: { claude: { models: 'not-an-array' } },
+        });
+      }
+      if (p === FALLBACK_CATALOG_PATH) {
+        return JSON.stringify({
+          version: '1.0',
+          providers: {
+            claude: {
+              models: ['sonnet', 'opus', 'haiku'],
+              capabilities: [
+                'reasoning',
+                'planning',
+                'coordination',
+                'analysis',
+                'review',
+                'code',
+                'long_context',
+                'structured_json',
+              ],
+              modelCapabilities: {
+                sonnet: [
+                  'reasoning',
+                  'planning',
+                  'coordination',
+                  'analysis',
+                  'review',
+                  'code',
+                  'long_context',
+                  'structured_json',
+                ],
+                opus: [
+                  'reasoning',
+                  'planning',
+                  'coordination',
+                  'analysis',
+                  'review',
+                  'code',
+                  'long_context',
+                  'structured_json',
+                  'deep_reasoning',
+                ],
+                haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
+              },
+            },
+          },
+        });
       }
       throw new Error('ENOENT');
     });
