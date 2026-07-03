@@ -403,6 +403,14 @@
         "en": "Confidence",
         "ja": "確信度"
       },
+      "cli_missing_inputs": {
+        "en": "Missing inputs",
+        "ja": "不足している入力"
+      },
+      "cli_more_questions": {
+        "en": "There are {count} more clarification items.",
+        "ja": "他に {count} 件の確認事項があります。"
+      },
       "cli_response_style": {
         "en": "Response style",
         "ja": "応答スタイル"

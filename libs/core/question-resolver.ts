@@ -108,6 +108,7 @@ export interface QuestionResolutionResult {
   should_clarify: boolean;
   reason: string;
   missing_inputs: string[];
+  omitted_question_count: number;
   questions: QuestionResolutionQuestion[];
   sources: string[];
   learning: {
@@ -202,6 +203,8 @@ function buildOperatorInteractionPacket(
     interaction_type: 'clarification',
     headline,
     summary,
+    missing_inputs: result.missing_inputs,
+    omitted_question_count: result.omitted_question_count,
     ...(briefSummary ? { execution_brief_summary: briefSummary } : {}),
     ...(typeof confidence === 'number' ? { confidence } : {}),
     questions: result.questions.map((question) => ({
@@ -340,9 +343,14 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
 
   const questions: QuestionResolutionQuestion[] = [];
   const seenKeys = new Set<string>();
+  let omittedQuestionCount = 0;
   const addQuestion = (question: QuestionResolutionQuestion) => {
     const key = `${question.id}::${question.question.trim().toLowerCase()}`;
-    if (seenKeys.has(key) || questions.length >= maxQuestions) return;
+    if (seenKeys.has(key)) return;
+    if (questions.length >= maxQuestions) {
+      omittedQuestionCount += 1;
+      return;
+    }
     seenKeys.add(key);
     questions.push(question);
   };
@@ -456,6 +464,7 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
       contextualDecision.missingInputs.length > 0
         ? contextualDecision.missingInputs
         : requiredInputs,
+    omitted_question_count: omittedQuestionCount,
     questions,
     sources,
     learning: {
