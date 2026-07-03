@@ -27,6 +27,9 @@ export interface ModelRegistryEntry {
   provider: string;
   family: string;
   status: ModelStatus;
+  cost_band?: 'low' | 'medium' | 'high' | 'very_high';
+  latency_band?: 'low' | 'medium' | 'high';
+  reasoning_confidence?: 'low' | 'medium' | 'high';
   role_fit: {
     intent_compiler: ModelRoleFit;
     surface_agent: ModelRoleFit;
@@ -47,6 +50,22 @@ export interface ReasoningModelRoute {
   route_reason: string;
   route_kind: 'primary' | 'shadow' | 'none';
   policy_version: string;
+}
+
+export type TaskModelTier = 'small' | 'standard' | 'large';
+export type TaskModelEffort = 'low' | 'medium' | 'high';
+
+export interface TaskModelHint {
+  tier: TaskModelTier;
+  effort: TaskModelEffort;
+  model_id: string;
+  route_reason: string;
+}
+
+export interface TaskModelHintInput {
+  phase_kind: 'plan' | 'implement' | 'review' | 'mechanical';
+  risk?: string;
+  estimated_scope?: string;
 }
 
 let validateFn: ValidateFunction | null = null;
@@ -118,6 +137,138 @@ function findEligibleFastModel(
     return null;
   }
   return model;
+}
+
+function isEligibleTaskModel(model: ModelRegistryEntry): boolean {
+  return model.status !== 'blocked' && model.status !== 'deprecated';
+}
+
+function scoreTaskModelStatus(status: ModelStatus): number {
+  switch (status) {
+    case 'approved':
+      return 0;
+    case 'candidate':
+      return 1;
+    case 'deprecated':
+      return 2;
+    case 'blocked':
+      return 3;
+  }
+}
+
+function findTaskModelForTier(
+  registry: ModelRegistryFile,
+  tier: TaskModelTier
+): ModelRegistryEntry {
+  const eligible = registry.models.filter(isEligibleTaskModel);
+
+  if (tier === 'small') {
+    const fastLane = eligible
+      .filter((model) => model.latency_band === 'low')
+      .filter((model) => model.role_fit.intent_compiler !== 'not_recommended')
+      .sort(
+        (left, right) =>
+          scoreTaskModelStatus(left.status) - scoreTaskModelStatus(right.status) ||
+          left.latency_band.localeCompare(right.latency_band) ||
+          right.reasoning_confidence.localeCompare(left.reasoning_confidence)
+      )[0];
+    if (fastLane) return fastLane;
+  }
+
+  const approvedPrimary = eligible.find(
+    (model) => model.status === 'approved' && model.role_fit.intent_compiler === 'primary'
+  );
+  if (approvedPrimary) return approvedPrimary;
+
+  const primary = eligible.find((model) => model.role_fit.intent_compiler === 'primary');
+  if (primary) return primary;
+
+  const secondary = eligible.find((model) => model.role_fit.intent_compiler === 'secondary');
+  if (secondary) return secondary;
+
+  throw new Error('Model registry does not contain an eligible task model.');
+}
+
+function normalizeScopeTier(estimatedScope?: string): TaskModelTier | undefined {
+  const scope = String(estimatedScope || '')
+    .trim()
+    .toLowerCase();
+  if (!scope) return undefined;
+  if (['xs', 'extra-small', 'small', 's'].includes(scope)) return 'small';
+  if (['m', 'medium'].includes(scope)) return 'standard';
+  if (['l', 'large', 'xl', 'extra-large'].includes(scope)) return 'large';
+  return undefined;
+}
+
+function normalizeRiskTier(risk?: string): TaskModelTier | undefined {
+  const normalized = String(risk || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return undefined;
+  if (['approval_required', 'high_stakes', 'high'].includes(normalized)) return 'large';
+  if (normalized === 'low') return 'small';
+  return undefined;
+}
+
+function tierToEffort(tier: TaskModelTier): TaskModelEffort {
+  switch (tier) {
+    case 'small':
+      return 'low';
+    case 'standard':
+      return 'medium';
+    case 'large':
+      return 'high';
+  }
+}
+
+function tierReason(input: TaskModelHintInput, tier: TaskModelTier): string {
+  const parts = [
+    `phase_kind=${input.phase_kind}`,
+    input.estimated_scope ? `estimated_scope=${input.estimated_scope}` : null,
+    input.risk ? `risk=${input.risk}` : null,
+  ].filter(Boolean);
+  return `${parts.join(', ')} -> ${tier}/${tierToEffort(tier)}`;
+}
+
+export function resolveTaskModelHint(
+  input: TaskModelHintInput,
+  options: { registry?: ModelRegistryFile } = {}
+): TaskModelHint {
+  const registry = options.registry ?? loadModelRegistry();
+  const scopeTier = normalizeScopeTier(input.estimated_scope);
+  const riskTier = normalizeRiskTier(input.risk);
+
+  let tier: TaskModelTier;
+  if (input.phase_kind === 'mechanical') {
+    tier = 'small';
+  } else if (input.phase_kind === 'review') {
+    tier = 'large';
+  } else if (input.phase_kind === 'plan') {
+    tier = scopeTier === 'small' ? 'standard' : 'large';
+  } else if (input.phase_kind === 'implement') {
+    tier =
+      riskTier === 'large' || scopeTier === 'large'
+        ? 'large'
+        : scopeTier === 'small' || riskTier === 'small'
+          ? 'small'
+          : 'standard';
+  } else {
+    tier = scopeTier || riskTier || 'standard';
+  }
+
+  if (riskTier === 'large') {
+    tier = 'large';
+  } else if (riskTier === 'small' && tier === 'standard') {
+    tier = 'small';
+  }
+
+  const model = findTaskModelForTier(registry, tier);
+  return {
+    tier,
+    effort: tierToEffort(tier),
+    model_id: model.model_id,
+    route_reason: tierReason(input, tier),
+  };
 }
 
 export function resolveReasoningModelRoute(
