@@ -1,13 +1,23 @@
 import { logger } from './core.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
 import { type AgentHandle } from './agent-lifecycle.js';
-import { getAgentManifest, loadAgentManifests, resolveAgentSelectionHints } from './agent-manifest.js';
+import {
+  getAgentManifest,
+  loadAgentManifests,
+  resolveAgentSelectionHints,
+} from './agent-manifest.js';
 import { auditChain } from './audit-chain.js';
+import { killSwitch } from './kill-switch.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { ensureAgentRuntimeRoot } from './agent-runtime-root.js';
-import { askAgentRuntime, ensureAgentRuntime, getAgentRuntimeHandle, stopAgentRuntime } from './agent-runtime-supervisor.js';
+import {
+  askAgentRuntime,
+  ensureAgentRuntime,
+  getAgentRuntimeHandle,
+  stopAgentRuntime,
+} from './agent-runtime-supervisor.js';
 import {
   askAgentRuntimeViaDaemon,
   createSupervisorBackedAgentHandle,
@@ -46,7 +56,10 @@ export interface A2AMessage {
 const A2A_SECRET = process.env.KYBERION_A2A_SECRET || crypto.randomBytes(32).toString('hex');
 
 export function signA2AMessage(message: A2AMessage): string {
-  const content = JSON.stringify({ header: { ...message.header, signature: undefined }, payload: message.payload });
+  const content = JSON.stringify({
+    header: { ...message.header, signature: undefined },
+    payload: message.payload,
+  });
   return crypto.createHmac('sha256', A2A_SECRET).update(content).digest('hex');
 }
 
@@ -88,6 +101,7 @@ class A2ABridgeImpl {
             result: 'denied',
             reason: `Invalid signature on message ${envelope.header.msg_id}`,
           });
+          killSwitch.logAction(envelope.header.sender, 'a2a_signature_invalid', true);
           throw new Error('A2A message signature verification failed');
         }
       } catch (e: any) {
@@ -109,9 +123,10 @@ class A2ABridgeImpl {
 
     logger.info(`[A2A_BRIDGE] Routing to ${agentId}: "${prompt.slice(0, 80)}..."`);
 
-    const missionId = typeof envelope.payload?.context?.mission_id === 'string'
-      ? String(envelope.payload.context.mission_id).toUpperCase()
-      : undefined;
+    const missionId =
+      typeof envelope.payload?.context?.mission_id === 'string'
+        ? String(envelope.payload.context.mission_id).toUpperCase()
+        : undefined;
     try {
       emitMissionOrchestrationObservation({
         decision: 'a2a_message_routed',
@@ -120,21 +135,29 @@ class A2ABridgeImpl {
         agent_id: agentId,
         sender: envelope.header.sender,
         receiver: agentId,
-        team_role: typeof envelope.payload?.context?.team_role === 'string'
-          ? String(envelope.payload.context.team_role)
-          : undefined,
-        channel: typeof envelope.payload?.context?.channel === 'string'
-          ? String(envelope.payload.context.channel)
-          : undefined,
-        thread: typeof envelope.payload?.context?.thread === 'string'
-          ? String(envelope.payload.context.thread)
-          : undefined,
+        team_role:
+          typeof envelope.payload?.context?.team_role === 'string'
+            ? String(envelope.payload.context.team_role)
+            : undefined,
+        channel:
+          typeof envelope.payload?.context?.channel === 'string'
+            ? String(envelope.payload.context.channel)
+            : undefined,
+        thread:
+          typeof envelope.payload?.context?.thread === 'string'
+            ? String(envelope.payload.context.thread)
+            : undefined,
         performative: envelope.header.performative,
-        intent: typeof envelope.payload?.intent === 'string' ? String(envelope.payload.intent) : undefined,
+        intent:
+          typeof envelope.payload?.intent === 'string'
+            ? String(envelope.payload.intent)
+            : undefined,
         prompt_excerpt: prompt.slice(0, 240),
       });
     } catch (error: any) {
-      logger.warn(`[A2A_BRIDGE] Failed to record orchestration observation: ${error?.message || error}`);
+      logger.warn(
+        `[A2A_BRIDGE] Failed to record orchestration observation: ${error?.message || error}`
+      );
     }
 
     // Audit log the routing
@@ -145,6 +168,7 @@ class A2ABridgeImpl {
       result: 'completed',
       metadata: { receiver: agentId, performative: envelope.header.performative },
     });
+    killSwitch.logAction(envelope.header.sender, `a2a_route:${agentId}`, false);
 
     // Ask the agent
     let responseText: string;
@@ -174,7 +198,9 @@ class A2ABridgeImpl {
     // Notify handlers
     const handlers = this.responseHandlers.get(envelope.header.sender) || [];
     for (const handler of handlers) {
-      try { handler(response); } catch (_) {}
+      try {
+        handler(response);
+      } catch (_) {}
     }
 
     return response;
@@ -189,7 +215,12 @@ class A2ABridgeImpl {
   /**
    * Auto-spawn an agent ONLY if it has a manifest (whitelist enforcement).
    */
-  async ensureAgent(agentId: string, provider?: AgentProvider, payload?: unknown, runtimeContextKey = 'default'): Promise<AgentHandle> {
+  async ensureAgent(
+    agentId: string,
+    provider?: AgentProvider,
+    payload?: unknown,
+    runtimeContextKey = 'default'
+  ): Promise<AgentHandle> {
     this.syncCachedHandle(agentId);
 
     const supervisorHandle = getAgentRuntimeHandle(agentId);
@@ -216,11 +247,23 @@ class A2ABridgeImpl {
     // Security: Only spawn agents with a known manifest
     const manifest = getAgentManifest(agentId);
     if (!manifest) {
-      throw new Error(`Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/product/agents/${agentId}.agent.md to allow.`);
+      killSwitch.logAction(agentId, 'a2a_spawn_denied', true);
+      throw new Error(
+        `Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/product/agents/${agentId}.agent.md to allow.`
+      );
     }
 
-    const { provider: resolvedProvider, modelId: resolvedModelId } = resolveAgentSelectionHints(manifest, provider);
-    const cwd = this.resolveSpawnCwd(agentId, resolvedProvider, manifest.systemPrompt, payload, runtimeContextKey);
+    const { provider: resolvedProvider, modelId: resolvedModelId } = resolveAgentSelectionHints(
+      manifest,
+      provider
+    );
+    const cwd = this.resolveSpawnCwd(
+      agentId,
+      resolvedProvider,
+      manifest.systemPrompt,
+      payload,
+      runtimeContextKey
+    );
 
     const spawnOptions = {
       agentId,
@@ -230,18 +273,35 @@ class A2ABridgeImpl {
       capabilities: manifest.capabilities,
       cwd,
       requestedBy: 'a2a_bridge',
-      runtimeOwnerId: typeof (payload as any)?.context?.mission_id === 'string'
-        ? String((payload as any).context.mission_id)
-        : agentId,
-      runtimeOwnerType: typeof (payload as any)?.context?.mission_id === 'string' ? 'mission' : 'agent',
+      runtimeOwnerId:
+        typeof (payload as any)?.context?.mission_id === 'string'
+          ? String((payload as any).context.mission_id)
+          : agentId,
+      runtimeOwnerType:
+        typeof (payload as any)?.context?.mission_id === 'string' ? 'mission' : 'agent',
       runtimeMetadata: {
         lease_kind: 'a2a',
         execution_mode: this.extractExecutionMode(payload) || 'default',
-        mission_id: typeof (payload as any)?.context?.mission_id === 'string' ? String((payload as any).context.mission_id) : undefined,
-        team_role: typeof (payload as any)?.context?.team_role === 'string' ? String((payload as any).context.team_role) : undefined,
-        channel: typeof (payload as any)?.context?.channel === 'string' ? String((payload as any).context.channel) : undefined,
-        thread: typeof (payload as any)?.context?.thread === 'string' ? String((payload as any).context.thread) : undefined,
-        intent: typeof (payload as any)?.intent === 'string' ? String((payload as any).intent) : undefined,
+        mission_id:
+          typeof (payload as any)?.context?.mission_id === 'string'
+            ? String((payload as any).context.mission_id)
+            : undefined,
+        team_role:
+          typeof (payload as any)?.context?.team_role === 'string'
+            ? String((payload as any).context.team_role)
+            : undefined,
+        channel:
+          typeof (payload as any)?.context?.channel === 'string'
+            ? String((payload as any).context.channel)
+            : undefined,
+        thread:
+          typeof (payload as any)?.context?.thread === 'string'
+            ? String((payload as any).context.thread)
+            : undefined,
+        intent:
+          typeof (payload as any)?.intent === 'string'
+            ? String((payload as any).intent)
+            : undefined,
       },
     } as const;
     let handle: AgentHandle;
@@ -307,17 +367,19 @@ class A2ABridgeImpl {
     provider: string,
     systemPrompt: string | undefined,
     payload: unknown,
-    runtimeContextKey: string,
+    runtimeContextKey: string
   ): string {
     if (runtimeContextKey !== 'conversation') {
       return pathResolver.rootDir();
     }
 
-    const context = payload && typeof payload === 'object'
-      ? ((payload as Record<string, unknown>).context as Record<string, unknown> | undefined)
-      : undefined;
+    const context =
+      payload && typeof payload === 'object'
+        ? ((payload as Record<string, unknown>).context as Record<string, unknown> | undefined)
+        : undefined;
     const channel = typeof context?.channel === 'string' ? context.channel : 'surface';
-    const thread = typeof context?.thread === 'string' ? context.thread.replace(/[^\w.-]+/g, '_') : 'default';
+    const thread =
+      typeof context?.thread === 'string' ? context.thread.replace(/[^\w.-]+/g, '_') : 'default';
     return ensureAgentRuntimeRoot({
       agentId,
       provider,
@@ -335,7 +397,8 @@ class A2ABridgeImpl {
     const record = payload as Record<string, unknown>;
     const text = typeof record.text === 'string' ? record.text.trim() : '';
     const intent = typeof record.intent === 'string' ? record.intent.trim() : '';
-    const context = record.context && typeof record.context === 'object' ? record.context : undefined;
+    const context =
+      record.context && typeof record.context === 'object' ? record.context : undefined;
 
     if (!intent && !context) {
       return text || JSON.stringify(payload);

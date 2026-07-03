@@ -78,8 +78,9 @@ export const ui = {
     const percent = Math.round(progress * 100);
     return '[' + chalk.cyan(bar) + '] ' + percent + '%';
   },
-  confirm: (question: string): Promise<boolean> => {
-    if (process.argv.includes('-y') || process.argv.includes('--yes')) return Promise.resolve(true);
+  confirm: (question: string, options?: { destructive?: boolean }): Promise<boolean> => {
+    const autoYes = process.argv.includes('-y') || process.argv.includes('--yes');
+    if (autoYes && !options?.destructive) return Promise.resolve(true);
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -136,7 +137,7 @@ export const sre = {
       recommendation: string;
       action: string;
     }> = [];
-    
+
     if (rawExistsSync(sigPath)) {
       try {
         const signatures = JSON.parse(rawReadTextFile(sigPath));
@@ -147,13 +148,13 @@ export const sre = {
               cause: sig.cause,
               impact: sig.impact,
               recommendation: sig.recommendation,
-              action: sig.action // New field for machine-executable command hint
+              action: sig.action, // New field for machine-executable command hint
             });
           }
         }
       } catch (_) {}
     }
-    
+
     // Fallback heuristic for TS/JS errors
     if (results.length === 0) {
       if (errorMessage.includes('Property') && errorMessage.includes('does not exist')) {
@@ -161,7 +162,7 @@ export const sre = {
           cause: 'TypeScript Type Mismatch',
           impact: 'Compilation failure',
           recommendation: 'Check the object interface and property name.',
-          action: 'inspect_interface'
+          action: 'inspect_interface',
         });
       }
     }
@@ -292,8 +293,7 @@ export class Cache {
       const diskPath = this._getDiskPath(key);
       const v8Path = diskPath.replace('.json', '.v8');
       try {
-        if (!rawExistsSync(this._persistenceDir))
-          rawMkdirp(this._persistenceDir);
+        if (!rawExistsSync(this._persistenceDir)) rawMkdirp(this._persistenceDir);
         const hash = this._generateHash(value);
         const entry = { value, timestamp, ttl, h: hash };
         rawWriteFile(v8Path, v8.serialize(entry));
@@ -335,8 +335,12 @@ export class Cache {
     return true;
   }
 
-  clear() { this._map.clear(); }
-  get size() { return this._map.size; }
+  clear() {
+    this._map.clear();
+  }
+  get size() {
+    return this._map.size;
+  }
 }
 
 export const _fileCache = new Cache(200, 3600000);
@@ -385,7 +389,9 @@ export const fileUtils = {
         _fileCache.set(resolved, { mtimeMs, data }, undefined, persistCache);
       }
       return data;
-    } catch (_) { return null; }
+    } catch (_) {
+      return null;
+    }
   },
   writeJson: (filePath: string, data: any) => {
     try {

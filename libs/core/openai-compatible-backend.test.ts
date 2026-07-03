@@ -5,12 +5,16 @@ import {
   buildOpenAiCompatibleBackendFromEnv,
 } from './openai-compatible-backend.js';
 
-vi.mock('./secure-io.js', () => ({
-  safeExec: vi.fn(() => 'shell-ok'),
-  safeReadFile: vi.fn(() => 'file contents'),
-  safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
-  safeWriteFile: vi.fn(),
-}));
+vi.mock('./secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./secure-io.js')>();
+  return {
+    ...actual,
+    safeExec: vi.fn(() => 'shell-ok'),
+    safeReadFile: vi.fn(() => 'file contents'),
+    safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
+    safeWriteFile: vi.fn(),
+  };
+});
 
 describe('openai-compatible-backend', () => {
   afterEach(() => {
@@ -41,7 +45,8 @@ describe('openai-compatible-backend', () => {
   });
 
   it('runs a tool loop against an OpenAI-compatible endpoint', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -64,8 +69,8 @@ describe('openai-compatible-backend', () => {
               },
             ],
           }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
       )
       .mockResolvedValueOnce(
         new Response(
@@ -79,8 +84,8 @@ describe('openai-compatible-backend', () => {
               },
             ],
           }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
       );
 
     vi.stubGlobal('fetch', fetchMock);
@@ -107,29 +112,30 @@ describe('openai-compatible-backend', () => {
   });
 
   it('stops repeated identical tool calls through the guardrail', async () => {
-    const makeResponse = (id: string) => new Response(
-      JSON.stringify({
-        choices: [
-          {
-            message: {
-              role: 'assistant',
-              content: null,
-              tool_calls: [
-                {
-                  id,
-                  type: 'function',
-                  function: {
-                    name: 'read_file',
-                    arguments: JSON.stringify({ path: 'README.md' }),
+    const makeResponse = (id: string) =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: null,
+                tool_calls: [
+                  {
+                    id,
+                    type: 'function',
+                    function: {
+                      name: 'read_file',
+                      arguments: JSON.stringify({ path: 'README.md' }),
+                    },
                   },
-                },
-              ],
+                ],
+              },
             },
-          },
-        ],
-      }),
-      { status: 200, headers: { 'content-type': 'application/json' } },
-    );
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
     let fetchCount = 0;
     const fetchMock = vi.fn(() => {
       fetchCount += 1;
