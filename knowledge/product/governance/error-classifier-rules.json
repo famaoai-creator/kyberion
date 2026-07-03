@@ -197,7 +197,7 @@
       "id": "input.unsupported-op",
       "category": "invalid_input",
       "label": "Unsupported pipeline operation",
-      "remediation": "Fix the pipeline step name or register the missing actuator for that operation.",
+      "remediation": "Fix the pipeline step name or route Terraform-style requests through modeling-actuator (terraform_to_architecture_adf / terraform_to_topology_ir) or deploy through wisdom:deploy_release with a ShellDeploymentAdapter.",
       "patterns": ["Unsupported pipeline op|unknown pipeline op|operation not supported"]
     },
     {

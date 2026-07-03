@@ -36,7 +36,7 @@ describe('error-classifier', () => {
 
     it('classifies path-scope policy denials', () => {
       const c = classifyError(
-        "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'.",
+        "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
       );
       expect(c.category).toBe('permission_denied');
       expect(c.ruleId).toBe('kyberion.path-scope');
@@ -54,7 +54,9 @@ describe('error-classifier', () => {
     });
 
     it('classifies generic policy violations that are not path-scope denials', () => {
-      const c = classifyError('POLICY_VIOLATION: network fetch is not allowed by policy for this role');
+      const c = classifyError(
+        'POLICY_VIOLATION: network fetch is not allowed by policy for this role'
+      );
       expect(c.category).toBe('governance_block');
       expect(c.ruleId).toBe('kyberion.policy-violation');
     });
@@ -135,7 +137,9 @@ describe('error-classifier', () => {
     });
 
     it('classifies ENOSPC', () => {
-      expect(classifyError('ENOSPC: no space left on device').category).toBe('resource_unavailable');
+      expect(classifyError('ENOSPC: no space left on device').category).toBe(
+        'resource_unavailable'
+      );
     });
 
     it('classifies EACCES', () => {
@@ -158,12 +162,14 @@ describe('error-classifier', () => {
       const c = classifyError('Unsupported pipeline op: system:terraform');
       expect(c.category).toBe('invalid_input');
       expect(c.ruleId).toBe('input.unsupported-op');
+      expect(c.remediation).toContain('modeling-actuator');
+      expect(c.remediation).toContain('wisdom:deploy_release');
     });
 
     it('classifies json parse', () => {
-      expect(
-        classifyError(new Error('Unexpected token } in JSON at position 42')).category,
-      ).toBe('invalid_input');
+      expect(classifyError(new Error('Unexpected token } in JSON at position 42')).category).toBe(
+        'invalid_input'
+      );
     });
   });
 
@@ -180,7 +186,7 @@ describe('error-classifier', () => {
 
     it('handles { message, code } object', () => {
       expect(classifyError({ message: 'connect failed', code: 'ECONNREFUSED' }).category).toBe(
-        'network',
+        'network'
       );
     });
 
@@ -205,7 +211,9 @@ describe('error-classifier', () => {
 
 describe('explainPolicyViolation', () => {
   it('diagnoses project scope denial', () => {
-    const d = explainPolicyViolation('[POLICY_VIOLATION] Persona \'developer\' is not authorized for project \'sbi-prime\'.');
+    const d = explainPolicyViolation(
+      "[POLICY_VIOLATION] Persona 'developer' is not authorized for project 'sbi-prime'."
+    );
     expect(d.violationType).toBe('project_scope_denied');
     expect(d.requiredRole).toBeTruthy();
     expect(d.repairSteps.length).toBeGreaterThan(0);
@@ -213,7 +221,9 @@ describe('explainPolicyViolation', () => {
   });
 
   it('diagnoses path scope denial', () => {
-    const d = explainPolicyViolation('[POLICY_VIOLATION] Write rejected by path-scope-policy: path is outside project root.');
+    const d = explainPolicyViolation(
+      '[POLICY_VIOLATION] Write rejected by path-scope-policy: path is outside project root.'
+    );
     expect(d.violationType).toBe('path_scope_denied');
     expect(d.repairSteps.some((s) => s.includes('active/missions'))).toBe(true);
   });
@@ -225,19 +235,25 @@ describe('explainPolicyViolation', () => {
   });
 
   it('diagnoses tenant broker expired', () => {
-    const d = explainPolicyViolation('[POLICY_VIOLATION] tenant.broker_expired: broker grant from sbi-main to sbi-prime has expired');
+    const d = explainPolicyViolation(
+      '[POLICY_VIOLATION] tenant.broker_expired: broker grant from sbi-main to sbi-prime has expired'
+    );
     expect(d.violationType).toBe('tenant_broker_expired');
     expect(d.requiredAuthority).toBe('CROSS_TENANT_BROKER');
   });
 
   it('diagnoses tenant broker missing', () => {
-    const d = explainPolicyViolation('[POLICY_VIOLATION] cross-tenant broker missing for tenant sbi-sec');
+    const d = explainPolicyViolation(
+      '[POLICY_VIOLATION] cross-tenant broker missing for tenant sbi-sec'
+    );
     expect(d.violationType).toBe('tenant_broker_missing');
     expect(d.repairSteps.some((s) => s.includes('cross-tenant-broker.json'))).toBe(true);
   });
 
   it('diagnoses tier access denial', () => {
-    const d = explainPolicyViolation('[POLICY_VIOLATION] tier guard denied write to knowledge/confidential/project-x/');
+    const d = explainPolicyViolation(
+      '[POLICY_VIOLATION] tier guard denied write to knowledge/confidential/project-x/'
+    );
     expect(d.violationType).toBe('tier_access_denied');
     expect(d.requiredAuthority).toBe('KNOWLEDGE_WRITE');
   });
