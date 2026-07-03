@@ -67,7 +67,10 @@ import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
 import { registerVoiceBridge } from './voice-bridge.js';
 import { installShellSpeechToTextBridgeIfAvailable } from './speech-to-text-bridge.js';
-import { installShellDeploymentAdapterIfAvailable } from './deployment-adapter.js';
+import {
+  installShellDeploymentAdapterFromConfigIfAvailable,
+  installShellDeploymentAdapterIfAvailable,
+} from './deployment-adapter.js';
 import { installAuditForwarderIfAvailable } from './audit-forwarder.js';
 import { installSecretResolverIfAvailable } from './secret-resolver.js';
 import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
@@ -187,7 +190,10 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
   installShellSpeechToTextBridgeIfAvailable();
-  installShellDeploymentAdapterIfAvailable();
+  const deployInstalled = installShellDeploymentAdapterIfAvailable();
+  if (!deployInstalled) {
+    installShellDeploymentAdapterFromConfigIfAvailable();
+  }
   installAuditForwarderIfAvailable();
   installSecretResolverIfAvailable();
   // Embedding backend is independent of reasoning mode; install early.
