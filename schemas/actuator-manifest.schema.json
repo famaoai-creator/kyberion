@@ -52,6 +52,26 @@
               "lib": { "type": "array", "items": { "type": "string" } },
               "env": { "type": "array", "items": { "type": "string" } }
             }
+          },
+          "prerequisites": {
+            "type": "object",
+            "description": "Runtime prerequisites used by capability probes to decide whether this op is usable on the current host.",
+            "properties": {
+              "binaries": { "type": "array", "items": { "type": "string" } },
+              "platforms": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["darwin", "linux", "win32"] }
+              },
+              "env": { "type": "array", "items": { "type": "string" } },
+              "services": { "type": "array", "items": { "type": "string" } },
+              "install": {
+                "oneOf": [
+                  { "type": "array", "items": { "type": "string" } },
+                  { "type": "object", "additionalProperties": { "type": "string" } }
+                ]
+              }
+            },
+            "additionalProperties": false
           }
         }
       }

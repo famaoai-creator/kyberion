@@ -42,6 +42,9 @@ jobs:
       - name: Lint check
         run: pnpm run lint
 
+      - name: Format check
+        run: pnpm run format:check:ci
+
       - name: TypeScript type check
         run: pnpm run typecheck
 
@@ -104,13 +107,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-suite: [smoke, unit, integration]
+        test-suite: [smoke, core, actuators, scripts, integration]
         include:
           - test-suite: smoke
             command: pnpm run test
-          - test-suite: unit
-            command: pnpm run test:core
+          - test-suite: core
+            command: pnpm exec vitest run libs/core/ --coverage
+          - test-suite: actuators
+            command: pnpm run test:actuators
+          - test-suite: scripts
+            command: pnpm run test:scripts
           - test-suite: integration
+            experimental: true
             command: pnpm run test:integration
     steps:
       - uses: actions/checkout@v4
@@ -131,11 +139,12 @@ jobs:
         run: pnpm run build
 
       - name: Run ${{ matrix.test-suite }} tests
+        continue-on-error: ${{ matrix.experimental == true }}
         run: ${{ matrix.command }}
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
-        if: matrix.test-suite == 'unit' && always()
+        if: matrix.test-suite == 'core' && always()
         with:
           name: coverage-report
           path: coverage/

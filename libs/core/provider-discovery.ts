@@ -1,7 +1,14 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger } from './core.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 /**
@@ -38,7 +45,9 @@ function readDiskCache(): ProviderInfo[] | null {
     const raw = safeReadFile(DISK_CACHE_PATH, { encoding: 'utf8' }) as string;
     const parsed = JSON.parse(raw) as { ts: number; providers: ProviderInfo[] };
     if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
-  } catch { /* cache miss — non-fatal */ }
+  } catch {
+    /* cache miss — non-fatal */
+  }
   return null;
 }
 
@@ -46,8 +55,12 @@ function writeDiskCache(providers: ProviderInfo[]): void {
   try {
     const dir = path.dirname(DISK_CACHE_PATH);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), { encoding: 'utf8' });
-  } catch { /* non-fatal */ }
+    safeWriteFile(DISK_CACHE_PATH, JSON.stringify({ ts: Date.now(), providers }), {
+      encoding: 'utf8',
+    });
+  } catch {
+    /* non-fatal */
+  }
 }
 
 /**
@@ -73,124 +86,85 @@ interface ProviderCapabilityCatalog {
 }
 
 const CAPABILITY_CATALOG_PATH = 'knowledge/product/orchestration/provider-capabilities.json';
-
-const FALLBACK_CATALOG: Record<string, ProviderCapabilityEntry> = {
-  gemini: {
-    models: [
-      'auto-gemini-3', 'auto-gemini-2.5',
-      'gemini-3.1-pro-preview', 'gemini-3-flash-preview',
-      'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-    ],
-    capabilities: [
-      'reasoning', 'planning', 'coordination', 'analysis', 'code', 'review',
-      'architecture', 'a2a', 'structured_json', 'surface', 'conversation',
-      'realtime', 'low_latency', 'routing', 'delegation', 'dashboard', 'a2ui',
-    ],
-    modelCapabilities: {
-      'auto-gemini-3': ['reasoning', 'planning', 'coordination', 'analysis', 'structured_json', 'code', 'review', 'architecture', 'a2a'],
-      'auto-gemini-2.5': ['reasoning', 'planning', 'coordination', 'analysis', 'structured_json', 'low_latency', 'code', 'review', 'architecture', 'a2a'],
-      'gemini-3.1-pro-preview': ['reasoning', 'planning', 'analysis', 'structured_json', 'long_context', 'code', 'review', 'architecture'],
-      'gemini-3-flash-preview': ['low_latency', 'conversation', 'structured_json', 'surface'],
-      'gemini-2.5-pro': ['reasoning', 'planning', 'analysis', 'structured_json', 'long_context', 'a2a', 'code', 'review', 'architecture'],
-      'gemini-2.5-flash': ['structured_json', 'surface', 'conversation', 'realtime', 'low_latency', 'routing', 'delegation', 'dashboard', 'a2ui', 'slack', 'presence', 'onboarding', 'gateway'],
-      'gemini-2.5-flash-lite': ['structured_json', 'conversation', 'low_latency', 'surface', 'slack'],
-    },
-  },
-  claude: {
-    models: [
-      'sonnet', 'opus', 'haiku',
-      'claude-sonnet-4-6', 'claude-opus-4-6',
-      'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001',
-    ],
-    capabilities: ['reasoning', 'planning', 'coordination', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
-    modelCapabilities: {
-      sonnet: ['reasoning', 'planning', 'coordination', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
-      opus: ['reasoning', 'planning', 'coordination', 'analysis', 'review', 'code', 'long_context', 'structured_json', 'deep_reasoning'],
-      haiku: ['conversation', 'summarization', 'low_latency', 'structured_json'],
-      'claude-sonnet-4-6': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
-      'claude-opus-4-6': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json', 'deep_reasoning'],
-      'claude-sonnet-4-20250514': ['reasoning', 'analysis', 'review', 'code', 'long_context', 'structured_json'],
-      'claude-haiku-4-5-20251001': ['conversation', 'summarization', 'low_latency', 'structured_json'],
-    },
-  },
-  copilot: {
-    models: [
-      'claude-sonnet-4.6', 'claude-sonnet-4.5', 'claude-sonnet-4',
-      'claude-opus-4.6', 'claude-opus-4.6-fast', 'claude-opus-4.5',
-      'claude-haiku-4.5', 'gemini-3-pro-preview', 'gpt-5.4', 'gpt-5.3-codex',
-    ],
-    capabilities: ['code', 'implementation', 'refactoring', 'review', 'reasoning', 'structured_json'],
-    modelCapabilities: {
-      'claude-sonnet-4.6': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
-      'claude-sonnet-4.5': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
-      'claude-sonnet-4': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
-      'claude-opus-4.6': ['reasoning', 'analysis', 'review', 'code', 'structured_json', 'deep_reasoning'],
-      'claude-opus-4.6-fast': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
-      'claude-opus-4.5': ['reasoning', 'analysis', 'review', 'code', 'structured_json'],
-      'claude-haiku-4.5': ['conversation', 'summarization', 'low_latency', 'structured_json'],
-      'gemini-3-pro-preview': ['reasoning', 'planning', 'analysis', 'structured_json'],
-      'gpt-5.4': ['code', 'implementation', 'refactoring', 'review', 'reasoning', 'structured_json'],
-      'gpt-5.3-codex': ['code', 'implementation', 'refactoring', 'review', 'reasoning', 'structured_json'],
-    },
-  },
-  codex: {
-    models: ['codex'],
-    capabilities: ['code', 'implementation', 'refactoring', 'patch', 'terminal', 'debugging', 'structured_json'],
-    modelCapabilities: {
-      codex: ['code', 'implementation', 'refactoring', 'patch', 'terminal', 'debugging', 'structured_json'],
-    },
-  },
-  agy: {
-    models: ['agy'],
-    capabilities: ['reasoning', 'planning', 'coordination', 'analysis', 'code', 'review', 'architecture', 'structured_json'],
-    modelCapabilities: {
-      agy: ['reasoning', 'planning', 'coordination', 'analysis', 'code', 'review', 'architecture', 'structured_json'],
-    },
-  },
-};
+const FALLBACK_CAPABILITY_CATALOG_PATH =
+  'knowledge/product/orchestration/provider-capabilities.fallback.json';
 
 let catalogCache: Record<string, ProviderCapabilityEntry> | null = null;
 
 function isCapabilityEntry(value: unknown): value is ProviderCapabilityEntry {
   if (!value || typeof value !== 'object') return false;
   const entry = value as Record<string, unknown>;
-  return Array.isArray(entry.models)
-    && Array.isArray(entry.capabilities)
-    && typeof entry.modelCapabilities === 'object' && entry.modelCapabilities !== null;
+  return (
+    Array.isArray(entry.models) &&
+    Array.isArray(entry.capabilities) &&
+    typeof entry.modelCapabilities === 'object' &&
+    entry.modelCapabilities !== null
+  );
+}
+
+function readCapabilityCatalog(filePath: string): ProviderCapabilityCatalog | null {
+  try {
+    const raw = safeReadFile(pathResolver.rootResolve(filePath), { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
+    if (parsed && parsed.providers && typeof parsed.providers === 'object') return parsed;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function mergeCatalogInto(
+  target: Record<string, ProviderCapabilityEntry>,
+  source: ProviderCapabilityCatalog | null,
+  fallbackLabel: string
+): void {
+  if (!source?.providers || typeof source.providers !== 'object') return;
+  for (const [provider, entry] of Object.entries(source.providers)) {
+    if (isCapabilityEntry(entry)) {
+      target[provider] = entry;
+    } else {
+      logger.warn(
+        `[PROVIDER_DISCOVERY] capability entry for '${provider}' is malformed in ${fallbackLabel}`
+      );
+    }
+  }
 }
 
 /**
  * Load the provider capability catalog from knowledge, merged over the built-in fallback.
  * Invalid or missing entries silently fall back so discovery never hard-fails on a bad edit.
  */
-export function loadProviderCapabilityCatalog(forceRefresh = false): Record<string, ProviderCapabilityEntry> {
+export function loadProviderCapabilityCatalog(
+  forceRefresh = false
+): Record<string, ProviderCapabilityEntry> {
   if (!forceRefresh && catalogCache) return catalogCache;
-  const merged: Record<string, ProviderCapabilityEntry> = { ...FALLBACK_CATALOG };
-  try {
-    const raw = safeReadFile(pathResolver.rootResolve(CAPABILITY_CATALOG_PATH), { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
-    if (parsed && parsed.providers && typeof parsed.providers === 'object') {
-      for (const [provider, entry] of Object.entries(parsed.providers)) {
-        if (isCapabilityEntry(entry)) {
-          merged[provider] = entry;
-        } else {
-          logger.warn(`[PROVIDER_DISCOVERY] capability entry for '${provider}' is malformed — keeping built-in baseline`);
-        }
-      }
-    } else {
-      logger.warn('[PROVIDER_DISCOVERY] provider-capabilities.json missing `providers` map — using built-in baseline');
-    }
-  } catch {
-    logger.info('[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using built-in capability baseline');
+  const merged: Record<string, ProviderCapabilityEntry> = {};
+  mergeCatalogInto(
+    merged,
+    readCapabilityCatalog(FALLBACK_CAPABILITY_CATALOG_PATH),
+    FALLBACK_CAPABILITY_CATALOG_PATH
+  );
+
+  const primary = readCapabilityCatalog(CAPABILITY_CATALOG_PATH);
+  if (primary) {
+    mergeCatalogInto(merged, primary, CAPABILITY_CATALOG_PATH);
+  } else {
+    logger.info(
+      '[PROVIDER_DISCOVERY] provider-capabilities.json unavailable — using built-in capability fallback catalog'
+    );
   }
   catalogCache = merged;
   return merged;
 }
 
 function capabilityEntryFor(provider: string): ProviderCapabilityEntry {
-  return loadProviderCapabilityCatalog()[provider]
-    || FALLBACK_CATALOG[provider]
-    || { models: [], capabilities: [], modelCapabilities: {} };
+  return (
+    loadProviderCapabilityCatalog()[provider] || {
+      models: [],
+      capabilities: [],
+      modelCapabilities: {},
+    }
+  );
 }
 
 export interface ProbedProviderCapabilities {
@@ -216,7 +190,7 @@ function unionArrays(existing: string[] = [], incoming: string[] = []): string[]
  */
 export function mergeProbedCapabilitiesIntoCatalog(
   probed: Record<string, ProbedProviderCapabilities>,
-  opts: { updatedBy?: string; note?: string; mode?: 'union' | 'replace'; timestamp?: string } = {},
+  opts: { updatedBy?: string; note?: string; mode?: 'union' | 'replace'; timestamp?: string } = {}
 ): ProviderCapabilityCatalog {
   const mode = opts.mode || 'union';
   const timestamp = opts.timestamp || new Date().toISOString();
@@ -225,10 +199,14 @@ export function mergeProbedCapabilitiesIntoCatalog(
   // Read the raw on-disk catalog (NOT merged with fallback) so we preserve its exact structure.
   let catalog: ProviderCapabilityCatalog = { version: '1.0', providers: {} };
   try {
-    const raw = safeReadFile(pathResolver.rootResolve(CAPABILITY_CATALOG_PATH), { encoding: 'utf8' }) as string;
+    const raw = safeReadFile(pathResolver.rootResolve(CAPABILITY_CATALOG_PATH), {
+      encoding: 'utf8',
+    }) as string;
     const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
     if (parsed && parsed.providers && typeof parsed.providers === 'object') catalog = parsed;
-  } catch { /* start from an empty catalog */ }
+  } catch {
+    /* start from an empty catalog */
+  }
 
   for (const [provider, entry] of Object.entries(probed)) {
     const current = catalog.providers[provider];
@@ -249,7 +227,11 @@ export function mergeProbedCapabilitiesIntoCatalog(
         modelCapabilities: mergedModelCaps,
       };
     }
-    catalog.providers[provider]!.provenance = { source: 'probe', updated_by: updatedBy, updated_at: timestamp };
+    catalog.providers[provider]!.provenance = {
+      source: 'probe',
+      updated_by: updatedBy,
+      updated_at: timestamp,
+    };
   }
 
   catalog.version = catalog.version || '1.0';
@@ -271,7 +253,9 @@ export function mergeProbedCapabilitiesIntoCatalog(
   cachedProviders = null;
   cacheTimestamp = 0;
 
-  logger.info(`[PROVIDER_DISCOVERY] Merged probe results into ${CAPABILITY_CATALOG_PATH} for: ${Object.keys(probed).join(', ')}`);
+  logger.info(
+    `[PROVIDER_DISCOVERY] Merged probe results into ${CAPABILITY_CATALOG_PATH} for: ${Object.keys(probed).join(', ')}`
+  );
   return catalog;
 }
 
@@ -291,7 +275,15 @@ function run(cmd: string, args: string[], timeoutMs = 10000): { ok: boolean; std
 
 function checkGemini(): ProviderInfo {
   const which = run('which', ['gemini']);
-  if (!which.ok) return { provider: 'gemini', installed: false, version: null, protocol: 'acp', models: [], healthy: false };
+  if (!which.ok)
+    return {
+      provider: 'gemini',
+      installed: false,
+      version: null,
+      protocol: 'acp',
+      models: [],
+      healthy: false,
+    };
 
   const ver = run('gemini', ['--version']);
   const entry = capabilityEntryFor('gemini');
@@ -309,7 +301,15 @@ function checkGemini(): ProviderInfo {
 
 function checkClaude(): ProviderInfo {
   const which = run('which', ['claude']);
-  if (!which.ok) return { provider: 'claude', installed: false, version: null, protocol: 'print-json', models: [], healthy: false };
+  if (!which.ok)
+    return {
+      provider: 'claude',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
 
   // Use --version only — probeShellClaudeCliAvailability() makes a live LLM call
   // which is too expensive for discovery. Credential validity is checked at use-time.
@@ -318,7 +318,7 @@ function checkClaude(): ProviderInfo {
   return {
     provider: 'claude',
     installed: true,
-    version: ver.ok ? (ver.stdout || null) : null,
+    version: ver.ok ? ver.stdout || null : null,
     protocol: 'print-json',
     models: entry.models,
     capabilities: entry.capabilities,
@@ -330,7 +330,15 @@ function checkClaude(): ProviderInfo {
 function checkCopilot(): ProviderInfo {
   // Check if gh copilot is available (--help is more reliable than --version)
   const help = run('gh', ['copilot', '--', '--help'], 15000);
-  if (!help.ok) return { provider: 'copilot', installed: false, version: null, protocol: 'acp', models: [], healthy: false };
+  if (!help.ok)
+    return {
+      provider: 'copilot',
+      installed: false,
+      version: null,
+      protocol: 'acp',
+      models: [],
+      healthy: false,
+    };
 
   const entry = capabilityEntryFor('copilot');
   return {
@@ -349,7 +357,8 @@ function checkCodex(): ProviderInfo {
   const which = run('which', ['codex']);
   const installed = which.ok;
   const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
-  const protocol: ProviderInfo['protocol'] = (mode === 'exec' || mode === 'legacy') ? 'exec' : 'json-rpc';
+  const protocol: ProviderInfo['protocol'] =
+    mode === 'exec' || mode === 'legacy' ? 'exec' : 'json-rpc';
   const entry = capabilityEntryFor('codex');
 
   return {
@@ -366,7 +375,15 @@ function checkCodex(): ProviderInfo {
 
 function checkAgy(): ProviderInfo {
   const which = run('which', ['agy']);
-  if (!which.ok) return { provider: 'agy', installed: false, version: null, protocol: 'print-json', models: [], healthy: false };
+  if (!which.ok)
+    return {
+      provider: 'agy',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
 
   const entry = capabilityEntryFor('agy');
   return {
@@ -386,7 +403,7 @@ function checkAgy(): ProviderInfo {
  */
 export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   // 1. In-memory cache
-  if (!forceRefresh && cachedProviders && (Date.now() - cacheTimestamp) < CACHE_TTL) {
+  if (!forceRefresh && cachedProviders && Date.now() - cacheTimestamp < CACHE_TTL) {
     return cachedProviders;
   }
 
@@ -396,23 +413,24 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
     if (disk) {
       cachedProviders = disk;
       cacheTimestamp = Date.now();
-      logger.info(`[PROVIDER_DISCOVERY] Loaded from cache: ${disk.filter(p => p.installed).map(p => p.provider).join(', ')}`);
+      logger.info(
+        `[PROVIDER_DISCOVERY] Loaded from cache: ${disk
+          .filter((p) => p.installed)
+          .map((p) => p.provider)
+          .join(', ')}`
+      );
       return disk;
     }
   }
 
   // 3. Full discovery
   logger.info('[PROVIDER_DISCOVERY] Scanning available providers...');
-  const providers = [
-    checkGemini(),
-    checkClaude(),
-    checkCopilot(),
-    checkCodex(),
-    checkAgy(),
-  ];
+  const providers = [checkGemini(), checkClaude(), checkCopilot(), checkCodex(), checkAgy()];
 
-  const available = providers.filter(p => p.installed);
-  logger.info(`[PROVIDER_DISCOVERY] Found ${available.length}/${providers.length}: ${available.map(p => p.provider).join(', ')}`);
+  const available = providers.filter((p) => p.installed);
+  logger.info(
+    `[PROVIDER_DISCOVERY] Found ${available.length}/${providers.length}: ${available.map((p) => p.provider).join(', ')}`
+  );
 
   cachedProviders = providers;
   cacheTimestamp = Date.now();
@@ -428,12 +446,16 @@ export function clearProviderDiscoveryCache(): void {
   cachedProviders = null;
   cacheTimestamp = 0;
   catalogCache = null;
-  try { safeUnlinkSync(DISK_CACHE_PATH); } catch { /* non-fatal */ }
+  try {
+    safeUnlinkSync(DISK_CACHE_PATH);
+  } catch {
+    /* non-fatal */
+  }
 }
 
 /**
  * Get only installed providers.
  */
 export function getAvailableProviders(): ProviderInfo[] {
-  return discoverProviders().filter(p => p.installed);
+  return discoverProviders().filter((p) => p.installed);
 }

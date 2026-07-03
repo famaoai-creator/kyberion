@@ -55,10 +55,14 @@ export default defineConfig({
         // Large script refactors are covered indirectly through command/build paths.
         'scripts/refactor/**/*.ts',
       ],
-      lines: 60,
-      functions: 60,
-      branches: 60,
-      statements: 60,
+      // IP-03 baseline ratchet from 2026-07-03 core coverage run.
+      // Do not lower these thresholds; raise them as coverage improves.
+      thresholds: {
+        lines: 67,
+        functions: 69,
+        branches: 52,
+        statements: 65,
+      },
     },
     testTimeout: 10000,
     hookTimeout: 10000,

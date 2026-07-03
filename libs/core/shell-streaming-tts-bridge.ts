@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * ShellStreamingTextToSpeechBridge — pluggable subprocess adapter
  * mirroring the shell STT bridge.
@@ -49,7 +50,7 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
 
   async *synthesizeStream(
     text: AsyncIterable<string>,
-    voice_profile_id: string,
+    voice_profile_id: string
   ): AsyncIterable<AudioChunk> {
     const proc: ChildProcessWithoutNullStreams = spawn(
       this.opts.command,
@@ -61,7 +62,7 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
           ...(this.opts.env ?? {}),
           KYBERION_VOICE_PROFILE_ID: voice_profile_id,
         },
-      },
+      }
     );
     let stderrTail = '';
     proc.stderr.on('data', (buf) => {
@@ -84,7 +85,9 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
     });
     proc.on('exit', (code) => {
       if (code !== 0) {
-        logger.warn(`[shell-tts] command "${this.opts.command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`);
+        logger.warn(
+          `[shell-tts] command "${this.opts.command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`
+        );
       }
       drained = true;
       while (resolvers.length) resolvers.shift()!(null);
@@ -122,7 +125,10 @@ export function installShellStreamingTtsBridge(opts: ShellStreamingTtsOptions): 
 export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; reason?: string } {
   const command = process.env.KYBERION_TTS_COMMAND;
   if (!command) return { installed: false, reason: 'KYBERION_TTS_COMMAND not set' };
-  const args = (process.env.KYBERION_TTS_ARGS ?? '').split(',').map((a) => a.trim()).filter(Boolean);
+  const args = (process.env.KYBERION_TTS_ARGS ?? '')
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean);
   installShellStreamingTtsBridge({ bridge_id: 'shell', command, args });
   return { installed: true };
 }

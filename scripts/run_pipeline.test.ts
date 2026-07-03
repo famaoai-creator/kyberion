@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { TraceContext } from '@agent/core';
-import { normalizePipelineOp, runSteps, formatPipelineFailure, validateFlow } from './run_pipeline.js';
+import {
+  normalizePipelineOp,
+  runSteps,
+  formatPipelineFailure,
+  validateFlow,
+} from './run_pipeline.js';
 
 describe('run_pipeline compatibility', () => {
   it('normalizes short-form system ops to namespaced ops', () => {
@@ -11,19 +16,20 @@ describe('run_pipeline compatibility', () => {
   });
 
   it('accepts short-form log ops with template params', async () => {
-    const result = await runSteps([
-      {
-        op: 'log',
-        params: {
-          template: 'hello {{name}}',
+    const result = await runSteps(
+      [
+        {
+          op: 'log',
+          params: {
+            template: 'hello {{name}}',
+          },
         },
-      },
-    ], { name: 'world' });
+      ],
+      { name: 'world' }
+    );
 
     expect(result.status).toBe('succeeded');
-    expect(result.results).toEqual([
-      { op: 'system:log', status: 'success' },
-    ]);
+    expect(result.results).toEqual([{ op: 'system:log', status: 'success' }]);
   });
 
   it('accepts short-form shell ops and exports context', async () => {
@@ -39,24 +45,42 @@ describe('run_pipeline compatibility', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.context.shell_result).toBe('test-output');
-    expect(result.results).toEqual([
-      { op: 'system:shell', status: 'success' },
-    ]);
+    expect(result.results).toEqual([{ op: 'system:shell', status: 'success' }]);
   });
 
-  it('resolves shell env values from context before execution', async () => {
+  it('parses JSON shell output into structured context when possible', async () => {
     const result = await runSteps([
       {
         op: 'shell',
         params: {
-          cmd: 'printf %s "$FOO"',
-          env: {
-            FOO: '{{name}}',
-          },
-          export_as: 'shell_env_result',
+          cmd: 'printf %s \'{"summary_line":"[UNHANDLED-INTENT] unreconciled=3 top=hello (2)"}\'',
+          export_as: 'reconcile_result',
         },
       },
-    ], { name: 'world' });
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.reconcile_result).toEqual({
+      summary_line: '[UNHANDLED-INTENT] unreconciled=3 top=hello (2)',
+    });
+  });
+
+  it('resolves shell env values from context before execution', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'shell',
+          params: {
+            cmd: 'printf %s "$FOO"',
+            env: {
+              FOO: '{{name}}',
+            },
+            export_as: 'shell_env_result',
+          },
+        },
+      ],
+      { name: 'world' }
+    );
 
     expect(result.status).toBe('succeeded');
     expect(result.context.shell_env_result).toBe('world');
@@ -64,7 +88,7 @@ describe('run_pipeline compatibility', () => {
 
   it('formats classified pipeline failures with remediation', () => {
     const failure = formatPipelineFailure(
-      "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'.",
+      "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
     );
 
     expect(failure.classification.category).toBe('permission_denied');
@@ -84,13 +108,46 @@ describe('run_pipeline compatibility', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.legacy_key).toBe('legacy');
   });
+
+  it('runs storage janitor through the core op in dry-run mode', async () => {
+    const result = await runSteps([
+      {
+        op: 'core:run_janitor',
+        produces: 'janitor_report',
+        params: {
+          dry_run: true,
+          export_as: 'janitor_report',
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toEqual([{ op: 'core:run_janitor', status: 'success' }]);
+    expect(result.context.janitor_report).toMatchObject({
+      dryRun: true,
+      expiredTmp: expect.any(Number),
+      deletedTmp: 0,
+      errors: expect.any(Array),
+    });
+  });
 });
 
 describe('validateFlow', () => {
   it('returns empty errors for a valid chain', () => {
     const errors = validateFlow([
-      { op: 'media:pptx_extract', role: 'source', produces: { channel: 'pptx_design', type: 'PptxDesign' }, params: {} },
-      { op: 'media:theme_from_pptx', role: 'transform', consumes: 'pptx_design', produces: 'active_theme', params: {} },
+      {
+        op: 'media:pptx_extract',
+        role: 'source',
+        produces: { channel: 'pptx_design', type: 'PptxDesign' },
+        params: {},
+      },
+      {
+        op: 'media:theme_from_pptx',
+        role: 'transform',
+        consumes: 'pptx_design',
+        produces: 'active_theme',
+        params: {},
+      },
       { op: 'media:save_brand', role: 'sink', consumes: ['active_theme'], params: {} },
     ]);
     expect(errors).toEqual([]);
@@ -107,7 +164,12 @@ describe('validateFlow', () => {
 
   it('reports multiple missing channels per step', () => {
     const errors = validateFlow([
-      { op: 'media:save_brand', role: 'sink', consumes: ['active_theme', 'layout_geometry'], params: {} },
+      {
+        op: 'media:save_brand',
+        role: 'sink',
+        consumes: ['active_theme', 'layout_geometry'],
+        params: {},
+      },
     ]);
     expect(errors).toHaveLength(1);
     expect(errors[0].missing).toContain('active_theme');
@@ -116,7 +178,13 @@ describe('validateFlow', () => {
 
   it('uses step.id as stepId when present', () => {
     const errors = validateFlow([
-      { id: 'save_brand_step', op: 'media:save_brand', role: 'sink', consumes: 'missing_channel', params: {} },
+      {
+        id: 'save_brand_step',
+        op: 'media:save_brand',
+        role: 'sink',
+        consumes: 'missing_channel',
+        params: {},
+      },
     ]);
     expect(errors[0].stepId).toBe('save_brand_step');
   });
@@ -124,7 +192,7 @@ describe('validateFlow', () => {
   it('satisfies consumes from initial context', () => {
     const errors = validateFlow(
       [{ op: 'media:save_brand', role: 'sink', consumes: 'active_theme', params: {} }],
-      { active_theme: { colors: {} } },
+      { active_theme: { colors: {} } }
     );
     expect(errors).toEqual([]);
   });
@@ -140,7 +208,13 @@ describe('validateFlow', () => {
   it('accepts string shorthand for produces', () => {
     const errors = validateFlow([
       { op: 'browser:snapshot', role: 'source', produces: 'web_snapshot', params: {} },
-      { op: 'reasoning:synthesize', role: 'transform', consumes: 'web_snapshot', produces: 'active_theme', params: {} },
+      {
+        op: 'reasoning:synthesize',
+        role: 'transform',
+        consumes: 'web_snapshot',
+        produces: 'active_theme',
+        params: {},
+      },
     ]);
     expect(errors).toEqual([]);
   });
@@ -195,22 +269,26 @@ describe('Typed Flow role resolution', () => {
   it('records pipeline step status, duration, and error classification in trace events', async () => {
     const trace = new TraceContext('pipeline:trace-contract', { pipelineId: 'trace-contract' });
 
-    const result = await runSteps([
-      {
-        id: 'first-step',
-        op: 'log',
-        params: {
-          template: 'hello',
+    const result = await runSteps(
+      [
+        {
+          id: 'first-step',
+          op: 'log',
+          params: {
+            template: 'hello',
+          },
         },
-      },
-      {
-        id: 'failing-step',
-        op: 'shell',
-        params: {
-          cmd: 'exit 7',
+        {
+          id: 'failing-step',
+          op: 'shell',
+          params: {
+            cmd: 'exit 7',
+          },
         },
-      },
-    ], {}, { trace });
+      ],
+      {},
+      { trace }
+    );
 
     const finalized = trace.finalize();
     const firstSpan = finalized.rootSpan.children[0];

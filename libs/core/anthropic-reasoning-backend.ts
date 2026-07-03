@@ -1,6 +1,6 @@
 /**
  * Anthropic Reasoning Backend — real implementation of ReasoningBackend
- * using @anthropic-ai/sdk with Opus 4.7, adaptive thinking, prompt caching,
+ * using @anthropic-ai/sdk with the routed Anthropic default model, adaptive thinking, prompt caching,
  * and Zod-validated structured output via `messages.parse()`.
  *
  * Registered at bootstrap when ANTHROPIC_API_KEY is present; otherwise the
@@ -12,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { llmSemaphore } from './semaphore.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -36,7 +37,7 @@ import type {
   ToolDefinition,
 } from './reasoning-backend.js';
 
-const DEFAULT_MODEL = 'claude-opus-4-7' as const;
+const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 16000;
 
 // Shared system prompt — kept byte-stable so the prompt cache hits across
@@ -76,10 +77,8 @@ const CritiqueResultSchema = z.object({
     HypothesisSketchSchema.extend({
       survived: z.boolean(),
       rejection_reason: z.string().optional(),
-      critiques: z
-        .array(z.object({ by: z.string(), content: z.string() }))
-        .optional(),
-    }),
+      critiques: z.array(z.object({ by: z.string(), content: z.string() })).optional(),
+    })
   ),
 });
 
@@ -180,7 +179,7 @@ const DesignSpecComponentSchema = z.object({
         kind: z.enum(['rest', 'grpc', 'event', 'function_call', 'cli', 'ui', 'file', 'other']),
         description: z.string().optional(),
         contract_ref: z.string().optional(),
-      }),
+      })
     )
     .optional(),
   depends_on: z.array(z.string()).optional(),
@@ -217,7 +216,7 @@ const ExtractedDesignSpecSchema = z.object({
         options_considered: z.array(z.string()).optional(),
         chosen: z.string(),
         rationale: z.string(),
-      }),
+      })
     )
     .default([]),
   risks: z
@@ -226,7 +225,7 @@ const ExtractedDesignSpecSchema = z.object({
         description: z.string(),
         severity: z.enum(['low', 'medium', 'high', 'critical']),
         mitigation: z.string().optional(),
-      }),
+      })
     )
     .default([]),
   open_decisions: z
@@ -236,7 +235,7 @@ const ExtractedDesignSpecSchema = z.object({
         options: z.array(z.string()).optional(),
         current_lean: z.string().optional(),
         blocking: z.boolean().optional(),
-      }),
+      })
     )
     .default([]),
 });
@@ -250,9 +249,7 @@ const TestCaseSchema = z.object({
   steps: z.array(z.string()).min(1),
   expected: z.string().min(1),
   priority: z.enum(['must', 'should', 'could']).optional(),
-  type: z
-    .enum(['unit', 'integration', 'e2e', 'acceptance', 'performance', 'security'])
-    .optional(),
+  type: z.enum(['unit', 'integration', 'e2e', 'acceptance', 'performance', 'security']).optional(),
   covers_requirements: z.array(z.string()).optional(),
 });
 
@@ -305,7 +302,7 @@ const SimulationResultSchema = z.object({
       first_failure_mode: z.string().optional(),
       first_success_mode: z.string().optional(),
       terminated_at_step: z.number().optional(),
-    }),
+    })
   ),
 });
 
@@ -323,17 +320,17 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
 
   /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
   private callParse(
-    params: Parameters<typeof this.client.messages.parse>[0],
+    params: Parameters<typeof this.client.messages.parse>[0]
   ): ReturnType<typeof this.client.messages.parse> {
     return llmSemaphore.run(() => this.client.messages.parse(params));
   }
 
   /** Semaphore-guarded wrapper around messages.create (non-streaming). */
   private callCreate(
-    params: Parameters<typeof this.client.messages.create>[0] & { stream?: false },
+    params: Parameters<typeof this.client.messages.create>[0] & { stream?: false }
   ): Promise<Anthropic.Message> {
     return llmSemaphore.run(
-      () => this.client.messages.create(params) as Promise<Anthropic.Message>,
+      () => this.client.messages.create(params) as Promise<Anthropic.Message>
     );
   }
 
@@ -673,7 +670,10 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     return this.delegateTask(prompt);
   }
 
-  async generateWithTools(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult> {
+  async generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[]
+  ): Promise<GenerateWithToolsResult> {
     const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
       name: t.name,
       description: t.description,

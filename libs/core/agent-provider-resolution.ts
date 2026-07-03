@@ -2,6 +2,7 @@ import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export interface ResolveAgentProviderOptions {
   preferredProvider: string;
@@ -29,13 +30,24 @@ function loadProviderConfig(): ProviderConfigFile {
   if (_cachedProviderConfig) return _cachedProviderConfig;
   try {
     const filePath = pathResolver.knowledge('product/governance/provider-config.json');
-    _cachedProviderConfig = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ProviderConfigFile;
+    _cachedProviderConfig = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as ProviderConfigFile;
   } catch (err) {
     const defaults: ProviderConfigFile = {
       default_priority: ['gemini', 'claude', 'codex', 'copilot'],
-      default_models: { gemini: 'gemini-2.5-flash', claude: 'sonnet', codex: 'codex', copilot: 'gpt-5.4' },
+      default_models: {
+        gemini: resolveRuntimeModelId('gemini-default'),
+        claude: resolveRuntimeModelId('anthropic-fast'),
+        codex: resolveRuntimeModelId('codex-default'),
+        copilot: resolveRuntimeModelId('copilot-default'),
+      },
     };
-    recordConfigFallback({ knowledgePath: 'product/governance/provider-config.json', error: err, defaults });
+    recordConfigFallback({
+      knowledgePath: 'product/governance/provider-config.json',
+      error: err,
+      defaults,
+    });
     _cachedProviderConfig = defaults;
   }
   return _cachedProviderConfig;
@@ -63,7 +75,9 @@ function capabilityCoverage(have: string[] | undefined, required: string[] | und
 
 function providerCapabilities(providerInfo?: ProviderInfo): string[] {
   if (!providerInfo) return [];
-  const capabilities = new Set((providerInfo.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean));
+  const capabilities = new Set(
+    (providerInfo.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+  );
   for (const modelCapabilities of Object.values(providerInfo.modelCapabilities || {})) {
     for (const capability of modelCapabilities || []) {
       capabilities.add(capability.trim().toLowerCase());
@@ -72,7 +86,10 @@ function providerCapabilities(providerInfo?: ProviderInfo): string[] {
   return Array.from(capabilities);
 }
 
-function modelCapabilities(providerInfo: ProviderInfo | undefined, modelId: string | undefined): string[] {
+function modelCapabilities(
+  providerInfo: ProviderInfo | undefined,
+  modelId: string | undefined
+): string[] {
   if (!providerInfo || !modelId) return [];
   return providerInfo.modelCapabilities?.[modelId] || [];
 }
@@ -86,7 +103,7 @@ function scoreModelCandidate(
   providerInfo: ProviderInfo | undefined,
   modelId: string,
   requiredCapabilities: string[] | undefined,
-  preferredModelId?: string,
+  preferredModelId?: string
 ): number {
   const caps = modelCapabilities(providerInfo, modelId);
   const matched = capabilityScore(caps, requiredCapabilities);
@@ -98,11 +115,13 @@ function scoreModelCandidate(
 function pickBestModel(
   providerInfo: ProviderInfo | undefined,
   requiredCapabilities: string[] | undefined,
-  preferredModelId?: string,
+  preferredModelId?: string
 ): string {
   const models = providerInfo?.models || [];
   if (preferredModelId && (models.length === 0 || models.includes(preferredModelId))) {
-    if (capabilityCoverage(modelCapabilities(providerInfo, preferredModelId), requiredCapabilities)) {
+    if (
+      capabilityCoverage(modelCapabilities(providerInfo, preferredModelId), requiredCapabilities)
+    ) {
       return preferredModelId;
     }
   }
@@ -121,35 +140,50 @@ function resolvePriority(preferredProvider: string): string[] {
     .split(',')
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
-  return Array.from(new Set([preferredProvider, ...envPriority, ...loadProviderConfig().default_priority]));
+  return Array.from(
+    new Set([preferredProvider, ...envPriority, ...loadProviderConfig().default_priority])
+  );
 }
 
 export function resolveAgentProviderTarget(
   options: ResolveAgentProviderOptions,
-  discoveredProviders = discoverProviders(),
+  discoveredProviders = discoverProviders()
 ): ResolvedAgentProviderTarget {
-  const installedProviders = discoveredProviders.filter((entry) => entry.installed && entry.healthy);
+  const installedProviders = discoveredProviders.filter(
+    (entry) => entry.installed && entry.healthy
+  );
   const availableProviders = installedProviders.map((entry) => entry.provider);
   const preferredProvider = options.preferredProvider;
-  const requiredCapabilities = (options.requiredCapabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+  const requiredCapabilities = (options.requiredCapabilities || [])
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
   const fallbackAllowlist = (options.fallbackProviders || [])
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
-  const fallbackCandidates = fallbackAllowlist.length > 0
-    ? installedProviders.filter((entry) => fallbackAllowlist.includes(entry.provider))
-    : installedProviders;
-  const nonPreferredFallbackCandidates = fallbackCandidates.filter((entry) => entry.provider !== preferredProvider);
-  const effectiveFallbackCandidates = nonPreferredFallbackCandidates.length > 0
-    ? nonPreferredFallbackCandidates
-    : fallbackCandidates;
-  const preferredInstalled = installedProviders.find((entry) => entry.provider === preferredProvider);
+  const fallbackCandidates =
+    fallbackAllowlist.length > 0
+      ? installedProviders.filter((entry) => fallbackAllowlist.includes(entry.provider))
+      : installedProviders;
+  const nonPreferredFallbackCandidates = fallbackCandidates.filter(
+    (entry) => entry.provider !== preferredProvider
+  );
+  const effectiveFallbackCandidates =
+    nonPreferredFallbackCandidates.length > 0 ? nonPreferredFallbackCandidates : fallbackCandidates;
+  const preferredInstalled = installedProviders.find(
+    (entry) => entry.provider === preferredProvider
+  );
 
   if (preferredInstalled) {
     const preferredCapabilities = providerCapabilities(preferredInstalled);
     const preferredScore = capabilityScore(preferredCapabilities, requiredCapabilities);
-    const bestFallbackScore = effectiveFallbackCandidates.length > 0
-      ? Math.max(...effectiveFallbackCandidates.map((entry) => capabilityScore(providerCapabilities(entry), requiredCapabilities)))
-      : Number.NEGATIVE_INFINITY;
+    const bestFallbackScore =
+      effectiveFallbackCandidates.length > 0
+        ? Math.max(
+            ...effectiveFallbackCandidates.map((entry) =>
+              capabilityScore(providerCapabilities(entry), requiredCapabilities)
+            )
+          )
+        : Number.NEGATIVE_INFINITY;
     if (
       (options.providerStrategy || 'adaptive') === 'strict' ||
       requiredCapabilities.length === 0 ||
@@ -158,7 +192,8 @@ export function resolveAgentProviderTarget(
       return {
         provider: preferredProvider,
         modelId: pickBestModel(preferredInstalled, requiredCapabilities, options.preferredModelId),
-        strategy: preferredScore > 0 || requiredCapabilities.length === 0 ? 'preferred' : 'unresolved',
+        strategy:
+          preferredScore > 0 || requiredCapabilities.length === 0 ? 'preferred' : 'unresolved',
         availableProviders,
       };
     }
@@ -182,9 +217,8 @@ export function resolveAgentProviderTarget(
     };
   }
 
-  const effectiveCandidates = effectiveFallbackCandidates.length > 0
-    ? nonPreferredFallbackCandidates
-    : fallbackCandidates;
+  const effectiveCandidates =
+    effectiveFallbackCandidates.length > 0 ? nonPreferredFallbackCandidates : fallbackCandidates;
 
   if (effectiveCandidates.length === 0) {
     return {
@@ -202,8 +236,9 @@ export function resolveAgentProviderTarget(
     const leftScore = capabilityScore(providerCapabilities(left), requiredCapabilities);
     const rightScore = capabilityScore(providerCapabilities(right), requiredCapabilities);
     return (
-      (rightScore - leftScore) ||
-      ((leftRank >= 0 ? leftRank : Number.MAX_SAFE_INTEGER) - (rightRank >= 0 ? rightRank : Number.MAX_SAFE_INTEGER))
+      rightScore - leftScore ||
+      (leftRank >= 0 ? leftRank : Number.MAX_SAFE_INTEGER) -
+        (rightRank >= 0 ? rightRank : Number.MAX_SAFE_INTEGER)
     );
   })[0]!;
 
@@ -266,11 +301,16 @@ export interface CapabilityResolution {
 
 function combinedCapabilities(info: ProviderInfo | undefined, modelId: string): string[] {
   const have = new Set(providerCapabilities(info));
-  for (const capability of modelCapabilities(info, modelId)) have.add(capability.trim().toLowerCase());
+  for (const capability of modelCapabilities(info, modelId))
+    have.add(capability.trim().toLowerCase());
   return Array.from(have);
 }
 
-function computeUnmet(info: ProviderInfo | undefined, modelId: string, required: string[]): string[] {
+function computeUnmet(
+  info: ProviderInfo | undefined,
+  modelId: string,
+  required: string[]
+): string[] {
   if (required.length === 0) return [];
   const have = normalizeSet(combinedCapabilities(info, modelId));
   return required.filter((capability) => !have.has(capability.trim().toLowerCase()));
@@ -278,22 +318,25 @@ function computeUnmet(info: ProviderInfo | undefined, modelId: string, required:
 
 export function resolveCapabilityTarget(
   options: CapabilityResolveOptions,
-  discoveredProviders = discoverProviders(),
+  discoveredProviders = discoverProviders()
 ): CapabilityResolution {
   const orchestration: OrchestrationTier = options.orchestration || 'leaf';
   // A managed-workflow task must land on a provider that can run a recorded fan-out.
   const baseRequired = (options.requiredCapabilities || [])
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
-  const requiredCapabilities = orchestration === 'managed_workflow'
-    ? Array.from(new Set([...baseRequired, 'managed_workflow']))
-    : baseRequired;
+  const requiredCapabilities =
+    orchestration === 'managed_workflow'
+      ? Array.from(new Set([...baseRequired, 'managed_workflow']))
+      : baseRequired;
   const installed = discoveredProviders.filter((entry) => entry.installed && entry.healthy);
   const availableProviders = installed.map((entry) => entry.provider);
 
   const unresolved = (rationale: string): CapabilityResolution => ({
     provider: options.preferredProvider || loadProviderConfig().default_priority[0]!,
-    modelId: options.preferredModelId || defaultModelFor(options.preferredProvider || loadProviderConfig().default_priority[0]!),
+    modelId:
+      options.preferredModelId ||
+      defaultModelFor(options.preferredProvider || loadProviderConfig().default_priority[0]!),
     strategy: 'unresolved',
     availableProviders,
     requiredCapabilities,
@@ -308,9 +351,12 @@ export function resolveCapabilityTarget(
 
   // Apply optional allowlist (always keep the preferred provider as a candidate).
   const allowlist = normalizeSet(options.fallbackProviders);
-  let candidates = allowlist.size > 0
-    ? installed.filter((entry) => allowlist.has(entry.provider) || entry.provider === options.preferredProvider)
-    : installed;
+  let candidates =
+    allowlist.size > 0
+      ? installed.filter(
+          (entry) => allowlist.has(entry.provider) || entry.provider === options.preferredProvider
+        )
+      : installed;
   if (candidates.length === 0) candidates = installed;
 
   // Apply health-based exclusions, but never strand the caller: if exclusion empties the pool,
@@ -326,7 +372,9 @@ export function resolveCapabilityTarget(
     }
   }
 
-  const priority = resolvePriority(options.preferredProvider || loadProviderConfig().default_priority[0]!);
+  const priority = resolvePriority(
+    options.preferredProvider || loadProviderConfig().default_priority[0]!
+  );
   const scoreOf = (entry: ProviderInfo): number => {
     const covers = capabilityCoverage(providerCapabilities(entry), requiredCapabilities) ? 1000 : 0;
     const matched = capabilityScore(providerCapabilities(entry), requiredCapabilities);
@@ -339,7 +387,10 @@ export function resolveCapabilityTarget(
     if (byScore !== 0) return byScore;
     const leftRank = priority.indexOf(left.provider);
     const rightRank = priority.indexOf(right.provider);
-    return (leftRank >= 0 ? leftRank : Number.MAX_SAFE_INTEGER) - (rightRank >= 0 ? rightRank : Number.MAX_SAFE_INTEGER);
+    return (
+      (leftRank >= 0 ? leftRank : Number.MAX_SAFE_INTEGER) -
+      (rightRank >= 0 ? rightRank : Number.MAX_SAFE_INTEGER)
+    );
   });
 
   const chosen = ranked[0]!;

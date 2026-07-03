@@ -1,14 +1,14 @@
-import { 
-  logger, 
-  safeReadFile, 
-  safeWriteFile, 
-  safeMkdir, 
-  safeExistsSync, 
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
   safeReaddir,
   safeUnlinkSync,
-  pathResolver, 
+  pathResolver,
   safeExec,
-  withRetry 
+  withRetry,
 } from '@agent/core';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -22,7 +22,7 @@ const A2A_INBOX = pathResolver.rootResolve('active/shared/runtime/a2a/inbox');
 const A2A_OUTBOX = pathResolver.rootResolve('active/shared/runtime/a2a/outbox');
 
 interface TransportOptions {
-  method: 'local' | 'gist';
+  method: 'local';
   encrypt: boolean;
   target_public_key?: string;
 }
@@ -44,9 +44,6 @@ export async function sendA2AMessage(message: any, options: TransportOptions) {
     const outPath = path.join(A2A_OUTBOX, `${msgId}.a2a`);
     safeWriteFile(outPath, payload);
     logger.success(`📥 [A2A_Transport] Message ${msgId} placed in local outbox.`);
-  } else if (options.method === 'gist') {
-    // Future: implement gh gist create
-    logger.info('🚀 [A2A_Transport] Gist transport triggered (Placeholder).');
   }
 }
 
@@ -55,8 +52,8 @@ export async function sendA2AMessage(message: any, options: TransportOptions) {
  */
 export async function pollA2AInbox(): Promise<any[]> {
   if (!safeExistsSync(A2A_INBOX)) return [];
-  
-  const files = safeReaddir(A2A_INBOX).filter(f => f.endsWith('.a2a'));
+
+  const files = safeReaddir(A2A_INBOX).filter((f) => f.endsWith('.a2a'));
   const messages: any[] = [];
 
   for (const file of files) {
@@ -86,7 +83,7 @@ export async function pollA2AInbox(): Promise<any[]> {
 async function _encryptPayload(plainText: string, publicKeyPath: string): Promise<string> {
   const symKey = crypto.randomBytes(32);
   const iv = crypto.randomBytes(16);
-  
+
   // Encrypt payload with AES
   const cipher = crypto.createCipheriv('aes-256-cbc', symKey, iv);
   let encrypted = cipher.update(plainText, 'utf8', 'hex');
@@ -107,13 +104,16 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
 
   // Retrieve our private key passphrase from Keychain
   const getPassInput = pathResolver.sharedTmp('actuators/network-actuator/get-pass-a2a.json');
-  safeWriteFile(getPassInput, JSON.stringify({
-    action: 'get',
-    params: { account: 'sovereign', service: 'kyberion-private-key-pass', export_as: 'v' }
-  }));
-  
+  safeWriteFile(
+    getPassInput,
+    JSON.stringify({
+      action: 'get',
+      params: { account: 'sovereign', service: 'kyberion-private-key-pass', export_as: 'v' },
+    })
+  );
+
   const passResult = JSON.parse(
-    safeExec('node', [pathResolver.capabilityEntry('secret-actuator'), '--input', getPassInput]),
+    safeExec('node', [pathResolver.capabilityEntry('secret-actuator'), '--input', getPassInput])
   );
   const pass = passResult.v;
   safeUnlinkSync(getPassInput);
@@ -122,7 +122,7 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
   const privKeyPath = pathResolver.vault('keys/sovereign-private.pem');
   const privateKey = crypto.createPrivateKey({
     key: safeReadFile(privKeyPath, { encoding: null }) as Buffer,
-    passphrase: pass
+    passphrase: pass,
   });
 
   // Decrypt symKey

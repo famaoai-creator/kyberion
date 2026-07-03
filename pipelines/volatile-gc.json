@@ -8,6 +8,12 @@
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 3"
   },
+  "schedule": {
+    "id": "volatile-gc-daily",
+    "cron": "0 4 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "steps": [
     {
       "id": "run_gc",

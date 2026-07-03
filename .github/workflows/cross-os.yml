@@ -52,6 +52,9 @@ jobs:
       - name: Unit tests (core)
         run: pnpm run test:core
 
+      - name: Governance boundary tests
+        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
+
       - name: Meeting participation dry-run
         run: pnpm run test:meeting-dry-run
 

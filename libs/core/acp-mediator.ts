@@ -6,18 +6,36 @@ import { touchManagedProcess, spawnManagedProcess, stopManagedProcess } from './
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import { pathResolver } from './path-resolver.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 /** Whitelist environment variables passed to child agent processes */
 const ENV_WHITELIST = [
-  'PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'LC_ALL', 'TERM',
-  'NODE_ENV', 'NODE_PATH', 'NVM_DIR', 'NVM_BIN',
-  'GOOGLE_API_KEY', 'GEMINI_API_KEY',
+  'PATH',
+  'HOME',
+  'USER',
+  'SHELL',
+  'LANG',
+  'LC_ALL',
+  'TERM',
+  'NODE_ENV',
+  'NODE_PATH',
+  'NVM_DIR',
+  'NVM_BIN',
+  'GOOGLE_API_KEY',
+  'GEMINI_API_KEY',
   'ANTHROPIC_API_KEY',
-  'MISSION_ID', 'MISSION_ROLE',
+  'MISSION_ID',
+  'MISSION_ROLE',
   // SSL/Proxy
-  'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
-  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
-  'http_proxy', 'https_proxy', 'no_proxy',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
 ];
 
 function sanitizeEnvForChild(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -53,6 +71,12 @@ export interface ACPMediatorOptions {
   modelId?: string;
   systemPrompt?: string;
   cwd?: string;
+  turnTimeoutMs?: number;
+  onCrash?: (info: {
+    agentId: string;
+    exitCode?: number | null;
+    signal?: NodeJS.Signals | null;
+  }) => void | Promise<void>;
 }
 
 export interface ProviderUsageSummary {
@@ -61,6 +85,58 @@ export interface ProviderUsageSummary {
   totalTokens?: number;
   raw?: Record<string, unknown>;
   lastUpdatedAt?: number;
+}
+
+export interface AgentRuntimeLogEntry {
+  ts: number;
+  type: string;
+  content: string;
+}
+
+export class AgentRuntimeCrashedError extends Error {
+  readonly agentId: string;
+  readonly exitCode?: number | null;
+  readonly signal?: NodeJS.Signals | null;
+  readonly recentLog: AgentRuntimeLogEntry[];
+
+  constructor(input: {
+    agentId: string;
+    exitCode?: number | null;
+    signal?: NodeJS.Signals | null;
+    recentLog: AgentRuntimeLogEntry[];
+  }) {
+    const stop = input.signal
+      ? `signal ${input.signal}`
+      : `exit code ${input.exitCode ?? 'unknown'}`;
+    super(`Agent runtime ${input.agentId} crashed (${stop})`);
+    this.name = 'AgentRuntimeCrashedError';
+    this.agentId = input.agentId;
+    this.exitCode = input.exitCode;
+    this.signal = input.signal;
+    this.recentLog = input.recentLog;
+  }
+}
+
+export class AgentTurnTimeoutError extends Error {
+  readonly agentId: string;
+  readonly timeoutMs: number;
+
+  constructor(agentId: string, timeoutMs: number) {
+    super(`Agent runtime ${agentId} turn timed out after ${timeoutMs}ms`);
+    this.name = 'AgentTurnTimeoutError';
+    this.agentId = agentId;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+interface PendingAsk {
+  reject: (error: Error) => void;
+  timeout?: ReturnType<typeof setTimeout>;
+}
+
+interface CrashState {
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
 }
 
 export class ACPMediator {
@@ -75,6 +151,9 @@ export class ACPMediator {
   private static readonly MAX_LOG_ENTRIES = 200;
   private runtimeResourceId: string;
   private usage: ProviderUsageSummary = {};
+  private pendingAsk: PendingAsk | null = null;
+  private crashState: CrashState | null = null;
+  private shuttingDown = false;
 
   constructor(private options: ACPMediatorOptions) {
     this.runtimeResourceId = `acp:${options.threadId}`;
@@ -88,17 +167,61 @@ export class ACPMediator {
   }
 
   /** Get recent terminal log entries */
-  public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+  public getLog(limit = 50): AgentRuntimeLogEntry[] {
     return this.logBuffer.slice(-limit);
   }
 
-  public getRuntimeInfo(): { pid?: number; sessionId: string | null; usage: ProviderUsageSummary; supportsSoftRefresh: boolean } {
+  public getRuntimeInfo(): {
+    pid?: number;
+    sessionId: string | null;
+    usage: ProviderUsageSummary;
+    supportsSoftRefresh: boolean;
+    alive: boolean;
+    crashed: boolean;
+  } {
     return {
       pid: this.child?.pid,
       sessionId: this.acpSessionId,
       usage: { ...this.usage },
       supportsSoftRefresh: true,
+      alive: this.isProcessAlive(),
+      crashed: Boolean(this.crashState),
     };
+  }
+
+  public isProcessAlive(): boolean {
+    if (this.crashState || !this.child?.pid) return false;
+    try {
+      process.kill(this.child.pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private runtimeCrashedError(): AgentRuntimeCrashedError {
+    return new AgentRuntimeCrashedError({
+      agentId: this.options.threadId,
+      exitCode: this.crashState?.exitCode,
+      signal: this.crashState?.signal,
+      recentLog: this.getLog(20),
+    });
+  }
+
+  private markCrashed(exitCode?: number | null, signal?: NodeJS.Signals | null): boolean {
+    if (this.shuttingDown) return;
+    if (this.crashState) return false;
+    this.crashState = { exitCode, signal };
+    this.booted = false;
+    const error = this.runtimeCrashedError();
+    this.log('runtime', error.message);
+    logger.error(`[ACP_MEDIATOR] ${error.message}`);
+    if (this.pendingAsk) {
+      if (this.pendingAsk.timeout) clearTimeout(this.pendingAsk.timeout);
+      this.pendingAsk.reject(error);
+      this.pendingAsk = null;
+    }
+    return true;
   }
 
   private updateUsageFromPayload(payload: unknown): void {
@@ -117,18 +240,18 @@ export class ACPMediator {
     logger.info('[ACP_MEDIATOR] Establishing Session...');
     const sessionRes = await this.connection.newSession({
       cwd: this.options.cwd || pathResolver.rootDir(),
-      mcpServers: []
+      mcpServers: [],
     });
     this.acpSessionId = sessionRes.sessionId;
     logger.info(`[ACP_MEDIATOR] Ready. Session: ${this.acpSessionId}`);
 
-    const targetModel = this.options.modelId || 'gemini-2.5-flash';
+    const targetModel = this.options.modelId || resolveRuntimeModelId('gemini-default');
     try {
       logger.info(`[ACP_MEDIATOR] Setting model to: ${targetModel}`);
       // @ts-ignore
       await this.connection.unstable_setSessionModel({
         sessionId: this.acpSessionId,
-        modelId: targetModel
+        modelId: targetModel,
       });
     } catch (e) {
       logger.warn(`[ACP_MEDIATOR] Model selection failed: ${e}`);
@@ -160,6 +283,38 @@ export class ACPMediator {
       },
     });
     this.child = managed.child;
+    this.crashState = null;
+    this.shuttingDown = false;
+
+    this.child.once('exit', (code, signal) => {
+      if (this.markCrashed(code, signal)) {
+        Promise.resolve(
+          this.options.onCrash?.({
+            agentId: this.options.threadId,
+            exitCode: code,
+            signal,
+          })
+        ).catch((error: any) => {
+          logger.warn(`[ACP_MEDIATOR] crash callback failed: ${error?.message || error}`);
+        });
+      }
+    });
+    this.child.once('error', (error) => {
+      this.log('runtime_error', error.message);
+      if (this.markCrashed(null, null)) {
+        Promise.resolve(
+          this.options.onCrash?.({
+            agentId: this.options.threadId,
+            exitCode: null,
+            signal: null,
+          })
+        ).catch((callbackError: any) => {
+          logger.warn(
+            `[ACP_MEDIATOR] crash callback failed: ${callbackError?.message || callbackError}`
+          );
+        });
+      }
+    });
 
     const sdkInput = new PassThrough();
     const sdkOutput = new PassThrough();
@@ -218,7 +373,9 @@ export class ACPMediator {
               try {
                 const jsonStr = match[1] || match[2];
                 const a2uiPacket = JSON.parse(jsonStr);
-                logger.info(`[A2UI_EXTRACTED] Detected UI Surface: ${a2uiPacket.surfaceId || 'unknown'}`);
+                logger.info(
+                  `[A2UI_EXTRACTED] Detected UI Surface: ${a2uiPacket.surfaceId || 'unknown'}`
+                );
                 this.processedA2UIOffsets.add(match.index);
 
                 dispatchA2UI(a2uiPacket);
@@ -233,7 +390,9 @@ export class ACPMediator {
           const toolCallId = (params.toolCall?.toolCallId || '').toLowerCase();
 
           if (toolCallId.includes('ask_user') || title.includes('asking user')) {
-            logger.warn(`[ACP_PERMISSION] Denied interactive user prompt tool: ${params.toolCall?.title}`);
+            logger.warn(
+              `[ACP_PERMISSION] Denied interactive user prompt tool: ${params.toolCall?.title}`
+            );
             return { outcome: 'denied' as const };
           }
 
@@ -242,14 +401,23 @@ export class ACPMediator {
           if (manifest) {
             // Extract actuator name from tool call title (e.g., "run_shell_command" → system, "read_file" → file)
             const actuatorMap: Record<string, string> = {
-              'shell': 'system-actuator', 'command': 'system-actuator', 'exec': 'system-actuator',
-              'file': 'file-actuator', 'read_file': 'file-actuator', 'write_file': 'file-actuator',
-              'browser': 'browser-actuator', 'navigate': 'browser-actuator',
-              'network': 'network-actuator', 'fetch': 'network-actuator', 'curl': 'network-actuator',
+              shell: 'system-actuator',
+              command: 'system-actuator',
+              exec: 'system-actuator',
+              file: 'file-actuator',
+              read_file: 'file-actuator',
+              write_file: 'file-actuator',
+              browser: 'browser-actuator',
+              navigate: 'browser-actuator',
+              network: 'network-actuator',
+              fetch: 'network-actuator',
+              curl: 'network-actuator',
             };
             for (const [keyword, actuator] of Object.entries(actuatorMap)) {
               if (title.includes(keyword) && !isActuatorAllowed(manifest, actuator)) {
-                logger.error(`[ACP_PERMISSION] DENIED by manifest: ${threadId} cannot use ${actuator} (tool: ${title})`);
+                logger.error(
+                  `[ACP_PERMISSION] DENIED by manifest: ${threadId} cannot use ${actuator} (tool: ${title})`
+                );
                 return { outcome: 'denied' as const };
               }
             }
@@ -257,40 +425,59 @@ export class ACPMediator {
 
           // Block explicitly dangerous operations
           const dangerousPatterns = ['rm -rf', 'format', 'drop table', 'delete', 'eval(', 'exec('];
-          if (dangerousPatterns.some(p => title.includes(p))) {
+          if (dangerousPatterns.some((p) => title.includes(p))) {
             logger.error(`[ACP_PERMISSION] BLOCKED dangerous operation: ${title}`);
             return { outcome: 'denied' as const };
           }
 
           // Allow safe operations
-          const safePatterns = ['read', 'search', 'list', 'view', 'get', 'ls', 'cat', 'grep', 'find', 'git status', 'git log', 'git diff'];
-          if (safePatterns.some(p => title.includes(p))) {
+          const safePatterns = [
+            'read',
+            'search',
+            'list',
+            'view',
+            'get',
+            'ls',
+            'cat',
+            'grep',
+            'find',
+            'git status',
+            'git log',
+            'git diff',
+          ];
+          if (safePatterns.some((p) => title.includes(p))) {
             return { outcome: 'approved' as const };
           }
 
           logger.info(`[ACP_PERMISSION] Approved: ${title}`);
           return { outcome: 'approved' as const };
         },
-        async readTextFile(params) { throw new Error('Not implemented'); },
-        async writeTextFile(params) { throw new Error('Not implemented'); },
-        async createTerminal(params) { throw new Error('Not implemented'); },
+        async readTextFile(params) {
+          throw new Error('Not implemented');
+        },
+        async writeTextFile(params) {
+          throw new Error('Not implemented');
+        },
+        async createTerminal(params) {
+          throw new Error('Not implemented');
+        },
         extMethod: async (m, p) => ({}),
-        extNotification: async (m, p) => {}
+        extNotification: async (m, p) => {},
       }),
       ndJsonStream(Writable.toWeb(sdkOutput) as any, Readable.toWeb(sdkInput) as any)
     );
 
-    await new Promise(r => setTimeout(r, 2000));
+    await waitForBootSignal(this.child, `acp:${threadId}`);
 
     logger.info('[ACP_MEDIATOR] Negotiating protocol...');
     await this.connection.initialize({
       protocolVersion: 1,
-      clientInfo: { name: 'Kyberion', version: '1.0.0' }
+      clientInfo: { name: 'Kyberion', version: '1.0.0' },
     } as any);
 
     logger.info('[ACP_MEDIATOR] Authenticating...');
     await this.connection.authenticate({
-      methodId: 'oauth-personal'
+      methodId: 'oauth-personal',
     });
 
     await this.establishSession();
@@ -303,8 +490,11 @@ export class ACPMediator {
     logger.info('[ACP_MEDIATOR] Session established.');
   }
 
-  public async ask(text: string): Promise<string> {
+  public async ask(text: string, options: { timeoutMs?: number } = {}): Promise<string> {
     if (!this.connection || !this.acpSessionId) throw new Error('Not booted.');
+    if (this.crashState) throw this.runtimeCrashedError();
+    if (this.pendingAsk)
+      throw new Error(`Agent runtime ${this.options.threadId} already has a pending turn`);
 
     // 1. Poll ISM Bus for incoming UI events before this turn
     const ismMessages = ptyEngine.popMessages(this.options.threadId, 'KYBERION-PRIME');
@@ -312,9 +502,12 @@ export class ACPMediator {
 
     if (ismMessages.length > 0) {
       const uiEvents = ismMessages
-        .filter(m => typeof m.payload === 'object' && m.payload.type === 'a2ui_action')
-        .map(m => `[UI_EVENT] User performed "${m.payload.event}" on UI. Data: ${JSON.stringify(m.payload.data)}`);
-      
+        .filter((m) => typeof m.payload === 'object' && m.payload.type === 'a2ui_action')
+        .map(
+          (m) =>
+            `[UI_EVENT] User performed "${m.payload.event}" on UI. Data: ${JSON.stringify(m.payload.data)}`
+        );
+
       if (uiEvents.length > 0) {
         logger.info(`[ACP_MEDIATOR] Enriching prompt with ${uiEvents.length} UI events.`);
         enrichedPrompt = `${uiEvents.join('\n')}\n\nUser Question: ${text}`;
@@ -332,9 +525,28 @@ export class ACPMediator {
     this.log('prompt', enrichedPrompt.slice(0, 200));
     logger.info(`[ACP_MEDIATOR] Asking: "${enrichedPrompt.slice(0, 100)}..."`);
 
-    const response = await this.connection.prompt({
-      sessionId: this.acpSessionId,
-      prompt: [{ type: 'text', text: enrichedPrompt }]
+    const timeoutMs =
+      options.timeoutMs ??
+      this.options.turnTimeoutMs ??
+      Number(process.env.KYBERION_AGENT_TURN_TIMEOUT_MS || 60_000);
+    const response = await new Promise<any>((resolve, reject) => {
+      const timeout =
+        timeoutMs > 0
+          ? setTimeout(
+              () => reject(new AgentTurnTimeoutError(this.options.threadId, timeoutMs)),
+              timeoutMs
+            )
+          : undefined;
+      this.pendingAsk = { reject, timeout };
+      this.connection
+        .prompt({
+          sessionId: this.acpSessionId,
+          prompt: [{ type: 'text', text: enrichedPrompt }],
+        })
+        .then(resolve, reject);
+    }).finally(() => {
+      if (this.pendingAsk?.timeout) clearTimeout(this.pendingAsk.timeout);
+      this.pendingAsk = null;
     });
     this.updateUsageFromPayload(response);
     return this.accumulatedResponse || `(No text, stopReason: ${response.stopReason})`;
@@ -350,6 +562,7 @@ export class ACPMediator {
 
   public async shutdown(): Promise<void> {
     if (this.child) {
+      this.shuttingDown = true;
       stopManagedProcess(this.runtimeResourceId, this.child);
       this.child = null;
     }
@@ -366,9 +579,18 @@ function extractUsageSummary(payload: unknown): ProviderUsageSummary | null {
     if (!current || typeof current !== 'object') continue;
     const usage = (current as any).usage;
     if (usage && typeof usage === 'object') {
-      const inputTokens = coerceNumber(usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens);
-      const outputTokens = coerceNumber(usage.outputTokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.completion_tokens);
-      const totalTokens = coerceNumber(usage.totalTokens ?? usage.total_tokens) ?? ((inputTokens ?? 0) + (outputTokens ?? 0));
+      const inputTokens = coerceNumber(
+        usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens
+      );
+      const outputTokens = coerceNumber(
+        usage.outputTokens ??
+          usage.output_tokens ??
+          usage.completionTokens ??
+          usage.completion_tokens
+      );
+      const totalTokens =
+        coerceNumber(usage.totalTokens ?? usage.total_tokens) ??
+        (inputTokens ?? 0) + (outputTokens ?? 0);
       return {
         inputTokens,
         outputTokens,
@@ -390,4 +612,37 @@ function coerceNumber(value: unknown): number | undefined {
     if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
+}
+
+async function waitForBootSignal(
+  child: ChildProcess,
+  label: string,
+  timeoutMs = Number(process.env.KYBERION_AGENT_BOOT_READY_TIMEOUT_MS || 5000)
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const done = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const cleanup = (): void => {
+      child.off('spawn', done);
+      child.stdout?.off('data', onData);
+      child.stderr?.off('data', onData);
+      if (timer) clearTimeout(timer);
+    };
+    const onData = (): void => done();
+    const timer = setTimeout(() => {
+      logger.warn(
+        `[ACP_MEDIATOR] Boot ready signal timeout for ${label}; continuing after ${timeoutMs}ms`
+      );
+      done();
+    }, timeoutMs);
+    timer.unref?.();
+    child.once('spawn', done);
+    child.stdout?.once('data', onData);
+    child.stderr?.once('data', onData);
+  });
 }
