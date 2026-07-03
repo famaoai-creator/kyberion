@@ -2,25 +2,47 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
 
 const ENV_WHITELIST = [
-  'PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'TERM', 'NODE_ENV',
-  'NVM_DIR', 'NVM_BIN', 'GOOGLE_API_KEY', 'GEMINI_API_KEY',
-  'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'MISSION_ID', 'MISSION_ROLE', 'KYBERION_PERSONA',
+  'PATH',
+  'HOME',
+  'USER',
+  'SHELL',
+  'LANG',
+  'TERM',
+  'NODE_ENV',
+  'NVM_DIR',
+  'NVM_BIN',
+  'GOOGLE_API_KEY',
+  'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'MISSION_ID',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
   'CODEX_HOME',
   // SSL/Proxy
-  'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
-  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
-  'http_proxy', 'https_proxy', 'no_proxy',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
 ];
 function safeEnv(): NodeJS.ProcessEnv {
   // Locally a relaxed map; cast at the boundary so callers see ProcessEnv
   // (Next 15 augmentation requires NODE_ENV; we treat that as opaque here).
   const env: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
-  for (const k of ENV_WHITELIST) { if (process.env[k]) env[k] = process.env[k] as string; }
+  for (const k of ENV_WHITELIST) {
+    if (process.env[k]) env[k] = process.env[k] as string;
+  }
   return env as unknown as NodeJS.ProcessEnv;
 }
 
@@ -54,7 +76,10 @@ export interface AgentAskOptions extends Record<string, unknown> {
  */
 export interface AgentEnhancer {
   name: string;
-  onBeforeAsk?(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }>;
+  onBeforeAsk?(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<{ prompt: string; options?: AgentAskOptions }>;
   onAfterAsk?(response: AgentResponse): Promise<AgentResponse>;
 }
 
@@ -63,7 +88,11 @@ export interface AgentAdapter {
   ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
   shutdown(): Promise<void>;
   getRuntimeInfo?(): Record<string, unknown>;
-  refreshContext?(): Promise<{ mode: 'soft' | 'stateless'; sessionId?: string | null; threadId?: string | null }>;
+  refreshContext?(): Promise<{
+    mode: 'soft' | 'stateless';
+    sessionId?: string | null;
+    threadId?: string | null;
+  }>;
   addEnhancer?(enhancer: AgentEnhancer): void;
 }
 
@@ -76,6 +105,37 @@ function summarizePromptForLog(prompt: string, maxChars = 200): string {
   const oneLine = prompt.replace(/\s+/g, ' ').trim();
   if (oneLine.length <= maxChars) return oneLine;
   return `${oneLine.slice(0, maxChars)}...`;
+}
+
+async function waitForBootSignal(
+  child: ChildProcess,
+  label: string,
+  timeoutMs = Number(process.env.KYBERION_AGENT_BOOT_READY_TIMEOUT_MS || 5000)
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const done = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const cleanup = (): void => {
+      child.off('spawn', done);
+      child.stdout?.off('data', onData);
+      child.stderr?.off('data', onData);
+      if (timer) clearTimeout(timer);
+    };
+    const onData = (): void => done();
+    const timer = setTimeout(() => {
+      logger.warn(`[UAA] Boot ready signal timeout for ${label}; continuing after ${timeoutMs}ms`);
+      done();
+    }, timeoutMs);
+    timer.unref?.();
+    child.once('spawn', done);
+    child.stdout?.once('data', onData);
+    child.stderr?.once('data', onData);
+  });
 }
 
 function isSafeReadOnlyPermissionTitle(title: string): boolean {
@@ -117,12 +177,12 @@ async function applyEnhancersBeforeAsk(
     const enhanced = await enhancer.onBeforeAsk(currentPrompt, currentOptions);
     currentPrompt = enhanced.prompt;
     currentOptions = { ...currentOptions, ...(enhanced.options || {}) };
-    
+
     if (currentPrompt !== originalPrompt) {
-      trace.push({ 
-        enhancer: enhancer.name, 
-        action: 'modify_prompt', 
-        details: `Diff: ${currentPrompt.length - originalPrompt.length} chars` 
+      trace.push({
+        enhancer: enhancer.name,
+        action: 'modify_prompt',
+        details: `Diff: ${currentPrompt.length - originalPrompt.length} chars`,
       });
     }
   }
@@ -130,7 +190,7 @@ async function applyEnhancersBeforeAsk(
 }
 
 async function applyEnhancersAfterAsk(
-  enhancers: AgentEnhancer[], 
+  enhancers: AgentEnhancer[],
   response: AgentResponse
 ): Promise<AgentResponse> {
   let next = response;
@@ -203,15 +263,15 @@ abstract class BaseACPAdapter implements AgentAdapter {
       const lines = guestBuffer.split('\n');
       guestBuffer = lines.pop() || '';
       for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('{')) {
-            sdkInput.write(trimmed + '\n');
-            if (this.runtimeResourceId) {
-              touchManagedProcess(this.runtimeResourceId);
-            }
+        const trimmed = line.trim();
+        if (trimmed.startsWith('{')) {
+          sdkInput.write(trimmed + '\n');
+          if (this.runtimeResourceId) {
+            touchManagedProcess(this.runtimeResourceId);
           }
         }
-      });
+      }
+    });
 
     sdkOutput.on('data', (data) => {
       const msg = data.toString();
@@ -226,18 +286,18 @@ abstract class BaseACPAdapter implements AgentAdapter {
       (agent) => ({
         sessionUpdate: async (params: any) => {
           logger.info(`[UAA_NOTIF] ${JSON.stringify(params)}`);
-          
+
           // RECURSIVE SCAN for text/thought chunks
           const findContent = (obj: any) => {
             if (!obj || typeof obj !== 'object') return;
-            
+
             // Look for Gemini-style update
             if (obj.sessionUpdate === 'agent_message_chunk' && obj.content?.text) {
               this.accumulatedResponse += obj.content.text;
             } else if (obj.sessionUpdate === 'agent_thought_chunk' && obj.content?.text) {
               this.accumulatedThought += obj.content.text;
             }
-            
+
             // Look for Codex-style turn update
             if (obj.turn?.items) {
               for (const item of obj.turn.items) {
@@ -266,29 +326,44 @@ abstract class BaseACPAdapter implements AgentAdapter {
           logger.warn(`[UAA_PERMISSION] Auto-denied non-read operation: ${params.toolCall?.title}`);
           return { outcome: 'denied' as const };
         },
-        async readTextFile(params) { throw new Error('Not implemented'); },
-        async writeTextFile(params) { throw new Error('Not implemented'); },
-        async createTerminal(params) { throw new Error('Not implemented'); },
+        async readTextFile(params) {
+          throw new Error('Not implemented');
+        },
+        async writeTextFile(params) {
+          throw new Error('Not implemented');
+        },
+        async createTerminal(params) {
+          throw new Error('Not implemented');
+        },
         extMethod: async (m, p) => ({}),
-        extNotification: async (m, p) => {}
+        extNotification: async (m, p) => {},
       }),
       ndJsonStream(Writable.toWeb(sdkOutput) as any, Readable.toWeb(sdkInput) as any)
     );
 
-    await new Promise(r => setTimeout(r, 2000));
-    await this.connection.initialize({ protocolVersion: 1, capabilities: {}, clientInfo: { name: 'Kyberion', version: '1.0.0' } });
-    
-    try { await this.connection.extMethod(this.dialect.authenticate, { methodId: this.authMethod, type: this.authMethod }); } catch (e) {}
+    await waitForBootSignal(this.child, `agent-adapter:${this.bootCommand}`);
+    await this.connection.initialize({
+      protocolVersion: 1,
+      capabilities: {},
+      clientInfo: { name: 'Kyberion', version: '1.0.0' },
+    });
 
-    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, { 
-      cwd: PROJECT_ROOT, 
+    try {
+      await this.connection.extMethod(this.dialect.authenticate, {
+        methodId: this.authMethod,
+        type: this.authMethod,
+      });
+    } catch (e) {}
+
+    const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
+      cwd: PROJECT_ROOT,
       workingDirectory: PROJECT_ROOT,
-      mcpServers: [] 
+      mcpServers: [],
     });
 
     // ROBUST ID EXTRACTION: Check all known locations
     this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
-    
+
     if (!this.acpSessionId) {
       throw new Error(`Failed to extract session ID from response: ${JSON.stringify(sessionRes)}`);
     }
@@ -299,7 +374,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       // @ts-ignore
       await this.connection.extMethod('session/set_model', {
         sessionId: this.acpSessionId,
-        modelId: 'gemini-2.5-flash'
+        modelId: resolveRuntimeModelId('gemini-default'),
       });
     } catch (e) {}
   }
@@ -313,7 +388,6 @@ abstract class BaseACPAdapter implements AgentAdapter {
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
 
-    
     // @ts-ignore
     const response: any = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
@@ -321,7 +395,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       prompt: [{ type: 'text', text: enhanced.prompt }],
       content: [{ type: 'text', text: enhanced.prompt }],
       input: [{ type: 'text', text: enhanced.prompt }],
-      ...enhanced.options
+      ...enhanced.options,
     });
     this.usageSummary = extractUsageSummary(response);
 
@@ -331,8 +405,8 @@ abstract class BaseACPAdapter implements AgentAdapter {
     let finalText = this.accumulatedResponse;
     if (!finalText && response.turn?.content) {
       finalText = (response.turn.content as any[])
-        .filter(p => p.type === 'text')
-        .map(p => p.text)
+        .filter((p) => p.type === 'text')
+        .map((p) => p.text)
         .join('\n');
     }
 
@@ -340,7 +414,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       text: finalText,
       thought: this.accumulatedThought,
       stopReason: (response as any).stopReason || 'completed',
-      trace
+      trace,
     };
     return applyEnhancersAfterAsk(this.enhancers, agentResponse);
   }
@@ -369,7 +443,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
       workingDirectory: PROJECT_ROOT,
-      mcpServers: []
+      mcpServers: [],
     });
     this.acpSessionId = sessionRes.sessionId || sessionRes.threadId || sessionRes.thread?.id;
     return { mode: 'soft', sessionId: this.acpSessionId };
@@ -383,12 +457,17 @@ export interface GeminiAdapterOptions {
 export class GeminiAdapter extends BaseACPAdapter {
   private options: GeminiAdapterOptions;
 
-  constructor(options?: GeminiAdapterOptions) { 
-    super('gemini', ['--acp'], {
-      authenticate: 'authenticate',
-      newSession: 'session/new',
-      prompt: 'session/prompt'
-    }, 'oauth-personal'); 
+  constructor(options?: GeminiAdapterOptions) {
+    super(
+      'gemini',
+      ['--acp'],
+      {
+        authenticate: 'authenticate',
+        newSession: 'session/new',
+        prompt: 'session/prompt',
+      },
+      'oauth-personal'
+    );
     this.options = options || {};
 
     // Auto-apply Gemini Add-ons for Pro models
@@ -401,7 +480,7 @@ export class GeminiAdapter extends BaseACPAdapter {
 
   public async boot(): Promise<void> {
     await super.boot();
-    const targetModel = this.options.model || process.env.KYBERION_GEMINI_MODEL || 'gemini-2.5-flash';
+    const targetModel = this.options.model || resolveRuntimeModelId('gemini-default');
     try {
       // @ts-ignore
       await this.connection?.extMethod('session/set_model', {
@@ -418,13 +497,19 @@ export class GeminiAdapter extends BaseACPAdapter {
 export class GeminiPhaseAwareInstructionEnhancer implements AgentEnhancer {
   public name = 'GeminiPhaseAwareInstructionEnhancer';
 
-  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
+  public async onBeforeAsk(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<{ prompt: string; options?: AgentAskOptions }> {
     if (!options?.phase) return { prompt, options };
 
     const phaseInstructions: Record<string, string> = {
-      alignment: 'Focus on understanding intent, clarifying ambiguity, and defining clear success criteria.',
-      execution: 'Prioritize surgical, deterministic code changes. Follow AGENTS.md strictly. Test before finality.',
-      review: 'Critically analyze changes for regressions, security leaks, and architectural consistency.',
+      alignment:
+        'Focus on understanding intent, clarifying ambiguity, and defining clear success criteria.',
+      execution:
+        'Prioritize surgical, deterministic code changes. Follow AGENTS.md strictly. Test before finality.',
+      review:
+        'Critically analyze changes for regressions, security leaks, and architectural consistency.',
     };
 
     const instruction = phaseInstructions[options.phase];
@@ -448,15 +533,20 @@ ${prompt}`;
 export class GeminiJsonModeEnforcer implements AgentEnhancer {
   public name = 'GeminiJsonModeEnforcer';
 
-  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
+  public async onBeforeAsk(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<{ prompt: string; options?: AgentAskOptions }> {
     // If the task implies structured output (ADF, manifest, etc.), ensure JSON mode
     const structuredTriggers = [/\badf\b/i, /\bmanifest\b/i, /\bschema\b/i, /\bjson\b/i];
-    const isStructured = structuredTriggers.some(t => t.test(prompt)) || options?.responseMimeType === 'application/json';
+    const isStructured =
+      structuredTriggers.some((t) => t.test(prompt)) ||
+      options?.responseMimeType === 'application/json';
 
     if (isStructured) {
-      const enhancedOptions = { 
-        ...options, 
-        responseMimeType: 'application/json' as const 
+      const enhancedOptions = {
+        ...options,
+        responseMimeType: 'application/json' as const,
       };
       const enhancedPrompt = `${prompt}\n\nIMPORTANT: Return valid JSON ONLY. No markdown wrappers.`;
       return { prompt: enhancedPrompt, options: enhancedOptions };
@@ -467,13 +557,16 @@ export class GeminiJsonModeEnforcer implements AgentEnhancer {
 }
 
 /**
- * Gemini-specific Add-on: Loads "Wisdom" from the evolution history 
+ * Gemini-specific Add-on: Loads "Wisdom" from the evolution history
  * to leverage Gemini's large context window for self-improvement.
  */
 export class GeminiWisdomEnhancer implements AgentEnhancer {
   public name = 'GeminiWisdomEnhancer';
 
-  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
+  public async onBeforeAsk(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<{ prompt: string; options?: AgentAskOptions }> {
     const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/product/evolution');
     let wisdomContext = '';
 
@@ -485,7 +578,7 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
           .filter((f) => f.endsWith('.md'))
           .sort((a, b) => a.localeCompare(b))
           .slice(-5);
-        
+
         for (const file of mdFiles) {
           const content = safeReadFile(path.join(wisdomDir, file), { encoding: 'utf8' }) as string;
           wisdomContext += `\n--- Lesson from ${file} ---\n${content}\n`;
@@ -505,7 +598,7 @@ ${wisdomContext}
 
 User Request:
 ${prompt}`;
-      
+
       return { prompt: enhancedPrompt, options };
     }
 
@@ -527,7 +620,10 @@ export class CodexExecutionEnhancer implements AgentEnhancer {
 
   constructor(private options: CodexExecutionEnhancerOptions = {}) {}
 
-  public async onBeforeAsk(prompt: string, options?: AgentAskOptions): Promise<{ prompt: string; options?: AgentAskOptions }> {
+  public async onBeforeAsk(
+    prompt: string,
+    options?: AgentAskOptions
+  ): Promise<{ prompt: string; options?: AgentAskOptions }> {
     const context = this.loadExecutionContext();
     if (!context) return { prompt, options };
 
@@ -561,7 +657,9 @@ ${prompt}`;
       this.cachedContext = `${header}\n\n${excerpt}`;
       return this.cachedContext;
     } catch (error: any) {
-      logger.warn(`[CodexEnhancer] Failed to load AGENTS.md context: ${error?.message || String(error)}`);
+      logger.warn(
+        `[CodexEnhancer] Failed to load AGENTS.md context: ${error?.message || String(error)}`
+      );
       this.cachedContext = '';
       return this.cachedContext;
     }
@@ -591,13 +689,13 @@ export class CodexAdapter implements AgentAdapter {
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
     logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
     const { spawnSync } = await import('node:child_process');
-    
+
     try {
       // Pass the text as a single argument to npx/codex exec
       const res = spawnSync('npx', ['codex', 'exec', '--json', enhanced.prompt], {
         encoding: 'utf8',
         env: safeEnv(),
-        shell: false 
+        shell: false,
       });
 
       if (res.error) throw res.error;
@@ -612,7 +710,7 @@ export class CodexAdapter implements AgentAdapter {
         text: parsed.message || parsed.content || res.stdout,
         thought: parsed.thought,
         stopReason: 'completed',
-        trace
+        trace,
       };
       return applyEnhancersAfterAsk(this.enhancers, agentResponse);
     } catch (e: any) {
@@ -662,13 +760,19 @@ export class AgyAdapter implements AgentAdapter {
 
   public async ask(text: string, options?: AgentAskOptions): Promise<AgentResponse> {
     const isInteractive = options?.interactive === true;
-    logger.info(`[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`);
+    logger.info(
+      `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`
+    );
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
     const { spawnSync } = await import('node:child_process');
 
     try {
-      const bin = this.options.bin || process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN || 'agy';
-      
+      const bin =
+        this.options.bin ||
+        process.env.KYBERION_ANTIGRAVITY_CLI_BIN ||
+        process.env.KYBERION_AGY_CLI_BIN ||
+        'agy';
+
       const args: string[] = [];
       if (isInteractive) {
         args.push('-i');
@@ -723,13 +827,14 @@ export class AgyAdapter implements AgentAdapter {
       }
 
       const output = (res.stdout || '').trim();
-      if (res.stderr) this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
+      if (res.stderr)
+        this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
 
       // Agy response extraction (if output starts with JSON or has ```json wrapper)
       const lines = output.split('\n');
-      const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
+      const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
       if (jsonStartIdx !== -1) {
         const cleanStdout = lines.slice(jsonStartIdx).join('\n');
         try {
@@ -798,10 +903,22 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private runtimeResourceId: string | null = null;
   private buffer = '';
   private nextId = 1;
-  private pendingRequests: Map<number, { resolve: (value: any) => void; reject: (err: Error) => void; timeout?: ReturnType<typeof setTimeout> }> = new Map();
+  private pendingRequests: Map<
+    number,
+    {
+      resolve: (value: any) => void;
+      reject: (err: Error) => void;
+      timeout?: ReturnType<typeof setTimeout>;
+    }
+  > = new Map();
   private threadId: string | null = null;
   private currentTurnId: string | null = null;
-  private pendingTurn: { turnId: string; resolve: (res: AgentResponse) => void; reject: (err: Error) => void; timeout: ReturnType<typeof setTimeout> } | null = null;
+  private pendingTurn: {
+    turnId: string;
+    resolve: (res: AgentResponse) => void;
+    reject: (err: Error) => void;
+    timeout: ReturnType<typeof setTimeout>;
+  } | null = null;
   private accumulatedText = '';
   private sawAgentDelta = false;
   private logBuffer: { ts: number; type: string; content: string }[] = [];
@@ -885,7 +1002,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
       if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
     });
     this.child.on('exit', (code, signal) => {
-      const err = new Error(`Codex app-server exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`);
+      const err = new Error(
+        `Codex app-server exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`
+      );
       for (const pending of this.pendingRequests.values()) {
         if (pending.timeout) clearTimeout(pending.timeout);
         pending.reject(err);
@@ -899,28 +1018,39 @@ export class CodexAppServerAdapter implements AgentAdapter {
     });
 
     const bootTimeoutMs = this.options.timeoutMs ?? 20000;
-    await this.sendRequest('initialize', {
-      clientInfo: { name: 'Kyberion', version: '1.0.0' },
-      capabilities: { experimentalApi: false, optOutNotificationMethods: [] },
-    }, bootTimeoutMs);
+    await this.sendRequest(
+      'initialize',
+      {
+        clientInfo: { name: 'Kyberion', version: '1.0.0' },
+        capabilities: { experimentalApi: false, optOutNotificationMethods: [] },
+      },
+      bootTimeoutMs
+    );
 
     const approvalMode = this.options.approvalMode || 'strict';
     const sandboxMode = this.getSandboxMode();
 
-    const threadRes: any = await this.sendRequest('thread/start', {
-      model: this.options.model ?? undefined,
-      modelProvider: this.options.modelProvider ?? undefined,
-      cwd,
-      approvalPolicy: this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
-      sandbox: sandboxMode,
-      developerInstructions: this.options.systemPrompt ?? undefined,
-      experimentalRawEvents: false,
-      persistExtendedHistory: false,
-    }, bootTimeoutMs);
+    const threadRes: any = await this.sendRequest(
+      'thread/start',
+      {
+        model: this.options.model ?? undefined,
+        modelProvider: this.options.modelProvider ?? undefined,
+        cwd,
+        approvalPolicy:
+          this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
+        sandbox: sandboxMode,
+        developerInstructions: this.options.systemPrompt ?? undefined,
+        experimentalRawEvents: false,
+        persistExtendedHistory: false,
+      },
+      bootTimeoutMs
+    );
 
     this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
     if (!this.threadId) {
-      throw new Error(`Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`);
+      throw new Error(
+        `Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`
+      );
     }
     logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
   }
@@ -936,14 +1066,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
     this.sawAgentDelta = false;
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: enhanced.prompt });
 
-    const turnRes: any = await this.sendRequest('turn/start', {
-      threadId: this.threadId,
-      input: [{ type: 'text', text: enhanced.prompt, text_elements: [] }],
-      model: this.options.model ?? undefined,
-      cwd: this.options.cwd ?? undefined,
-      sandboxPolicy: this.buildSandboxPolicy(),
-      ...enhanced.options,
-    }, this.options.timeoutMs ?? 20000);
+    const turnRes: any = await this.sendRequest(
+      'turn/start',
+      {
+        threadId: this.threadId,
+        input: [{ type: 'text', text: enhanced.prompt, text_elements: [] }],
+        model: this.options.model ?? undefined,
+        cwd: this.options.cwd ?? undefined,
+        sandboxPolicy: this.buildSandboxPolicy(),
+        ...enhanced.options,
+      },
+      this.options.timeoutMs ?? 20000
+    );
 
     const turnId = turnRes?.turn?.id || turnRes?.turnId;
     if (turnId) this.currentTurnId = turnId;
@@ -955,7 +1089,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const early = this.earlyTurnResults.get(turnId);
     if (early) {
       this.earlyTurnResults.delete(turnId);
-      return applyEnhancersAfterAsk(this.enhancers, { text: early.text, stopReason: early.stopReason, trace });
+      return applyEnhancersAfterAsk(this.enhancers, {
+        text: early.text,
+        stopReason: early.stopReason,
+        trace,
+      });
     }
 
     const timeoutMs = this.options.timeoutMs ?? 300000;
@@ -991,16 +1129,21 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const cwd = this.options.cwd || PROJECT_ROOT;
     const approvalMode = this.options.approvalMode || 'strict';
     const sandboxMode = this.getSandboxMode();
-    const threadRes: any = await this.sendRequest('thread/start', {
-      model: this.options.model ?? undefined,
-      modelProvider: this.options.modelProvider ?? undefined,
-      cwd,
-      approvalPolicy: this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
-      sandbox: sandboxMode,
-      developerInstructions: this.options.systemPrompt ?? undefined,
-      experimentalRawEvents: false,
-      persistExtendedHistory: false,
-    }, this.options.timeoutMs ?? 20000);
+    const threadRes: any = await this.sendRequest(
+      'thread/start',
+      {
+        model: this.options.model ?? undefined,
+        modelProvider: this.options.modelProvider ?? undefined,
+        cwd,
+        approvalPolicy:
+          this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
+        sandbox: sandboxMode,
+        developerInstructions: this.options.systemPrompt ?? undefined,
+        experimentalRawEvents: false,
+        persistExtendedHistory: false,
+      },
+      this.options.timeoutMs ?? 20000
+    );
     this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
     return { mode: 'soft', threadId: this.threadId };
   }
@@ -1074,7 +1217,11 @@ export class CodexAppServerAdapter implements AgentAdapter {
     if (method === 'rawResponseItem/completed') {
       if (this.threadId && params.threadId && params.threadId !== this.threadId) return;
       if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
-      if (!this.sawAgentDelta && params.item?.type === 'message' && params.item?.role === 'assistant') {
+      if (
+        !this.sawAgentDelta &&
+        params.item?.type === 'message' &&
+        params.item?.role === 'assistant'
+      ) {
         const content = Array.isArray(params.item?.content) ? params.item.content : [];
         const text = content
           .filter((c: any) => c?.type === 'output_text' && typeof c.text === 'string')
@@ -1098,7 +1245,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
       if (!turnId) return;
 
       const status = params.turn?.status || 'completed';
-      const stopReason = status === 'failed' ? 'error' : (status === 'interrupted' ? 'interrupted' : 'completed');
+      const stopReason =
+        status === 'failed' ? 'error' : status === 'interrupted' ? 'interrupted' : 'completed';
       const finalText = this.accumulatedText;
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: finalText.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
@@ -1138,7 +1286,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
       }
       case 'item/permissions/requestApproval': {
         this.sendResponse(id, {
-          permissions: relaxed ? (params?.permissions || {}) : {},
+          permissions: relaxed ? params?.permissions || {} : {},
           scope: relaxed ? 'session' : 'turn',
         });
         return;
@@ -1150,7 +1298,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
       case 'item/tool/call': {
         this.sendResponse(id, {
           success: false,
-          contentItems: [{ type: 'inputText', text: 'Dynamic tool calls are not supported by Kyberion.' }],
+          contentItems: [
+            { type: 'inputText', text: 'Dynamic tool calls are not supported by Kyberion.' },
+          ],
         });
         return;
       }
@@ -1226,7 +1376,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
     return parsed.every((cmd: any) => {
       const type = cmd?.type;
       if (type === 'read') return this.isPathAllowed(cmd?.path, params?.cwd);
-      if (type === 'list_files' || type === 'search') return this.isPathAllowed(cmd?.path, params?.cwd);
+      if (type === 'list_files' || type === 'search')
+        return this.isPathAllowed(cmd?.path, params?.cwd);
       return false;
     });
   }
@@ -1249,7 +1400,6 @@ export class CodexAppServerAdapter implements AgentAdapter {
     if (resolved === root) return true;
     return resolved.startsWith(root + path.sep);
   }
-
 }
 
 /**
@@ -1297,7 +1447,9 @@ export class ClaudeAdapter implements AgentAdapter {
   }
 
   public async boot(): Promise<void> {
-    logger.info(`[UAA] Claude Code ready (model: ${this.options.model || 'default'}, session: ${this.options.sessionId || 'new'})`);
+    logger.info(
+      `[UAA] Claude Code ready (model: ${this.options.model || 'default'}, session: ${this.options.sessionId || 'new'})`
+    );
   }
 
   public async ask(text: string): Promise<AgentResponse> {
@@ -1343,7 +1495,8 @@ export class ClaudeAdapter implements AgentAdapter {
       if (res.error) throw res.error;
 
       const output = (res.stdout || '').trim();
-      if (res.stderr) this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
+      if (res.stderr)
+        this.logBuffer.push({ ts: Date.now(), type: 'stderr', content: res.stderr.trim() });
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       try {
@@ -1356,7 +1509,10 @@ export class ClaudeAdapter implements AgentAdapter {
         };
       } catch (_) {
         // Fallback: treat as plain text
-        return { text: output || res.stderr || '', stopReason: res.status === 0 ? 'completed' : 'error' };
+        return {
+          text: output || res.stderr || '',
+          stopReason: res.status === 0 ? 'completed' : 'error',
+        };
       }
     } catch (e: any) {
       logger.error(`[UAA] Claude failed: ${e.message}`);
@@ -1388,13 +1544,13 @@ export class ClaudeAdapter implements AgentAdapter {
     if (allowedActuators.length > 0) {
       for (const actuator of allowedActuators) {
         const tools = ACTUATOR_TO_CLAUDE_TOOLS[actuator];
-        if (tools) tools.forEach(t => allowedTools.add(t));
+        if (tools) tools.forEach((t) => allowedTools.add(t));
       }
     }
 
     for (const actuator of deniedActuators) {
       const tools = ACTUATOR_TO_CLAUDE_TOOLS[actuator];
-      if (tools) tools.forEach(t => disallowedTools.add(t));
+      if (tools) tools.forEach((t) => disallowedTools.add(t));
     }
 
     return {
@@ -1422,7 +1578,10 @@ function createCodexAdapterFromEnv(): AgentAdapter {
   return new CodexAppServerAdapter({
     model: process.env.KYBERION_CODEX_MODEL,
     modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
-    approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
+    approvalMode:
+      (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
+        ? 'relaxed'
+        : 'strict',
   });
 }
 

@@ -8,8 +8,7 @@
  */
 
 import * as path from 'node:path';
-import * as fs from 'node:fs';
-import { logger, pathResolver } from '@agent/core';
+import { logger, pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
 import {
   registerScheduledPipeline,
   getSchedulesDueNow,
@@ -27,13 +26,13 @@ const TICK_INTERVAL_MS = 60_000;
 
 function collectPipelineFiles(dir: string): string[] {
   const found: string[] = [];
-  if (!fs.existsSync(dir)) return found;
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
+  if (!safeExistsSync(dir)) return found;
+  const entries = safeReaddir(dir);
+  for (const name of entries) {
+    const full = path.join(dir, name);
+    if (safeLstat(full).isDirectory()) {
       found.push(...collectPipelineFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith('.json')) {
+    } else if (name.endsWith('.json')) {
       found.push(full);
     }
   }
@@ -69,7 +68,9 @@ function syncSchedulesFromAdf(): void {
       });
       registered++;
     } catch (err: any) {
-      logger.warn(`[CHRONOS] Skipped ${path.relative(pathResolver.rootDir(), fullPath)}: ${err.message}`);
+      logger.warn(
+        `[CHRONOS] Skipped ${path.relative(pathResolver.rootDir(), fullPath)}: ${err.message}`
+      );
     }
   }
 
@@ -103,7 +104,7 @@ async function tick(): Promise<void> {
       const result = await runSteps(
         adf.steps,
         { ...(scheduled.context ?? {}), ...(adf.context ?? {}) },
-        { pipelinePath: scheduled.pipelinePath },
+        { pipelinePath: scheduled.pipelinePath }
       );
 
       const registry2 = loadScheduleRegistry();

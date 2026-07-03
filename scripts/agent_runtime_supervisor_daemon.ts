@@ -1,4 +1,6 @@
 import * as net from 'node:net';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   appendSupervisorEvent,
   askAgentRuntime,
@@ -22,7 +24,16 @@ import {
   stopAgentRuntime,
 } from '@agent/core';
 
-type SupervisorMethod = 'health' | 'ensure' | 'ask' | 'status' | 'list' | 'touch' | 'shutdown' | 'refresh' | 'restart';
+type SupervisorMethod =
+  | 'health'
+  | 'ensure'
+  | 'ask'
+  | 'status'
+  | 'list'
+  | 'touch'
+  | 'shutdown'
+  | 'refresh'
+  | 'restart';
 
 interface SupervisorRequest {
   id: string;
@@ -41,11 +52,71 @@ const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
 const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
 
-function toSnapshotResult(agentId: string, snapshot: ReturnType<typeof getAgentRuntimeSnapshot>, lease?: {
-  owner_id?: string;
-  owner_type?: string;
-  metadata?: Record<string, unknown>;
-}): Record<string, unknown> | null {
+export interface AgentRuntimeSupervisorDaemonOptions {
+  socketPath?: string;
+  lockPath?: string;
+  transport?: 'unix' | 'tcp';
+  host?: string;
+  port?: number;
+  exitOnFatalError?: boolean;
+  exitOnExistingHealthyDaemon?: boolean;
+  retryOnAddressInUse?: boolean;
+}
+
+export interface AgentRuntimeSupervisorDaemonInstance {
+  server: net.Server;
+  socketPath: string;
+  host?: string;
+  port?: number;
+  lockPath: string;
+  cleanup: () => void;
+}
+
+type TcpListenTarget = { host: string; port: number };
+type ListenTarget = string | TcpListenTarget;
+
+function resolveTransport(options: AgentRuntimeSupervisorDaemonOptions = {}): 'unix' | 'tcp' {
+  return (
+    options.transport ||
+    (process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT as 'unix' | 'tcp' | undefined) ||
+    'unix'
+  );
+}
+
+function resolveSocketPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
+  return (
+    options.socketPath || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH || SOCKET_PATH
+  );
+}
+
+function resolveLockPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
+  return (
+    options.lockPath || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH || DAEMON_LOCK_PATH
+  );
+}
+
+function resolveListenTarget(
+  options: AgentRuntimeSupervisorDaemonOptions,
+  socketPath: string
+): ListenTarget {
+  if (resolveTransport(options) === 'tcp') {
+    return {
+      host: options.host || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST || '127.0.0.1',
+      port: options.port ?? Number(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT || 0),
+    };
+  }
+  return socketPath;
+}
+
+function toSnapshotResult(
+  agentId: string,
+  snapshot: ReturnType<typeof getAgentRuntimeSnapshot>,
+  lease?: {
+    owner_id?: string;
+    owner_type?: string;
+    metadata?: Record<string, unknown>;
+  }
+): Record<string, unknown> | null {
   if (!snapshot) return null;
   return {
     agent_id: agentId,
@@ -60,15 +131,20 @@ function toSnapshotResult(agentId: string, snapshot: ReturnType<typeof getAgentR
   };
 }
 
-function ensureSocketDir(): void {
-  if (!safeExistsSync(SOCKET_DIR)) safeMkdir(SOCKET_DIR, { recursive: true });
+function ensureSocketDir(socketPath: string, transport: 'unix' | 'tcp'): void {
+  if (transport === 'tcp') return;
+  const socketDir = path.dirname(socketPath);
+  if (socketDir && !safeExistsSync(socketDir)) safeMkdir(socketDir, { recursive: true });
 }
 
 function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
   socket.end(`${JSON.stringify(response)}\n`);
 }
 
-async function handleRequest(request: SupervisorRequest): Promise<SupervisorResponse> {
+async function handleRequest(
+  request: SupervisorRequest,
+  socketLabel: string
+): Promise<SupervisorResponse> {
   try {
     switch (request.method) {
       case 'health':
@@ -78,7 +154,7 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
           result: {
             ok: true,
             pid: process.pid,
-            socket_path: SOCKET_PATH,
+            socket_path: socketLabel,
           },
         };
       case 'ensure': {
@@ -89,20 +165,29 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
           provider: String(payload.provider || ''),
           modelId: typeof payload.modelId === 'string' ? payload.modelId : undefined,
           systemPrompt: typeof payload.systemPrompt === 'string' ? payload.systemPrompt : undefined,
-          capabilities: Array.isArray(payload.capabilities) ? payload.capabilities.map(String) : undefined,
-          cwd: typeof payload.cwd === 'string' ? payload.cwd : rootDir(),
-          parentAgentId: typeof payload.parentAgentId === 'string' ? payload.parentAgentId : undefined,
-          missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
-          trustRequired: typeof payload.trustRequired === 'number' ? payload.trustRequired : undefined,
-          requestedBy: String(payload.requestedBy || 'supervisor_daemon'),
-          runtimeMetadata: payload.runtimeMetadata && typeof payload.runtimeMetadata === 'object'
-            ? payload.runtimeMetadata as Record<string, unknown>
+          capabilities: Array.isArray(payload.capabilities)
+            ? payload.capabilities.map(String)
             : undefined,
-          runtimeOwnerId: typeof payload.runtimeOwnerId === 'string' ? payload.runtimeOwnerId : undefined,
-          runtimeOwnerType: typeof payload.runtimeOwnerType === 'string' ? payload.runtimeOwnerType : undefined,
+          cwd: typeof payload.cwd === 'string' ? payload.cwd : rootDir(),
+          parentAgentId:
+            typeof payload.parentAgentId === 'string' ? payload.parentAgentId : undefined,
+          missionId: typeof payload.missionId === 'string' ? payload.missionId : undefined,
+          trustRequired:
+            typeof payload.trustRequired === 'number' ? payload.trustRequired : undefined,
+          requestedBy: String(payload.requestedBy || 'supervisor_daemon'),
+          runtimeMetadata:
+            payload.runtimeMetadata && typeof payload.runtimeMetadata === 'object'
+              ? (payload.runtimeMetadata as Record<string, unknown>)
+              : undefined,
+          runtimeOwnerId:
+            typeof payload.runtimeOwnerId === 'string' ? payload.runtimeOwnerId : undefined,
+          runtimeOwnerType:
+            typeof payload.runtimeOwnerType === 'string' ? payload.runtimeOwnerType : undefined,
         });
         const snapshot = getAgentRuntimeSnapshot(handle.agentId, 20);
-        const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === handle.agentId);
+        const lease = listAgentRuntimeLeaseSummaries().find(
+          (entry) => entry.agent_id === handle.agentId
+        );
         return {
           id: request.id,
           ok: true,
@@ -115,6 +200,7 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
           String(payload.agentId || ''),
           String(payload.prompt || ''),
           String(payload.requestedBy || 'supervisor_daemon'),
+          { timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined }
         );
         return {
           id: request.id,
@@ -125,15 +211,23 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
       case 'status': {
         const payload = request.payload || {};
         const agentId = String(payload.agentId || '');
-        const snapshot = getAgentRuntimeSnapshot(agentId, typeof payload.logLimit === 'number' ? payload.logLimit : 20);
+        const snapshot = getAgentRuntimeSnapshot(
+          agentId,
+          typeof payload.logLimit === 'number' ? payload.logLimit : 20
+        );
         const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === agentId);
         return {
           id: request.id,
           ok: true,
-          result: snapshot ? {
-            ...toSnapshotResult(agentId, snapshot, lease),
-            log: getAgentRuntimeLog(agentId, typeof payload.logLimit === 'number' ? payload.logLimit : 20),
-          } : null,
+          result: snapshot
+            ? {
+                ...toSnapshotResult(agentId, snapshot, lease),
+                log: getAgentRuntimeLog(
+                  agentId,
+                  typeof payload.logLimit === 'number' ? payload.logLimit : 20
+                ),
+              }
+            : null,
         };
       }
       case 'list': {
@@ -144,9 +238,11 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
           ok: true,
           result: snapshots.map((snapshot) => {
             const lease = leases.find((entry) => entry.agent_id === snapshot.agent.agentId);
-            return toSnapshotResult(snapshot.agent.agentId, snapshot, lease) || {
-              agent_id: snapshot.agent.agentId,
-            };
+            return (
+              toSnapshotResult(snapshot.agent.agentId, snapshot, lease) || {
+                agent_id: snapshot.agent.agentId,
+              }
+            );
           }),
         };
       }
@@ -164,7 +260,7 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
         const payload = request.payload || {};
         await stopAgentRuntime(
           String(payload.agentId || ''),
-          String(payload.requestedBy || 'supervisor_daemon'),
+          String(payload.requestedBy || 'supervisor_daemon')
         );
         return {
           id: request.id,
@@ -176,7 +272,7 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
         const payload = request.payload || {};
         const result = await refreshAgentRuntime(
           String(payload.agentId || ''),
-          String(payload.requestedBy || 'supervisor_daemon'),
+          String(payload.requestedBy || 'supervisor_daemon')
         );
         return {
           id: request.id,
@@ -188,10 +284,12 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
         const payload = request.payload || {};
         const handle = await restartAgentRuntime(
           String(payload.agentId || ''),
-          String(payload.requestedBy || 'supervisor_daemon'),
+          String(payload.requestedBy || 'supervisor_daemon')
         );
         const snapshot = getAgentRuntimeSnapshot(handle.agentId, 20);
-        const lease = listAgentRuntimeLeaseSummaries().find((entry) => entry.agent_id === handle.agentId);
+        const lease = listAgentRuntimeLeaseSummaries().find(
+          (entry) => entry.agent_id === handle.agentId
+        );
         return {
           id: request.id,
           ok: true,
@@ -210,49 +308,122 @@ async function handleRequest(request: SupervisorRequest): Promise<SupervisorResp
   }
 }
 
-async function main() {
+async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket =
+      typeof target === 'string'
+        ? net.createConnection(target)
+        : net.createConnection({ host: target.host, port: target.port });
+    let settled = false;
+    const done = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(value);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => {
+      socket.write(`${JSON.stringify({ id: 'health-probe', method: 'health' })}\n`);
+    });
+    socket.on('data', (chunk) => {
+      const line = String(chunk).trim();
+      if (!line) return done(false);
+      try {
+        const response = JSON.parse(line) as SupervisorResponse;
+        done(Boolean(response.ok));
+      } catch {
+        done(false);
+      }
+    });
+    socket.once('timeout', () => done(false));
+    socket.once('error', () => done(false));
+  });
+}
+
+export async function startAgentRuntimeSupervisorDaemon(
+  options: AgentRuntimeSupervisorDaemonOptions = {}
+): Promise<AgentRuntimeSupervisorDaemonInstance> {
   process.env.MISSION_ROLE ||= 'surface_runtime';
-  ensureSocketDir();
+  const transport = resolveTransport(options);
+  const socketPath = resolveSocketPath(options);
+  const lockPath = resolveLockPath(options);
+  ensureSocketDir(socketPath, transport);
+  const listenTarget = resolveListenTarget(options, socketPath);
+  let socketLabel = transport === 'tcp' ? '' : socketPath;
 
   // Multi-instance guard: use a PID-based lock file for the daemon's lifetime
   try {
-    safeCreateExclusiveFileSync(DAEMON_LOCK_PATH, process.pid.toString());
+    safeCreateExclusiveFileSync(lockPath, process.pid.toString());
   } catch (err: any) {
     // If lock already exists, try to read the PID
     let pid: number | undefined;
     try {
-      const content = String(safeReadFile(DAEMON_LOCK_PATH, { encoding: 'utf8' })).trim();
+      const content = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
       if (content) {
         pid = parseInt(content);
       } else {
         // Lock exists but empty? Wait and retry.
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const retryContent = String(safeReadFile(DAEMON_LOCK_PATH, { encoding: 'utf8' })).trim();
+        const retryContent = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
         if (retryContent) pid = parseInt(retryContent);
       }
-    } catch (_) {}
+    } catch (error: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to inspect daemon lock: ${error?.message || error}`
+      );
+    }
 
     if (pid && pid !== process.pid) {
       try {
         process.kill(pid, 0); // Check if process exists
-        logger.info(`[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`);
+        logger.info(
+          `[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`
+        );
         process.exit(0);
       } catch (killErr: any) {
         // Process does not exist, stale lock
-        try { safeUnlinkSync(DAEMON_LOCK_PATH); } catch (_) {}
-        try { safeCreateExclusiveFileSync(DAEMON_LOCK_PATH, process.pid.toString()); } catch (_) {}
+        try {
+          safeUnlinkSync(lockPath);
+        } catch (error: any) {
+          logger.warn(
+            `[agent-runtime-supervisor-daemon] failed to remove stale lock: ${error?.message || error}`
+          );
+        }
+        try {
+          safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+        } catch (error: any) {
+          logger.warn(
+            `[agent-runtime-supervisor-daemon] failed to recreate daemon lock: ${error?.message || error}`
+          );
+        }
       }
     } else {
       // No valid PID found, assume stale/broken and try to overwrite
-      try { safeUnlinkSync(DAEMON_LOCK_PATH); } catch (_) {}
-      try { safeCreateExclusiveFileSync(DAEMON_LOCK_PATH, process.pid.toString()); } catch (_) {}
+      try {
+        safeUnlinkSync(lockPath);
+      } catch (error: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to remove broken lock: ${error?.message || error}`
+        );
+      }
+      try {
+        safeCreateExclusiveFileSync(lockPath, process.pid.toString());
+      } catch (error: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to recreate daemon lock: ${error?.message || error}`
+        );
+      }
     }
   }
 
-  if (safeExistsSync(SOCKET_PATH)) {
+  if (transport === 'unix' && safeExistsSync(socketPath)) {
     try {
-      safeUnlinkSync(SOCKET_PATH);
-    } catch (_) {}
+      safeUnlinkSync(socketPath);
+    } catch (error: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to remove stale socket before listen: ${error?.message || error}`
+      );
+    }
   }
 
   const server = net.createServer((socket) => {
@@ -267,7 +438,7 @@ async function main() {
       }
       try {
         const request = JSON.parse(line) as SupervisorRequest;
-        const response = await handleRequest(request);
+        const response = await handleRequest(request, socketLabel || socketPath);
         writeResponse(socket, response);
       } catch (error: any) {
         writeResponse(socket, { id: 'invalid', ok: false, error: error?.message || String(error) });
@@ -275,40 +446,106 @@ async function main() {
     });
   });
 
+  let retriedListen = false;
   server.on('error', (error: any) => {
+    if (!retriedListen && error?.code === 'EADDRINUSE') {
+      retriedListen = true;
+      void (async () => {
+        const healthy = await probeDaemonHealth(listenTarget);
+        if (healthy) {
+          logger.info(
+            `[agent-runtime-supervisor-daemon] existing healthy daemon already bound at ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
+          );
+          if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+          return;
+        }
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] socket busy, retrying after stale socket cleanup: ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
+        );
+        try {
+          if (transport === 'unix' && safeExistsSync(socketPath)) safeUnlinkSync(socketPath);
+          server.listen(listenTarget);
+          return;
+        } catch (retryError: any) {
+          logger.error(
+            `[agent-runtime-supervisor-daemon] retry after EADDRINUSE failed: ${retryError?.message || retryError}`
+          );
+        }
+        if (options.exitOnFatalError !== false) process.exit(1);
+      })();
+      return;
+    }
     logger.error(`[agent-runtime-supervisor-daemon] ${error?.message || error}`);
-    process.exit(1);
+    if (options.exitOnFatalError !== false) process.exit(1);
   });
 
-  server.listen(SOCKET_PATH, () => {
-    appendSupervisorEvent({
-      decision: 'agent_runtime_supervisor_daemon_started',
-      pid: process.pid,
-      socket_path: SOCKET_PATH,
+  await new Promise<void>((resolve, reject) => {
+    server.once('listening', resolve);
+    server.listen(listenTarget, () => {
+      const address = server.address();
+      if (transport === 'tcp' && typeof address === 'object' && address) {
+        socketLabel = `${address.address}:${address.port}`;
+      }
+      appendSupervisorEvent({
+        decision: 'agent_runtime_supervisor_daemon_started',
+        pid: process.pid,
+        socket_path: socketLabel || socketPath,
+      });
+      logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
     });
-    logger.info(`[agent-runtime-supervisor-daemon] listening on ${SOCKET_PATH}`);
+    const timeout = setTimeout(
+      () => reject(new Error('agent_runtime_supervisor_daemon_start_timeout')),
+      5000
+    );
+    timeout.unref?.();
   });
 
   const cleanup = () => {
     try {
-      if (safeExistsSync(SOCKET_PATH)) safeUnlinkSync(SOCKET_PATH);
-    } catch (_) {}
+      if (transport === 'unix' && safeExistsSync(socketPath)) safeUnlinkSync(socketPath);
+    } catch (error: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to cleanup socket: ${error?.message || error}`
+      );
+    }
     try {
-      if (safeExistsSync(DAEMON_LOCK_PATH)) {
-        const currentPid = String(safeReadFile(DAEMON_LOCK_PATH, { encoding: 'utf8' })).trim();
+      if (safeExistsSync(lockPath)) {
+        const currentPid = String(safeReadFile(lockPath, { encoding: 'utf8' })).trim();
         if (currentPid === process.pid.toString()) {
-          safeUnlinkSync(DAEMON_LOCK_PATH);
+          safeUnlinkSync(lockPath);
         }
       }
-    } catch (_) {}
+    } catch (error: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to cleanup daemon lock: ${error?.message || error}`
+      );
+    }
   };
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
   process.once('exit', cleanup);
+
+  const address = server.address();
+  return {
+    server,
+    socketPath: transport === 'tcp' ? '' : socketPath,
+    host:
+      transport === 'tcp' && typeof address === 'object' && address ? address.address : undefined,
+    port: transport === 'tcp' && typeof address === 'object' && address ? address.port : undefined,
+    lockPath,
+    cleanup,
+  };
 }
 
+async function main() {
+  await startAgentRuntimeSupervisorDaemon();
+}
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exit(1);
-});
+const isDirect =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirect) {
+  main().catch((error: any) => {
+    logger.error(error?.message || String(error));
+    process.exit(1);
+  });
+}

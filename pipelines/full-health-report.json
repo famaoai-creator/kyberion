@@ -5,7 +5,11 @@
   "description": "Comprehensive health check and report generation.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🏥 Starting Full System Health Audit..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🏥 Starting Full System Health Audit..." }
+    },
     {
       "role": "source",
       "op": "system:shell",
@@ -16,13 +20,17 @@
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "diag_results", "type": "ShellResult" },
-      "params": { "cmd": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json" }
+      "params": {
+        "cmd": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json"
+      }
     },
     {
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "prod_results", "type": "ShellResult" },
-      "params": { "cmd": "node dist/scripts/run_pipeline.js --input pipelines/dev-productivity-audit.json" }
+      "params": {
+        "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/dev-productivity-audit.json"
+      }
     },
     {
       "role": "sink",
@@ -32,6 +40,10 @@
         "cmd": "echo '# Kyberion System Health Report\n\nGenerated on: {{run_utc_now}}\n\n## Vital Check\n```\n{{vital_results}}\n```\n\n## Diagnostics\n```\n{{diag_results}}\n```\n\n## Productivity Audit\n```\n{{prod_results}}\n```' > HEALTH_REPORT.md"
       }
     },
-    { "role": "sink", "op": "system:log", "params": { "message": "✅ Full health report generated: HEALTH_REPORT.md" } }
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ Full health report generated: HEALTH_REPORT.md" }
+    }
   ]
 }

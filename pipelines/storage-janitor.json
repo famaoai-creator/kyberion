@@ -1,0 +1,44 @@
+{
+  "action": "pipeline",
+  "name": "storage-janitor",
+  "version": "1.0.0",
+  "description": "Runs governed TTL cleanup for active/shared/tmp, shared logs, data-vault, and runtime retention directories via libs/core/storage-janitor.ts.",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md",
+    "implementation": "libs/core/storage-janitor.ts"
+  },
+  "context": {
+    "dry_run": false
+  },
+  "schedule": {
+    "id": "storage-janitor-daily",
+    "cron": "30 4 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "run_janitor",
+      "role": "source",
+      "op": "core:run_janitor",
+      "produces": {
+        "channel": "janitor_report",
+        "type": "JanitorReport"
+      },
+      "params": {
+        "dry_run": "{{dry_run}}",
+        "export_as": "janitor_report"
+      }
+    },
+    {
+      "id": "write_report",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "janitor_report",
+      "params": {
+        "path": "active/shared/tmp/storage-janitor-report.md",
+        "content": "# Storage Janitor Report\n\nTimestamp: {{janitor_report.timestamp}}\nDry run: {{janitor_report.dryRun}}\n\n## Tmp\nExpired: {{janitor_report.expiredTmp}}\nDeleted: {{janitor_report.deletedTmp}}\n\n## Logs\nExpired: {{janitor_report.expiredLogs}}\nRotated: {{janitor_report.rotatedLogs}}\n\n## Data Vault\nExpired: {{janitor_report.expiredDataVault}}\nDeleted: {{janitor_report.deletedDataVault}}\n\n## Runtime\nExpired: {{janitor_report.expiredRuntime}}\nDeleted: {{janitor_report.deletedRuntime}}\n\n## Errors\n{{janitor_report.errors}}"
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
@@ -8,7 +9,10 @@ function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): strin
   const to = (params.to ?? '').replace(/"/g, '\\"');
   const cc = (params.cc ?? '').replace(/"/g, '\\"');
   const subject = (params.subject ?? '(no subject)').replace(/"/g, '\\"');
-  const body = (params.body ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+  const body = (params.body ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n');
   const fromAddr = (params.from ?? process.env.KYBERION_EMAIL_FROM ?? '').replace(/"/g, '\\"');
 
   const sendLine = op === 'send' ? 'msg.send()' : '// draft only';
@@ -51,23 +55,31 @@ export class MacMailAppEmailProvider implements EmailProvider {
     return new Promise((resolve) => {
       const child = spawn('osascript', ['-l', 'JavaScript', '-e', script], {
         cwd: pathResolver.rootDir(),
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
 
       let stdout = '';
       let stderr = '';
 
-      child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-      child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk);
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
 
       child.on('close', (code) => {
         if (code === 0 && stdout.trim() === 'ok') {
-          resolve({ status: 'succeeded', provider: this.id, message: 'JXA mail operation completed successfully.' });
+          resolve({
+            status: 'succeeded',
+            provider: this.id,
+            message: 'JXA mail operation completed successfully.',
+          });
         } else {
           resolve({
             status: 'failed',
             provider: this.id,
-            error: stderr.trim() || `JXA script failed with exit code ${code}`
+            error: stderr.trim() || `JXA script failed with exit code ${code}`,
           });
         }
       });
@@ -79,7 +91,11 @@ export class SmtpEmailProvider implements EmailProvider {
   readonly id = 'smtp';
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(process.env.KYBERION_SMTP_HOST && process.env.KYBERION_SMTP_USER && process.env.KYBERION_SMTP_PASS);
+    return Boolean(
+      process.env.KYBERION_SMTP_HOST &&
+      process.env.KYBERION_SMTP_USER &&
+      process.env.KYBERION_SMTP_PASS
+    );
   }
 
   async send(params: EmailParams): Promise<EmailResult> {
@@ -115,23 +131,31 @@ print("ok")
     return new Promise((resolve) => {
       const child = spawn('python3', ['-c', pythonScript], {
         cwd: pathResolver.rootDir(),
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
 
       let stdout = '';
       let stderr = '';
 
-      child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-      child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk);
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
 
       child.on('close', (code) => {
         if (code === 0 && stdout.trim() === 'ok') {
-          resolve({ status: 'succeeded', provider: this.id, message: 'SMTP email sent successfully.' });
+          resolve({
+            status: 'succeeded',
+            provider: this.id,
+            message: 'SMTP email sent successfully.',
+          });
         } else {
           resolve({
             status: 'failed',
             provider: this.id,
-            error: stderr.trim() || `SMTP python execution failed with exit code ${code}`
+            error: stderr.trim() || `SMTP python execution failed with exit code ${code}`,
           });
         }
       });
@@ -177,10 +201,7 @@ let globalRouter: EmailPolicyRouter | null = null;
 
 function getRouter(): EmailPolicyRouter {
   if (!globalRouter) {
-    globalRouter = new EmailPolicyRouter([
-      new MacMailAppEmailProvider(),
-      new SmtpEmailProvider()
-    ]);
+    globalRouter = new EmailPolicyRouter([new MacMailAppEmailProvider(), new SmtpEmailProvider()]);
   }
   return globalRouter;
 }
