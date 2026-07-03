@@ -1131,12 +1131,17 @@ export type {
 export {
   loadModelRegistry,
   resolveReasoningModelRoute,
+  resolveTaskModelHint,
   resetReasoningModelRoutingCache,
 } from './reasoning-model-routing.js';
 export type {
   ModelRegistryEntry,
   ModelRegistryFile,
   ReasoningModelRoute,
+  TaskModelEffort,
+  TaskModelHint,
+  TaskModelHintInput,
+  TaskModelTier,
 } from './reasoning-model-routing.js';
 export {
   loadVoiceTaskProfileCatalog,
