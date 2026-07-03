@@ -29,6 +29,7 @@ import {
   logger,
   pathResolver,
   promoteMemoryCandidateToKnowledge,
+  promotePersonalMemoryCandidates,
   resolveMissionClassification,
   resolveMissionWorkflowDesign,
   resolveOrganizationMissionTeamTemplateCatalogId,
@@ -276,31 +277,34 @@ function rejectMemoryCandidate(candidateId: string, note?: string) {
   logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);
 }
 
-function promoteMemoryCandidate(
+async function promoteMemoryCandidate(
   candidateId: string,
   executionRole: 'mission_controller' | 'chronos_gateway' = 'mission_controller',
-  note?: string
+  note?: string,
+  supersedes?: string
 ) {
   if (!candidateId) {
     logger.error(
-      'Usage: mission_controller memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>]'
+      'Usage: mission_controller memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]'
     );
     return;
   }
-  const result = promoteMemoryCandidateToKnowledge({
+  const result = await promoteMemoryCandidateToKnowledge({
     candidateId,
     executionRole,
     ratificationNote: note,
+    supersedes,
   });
   logger.success(
     `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`
   );
 }
 
-function promotePendingMemoryCandidates(input: {
+async function promotePendingMemoryCandidates(input: {
   executionRole?: 'mission_controller' | 'chronos_gateway';
   dryRun?: boolean;
   note?: string;
+  supersedes?: string;
 }) {
   const executionRole = input.executionRole || 'mission_controller';
   const pending = listMemoryPromotionCandidates()
@@ -309,34 +313,43 @@ function promotePendingMemoryCandidates(input: {
 
   if (pending.length === 0) {
     logger.info('No approved memory candidates to promote.');
-    return;
   }
 
-  if (input.dryRun) {
+  let promoted = 0;
+  let failed = 0;
+  if (input.dryRun && pending.length > 0) {
     logger.info(`Dry run: ${pending.length} approved memory candidate(s) would be promoted.`);
     for (const row of pending) {
       console.log(
         `- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) ${row.source_ref}`
       );
     }
-    return;
-  }
-
-  let promoted = 0;
-  let failed = 0;
-  for (const row of pending) {
-    try {
-      const result = promoteMemoryCandidateToKnowledge({
-        candidateId: row.candidate_id,
-        executionRole,
-        ratificationNote: input.note,
-      });
-      promoted += 1;
-      logger.info(`🟢 promoted ${result.candidate.candidate_id} -> ${result.promotedRef}`);
-    } catch (err: any) {
-      failed += 1;
-      logger.warn(`⚠️ failed to promote ${row.candidate_id}: ${err?.message || err}`);
+  } else {
+    for (const row of pending) {
+      try {
+        const result = await promoteMemoryCandidateToKnowledge({
+          candidateId: row.candidate_id,
+          executionRole,
+          ratificationNote: input.note,
+          supersedes: input.supersedes,
+        });
+        promoted += 1;
+        logger.info(`🟢 promoted ${result.candidate.candidate_id} -> ${result.promotedRef}`);
+      } catch (err: any) {
+        failed += 1;
+        logger.warn(`⚠️ failed to promote ${row.candidate_id}: ${err?.message || err}`);
+      }
     }
+  }
+  const autopromote = await promotePersonalMemoryCandidates({
+    executionRole,
+    ratificationNote: input.note,
+    dryRun: input.dryRun,
+  });
+  if (autopromote.enabled) {
+    logger.info(
+      `🟣 personal autopromote: considered=${autopromote.considered}, promoted=${autopromote.promoted.length}, skipped=${autopromote.skipped.length}`
+    );
   }
   logger.success(`✅ Memory bulk promotion finished. promoted=${promoted}, failed=${failed}`);
 }
@@ -1196,7 +1209,7 @@ Lifecycle Commands:
                                  Verify a mission (active → distilling or back to active)
   distill  <ID>                  Extract knowledge via LLM (distilling → completed)
   finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
-  resume   [ID]                  Resume the last active mission (or specify ID)
+  resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
   dispatch-tickets <ID>          Register NEXT_TASKS as work items / issue payloads
                                  --ticket-targets workitem,github,jira
                                  --live-ticket-targets github,jira
@@ -1223,9 +1236,9 @@ Queue Commands:
                                  Mark a memory candidate as approved
   memory-reject <CANDIDATE_ID> [--note <TEXT>]
                                  Mark a memory candidate as rejected
-  memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>]
+  memory-promote <CANDIDATE_ID> [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]
                                  Promote an approved candidate to governed knowledge
-  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--dry-run]
+  memory-promote-pending [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>] [--dry-run]
                                  Bulk promote approved memory candidates in queue order
 
 Visibility Commands:

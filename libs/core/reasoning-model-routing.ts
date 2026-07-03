@@ -7,9 +7,13 @@ import type {
   ReasoningLevel,
   ReasoningLevelDecision,
   ReasoningLevelPolicy,
+  TaskModelEffort,
+  TaskModelPhaseKind,
+  TaskModelTier,
 } from './reasoning-level-policy.js';
 import { loadReasoningLevelPolicy } from './reasoning-level-policy.js';
 export { resolveRuntimeModelId, type RuntimeModelRole } from './runtime-model-defaults.js';
+export type { TaskModelEffort, TaskModelTier } from './reasoning-level-policy.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -27,6 +31,7 @@ export interface ModelRegistryEntry {
   provider: string;
   family: string;
   status: ModelStatus;
+  tier: TaskModelTier;
   cost_band?: 'low' | 'medium' | 'high' | 'very_high';
   latency_band?: 'low' | 'medium' | 'high';
   reasoning_confidence?: 'low' | 'medium' | 'high';
@@ -52,9 +57,6 @@ export interface ReasoningModelRoute {
   policy_version: string;
 }
 
-export type TaskModelTier = 'small' | 'standard' | 'large';
-export type TaskModelEffort = 'low' | 'medium' | 'high';
-
 export interface TaskModelHint {
   tier: TaskModelTier;
   effort: TaskModelEffort;
@@ -63,7 +65,7 @@ export interface TaskModelHint {
 }
 
 export interface TaskModelHintInput {
-  phase_kind: 'plan' | 'implement' | 'review' | 'mechanical';
+  phase_kind: TaskModelPhaseKind;
   risk?: string;
   estimated_scope?: string;
 }
@@ -143,6 +145,21 @@ function isEligibleTaskModel(model: ModelRegistryEntry): boolean {
   return model.status !== 'blocked' && model.status !== 'deprecated';
 }
 
+function resolveTaskModelRegistryTier(model: ModelRegistryEntry): TaskModelTier {
+  return model.tier;
+}
+
+function taskModelTierChoices(tier: TaskModelTier): TaskModelTier[] {
+  switch (tier) {
+    case 'small':
+      return ['small', 'standard', 'large'];
+    case 'standard':
+      return ['standard', 'large'];
+    case 'large':
+      return ['large'];
+  }
+}
+
 function scoreTaskModelStatus(status: ModelStatus): number {
   switch (status) {
     case 'approved':
@@ -162,18 +179,19 @@ function findTaskModelForTier(
 ): ModelRegistryEntry {
   const eligible = registry.models.filter(isEligibleTaskModel);
 
-  if (tier === 'small') {
-    const fastLane = eligible
-      .filter((model) => model.latency_band === 'low')
-      .filter((model) => model.role_fit.intent_compiler !== 'not_recommended')
-      .sort(
-        (left, right) =>
-          scoreTaskModelStatus(left.status) - scoreTaskModelStatus(right.status) ||
-          left.latency_band.localeCompare(right.latency_band) ||
-          right.reasoning_confidence.localeCompare(left.reasoning_confidence)
-      )[0];
-    if (fastLane) return fastLane;
-  }
+  const allowedTiers = taskModelTierChoices(tier);
+  const tierSorted = eligible
+    .filter((model) => allowedTiers.includes(resolveTaskModelRegistryTier(model)))
+    .filter((model) => model.role_fit.intent_compiler !== 'not_recommended')
+    .sort(
+      (left, right) =>
+        allowedTiers.indexOf(resolveTaskModelRegistryTier(left)) -
+          allowedTiers.indexOf(resolveTaskModelRegistryTier(right)) ||
+        scoreTaskModelStatus(left.status) - scoreTaskModelStatus(right.status) ||
+        left.latency_band.localeCompare(right.latency_band) ||
+        right.reasoning_confidence.localeCompare(left.reasoning_confidence)
+    )[0];
+  if (tierSorted) return tierSorted;
 
   const approvedPrimary = eligible.find(
     (model) => model.status === 'approved' && model.role_fit.intent_compiler === 'primary'
@@ -200,14 +218,38 @@ function normalizeScopeTier(estimatedScope?: string): TaskModelTier | undefined 
   return undefined;
 }
 
-function normalizeRiskTier(risk?: string): TaskModelTier | undefined {
+function normalizeScopeKey(estimatedScope?: string): 'S' | 'M' | 'L' | undefined {
+  const scope = String(estimatedScope || '')
+    .trim()
+    .toLowerCase();
+  if (!scope) return undefined;
+  if (['xs', 'extra-small', 'small', 's'].includes(scope)) return 'S';
+  if (['m', 'medium'].includes(scope)) return 'M';
+  if (['l', 'large', 'xl', 'extra-large'].includes(scope)) return 'L';
+  return undefined;
+}
+
+function normalizeRiskKey(
+  risk?: string
+): 'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes' | undefined {
   const normalized = String(risk || '')
     .trim()
     .toLowerCase();
   if (!normalized) return undefined;
-  if (['approval_required', 'high_stakes', 'high'].includes(normalized)) return 'large';
-  if (normalized === 'low') return 'small';
+  if (normalized === 'low') return 'low';
+  if (normalized === 'medium') return 'medium';
+  if (normalized === 'high') return 'high';
+  if (normalized === 'approval_required') return 'approval_required';
+  if (normalized === 'high_stakes') return 'high_stakes';
   return undefined;
+}
+
+function normalizeRiskTier(risk?: string): TaskModelTier | undefined {
+  const normalized = normalizeRiskKey(risk);
+  if (!normalized) return undefined;
+  if (normalized === 'low') return 'small';
+  if (normalized === 'medium') return 'standard';
+  return 'large';
 }
 
 function tierToEffort(tier: TaskModelTier): TaskModelEffort {
@@ -230,44 +272,119 @@ function tierReason(input: TaskModelHintInput, tier: TaskModelTier): string {
   return `${parts.join(', ')} -> ${tier}/${tierToEffort(tier)}`;
 }
 
+type TaskModelRoutingChoice = {
+  tier: TaskModelTier;
+  effort: TaskModelEffort;
+  model_id: string;
+};
+
+type TaskModelPhaseRouting = {
+  default: TaskModelRoutingChoice;
+  scope?: Partial<Record<'S' | 'M' | 'L', TaskModelRoutingChoice>>;
+  risk?: Partial<
+    Record<'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes', TaskModelRoutingChoice>
+  >;
+};
+
+function isEligibleTaskModelForChoice(
+  registry: ModelRegistryFile,
+  choice: TaskModelRoutingChoice
+): boolean {
+  const model = registry.models.find((entry) => entry.model_id === choice.model_id);
+  if (!model || !isEligibleTaskModel(model)) return false;
+  return resolveTaskModelRegistryTier(model) === choice.tier;
+}
+
+function resolveTaskModelRoutingChoice(
+  registry: ModelRegistryFile,
+  routing: NonNullable<ReasoningLevelPolicy['task_model_routing']>,
+  input: TaskModelHintInput
+): { choice: TaskModelRoutingChoice; route_reason: string } {
+  const phaseRouting = routing.phases[input.phase_kind] as TaskModelPhaseRouting | undefined;
+  const scopeKey = normalizeScopeKey(input.estimated_scope);
+  const riskKey = normalizeRiskKey(input.risk);
+  const reasons = [`phase_kind=${input.phase_kind}`];
+  let choice: TaskModelRoutingChoice = phaseRouting?.default || routing.default;
+
+  if (phaseRouting?.scope && scopeKey && phaseRouting.scope[scopeKey]) {
+    choice = phaseRouting.scope[scopeKey] as TaskModelRoutingChoice;
+    reasons.push(`scope=${scopeKey}`);
+  }
+  if (phaseRouting?.risk && riskKey && phaseRouting.risk[riskKey]) {
+    choice = phaseRouting.risk[riskKey] as TaskModelRoutingChoice;
+    reasons.push(`risk=${riskKey}`);
+  }
+
+  if (!isEligibleTaskModelForChoice(registry, choice)) {
+    const fallback = findTaskModelForTier(registry, choice.tier);
+    reasons.push(`fallback_model_id=${fallback.model_id}`);
+    return {
+      choice: {
+        tier: choice.tier,
+        effort: choice.effort,
+        model_id: fallback.model_id,
+      },
+      route_reason: `${reasons.join(', ')} -> ${choice.tier}/${choice.effort}`,
+    };
+  }
+
+  return {
+    choice,
+    route_reason: `${reasons.join(', ')} -> ${choice.tier}/${choice.effort}`,
+  };
+}
+
 export function resolveTaskModelHint(
   input: TaskModelHintInput,
   options: { registry?: ModelRegistryFile } = {}
 ): TaskModelHint {
   const registry = options.registry ?? loadModelRegistry();
-  const scopeTier = normalizeScopeTier(input.estimated_scope);
-  const riskTier = normalizeRiskTier(input.risk);
+  const routing = loadReasoningLevelPolicy().task_model_routing;
+  if (!routing) {
+    const scopeTier = normalizeScopeTier(input.estimated_scope);
+    const riskTier = normalizeRiskTier(input.risk);
+    let tier: TaskModelTier;
+    if (input.phase_kind === 'mechanical') {
+      tier = 'small';
+    } else if (input.phase_kind === 'review') {
+      tier = 'large';
+    } else if (input.phase_kind === 'plan') {
+      tier = scopeTier === 'small' ? 'standard' : 'large';
+    } else if (input.phase_kind === 'implement') {
+      tier =
+        riskTier === 'large' || scopeTier === 'large'
+          ? 'large'
+          : scopeTier === 'small' || riskTier === 'small'
+            ? 'small'
+            : 'standard';
+    } else {
+      tier = scopeTier || riskTier || 'standard';
+    }
 
-  let tier: TaskModelTier;
-  if (input.phase_kind === 'mechanical') {
-    tier = 'small';
-  } else if (input.phase_kind === 'review') {
-    tier = 'large';
-  } else if (input.phase_kind === 'plan') {
-    tier = scopeTier === 'small' ? 'standard' : 'large';
-  } else if (input.phase_kind === 'implement') {
-    tier =
-      riskTier === 'large' || scopeTier === 'large'
-        ? 'large'
-        : scopeTier === 'small' || riskTier === 'small'
-          ? 'small'
-          : 'standard';
-  } else {
-    tier = scopeTier || riskTier || 'standard';
+    if (riskTier === 'large') {
+      tier = 'large';
+    } else if (riskTier === 'small' && tier === 'standard') {
+      tier = 'small';
+    }
+
+    const model = findTaskModelForTier(registry, tier);
+    return {
+      tier,
+      effort: tierToEffort(tier),
+      model_id: model.model_id,
+      route_reason: tierReason(input, tier),
+    };
   }
 
-  if (riskTier === 'large') {
-    tier = 'large';
-  } else if (riskTier === 'small' && tier === 'standard') {
-    tier = 'small';
-  }
-
-  const model = findTaskModelForTier(registry, tier);
+  const routed = resolveTaskModelRoutingChoice(registry, routing, input);
+  const model =
+    registry.models.find((entry) => entry.model_id === routed.choice.model_id) ||
+    findTaskModelForTier(registry, routed.choice.tier);
   return {
-    tier,
-    effort: tierToEffort(tier),
+    tier: routed.choice.tier,
+    effort: routed.choice.effort,
     model_id: model.model_id,
-    route_reason: tierReason(input, tier),
+    route_reason: routed.route_reason,
   };
 }
 

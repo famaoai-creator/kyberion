@@ -33,6 +33,10 @@
           "type": "string",
           "enum": ["approved", "candidate", "deprecated", "blocked"]
         },
+        "tier": {
+          "type": "string",
+          "enum": ["small", "standard", "large"]
+        },
         "role_fit": {
           "type": "object",
           "additionalProperties": false,
@@ -67,6 +71,7 @@
         "provider",
         "family",
         "status",
+        "tier",
         "role_fit",
         "cost_band",
         "latency_band",

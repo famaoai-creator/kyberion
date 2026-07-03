@@ -130,7 +130,10 @@ export class GeminiCliBackend implements ReasoningBackend {
     });
     return (await this.runStructured({
       systemPrompt: 'Simulate branch execution. Output JSON ONLY.',
-      userPrompt: JSON.stringify(input.branches),
+      userPrompt: [
+        `Max steps per branch: ${input.maxStepsPerBranch ?? 10}`,
+        JSON.stringify(input.branches),
+      ].join('\n'),
       schema,
     })) as SimulationResult;
   }

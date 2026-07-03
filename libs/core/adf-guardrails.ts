@@ -198,7 +198,7 @@ export function validatePipelineGuardrails(
       if (elseBranch) visitSteps(elseBranch, `${stepPath}.params.else`, depth + 1);
     }
 
-    if (step.op === 'core:foreach') {
+    if (step.op === 'core:foreach' || step.op === 'core:parallel_foreach') {
       const params = step.params as Record<string, unknown> | undefined;
       const items = params?.items;
       if (Array.isArray(items) && items.length > policy.limits.max_foreach_items) {
@@ -211,6 +211,18 @@ export function validatePipelineGuardrails(
       }
       const body = Array.isArray(params?.do) ? (params?.do as PipelineAdfStep[]) : undefined;
       if (body) visitSteps(body, `${stepPath}.params.do`, depth + 1);
+    }
+
+    if (
+      step.op === 'core:while' ||
+      step.op === 'core:loop_until' ||
+      step.op === 'core:retry_until_quality'
+    ) {
+      const params = step.params as Record<string, unknown> | undefined;
+      const body = Array.isArray(params?.pipeline)
+        ? (params?.pipeline as PipelineAdfStep[])
+        : undefined;
+      if (body) visitSteps(body, `${stepPath}.params.pipeline`, depth + 1);
     }
 
     const nestedPipeline = extractNestedPipeline(step);

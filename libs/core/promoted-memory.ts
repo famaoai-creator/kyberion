@@ -5,6 +5,7 @@ import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
+import { logger } from './core.js';
 import {
   resolvePromotedReportAudience,
   resolvePromotedReportOutputFormat,
@@ -18,6 +19,8 @@ interface PromotedMemoryRecordBase {
   title: string;
   summary: string;
   candidate_id: string;
+  supersedes?: string;
+  superseded_by?: string;
   project_id?: string;
   track_id?: string;
   track_name?: string;
@@ -67,13 +70,13 @@ export type PromotedMemoryRecord =
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const validatorCache = new Map<string, ValidateFunction>();
+const HINTS_PATH = pathResolver.knowledge('product/governance/HINTS.md');
+const HINTS_MARKER =
+  '<!-- Distillation pipeline will append structured hint blocks below this line -->';
 
 type PromotedMemoryExecutionRole = 'mission_controller' | 'chronos_gateway';
 
-function withPromotedMemoryExecutionContext<T>(
-  role: PromotedMemoryExecutionRole,
-  fn: () => T,
-): T {
+function withPromotedMemoryExecutionContext<T>(role: PromotedMemoryExecutionRole, fn: () => T): T {
   return withExecutionContext(role, fn, 'ecosystem_architect');
 }
 
@@ -98,7 +101,10 @@ function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
   return validator;
 }
 
-function logicalDirFor(input: { kind: PromotedMemoryRecord['kind']; tier: PromotedMemoryRecord['tier'] }): string {
+function logicalDirFor(input: {
+  kind: PromotedMemoryRecord['kind'];
+  tier: PromotedMemoryRecord['tier'];
+}): string {
   switch (input.kind) {
     case 'pattern':
       return `knowledge/${input.tier}/common/patterns/generated`;
@@ -113,9 +119,7 @@ function logicalDirFor(input: { kind: PromotedMemoryRecord['kind']; tier: Promot
 
 function normalizeLines(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => (typeof item === 'string' ? item.trim() : ''))
-      .filter(Boolean);
+    return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
   }
   if (typeof value === 'string') {
     return value
@@ -141,6 +145,8 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
     `kind: ${record.kind}`,
     `tier: ${record.tier}`,
     `candidate_id: ${record.candidate_id}`,
+    `supersedes: ${record.supersedes || ''}`,
+    `superseded_by: ${record.superseded_by || ''}`,
     `project_id: ${record.project_id || ''}`,
     `task_session_id: ${record.task_session_id || ''}`,
     `specialist_id: ${record.specialist_id || ''}`,
@@ -158,11 +164,11 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
       ...frontmatter,
       `## Applicability`,
       ``,
-      ...(record.applicability.map((item) => `- ${item}`)),
+      ...record.applicability.map((item) => `- ${item}`),
       ``,
       `## Reusable Steps`,
       ``,
-      ...(record.reusable_steps.map((item, index) => `${index + 1}. ${item}`)),
+      ...record.reusable_steps.map((item, index) => `${index + 1}. ${item}`),
       ``,
       `## Expected Outcome`,
       ``,
@@ -170,11 +176,11 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
       ``,
       `## Evidence`,
       ``,
-      ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+      ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
       ``,
       `## Artifacts`,
       ``,
-      ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+      ...(record.artifact_ids || []).map((id) => `- ${id}`),
     ].join('\n');
   }
   if (record.kind === 'sop_candidate') {
@@ -182,23 +188,23 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
       ...frontmatter,
       `## Procedure Steps`,
       ``,
-      ...(record.procedure_steps.map((item, index) => `${index + 1}. ${item}`)),
+      ...record.procedure_steps.map((item, index) => `${index + 1}. ${item}`),
       ``,
       `## Safety Notes`,
       ``,
-      ...(record.safety_notes.map((item) => `- ${item}`)),
+      ...record.safety_notes.map((item) => `- ${item}`),
       ``,
       `## Escalation Conditions`,
       ``,
-      ...(record.escalation_conditions.map((item) => `- ${item}`)),
+      ...record.escalation_conditions.map((item) => `- ${item}`),
       ``,
       `## Evidence`,
       ``,
-      ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+      ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
       ``,
       `## Artifacts`,
       ``,
-      ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+      ...(record.artifact_ids || []).map((id) => `- ${id}`),
     ].join('\n');
   }
   if (record.kind === 'knowledge_hint') {
@@ -210,19 +216,19 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
       ``,
       `## Trigger Phrases`,
       ``,
-      ...(record.hint_triggers.map((item) => `- ${item}`)),
+      ...record.hint_triggers.map((item) => `- ${item}`),
       ``,
       `## Recommended References`,
       ``,
-      ...(record.recommended_refs.map((item) => `- ${item}`)),
+      ...record.recommended_refs.map((item) => `- ${item}`),
       ``,
       `## Evidence`,
       ``,
-      ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+      ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
       ``,
       `## Artifacts`,
       ``,
-      ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+      ...(record.artifact_ids || []).map((id) => `- ${id}`),
     ].join('\n');
   }
   return [
@@ -237,20 +243,120 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
     ``,
     `## Template Sections`,
     ``,
-    ...(record.template_sections.map((item, index) => `${index + 1}. ${item}`)),
+    ...record.template_sections.map((item, index) => `${index + 1}. ${item}`),
     ``,
     `## Evidence`,
     ``,
-    ...((record.evidence_refs || []).map((ref) => `- ${ref}`)),
+    ...(record.evidence_refs || []).map((ref) => `- ${ref}`),
     ``,
     `## Artifacts`,
     ``,
-    ...((record.artifact_ids || []).map((id) => `- ${id}`)),
+    ...(record.artifact_ids || []).map((id) => `- ${id}`),
   ].join('\n');
 }
 
+function buildHintsBlock(record: PromotedKnowledgeHintRecord): string {
+  return [
+    `## ${record.record_id} (${record.created_at.slice(0, 10)})`,
+    '',
+    record.summary,
+    '',
+    `source_ref: ${record.candidate_id}`,
+    `evidence_refs:`,
+    ...record.evidence_refs.map((ref) => `- ${ref}`),
+    '',
+  ].join('\n');
+}
+
+function appendGovernanceHintRecord(record: PromotedKnowledgeHintRecord): void {
+  const block = buildHintsBlock(record);
+  const existing = safeExistsSync(HINTS_PATH)
+    ? (safeReadFile(HINTS_PATH, { encoding: 'utf8' }) as string)
+    : [
+        '# Operational Hints',
+        '',
+        '> **Generated by** `pipelines/fragments/memory-distillation.json` (via `volatile-gc` → `memory-promotion-queue`).',
+        '> Do not edit manually — content is overwritten by the distillation pipeline.',
+        '> **Purpose**: Condensed operational learnings from recent missions and volatile working-memory faces,',
+        '> surfaced here so Recovery and Alignment phases can read relevant hints without full knowledge search.',
+        '',
+        HINTS_MARKER,
+        '',
+      ].join('\n');
+
+  const appended = existing.includes(HINTS_MARKER)
+    ? existing.replace(HINTS_MARKER, `${HINTS_MARKER}\n\n${block}`)
+    : `${existing.trimEnd()}\n\n${block}`;
+
+  // Keep the append path simple and deterministic; archive rotation can be
+  // added once the promotion flow is fully exercised in production.
+  safeWriteFile(HINTS_PATH, appended.endsWith('\n') ? appended : `${appended}\n`);
+}
+
+function resolvePromotedRecordPath(ref: string): string | null {
+  const normalized = String(ref || '').trim();
+  if (!normalized) return null;
+  if (normalized.endsWith('.md') || normalized.includes('/')) {
+    const abs = pathResolver.resolve(normalized);
+    return safeExistsSync(abs) ? abs : null;
+  }
+  const kinds = ['pattern', 'sop_candidate', 'knowledge_hint', 'report_template'] as const;
+  const tiers = ['personal', 'confidential', 'public'] as const;
+  for (const tier of tiers) {
+    for (const kind of kinds) {
+      const dir =
+        kind === 'pattern'
+          ? `knowledge/${tier}/common/patterns/generated`
+          : kind === 'sop_candidate'
+            ? `knowledge/${tier}/common/operations/generated`
+            : kind === 'knowledge_hint'
+              ? `knowledge/${tier}/common/wisdom/generated`
+              : `knowledge/${tier}/common/templates/generated`;
+      const abs = pathResolver.resolve(`${dir}/${normalized}.md`);
+      if (safeExistsSync(abs)) return abs;
+    }
+  }
+  return null;
+}
+
+function updateFrontmatterField(absPath: string, key: string, value: string): void {
+  if (!safeExistsSync(absPath)) return;
+  const raw = safeReadFile(absPath, { encoding: 'utf8' }) as string;
+  const lines = raw.split(/\r?\n/);
+  const start = lines.indexOf('---');
+  if (start < 0) return;
+  const end = lines.indexOf('---', start + 1);
+  if (end < 0) return;
+  const nextValue = `${key}: ${value}`;
+  let updated = false;
+  for (let i = start + 1; i < end; i += 1) {
+    if (lines[i].startsWith(`${key}:`)) {
+      lines[i] = nextValue;
+      updated = true;
+      break;
+    }
+  }
+  if (!updated) lines.splice(end, 0, nextValue);
+  safeWriteFile(absPath, `${lines.join('\n').replace(/\n?$/, '\n')}`);
+}
+
+function backlinkSupersededRecord(record: PromotedMemoryRecord): void {
+  const targetRef = record.supersedes;
+  if (!targetRef) return;
+  const targetPath = resolvePromotedRecordPath(targetRef);
+  if (!targetPath) {
+    logger.warn(
+      `[promoted-memory] superseded record not found for ${record.record_id}: ${targetRef}`
+    );
+    return;
+  }
+  updateFrontmatterField(targetPath, 'superseded_by', record.record_id);
+}
+
 export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): PromotedMemoryRecord {
-  const tier = candidate.tier === 'personal' || candidate.tier === 'public' ? candidate.tier : 'confidential';
+  const tier =
+    candidate.tier === 'personal' || candidate.tier === 'public' ? candidate.tier : 'confidential';
+  const metadata = candidate.metadata || {};
   const base: PromotedMemoryRecordBase = {
     record_id: candidate.candidate_id,
     kind: candidate.target_kind,
@@ -258,6 +364,14 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     title: candidate.title,
     summary: candidate.summary,
     candidate_id: candidate.candidate_id,
+    supersedes:
+      typeof metadata.supersedes === 'string' && metadata.supersedes.trim()
+        ? metadata.supersedes.trim()
+        : undefined,
+    superseded_by:
+      typeof metadata.superseded_by === 'string' && metadata.superseded_by.trim()
+        ? metadata.superseded_by.trim()
+        : undefined,
     project_id: candidate.project_id,
     track_id: candidate.track_id,
     track_name: candidate.track_name,
@@ -269,64 +383,90 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     evidence_refs: candidate.evidence_refs,
     created_at: new Date().toISOString(),
   };
-  const metadata = candidate.metadata || {};
   if (candidate.target_kind === 'pattern') {
     return {
       ...base,
       kind: 'pattern',
-      applicability: normalizeLines(metadata.applicability).length > 0
-        ? normalizeLines(metadata.applicability)
-        : ['repeatable delivery work', candidate.specialist_id || 'general specialist'],
-      reusable_steps: normalizeLines(metadata.reusable_steps).length > 0
-        ? normalizeLines(metadata.reusable_steps)
-        : fallbackSteps(candidate.summary, ['review the prior outcome', 'adapt the pattern to the active request', 'verify the delivered result']),
-      expected_outcome: typeof metadata.expected_outcome === 'string' && metadata.expected_outcome.trim()
-        ? metadata.expected_outcome.trim()
-        : candidate.summary,
+      applicability:
+        normalizeLines(metadata.applicability).length > 0
+          ? normalizeLines(metadata.applicability)
+          : ['repeatable delivery work', candidate.specialist_id || 'general specialist'],
+      reusable_steps:
+        normalizeLines(metadata.reusable_steps).length > 0
+          ? normalizeLines(metadata.reusable_steps)
+          : fallbackSteps(candidate.summary, [
+              'review the prior outcome',
+              'adapt the pattern to the active request',
+              'verify the delivered result',
+            ]),
+      expected_outcome:
+        typeof metadata.expected_outcome === 'string' && metadata.expected_outcome.trim()
+          ? metadata.expected_outcome.trim()
+          : candidate.summary,
     };
   }
   if (candidate.target_kind === 'sop_candidate') {
     return {
       ...base,
       kind: 'sop_candidate',
-      procedure_steps: normalizeLines(metadata.procedure_steps).length > 0
-        ? normalizeLines(metadata.procedure_steps)
-        : fallbackSteps(candidate.summary, ['inspect the current state', 'apply the standard operator action', 'confirm the outcome and capture evidence']),
-      safety_notes: normalizeLines(metadata.safety_notes).length > 0
-        ? normalizeLines(metadata.safety_notes)
-        : ['Require approval before irreversible or high-risk actions.', 'Capture evidence before and after the action.'],
-      escalation_conditions: normalizeLines(metadata.escalation_conditions).length > 0
-        ? normalizeLines(metadata.escalation_conditions)
-        : ['Unexpected runtime failure', 'Policy or approval mismatch', 'Result does not match the expected state'],
+      procedure_steps:
+        normalizeLines(metadata.procedure_steps).length > 0
+          ? normalizeLines(metadata.procedure_steps)
+          : fallbackSteps(candidate.summary, [
+              'inspect the current state',
+              'apply the standard operator action',
+              'confirm the outcome and capture evidence',
+            ]),
+      safety_notes:
+        normalizeLines(metadata.safety_notes).length > 0
+          ? normalizeLines(metadata.safety_notes)
+          : [
+              'Require approval before irreversible or high-risk actions.',
+              'Capture evidence before and after the action.',
+            ],
+      escalation_conditions:
+        normalizeLines(metadata.escalation_conditions).length > 0
+          ? normalizeLines(metadata.escalation_conditions)
+          : [
+              'Unexpected runtime failure',
+              'Policy or approval mismatch',
+              'Result does not match the expected state',
+            ],
     };
   }
   if (candidate.target_kind === 'knowledge_hint') {
     return {
       ...base,
       kind: 'knowledge_hint',
-      hint_scope: typeof metadata.hint_scope === 'string' && metadata.hint_scope.trim()
-        ? metadata.hint_scope.trim()
-        : candidate.specialist_id || 'general reasoning',
-      hint_triggers: normalizeLines(metadata.hint_triggers).length > 0
-        ? normalizeLines(metadata.hint_triggers)
-        : [candidate.title, candidate.summary].filter(Boolean),
-      recommended_refs: normalizeLines(metadata.recommended_refs).length > 0
-        ? normalizeLines(metadata.recommended_refs)
-        : candidate.evidence_refs || [],
+      hint_scope:
+        typeof metadata.hint_scope === 'string' && metadata.hint_scope.trim()
+          ? metadata.hint_scope.trim()
+          : candidate.specialist_id || 'general reasoning',
+      hint_triggers:
+        normalizeLines(metadata.hint_triggers).length > 0
+          ? normalizeLines(metadata.hint_triggers)
+          : [candidate.title, candidate.summary].filter(Boolean),
+      recommended_refs:
+        normalizeLines(metadata.recommended_refs).length > 0
+          ? normalizeLines(metadata.recommended_refs)
+          : candidate.evidence_refs || [],
     };
   }
   return {
     ...base,
     kind: 'report_template',
-    template_sections: normalizeLines(metadata.template_sections).length > 0
-      ? normalizeLines(metadata.template_sections)
-      : resolvePromotedReportTemplateSections(),
-    audience: typeof metadata.audience === 'string' && metadata.audience.trim()
-      ? metadata.audience.trim()
-      : resolvePromotedReportAudience(),
-    output_format: typeof metadata.output_format === 'string' && metadata.output_format.trim()
-      ? metadata.output_format.trim()
-      : resolvePromotedReportOutputFormat(),
+    template_sections:
+      normalizeLines(metadata.template_sections).length > 0
+        ? normalizeLines(metadata.template_sections)
+        : resolvePromotedReportTemplateSections(),
+    audience:
+      typeof metadata.audience === 'string' && metadata.audience.trim()
+        ? metadata.audience.trim()
+        : resolvePromotedReportAudience(),
+    output_format:
+      typeof metadata.output_format === 'string' && metadata.output_format.trim()
+        ? metadata.output_format.trim()
+        : resolvePromotedReportOutputFormat(),
   };
 }
 
@@ -343,7 +483,8 @@ const TEST_TRACK_PATTERN = /^TRK-TEST-/i;
  * candidate had no real title. A record matching one of these is, by
  * definition, all-fallback content and adds no new knowledge.
  */
-const GENERIC_TITLE_PATTERN = /^reusable (pattern|sop|sop\s+candidate|hint|knowledge\s+hint|template|report\s+template|memory)$/i;
+const GENERIC_TITLE_PATTERN =
+  /^reusable (pattern|sop|sop\s+candidate|hint|knowledge\s+hint|template|report\s+template|memory)$/i;
 const MIN_TITLE_LENGTH = 8;
 const MIN_SUMMARY_LENGTH = 25;
 
@@ -354,7 +495,10 @@ const MIN_SUMMARY_LENGTH = 25;
  * `rejected` rather than `promoted`.
  */
 export class NotMeaningfulPromotionCandidateError extends Error {
-  constructor(public readonly reason: string, public readonly candidateId: string) {
+  constructor(
+    public readonly reason: string,
+    public readonly candidateId: string
+  ) {
     super(`Promotion candidate ${candidateId} not meaningful: ${reason}`);
     this.name = 'NotMeaningfulPromotionCandidateError';
   }
@@ -371,7 +515,7 @@ export interface MeaningfulCheckResult {
  * unit testing.
  */
 export function isMeaningfulPromotionCandidate(
-  candidate: DistillCandidateRecord,
+  candidate: DistillCandidateRecord
 ): MeaningfulCheckResult {
   if (candidate.track_id && TEST_TRACK_PATTERN.test(candidate.track_id)) {
     return { ok: false, reason: `test track (${candidate.track_id}) — promotion suppressed` };
@@ -391,25 +535,38 @@ export function isMeaningfulPromotionCandidate(
   if (candidate.target_kind === 'pattern') {
     const hasApplicability = normalizeLines(md.applicability).length > 0;
     const hasSteps = normalizeLines(md.reusable_steps).length > 0;
-    const hasOutcome = typeof md.expected_outcome === 'string' && md.expected_outcome.trim().length > 0;
+    const hasOutcome =
+      typeof md.expected_outcome === 'string' && md.expected_outcome.trim().length > 0;
     if (!hasApplicability && !hasSteps && !hasOutcome) {
-      return { ok: false, reason: 'pattern has no applicability/steps/outcome metadata — would be all fallback' };
+      return {
+        ok: false,
+        reason: 'pattern has no applicability/steps/outcome metadata — would be all fallback',
+      };
     }
   } else if (candidate.target_kind === 'sop_candidate') {
     const hasSteps = normalizeLines(md.procedure_steps).length > 0;
     if (!hasSteps) {
-      return { ok: false, reason: 'sop_candidate has no procedure_steps metadata — would be all fallback' };
+      return {
+        ok: false,
+        reason: 'sop_candidate has no procedure_steps metadata — would be all fallback',
+      };
     }
   } else if (candidate.target_kind === 'knowledge_hint') {
     const hasScope = typeof md.hint_scope === 'string' && md.hint_scope.trim().length > 0;
     const hasTriggers = normalizeLines(md.hint_triggers).length > 0;
     if (!hasScope && !hasTriggers) {
-      return { ok: false, reason: 'knowledge_hint has no scope or triggers — would be all fallback' };
+      return {
+        ok: false,
+        reason: 'knowledge_hint has no scope or triggers — would be all fallback',
+      };
     }
   } else if (candidate.target_kind === 'report_template') {
     const hasSections = normalizeLines(md.template_sections).length > 0;
     if (!hasSections) {
-      return { ok: false, reason: 'report_template has no template_sections — would be all fallback' };
+      return {
+        ok: false,
+        reason: 'report_template has no template_sections — would be all fallback',
+      };
     }
   }
   return { ok: true };
@@ -417,13 +574,13 @@ export function isMeaningfulPromotionCandidate(
 
 export function savePromotedMemoryRecord(
   candidate: DistillCandidateRecord,
-  options: { executionRole?: PromotedMemoryExecutionRole } = {},
+  options: { executionRole?: PromotedMemoryExecutionRole } = {}
 ): { logicalPath: string; record: PromotedMemoryRecord } {
   const meaningful = isMeaningfulPromotionCandidate(candidate);
   if (!meaningful.ok) {
     throw new NotMeaningfulPromotionCandidateError(
       meaningful.reason || 'unknown reason',
-      candidate.candidate_id,
+      candidate.candidate_id
     );
   }
   const executionRole = options.executionRole || 'mission_controller';
@@ -431,7 +588,9 @@ export function savePromotedMemoryRecord(
     const record = buildPromotedMemoryRecord(candidate);
     const validate = ensureValidator(record.kind);
     if (!validate(record)) {
-      const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      const errors = (validate.errors || []).map(
+        (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+      );
       throw new Error(`Invalid promoted memory record: ${errors.join('; ')}`);
     }
     const logicalDir = logicalDirFor({ kind: record.kind, tier: record.tier });
@@ -443,6 +602,10 @@ export function savePromotedMemoryRecord(
     safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
     const markdown = buildMarkdown(record);
     safeWriteFile(mdPath, markdown);
+    backlinkSupersededRecord(record);
+    if (record.kind === 'knowledge_hint') {
+      appendGovernanceHintRecord(record);
+    }
     return {
       logicalPath: `${logicalDir}/${baseName}.md`,
       record,

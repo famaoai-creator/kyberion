@@ -209,6 +209,7 @@ export const VALUE_FLAGS = new Set([
   '--actor-type',
   '--evidence',
   '--note',
+  '--supersedes',
   '--execution-role',
   '--routing-decision',
   '--intent-id',

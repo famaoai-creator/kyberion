@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeWriteFile } from './secure-io.js';
 import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
+import { truncateTextWithCount } from './text-truncation.js';
 import {
   runApprovedClaudeBrowserTask,
   runApprovedClaudeDocumentTask,
@@ -57,11 +58,13 @@ function buildTaskContext(params: ExecuteApprovedClaudeTaskSessionParams): strin
       query_text: params.queryText,
     },
     null,
-    2,
+    2
   );
 }
 
-function buildApprovalContext(params: ExecuteApprovedClaudeTaskSessionParams): ClaudeTaskRunnerContext {
+function buildApprovalContext(
+  params: ExecuteApprovedClaudeTaskSessionParams
+): ClaudeTaskRunnerContext {
   return {
     agentId: params.agentId,
     channel: params.channel ?? 'surface',
@@ -86,7 +89,7 @@ function buildOutputPath(sessionId: string): string {
 }
 
 export async function executeApprovedClaudeTaskSession(
-  params: ExecuteApprovedClaudeTaskSessionParams,
+  params: ExecuteApprovedClaudeTaskSessionParams
 ): Promise<ExecuteApprovedClaudeTaskSessionResult> {
   const kind = resolveTaskKind(params.session.task_type);
   if (!kind) {
@@ -98,7 +101,7 @@ export async function executeApprovedClaudeTaskSession(
   const approvalContext = buildApprovalContext(params);
 
   logger.info(
-    `[claude-task-session-executor] running ${kind} task session ${params.session.session_id} via approved Claude runner`,
+    `[claude-task-session-executor] running ${kind} task session ${params.session.session_id} via approved Claude runner`
   );
 
   try {
@@ -106,11 +109,11 @@ export async function executeApprovedClaudeTaskSession(
       kind === 'browser'
         ? await runApprovedClaudeBrowserTask(
             { instruction, context, maxTurns: 10 },
-            approvalContext,
+            approvalContext
           )
         : await runApprovedClaudeDocumentTask(
             { instruction, context, maxTurns: 15 },
-            approvalContext,
+            approvalContext
           );
 
     const outputPath = buildOutputPath(params.session.session_id);
@@ -121,7 +124,7 @@ export async function executeApprovedClaudeTaskSession(
       artifact: {
         kind: `claude_${kind}_output`,
         output_path: outputPath,
-        preview_text: output.slice(0, 500),
+        ...truncateTextWithCount(output, 500),
         storage_class: 'tmp',
       },
     });
@@ -152,7 +155,7 @@ export async function executeApprovedClaudeTaskSession(
       status: 'blocked',
       artifact: {
         kind: `claude_${kind}_output`,
-        preview_text: message.slice(0, 500),
+        ...truncateTextWithCount(message, 500),
         storage_class: 'tmp',
       },
     });
