@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import type { TaskModelHint } from './reasoning-model-routing.js';
 
 const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
@@ -33,6 +34,7 @@ export interface SpawnOptions {
   missionId?: string;
   trustRequired?: number;
   turnTimeoutMs?: number;
+  runtimeMetadata?: Record<string, unknown>;
   restartPolicy?: {
     maxRestarts: number;
     windowMs: number;
@@ -96,6 +98,40 @@ interface ProviderLifecycleFile {
 }
 
 let _cachedLifecycle: Record<string, LifecycleEntry> | null = null;
+
+function readTaskModelHint(runtimeMetadata?: Record<string, unknown>): TaskModelHint | undefined {
+  const candidate = runtimeMetadata?.task_model_hint;
+  if (!candidate || typeof candidate !== 'object') return undefined;
+  const hint = candidate as Partial<TaskModelHint>;
+  if (
+    typeof hint.model_id !== 'string' ||
+    typeof hint.tier !== 'string' ||
+    typeof hint.effort !== 'string' ||
+    typeof hint.route_reason !== 'string'
+  ) {
+    return undefined;
+  }
+  if (hint.tier !== 'small' && hint.tier !== 'standard' && hint.tier !== 'large') return undefined;
+  if (hint.effort !== 'low' && hint.effort !== 'medium' && hint.effort !== 'high') return undefined;
+  return {
+    model_id: hint.model_id.trim(),
+    tier: hint.tier,
+    effort: hint.effort,
+    route_reason: hint.route_reason,
+  };
+}
+
+export function resolveAgentLifecycleModelId(
+  options: Pick<SpawnOptions, 'modelId' | 'runtimeMetadata'>,
+  env: NodeJS.ProcessEnv = process.env
+): string | undefined {
+  const taskRoutingMode = String(env.KYBERION_TASK_MODEL_ROUTING || 'advisory').toLowerCase();
+  const taskModelHint = readTaskModelHint(options.runtimeMetadata);
+  if (taskRoutingMode === 'enforce' && taskModelHint?.model_id) {
+    return taskModelHint.model_id;
+  }
+  return options.modelId;
+}
 
 function loadProviderLifecycle(): Record<string, LifecycleEntry> {
   if (_cachedLifecycle) return _cachedLifecycle;
@@ -263,12 +299,16 @@ class AgentLifecycleManagerImpl {
   }
 
   private async spawnInternal(agentId: string, options: SpawnOptions): Promise<AgentHandle> {
-    const runtimeMetadata = (options as any)?.runtimeMetadata || {};
+    const runtimeMetadata = options.runtimeMetadata || {};
+    const resolvedModelId = resolveAgentLifecycleModelId(
+      { modelId: options.modelId, runtimeMetadata },
+      process.env
+    );
     const shouldResolveProvider = !runtimeMetadata.skip_provider_resolution;
     const resolvedTarget = shouldResolveProvider
       ? resolveAgentProviderTarget({
           preferredProvider: options.provider,
-          preferredModelId: options.modelId,
+          preferredModelId: resolvedModelId,
           providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as
             | 'strict'
             | 'preferred'
@@ -282,7 +322,7 @@ class AgentLifecycleManagerImpl {
         })
       : {
           provider: options.provider,
-          modelId: options.modelId || options.provider,
+          modelId: resolvedModelId || options.modelId || options.provider,
           strategy: 'preferred' as const,
           availableProviders: [options.provider],
         };
@@ -332,11 +372,12 @@ class AgentLifecycleManagerImpl {
       metadata: {
         provider_resolution: {
           preferredProvider: options.provider,
-          preferredModelId: options.modelId || null,
+          preferredModelId: resolvedModelId || null,
           strategy: resolvedTarget.strategy,
           availableProviders: resolvedTarget.availableProviders,
           requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : [],
         },
+        task_model_hint: runtimeMetadata.task_model_hint,
       },
     });
 
@@ -658,9 +699,7 @@ class AgentLifecycleManagerImpl {
       .filter(Boolean) as AgentRuntimeSnapshot[];
   }
 
-  async refreshContext(
-    agentId: string
-  ): Promise<{
+  async refreshContext(agentId: string): Promise<{
     mode: 'soft' | 'restart' | 'stateless';
     snapshot: AgentRuntimeSnapshot | undefined;
   }> {
