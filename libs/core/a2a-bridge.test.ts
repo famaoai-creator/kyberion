@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
   const toSupervisorEnsurePayload = vi.fn();
   const getAgentManifest = vi.fn();
   const resolveAgentSelectionHints = vi.fn();
+  const logAction = vi.fn();
   return {
     warn,
     info,
@@ -36,6 +37,7 @@ const mocks = vi.hoisted(() => {
     toSupervisorEnsurePayload,
     getAgentManifest,
     resolveAgentSelectionHints,
+    logAction,
   };
 });
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -81,6 +83,12 @@ vi.mock('./audit-chain', () => ({
   },
 }));
 
+vi.mock('./kill-switch.js', () => ({
+  killSwitch: {
+    logAction: mocks.logAction,
+  },
+}));
+
 describe('a2a-bridge', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -89,7 +97,8 @@ describe('a2a-bridge', () => {
     mocks.toSupervisorEnsurePayload.mockImplementation((payload: any) => payload);
     mocks.resolveAgentSelectionHints.mockImplementation((manifest: any) => ({
       provider: manifest.selection_hints?.preferred_provider || manifest.provider || 'gemini',
-      modelId: manifest.selection_hints?.preferred_modelId || manifest.modelId || 'gemini-2.5-flash',
+      modelId:
+        manifest.selection_hints?.preferred_modelId || manifest.modelId || 'gemini-2.5-flash',
     }));
   });
 
@@ -115,7 +124,7 @@ describe('a2a-bridge', () => {
           ...message.header,
           signature,
         },
-      }),
+      })
     ).toBe(true);
   });
 
@@ -131,7 +140,7 @@ describe('a2a-bridge', () => {
           performative: 'request',
         },
         payload: { text: 'hello' },
-      }),
+      })
     ).rejects.toThrow('A2A message missing receiver');
 
     mocks.getAgentManifest.mockReturnValue(undefined);
@@ -148,13 +157,17 @@ describe('a2a-bridge', () => {
             systemPrompt: 'You are nerve',
             capabilities: ['delegate'],
           }
-        : undefined,
+        : undefined
     );
     const handle = { ask: vi.fn(async (prompt: string) => `echo:${prompt}`) };
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
     mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
-    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'codex-nerve' ? handle : null);
-    mocks.askAgentRuntime.mockImplementation(async (_agentId: string, prompt: string) => `echo:${prompt}`);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) =>
+      agentId === 'codex-nerve' ? handle : null
+    );
+    mocks.askAgentRuntime.mockImplementation(
+      async (_agentId: string, prompt: string) => `echo:${prompt}`
+    );
     mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.get.mockImplementation((agentId: string) => {
       if (agentId === 'sender-x') return { status: 'ready' };
@@ -179,13 +192,18 @@ describe('a2a-bridge', () => {
     const result = await a2aBridge.route(envelope);
 
     expect(mocks.ensureAgentRuntime).toHaveBeenCalled();
-    expect(mocks.askAgentRuntime).toHaveBeenCalledWith('codex-nerve', 'delegate this', 'a2a_bridge');
+    expect(mocks.askAgentRuntime).toHaveBeenCalledWith(
+      'codex-nerve',
+      'delegate this',
+      'a2a_bridge'
+    );
     expect(mocks.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'a2a_route',
         result: 'completed',
-      }),
+      })
     );
+    expect(mocks.logAction).toHaveBeenCalledWith('sender-x', 'a2a_route:codex-nerve', false);
     expect(result.header.sender).toBe('codex-nerve');
     expect(result.header.receiver).toBe('sender-x');
     expect(result.payload).toEqual({ text: 'echo:delegate this' });
@@ -203,7 +221,9 @@ describe('a2a-bridge', () => {
     });
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
     mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
-    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'nerve-agent' ? handle : null);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) =>
+      agentId === 'nerve-agent' ? handle : null
+    );
     mocks.askAgentRuntime.mockResolvedValue('ok');
     mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.get.mockImplementation((agentId: string) => {
@@ -230,19 +250,23 @@ describe('a2a-bridge', () => {
       },
     });
 
-    expect(mocks.askAgentRuntime).toHaveBeenCalledWith('nerve-agent', [
-      'Intent: request_marketing_material',
-      '',
-      'Context:',
-      '{',
-      '  "channel": "slack",',
-      '  "execution_mode": "conversation",',
-      '  "user_language": "ja"',
-      '}',
-      '',
-      'Request:',
-      'Kyberionの資料を作って欲しいんだけど可能かな？',
-    ].join('\n'), 'a2a_bridge');
+    expect(mocks.askAgentRuntime).toHaveBeenCalledWith(
+      'nerve-agent',
+      [
+        'Intent: request_marketing_material',
+        '',
+        'Context:',
+        '{',
+        '  "channel": "slack",',
+        '  "execution_mode": "conversation",',
+        '  "user_language": "ja"',
+        '}',
+        '',
+        'Request:',
+        'Kyberionの資料を作って欲しいんだけど可能かな？',
+      ].join('\n'),
+      'a2a_bridge'
+    );
   });
 
   it('spawns conversation-mode agents inside a conversation sandbox cwd', async () => {
@@ -256,7 +280,9 @@ describe('a2a-bridge', () => {
     const handle = { ask: vi.fn(async () => 'ok') };
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
     mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
-    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'nerve-agent' ? handle : null);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) =>
+      agentId === 'nerve-agent' ? handle : null
+    );
     mocks.askAgentRuntime.mockResolvedValue('ok');
     mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.get.mockReturnValue(undefined);
@@ -280,9 +306,13 @@ describe('a2a-bridge', () => {
       },
     });
 
-    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(expect.objectContaining({
-      cwd: expect.stringContaining('active/shared/tmp/agent-runtime-roots/conversation/slack/1773596301.435519/nerve-agent'),
-    }));
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: expect.stringContaining(
+          'active/shared/tmp/agent-runtime-roots/conversation/slack/1773596301.435519/nerve-agent'
+        ),
+      })
+    );
   });
 
   it('denies invalid signatures and accepts unsigned internal senders', async () => {
@@ -296,7 +326,9 @@ describe('a2a-bridge', () => {
     const handle = { ask: vi.fn(async () => 'ok') };
     mocks.ensureAgentRuntime.mockResolvedValue(handle);
     mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
-    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) => agentId === 'agent-y' ? handle : null);
+    mocks.getAgentRuntimeHandle.mockImplementation((agentId: string) =>
+      agentId === 'agent-y' ? handle : null
+    );
     mocks.askAgentRuntime.mockResolvedValue('ok');
     mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
 
@@ -311,7 +343,7 @@ describe('a2a-bridge', () => {
           signature: 'deadbeef',
         },
         payload: 'hello',
-      }),
+      })
     ).rejects.toThrow(/signature/);
 
     await expect(
@@ -324,7 +356,7 @@ describe('a2a-bridge', () => {
           performative: 'request',
         },
         payload: 'hello',
-      }),
+      })
     ).resolves.toMatchObject({
       payload: { text: 'ok' },
     });
@@ -378,7 +410,10 @@ describe('a2a-bridge', () => {
   it('emits a2a envelopes that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json')
+    );
 
     expect(
       validate({
@@ -393,14 +428,17 @@ describe('a2a-bridge', () => {
           text: 'hello',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects invalid a2a envelopes', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json')
+    );
 
     expect(
       validate({
@@ -411,7 +449,7 @@ describe('a2a-bridge', () => {
           performative: 'request',
         },
         payload: {},
-      }),
+      })
     ).toBe(false);
   });
 });

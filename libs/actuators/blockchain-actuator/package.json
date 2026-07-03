@@ -1,6 +1,6 @@
 {
   "name": "@agent/blockchain-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Blockchain Anchoring Actuator for Kyberion Ecosystem",
   "main": "../../../dist/libs/actuators/blockchain-actuator/src/index.js",
