@@ -9,8 +9,10 @@ import {
   ledger,
   logger,
   pathResolver,
+  resolveTaskModelHint,
   resolveMissionTeamReceiver,
   safeExistsSync,
+  type TaskModelHint,
 } from '@agent/core';
 import { importExternalWorkItem } from '@agent/core';
 import { findMissionPath } from '@agent/core';
@@ -21,10 +23,7 @@ import {
   readJsonFile,
   writeJsonFile,
 } from './mission-dispatch-io.js';
-import {
-  appendDispatchEvent,
-  writeDispatchArtifact,
-} from './mission-dispatch-lifecycle.js';
+import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { recordTask } from './mission-maintenance.js';
 
 export type MissionTicketDispatchTarget = 'workitem' | 'github' | 'jira';
@@ -48,6 +47,7 @@ export interface MissionTicketDispatchRecord {
   team_role?: string;
   title: string;
   work_item_id?: string;
+  task_model_hint?: TaskModelHint;
   ticket_targets: MissionTicketDispatchTarget[];
   ticket_files: string[];
   live_results: Record<string, unknown>;
@@ -82,6 +82,11 @@ interface PlannedTask {
   description?: string;
   deliverable?: string;
   target_path?: string;
+  dependencies?: string[];
+  acceptance_criteria?: string[];
+  risk?: 'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes';
+  expected_output_format?: 'text' | 'files' | 'structured';
+  estimated_scope?: 'S' | 'M' | 'L';
   [key: string]: unknown;
 }
 
@@ -133,6 +138,7 @@ function buildWorkItemDescription(input: {
     `Task: ${input.task.description || input.task.task_id}`,
     input.task.deliverable ? `Deliverable: ${input.task.deliverable}` : '',
     input.task.target_path ? `Target path: ${input.task.target_path}` : '',
+    input.task.risk ? `Risk: ${input.task.risk}` : '',
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -153,11 +159,15 @@ function buildExternalBody(input: {
     input.task.description ? `Task: ${input.task.description}` : `Task: ${input.task.task_id}`,
     input.task.deliverable ? `Deliverable: ${input.task.deliverable}` : '',
     input.task.target_path ? `Target path: ${input.task.target_path}` : '',
+    input.task.risk ? `Risk: ${input.task.risk}` : '',
   ].filter(Boolean);
   return lines.join('\n');
 }
 
-function validateMissionTicketTask(task: PlannedTask, assigneeId?: string): { ok: boolean; notes: string[] } {
+function validateMissionTicketTask(
+  task: PlannedTask,
+  assigneeId?: string
+): { ok: boolean; notes: string[] } {
   const notes: string[] = [];
   const description = String(task.description || '').trim();
 
@@ -190,7 +200,11 @@ function loadExistingManifest(missionPath: string): MissionTicketDispatchManifes
   }
 }
 
-function resolveProjectLink(state: MissionState): { project_id?: string; project_path?: string; track_id?: string } {
+function resolveProjectLink(state: MissionState): {
+  project_id?: string;
+  project_path?: string;
+  track_id?: string;
+} {
   return {
     project_id: state.relationships?.project?.project_id,
     project_path: state.relationships?.project?.project_path,
@@ -198,9 +212,17 @@ function resolveProjectLink(state: MissionState): { project_id?: string; project
   };
 }
 
+function resolvePlannedTaskModelHint(task: PlannedTask): TaskModelHint {
+  return resolveTaskModelHint({
+    phase_kind: 'implement',
+    ...(typeof task.risk === 'string' ? { risk: task.risk } : {}),
+    ...(typeof task.estimated_scope === 'string' ? { estimated_scope: task.estimated_scope } : {}),
+  });
+}
+
 export async function dispatchMissionTickets(
   state: MissionState,
-  options: MissionTicketDispatchOptions = {},
+  options: MissionTicketDispatchOptions = {}
 ): Promise<MissionTicketDispatchManifest> {
   const missionId = state.mission_id.toUpperCase();
   const missionPath = findMissionPath(missionId) || pathResolver.missionDir(missionId, state.tier);
@@ -208,7 +230,9 @@ export async function dispatchMissionTickets(
     throw new Error(`Mission path not found for ${missionId}`);
   }
 
-  const plannedTasks = readPlannedTasks(missionPath).filter((task) => (task.status || 'planned') === 'planned');
+  const plannedTasks = readPlannedTasks(missionPath).filter(
+    (task) => (task.status || 'planned') === 'planned'
+  );
   if (plannedTasks.length === 0) {
     throw new Error(`No planned tasks available for ${missionId}`);
   }
@@ -216,18 +240,18 @@ export async function dispatchMissionTickets(
 
   const targets: MissionTicketDispatchTarget[] =
     options.targets && options.targets.length > 0
-      ? [...new Set(options.targets)] as MissionTicketDispatchTarget[]
+      ? ([...new Set(options.targets)] as MissionTicketDispatchTarget[])
       : ['workitem'];
   const liveTargets: MissionTicketDispatchTarget[] =
     options.liveTargets && options.liveTargets.length > 0
-      ? [...new Set(options.liveTargets)] as MissionTicketDispatchTarget[]
+      ? ([...new Set(options.liveTargets)] as MissionTicketDispatchTarget[])
       : [];
   ensureTicketDirs(missionPath);
 
   const projectLink = resolveProjectLink(state);
   const existingManifest = loadExistingManifest(missionPath);
   const existingRecords = new Map<string, MissionTicketDispatchRecord>(
-    (existingManifest?.records || []).map((record) => [record.task_id, record]),
+    (existingManifest?.records || []).map((record) => [record.task_id, record])
   );
   const allTasks = readPlannedTasks(missionPath);
 
@@ -239,11 +263,14 @@ export async function dispatchMissionTickets(
     const liveResults: Record<string, unknown> = {};
     const notes: string[] = [];
     let status: MissionTicketDispatchRecord['status'] = 'created';
+    const taskModelHint = resolvePlannedTaskModelHint(task);
 
     const existing = existingRecords.get(task.task_id);
     const workItemSourceRef = `mission:${missionId}:${task.task_id}`;
     let workItemId = existing?.work_item_id;
-    const resolvedAssignment = teamRole ? resolveMissionTeamReceiver({ missionId, teamRole }) : null;
+    const resolvedAssignment = teamRole
+      ? resolveMissionTeamReceiver({ missionId, teamRole })
+      : null;
     const resolvedAgentId = task.assigned_to?.agent_id || resolvedAssignment?.agent_id || undefined;
     const validation = validateMissionTicketTask(task, resolvedAgentId);
     if (!validation.ok) {
@@ -284,13 +311,23 @@ export async function dispatchMissionTickets(
           resolved_agent_id: resolvedAgentId || null,
           assignee_label: resolvedAgentId || teamRole || null,
           ticket_targets: targets,
+          task_model_hint: taskModelHint,
+          risk: task.risk || null,
+          estimated_scope: task.estimated_scope || null,
+          acceptance_criteria: task.acceptance_criteria || [],
+          expected_output_format: task.expected_output_format || null,
+          dependencies: task.dependencies || [],
         },
       });
       workItemId = sourceResult.item_id;
       status = existing?.work_item_id ? 'updated' : 'created';
     }
 
-    const githubArtifactPath = nodePath.join(ticketRoot(missionPath), 'github', `${task.task_id}.json`);
+    const githubArtifactPath = nodePath.join(
+      ticketRoot(missionPath),
+      'github',
+      `${task.task_id}.json`
+    );
     const githubPayload = {
       id: workItemId || task.task_id,
       number: undefined,
@@ -309,9 +346,10 @@ export async function dispatchMissionTickets(
         ...(teamRole ? [`team_role:${teamRole}`] : []),
       ],
       assignees: resolvedAgentId ? [{ login: resolvedAgentId }] : [],
-      repository_url: options.github?.owner && options.github?.repo
-        ? `https://github.com/${options.github.owner}/${options.github.repo}`
-        : undefined,
+      repository_url:
+        options.github?.owner && options.github?.repo
+          ? `https://github.com/${options.github.owner}/${options.github.repo}`
+          : undefined,
       html_url: undefined,
       updated_at: new Date().toISOString(),
       draft: false,
@@ -319,33 +357,43 @@ export async function dispatchMissionTickets(
     if (status !== 'failed' && targets.includes('github')) {
       writeDispatchArtifact(githubArtifactPath, githubPayload);
       ticketFiles.push(githubArtifactPath);
-        if (liveTargets.includes('github')) {
-          if (!options.github?.owner || !options.github?.repo) {
-            notes.push('github live dispatch skipped: missing owner/repo');
-          } else {
-            try {
-              const result = await executeServicePreset('github', 'create_issue', {
-              owner: options.github.owner,
-              repo: options.github.repo,
-                title: githubPayload.title,
-                body: githubPayload.body,
-              }, 'secret-guard');
-              liveResults.github = {
-                ...(result && typeof result === 'object' ? result as Record<string, unknown> : { value: result }),
+      if (liveTargets.includes('github')) {
+        if (!options.github?.owner || !options.github?.repo) {
+          notes.push('github live dispatch skipped: missing owner/repo');
+        } else {
+          try {
+            const result = await executeServicePreset(
+              'github',
+              'create_issue',
+              {
                 owner: options.github.owner,
                 repo: options.github.repo,
-                repository_url: githubPayload.repository_url || `https://github.com/${options.github.owner}/${options.github.repo}`,
-                issue_number: typeof (result as any)?.number === 'number'
+                title: githubPayload.title,
+                body: githubPayload.body,
+              },
+              'secret-guard'
+            );
+            liveResults.github = {
+              ...(result && typeof result === 'object'
+                ? (result as Record<string, unknown>)
+                : { value: result }),
+              owner: options.github.owner,
+              repo: options.github.repo,
+              repository_url:
+                githubPayload.repository_url ||
+                `https://github.com/${options.github.owner}/${options.github.repo}`,
+              issue_number:
+                typeof (result as any)?.number === 'number'
                   ? (result as any).number
                   : typeof (result as any)?.id === 'number'
                     ? (result as any).id
                     : undefined,
-              };
-            } catch (error: any) {
-              notes.push(`github live dispatch failed: ${error?.message || error}`);
-              status = 'failed';
-            }
+            };
+          } catch (error: any) {
+            notes.push(`github live dispatch failed: ${error?.message || error}`);
+            status = 'failed';
           }
+        }
       }
     }
 
@@ -369,7 +417,9 @@ export async function dispatchMissionTickets(
           ...(state.mission_type ? [`mission_type:${state.mission_type}`] : []),
           ...(teamRole ? [`team_role:${teamRole}`] : []),
         ],
-        assignee: resolvedAgentId ? { accountId: resolvedAgentId, displayName: resolvedAgentId } : undefined,
+        assignee: resolvedAgentId
+          ? { accountId: resolvedAgentId, displayName: resolvedAgentId }
+          : undefined,
         project: { key: jiraProjectKey, id: jiraProjectKey },
         updated: new Date().toISOString(),
       },
@@ -377,33 +427,41 @@ export async function dispatchMissionTickets(
     if (status !== 'failed' && targets.includes('jira')) {
       writeDispatchArtifact(jiraArtifactPath, jiraPayload);
       ticketFiles.push(jiraArtifactPath);
-        if (liveTargets.includes('jira')) {
-          if (!options.jira?.projectKey || !options.jira?.domain) {
-            notes.push('jira live dispatch skipped: missing domain/projectKey');
-          } else {
-            try {
-              const result = await executeServicePreset('jira', 'create_issue', {
-              domain: options.jira.domain,
-              project_key: options.jira.projectKey,
+      if (liveTargets.includes('jira')) {
+        if (!options.jira?.projectKey || !options.jira?.domain) {
+          notes.push('jira live dispatch skipped: missing domain/projectKey');
+        } else {
+          try {
+            const result = await executeServicePreset(
+              'jira',
+              'create_issue',
+              {
+                domain: options.jira.domain,
+                project_key: options.jira.projectKey,
                 summary: jiraPayload.fields.summary,
                 description: jiraPayload.fields.description,
                 issue_type: 'Task',
-              }, 'secret-guard');
-              liveResults.jira = {
-                ...(result && typeof result === 'object' ? result as Record<string, unknown> : { value: result }),
-                domain: options.jira.domain,
-                projectKey: options.jira.projectKey,
-                issue_key: typeof (result as any)?.key === 'string'
+              },
+              'secret-guard'
+            );
+            liveResults.jira = {
+              ...(result && typeof result === 'object'
+                ? (result as Record<string, unknown>)
+                : { value: result }),
+              domain: options.jira.domain,
+              projectKey: options.jira.projectKey,
+              issue_key:
+                typeof (result as any)?.key === 'string'
                   ? (result as any).key
                   : typeof (result as any)?.issue_key === 'string'
                     ? (result as any).issue_key
                     : undefined,
-              };
-            } catch (error: any) {
-              notes.push(`jira live dispatch failed: ${error?.message || error}`);
-              status = 'failed';
-            }
+            };
+          } catch (error: any) {
+            notes.push(`jira live dispatch failed: ${error?.message || error}`);
+            status = 'failed';
           }
+        }
       }
     }
 
@@ -412,6 +470,7 @@ export async function dispatchMissionTickets(
       team_role: teamRole,
       title: task.description || task.task_id,
       work_item_id: workItemId,
+      task_model_hint: taskModelHint,
       ticket_targets: ticketTargets,
       ticket_files: ticketFiles,
       live_results: liveResults,
@@ -432,7 +491,9 @@ export async function dispatchMissionTickets(
           ticket_targets: ticketTargets,
           live_targets: liveTargets,
           live_results: liveResults,
+          task_model_hint: taskModelHint,
           status,
+          attempt_count: 1,
         },
       };
       allTasks[taskIndex] = nextTask;
@@ -444,6 +505,7 @@ export async function dispatchMissionTickets(
       task_id: task.task_id,
       team_role: teamRole,
       work_item_id: workItemId,
+      task_model_hint: taskModelHint,
       ticket_targets: ticketTargets,
       ticket_files: ticketFiles,
       live_targets: liveTargets,
@@ -452,13 +514,15 @@ export async function dispatchMissionTickets(
     });
 
     await recordTask(missionId, `Dispatched ticket ${task.task_id}`, {
-      next_step: status === 'failed'
-        ? 'review ticket dispatch failure and repair the ticket payload'
-        : 'wait for ticket-side work to complete and then reconcile results',
+      next_step:
+        status === 'failed'
+          ? 'review ticket dispatch failure and repair the ticket payload'
+          : 'wait for ticket-side work to complete and then reconcile results',
       ticket_dispatch_summary: {
         task_id: task.task_id,
         team_role: teamRole,
         work_item_id: workItemId,
+        task_model_hint: taskModelHint,
         targets,
         live_targets: liveTargets,
         status,
@@ -499,6 +563,8 @@ export async function dispatchMissionTickets(
     manifest_path: manifestFilePath,
   });
 
-  logger.info(`[tickets] mission=${missionId} targets=${targets.join(',')} live=${liveTargets.join(',') || 'none'} count=${records.length}`);
+  logger.info(
+    `[tickets] mission=${missionId} targets=${targets.join(',')} live=${liveTargets.join(',') || 'none'} count=${records.length}`
+  );
   return manifest;
 }

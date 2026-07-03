@@ -2,10 +2,24 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import { loadTaskSession, saveTaskSession, type TaskSession } from './task-session.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
-import { appendArtifactOwnershipRecord, createArtifactOwnershipRecord } from './artifact-registry.js';
+import {
+  appendArtifactOwnershipRecord,
+  createArtifactOwnershipRecord,
+} from './artifact-registry.js';
+import {
+  evaluateDeliverableQuality,
+  inferDeliverableKind,
+  qualityScoreFromReport,
+} from './deliverable-quality.js';
 
 export interface ArtifactRecord {
   artifact_id: string;
@@ -44,9 +58,13 @@ function artifactPath(artifactId: string): string {
   return `${ARTIFACT_DIR}/${artifactId}.json`;
 }
 
-export function createArtifactRecord(input: Omit<ArtifactRecord, 'artifact_id'> & { artifact_id?: string }): ArtifactRecord {
+export function createArtifactRecord(
+  input: Omit<ArtifactRecord, 'artifact_id'> & { artifact_id?: string }
+): ArtifactRecord {
   return {
-    artifact_id: input.artifact_id || `ART-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    artifact_id:
+      input.artifact_id ||
+      `ART-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     ...input,
   };
 }
@@ -57,25 +75,49 @@ export function validateArtifactRecord(value: unknown): value is ArtifactRecord 
 
 export function saveArtifactRecord(record: ArtifactRecord): string {
   if (!validateArtifactRecord(record)) {
-    const errors = (ensureValidator().errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+    const errors = (ensureValidator().errors || []).map(
+      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+    );
     throw new Error(`Invalid artifact record: ${errors.join('; ')}`);
   }
   if (!safeExistsSync(ARTIFACT_DIR)) safeMkdir(ARTIFACT_DIR, { recursive: true });
+  const deliverableKind = inferDeliverableKind(record.kind);
+  const qualityReport = deliverableKind
+    ? evaluateDeliverableQuality(deliverableKind, {
+        ...record,
+        text: record.preview_text,
+      })
+    : null;
+  const metadata = {
+    ...(record.metadata || {}),
+    ...(qualityReport
+      ? {
+          quality_kind: qualityReport.kind,
+          quality_verdict: qualityReport.severity,
+          quality_score: qualityScoreFromReport(qualityReport),
+          quality_hard_checks: [...qualityReport.hard_checks],
+          quality_soft_checks: [...qualityReport.soft_checks],
+        }
+      : {}),
+  };
   const filePath = artifactPath(record.artifact_id);
-  safeWriteFile(filePath, JSON.stringify(record, null, 2));
-  appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-    artifact_id: record.artifact_id,
-    project_id: record.project_id,
-    mission_id: record.mission_id,
-    task_session_id: record.task_session_id,
-    kind: record.kind,
-    storage_class: record.storage_class,
-    path: record.path,
-    external_ref: record.external_ref,
-    evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
-      ? ((record.metadata as any).evidence_refs as string[])
-      : [],
-  }));
+  safeWriteFile(filePath, JSON.stringify({ ...record, metadata }, null, 2));
+  appendArtifactOwnershipRecord(
+    createArtifactOwnershipRecord({
+      artifact_id: record.artifact_id,
+      project_id: record.project_id,
+      mission_id: record.mission_id,
+      task_session_id: record.task_session_id,
+      kind: record.kind,
+      storage_class: record.storage_class,
+      path: record.path,
+      external_ref: record.external_ref,
+      ...(metadata ? { metadata } : {}),
+      evidence_refs: Array.isArray((metadata as any)?.evidence_refs)
+        ? ((metadata as any).evidence_refs as string[])
+        : [],
+    })
+  );
   return filePath;
 }
 
@@ -96,20 +138,27 @@ export function listArtifactRecords(): ArtifactRecord[] {
     .sort((a, b) => a.artifact_id.localeCompare(b.artifact_id));
 }
 
-export function attachArtifactRecordToTaskSession(sessionId: string, record: ArtifactRecord): TaskSession | null {
-  appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-    artifact_id: record.artifact_id,
-    project_id: record.project_id,
-    mission_id: record.mission_id,
-    task_session_id: record.task_session_id || sessionId,
-    kind: record.kind,
-    storage_class: record.storage_class,
-    path: record.path,
-    external_ref: record.external_ref,
-    evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
-      ? ((record.metadata as any).evidence_refs as string[])
-      : [],
-  }), { for_delivery: true });
+export function attachArtifactRecordToTaskSession(
+  sessionId: string,
+  record: ArtifactRecord
+): TaskSession | null {
+  appendArtifactOwnershipRecord(
+    createArtifactOwnershipRecord({
+      artifact_id: record.artifact_id,
+      project_id: record.project_id,
+      mission_id: record.mission_id,
+      task_session_id: record.task_session_id || sessionId,
+      kind: record.kind,
+      storage_class: record.storage_class,
+      path: record.path,
+      external_ref: record.external_ref,
+      ...(record.metadata ? { metadata: record.metadata } : {}),
+      evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
+        ? ((record.metadata as any).evidence_refs as string[])
+        : [],
+    }),
+    { for_delivery: true }
+  );
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   session.artifact = {

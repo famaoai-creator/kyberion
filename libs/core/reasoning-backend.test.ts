@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  delegateBestOf,
+  delegateStructured,
   getReasoningBackend,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
   type ReasoningBackend,
 } from './reasoning-backend.js';
+import { z } from 'zod';
 
 describe('reasoning-backend', () => {
   afterEach(() => {
@@ -33,6 +36,58 @@ describe('reasoning-backend', () => {
     };
     registerReasoningBackend(fake);
     expect(getReasoningBackend().name).toBe('fake');
+  });
+
+  it('delegates structured output with retry-on-mismatch', async () => {
+    const calls: string[] = [];
+    const backend = {
+      delegateTask: async (instruction: string) => {
+        calls.push(instruction);
+        return calls.length === 1 ? 'not json' : JSON.stringify({ answer: 'ok' });
+      },
+    };
+
+    const result = await delegateStructured(
+      backend,
+      'Return answer',
+      z.object({ answer: z.string() }),
+      { maxRetries: 1 }
+    );
+
+    expect(result).toEqual({ answer: 'ok' });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain('Retry attempt 1');
+  });
+
+  it('selects a judge winner from best-of candidates', async () => {
+    const calls: string[] = [];
+    const backend = {
+      delegateTask: async (instruction: string) => {
+        calls.push(instruction);
+        if (instruction.includes('candidate 1/2')) {
+          return JSON.stringify({ answer: 'first' });
+        }
+        if (instruction.includes('candidate 2/2')) {
+          return JSON.stringify({ answer: 'second' });
+        }
+        return JSON.stringify({ winner_index: 1, rationale: 'second is better' });
+      },
+    };
+
+    const result = await delegateBestOf(
+      backend,
+      'Return answer',
+      z.object({ answer: z.string() }),
+      {
+        candidateCount: 2,
+        judgeInstructions: 'Pick the more useful answer.',
+      }
+    );
+
+    expect(result.winner).toEqual({ answer: 'second' });
+    expect(result.candidates).toHaveLength(2);
+    expect(result.judge.winner_index).toBe(1);
+    expect(calls).toHaveLength(3);
   });
 
   describe('stub backend', () => {
@@ -91,9 +146,7 @@ describe('reasoning-backend', () => {
 
     it('simulates each branch with null terminals', async () => {
       const result = await stubReasoningBackend.simulateBranches({
-        branches: [
-          { branch_id: 'A', hypothesis_ref: 'H1', worktree_path: 'x/' },
-        ],
+        branches: [{ branch_id: 'A', hypothesis_ref: 'H1', worktree_path: 'x/' }],
         goal: 'ship',
       });
       expect(result.branches[0].terminated_at_step).toBeNull();

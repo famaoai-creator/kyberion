@@ -6,15 +6,19 @@
 import * as path from 'node:path';
 import {
   auditChain,
+  evaluateDeliverableQuality,
   findMissionPath,
   logger,
   pathResolver,
+  inferDeliverableKind,
   safeAppendFileSync,
   safeExec,
   safeExistsSync,
   safeReaddir,
   safeReadFile,
   safeWriteFile,
+  listArtifactOwnershipRecordsForMission,
+  loadArtifactRecord,
   trustEngine,
   validateOutcomeContractAtCompletion,
   evaluateArtifactBundleGate,
@@ -40,7 +44,9 @@ export function syncRoleProcedure(missionId: string, persona: string): void {
     safeWriteFile(targetPath, procedure);
     logger.info(`📋 [Governance] Mirrored procedure for role "${persona}" to mission context.`);
   } else {
-    logger.warn(`⚠️ [Governance] No specific procedure found for role "${persona}" at ${sourcePath}. Using default.`);
+    logger.warn(
+      `⚠️ [Governance] No specific procedure found for role "${persona}" at ${sourcePath}. Using default.`
+    );
   }
 }
 
@@ -68,7 +74,9 @@ export function readTrustLedger(): Record<string, any> {
   return raw?.agents ?? raw ?? {};
 }
 
-export async function validateMissionQuality(id: string): Promise<{ ok: boolean; reason?: string }> {
+export async function validateMissionQuality(
+  id: string
+): Promise<{ ok: boolean; reason?: string }> {
   const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
   if (!safeExistsSync(policyPath)) return { ok: true };
 
@@ -81,11 +89,12 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
 
   if (state.outcome_contract) {
     const missionPath = findMissionPath(id);
-    const evidenceRefs = missionPath && safeExistsSync(path.join(missionPath, 'evidence'))
-      ? safeReaddir(path.join(missionPath, 'evidence'))
-          .filter((entry) => entry !== '.gitkeep')
-          .map((entry) => path.join(missionPath, 'evidence', entry))
-      : [];
+    const evidenceRefs =
+      missionPath && safeExistsSync(path.join(missionPath, 'evidence'))
+        ? safeReaddir(path.join(missionPath, 'evidence'))
+            .filter((entry) => entry !== '.gitkeep')
+            .map((entry) => path.join(missionPath, 'evidence', entry))
+        : [];
     const outcomeCheck = validateOutcomeContractAtCompletion(state.outcome_contract, {
       artifactRefs: evidenceRefs,
     });
@@ -98,13 +107,35 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
   if (bundle) {
     const bundleGate = evaluateArtifactBundleGate(bundle);
     if (bundleGate.verdict !== 'ready') {
-      return { ok: false, reason: bundleGate.reason || `Artifact bundle gate ${bundleGate.verdict}.` };
+      return {
+        ok: false,
+        reason: bundleGate.reason || `Artifact bundle gate ${bundleGate.verdict}.`,
+      };
+    }
+  }
+
+  const missionArtifacts = listArtifactOwnershipRecordsForMission(id, { includeTmp: false });
+  for (const ownership of missionArtifacts) {
+    const artifact = loadArtifactRecord(ownership.artifact_id);
+    if (!artifact) continue;
+    const kind = inferDeliverableKind(artifact.kind);
+    if (!kind) continue;
+    const gate = evaluateDeliverableQuality(kind, artifact);
+    if (gate.severity === 'poor') {
+      return {
+        ok: false,
+        reason: gate.reason || `Deliverable quality gate blocked ${artifact.artifact_id}.`,
+      };
     }
   }
 
   if (reqs.require_test_success) {
     logger.info('🧪 [QualityCheck] Verification required: require_test_success=true');
-    if (state.status !== 'distilling' && state.status !== 'validating' && state.status !== 'completed') {
+    if (
+      state.status !== 'distilling' &&
+      state.status !== 'validating' &&
+      state.status !== 'completed'
+    ) {
       return { ok: false, reason: 'Mission must pass validation/verification before finishing.' };
     }
   }
@@ -125,12 +156,15 @@ export async function validateMissionQuality(id: string): Promise<{ ok: boolean;
 
 export function recordAgentRuntimeEvent(
   agentRuntimeEventPath: string,
-  event: Record<string, unknown>,
+  event: Record<string, unknown>
 ): void {
   const dir = path.dirname(agentRuntimeEventPath);
   if (!safeExistsSync(dir)) safeWriteFile(agentRuntimeEventPath, '');
-  safeAppendFileSync(agentRuntimeEventPath, JSON.stringify({
-    ts: new Date().toISOString(),
-    ...event,
-  }) + '\n');
+  safeAppendFileSync(
+    agentRuntimeEventPath,
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      ...event,
+    }) + '\n'
+  );
 }

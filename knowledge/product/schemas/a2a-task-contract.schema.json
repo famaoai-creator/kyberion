@@ -6,6 +6,20 @@
   "properties": {
     "intent": { "type": "string" },
     "text": { "type": "string" },
+    "objective": { "type": "string" },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "expected_outputs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rationale": { "type": "string" },
+    "prior_decisions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "context": {
       "type": "object",
       "required": ["mission_id", "team_role"],
@@ -15,7 +29,10 @@
         "execution_mode": { "type": "string" },
         "channel": { "type": "string" },
         "thread": { "type": "string" },
-        "slack_channel": { "type": "string" }
+        "slack_channel": { "type": "string" },
+        "correlation_id": { "type": "string" },
+        "task_model_hint": { "type": "object" },
+        "model_hint": { "type": "object" }
       },
       "additionalProperties": true
     }

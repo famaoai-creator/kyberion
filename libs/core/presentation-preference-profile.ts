@@ -1,3 +1,4 @@
+import { logger } from './core.js';
 import type { PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
 import type { PresentationSlidePatternSelectionPolicy } from './presentation-slide-pattern.js';
 
@@ -40,9 +41,17 @@ export function getPresentationBriefQuestions(
   profile: PresentationPreferenceProfile,
   deckPurpose?: PresentationDeckPurpose | string | null,
   maxQuestions = 2
-): string[] {
+): { questions: string[]; omitted_count: number } {
   const questions = selectPresentationBriefQuestionSet(profile, deckPurpose)?.questions || [];
-  return questions.slice(0, Math.max(1, maxQuestions));
+  const limit = Math.max(1, maxQuestions);
+  const selected = questions.slice(0, limit);
+  const omittedCount = Math.max(0, questions.length - selected.length);
+  if (omittedCount > 0) {
+    logger.info(
+      `[presentation-preference-profile] omitted ${omittedCount} brief question(s) for deckPurpose=${deckPurpose || 'default'}`
+    );
+  }
+  return { questions: selected, omitted_count: omittedCount };
 }
 
 export function selectPresentationThemeSet(

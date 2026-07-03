@@ -1,11 +1,27 @@
 import * as net from 'node:net';
 import { spawnManagedProcess } from './managed-process.js';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeUnlinkSync, safeCreateExclusiveFileSync, safeStat } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeUnlinkSync,
+  safeCreateExclusiveFileSync,
+  safeStat,
+} from './secure-io.js';
 import type { AgentHandle, SpawnOptions } from './agent-lifecycle.js';
 import type { AgentRecord } from './agent-registry.js';
+import type { TaskModelHint } from './reasoning-model-routing.js';
 
-type SupervisorMethod = 'health' | 'ensure' | 'ask' | 'status' | 'list' | 'touch' | 'shutdown' | 'refresh' | 'restart';
+type SupervisorMethod =
+  | 'health'
+  | 'ensure'
+  | 'ask'
+  | 'status'
+  | 'list'
+  | 'touch'
+  | 'shutdown'
+  | 'refresh'
+  | 'restart';
 
 interface SupervisorRequest<T = Record<string, unknown>> {
   id: string;
@@ -58,6 +74,8 @@ export interface AgentRuntimeSupervisorAskPayload {
   agentId: string;
   prompt: string;
   requestedBy: string;
+  correlationId?: string;
+  taskModelHint?: TaskModelHint;
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
@@ -88,7 +106,7 @@ function makeRequest<T>(method: SupervisorMethod, payload?: T): SupervisorReques
 
 async function sendSupervisorRequest<TPayload, TResult>(
   request: SupervisorRequest<TPayload>,
-  timeoutMs = HEALTH_TIMEOUT_MS,
+  timeoutMs = HEALTH_TIMEOUT_MS
 ): Promise<TResult> {
   const targetSocket = socketPath();
   return new Promise((resolve, reject) => {
@@ -120,7 +138,9 @@ async function sendSupervisorRequest<TPayload, TResult>(
         }
         return finish(() => resolve(response.result as TResult));
       } catch (error: any) {
-        return finish(() => reject(new Error(`invalid_supervisor_response: ${error?.message || error}`)));
+        return finish(() =>
+          reject(new Error(`invalid_supervisor_response: ${error?.message || error}`))
+        );
       }
     });
     socket.once('timeout', () => finish(() => reject(new Error('supervisor_request_timeout'))));
@@ -128,12 +148,17 @@ async function sendSupervisorRequest<TPayload, TResult>(
   });
 }
 
-async function waitForSupervisorHealth(timeoutMs = START_TIMEOUT_MS): Promise<AgentRuntimeSupervisorHealth> {
+async function waitForSupervisorHealth(
+  timeoutMs = START_TIMEOUT_MS
+): Promise<AgentRuntimeSupervisorHealth> {
   const deadline = Date.now() + timeoutMs;
   let lastError: Error | undefined;
   while (Date.now() < deadline) {
     try {
-      return await sendSupervisorRequest<undefined, AgentRuntimeSupervisorHealth>(makeRequest('health'), HEALTH_TIMEOUT_MS);
+      return await sendSupervisorRequest<undefined, AgentRuntimeSupervisorHealth>(
+        makeRequest('health'),
+        HEALTH_TIMEOUT_MS
+      );
     } catch (error: any) {
       lastError = error;
       await new Promise((resolve) => setTimeout(resolve, 250));
@@ -162,7 +187,7 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
         return ensureAgentRuntimeSupervisorDaemon();
       }
     } catch (_) {}
-    
+
     return waitForSupervisorHealth();
   }
 
@@ -196,80 +221,92 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
 }
 
 export async function getAgentRuntimeSupervisorHealth(): Promise<AgentRuntimeSupervisorHealth> {
-
   return ensureAgentRuntimeSupervisorDaemon();
 }
 
-export async function ensureAgentRuntimeViaDaemon(payload: AgentRuntimeSupervisorEnsurePayload): Promise<AgentRuntimeSupervisorSnapshot> {
+export async function ensureAgentRuntimeViaDaemon(
+  payload: AgentRuntimeSupervisorEnsurePayload
+): Promise<AgentRuntimeSupervisorSnapshot> {
   await ensureAgentRuntimeSupervisorDaemon();
   return sendSupervisorRequest<AgentRuntimeSupervisorEnsurePayload, AgentRuntimeSupervisorSnapshot>(
     makeRequest('ensure', payload),
-    ENSURE_TIMEOUT_MS,
+    ENSURE_TIMEOUT_MS
   );
 }
 
-export async function askAgentRuntimeViaDaemon(payload: AgentRuntimeSupervisorAskPayload): Promise<{ text: string }> {
+export async function askAgentRuntimeViaDaemon(
+  payload: AgentRuntimeSupervisorAskPayload
+): Promise<{ text: string }> {
   await ensureAgentRuntimeSupervisorDaemon();
   return sendSupervisorRequest<AgentRuntimeSupervisorAskPayload, { text: string }>(
     makeRequest('ask', payload),
-    ASK_TIMEOUT_MS,
+    ASK_TIMEOUT_MS
   );
 }
 
-export async function getAgentRuntimeStatusViaDaemon(agentId: string, logLimit = 20): Promise<AgentRuntimeSupervisorSnapshot | null> {
+export async function getAgentRuntimeStatusViaDaemon(
+  agentId: string,
+  logLimit = 20
+): Promise<AgentRuntimeSupervisorSnapshot | null> {
   await ensureAgentRuntimeSupervisorDaemon();
-  return sendSupervisorRequest<{ agentId: string; logLimit: number }, AgentRuntimeSupervisorSnapshot | null>(
-    makeRequest('status', { agentId, logLimit }),
-    STATUS_TIMEOUT_MS,
-  );
+  return sendSupervisorRequest<
+    { agentId: string; logLimit: number },
+    AgentRuntimeSupervisorSnapshot | null
+  >(makeRequest('status', { agentId, logLimit }), STATUS_TIMEOUT_MS);
 }
 
 export async function listAgentRuntimesViaDaemon(): Promise<AgentRuntimeSupervisorSnapshot[]> {
   await ensureAgentRuntimeSupervisorDaemon();
-  return sendSupervisorRequest<undefined, AgentRuntimeSupervisorSnapshot[]>(makeRequest('list'), STATUS_TIMEOUT_MS);
+  return sendSupervisorRequest<undefined, AgentRuntimeSupervisorSnapshot[]>(
+    makeRequest('list'),
+    STATUS_TIMEOUT_MS
+  );
 }
 
 export async function touchAgentRuntimeViaDaemon(agentId: string): Promise<{ touched: boolean }> {
   await ensureAgentRuntimeSupervisorDaemon();
   return sendSupervisorRequest<{ agentId: string }, { touched: boolean }>(
     makeRequest('touch', { agentId }),
-    STATUS_TIMEOUT_MS,
+    STATUS_TIMEOUT_MS
   );
 }
 
-export async function shutdownAgentRuntimeViaDaemon(agentId: string, requestedBy: string): Promise<{ stopped: boolean }> {
+export async function shutdownAgentRuntimeViaDaemon(
+  agentId: string,
+  requestedBy: string
+): Promise<{ stopped: boolean }> {
   await ensureAgentRuntimeSupervisorDaemon();
   return sendSupervisorRequest<{ agentId: string; requestedBy: string }, { stopped: boolean }>(
     makeRequest('shutdown', { agentId, requestedBy }),
-    STATUS_TIMEOUT_MS,
+    STATUS_TIMEOUT_MS
   );
 }
 
 export async function refreshAgentRuntimeViaDaemon(
   agentId: string,
-  requestedBy: string,
+  requestedBy: string
 ): Promise<{ refreshed: boolean; reason: string }> {
   await ensureAgentRuntimeSupervisorDaemon();
-  return sendSupervisorRequest<{ agentId: string; requestedBy: string }, { refreshed: boolean; reason: string }>(
-    makeRequest('refresh', { agentId, requestedBy }),
-    STATUS_TIMEOUT_MS,
-  );
+  return sendSupervisorRequest<
+    { agentId: string; requestedBy: string },
+    { refreshed: boolean; reason: string }
+  >(makeRequest('refresh', { agentId, requestedBy }), STATUS_TIMEOUT_MS);
 }
 
 export async function restartAgentRuntimeViaDaemon(
-  payload: AgentRuntimeSupervisorEnsurePayload,
+  payload: AgentRuntimeSupervisorEnsurePayload
 ): Promise<AgentRuntimeSupervisorSnapshot> {
   await ensureAgentRuntimeSupervisorDaemon();
   return sendSupervisorRequest<AgentRuntimeSupervisorEnsurePayload, AgentRuntimeSupervisorSnapshot>(
     makeRequest('restart', payload),
-    ENSURE_TIMEOUT_MS,
+    ENSURE_TIMEOUT_MS
   );
 }
 
 export function createSupervisorBackedAgentHandle(
   agentId: string,
   requestedBy: string,
-  snapshot?: AgentRuntimeSupervisorSnapshot,
+  snapshot?: AgentRuntimeSupervisorSnapshot
 ): AgentHandle {
   return {
     agentId,
@@ -304,7 +341,7 @@ export function toSupervisorEnsurePayload(
     runtimeMetadata?: Record<string, unknown>;
     runtimeOwnerId?: string;
     runtimeOwnerType?: string;
-  },
+  }
 ): AgentRuntimeSupervisorEnsurePayload {
   return {
     agentId: options.agentId!,

@@ -112,6 +112,7 @@ export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
+export * from './deliverable-quality.js';
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';
@@ -1031,6 +1032,7 @@ export type {
 } from './sdlc-artifact-store.js';
 export {
   getReasoningBackend,
+  delegateBestOf,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1389,6 +1391,8 @@ export * from './mission-team-orchestrator.js';
 export * from './agent-runtime-supervisor.js';
 export * from './agent-runtime-supervisor-client.js';
 export * from './mission-orchestration-events.js';
+export * from './mission-orchestration-journal.js';
+export * from './mission-task-recovery.js';
 export * from './mission-orchestration-worker.js';
 export * from './mission-task-events.js';
 export * from './worker-assignment-policy.js';

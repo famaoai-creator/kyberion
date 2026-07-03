@@ -66,6 +66,42 @@
         "proposed_memory_kind": "heuristic",
         "sensitivity_tier": "personal"
       }
+    },
+    {
+      "id": "summarize_task_model_routing",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "task_model_routing_summary", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/summarize_task_model_routing.js --json > active/shared/tmp/task-model-routing-summary.json || printf '{\"samples\":[],\"rows\":[]}' > active/shared/tmp/task-model-routing-summary.json"
+      }
+    },
+    {
+      "id": "log_task_model_routing_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "task_model_routing_summary",
+      "params": {
+        "message": "[WEEKLY-REVIEW] Task model routing summary written to active/shared/tmp/task-model-routing-summary.json."
+      }
+    },
+    {
+      "id": "summarize_memory_queue",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "memory_queue_summary", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/summarize_memory_promotion_queue.js --status queued --output active/shared/tmp/memory-promotion-queue-summary.md"
+      }
+    },
+    {
+      "id": "log_memory_queue_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "memory_queue_summary",
+      "params": {
+        "message": "[WEEKLY-REVIEW] Memory promotion queue summary written to active/shared/tmp/memory-promotion-queue-summary.md."
+      }
     }
   ]
 }

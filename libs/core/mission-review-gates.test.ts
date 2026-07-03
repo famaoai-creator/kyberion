@@ -18,6 +18,7 @@ describe('mission-review-gates', () => {
     expect(review.review_mode).toBe('strict');
     expect(review.required_gate_ids).toContain('CONTRACT_VALID');
     expect(review.required_gate_ids).toContain('SECURITY_READY');
+    expect(review.required_gate_ids).toContain('DELIVERABLE_QUALITY');
   });
 
   it('selects lean mode for low-risk workflows', () => {
@@ -31,6 +32,7 @@ describe('mission-review-gates', () => {
 
     expect(review.review_mode).toBe('lean');
     expect(review.required_gate_ids).toContain('CONTRACT_VALID');
+    expect(review.required_gate_ids).not.toContain('DELIVERABLE_QUALITY');
   });
 
   it('aggregates gate verdicts with strictest priority', () => {
@@ -59,7 +61,7 @@ describe('mission-review-gates', () => {
         approval: { status: 'pending' },
         created_at: '2026-06-05T00:00:00.000Z',
         updated_at: '2026-06-05T00:00:00.000Z',
-      }),
+      })
     ).toMatchObject({ verdict: 'concerns' });
 
     expect(
@@ -73,7 +75,7 @@ describe('mission-review-gates', () => {
         approval: { status: 'approved' },
         created_at: '2026-06-05T00:00:00.000Z',
         updated_at: '2026-06-05T00:00:00.000Z',
-      }),
+      })
     ).toMatchObject({ verdict: 'ready' });
   });
 });

@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { TraceContext } from '@agent/core';
-import {
+
+const {
   normalizePipelineOp,
   runSteps,
   formatPipelineFailure,
   validateFlow,
-} from './run_pipeline.js';
+  normalizeReasoningPolicy,
+  buildReasoningPolicyNote,
+  isReasoningBudgetExceeded,
+} = await import(new URL('./run_pipeline.js', import.meta.url).href);
 
 describe('run_pipeline compatibility', () => {
   it('normalizes short-form system ops to namespaced ops', () => {
     expect(normalizePipelineOp('shell')).toBe('system:shell');
     expect(normalizePipelineOp('log')).toBe('system:log');
     expect(normalizePipelineOp('if')).toBe('core:if');
+    expect(normalizePipelineOp('while')).toBe('core:while');
+    expect(normalizePipelineOp('parallel_foreach')).toBe('core:parallel_foreach');
     expect(normalizePipelineOp('system:shell')).toBe('system:shell');
   });
 
@@ -129,6 +135,121 @@ describe('run_pipeline compatibility', () => {
       deletedTmp: 0,
       errors: expect.any(Array),
     });
+  });
+
+  it('runs parallel_foreach with bounded concurrency and collects per-item outputs', async () => {
+    const startedAt = Date.now();
+    const result = await runSteps([
+      {
+        op: 'core:parallel_foreach',
+        params: {
+          items: [1, 2],
+          as: 'item',
+          concurrency: 2,
+          export_as: 'parallel_outputs',
+          do: [
+            {
+              op: 'core:wait',
+              params: {
+                duration_ms: 120,
+              },
+            },
+            {
+              op: 'core:transform',
+              params: {
+                input: '{{item}}',
+                script: 'return { doubled: Number(input) * 2 };',
+                export_as: 'mapped',
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    const elapsed = Date.now() - startedAt;
+
+    expect(result.status).toBe('succeeded');
+    expect(elapsed).toBeLessThan(220);
+    expect(result.context.parallel_outputs).toHaveLength(2);
+    expect(result.context.parallel_outputs[0].context.mapped.doubled).toBe(2);
+    expect(result.context.parallel_outputs[1].context.mapped.doubled).toBe(4);
+  });
+
+  it('runs while loops until the condition is no longer true', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:while',
+          params: {
+            condition: { from: 'loop.count', operator: 'lt', value: 3 },
+            max_iterations: 5,
+            export_as: 'loop_result',
+            pipeline: [
+              {
+                op: 'core:transform',
+                params: {
+                  input: '{{loop.count}}',
+                  script: 'return { count: Number(input || 0) + 1 };',
+                  export_as: 'loop',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      { loop: { count: 0 } }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.loop as any).count).toBe(3);
+    expect(result.context.loop_result).toMatchObject({
+      iterations: 3,
+      history: expect.any(Array),
+    });
+  });
+
+  it('passes effort and budget through reasoning steps', () => {
+    const policy = normalizeReasoningPolicy({
+      op: 'reasoning:synthesize',
+      effort: 'high',
+      budget: {
+        cost_cap_tokens: 1234,
+        max_prompt_chars: 10_000,
+        max_response_chars: 10_000,
+        max_combined_chars: 20_000,
+        approval_required: true,
+      },
+      params: {},
+    });
+
+    expect(policy).toMatchObject({
+      effort: 'high',
+      budget: {
+        cost_cap_tokens: 1234,
+        max_prompt_chars: 10_000,
+        max_response_chars: 10_000,
+        max_combined_chars: 20_000,
+        approval_required: true,
+      },
+    });
+    expect(buildReasoningPolicyNote(policy)).toContain('effort=high');
+    expect(buildReasoningPolicyNote(policy)).toContain('cost_cap_tokens=1234');
+  });
+
+  it('halts reasoning steps when the declared budget is too small', () => {
+    const policy = normalizeReasoningPolicy({
+      op: 'reasoning:synthesize',
+      params: {},
+      budget: {
+        max_prompt_chars: 1,
+        approval_required: true,
+      },
+    });
+
+    expect(
+      isReasoningBudgetExceeded(policy, 'Instruction: x\nContext: {"topic":"budget stop"}', '')
+    ).toContain('prompt budget exceeded');
+    expect(buildReasoningPolicyNote(policy)).toContain('approval_required=true');
   });
 });
 

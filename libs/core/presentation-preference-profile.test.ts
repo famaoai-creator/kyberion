@@ -9,7 +9,8 @@ import {
   safeReadFile,
   selectPresentationBriefQuestionSet,
 } from '@agent/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { logger } from './core.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -25,7 +26,10 @@ describe('presentation-preference-profile schema', () => {
     );
     const example = JSON.parse(
       safeReadFile(
-        path.resolve(root, 'knowledge/product/schemas/presentation-preference-profile.example.json'),
+        path.resolve(
+          root,
+          'knowledge/product/schemas/presentation-preference-profile.example.json'
+        ),
         {
           encoding: 'utf8',
         }
@@ -39,7 +43,10 @@ describe('presentation-preference-profile schema', () => {
     const root = process.cwd();
     const profile = JSON.parse(
       safeReadFile(
-        path.resolve(root, 'knowledge/product/schemas/presentation-preference-profile.example.json'),
+        path.resolve(
+          root,
+          'knowledge/product/schemas/presentation-preference-profile.example.json'
+        ),
         {
           encoding: 'utf8',
         }
@@ -47,7 +54,7 @@ describe('presentation-preference-profile schema', () => {
     );
 
     expect(selectPresentationBriefQuestionSet(profile, 'proposal')?.label).toBe('Proposal deck');
-    expect(getPresentationBriefQuestions(profile, 'marketing')).toEqual([
+    expect(getPresentationBriefQuestions(profile, 'marketing').questions).toEqual([
       '営業資料ですか、告知資料ですか?',
       'ブランド準拠の強さはどの程度必要ですか?',
     ]);
@@ -59,5 +66,28 @@ describe('presentation-preference-profile schema', () => {
         default_pattern_id: 'key-message-single',
       })
     );
+  });
+
+  it('logs how many brief questions were omitted when limiting the preview', () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const profile = {
+      brief_question_sets: [
+        {
+          label: 'Test deck',
+          questions: ['Q1', 'Q2', 'Q3'],
+        },
+      ],
+      theme_sets: [],
+      theme_selection_policy: {},
+    } as any;
+
+    expect(getPresentationBriefQuestions(profile, 'proposal', 2)).toEqual({
+      questions: ['Q1', 'Q2'],
+      omitted_count: 1,
+    });
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[presentation-preference-profile] omitted 1 brief question(s) for deckPurpose=proposal'
+    );
+    infoSpy.mockRestore();
   });
 });

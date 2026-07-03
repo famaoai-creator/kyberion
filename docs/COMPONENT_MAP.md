@@ -65,21 +65,21 @@ The concept map explains how those ideas fit together logically.
 
 ## Top-level directories
 
-| Path | Role | Start here when you want to... |
-| --- | --- | --- |
-| `AGENTS.md` | Sovereign charter and operating rules | Understand the philosophy, constraints, and lifecycle |
-| `docs/` | Human-facing guides | Learn setup, terminology, and architecture |
-| `libs/core/` | Shared kernel utilities | Inspect secure I/O, path resolution, locks, CLI helpers |
-| `libs/actuators/` | Execution "spinal cord" | See what the system can physically do |
-| `knowledge/` | Tiered memory and procedures | Add guidance, playbooks, governance, and private context |
-| `scripts/` | Entry-point commands | Run onboarding, missions, dashboards, and discovery tools |
-| `pipelines/` | Declarative workflows | Review system diagnostics and repeatable flows |
-| `plugins/` | Runtime guardrails and telemetry | Inspect policy enforcement and instrumentation |
-| `satellites/` | External bridges | Connect Kyberion to platforms like Slack |
-| `presence/` | Background sensing, dashboards, and control surfaces | Inspect pulse, display, sensory integrations, and Chronos Mirror v2 |
-| `active/` | Mission/runtime workspace and project operational state | Review live mission state, project state, and generated operational files |
-| `schemas/` | Structured data contracts | Validate JSON-based ADF and ecosystem data |
-| `tests/` | Cross-cutting tests | Run smoke and integration coverage |
+| Path              | Role                                                    | Start here when you want to...                                            |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `AGENTS.md`       | Sovereign charter and operating rules                   | Understand the philosophy, constraints, and lifecycle                     |
+| `docs/`           | Human-facing guides                                     | Learn setup, terminology, and architecture                                |
+| `libs/core/`      | Shared kernel utilities                                 | Inspect secure I/O, path resolution, locks, CLI helpers                   |
+| `libs/actuators/` | Execution "spinal cord"                                 | See what the system can physically do                                     |
+| `knowledge/`      | Tiered memory and procedures                            | Add guidance, playbooks, governance, and private context                  |
+| `scripts/`        | Entry-point commands                                    | Run onboarding, missions, dashboards, and discovery tools                 |
+| `pipelines/`      | Declarative workflows                                   | Review system diagnostics and repeatable flows                            |
+| `plugins/`        | Runtime guardrails and telemetry                        | Inspect policy enforcement and instrumentation                            |
+| `satellites/`     | External bridges                                        | Connect Kyberion to platforms like Slack                                  |
+| `presence/`       | Background sensing, dashboards, and control surfaces    | Inspect pulse, display, sensory integrations, and Chronos Mirror v2       |
+| `active/`         | Mission/runtime workspace and project operational state | Review live mission state, project state, and generated operational files |
+| `schemas/`        | Structured data contracts                               | Validate JSON-based ADF and ecosystem data                                |
+| `tests/`          | Cross-cutting tests                                     | Run smoke and integration coverage                                        |
 
 ## Core execution paths
 
@@ -101,6 +101,7 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `libs/core/mission-orchestration-worker.ts`
 - `libs/core/agent-runtime-supervisor.ts`
 - `libs/core/a2a-bridge.ts`
+- `docs/developer/AGENT_COMMS.md`
 - `pipelines/vital-check.json`
 - `active/missions/`
 - `knowledge/product/architecture/agent-mission-control-model.md`
@@ -311,11 +312,11 @@ The authoritative architecture reference is:
 
 ## Knowledge tiers
 
-| Tier | Path | Purpose |
-| --- | --- | --- |
-| Personal | `knowledge/personal/` | Identity, private preferences, private missions |
-| Confidential | `knowledge/confidential/` | Sensitive organizational knowledge |
-| Public | `knowledge/public/` and shared docs | Reusable governance, procedures, and shared knowledge |
+| Tier         | Path                                | Purpose                                               |
+| ------------ | ----------------------------------- | ----------------------------------------------------- |
+| Personal     | `knowledge/personal/`               | Identity, private preferences, private missions       |
+| Confidential | `knowledge/confidential/`           | Sensitive organizational knowledge                    |
+| Public       | `knowledge/public/` and shared docs | Reusable governance, procedures, and shared knowledge |
 
 The charter assumes strict isolation between these tiers.
 

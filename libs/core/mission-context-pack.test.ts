@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  safeExistsSync,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import {
   appendArtifactOwnershipRecord,
@@ -37,7 +32,36 @@ afterEach(() => {
   if (safeExistsSync(artifactRegistryPath)) safeRmSync(artifactRegistryPath);
 });
 
+function seedContextPackArtifacts(projectId: string): void {
+  appendArtifactOwnershipRecord(
+    createArtifactOwnershipRecord({
+      artifact_id: 'ART-CONTEXT-PACK-BASE',
+      project_id: projectId,
+      mission_id: 'MSN-CONTEXT-PACK-BASE',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/context-pack-base.md',
+      created_at: '2026-06-04T00:00:00.000Z',
+      metadata: { quality_score: 20, quality_verdict: 'warn' },
+    })
+  );
+  appendArtifactOwnershipRecord(
+    createArtifactOwnershipRecord({
+      artifact_id: 'ART-CONTEXT-PACK-REVISION',
+      project_id: projectId,
+      mission_id: 'MSN-CONTEXT-PACK-REVISION',
+      kind: 'markdown',
+      storage_class: 'artifact_store',
+      path: 'active/shared/artifacts/context-pack-revision.md',
+      created_at: '2026-06-05T00:00:00.000Z',
+      evidence_refs: ['mission:MSN-CONTEXT-PACK-REVISION'],
+      metadata: { quality_score: 95, quality_verdict: 'ready' },
+    })
+  );
+}
+
 function makePack(): MissionContextPack {
+  seedContextPackArtifacts('PRJ-CONTEXT-PACK-001');
   return buildMissionContextPack({
     contextPackId: 'CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-ABC12345',
     missionPath,
@@ -183,7 +207,8 @@ function makePack(): MissionContextPack {
     workItem: {
       item_id: 'WIT-CONTEXT-PACK-001',
       title: 'Implement context pack injection',
-      description: 'Build the scoped mission context pack and use it in the work item dispatch prompt.',
+      description:
+        'Build the scoped mission context pack and use it in the work item dispatch prompt.',
       status: 'ready',
       priority: 'high',
       source: 'local',
@@ -197,6 +222,10 @@ function makePack(): MissionContextPack {
         team_role: 'implementer',
         deliverable: 'knowledge/product/architecture/mission-context-injection-model.md',
         target_path: 'knowledge/product/architecture/mission-context-injection-model.md',
+        acceptance_criteria: [
+          'context pack should include work item criteria',
+          'dispatch prompt should stay scoped',
+        ],
       },
     },
     missionTeamAssignment: {
@@ -217,6 +246,12 @@ function makePack(): MissionContextPack {
       modelId: 'claude-4',
       required_capabilities: ['architecture', 'typescript'],
       notes: 'test assignment',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
     },
     knowledgeHints: [
       {
@@ -234,6 +269,7 @@ function makePack(): MissionContextPack {
 }
 
 function makePrunablePack(): MissionContextPack {
+  seedContextPackArtifacts('PRJ-CONTEXT-PACK-PRUNED');
   return buildMissionContextPack({
     contextPackId: 'CPK-MSN-CONTEXT-PACK-TEST-PRUNED-ABC12345',
     contextBudgetChars: 900,
@@ -301,7 +337,9 @@ function makePrunablePack(): MissionContextPack {
     projectState: {
       project_id: 'PRJ-CONTEXT-PACK-PRUNED',
       name: 'Context Pack Project',
-      summary: 'A project used to validate scoped mission context injection with pruning. '.repeat(10),
+      summary: 'A project used to validate scoped mission context injection with pruning. '.repeat(
+        10
+      ),
       status: 'active',
       tier: 'public',
       tenant_slug: 'acme',
@@ -374,7 +412,10 @@ function makePrunablePack(): MissionContextPack {
     workItem: {
       item_id: 'WIT-CONTEXT-PACK-PRUNED',
       title: 'Implement context pack pruning',
-      description: 'Build the scoped mission context pack and use it in the work item dispatch prompt. '.repeat(12),
+      description:
+        'Build the scoped mission context pack and use it in the work item dispatch prompt. '.repeat(
+          12
+        ),
       status: 'ready',
       priority: 'high',
       source: 'local',
@@ -450,19 +491,34 @@ describe('mission-context-pack', () => {
     expect(pack.task_session?.session_id).toBe('TSK-CONTEXT-PACK-001');
     expect(pack.work_item?.item_id).toBe('WIT-CONTEXT-PACK-001');
     expect(pack.knowledge_hints).toHaveLength(1);
-    expect(pack.sources.map((entry) => entry.kind)).toEqual(expect.arrayContaining([
-      'mission_state',
-      'mission_team',
-      'project_state',
-      'project_track',
-      'task_session',
-      'work_item',
-      'knowledge_hint',
-    ]));
+    expect(pack.task_guidance?.seed).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Reference artifact: ART-CONTEXT-PACK-REVISION'),
+      ])
+    );
+    expect(pack.task_guidance?.acceptance_criteria).toEqual(
+      expect.arrayContaining([
+        'context pack should include work item criteria',
+        'dispatch prompt should stay scoped',
+      ])
+    );
+    expect(pack.sources.map((entry) => entry.kind)).toEqual(
+      expect.arrayContaining([
+        'mission_state',
+        'mission_team',
+        'project_state',
+        'project_track',
+        'task_session',
+        'work_item',
+        'knowledge_hint',
+      ])
+    );
 
     const rendered = renderMissionContextPack(pack);
     expect(rendered).toContain('Mission context pack (scoped, minimal, role-specific).');
     expect(rendered).toContain('Use only the facts in this pack');
+    expect(rendered).toContain('Fast-lane guidance: model_tier=fast');
+    expect(rendered).toContain('schema-forced result');
     expect(rendered).toContain('Implement context pack injection');
   });
 
@@ -485,30 +541,63 @@ describe('mission-context-pack', () => {
   });
 
   it('injects reusable artifact hints without binding the artifact to the mission', () => {
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-CONTEXT-PACK-BASE',
-      project_id: 'PRJ-CONTEXT-PACK-001',
-      mission_id: 'MSN-CONTEXT-PACK-BASE',
-      kind: 'markdown',
-      storage_class: 'artifact_store',
-      path: 'active/shared/artifacts/context-pack-base.md',
-      created_at: '2026-06-04T00:00:00.000Z',
-    }));
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-CONTEXT-PACK-REVISION',
-      project_id: 'PRJ-CONTEXT-PACK-001',
-      mission_id: 'MSN-CONTEXT-PACK-REVISION',
-      kind: 'markdown',
-      storage_class: 'artifact_store',
-      path: 'active/shared/artifacts/context-pack-revision.md',
-      created_at: '2026-06-05T00:00:00.000Z',
-      evidence_refs: ['mission:MSN-CONTEXT-PACK-REVISION'],
-    }));
-
     const pack = makePack();
     expect(pack.artifact_hints?.[0]?.artifact_id).toBe('ART-CONTEXT-PACK-REVISION');
     expect(pack.artifact_hints?.[0]?.reuse_reason).toContain('Reusable project artifact');
-    expect(pack.artifact_hints?.every((hint) => hint.project_id === 'PRJ-CONTEXT-PACK-001')).toBe(true);
+    expect(pack.artifact_hints?.every((hint) => hint.project_id === 'PRJ-CONTEXT-PACK-001')).toBe(
+      true
+    );
+  });
+
+  it('prefers higher quality reusable artifacts over newer lower quality ones', () => {
+    seedContextPackArtifacts('PRJ-CONTEXT-PACK-QUALITY');
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-CONTEXT-PACK-LATEST-BUT-LOW',
+        project_id: 'PRJ-CONTEXT-PACK-QUALITY',
+        mission_id: 'MSN-CONTEXT-PACK-LOW',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/context-pack-low.md',
+        created_at: '2026-06-06T00:00:00.000Z',
+        metadata: { quality_score: 10, quality_verdict: 'poor' },
+      })
+    );
+
+    const pack = buildMissionContextPack({
+      contextPackId: 'CPK-MSN-CONTEXT-PACK-QUALITY',
+      missionPath,
+      missionState: {
+        mission_id: missionId,
+        mission_type: 'product_development',
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-test',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {
+          project: {
+            project_id: 'PRJ-CONTEXT-PACK-QUALITY',
+            project_path: 'active/projects/public/acme/PRJ-CONTEXT-PACK-QUALITY/project-os',
+            relationship_type: 'supports',
+          },
+        },
+        assigned_persona: 'worker',
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.artifact_hints?.[0]?.artifact_id).toBe('ART-CONTEXT-PACK-REVISION');
   });
 
   it('prunes oversized context packs and writes a mission-local rollup', () => {

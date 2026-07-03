@@ -92,7 +92,7 @@ function summarize(missionId: string): void {
   logger.info(`   operator_self pending: ${selfPending.length}`);
   logger.info(`   team_member pending: ${othersPending.length}`);
   logger.info(
-    `   owner kinds: self=${lifecycle.by_owner_kind.operator_self} team=${lifecycle.by_owner_kind.team_member} external=${lifecycle.by_owner_kind.external} unassigned=${lifecycle.by_owner_kind.unassigned}`,
+    `   owner kinds: self=${lifecycle.by_owner_kind.operator_self} team=${lifecycle.by_owner_kind.team_member} external=${lifecycle.by_owner_kind.external} unassigned=${lifecycle.by_owner_kind.unassigned}`
   );
   if (lifecycle.blocked_items.length > 0) {
     logger.info('   blocked reasons:');
@@ -221,9 +221,9 @@ async function main(): Promise<void> {
   logger.info(`   primary_role: ${meetingBrief.primary_role}`);
   logger.info(`   follow_up_channel: ${meetingBrief.follow_up_channel}`);
   logger.info(`   brief_path: ${briefPath}`);
-  if (briefQuestions.length > 0) {
+  if (briefQuestions.questions.length > 0) {
     logger.info(`   preflight questions:`);
-    for (const q of briefQuestions.slice(0, 3)) {
+    for (const q of briefQuestions.questions.slice(0, 3)) {
       logger.info(`   - ${q}`);
     }
   }

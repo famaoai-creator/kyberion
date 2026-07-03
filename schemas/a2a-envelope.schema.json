@@ -12,15 +12,28 @@
       "properties": {
         "msg_id": { "type": "string", "description": "UUID or unique message identifier" },
         "parent_id": { "type": "string", "description": "Reference to a previous message ID" },
-        "conversation_id": { "type": "string", "description": "Mission ID or long-running task ID" },
-        "sender": { "type": "string", "description": "Agent identity (e.g., kyberion:brain:gemini)" },
+        "conversation_id": {
+          "type": "string",
+          "description": "Mission ID or long-running task ID"
+        },
+        "correlation_id": {
+          "type": "string",
+          "description": "Correlation key for a single trace or turn"
+        },
+        "sender": {
+          "type": "string",
+          "description": "Agent identity (e.g., kyberion:brain:gemini)"
+        },
         "receiver": { "type": "string", "description": "Target identity (e.g., kyberion:nerve)" },
-        "performative": { 
+        "performative": {
           "enum": ["request", "propose", "inform", "accept", "reject", "query", "result"],
           "description": "The speech act of this message"
         },
         "timestamp": { "type": "string", "format": "date-time" },
-        "signature": { "type": "string", "description": "Optional cryptographic signature for Sovereign approval" }
+        "signature": {
+          "type": "string",
+          "description": "Optional cryptographic signature for Sovereign approval"
+        }
       }
     },
     "payload": {

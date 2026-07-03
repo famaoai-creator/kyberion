@@ -146,7 +146,7 @@ const divergePersonasSpec: StructuredOpSpec<DivergeHypothesisInput, HypothesisSk
         proposed_by: z.string(),
         content: z.string(),
         status: z.enum(['pending', 'survived', 'rejected']).optional(),
-      }),
+      })
     ),
   }),
   buildUserPrompt: (input) =>
@@ -171,7 +171,7 @@ const crossCritiqueSpec: StructuredOpSpec<CritiqueInput, CritiqueResult> = {
         survived: z.boolean(),
         rejection_reason: OptionalSchema(z.string()),
         critiques: z.array(z.object({ by: z.string(), content: z.string() })).optional(),
-      }),
+      })
     ),
   }),
   buildUserPrompt: (input) =>
@@ -211,7 +211,7 @@ const forkBranchesSpec: StructuredOpSpec<BranchForkInput, ForkedBranch[]> = {
         branch_id: z.string(),
         hypothesis_ref: z.string(),
         worktree_path: z.string(),
-      }),
+      })
     ),
   }),
   buildUserPrompt: (input) =>
@@ -235,13 +235,14 @@ const simulateBranchesSpec: StructuredOpSpec<SimulationInput, SimulationResult> 
         first_failure_mode: z.string().nullable(),
         first_success_mode: z.string().nullable(),
         terminated_at_step: z.number().nullable(),
-      }),
+      })
     ),
   }),
   buildUserPrompt: (input) =>
     [
       'Simulate the short-horizon execution of the branches.',
       `Goal: ${input.goal}`,
+      `Max steps per branch: ${input.maxStepsPerBranch ?? 10}`,
       JSON.stringify(input.branches, null, 2),
     ].join('\n'),
   extract: (parsed) => parsed as SimulationResult,
@@ -387,7 +388,9 @@ export function parseStructuredJson(text: string, op: string): unknown {
     }
   }
 
-  throw new Error(`[structured-reasoning] failed to parse JSON for op "${op}": ${trimmed.slice(0, 300)}`);
+  throw new Error(
+    `[structured-reasoning] failed to parse JSON for op "${op}": ${trimmed.slice(0, 300)}`
+  );
 }
 
 /**
@@ -397,13 +400,15 @@ export function parseStructuredJson(text: string, op: string): unknown {
 export async function runStructuredReasoningOp<TInput, TOutput>(
   spec: StructuredOpSpec<TInput, TOutput>,
   input: TInput,
-  complete: (systemPrompt: string, userPrompt: string) => Promise<string>,
+  complete: (systemPrompt: string, userPrompt: string) => Promise<string>
 ): Promise<TOutput> {
   const raw = await complete(STRUCTURED_REASONING_SYSTEM_PROMPT, spec.buildUserPrompt(input));
   const json = parseStructuredJson(raw, spec.op);
   const result = spec.schema.safeParse(json);
   if (!result.success) {
-    throw new Error(`[structured-reasoning] schema validation failed for "${spec.op}": ${result.error.message}`);
+    throw new Error(
+      `[structured-reasoning] schema validation failed for "${spec.op}": ${result.error.message}`
+    );
   }
   return spec.extract(result.data);
 }

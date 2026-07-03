@@ -23,6 +23,7 @@ import {
   safeCreateExclusiveFileSync,
   stopAgentRuntime,
 } from '@agent/core';
+import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
 
 type SupervisorMethod =
   | 'health'
@@ -74,6 +75,27 @@ export interface AgentRuntimeSupervisorDaemonInstance {
 
 type TcpListenTarget = { host: string; port: number };
 type ListenTarget = string | TcpListenTarget;
+
+function readTaskModelHint(value: unknown): TaskModelHint | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const hint = value as Partial<TaskModelHint>;
+  if (
+    typeof hint.model_id !== 'string' ||
+    typeof hint.tier !== 'string' ||
+    typeof hint.effort !== 'string' ||
+    typeof hint.route_reason !== 'string'
+  ) {
+    return undefined;
+  }
+  if (hint.tier !== 'small' && hint.tier !== 'standard' && hint.tier !== 'large') return undefined;
+  if (hint.effort !== 'low' && hint.effort !== 'medium' && hint.effort !== 'high') return undefined;
+  return {
+    model_id: hint.model_id.trim(),
+    tier: hint.tier,
+    effort: hint.effort,
+    route_reason: hint.route_reason,
+  };
+}
 
 function resolveTransport(options: AgentRuntimeSupervisorDaemonOptions = {}): 'unix' | 'tcp' {
   return (
@@ -200,7 +222,12 @@ async function handleRequest(
           String(payload.agentId || ''),
           String(payload.prompt || ''),
           String(payload.requestedBy || 'supervisor_daemon'),
-          { timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined }
+          {
+            timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined,
+            correlationId:
+              typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
+            taskModelHint: readTaskModelHint(payload.taskModelHint),
+          }
         );
         return {
           id: request.id,

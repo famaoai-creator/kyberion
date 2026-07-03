@@ -1417,6 +1417,7 @@ export interface ClaudeAdapterOptions {
   systemPrompt?: string;
   cwd?: string;
   model?: string;
+  effort?: 'low' | 'medium' | 'high';
   allowedTools?: string[];
   disallowedTools?: string[];
   maxBudgetUsd?: number;
@@ -1465,6 +1466,9 @@ export class ClaudeAdapter implements AgentAdapter {
       }
       if (this.options.model) {
         args.push('--model', this.options.model);
+      }
+      if (this.options.effort) {
+        args.push('--effort', this.options.effort);
       }
       if (this.options.maxBudgetUsd) {
         args.push('--max-budget-usd', String(this.options.maxBudgetUsd));

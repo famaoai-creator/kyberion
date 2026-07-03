@@ -8,12 +8,8 @@ import {
   type ContextualClarificationExecutionShape,
 } from './contextual-intent-clarification-policy.js';
 import { getMeetingBriefQuestions } from './meeting-operations-profile.js';
-import {
-  getNarratedVideoBriefQuestions,
-} from './narrated-video-preference-profile.js';
-import {
-  getPresentationPreferenceProfile,
-} from './presentation-preference-registry.js';
+import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
+import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
@@ -21,7 +17,9 @@ import type { OperatorInteractionPacket } from './src/types/operator-interaction
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/question-resolution-policy.schema.json');
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/question-resolution-policy.schema.json'
+);
 const POLICY_PATH = pathResolver.knowledge('product/governance/question-resolution-policy.json');
 
 export interface QuestionResolutionQuestion {
@@ -45,12 +43,14 @@ interface QuestionLike {
 }
 
 function slugifyQuestion(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'question';
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'question'
+  );
 }
 
 export interface QuestionResolutionRule {
@@ -127,7 +127,9 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 function loadPolicyFile(): QuestionResolutionPolicyFile {
-  const parsed = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string) as QuestionResolutionPolicyFile;
+  const parsed = JSON.parse(
+    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
+  ) as QuestionResolutionPolicyFile;
   const validate = ensurePolicyValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -153,7 +155,7 @@ function normalizeMissingInputs(values: Array<string | undefined | null>): strin
 
 function inferQuestionsFromIntentRequirements(
   requiredInputs: string[],
-  missingInputs: Set<string>,
+  missingInputs: Set<string>
 ): QuestionResolutionQuestion[] {
   return requiredInputs
     .filter((input) => missingInputs.has(input))
@@ -170,14 +172,18 @@ function inferQuestionsFromIntentRequirements(
 function normalizeQuestion(
   question: QuestionResolutionQuestion | SupplementalQuestion | QuestionLike,
   source: QuestionResolutionQuestion['source'],
-  blocking: boolean,
+  blocking: boolean
 ): QuestionResolutionQuestion {
   return {
     id: question.id,
     question: question.question,
     reason: question.reason,
-    ...('required_input' in question && question.required_input ? { required_input: question.required_input } : {}),
-    ...('default_assumption' in question && question.default_assumption ? { default_assumption: question.default_assumption } : {}),
+    ...('required_input' in question && question.required_input
+      ? { required_input: question.required_input }
+      : {}),
+    ...('default_assumption' in question && question.default_assumption
+      ? { default_assumption: question.default_assumption }
+      : {}),
     ...('impact' in question && question.impact ? { impact: question.impact } : {}),
     source,
     blocking,
@@ -189,7 +195,7 @@ function buildOperatorInteractionPacket(
   headline: string,
   summary: string,
   briefSummary?: string,
-  confidence?: number,
+  confidence?: number
 ): OperatorInteractionPacket {
   return {
     kind: 'operator-interaction-packet',
@@ -209,7 +215,8 @@ function buildOperatorInteractionPacket(
     llm_touchpoints: [
       {
         stage: 'question_resolution',
-        purpose: 'Resolve missing intent slots through governed clarification instead of ad hoc prompting.',
+        purpose:
+          'Resolve missing intent slots through governed clarification instead of ad hoc prompting.',
         output_contract: 'question-resolution-packet',
       },
       {
@@ -235,20 +242,25 @@ function buildOperatorInteractionPacket(
   };
 }
 
-function buildProfileQuestions(
-  intentId: string | undefined,
-): QuestionResolutionQuestion[] {
+function buildProfileQuestions(intentId: string | undefined): QuestionResolutionQuestion[] {
   switch (intentId) {
     case 'meeting-operations':
-      return getMeetingBriefQuestions(getMeetingProfileFallback(), undefined).map((question, index) => ({
-        id: `meeting_profile_${index + 1}_${slugifyQuestion(question)}`,
-        question,
-        reason: 'The meeting profile provides reusable preflight questions for this coordination flow.',
-        source: 'profile' as const,
-        blocking: false,
-      }));
+      return getMeetingBriefQuestions(getMeetingProfileFallback(), undefined, 3).questions.map(
+        (question, index) => ({
+          id: `meeting_profile_${index + 1}_${slugifyQuestion(question)}`,
+          question,
+          reason:
+            'The meeting profile provides reusable preflight questions for this coordination flow.',
+          source: 'profile' as const,
+          blocking: false,
+        })
+      );
     case 'generate-presentation':
-      return getPresentationBriefQuestions(getPresentationPreferenceProfile(), undefined, 3).map((question, index) => ({
+      return getPresentationBriefQuestions(
+        getPresentationPreferenceProfile(),
+        undefined,
+        3
+      ).questions.map((question, index) => ({
         id: `presentation_profile_${index + 1}_${slugifyQuestion(question)}`,
         question,
         reason: 'The presentation profile provides reusable brief questions for this deck flow.',
@@ -256,10 +268,15 @@ function buildProfileQuestions(
         blocking: false,
       }));
     case 'generate-narrated-video':
-      return getNarratedVideoBriefQuestions(getNarratedVideoProfileFallback(), undefined).slice(0, 3).map((question, index) => ({
+      return getNarratedVideoBriefQuestions(
+        getNarratedVideoProfileFallback(),
+        undefined,
+        3
+      ).questions.map((question, index) => ({
         id: `video_profile_${index + 1}_${slugifyQuestion(question)}`,
         question,
-        reason: 'The narrated video profile provides reusable preflight questions for this media flow.',
+        reason:
+          'The narrated video profile provides reusable preflight questions for this media flow.',
         source: 'profile' as const,
         blocking: false,
       }));
@@ -270,17 +287,23 @@ function buildProfileQuestions(
 
 function getMeetingProfileFallback(): any {
   return JSON.parse(
-    safeReadFile(pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json'), {
-      encoding: 'utf8',
-    }) as string,
+    safeReadFile(
+      pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json'),
+      {
+        encoding: 'utf8',
+      }
+    ) as string
   ) as any;
 }
 
 function getNarratedVideoProfileFallback(): any {
   return JSON.parse(
-    safeReadFile(pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json'), {
-      encoding: 'utf8',
-    }) as string,
+    safeReadFile(
+      pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json'),
+      {
+        encoding: 'utf8',
+      }
+    ) as string
   ) as any;
 }
 
@@ -309,11 +332,10 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
 
   const maxQuestions = Math.max(
     1,
-    input.maxQuestions ||
-      rule?.max_questions_per_turn ||
-      policy.defaults.max_questions_per_turn,
+    input.maxQuestions || rule?.max_questions_per_turn || policy.defaults.max_questions_per_turn
   );
-  const minConfidenceToSkip = rule?.min_confidence_to_skip ?? policy.defaults.min_confidence_to_skip;
+  const minConfidenceToSkip =
+    rule?.min_confidence_to_skip ?? policy.defaults.min_confidence_to_skip;
   const confidence = clampConfidence(input.confidence, 0.5);
 
   const questions: QuestionResolutionQuestion[] = [];
@@ -343,8 +365,8 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
           impact: question.impact,
         },
         'policy',
-        Boolean(question.required_input ? missingInputs.has(question.required_input) : true),
-      ),
+        Boolean(question.required_input ? missingInputs.has(question.required_input) : true)
+      )
     );
   }
 
@@ -360,8 +382,8 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
           impact: question.impact,
         },
         'execution_brief',
-        true,
-      ),
+        true
+      )
     );
   }
 
@@ -377,14 +399,14 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
           impact: question.impact,
         },
         'supplemental',
-        true,
-      ),
+        true
+      )
     );
   }
 
   for (const question of inferQuestionsFromIntentRequirements(
     intent?.intake_requirements || [],
-    missingInputs,
+    missingInputs
   )) {
     addQuestion(question);
   }
@@ -408,9 +430,7 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
   }
 
   const shouldClarify =
-    contextualDecision.shouldClarify ||
-    questions.length > 0 ||
-    confidence < minConfidenceToSkip;
+    contextualDecision.shouldClarify || questions.length > 0 || confidence < minConfidenceToSkip;
 
   const sources = Array.from(
     new Set([
@@ -418,7 +438,7 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
       ...(rule?.source_label ? [rule.source_label] : []),
       ...(input.executionBrief?.clarification_questions?.length ? ['execution-brief'] : []),
       'contextual-intent-clarification-policy',
-    ]),
+    ])
   );
 
   const result: QuestionResolutionResult = {
@@ -432,9 +452,10 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
       (questions.length > 0
         ? 'The request still has unresolved inputs.'
         : 'The request can proceed without clarification.'),
-    missing_inputs: contextualDecision.missingInputs.length > 0
-      ? contextualDecision.missingInputs
-      : requiredInputs,
+    missing_inputs:
+      contextualDecision.missingInputs.length > 0
+        ? contextualDecision.missingInputs
+        : requiredInputs,
     questions,
     sources,
     learning: {
@@ -451,7 +472,7 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
 export function resolveQuestionInteractionPacket(
   input: ResolveQuestionInput,
   headline = 'More context is required before execution',
-  summary = 'The request needs clarification before Kyberion can proceed safely.',
+  summary = 'The request needs clarification before Kyberion can proceed safely.'
 ): OperatorInteractionPacket | undefined {
   const result = resolveQuestionResolution(input);
   if (!result.should_clarify || result.questions.length === 0) return undefined;
@@ -460,7 +481,7 @@ export function resolveQuestionInteractionPacket(
     headline,
     summary,
     input.executionBrief?.user_facing_summary || input.executionBrief?.summary,
-    clampConfidence(input.confidence, 0.5),
+    clampConfidence(input.confidence, 0.5)
   );
 }
 

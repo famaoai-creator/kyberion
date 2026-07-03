@@ -1,21 +1,6 @@
-export type RuntimeModelRole =
-  | 'anthropic-default'
-  | 'anthropic-fast'
-  | 'gemini-default'
-  | 'gemini-fast'
-  | 'openai-vision'
-  | 'codex-default'
-  | 'copilot-default';
+import { resolveRuntimeDefaultModelId, type ProviderConfigRuntimeRole } from './provider-config.js';
 
-const RUNTIME_MODEL_DEFAULTS: Readonly<Record<RuntimeModelRole, string>> = {
-  'anthropic-default': 'claude-opus-4-8',
-  'anthropic-fast': 'claude-sonnet-5',
-  'gemini-default': 'gemini-3.5-flash',
-  'gemini-fast': 'gemini-3.1-flash-lite',
-  'openai-vision': 'gpt-5.5',
-  'codex-default': 'gpt-5.5',
-  'copilot-default': 'claude-sonnet-4-6',
-};
+export type RuntimeModelRole = ProviderConfigRuntimeRole;
 
 const RUNTIME_MODEL_ENV_OVERRIDES: Readonly<Record<RuntimeModelRole, readonly string[]>> = {
   'anthropic-default': [
@@ -39,5 +24,5 @@ export function resolveRuntimeModelId(
     const value = env[key]?.trim();
     if (value) return value;
   }
-  return RUNTIME_MODEL_DEFAULTS[role];
+  return resolveRuntimeDefaultModelId(role);
 }

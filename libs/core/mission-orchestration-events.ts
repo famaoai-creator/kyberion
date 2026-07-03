@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
+import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
 
 export type MissionOrchestrationEventType =
   | 'mission_issue_requested'
@@ -40,10 +41,13 @@ export function getMissionOrchestrationEventPath(eventId: string): string {
 
 export function emitMissionOrchestrationObservation(event: Record<string, unknown>): void {
   ensureDirs();
-  safeAppendFileSync(OBS_PATH, `${JSON.stringify({
-    ts: new Date().toISOString(),
-    ...event,
-  })}\n`);
+  safeAppendFileSync(
+    OBS_PATH,
+    `${JSON.stringify({
+      ts: new Date().toISOString(),
+      ...event,
+    })}\n`
+  );
 }
 
 export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unknown>>(input: {
@@ -66,6 +70,16 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
     payload: input.payload,
   };
   safeWriteFile(getMissionOrchestrationEventPath(event.event_id), JSON.stringify(event, null, 2));
+  appendMissionOrchestrationJournalEntry({
+    missionId: event.mission_id,
+    eventId: event.event_id,
+    eventType: event.event_type,
+    status: 'enqueued',
+    payload: event.payload,
+    requestedBy: event.requested_by,
+    causationId: event.causation_id,
+    correlationId: event.correlation_id,
+  });
   emitMissionOrchestrationObservation({
     decision: 'mission_orchestration_event_enqueued',
     event_id: event.event_id,
@@ -76,11 +90,17 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
   return event;
 }
 
-export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>>(eventPath: string): MissionOrchestrationEvent<TPayload> {
-  return JSON.parse(safeReadFile(eventPath, { encoding: 'utf8' }) as string) as MissionOrchestrationEvent<TPayload>;
+export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>>(
+  eventPath: string
+): MissionOrchestrationEvent<TPayload> {
+  return JSON.parse(
+    safeReadFile(eventPath, { encoding: 'utf8' }) as string
+  ) as MissionOrchestrationEvent<TPayload>;
 }
 
-export function startMissionOrchestrationWorker<TPayload = Record<string, unknown>>(event: MissionOrchestrationEvent<TPayload>): string {
+export function startMissionOrchestrationWorker<TPayload = Record<string, unknown>>(
+  event: MissionOrchestrationEvent<TPayload>
+): string {
   const eventPath = getMissionOrchestrationEventPath(event.event_id);
   spawnManagedProcess({
     resourceId: `mission-orchestration:${event.event_id}`,

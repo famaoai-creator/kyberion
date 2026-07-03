@@ -1,13 +1,15 @@
 import * as path from 'node:path';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   safeMkdir,
   safeWriteFile,
   safeReadFile,
   pathResolver,
   safeExistsSync,
+  registerReasoningBackend,
   resetReasoningBackend,
   resetVoiceBridge,
+  stubReasoningBackend,
 } from '@agent/core';
 import {
   stakeholderGridSort,
@@ -18,6 +20,9 @@ import {
   pptxDiff,
   evaluateSimulationQuality,
   evaluateEnsembleConvergence,
+  simulateAll,
+  simulateAllEnsemble,
+  generateFacilitationScriptOp,
   dispatchDecisionOp,
 } from './decision-ops.js';
 
@@ -285,6 +290,55 @@ describe('pptxDiff', () => {
   });
 });
 
+describe('generateFacilitationScriptOp', () => {
+  afterEach(() => {
+    resetReasoningBackend();
+  });
+
+  it('uses best-of-N and judge selection for facilitation utterances', async () => {
+    const delegateTask = vi.fn().mockImplementation((instruction: string) => {
+      if (instruction.includes('candidate 1/2')) {
+        return Promise.resolve(
+          JSON.stringify({
+            speech_text: 'Let us review the agenda.',
+            next_action: 'continue_listen',
+          })
+        );
+      }
+      if (instruction.includes('candidate 2/2')) {
+        return Promise.resolve(
+          JSON.stringify({
+            speech_text: 'Please choose the next topic.',
+            next_action: 'transition_topic',
+          })
+        );
+      }
+      return Promise.resolve(
+        JSON.stringify({ winner_index: 1, rationale: 'clearer and more directive' })
+      );
+    });
+
+    registerReasoningBackend({
+      ...stubReasoningBackend,
+      name: 'best-of-test',
+      delegateTask,
+    });
+
+    const result = await generateFacilitationScriptOp({
+      facilitator_persona_label: 'moderator',
+      current_topic: 'status',
+      recent_transcript_chunk: 'We are still on the first topic.',
+      language: 'en',
+    });
+
+    expect(result).toEqual({
+      speech_text: 'Please choose the next topic.',
+      next_action: 'transition_topic',
+    });
+    expect(delegateTask).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('evaluateSimulationQuality', () => {
   const mkBranch = (
     over: Partial<{
@@ -446,6 +500,96 @@ describe('evaluateEnsembleConvergence (IP-4)', () => {
     ];
     const report = evaluateEnsembleConvergence({ runs });
     expect(report.threshold).toBe(0.6);
+  });
+});
+
+describe('simulateAll', () => {
+  afterEach(() => {
+    resetReasoningBackend();
+  });
+
+  it('retries once with a larger branch budget when the first run is poor', async () => {
+    const simulateBranches = vi.fn().mockImplementation(async (input: any) => {
+      if ((input.maxStepsPerBranch ?? 0) < 12) {
+        return { branches: [] };
+      }
+      return {
+        branches: [
+          {
+            branch_id: 'B-1',
+            hypothesis_ref: 'H-1',
+            first_failure_mode: null,
+            first_success_mode: 'completed',
+            terminated_at_step: 4,
+          },
+        ],
+      };
+    });
+
+    registerReasoningBackend({
+      ...stubReasoningBackend,
+      name: 'simulate-retry-test',
+      simulateBranches,
+    });
+
+    const outputDir = tmpPath(`simulate-${Date.now()}-${Math.random()}`).rel;
+    const result = await simulateAll({
+      goal: 'ship the change',
+      output_dir: outputDir,
+      max_steps_per_branch: 10,
+    });
+
+    expect(simulateBranches).toHaveBeenCalledTimes(2);
+    expect(result.quality_retry_count).toBe(1);
+    expect(result.quality_severity).toBe('ok');
+    expect(result.max_steps_per_branch).toBeGreaterThan(10);
+    const summary = JSON.parse(
+      safeReadFile(pathResolver.rootResolve(result.written_to), { encoding: 'utf8' }) as string
+    );
+    expect(summary.max_steps_per_branch).toBeGreaterThan(10);
+  });
+});
+
+describe('simulateAllEnsemble', () => {
+  afterEach(() => {
+    resetReasoningBackend();
+  });
+
+  it('retries once with a larger run budget when convergence is poor', async () => {
+    let callCount = 0;
+    const simulateBranches = vi.fn().mockImplementation(async () => {
+      callCount += 1;
+      const branchId = callCount <= 3 ? `B-${callCount}` : 'B-1';
+      return {
+        branches: [
+          {
+            branch_id: branchId,
+            hypothesis_ref: 'H-1',
+            first_failure_mode: null,
+            first_success_mode: 'mode-y',
+            terminated_at_step: 1,
+          },
+        ],
+      };
+    });
+
+    registerReasoningBackend({
+      ...stubReasoningBackend,
+      name: 'ensemble-retry-test',
+      simulateBranches,
+    });
+
+    const outputDir = tmpPath(`ensemble-${Date.now()}-${Math.random()}`).rel;
+    const result = await simulateAllEnsemble({
+      goal: 'ship the change',
+      output_dir: outputDir,
+      runs: 3,
+      convergence_threshold: 0.9,
+    });
+
+    expect(result.retry_count).toBe(1);
+    expect(result.convergence_severity).toBe('ok');
+    expect(simulateBranches).toHaveBeenCalledTimes(8);
   });
 });
 

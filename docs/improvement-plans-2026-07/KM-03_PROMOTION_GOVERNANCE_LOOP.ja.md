@@ -2,6 +2,8 @@
 
 > 優先度: P1 / 規模: M / 依存: KM-01(ライフサイクル稼働) / 関連: [VOLATILE_KNOWLEDGE_PLAN](../../VOLATILE_KNOWLEDGE_PLAN.ja.md) Phase 4
 
+> 注: `claude-sonnet-4` / `claude-haiku` は文書上の指示としてそのまま残す。Codex で実装する場合に限り、対応する OpenAI 側モデルへ読み替えてよい。Claude を実際に使う場合は表記どおりに扱う。
+
 ## 背景と課題
 
 「学習を統治された形でナレッジに昇格させる」ループが途中で切れており、しかも正しさの防衛が薄い。

@@ -43,10 +43,75 @@
         "REACTION_FAST": { "type": "string", "minLength": 1 },
         "REFLEX_DETERMINISTIC": { "type": "string", "minLength": 1 }
       }
+    },
+    "task_model_routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/$defs/task_model_route" },
+        "phases": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mechanical": { "$ref": "#/$defs/task_phase_routing" },
+            "plan": { "$ref": "#/$defs/task_phase_routing" },
+            "implement": { "$ref": "#/$defs/task_phase_routing" },
+            "review": { "$ref": "#/$defs/task_phase_routing" }
+          }
+        }
+      },
+      "required": ["default", "phases"]
     }
   },
   "required": ["version", "thresholds", "fast_shapes", "rules"],
   "$defs": {
+    "task_model_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["small", "standard", "large"]
+        },
+        "effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["tier", "effort", "model_id"]
+    },
+    "task_phase_routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/$defs/task_model_route" },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "S": { "$ref": "#/$defs/task_model_route" },
+            "M": { "$ref": "#/$defs/task_model_route" },
+            "L": { "$ref": "#/$defs/task_model_route" }
+          }
+        },
+        "risk": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "low": { "$ref": "#/$defs/task_model_route" },
+            "medium": { "$ref": "#/$defs/task_model_route" },
+            "high": { "$ref": "#/$defs/task_model_route" },
+            "approval_required": { "$ref": "#/$defs/task_model_route" },
+            "high_stakes": { "$ref": "#/$defs/task_model_route" }
+          }
+        }
+      },
+      "required": ["default"]
+    },
     "rule": {
       "type": "object",
       "additionalProperties": false,

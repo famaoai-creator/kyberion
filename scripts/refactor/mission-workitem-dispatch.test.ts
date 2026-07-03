@@ -27,7 +27,9 @@ let originalArtifactRegistryRaw: string | null = null;
 
 beforeEach(() => {
   if (safeExistsSync(artifactRegistryPath) && originalArtifactRegistryRaw === null) {
-    originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, { encoding: 'utf8' }) as string;
+    originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, {
+      encoding: 'utf8',
+    }) as string;
   }
 });
 
@@ -84,6 +86,30 @@ function makeLinkedProjectMissionState(input: {
   };
 }
 
+function makeTaskResultText(input: {
+  summary: string;
+  artifacts?: Array<{ path: string; kind: string }>;
+  verification_done?: string[];
+  gaps?: string[];
+  needs?: string[];
+  extraText?: string;
+}): string {
+  return [
+    '```task_result',
+    JSON.stringify({
+      summary: input.summary,
+      artifacts: input.artifacts || [],
+      verification_done: input.verification_done || [],
+      gaps: input.gaps || [],
+      needs: input.needs || [],
+    }),
+    '```',
+    input.extraText || '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
@@ -107,7 +133,8 @@ describe('mission work item dispatch', () => {
   it('routes a work item to the assigned agent and records the response', async () => {
     createWorkItem({
       title: `${missionId}: Draft the outline`,
-      description: 'Draft the presentation outline with slide titles, bullet points, and speaker notes.',
+      description:
+        'Draft the presentation outline with slide titles, bullet points, and speaker notes.',
       status: 'ready',
       source: 'local',
       sourceRef: `mission:${missionId}:task-1`,
@@ -119,27 +146,41 @@ describe('mission work item dispatch', () => {
         team_role: 'product_strategist',
         deliverable: 'deliverables/outline.md',
         target_path: 'deliverables/outline.md',
+        risk: 'low',
+        estimated_scope: 'S',
       },
     });
 
-    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
-      mode: 'agent',
-      finalStatus: 'review',
-    }, {
-      routeA2A: vi.fn(async () => ({
-        a2a_version: '1.0',
-        header: {
-          msg_id: 'RES-1',
-          sender: 'sovereign-brain',
-          receiver: 'kyberion:workitem-dispatcher',
-          performative: 'result' as const,
-          timestamp: new Date().toISOString(),
-        },
-        payload: {
-          text: 'agent completed the outline',
-        },
-      })),
-    });
+    const routeA2A = vi.fn(async () => ({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'RES-1',
+        sender: 'sovereign-brain',
+        receiver: 'kyberion:workitem-dispatcher',
+        performative: 'result' as const,
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        text: makeTaskResultText({
+          summary: 'Completed the outline and stored it in the mission evidence directory.',
+          artifacts: [{ path: 'deliverables/outline.md', kind: 'markdown' }],
+          verification_done: ['Reviewed outline structure against the requested slide sequence.'],
+          gaps: [],
+          needs: [],
+          extraText: 'agent completed the outline',
+        }),
+      },
+    }));
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'agent',
+        finalStatus: 'review',
+      },
+      {
+        routeA2A,
+      }
+    );
 
     expect(manifest.work_item_count).toBe(1);
     expect(manifest.records[0]).toMatchObject({
@@ -158,6 +199,21 @@ describe('mission work item dispatch', () => {
     expect(items[0].metadata).toMatchObject({
       last_dispatch_mode: 'agent',
       last_dispatch_mission_id: missionId,
+      last_task_model_hint: expect.objectContaining({
+        model_id: 'openai:gpt-5.4-mini',
+        tier: 'small',
+        effort: 'low',
+      }),
+    });
+    const routeCall = routeA2A.mock.calls[0] as unknown as [any];
+    expect(routeCall).toBeDefined();
+    expect(routeCall[0].payload.text).toContain('Model hint: openai:gpt-5.4-mini (small/low)');
+    expect(routeCall[0].payload.context).toMatchObject({
+      task_model_hint: expect.objectContaining({
+        model_id: 'openai:gpt-5.4-mini',
+        tier: 'small',
+        effort: 'low',
+      }),
     });
 
     const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
@@ -167,37 +223,357 @@ describe('mission work item dispatch', () => {
       mission_id: missionId,
       item_id: manifest.records[0].item_id,
       execution_mode: 'agent',
+      task_model_hint: expect.objectContaining({
+        model_id: 'openai:gpt-5.4-mini',
+        tier: 'small',
+        effort: 'low',
+      }),
     });
+    expect(response.prompt).toContain('Model hint: openai:gpt-5.4-mini (small/low)');
     expect(response.context_pack_path).toContain('/coordination/context-packs/');
     expect(response.prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
     expect(response.response_text).toContain('agent completed the outline');
     expect(safeExistsSync(`${missionPath}/coordination/events/workitem-dispatch.jsonl`)).toBe(true);
   });
 
+  it('downgrades completion when acceptance criteria are missing from the response', async () => {
+    createWorkItem({
+      title: `${missionId}: Validate acceptance criteria`,
+      description:
+        'Validate the acceptance criteria gate and ensure unmet criteria do not become done.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-acceptance`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/acceptance-check.md',
+        target_path: 'deliverables/acceptance-check.md',
+        acceptance_criteria: ['mention the acceptance gate'],
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'agent',
+        finalStatus: 'done',
+      },
+      {
+        routeA2A: vi.fn(async () => ({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'RES-AC-1',
+            sender: 'sovereign-brain',
+            receiver: 'kyberion:workitem-dispatcher',
+            performative: 'result' as const,
+            timestamp: new Date().toISOString(),
+          },
+          payload: {
+            text: makeTaskResultText({
+              summary:
+                'Completed the acceptance check but did not include the requested gate phrase.',
+              artifacts: [{ path: 'deliverables/acceptance-check.md', kind: 'markdown' }],
+              verification_done: ['Compared the output against the acceptance criteria.'],
+              gaps: ['The gate phrase is absent.'],
+              needs: [],
+              extraText: 'The task was completed, but the gate phrase is absent.',
+            }),
+          },
+        })),
+      }
+    );
+
+    expect(manifest.records[0]).toMatchObject({
+      work_item_status_after: 'review',
+      reflection_status: 'review',
+    });
+
+    const replyPath = String(
+      manifest.records[0].reflection_path ||
+        `${missionPath}/coordination/tickets/replies/${manifest.records[0].item_id}.json`
+    );
+    const reply = JSON.parse(safeReadFile(replyPath, { encoding: 'utf8' }) as string);
+    expect(reply).toMatchObject({
+      ticket_state: 'review',
+      acceptance_criteria_satisfied: false,
+    });
+    expect(reply.notes.join('\n')).toContain('acceptance criteria not met');
+  });
+
+  it('re-requests task_result once when the initial response is unstructured', async () => {
+    createWorkItem({
+      title: `${missionId}: Structure the task result`,
+      description: 'Return a structured task_result block and capture the response summary.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-structured`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/structured-result.md',
+        target_path: 'deliverables/structured-result.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+
+    const delegateTask = vi
+      .fn()
+      .mockResolvedValueOnce('plain text without a structured block')
+      .mockResolvedValueOnce(
+        makeTaskResultText({
+          summary: 'Captured the structured task result after retry.',
+          artifacts: [{ path: 'deliverables/structured-result.md', kind: 'markdown' }],
+          verification_done: ['Responded with the required task_result block.'],
+          gaps: [],
+          needs: [],
+        })
+      );
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+        finalStatus: 'review',
+      },
+      {
+        delegateTask,
+      }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(2);
+    expect(manifest.records[0]).toMatchObject({
+      task_result: expect.objectContaining({
+        summary: 'Captured the structured task result after retry.',
+      }),
+    });
+
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
+    const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
+    expect(response.task_result).toMatchObject({
+      summary: 'Captured the structured task result after retry.',
+    });
+  });
+
+  it('blocks the work item and records a clarification packet when task_result needs remain', async () => {
+    createWorkItem({
+      title: `${missionId}: Request missing inputs`,
+      description:
+        'Return the unresolved inputs as a clarification packet and keep the item blocked.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-needs-input`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/needs-input.md',
+        target_path: 'deliverables/needs-input.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+
+    const delegateTask = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeTaskResultText({
+          summary: 'The work is not ready without more context.',
+          artifacts: [],
+          verification_done: ['Captured the unresolved inputs.'],
+          gaps: ['The scope is incomplete.'],
+          needs: ['project_brief', 'acceptance_criteria'],
+        })
+      )
+      .mockResolvedValueOnce(
+        makeTaskResultText({
+          summary: 'The work is still blocked pending missing inputs.',
+          artifacts: [],
+          verification_done: ['Repeated the unresolved inputs.'],
+          gaps: ['The scope is still incomplete.'],
+          needs: ['project_brief', 'acceptance_criteria'],
+        })
+      );
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+        finalStatus: 'review',
+      },
+      {
+        delegateTask,
+      }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(2);
+    expect(manifest.records[0]).toMatchObject({
+      work_item_status_after: 'blocked',
+      clarification_packet: expect.objectContaining({
+        kind: 'operator-interaction-packet',
+        interaction_type: 'clarification',
+      }),
+    });
+    expect(manifest.records[0].clarification_packet_path).toBeDefined();
+    expect(manifest.records[0].notes).toContain('needs_input');
+
+    const clarificationPath = String(
+      manifest.records[0].clarification_packet_path ||
+        `${missionPath}/evidence/workitem-clarification-${manifest.records[0].item_id}.json`
+    );
+    expect(safeExistsSync(clarificationPath)).toBe(true);
+    const clarification = JSON.parse(
+      safeReadFile(clarificationPath, { encoding: 'utf8' }) as string
+    );
+    expect(clarification).toMatchObject({
+      mission_id: missionId,
+      item_id: manifest.records[0].item_id,
+      status: 'needs_input',
+      clarification_packet: expect.objectContaining({
+        kind: 'operator-interaction-packet',
+        interaction_type: 'clarification',
+      }),
+    });
+    expect(Array.isArray(clarification.clarification_packet.questions)).toBe(true);
+    expect(clarification.clarification_packet.questions.length).toBeGreaterThan(0);
+    expect(clarification.clarification_packet.questions[0].question).toContain('project brief');
+
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
+    const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
+    expect(response.clarification_packet).toMatchObject({
+      kind: 'operator-interaction-packet',
+      interaction_type: 'clarification',
+    });
+    expect(response.clarification_packet_path).toBe(clarificationPath);
+  });
+
+  it('requires an independent reviewer for high-stakes work and keeps the item in review when refuted', async () => {
+    createWorkItem({
+      title: `${missionId}: Review the high-stakes change`,
+      description:
+        'Implement the high-stakes change with explicit reviewer sign-off and keep the outcome blocked until the reviewer approves.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-high-stakes`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'deliverables/high-stakes.md',
+        target_path: 'deliverables/high-stakes.md',
+        acceptance_criteria: ['mention the reviewer sign-off'],
+        risk: 'high_stakes',
+        estimated_scope: 'L',
+      },
+    });
+
+    const delegateTask = vi.fn(async (_instruction: string, context?: string) => {
+      if (String(context || '').startsWith('workitem-review:')) {
+        return JSON.stringify({
+          approved: false,
+          refuted: true,
+          findings: ['The response does not show an independent reviewer sign-off.'],
+          rationale: 'High-stakes work must stay in review until a separate reviewer approves it.',
+        });
+      }
+      return makeTaskResultText({
+        summary: 'Implemented the high-stakes change, but reviewer sign-off is still missing.',
+        artifacts: [{ path: 'deliverables/high-stakes.md', kind: 'markdown' }],
+        verification_done: ['Produced the requested change artifact.'],
+        gaps: ['Reviewer sign-off is missing.'],
+        needs: [],
+        extraText: 'implementation complete with reviewer sign-off missing',
+      });
+    });
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+        finalStatus: 'done',
+      },
+      {
+        delegateTask,
+      }
+    );
+
+    expect(delegateTask).toHaveBeenCalledTimes(2);
+    expect(manifest.records[0]).toMatchObject({
+      reviewer_status: 'refuted',
+      reflection_status: 'review',
+      work_item_status_after: 'review',
+    });
+
+    const reviewArtifact = JSON.parse(
+      safeReadFile(`${missionPath}/evidence/workitem-review-${manifest.records[0].item_id}.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(reviewArtifact).toMatchObject({
+      item_id: manifest.records[0].item_id,
+      verdict: expect.objectContaining({
+        approved: false,
+        refuted: true,
+      }),
+    });
+
+    const responseArtifact = JSON.parse(
+      safeReadFile(
+        `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`,
+        { encoding: 'utf8' }
+      ) as string
+    );
+    expect(responseArtifact).toMatchObject({
+      reviewer_status: 'refuted',
+    });
+    expect(responseArtifact.prompt).toContain(
+      'Mission context pack (scoped, minimal, role-specific).'
+    );
+    expect(responseArtifact.response_text).toContain('implementation complete');
+  });
+
   it('injects reusable artifact hints into the dispatched prompt', async () => {
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-WORKITEM-BASE',
-      project_id: missionId,
-      mission_id: 'MSN-WORKITEM-BASE',
-      kind: 'markdown',
-      storage_class: 'artifact_store',
-      path: 'active/shared/artifacts/workitem-base.md',
-      created_at: '2026-06-03T00:00:00.000Z',
-    }));
-    appendArtifactOwnershipRecord(createArtifactOwnershipRecord({
-      artifact_id: 'ART-WORKITEM-REVISION',
-      project_id: missionId,
-      mission_id: 'MSN-WORKITEM-REVISION',
-      kind: 'markdown',
-      storage_class: 'artifact_store',
-      path: 'active/shared/artifacts/workitem-revision.md',
-      created_at: '2026-06-04T00:00:00.000Z',
-      evidence_refs: ['mission:MSN-WORKITEM-REVISION'],
-    }));
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-WORKITEM-BASE',
+        project_id: missionId,
+        mission_id: 'MSN-WORKITEM-BASE',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/workitem-base.md',
+        created_at: '2026-06-03T00:00:00.000Z',
+      })
+    );
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-WORKITEM-REVISION',
+        project_id: missionId,
+        mission_id: 'MSN-WORKITEM-REVISION',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/workitem-revision.md',
+        created_at: '2026-06-04T00:00:00.000Z',
+        evidence_refs: ['mission:MSN-WORKITEM-REVISION'],
+      })
+    );
 
     createWorkItem({
       title: `${missionId}: Revise the outline with existing artifact reuse`,
-      description: 'Revise the outline and explicitly reuse the latest canonical markdown artifact.',
+      description:
+        'Revise the outline and explicitly reuse the latest canonical markdown artifact.',
       status: 'ready',
       source: 'local',
       sourceRef: `mission:${missionId}:task-1-reuse`,
@@ -213,24 +589,37 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
-      mode: 'agent',
-      finalStatus: 'review',
-    }, {
-      routeA2A: vi.fn(async (envelope) => ({
-        a2a_version: '1.0',
-        header: {
-          msg_id: 'RES-REUSE-1',
-          sender: 'sovereign-brain',
-          receiver: 'kyberion:workitem-dispatcher',
-          performative: 'result' as const,
-          timestamp: new Date().toISOString(),
-        },
-        payload: {
-          text: `${String(envelope.payload?.text || '')}\n\nartifact reuse confirmed`,
-        },
-      })),
-    });
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'agent',
+        finalStatus: 'review',
+      },
+      {
+        routeA2A: vi.fn(async (envelope) => ({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'RES-REUSE-1',
+            sender: 'sovereign-brain',
+            receiver: 'kyberion:workitem-dispatcher',
+            performative: 'result' as const,
+            timestamp: new Date().toISOString(),
+          },
+          payload: {
+            text: makeTaskResultText({
+              summary: 'Reused the canonical artifact and revised the outline accordingly.',
+              artifacts: [{ path: 'deliverables/outline.md', kind: 'markdown' }],
+              verification_done: [
+                'Confirmed the latest reusable markdown artifact was referenced.',
+              ],
+              gaps: [],
+              needs: [],
+              extraText: `${String(envelope.payload?.text || '')}\n\nartifact reuse confirmed`,
+            }),
+          },
+        })),
+      }
+    );
 
     const responseFile = `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`;
     const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
@@ -243,7 +632,8 @@ describe('mission work item dispatch', () => {
   it('records the cognitive routing decision in the dispatch artifact and prompt', async () => {
     createWorkItem({
       title: `${missionId}: Execute the deterministic pipeline`,
-      description: 'Run the known deterministic pipeline from the pipeline_ref and persist the result artifact.',
+      description:
+        'Run the known deterministic pipeline from the pipeline_ref and persist the result artifact.',
       status: 'ready',
       source: 'local',
       sourceRef: `mission:${missionId}:task-1-deterministic`,
@@ -259,13 +649,26 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const delegateTask = vi.fn(async (instruction: string) => `subagent accepted\n${instruction}`);
-    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
-      mode: 'subagent',
-      finalStatus: 'review',
-    }, {
-      delegateTask,
-    });
+    const delegateTask = vi.fn(async (instruction: string) =>
+      makeTaskResultText({
+        summary: 'Executed the deterministic pipeline and returned a structured result.',
+        artifacts: [{ path: 'deliverables/deterministic-result.md', kind: 'markdown' }],
+        verification_done: ['Ran the deterministic pipeline instructions.'],
+        gaps: [],
+        needs: [],
+        extraText: `subagent accepted\n${instruction}`,
+      })
+    );
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+        finalStatus: 'review',
+      },
+      {
+        delegateTask,
+      }
+    );
 
     expect(delegateTask).toHaveBeenCalledTimes(1);
     const prompt = String(delegateTask.mock.calls[0]?.[0] || '');
@@ -294,7 +697,8 @@ describe('mission work item dispatch', () => {
   it('blocks repeated identical dispatch outcomes and marks needs_attention', async () => {
     createWorkItem({
       title: `${missionId}: Repeat the same output until stopped`,
-      description: 'Repeat the same result three times so the drift watchdog can detect a loop and stop the mission work item.',
+      description:
+        'Repeat the same result three times so the drift watchdog can detect a loop and stop the mission work item.',
       status: 'ready',
       source: 'local',
       sourceRef: `mission:${missionId}:task-1-drift`,
@@ -309,9 +713,22 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const delegateTask = vi.fn(async () => 'identical result');
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Repeated the same output for drift-watchdog testing.',
+        artifacts: [{ path: 'deliverables/drift-watchdog.md', kind: 'markdown' }],
+        verification_done: ['Compared output to the previous run.'],
+        gaps: [],
+        needs: [],
+        extraText: 'identical result',
+      })
+    );
 
-    const first = await dispatchMissionWorkItems(makeMissionState(), { mode: 'subagent', finalStatus: 'review' }, { delegateTask });
+    const first = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'review' },
+      { delegateTask }
+    );
     let current = listWorkItems({ projectId: missionId, source: 'local' })[0];
     updateWorkItem({
       itemId: current.item_id,
@@ -322,7 +739,11 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const second = await dispatchMissionWorkItems(makeMissionState(), { mode: 'subagent', finalStatus: 'review' }, { delegateTask });
+    const second = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'review' },
+      { delegateTask }
+    );
     current = listWorkItems({ projectId: missionId, source: 'local' })[0];
     updateWorkItem({
       itemId: current.item_id,
@@ -333,7 +754,11 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const third = await dispatchMissionWorkItems(makeMissionState(), { mode: 'subagent', finalStatus: 'review' }, { delegateTask });
+    const third = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'review' },
+      { delegateTask }
+    );
 
     expect(delegateTask).toHaveBeenCalledTimes(3);
     expect(first.records[0]?.work_item_status_after).toBe('review');
@@ -361,20 +786,29 @@ describe('mission work item dispatch', () => {
     const linkedMissionPath = pathResolver.missionDir(linkedMissionId, 'public');
     if (!safeExistsSync(linkedMissionPath)) safeMkdir(linkedMissionPath, { recursive: true });
 
-    safeWriteFile(`${linkedMissionPath}/NEXT_TASKS.json`, JSON.stringify([
-      {
-        task_id: 'task-1-linked-project',
-        status: 'planned',
-        assigned_to: { role: 'planner', agent_id: 'sovereign-brain' },
-        description: 'Verify linked project work item selection and ensure project-scoped artifact hints are still injected.',
-        deliverable: 'evidence/linked-project-compatibility.md',
-        target_path: 'evidence/linked-project-compatibility.md',
-      },
-    ], null, 2));
+    safeWriteFile(
+      `${linkedMissionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-1-linked-project',
+            status: 'planned',
+            assigned_to: { role: 'planner', agent_id: 'sovereign-brain' },
+            description:
+              'Verify linked project work item selection and ensure project-scoped artifact hints are still injected.',
+            deliverable: 'evidence/linked-project-compatibility.md',
+            target_path: 'evidence/linked-project-compatibility.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
 
     createWorkItem({
       title: `${linkedMissionId}: Verify linked project dispatch`,
-      description: 'Verify linked project work item selection and ensure project-scoped artifact hints are still injected.',
+      description:
+        'Verify linked project work item selection and ensure project-scoped artifact hints are still injected.',
       status: 'ready',
       source: 'local',
       sourceRef: `mission:${linkedMissionId}:task-1-linked-project`,
@@ -391,37 +825,51 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const manifest = await dispatchMissionTickets(makeLinkedProjectMissionState({
-      missionId: linkedMissionId,
-      projectId: linkedProjectId,
-      projectPath: `active/projects/public/shared/${linkedProjectId}/project-os`,
-    }), {
-      targets: ['workitem'],
-    });
+    const manifest = await dispatchMissionTickets(
+      makeLinkedProjectMissionState({
+        missionId: linkedMissionId,
+        projectId: linkedProjectId,
+        projectPath: `active/projects/public/shared/${linkedProjectId}/project-os`,
+      }),
+      {
+        targets: ['workitem'],
+      }
+    );
     expect(manifest.records[0]?.work_item_id).toBeDefined();
 
-    const dispatchManifest = await dispatchMissionWorkItems(makeLinkedProjectMissionState({
-      missionId: linkedMissionId,
-      projectId: linkedProjectId,
-      projectPath: `active/projects/public/shared/${linkedProjectId}/project-os`,
-    }), {
-      mode: 'agent',
-      finalStatus: 'review',
-    }, {
-      routeA2A: vi.fn(async (envelope) => ({
-        a2a_version: '1.0',
-        header: {
-          msg_id: 'RES-LINKED-1',
-          sender: 'sovereign-brain',
-          receiver: 'kyberion:workitem-dispatcher',
-          performative: 'result' as const,
-          timestamp: new Date().toISOString(),
-        },
-        payload: {
-          text: `${String(envelope.payload?.text || '')}\n\nlinked project dispatch confirmed`,
-        },
-      })),
-    });
+    const dispatchManifest = await dispatchMissionWorkItems(
+      makeLinkedProjectMissionState({
+        missionId: linkedMissionId,
+        projectId: linkedProjectId,
+        projectPath: `active/projects/public/shared/${linkedProjectId}/project-os`,
+      }),
+      {
+        mode: 'agent',
+        finalStatus: 'review',
+      },
+      {
+        routeA2A: vi.fn(async (envelope) => ({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'RES-LINKED-1',
+            sender: 'sovereign-brain',
+            receiver: 'kyberion:workitem-dispatcher',
+            performative: 'result' as const,
+            timestamp: new Date().toISOString(),
+          },
+          payload: {
+            text: makeTaskResultText({
+              summary: 'Verified linked project dispatch and produced the requested artifact.',
+              artifacts: [{ path: 'evidence/linked-project-compatibility.md', kind: 'markdown' }],
+              verification_done: ['Confirmed the linked project dispatch path.'],
+              gaps: [],
+              needs: [],
+              extraText: `${String(envelope.payload?.text || '')}\n\nlinked project dispatch confirmed`,
+            }),
+          },
+        })),
+      }
+    );
 
     expect(dispatchManifest.work_item_count).toBe(1);
     expect(dispatchManifest.records[0]?.work_item_status_after).toBe('review');
@@ -436,27 +884,47 @@ describe('mission work item dispatch', () => {
   });
 
   it('reflects completed work item results back onto ticket artifacts', async () => {
-    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([
-      {
-        task_id: 'task-1',
-        status: 'planned',
-        assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
-        description: 'Implement the reflected ticket workflow',
-        deliverable: 'evidence/ticket-reflection.md',
-        target_path: 'evidence/ticket-reflection.md',
-      },
-    ], null, 2));
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-1',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the reflected ticket workflow',
+            deliverable: 'evidence/ticket-reflection.md',
+            target_path: 'evidence/ticket-reflection.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
 
     await dispatchMissionTickets(makeMissionState(), {
       targets: ['workitem', 'github', 'jira'],
     });
 
-    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
-      mode: 'subagent',
-      finalStatus: 'done',
-    }, {
-      delegateTask: vi.fn(async () => 'subagent completed the reflected ticket workflow'),
-    });
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+        finalStatus: 'done',
+      },
+      {
+        delegateTask: vi.fn(async () =>
+          makeTaskResultText({
+            summary: 'Completed the reflected ticket workflow and wrote the requested artifact.',
+            artifacts: [{ path: 'evidence/ticket-reflection.md', kind: 'markdown' }],
+            verification_done: ['Confirmed ticket reflection updates were written.'],
+            gaps: [],
+            needs: [],
+            extraText: 'subagent completed the reflected ticket workflow',
+          })
+        ),
+      }
+    );
 
     const replyPath = `${missionPath}/coordination/tickets/replies/task-1.json`;
     expect(safeExistsSync(replyPath)).toBe(true);
@@ -468,26 +936,40 @@ describe('mission work item dispatch', () => {
     });
     expect(reply.context_pack_path).toContain('/coordination/context-packs/');
 
-    const ticketManifest = JSON.parse(safeReadFile(`${missionPath}/coordination/tickets/dispatch-manifest.json`, { encoding: 'utf8' }) as string);
+    const ticketManifest = JSON.parse(
+      safeReadFile(`${missionPath}/coordination/tickets/dispatch-manifest.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
     expect(ticketManifest.records[0]).toMatchObject({
       task_id: 'task-1',
       reflection_status: 'done',
       ticket_state_after: 'done',
     });
 
-    const nextTasks = JSON.parse(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string);
+    const nextTasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
     expect(nextTasks[0].ticket_dispatch).toMatchObject({
       result_status: 'done',
       review_required: false,
       blocked: false,
     });
 
-    const githubArtifact = JSON.parse(safeReadFile(`${missionPath}/coordination/tickets/github/task-1.json`, { encoding: 'utf8' }) as string);
+    const githubArtifact = JSON.parse(
+      safeReadFile(`${missionPath}/coordination/tickets/github/task-1.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
     expect(githubArtifact.state).toBe('closed');
     expect(Array.isArray(githubArtifact.comments)).toBe(true);
     expect(githubArtifact.comments.length).toBeGreaterThan(0);
 
-    const jiraArtifact = JSON.parse(safeReadFile(`${missionPath}/coordination/tickets/jira/task-1.json`, { encoding: 'utf8' }) as string);
+    const jiraArtifact = JSON.parse(
+      safeReadFile(`${missionPath}/coordination/tickets/jira/task-1.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
     expect(jiraArtifact.fields.status.name).toBe('Done');
     expect(Array.isArray(jiraArtifact.comments)).toBe(true);
     expect(jiraArtifact.comments.length).toBeGreaterThan(0);
@@ -517,12 +999,25 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
-      mode: 'subagent',
-      finalStatus: 'done',
-    }, {
-      delegateTask: vi.fn(async () => 'subagent completed the summary'),
-    });
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+        finalStatus: 'done',
+      },
+      {
+        delegateTask: vi.fn(async () =>
+          makeTaskResultText({
+            summary: 'Completed the summary and captured the requested evidence.',
+            artifacts: [{ path: 'evidence/summary.md', kind: 'markdown' }],
+            verification_done: ['Reviewed the summary against the mission notes.'],
+            gaps: [],
+            needs: [],
+            extraText: 'subagent completed the summary',
+          })
+        ),
+      }
+    );
 
     expect(manifest.records[0]).toMatchObject({
       execution_mode: 'subagent',
@@ -550,17 +1045,34 @@ describe('mission work item dispatch', () => {
       },
     });
 
-    const manifest = await dispatchMissionWorkItems(makeMissionState(), {
-      mode: 'subagent',
-    }, {
-      delegateTask: vi.fn(async () => 'should not run'),
-    });
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'subagent',
+      },
+      {
+        delegateTask: vi.fn(async () =>
+          makeTaskResultText({
+            summary: 'Should not run.',
+            artifacts: [],
+            verification_done: [],
+            gaps: [],
+            needs: [],
+            extraText: 'should not run',
+          })
+        ),
+      }
+    );
 
     expect(manifest.records[0]).toMatchObject({
       status: 'failed',
     });
     expect(manifest.records[0].notes).toContain('missing assignee_peer_id');
     expect(manifest.records[0].response_path).toBeUndefined();
-    expect(safeExistsSync(`${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`)).toBe(false);
+    expect(
+      safeExistsSync(
+        `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`
+      )
+    ).toBe(false);
   });
 });

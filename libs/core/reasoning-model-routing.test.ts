@@ -86,6 +86,7 @@ describe('reasoning-model-routing', () => {
           provider: 'openai',
           family: 'gpt-5',
           status: 'approved' as const,
+          tier: 'large' as const,
           role_fit: {
             intent_compiler: 'primary' as const,
             surface_agent: 'primary' as const,
@@ -117,6 +118,7 @@ describe('reasoning-model-routing', () => {
     expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.5-flash');
     expect(resolveRuntimeModelId('openai-vision', {})).toBe('gpt-5.5');
     expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.5');
+    expect(resolveRuntimeModelId('copilot-default', {})).toBe('claude-sonnet-4-6');
 
     expect(
       resolveRuntimeModelId('anthropic-default', {
@@ -132,6 +134,23 @@ describe('reasoning-model-routing', () => {
 
   it('derives task-level tier and effort hints deterministically', () => {
     const registry = loadModelRegistry();
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'plan',
+          estimated_scope: 'S',
+          risk: 'medium',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        tier: 'standard',
+        effort: 'medium',
+        model_id: 'openai:gpt-5.5',
+      })
+    );
 
     expect(
       resolveTaskModelHint(
@@ -194,6 +213,7 @@ describe('reasoning-model-routing', () => {
           provider: 'openai',
           family: 'gpt-5',
           status: 'approved' as const,
+          tier: 'large' as const,
           role_fit: {
             intent_compiler: 'primary' as const,
             surface_agent: 'primary' as const,

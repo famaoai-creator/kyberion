@@ -8,6 +8,15 @@
     "codex": "codex",
     "copilot": "gpt-5.4"
   },
+  "runtime_defaults": {
+    "anthropic-default": "claude-opus-4-8",
+    "anthropic-fast": "claude-sonnet-5",
+    "gemini-default": "gemini-3.5-flash",
+    "gemini-fast": "gemini-3.1-flash-lite",
+    "openai-vision": "gpt-5.5",
+    "codex-default": "gpt-5.5",
+    "copilot-default": "claude-sonnet-4-6"
+  },
   "lifecycle": {
     "gemini": {
       "boot_command": "gemini",

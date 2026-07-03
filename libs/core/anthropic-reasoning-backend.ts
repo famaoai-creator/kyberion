@@ -465,6 +465,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       `Decide the first failure mode, the first success mode, and when termination occurs.`,
       `Either failure or success (not both) may be non-null per branch.`,
       `terminated_at_step is a small positive integer (step count) or null if unresolved.`,
+      `MAX STEPS PER BRANCH: ${input.maxStepsPerBranch ?? 10}`,
       ``,
       `GOAL: ${input.goal}`,
       `BRANCHES:`,

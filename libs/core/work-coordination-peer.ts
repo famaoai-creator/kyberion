@@ -33,7 +33,8 @@ export interface WorkCoordinationPeerCommandPayload {
   payload?: any;
 }
 
-export type WorkCoordinationPeerCommandEnvelope = PeerMessageEnvelope<WorkCoordinationPeerCommandPayload>;
+export type WorkCoordinationPeerCommandEnvelope =
+  PeerMessageEnvelope<WorkCoordinationPeerCommandPayload>;
 
 export interface WorkCoordinationPeerCommandResult {
   ok: boolean;
@@ -49,6 +50,7 @@ export function buildWorkCoordinationPeerCommandEnvelope(input: {
   recipientPeerId: string;
   sharedSecret: string;
   command: WorkCoordinationPeerCommandPayload;
+  correlationId?: string;
 }): WorkCoordinationPeerCommandEnvelope {
   return buildPeerMessageEnvelope({
     senderPeerId: input.senderPeerId,
@@ -57,6 +59,7 @@ export function buildWorkCoordinationPeerCommandEnvelope(input: {
     type: 'request',
     payload: input.command,
     sharedSecret: input.sharedSecret,
+    correlationId: input.correlationId,
   });
 }
 
