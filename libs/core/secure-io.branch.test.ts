@@ -6,16 +6,31 @@ import * as path from 'node:path';
 const guardMocks = vi.hoisted(() => ({
   validateWritePermission: vi.fn(() => ({ allowed: true, reason: '' })),
   validateReadPermission: vi.fn(() => ({ allowed: true, reason: '' })),
+  detectTier: vi.fn(() => 'confidential'),
 }));
 
 vi.mock('./tier-guard.js', () => ({
   validateWritePermission: guardMocks.validateWritePermission,
   validateReadPermission: guardMocks.validateReadPermission,
+  detectTier: guardMocks.detectTier,
 }));
 
-vi.mock('./path-resolver.js', () => ({
-  resolve: (p: string) => p,
-}));
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      resolve: (p: string) => p,
+      rootResolve: (p: string) => p,
+      shared: (p: string) => p,
+      knowledge: (p: string) => p,
+      active: (p: string) => p,
+      vision: (p: string) => p,
+      rootDir: () => process.cwd(),
+    },
+  };
+});
 
 vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
@@ -116,10 +131,16 @@ describe('secure-io branch coverage', () => {
     const file = path.join(tmpDir, 'denied.txt');
     fs.writeFileSync(file, 'x');
 
-    guardMocks.validateReadPermission.mockReturnValueOnce({ allowed: false, reason: 'read denied' });
+    guardMocks.validateReadPermission.mockReturnValueOnce({
+      allowed: false,
+      reason: 'read denied',
+    });
     expect(() => io.safeReadFile(file)).toThrow('[SECURITY] Read access denied');
 
-    guardMocks.validateWritePermission.mockReturnValueOnce({ allowed: false, reason: 'write denied' });
+    guardMocks.validateWritePermission.mockReturnValueOnce({
+      allowed: false,
+      reason: 'write denied',
+    });
     expect(() => io.safeWriteFile(file, 'y')).toThrow('write denied');
   });
 
@@ -181,7 +202,9 @@ describe('secure-io branch coverage', () => {
     const leftovers = fs.readdirSync(tmpDir).filter((entry) => entry.includes('cleanup.txt.tmp.'));
     expect(leftovers).toHaveLength(0);
 
-    expect(() => io.safeWriteFile(path.join(tmpDir, 'no-mkdir', 'x.txt'), 'x', { mkdir: false })).toThrow();
+    expect(() =>
+      io.safeWriteFile(path.join(tmpDir, 'no-mkdir', 'x.txt'), 'x', { mkdir: false })
+    ).toThrow();
   });
 
   it('covers role-violation branches when reason is empty', async () => {
@@ -213,7 +236,10 @@ describe('secure-io branch coverage', () => {
     guardMocks.validateWritePermission.mockReturnValueOnce({ allowed: false, reason: 'no-fsync' });
     expect(() => io.safeFsyncFile(file)).toThrow('no-fsync');
 
-    guardMocks.validateWritePermission.mockReturnValueOnce({ allowed: false, reason: 'no-append-sync' });
+    guardMocks.validateWritePermission.mockReturnValueOnce({
+      allowed: false,
+      reason: 'no-append-sync',
+    });
     expect(() => io.safeAppendFileSync(file, 'x')).toThrow('no-append-sync');
 
     guardMocks.validateWritePermission.mockReturnValueOnce({ allowed: false, reason: 'no-rm' });
