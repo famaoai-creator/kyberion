@@ -1097,7 +1097,8 @@ function buildFallbackWorkLoop(
 function buildClarificationPacket(
   contract: IntentContract,
   workLoop: OrganizationWorkLoopSummary,
-  executionBrief?: ActuatorExecutionBrief
+  executionBrief?: ActuatorExecutionBrief,
+  locale?: string
 ): OperatorInteractionPacket | undefined {
   if (!contract.clarification_needed) return undefined;
   return resolveQuestionInteractionPacket(
@@ -1105,6 +1106,7 @@ function buildClarificationPacket(
       text: contract.source_text,
       intentId: contract.intent_id,
       executionShape: contract.resolution.execution_shape as any,
+      locale,
       requiredInputs: contract.required_inputs,
       confidence: contract.confidence,
       executionBrief,
@@ -1510,7 +1512,8 @@ export async function compileUserIntentFlow(
         clarificationPacket: buildClarificationPacket(
           intentContract,
           workLoop,
-          finalExecutionBrief
+          finalExecutionBrief,
+          input.locale
         ),
         source,
       },
@@ -1547,7 +1550,12 @@ export async function compileUserIntentFlow(
     routingDecision,
     reasoningDecision,
     shadowModelRoute,
-    clarificationPacket: buildClarificationPacket(intentContract, workLoop, finalExecutionBrief),
+    clarificationPacket: buildClarificationPacket(
+      intentContract,
+      workLoop,
+      finalExecutionBrief,
+      input.locale
+    ),
     source,
   };
 }

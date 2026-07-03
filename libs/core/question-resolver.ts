@@ -86,6 +86,7 @@ export interface ResolveQuestionInput {
   text: string;
   intentId?: string;
   executionShape?: ContextualClarificationExecutionShape;
+  locale?: string;
   requiredInputs?: string[];
   confidence?: number;
   executionBrief?: ActuatorExecutionBrief;
@@ -100,6 +101,76 @@ export interface ResolveQuestionInput {
 }
 
 type SupplementalQuestion = NonNullable<ResolveQuestionInput['supplementalQuestions']>[number];
+
+type QuestionLocale = 'en' | 'ja';
+
+function resolveQuestionLocale(inputLocale?: string): QuestionLocale {
+  const normalized = String(inputLocale || process.env.KYBERION_UI_LOCALE || process.env.LANG || '')
+    .trim()
+    .replace(/_/g, '-')
+    .toLowerCase();
+  return normalized.startsWith('ja') ? 'ja' : 'en';
+}
+
+function localizedQuestionText(
+  locale: QuestionLocale,
+  key: 'provide' | 'reason' | 'confirm' | 'headline' | 'summary' | 'unresolved' | 'clear',
+  input?: string
+): string {
+  switch (key) {
+    case 'provide':
+      return locale === 'ja' ? `${input} を指定してください。` : `Please provide ${input}.`;
+    case 'reason':
+      return locale === 'ja'
+        ? 'この入力がないと安全に実行できません。'
+        : 'The request cannot be executed safely without this input.';
+    case 'confirm':
+      return locale === 'ja' ? `${input} を確認してください。` : `Please confirm ${input}.`;
+    case 'headline':
+      return locale === 'ja'
+        ? '実行前に追加の確認が必要です'
+        : 'More context is required before execution';
+    case 'summary':
+      return locale === 'ja'
+        ? '実行を続ける前に入力内容の確認が必要です。'
+        : 'The request needs clarification before Kyberion can proceed safely.';
+    case 'unresolved':
+      return locale === 'ja'
+        ? '未解決の入力があります。'
+        : 'The request still has unresolved inputs.';
+    case 'clear':
+      return locale === 'ja'
+        ? 'この依頼は追加確認なしで進められます。'
+        : 'The request can proceed without clarification.';
+  }
+}
+
+function localizeContextualReason(
+  locale: QuestionLocale,
+  reason: string,
+  fallback: string
+): string {
+  if (locale !== 'ja') return reason;
+  if (reason.startsWith('Missing inputs remain above the clarification threshold')) {
+    return `不足している入力は確認しきい値を超えています${reason.match(/\(([^)]+)\)/)?.[0] || ''}`;
+  }
+  if (reason.startsWith('Missing critical inputs:')) {
+    return `重要な不足入力があります: ${reason.replace(/^Missing critical inputs:\s*/u, '').replace(/\.$/u, '。')}`;
+  }
+  if (reason === 'No clarification is required because no inputs are missing.') {
+    return '入力の不足がないため、追加の確認は不要です。';
+  }
+  if (reason === 'The request matches a force-clarification ambiguity pattern.') {
+    return '依頼が強制確認の曖昧性パターンに一致しました。';
+  }
+  if (reason === 'The missing inputs are covered by policy defaults.') {
+    return '不足入力はポリシーの既定値で補完できます。';
+  }
+  if (reason.startsWith('The request can proceed with policy defaults because confidence is')) {
+    return `confidence ${reason.match(/([0-9.]+)\./u)?.[1] || ''} なので、ポリシーの既定値で進められます。`;
+  }
+  return fallback;
+}
 
 export interface QuestionResolutionResult {
   kind: 'question-resolution-packet';
@@ -156,14 +227,15 @@ function normalizeMissingInputs(values: Array<string | undefined | null>): strin
 
 function inferQuestionsFromIntentRequirements(
   requiredInputs: string[],
-  missingInputs: Set<string>
+  missingInputs: Set<string>,
+  locale: QuestionLocale
 ): QuestionResolutionQuestion[] {
   return requiredInputs
     .filter((input) => missingInputs.has(input))
     .map((input) => ({
       id: input,
-      question: `Please provide ${input.replace(/_/g, ' ')}.`,
-      reason: 'The request cannot be executed safely without this input.',
+      question: localizedQuestionText(locale, 'provide', input.replace(/_/g, ' ')),
+      reason: localizedQuestionText(locale, 'reason'),
       required_input: input,
       source: 'intent_requirement' as const,
       blocking: true,
@@ -311,6 +383,7 @@ function getNarratedVideoProfileFallback(): any {
 }
 
 export function resolveQuestionResolution(input: ResolveQuestionInput): QuestionResolutionResult {
+  const locale = resolveQuestionLocale(input.locale);
   const policy = loadPolicyFile();
   const intentCatalog = loadStandardIntentCatalog();
   const intent = input.intentId
@@ -414,7 +487,8 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
 
   for (const question of inferQuestionsFromIntentRequirements(
     intent?.intake_requirements || [],
-    missingInputs
+    missingInputs,
+    locale
   )) {
     addQuestion(question);
   }
@@ -424,11 +498,19 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
       id: missingInputs.values().next().value || 'confirm_goal',
       question:
         missingInputs.size > 0
-          ? `Please confirm ${String(missingInputs.values().next().value).replace(/_/g, ' ')}.`
-          : 'What should Kyberion do, and what outcome should count as success?',
-      reason:
-        contextualDecision.reason ||
-        'The request needs one confirming question before execution can continue.',
+          ? localizedQuestionText(
+              locale,
+              'confirm',
+              String(missingInputs.values().next().value).replace(/_/g, ' ')
+            )
+          : locale === 'ja'
+            ? 'Kyberion は何を実行し、何を成功とみなせばよいですか?'
+            : 'What should Kyberion do, and what outcome should count as success?',
+      reason: localizeContextualReason(
+        locale,
+        contextualDecision.reason,
+        localizedQuestionText(locale, 'reason')
+      ),
       ...(missingInputs.size > 0
         ? { required_input: String(missingInputs.values().next().value) }
         : {}),
@@ -454,12 +536,15 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
     ...(input.intentId ? { intent_id: input.intentId } : {}),
     ...(input.executionShape ? { execution_shape: input.executionShape } : {}),
     should_clarify: shouldClarify,
-    reason:
-      contextualDecision.reason ||
-      rule?.rationale ||
-      (questions.length > 0
-        ? 'The request still has unresolved inputs.'
-        : 'The request can proceed without clarification.'),
+    reason: rule?.rationale
+      ? rule.rationale
+      : localizeContextualReason(
+          locale,
+          contextualDecision.reason,
+          questions.length > 0
+            ? localizedQuestionText(locale, 'unresolved')
+            : localizedQuestionText(locale, 'clear')
+        ),
     missing_inputs:
       contextualDecision.missingInputs.length > 0
         ? contextualDecision.missingInputs
@@ -480,15 +565,16 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
 
 export function resolveQuestionInteractionPacket(
   input: ResolveQuestionInput,
-  headline = 'More context is required before execution',
-  summary = 'The request needs clarification before Kyberion can proceed safely.'
+  headline,
+  summary
 ): OperatorInteractionPacket | undefined {
+  const locale = resolveQuestionLocale(input.locale);
   const result = resolveQuestionResolution(input);
   if (!result.should_clarify || result.questions.length === 0) return undefined;
   return buildOperatorInteractionPacket(
     result,
-    headline,
-    summary,
+    headline || localizedQuestionText(locale, 'headline'),
+    summary || localizedQuestionText(locale, 'summary'),
     input.executionBrief?.user_facing_summary || input.executionBrief?.summary,
     clampConfidence(input.confidence, 0.5)
   );
