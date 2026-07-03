@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as bridge from './browser-extension-bridge.js';
 import * as approvalGate from './approval-gate.js';
+import * as killSwitch from './kill-switch.js';
 import { type ProcedureEntry } from './procedure-types.js';
 import {
   dispatchProcedure,
   extendLeaseForMfa,
   type DispatchInput,
 } from './procedure-dispatcher.js';
-import type { BrowserExtensionRecording, BrowserExtensionSessionRequest } from './browser-extension-bridge.js';
+import type {
+  BrowserExtensionRecording,
+  BrowserExtensionSessionRequest,
+} from './browser-extension-bridge.js';
 import type { ServiceRecording } from './service-recording.js';
 
 const SERVICE_PROCEDURE: ProcedureEntry = {
@@ -17,16 +21,27 @@ const SERVICE_PROCEDURE: ProcedureEntry = {
   target: { name: 'Deal Intake', services: ['jira', 'slack'] },
   intent_phrases: ['起票して通知'],
   pipeline_ref: 'pipelines/service/deal-intake.json',
-  risk_class: 'high', version: '1.0.0', status: 'active',
+  risk_class: 'high',
+  version: '1.0.0',
+  status: 'active',
 };
 
 function serviceRecording(overrides: Partial<ServiceRecording> = {}): ServiceRecording {
   return {
     schema_version: 'service-recording.v1',
-    recording_id: 'svc-1', source: 'service-capture', created_at: '2026-06-24T00:00:00.000Z',
+    recording_id: 'svc-1',
+    source: 'service-capture',
+    created_at: '2026-06-24T00:00:00.000Z',
     target: { name: 'Deal Intake', services: ['jira', 'slack'] },
     steps: [
-      { step_id: 's1', service_id: 'jira', action: 'create_issue', summary: '起票', risk_class: 'high', produces: 'issue_key' },
+      {
+        step_id: 's1',
+        service_id: 'jira',
+        action: 'create_issue',
+        summary: '起票',
+        risk_class: 'high',
+        produces: 'issue_key',
+      },
     ],
     risk_summary: { requires_manual_review: true, approval_required_count: 1 },
     review: { status: 'approved', decisions: [{ step_id: 's1', status: 'approved' }] },
@@ -59,7 +74,11 @@ const RECORDING: BrowserExtensionRecording = {
   tab: { origin: 'https://s2.kingtime.jp', origin_hash: 'h1', title: 'King of Time' },
   extension: { version: '1.0.0' },
   actions: [],
-  risk_summary: { requires_manual_review: true, sensitive_input_omitted: 0, approval_required_count: 0 },
+  risk_summary: {
+    requires_manual_review: true,
+    sensitive_input_omitted: 0,
+    approval_required_count: 0,
+  },
   review: {
     status: 'approved',
     reviewed_at: '2026-06-24T00:00:00Z',
@@ -94,6 +113,7 @@ describe('dispatchProcedure', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('blocks a service:preset dispatch with no serviceRecording', async () => {
+    const logSpy = vi.spyOn(killSwitch.killSwitch, 'logAction');
     const input: DispatchInput = {
       ...BASE_INPUT,
       procedure: { ...PROCEDURE, adapter: { ...PROCEDURE.adapter, executor: 'service:preset' } },
@@ -101,6 +121,7 @@ describe('dispatchProcedure', () => {
     const result = await dispatchProcedure(input);
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('serviceRecording');
+    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_service_missing_recording', true);
   });
 
   it('returns not_implemented for system (desktop) executor', async () => {
@@ -127,18 +148,23 @@ describe('dispatchProcedure', () => {
   // -------------------------------------------------------------------------
 
   it('returns blocked when recording is missing', async () => {
+    const logSpy = vi.spyOn(killSwitch.killSwitch, 'logAction');
     const result = await dispatchProcedure({ ...BASE_INPUT, recording: undefined });
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('recording');
+    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatch_missing_recording', true);
   });
 
   it('returns blocked when session is missing', async () => {
+    const logSpy = vi.spyOn(killSwitch.killSwitch, 'logAction');
     const result = await dispatchProcedure({ ...BASE_INPUT, session: undefined });
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('session');
+    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatch_missing_session', true);
   });
 
   it('returns blocked when recording origin is not in procedure allowed origins', async () => {
+    const logSpy = vi.spyOn(killSwitch.killSwitch, 'logAction');
     const wrongOriginRecording: BrowserExtensionRecording = {
       ...RECORDING,
       tab: { ...RECORDING.tab, origin: 'https://trusted.example.com.evil' },
@@ -147,32 +173,56 @@ describe('dispatchProcedure', () => {
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('trusted.example.com.evil');
     expect(result.errors[0]).toContain('not in allowed origins');
+    expect(logSpy).toHaveBeenCalledWith(
+      'test-agent',
+      'procedure_origin_blocked:attendance.approve.kingoftime',
+      true
+    );
   });
 
   it('issues one origin-bound lease per segment for a multi-origin recording', async () => {
     // preflight internals are covered by their own suite; mock to ready so this
     // test focuses on the dispatcher's segmentation + per-segment lease wiring.
     vi.spyOn(bridge, 'preflightBrowserExtensionSession').mockReturnValue({
-      status: 'ready_for_review', errors: [], approvalRequired: false, approvedStepHashes: [],
+      status: 'ready_for_review',
+      errors: [],
+      approvalRequired: false,
+      approvedStepHashes: [],
     });
     const multiOrigin: ProcedureEntry = {
       ...PROCEDURE,
-      target: { ...PROCEDURE.target, origins: ['https://s2.kingtime.jp', 'https://news.yahoo.co.jp'] },
+      target: {
+        ...PROCEDURE.target,
+        origins: ['https://s2.kingtime.jp', 'https://news.yahoo.co.jp'],
+      },
     };
     const segmentedRecording: BrowserExtensionRecording = {
       ...RECORDING,
       actions: [
         {
-          action_id: 'nav-1', op: 'navigate', summary: 'handoff', risk: 'observe',
+          action_id: 'nav-1',
+          op: 'navigate',
+          summary: 'handoff',
+          risk: 'observe',
           captured_at: '2026-06-24T00:00:01Z',
-          navigation: { from_origin: 'https://s2.kingtime.jp', to_origin: 'https://news.yahoo.co.jp' },
+          navigation: {
+            from_origin: 'https://s2.kingtime.jp',
+            to_origin: 'https://news.yahoo.co.jp',
+          },
         },
       ],
     };
-    const result = await dispatchProcedure({ ...BASE_INPUT, procedure: multiOrigin, recording: segmentedRecording });
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: multiOrigin,
+      recording: segmentedRecording,
+    });
     expect(result.status).toBe('lease_issued');
     expect(result.segments).toHaveLength(2);
-    expect(result.segments?.map((s) => s.origin)).toEqual(['https://s2.kingtime.jp', 'https://news.yahoo.co.jp']);
+    expect(result.segments?.map((s) => s.origin)).toEqual([
+      'https://s2.kingtime.jp',
+      'https://news.yahoo.co.jp',
+    ]);
     expect(result.segments?.[0].lease.origin).toBe('https://s2.kingtime.jp');
     expect(result.segments?.[1].lease.segment_index).toBe(1);
     expect(result.lease).toBeUndefined();
@@ -183,9 +233,15 @@ describe('dispatchProcedure', () => {
       ...RECORDING,
       actions: [
         {
-          action_id: 'nav-1', op: 'navigate', summary: 'handoff', risk: 'observe',
+          action_id: 'nav-1',
+          op: 'navigate',
+          summary: 'handoff',
+          risk: 'observe',
           captured_at: '2026-06-24T00:00:01Z',
-          navigation: { from_origin: 'https://s2.kingtime.jp', to_origin: 'https://evil.example.com' },
+          navigation: {
+            from_origin: 'https://s2.kingtime.jp',
+            to_origin: 'https://evil.example.com',
+          },
         },
       ],
     };
@@ -196,6 +252,7 @@ describe('dispatchProcedure', () => {
   });
 
   it('returns approval_required when approval gate blocks', async () => {
+    const logSpy = vi.spyOn(killSwitch.killSwitch, 'logAction');
     vi.spyOn(bridge, 'enforceBrowserExtensionApproval').mockReturnValue({
       allowed: false,
       status: 'pending',
@@ -206,6 +263,11 @@ describe('dispatchProcedure', () => {
     expect(result.status).toBe('approval_required');
     expect(result.approvalRequestId).toBe('REQ-42');
     expect(result.errors).toHaveLength(0);
+    expect(logSpy).toHaveBeenCalledWith(
+      'test-agent',
+      'procedure_approval_required:attendance.approve.kingoftime',
+      true
+    );
   });
 
   it('returns lease_issued when approval is granted', async () => {
@@ -256,7 +318,7 @@ describe('dispatchProcedure', () => {
       expect.objectContaining({
         channel: 'sidepanel',
         correlationId: 'corr-xyz',
-      }),
+      })
     );
   });
 
@@ -293,7 +355,7 @@ describe('extendLeaseForMfa', () => {
   const existingLease: bridge.BrowserExtensionLease = {
     lease_id: 'LEASE-original',
     issued_at: '2026-06-24T09:55:00Z',
-    expires_at: '2026-06-24T10:00:00Z',  // expires exactly at `now`
+    expires_at: '2026-06-24T10:00:00Z', // expires exactly at `now`
     approved_step_hashes: ['hash1', 'hash2'],
   };
 
@@ -312,10 +374,15 @@ describe('extendLeaseForMfa', () => {
   });
 
   it('new lease expires approximately 10 minutes after now', () => {
-    const result = extendLeaseForMfa({ existingLease, recording: RECORDING, session: SESSION, now });
+    const result = extendLeaseForMfa({
+      existingLease,
+      recording: RECORDING,
+      session: SESSION,
+      now,
+    });
     const expiresAt = Date.parse(result.lease!.expires_at);
     const diff = expiresAt - now.getTime();
-    expect(diff).toBeCloseTo(10 * 60_000, -3);  // within ~1s tolerance
+    expect(diff).toBeCloseTo(10 * 60_000, -3); // within ~1s tolerance
   });
 
   it('refuses extension when the lease is already expired (no past-expiry grace)', () => {
@@ -401,14 +468,21 @@ describe('dispatchProcedure — service:preset', () => {
   });
 
   it('executes after approval and returns service results', async () => {
-    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({ allowed: true, status: 'approved' });
+    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({
+      allowed: true,
+      status: 'approved',
+    });
     const result = await dispatchProcedure(baseInput());
     expect(result.status).toBe('executed');
     expect(result.serviceResults?.[0]).toMatchObject({ step_id: 's1', status: 'done' });
   });
 
   it('returns approval_required when the external-effect gate blocks', async () => {
-    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({ allowed: false, status: 'pending', requestId: 'REQ-9' });
+    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({
+      allowed: false,
+      status: 'pending',
+      requestId: 'REQ-9',
+    });
     const result = await dispatchProcedure(baseInput());
     expect(result.status).toBe('approval_required');
     expect(result.approvalRequestId).toBe('REQ-9');
@@ -417,7 +491,15 @@ describe('dispatchProcedure — service:preset', () => {
   it('runs read-only recordings without invoking the approval gate', async () => {
     const spy = vi.spyOn(approvalGate, 'enforceApprovalGate');
     const readOnly = serviceRecording({
-      steps: [{ step_id: 'r1', service_id: 'jira', action: 'search', summary: '検索', risk_class: 'read' }],
+      steps: [
+        {
+          step_id: 'r1',
+          service_id: 'jira',
+          action: 'search',
+          summary: '検索',
+          risk_class: 'read',
+        },
+      ],
       risk_summary: { requires_manual_review: true, approval_required_count: 0 },
       review: { status: 'approved', decisions: [{ step_id: 'r1', status: 'approved' }] },
     });
@@ -428,7 +510,9 @@ describe('dispatchProcedure — service:preset', () => {
 
   it('blocks a step whose service is not in the procedure allowlist', async () => {
     const offlist = serviceRecording({
-      steps: [{ step_id: 's1', service_id: 'box', action: 'upload', summary: 'x', risk_class: 'high' }],
+      steps: [
+        { step_id: 's1', service_id: 'box', action: 'upload', summary: 'x', risk_class: 'high' },
+      ],
       review: { status: 'approved', decisions: [{ step_id: 's1', status: 'approved' }] },
     });
     const result = await dispatchProcedure({ ...baseInput(), serviceRecording: offlist });

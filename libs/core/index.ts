@@ -118,11 +118,7 @@ export { distillIncident, summarizeIncidents } from './incident-distiller.js';
 export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
 export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
 export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
-export {
-  buildNextAction,
-  buildNextActionFromError,
-  formatNextAction,
-} from './next-action.js';
+export { buildNextAction, buildNextActionFromError, formatNextAction } from './next-action.js';
 export type {
   BuildNextActionInput,
   ErrorNextActionContext,
@@ -133,8 +129,21 @@ export type {
 // Classification & Knowledge
 export * as classifier from './classifier.js';
 export * from './knowledge-provider.js';
-export { buildKnowledgeIndex, buildScopedIndex, queryKnowledge, queryKnowledgeHybrid, clearKnowledgeEmbedCache, KnowledgeHintIndex, DEFAULT_SCOPE, computeScopeHash } from './src/knowledge-index.js';
-export type { KnowledgeHint, KnowledgeQueryOptions, KnowledgeScope } from './src/knowledge-index.js';
+export {
+  buildKnowledgeIndex,
+  buildScopedIndex,
+  queryKnowledge,
+  queryKnowledgeHybrid,
+  clearKnowledgeEmbedCache,
+  KnowledgeHintIndex,
+  DEFAULT_SCOPE,
+  computeScopeHash,
+} from './src/knowledge-index.js';
+export type {
+  KnowledgeHint,
+  KnowledgeQueryOptions,
+  KnowledgeScope,
+} from './src/knowledge-index.js';
 
 // Networking
 export { secureFetch } from './network.js';
@@ -210,19 +219,14 @@ export type {
   MeshHubPeerMessagingAdapterOptions,
   MeshHubRecipientProposalRecord,
 } from './mesh-hub-peer-messaging-adapter.js';
-export {
-  routeMeshRequest,
-} from './mesh-router.js';
+export { routeMeshRequest } from './mesh-router.js';
 export type {
   MeshRouteCandidate,
   MeshRouteDecision,
   MeshRouteExclusion,
   MeshRouteOptions,
 } from './mesh-router.js';
-export {
-  formatMeshHubInspectionReport,
-  inspectMeshHub,
-} from './mesh-hub-inspection.js';
+export { formatMeshHubInspectionReport, inspectMeshHub } from './mesh-hub-inspection.js';
 export type {
   MeshHubDeliveryInspection,
   MeshHubInspectionOptions,
@@ -312,9 +316,7 @@ export {
   listWorkCoordinationImportCatalogEntries,
   loadWorkCoordinationImportCatalog,
 } from './work-coordination-import-catalog.js';
-export type {
-  WorkCoordinationImportCatalogEntry,
-} from './work-coordination-import-catalog.js';
+export type { WorkCoordinationImportCatalogEntry } from './work-coordination-import-catalog.js';
 export {
   getServiceBootstrapCatalogEntryByServiceId,
   findServiceBootstrapEntriesByUtterance,
@@ -322,31 +324,23 @@ export {
   loadServiceBootstrapCatalog,
   listServiceBootstrapCatalogEntries,
 } from './service-bootstrap-catalog.js';
-export type {
-  ServiceBootstrapCatalogEntry,
-} from './service-bootstrap-catalog.js';
+export type { ServiceBootstrapCatalogEntry } from './service-bootstrap-catalog.js';
 export {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
 } from './actuator-dependency-bundles.js';
-export type {
-  ActuatorDependencyBundleEntry,
-} from './actuator-dependency-bundles.js';
+export type { ActuatorDependencyBundleEntry } from './actuator-dependency-bundles.js';
 export {
   findSkillInstallPackageMapEntry,
   loadSkillInstallPackageMap,
 } from './skill-install-package-map.js';
-export type {
-  SkillInstallPackageMapEntry,
-} from './skill-install-package-map.js';
+export type { SkillInstallPackageMapEntry } from './skill-install-package-map.js';
 export {
   getServiceAuthorities,
   listServiceAuthorityMapEntries,
   loadServiceAuthorityMap,
 } from './service-authority-map.js';
-export type {
-  ServiceAuthorityMapEntry,
-} from './service-authority-map.js';
+export type { ServiceAuthorityMapEntry } from './service-authority-map.js';
 export { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 export { distillPdfDesign } from './src/pdf-utils.js';
 export { distillPptxDesign } from './src/pptx-utils.js';
@@ -470,6 +464,10 @@ export {
   grantAccessGuarded,
   isSecretPath,
 } from './secret-guard.js';
+export * from './shell-command-policy.js';
+export * from './adf-guardrails.js';
+export * from './egress-policy.js';
+export * from './governance-status.js';
 
 // Orchestration
 export * as orchestrator from './orchestrator.js';
@@ -563,7 +561,12 @@ export {
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
 } from './storage-janitor.js';
-export type { JanitorReport, ScanTmpResult, RotateLogsResult, ScanDataVaultResult } from './storage-janitor.js';
+export type {
+  JanitorReport,
+  ScanTmpResult,
+  RotateLogsResult,
+  ScanDataVaultResult,
+} from './storage-janitor.js';
 
 // Data Vault (external data source reference cache)
 export {
@@ -572,10 +575,20 @@ export {
   invalidateVaultEntry,
   listVaultEntries,
 } from './data-vault.js';
-export type { VaultEntry, FetchWithVaultCacheOptions, FetchWithVaultCacheResult, DataVaultTier, VaultEntryFilter } from './data-vault.js';
+export type {
+  VaultEntry,
+  FetchWithVaultCacheOptions,
+  FetchWithVaultCacheResult,
+  DataVaultTier,
+  VaultEntryFilter,
+} from './data-vault.js';
 
 // Process Logger (file-backed logger for long-running daemons)
-export { createProcessLogger, resetProcessLoggerRegistry, ProcessLogger } from './process-logger.js';
+export {
+  createProcessLogger,
+  resetProcessLoggerRegistry,
+  ProcessLogger,
+} from './process-logger.js';
 export type { ProcessLogEntry, ProcessLogLevel, ProcessLoggerOptions } from './process-logger.js';
 
 // Service Engine (vault-cached variant)
@@ -804,14 +817,8 @@ export {
   writeVideoFrameBusToMp4,
   writeVideoFramesToMp4,
 } from './video-frame-archive.js';
-export type {
-  VideoFrameArchiveOptions,
-  VideoFrameArchiveResult,
-} from './video-frame-archive.js';
-export {
-  SCREEN_CAPTURE_BRIDGE_ID,
-  createScreenCaptureBridge,
-} from './screen-capture-bridge.js';
+export type { VideoFrameArchiveOptions, VideoFrameArchiveResult } from './video-frame-archive.js';
+export { SCREEN_CAPTURE_BRIDGE_ID, createScreenCaptureBridge } from './screen-capture-bridge.js';
 export type {
   ScreenCaptureBridge,
   ScreenCaptureBridgeOptions,
@@ -895,10 +902,7 @@ export type {
   VirtualInputDeviceKind,
   VirtualInputDeviceRecord,
 } from './virtual-input-device-inventory-bridge.js';
-export {
-  VIRTUAL_CAMERA_BRIDGE_ID,
-  createVirtualCameraBridge,
-} from './virtual-camera-bridge.js';
+export { VIRTUAL_CAMERA_BRIDGE_ID, createVirtualCameraBridge } from './virtual-camera-bridge.js';
 export type {
   VirtualCameraBackendId,
   VirtualCameraBridge,
@@ -1065,13 +1069,8 @@ export type {
   OpenAiCompatibleBackendOptions,
   OpenAiCompatibleBackendAvailability,
 } from './openai-compatible-backend.js';
-export {
-  OpenRouterBackend,
-  buildOpenRouterBackendFromEnv,
-} from './openrouter-backend.js';
-export type {
-  OpenRouterBackendOptions,
-} from './openrouter-backend.js';
+export { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
+export type { OpenRouterBackendOptions } from './openrouter-backend.js';
 export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
 export { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
 export type { GeminiCliIntentExtractorOptions } from './gemini-cli-intent-extractor.js';
@@ -1287,9 +1286,7 @@ export {
   resolveChangelogPolicy,
   resetChangelogPolicyCatalogCache,
 } from './changelog-policy.js';
-export {
-  resolveProposalSectionKeywords,
-} from './media-semantic-map.js';
+export { resolveProposalSectionKeywords } from './media-semantic-map.js';
 export {
   loadSpreadsheetStylePolicyCatalog,
   resolveSpreadsheetStyleIndex,
@@ -1300,9 +1297,7 @@ export {
   loadLegacyMediaOpsCatalog,
   resetLegacyMediaOpsCatalogCache,
 } from './legacy-media-ops.js';
-export {
-  installEmbeddingBackendIfAvailable,
-} from './embedding-bootstrap.js';
+export { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 export {
   getEmbeddingBackend,
   registerEmbeddingBackend,
@@ -1310,17 +1305,13 @@ export {
   cosineSimilarity,
   reciprocalRankFusion,
 } from './embedding-backend.js';
-export type {
-  EmbeddingBackend,
-} from './embedding-backend.js';
+export type { EmbeddingBackend } from './embedding-backend.js';
 export {
   MlxEmbeddingBackend,
   isMlxAvailable,
   probeMlxEmbeddingBackend,
 } from './mlx-embedding-backend.js';
-export type {
-  MlxEmbeddingBackendOptions,
-} from './mlx-embedding-backend.js';
+export type { MlxEmbeddingBackendOptions } from './mlx-embedding-backend.js';
 export type {
   InstallAnthropicOptions,
   InstallReasoningOptions,
@@ -1555,11 +1546,22 @@ export { tryRepairJson, repairJsonString } from './json-repair.js';
 export { Semaphore, llmSemaphore } from './semaphore.js';
 
 // Prompt constraints (Paper2Any pattern — reusable output constraint fragments)
-export { JSON_OUTPUT_CONSTRAINTS, JSON_OBJECT_CONSTRAINTS, JSON_ARRAY_CONSTRAINTS, jsonOutputConstraints, VALIDATOR_CHAIN_PATTERN } from './prompt-constraints.js';
+export {
+  JSON_OUTPUT_CONSTRAINTS,
+  JSON_OBJECT_CONSTRAINTS,
+  JSON_ARRAY_CONSTRAINTS,
+  jsonOutputConstraints,
+  VALIDATOR_CHAIN_PATTERN,
+} from './prompt-constraints.js';
 export type { ValidatorName } from './prompt-constraints.js';
 
 // BlackHole routing guard (SIGINT safety — restores system mic on Ctrl+C)
-export { markRouterActive, markRouterInactive, isRouterActive, resetRouterSync } from './blackhole-routing-guard.js';
+export {
+  markRouterActive,
+  markRouterInactive,
+  isRouterActive,
+  resetRouterSync,
+} from './blackhole-routing-guard.js';
 
 // ---------------------------------------------------------------------------
 // Intent-driven automation (P0-P4) — procedure catalog, compiler, dispatcher,
@@ -1585,7 +1587,11 @@ export {
 } from './procedure-registry.js';
 export type { ResolveOptions } from './procedure-registry.js';
 export { isDryRunSafe, compileBrowserRecording } from './browser-recording-compiler.js';
-export type { CompiledBrowserStep, CompileOptions, CompileRecordingResult } from './browser-recording-compiler.js';
+export type {
+  CompiledBrowserStep,
+  CompileOptions,
+  CompileRecordingResult,
+} from './browser-recording-compiler.js';
 // dispatchProcedure — re-exports extendLeaseForMfa from browser-extension-bridge (already exported above)
 export { dispatchProcedure } from './procedure-dispatcher.js';
 export type { DispatchInput, DispatchResult, DispatchStatus } from './procedure-dispatcher.js';

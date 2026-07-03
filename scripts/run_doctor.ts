@@ -3,6 +3,7 @@ import {
   listEnvironmentManifestIds,
   listScheduledPipelines,
   loadEnvironmentManifest,
+  getGovernanceControlSummary,
   probeManifest,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
@@ -30,6 +31,7 @@ export interface DoctorRunReport {
     counts: { must: number; should: number; nice: number };
   }>;
   scheduleLines: string[];
+  governanceLines: string[];
 }
 
 export function collectPipelineScheduleDoctorLines(): string[] {
@@ -87,7 +89,17 @@ export async function collectDoctorReport(argv: {
     totalMissing += summary.counts.must + summary.counts.should;
   }
 
-  return { totalMissing, summaries, scheduleLines: collectPipelineScheduleDoctorLines() };
+  const governance = getGovernanceControlSummary();
+  const governanceLines = [
+    `Governance controls: kill_switch=${governance.kill_switch_monitoring ? 'armed' : 'idle'}; pending_approvals=${governance.pending_approvals}; approval_rules=${governance.approval_rules}; shell_rules=${governance.shell_allow_rules}/${governance.shell_deny_rules}; egress_mode=${governance.egress_mode}; egress_domains=${governance.egress_allowlist_domains}`,
+  ];
+
+  return {
+    totalMissing,
+    summaries,
+    scheduleLines: collectPipelineScheduleDoctorLines(),
+    governanceLines,
+  };
 }
 
 async function main(): Promise<void> {
@@ -110,6 +122,9 @@ async function main(): Promise<void> {
     console.log('');
   }
   for (const line of report.scheduleLines) {
+    console.log(line);
+  }
+  for (const line of report.governanceLines) {
     console.log(line);
   }
   console.log('');

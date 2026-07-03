@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { enforceApprovalGate } from './approval-gate.js';
+import { killSwitch } from './kill-switch.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import {
   type BrowserExtensionLease,
@@ -136,12 +137,14 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
   const { procedure, recording, session, agentId, channel, correlationId } = input;
 
   if (!recording) {
+    killSwitch.logAction(agentId, 'procedure_dispatch_missing_recording', true);
     return {
       status: 'blocked',
       errors: ['extension_session executor requires a recording'],
     };
   }
   if (!session) {
+    killSwitch.logAction(agentId, 'procedure_dispatch_missing_session', true);
     return {
       status: 'blocked',
       errors: ['extension_session executor requires a session'],
@@ -155,6 +158,7 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
     for (const segment of segments) {
       const allowed = procedure.target.origins.some((o) => matchesAllowedOrigin(o, segment.origin));
       if (!allowed) {
+        killSwitch.logAction(agentId, `procedure_origin_blocked:${procedure.procedure_id}`, true);
         return {
           status: 'blocked',
           errors: [
@@ -181,8 +185,9 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
   if (!approval.allowed) {
     logger.info(
       `[procedure-dispatcher] approval required for "${procedure.procedure_id}" ` +
-        `— request_id=${approval.requestId ?? 'n/a'}`,
+        `— request_id=${approval.requestId ?? 'n/a'}`
     );
+    killSwitch.logAction(agentId, `procedure_approval_required:${procedure.procedure_id}`, true);
     return {
       status: 'approval_required',
       approvalRequestId: approval.requestId,
@@ -194,7 +199,10 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
   if (segments.length > 1) {
     const issued = issueSegmentedLeases({ recording, session, approval });
     if (issued.errors.length > 0 || !issued.leases) {
-      return { status: 'blocked', errors: issued.errors.length > 0 ? issued.errors : ['segmented lease issuance failed'] };
+      return {
+        status: 'blocked',
+        errors: issued.errors.length > 0 ? issued.errors : ['segmented lease issuance failed'],
+      };
     }
     // Authoritative per-segment execute-mode preflight: each segment's
     // sub-recording validated against its own origin-bound lease (origin /
@@ -207,12 +215,15 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
         bridgeAvailable: true,
       });
       if (verified.status === 'blocked') {
-        return { status: 'blocked', errors: [`segment ${seg.segment_index} (${seg.origin}): ${verified.errors.join('; ')}`] };
+        return {
+          status: 'blocked',
+          errors: [`segment ${seg.segment_index} (${seg.origin}): ${verified.errors.join('; ')}`],
+        };
       }
     }
     logger.info(
       `[procedure-dispatcher] ${issued.leases.length} segment leases issued for "${procedure.procedure_id}" ` +
-        `origins=[${issued.leases.map((s) => s.origin).join(', ')}]`,
+        `origins=[${issued.leases.map((s) => s.origin).join(', ')}]`
     );
     return { status: 'lease_issued', segments: issued.leases, errors: [] };
   }
@@ -228,7 +239,7 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
 
   logger.info(
     `[procedure-dispatcher] lease issued for "${procedure.procedure_id}" ` +
-      `origin="${recording.tab.origin}" lease="${issued.lease.lease_id}"`,
+      `origin="${recording.tab.origin}" lease="${issued.lease.lease_id}"`
   );
   return { status: 'lease_issued', lease: issued.lease, errors: [] };
 }
@@ -242,10 +253,15 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   const { procedure, serviceRecording, agentId, channel, correlationId } = input;
 
   if (!serviceRecording) {
+    killSwitch.logAction(agentId, 'procedure_service_missing_recording', true);
     return { status: 'blocked', errors: ['service:preset executor requires a serviceRecording'] };
   }
   if (serviceRecording.review?.status !== 'approved') {
-    return { status: 'blocked', errors: ['service execution requires an approved recording review'] };
+    killSwitch.logAction(agentId, 'procedure_service_unapproved_recording', true);
+    return {
+      status: 'blocked',
+      errors: ['service execution requires an approved recording review'],
+    };
   }
 
   // Service guard: every step's service_id must be in the procedure's allowed set.
@@ -253,9 +269,12 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   if (allowedServices.length > 0) {
     for (const step of serviceRecording.steps) {
       if (!allowedServices.includes(step.service_id)) {
+        killSwitch.logAction(agentId, `procedure_service_blocked:${procedure.procedure_id}`, true);
         return {
           status: 'blocked',
-          errors: [`step ${step.step_id} uses service "${step.service_id}" not in allowed services [${allowedServices.join(', ')}]`],
+          errors: [
+            `step ${step.step_id} uses service "${step.service_id}" not in allowed services [${allowedServices.join(', ')}]`,
+          ],
         };
       }
     }
@@ -269,7 +288,8 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
       intentId: SERVICE_EXTERNAL_EFFECT_OP,
       operationId: SERVICE_EXTERNAL_EFFECT_OP,
       agentId,
-      correlationId: correlationId ?? `procedure:${procedure.procedure_id}:${serviceRecording.recording_id}`,
+      correlationId:
+        correlationId ?? `procedure:${procedure.procedure_id}:${serviceRecording.recording_id}`,
       channel: channel ?? 'service',
       payload: {
         services: allowedServices,
@@ -282,7 +302,14 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
       },
     });
     if (!approval.allowed) {
-      logger.info(`[procedure-dispatcher] service approval required for "${procedure.procedure_id}" — request_id=${approval.requestId ?? 'n/a'}`);
+      logger.info(
+        `[procedure-dispatcher] service approval required for "${procedure.procedure_id}" — request_id=${approval.requestId ?? 'n/a'}`
+      );
+      killSwitch.logAction(
+        agentId,
+        `procedure_service_approval_required:${procedure.procedure_id}`,
+        true
+      );
       return { status: 'approval_required', approvalRequestId: approval.requestId, errors: [] };
     }
   }
@@ -295,13 +322,19 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   });
 
   if (exec.status === 'completed') {
-    logger.info(`[procedure-dispatcher] service procedure "${procedure.procedure_id}" executed (${exec.results.length} steps)`);
+    logger.info(
+      `[procedure-dispatcher] service procedure "${procedure.procedure_id}" executed (${exec.results.length} steps)`
+    );
     return { status: 'executed', serviceResults: exec.results, errors: [] };
   }
   const failed = exec.results.find((r) => r.status === 'error' || r.status === 'blocked');
   return {
     status: 'blocked',
     serviceResults: exec.results,
-    errors: [failed ? `step ${failed.step_id} ${failed.status}: ${failed.detail ?? ''}` : `service execution ${exec.status}`],
+    errors: [
+      failed
+        ? `step ${failed.step_id} ${failed.status}: ${failed.detail ?? ''}`
+        : `service execution ${exec.status}`,
+    ],
   };
 }
