@@ -31,16 +31,16 @@ We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 <optional footer, e.g. BREAKING CHANGE: …>
 ```
 
-| Type | Bump |
-|---|---|
-| `feat:` | minor |
-| `fix:` | patch |
-| `perf:` | patch |
-| `refactor:` | patch (no observable behavior change) |
-| `docs:` | none (rolled into the next bump) |
-| `test:` | none |
-| `build:` / `ci:` / `chore:` | none |
-| `feat!:` or any with `BREAKING CHANGE:` footer | major |
+| Type                                           | Bump                                  |
+| ---------------------------------------------- | ------------------------------------- |
+| `feat:`                                        | minor                                 |
+| `fix:`                                         | patch                                 |
+| `perf:`                                        | patch                                 |
+| `refactor:`                                    | patch (no observable behavior change) |
+| `docs:`                                        | none (rolled into the next bump)      |
+| `test:`                                        | none                                  |
+| `build:` / `ci:` / `chore:`                    | none                                  |
+| `feat!:` or any with `BREAKING CHANGE:` footer | major                                 |
 
 PRs must use one of these types. CI rejects PR titles that do not match the pattern. Pushes to `main` reject commit subjects that do not match the pattern, except for the default GitHub merge commit subject (`Merge pull request #...`) when a human uses the merge button.
 
@@ -110,6 +110,10 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ghcr.io/famaoai-creator/kyberion-playground:latest \
   --push .
 ```
+
+For project-specific deploy triggers, add `knowledge/personal/deployments/default.json`
+or `knowledge/personal/deployments/<project>.json` with a `command` field. The release
+bootstrap prefers `KYBERION_DEPLOY_COMMAND`, then falls back to that personal config.
 
 ## Migration scripts
 

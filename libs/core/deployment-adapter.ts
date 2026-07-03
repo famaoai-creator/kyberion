@@ -16,8 +16,14 @@
  * before the pipeline reaches this step.
  */
 
+import AjvModule, { type ValidateFunction } from 'ajv';
 import { execFileSync } from 'node:child_process';
+import * as path from 'node:path';
+import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -84,6 +90,57 @@ export interface ShellDeploymentAdapterOptions {
   command: string;
   shell?: string;
   timeoutMs?: number;
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
+export interface ShellDeploymentAdapterConfig {
+  command: string;
+  shell?: string;
+  timeout_ms?: number;
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
+function normalizeDeploymentProjectName(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function resolveDeploymentConfigPath(env: NodeJS.ProcessEnv): string | null {
+  const explicitPath = env.KYBERION_DEPLOY_CONFIG_PATH?.trim();
+  if (explicitPath) {
+    return pathResolver.resolve(explicitPath);
+  }
+  const projectName = normalizeDeploymentProjectName(
+    env.KYBERION_DEPLOY_PROJECT ||
+      env.KYBERION_PROJECT_NAME ||
+      env.KYBERION_DEPLOYMENT_PROJECT ||
+      'default'
+  );
+  if (!projectName) return null;
+  return pathResolver.knowledge(path.join('personal/deployments', `${projectName}.json`));
+}
+
+function loadShellDeploymentAdapterConfig(
+  env: NodeJS.ProcessEnv
+): { config: ShellDeploymentAdapterConfig; path: string } | null {
+  return withExecutionContext('ecosystem_architect', () => {
+    const configPath = resolveDeploymentConfigPath(env);
+    if (!configPath || !safeExistsSync(configPath)) return null;
+    const parsed = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+    const validate = ensureDeploymentConfigValidator();
+    if (!validate(parsed)) {
+      const errors = (validate.errors || [])
+        .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+        .join('; ');
+      throw new Error(`Invalid deployment adapter config at ${configPath}: ${errors}`);
+    }
+    return { config: parsed as ShellDeploymentAdapterConfig, path: configPath };
+  });
 }
 
 export class ShellDeploymentAdapter implements DeploymentAdapter {
@@ -102,6 +159,8 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
       const stdout = execFileSync(shell, ['-c', cmd], {
         encoding: 'utf8',
         timeout: this.options.timeoutMs ?? 10 * 60 * 1000,
+        cwd: this.options.cwd,
+        env: this.options.env ? { ...process.env, ...this.options.env } : process.env,
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: 16 * 1024 * 1024,
       });
@@ -143,4 +202,37 @@ export function installShellDeploymentAdapterIfAvailable(
     '[deployment-adapter] installed ShellDeploymentAdapter from KYBERION_DEPLOY_COMMAND'
   );
   return true;
+}
+
+export function installShellDeploymentAdapterFromConfigIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const loaded = loadShellDeploymentAdapterConfig(env);
+  if (!loaded) return false;
+  registerDeploymentAdapter(
+    new ShellDeploymentAdapter({
+      command: loaded.config.command,
+      ...(typeof loaded.config.shell === 'string' ? { shell: loaded.config.shell } : {}),
+      ...(typeof loaded.config.timeout_ms === 'number'
+        ? { timeoutMs: loaded.config.timeout_ms }
+        : {}),
+      ...(typeof loaded.config.cwd === 'string' ? { cwd: loaded.config.cwd } : {}),
+      ...(loaded.config.env ? { env: loaded.config.env } : {}),
+    })
+  );
+  logger.success(`[deployment-adapter] installed ShellDeploymentAdapter from ${loaded.path}`);
+  return true;
+}
+const Ajv = (AjvModule as any).default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true });
+const DEPLOYMENT_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/deployment-adapter-config.schema.json'
+);
+
+let deploymentConfigValidateFn: ValidateFunction | null = null;
+
+function ensureDeploymentConfigValidator(): ValidateFunction {
+  if (deploymentConfigValidateFn) return deploymentConfigValidateFn;
+  deploymentConfigValidateFn = compileSchemaFromPath(ajv, DEPLOYMENT_CONFIG_SCHEMA_PATH);
+  return deploymentConfigValidateFn;
 }
