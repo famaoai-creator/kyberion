@@ -1,5 +1,10 @@
+/* eslint-disable no-restricted-imports -- foundation process wrapper; callers should use this instead of direct child_process */
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import { runtimeSupervisor, type RuntimeResourceKind, type RuntimeShutdownPolicy } from './runtime-supervisor.js';
+import {
+  runtimeSupervisor,
+  type RuntimeResourceKind,
+  type RuntimeShutdownPolicy,
+} from './runtime-supervisor.js';
 
 export interface ManagedProcessSpec {
   resourceId: string;

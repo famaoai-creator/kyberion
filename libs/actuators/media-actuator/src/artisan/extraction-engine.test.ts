@@ -1,6 +1,13 @@
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { generateNativePptx, generateNativeXlsx, pathResolver, safeExistsSync, safeMkdir, safeRmSync } from '@agent/core';
+import {
+  generateNativePptx,
+  generateNativeXlsx,
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+} from '@agent/core';
 import type { PptxDesignProtocol, XlsxDesignProtocol } from '@agent/core/media-contracts';
 import { extract } from './extraction-engine.js';
 
@@ -73,11 +80,30 @@ function createTestXlsxProtocol(): XlsxDesignProtocol {
       borders: [{}],
       numFmts: [],
       cellXfs: [
-        { font: { name: 'Yu Gothic', size: 11, scheme: 'minor' as const }, fill: { patternType: 'none' as const }, border: {} },
-        { font: { name: 'Yu Gothic', size: 11, bold: true, color: { rgb: '#FFFFFF' } }, fill: { patternType: 'solid' as const, fgColor: { rgb: '#1E3A5F' } }, border: {} },
+        {
+          font: { name: 'Yu Gothic', size: 11, scheme: 'minor' as const },
+          fill: { patternType: 'none' as const },
+          border: {},
+        },
+        {
+          font: { name: 'Yu Gothic', size: 11, bold: true, color: { rgb: '#FFFFFF' } },
+          fill: { patternType: 'solid' as const, fgColor: { rgb: '#1E3A5F' } },
+          border: {},
+        },
       ],
       dxfs: [],
-      namedStyles: [{ name: 'Normal', xfId: 0, builtinId: 0, style: { font: { name: 'Yu Gothic', size: 11, scheme: 'minor' as const }, fill: { patternType: 'none' as const }, border: {} } }],
+      namedStyles: [
+        {
+          name: 'Normal',
+          xfId: 0,
+          builtinId: 0,
+          style: {
+            font: { name: 'Yu Gothic', size: 11, scheme: 'minor' as const },
+            fill: { patternType: 'none' as const },
+            border: {},
+          },
+        },
+      ],
     },
     sharedStrings: [],
     definedNames: [],
@@ -144,20 +170,24 @@ describe('artisan extraction engine raw preservation', () => {
     const pptx = await extract(pptxPath, 'all', { preserveRaw: true });
     const xlsx = await extract(xlsxPath, 'all', { preserveRaw: true });
 
-    expect(pptx.layers.raw).toEqual(expect.objectContaining({
-      version: '3.0.0',
-      slides: expect.any(Array),
-      rawThemeXml: expect.any(String),
-    }));
-    expect(pptx.layers.raw.slides[0]).toEqual(expect.objectContaining({
-      rawSlideXml: expect.any(String),
-    }));
-    expect(xlsx.layers.raw).toEqual(expect.objectContaining({
-      version: '1.0.0',
-      sheets: expect.any(Array),
-      styles: expect.objectContaining({
-        rawStylesXml: expect.any(String),
-      }),
-    }));
+    expect(pptx.layers.raw).toEqual(
+      expect.objectContaining({
+        version: '3.0.0',
+        slides: expect.any(Array),
+        rawThemeXml: expect.any(String),
+      })
+    );
+    expect(pptx.layers.raw.slides[0]).toEqual(
+      expect.objectContaining({
+        rawSlideXml: expect.any(String),
+      })
+    );
+    expect(xlsx.layers.raw).toEqual(
+      expect.objectContaining({
+        version: '1.0.0',
+        sheets: expect.any(Array),
+        theme: expect.any(Object),
+      })
+    );
   });
 });

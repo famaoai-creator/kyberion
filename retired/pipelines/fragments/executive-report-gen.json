@@ -15,10 +15,7 @@
       "produces": { "channel": "report_result", "type": "ShellResult" },
       "params": {
         "command": "node",
-        "args": [
-          "dist/scripts/report_generator.js",
-          "--output", "{{output_file}}"
-        ]
+        "args": ["dist/scripts/report_generator.js", "--output", "{{output_file}}"]
       }
     },
     {

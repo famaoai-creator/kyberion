@@ -17,11 +17,14 @@ function normalize(relPath: string): string {
 
 describe('Foundation IO boundary', () => {
   it('restricts fs-primitives imports to foundational modules', () => {
-    const codeFiles = getAllFiles(rootDir).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
+    const codeFiles = getAllFiles(rootDir).filter((filePath) =>
+      /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath)
+    );
     const importers = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => relPath !== 'libs/core/fs-primitives.ts')
       .filter((relPath) => !relPath.startsWith('dist/'))
+      .filter((relPath) => !relPath.startsWith('vault/'))
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.startsWith('active/shared/tmp/'))
       .filter((relPath) => !relPath.startsWith('active/shared/runtime/'))

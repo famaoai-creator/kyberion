@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "inspect-mission-inventory",
+  "version": "1.0.0",
+  "name": "Inspect Mission Inventory",
+  "description": "List the current mission inventory through the mission controller.",
+  "steps": [
+    {
+      "id": "list_missions",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "mission_inventory_output", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/scripts/mission_controller.js list",
+        "export_as": "mission_inventory_output"
+      }
+    },
+    {
+      "id": "log_missions",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "mission_inventory_output",
+      "params": {
+        "message": "{{mission_inventory_output}}"
+      }
+    }
+  ]
+}

@@ -21,20 +21,30 @@ import {
   safeExecResult,
   buildNextActionFromError,
   formatNextAction,
+  runJanitor,
+  checkActuatorCapabilities,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import { markRouterActive, markRouterInactive, resetRouterSync } from '@agent/core/blackhole-routing-guard';
+import {
+  markRouterActive,
+  markRouterInactive,
+  resetRouterSync,
+} from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import { derivePipelineStatus, type PipelineAdfStep, ROLE_FROM_TYPE } from '@agent/core/pipeline-contract';
+import {
+  derivePipelineStatus,
+  type PipelineAdfStep,
+  ROLE_FROM_TYPE,
+} from '@agent/core/pipeline-contract';
 
 /** Resolve the effective step type from role/type. role takes precedence. */
 function resolveStepType(step: PipelineAdfStep): string {
   if (step.role) {
-    if (step.role === 'source')    return 'capture';
+    if (step.role === 'source') return 'capture';
     if (step.role === 'transform') return 'transform';
-    if (step.role === 'sink')      return 'apply';
-    if (step.role === 'gate')      return 'control';
+    if (step.role === 'sink') return 'apply';
+    if (step.role === 'gate') return 'control';
   }
   return step.type ?? 'apply';
 }
@@ -59,7 +69,7 @@ export interface FlowValidationError {
  */
 export function validateFlow(
   steps: PipelineAdfStep[],
-  initialCtx: Record<string, unknown> = {},
+  initialCtx: Record<string, unknown> = {}
 ): FlowValidationError[] {
   const available = new Set<string>(Object.keys(initialCtx));
   const errors: FlowValidationError[] = [];
@@ -67,9 +77,11 @@ export function validateFlow(
   for (const step of steps) {
     const id = step.id ?? step.op;
     const consumed = step.consumes
-      ? (Array.isArray(step.consumes) ? step.consumes : [step.consumes])
+      ? Array.isArray(step.consumes)
+        ? step.consumes
+        : [step.consumes]
       : [];
-    const missing = consumed.filter(ch => !available.has(ch));
+    const missing = consumed.filter((ch) => !available.has(ch));
     if (missing.length > 0) errors.push({ stepId: id, missing });
 
     // Register what this step produces for downstream steps
@@ -89,7 +101,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
 
-type DispatchFunc = (op: string, params: any, ctx: Record<string, unknown>, type?: string, trace?: TraceContext) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
+type DispatchFunc = (
+  op: string,
+  params: any,
+  ctx: Record<string, unknown>,
+  type?: string,
+  trace?: TraceContext
+) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
 const dispatchCache: Record<string, DispatchFunc> = {};
 const moduleCache: Record<string, any> = {};
@@ -103,7 +121,7 @@ interface RunStepsOptions {
 
 function resolveParamsRecursive(params: any, ctx: any): any {
   if (Array.isArray(params)) {
-    return params.map(item => resolveParamsRecursive(item, ctx));
+    return params.map((item) => resolveParamsRecursive(item, ctx));
   }
   if (params && typeof params === 'object') {
     return Object.fromEntries(
@@ -115,7 +133,7 @@ function resolveParamsRecursive(params: any, ctx: any): any {
 
 async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
   if (dispatchCache[domain]) return dispatchCache[domain];
-  
+
   if (domain === 'reasoning') {
     dispatchCache[domain] = async (op, params, ctx, type, _trace?) => {
       const { getReasoningBackend } = await import('@agent/core');
@@ -132,31 +150,37 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             : params.context || ctx;
         const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}`;
         const rawResponse = shouldUseSubagentForReasoningStep(params)
-          ? await backend.delegateTask(String(resolvedInstruction || 'Analyze the context.'), JSON.stringify(resolvedContext))
-          : await withRetry(
-              () => backend.prompt(prompt),
-              {
-                maxRetries: 2,
-                initialDelayMs: 3000,
-                maxDelayMs: 15000,
-                factor: 2,
-                shouldRetry: (err: Error) =>
-                  err.message.includes('timed out') ||
-                  err.message.includes('INVALID_STREAM') ||
-                  err.message.includes('empty response') ||
-                  err.message.includes('missing "response"'),
-                onRetry: (err: Error, attempt: number) =>
-                  logger.warn(`  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`),
-              },
-            );
-        return { handled: true, ctx: { ...ctx, [params.export_as || 'last_reasoning']: rawResponse } };
+          ? await backend.delegateTask(
+              String(resolvedInstruction || 'Analyze the context.'),
+              JSON.stringify(resolvedContext)
+            )
+          : await withRetry(() => backend.prompt(prompt), {
+              maxRetries: 2,
+              initialDelayMs: 3000,
+              maxDelayMs: 15000,
+              factor: 2,
+              shouldRetry: (err: Error) =>
+                err.message.includes('timed out') ||
+                err.message.includes('INVALID_STREAM') ||
+                err.message.includes('empty response') ||
+                err.message.includes('missing "response"'),
+              onRetry: (err: Error, attempt: number) =>
+                logger.warn(
+                  `  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`
+                ),
+            });
+        return {
+          handled: true,
+          ctx: { ...ctx, [params.export_as || 'last_reasoning']: rawResponse },
+        };
       }
       return { handled: false, ctx };
     };
     return dispatchCache[domain];
   }
 
-  const { resolveProviderCapabilityId, invokeProviderCapability } = await import('@agent/core/provider-bridge');
+  const { resolveProviderCapabilityId, invokeProviderCapability } =
+    await import('@agent/core/provider-bridge');
 
   dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
     const resolvedId = resolveProviderCapabilityId(domain, op);
@@ -168,8 +192,13 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
         context: ctx,
       });
       let parsed = result;
-      try { parsed = JSON.parse(result); } catch {}
-      return { handled: true, ctx: { ...ctx, [params.export_as || 'last_provider_result']: parsed } };
+      try {
+        parsed = JSON.parse(result);
+      } catch {}
+      return {
+        handled: true,
+        ctx: { ...ctx, [params.export_as || 'last_provider_result']: parsed },
+      };
     }
 
     let result = { handled: false, ctx };
@@ -188,11 +217,11 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
         moduleCache[domain] = await import(pathToFileURL(entry).href);
       }
       const mod = moduleCache[domain];
-      
+
       if (typeof mod.dispatchDecisionOp === 'function') {
         result = await mod.dispatchDecisionOp(op, params, ctx);
       }
-      
+
       if (!result.handled && typeof mod.handleAction === 'function') {
         try {
           const actionResult = await mod.handleAction({
@@ -204,26 +233,35 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
           });
           result = {
             handled: true,
-            ctx: actionResult && typeof actionResult === 'object'
-              ? { ...ctx, ...(actionResult as Record<string, unknown>) }
-              : { ...ctx, [params.export_as || 'last_action_result']: actionResult },
+            ctx:
+              actionResult && typeof actionResult === 'object'
+                ? { ...ctx, ...(actionResult as Record<string, unknown>) }
+                : { ...ctx, [params.export_as || 'last_action_result']: actionResult },
           };
         } catch (err: any) {
           // If the error is an actual execution failure (like SECURITY, File not found, etc.),
           // throw it immediately to trigger autonomous repair.
           // Only fallback to legacy direct action if the actuator doesn't support 'pipeline' action.
-          if (!err.message.toLowerCase().includes('unsupported') && !err.message.toLowerCase().includes('not a function')) {
+          if (
+            !err.message.toLowerCase().includes('unsupported') &&
+            !err.message.toLowerCase().includes('not a function')
+          ) {
             throw err;
           }
           try {
             const resolvedParams = resolveParamsRecursive(params, ctx);
-            const directResult = await mod.handleAction({ 
-              action: op, 
-              params: { ...resolvedParams, context: ctx }
+            const directResult = await mod.handleAction({
+              action: op,
+              params: { ...resolvedParams, context: ctx },
             });
-            result = { handled: true, ctx: { ...ctx, [params.export_as || 'last_action_result']: directResult } };
+            result = {
+              handled: true,
+              ctx: { ...ctx, [params.export_as || 'last_action_result']: directResult },
+            };
           } catch (err2: any) {
-            logger.info(`  [SYS_PIPELINE] Actuator fallback failed for domain: ${domain}, op: ${op}. Error: ${err2.message}`);
+            logger.info(
+              `  [SYS_PIPELINE] Actuator fallback failed for domain: ${domain}, op: ${op}. Error: ${err2.message}`
+            );
             throw err; // Critical: Re-throw to trigger autonomous repair
           }
         }
@@ -243,9 +281,11 @@ export function normalizePipelineOp(op: string): string {
     if (domain === 'project' && action === 'list') return 'system:list_projects';
     if (domain === 'knowledge' && action === 'list') return 'system:list_knowledge';
     if (domain === 'capability' && action === 'list') return 'system:list_capabilities';
-    if (domain === 'agent' && (action === 'list-manifests' || action === 'list_manifests')) return 'agent:list_manifests';
-    if (domain === 'agent' && (action === 'list-runtimes' || action === 'list_runtimes')) return 'agent:list_runtimes';
-    
+    if (domain === 'agent' && (action === 'list-manifests' || action === 'list_manifests'))
+      return 'agent:list_manifests';
+    if (domain === 'agent' && (action === 'list-runtimes' || action === 'list_runtimes'))
+      return 'agent:list_runtimes';
+
     if (domain === 'mission') return `system:${action}`;
     return op;
   }
@@ -256,6 +296,36 @@ export function normalizePipelineOp(op: string): string {
 function resolveLogMessage(params: Record<string, unknown>, ctx: Record<string, unknown>): string {
   const template = params.message ?? params.template ?? params.text ?? '';
   return String(resolveVars(template, ctx));
+}
+
+function resolveActuatorManifestPath(
+  domain: string
+): { actuatorId: string; manifestPath: string } | null {
+  const candidates = [`${domain}-actuator`, domain];
+  for (const actuatorId of candidates) {
+    const manifestPath = pathResolver.rootResolve(
+      path.join('libs/actuators', actuatorId, 'manifest.json')
+    );
+    if (safeExistsSync(manifestPath)) return { actuatorId, manifestPath };
+  }
+  return null;
+}
+
+async function assertPipelineStepCapabilityAvailable(
+  domain: string,
+  action: string
+): Promise<void> {
+  const manifest = resolveActuatorManifestPath(domain);
+  if (!manifest) return;
+  const status = await checkActuatorCapabilities(manifest.actuatorId, manifest.manifestPath);
+  const capability = status.capabilities.find((entry) => entry.op === action);
+  if (!capability || capability.available) return;
+  const prereqText = capability.prerequisites?.length
+    ? ` Prerequisites: ${capability.prerequisites.join(' | ')}`
+    : '';
+  throw new Error(
+    `capability ${domain}:${action} unavailable: ${capability.reason || 'runtime prerequisite missing'}.${prereqText}`
+  );
 }
 
 function globToRegExp(pattern: string): RegExp {
@@ -279,7 +349,9 @@ function resolveFragmentPath(ref: string): string {
   }
   const normalized = ref.startsWith('./') ? ref.slice(2) : ref;
   const pipelinesDir = path.join(pathResolver.rootDir(), 'pipelines');
-  const relativeRef = normalized.startsWith('pipelines/') ? normalized.slice('pipelines/'.length) : normalized;
+  const relativeRef = normalized.startsWith('pipelines/')
+    ? normalized.slice('pipelines/'.length)
+    : normalized;
   const resolved = path.resolve(pipelinesDir, relativeRef);
   const rel = path.relative(pipelinesDir, resolved);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {
@@ -307,7 +379,7 @@ export function formatPipelineFailure(err: unknown): {
 
 function logNextActionForPipelineFailure(
   failure: ReturnType<typeof formatPipelineFailure>,
-  pipelinePath: string,
+  pipelinePath: string
 ) {
   const nextAction = buildNextActionFromError(failure.classification, {
     source: 'pipeline',
@@ -321,90 +393,99 @@ function logNextActionForPipelineFailure(
 export async function runSteps(
   steps: PipelineAdfStep[],
   initialCtx: Record<string, unknown> = {},
-  opts: RunStepsOptions = {},
+  opts: RunStepsOptions = {}
 ) {
   let ctx: Record<string, unknown> = { ...initialCtx };
   const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
   const shellBin = 'bash';
   const rootDir = pathResolver.rootDir();
-for (const step of steps) {
-  const stepStartedAtMs = Date.now();
-  const stepTraceBase = {
-    step_index: results.length,
-    step_id: step.id || step.op,
-    op: step.op,
-    ...(step.role ? { step_role: step.role } : step.type ? { step_type: step.type } : {}),
-  };
-  // Normalize: role → effective type for downstream dispatch
-  const effectiveType = resolveStepType(step);
-  opts.trace?.startSpan(step.op, {
-    ...stepTraceBase,
-  });
-  opts.trace?.addEvent('step.started', stepTraceBase);
-
-  let attempt = 0;
-  let stepSucceeded = false;
-  let lastError: any = null;
-  let currentNormalizedOp = step.op;
-  const finishStepTrace = (
-    eventName: string,
-    status: 'success' | 'failed' | 'skipped',
-    attributes: Record<string, string | number | boolean> = {},
-  ): void => {
-    opts.trace?.addEvent(eventName, {
+  for (const step of steps) {
+    const stepStartedAtMs = Date.now();
+    const stepTraceBase = {
+      step_index: results.length,
+      step_id: step.id || step.op,
+      op: step.op,
+      ...(step.role ? { step_role: step.role } : step.type ? { step_type: step.type } : {}),
+    };
+    // Normalize: role → effective type for downstream dispatch
+    const effectiveType = resolveStepType(step);
+    opts.trace?.startSpan(step.op, {
       ...stepTraceBase,
-      op: currentNormalizedOp,
-      status,
-      duration_ms: Date.now() - stepStartedAtMs,
-      ...attributes,
     });
-  };
+    opts.trace?.addEvent('step.started', stepTraceBase);
 
-  // ── before hooks ──────────────────────────────────────────────
-  if (step.hooks?.before?.length) {
-    const beforeDecision = await runStepHooks(step.hooks.before, ctx, 'before', loadActuatorDispatch);
-    if (beforeDecision === 'abort') {
-      results.push({ op: step.op, status: 'failed', error: 'aborted by before hook' });
-      finishStepTrace('step.aborted', 'failed');
-      opts.trace?.endSpan('error', 'before hook abort');
-      return { status: 'failed', results, context: ctx };
-    }
-    if (beforeDecision === 'skip') {
-      results.push({ op: step.op, status: 'success' });
-      finishStepTrace('step.skipped', 'skipped');
-      opts.trace?.endSpan('ok');
-      continue;
-    }
-  }
+    let attempt = 0;
+    let stepSucceeded = false;
+    let lastError: any = null;
+    let currentNormalizedOp = step.op;
+    const finishStepTrace = (
+      eventName: string,
+      status: 'success' | 'failed' | 'skipped',
+      attributes: Record<string, string | number | boolean> = {}
+    ): void => {
+      opts.trace?.addEvent(eventName, {
+        ...stepTraceBase,
+        op: currentNormalizedOp,
+        status,
+        duration_ms: Date.now() - stepStartedAtMs,
+        ...attributes,
+      });
+    };
 
-  while (attempt < 2 && !stepSucceeded) {
-    // CRITICAL: Resolve normalizedOp, domain, action, and params INSIDE the attempt loop
-    // so that repaired step definitions are actually used during the retry.
-    const normalizedOp = normalizePipelineOp(step.op);
-    currentNormalizedOp = normalizedOp;
-    const [domain, action] = normalizedOp.split(':');
-    // Bridge produces.channel → params.export_as so actuators (which read params.export_as)
-    // write to the correct ctx key when a step uses the v2 Typed Flow format.
-    const rawParams = (step.params || {}) as Record<string, unknown>;
-    const _producedChannel = step.produces
-      ? (typeof step.produces === 'string' ? step.produces : step.produces.channel)
-      : undefined;
-    const params = (_producedChannel && !rawParams.export_as)
-      ? { ...rawParams, export_as: _producedChannel }
-      : rawParams;
-    try {
-      if (domain === 'system' && action === 'log') {
-        logger.info(resolveLogMessage(params, ctx));
-      } else if (domain === 'system' && action === 'write_file') {
-          const enrichedCtx = { ...ctx, '$now': new Date().toISOString() };
+    // ── before hooks ──────────────────────────────────────────────
+    if (step.hooks?.before?.length) {
+      const beforeDecision = await runStepHooks(
+        step.hooks.before,
+        ctx,
+        'before',
+        loadActuatorDispatch
+      );
+      if (beforeDecision === 'abort') {
+        results.push({ op: step.op, status: 'failed', error: 'aborted by before hook' });
+        finishStepTrace('step.aborted', 'failed');
+        opts.trace?.endSpan('error', 'before hook abort');
+        return { status: 'failed', results, context: ctx };
+      }
+      if (beforeDecision === 'skip') {
+        results.push({ op: step.op, status: 'success' });
+        finishStepTrace('step.skipped', 'skipped');
+        opts.trace?.endSpan('ok');
+        continue;
+      }
+    }
+
+    while (attempt < 2 && !stepSucceeded) {
+      // CRITICAL: Resolve normalizedOp, domain, action, and params INSIDE the attempt loop
+      // so that repaired step definitions are actually used during the retry.
+      const normalizedOp = normalizePipelineOp(step.op);
+      currentNormalizedOp = normalizedOp;
+      const [domain, action] = normalizedOp.split(':');
+      // Bridge produces.channel → params.export_as so actuators (which read params.export_as)
+      // write to the correct ctx key when a step uses the v2 Typed Flow format.
+      const rawParams = (step.params || {}) as Record<string, unknown>;
+      const _producedChannel = step.produces
+        ? typeof step.produces === 'string'
+          ? step.produces
+          : step.produces.channel
+        : undefined;
+      const params =
+        _producedChannel && !rawParams.export_as
+          ? { ...rawParams, export_as: _producedChannel }
+          : rawParams;
+      try {
+        if (domain === 'system' && action === 'log') {
+          logger.info(resolveLogMessage(params, ctx));
+        } else if (domain === 'system' && action === 'write_file') {
+          const enrichedCtx = { ...ctx, $now: new Date().toISOString() };
           const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
           const writePath = nodePath.resolve(rootDir, String(resolvedParams.path ?? ''));
           const rawContent = resolvedParams.content;
-          const contentStr = typeof rawContent === 'string'
-            ? rawContent
-            : rawContent !== undefined
-              ? JSON.stringify(rawContent, null, 2)
-              : '';
+          const contentStr =
+            typeof rawContent === 'string'
+              ? rawContent
+              : rawContent !== undefined
+                ? JSON.stringify(rawContent, null, 2)
+                : '';
           const dir = nodePath.dirname(writePath);
           if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
           safeWriteFile(writePath, contentStr);
@@ -417,7 +498,7 @@ for (const step of steps) {
             Object.entries((params.env || {}) as Record<string, unknown>).map(([key, value]) => [
               key,
               typeof value === 'string' ? String(resolveVars(value, ctx)) : String(value),
-            ]),
+            ])
           ) as Record<string, string>;
           const timeoutMs = typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined;
           const output = safeExec(shellBin, ['-c', cmd], {
@@ -425,8 +506,16 @@ for (const step of steps) {
             env,
             ...(timeoutMs ? { timeoutMs } : {}),
           }).trim();
+          let parsedOutput: unknown = output;
+          if (output) {
+            try {
+              parsedOutput = JSON.parse(output);
+            } catch {
+              parsedOutput = output;
+            }
+          }
           if (params.export_as && typeof params.export_as === 'string') {
-            ctx = { ...ctx, [params.export_as]: output };
+            ctx = { ...ctx, [params.export_as]: parsedOutput };
           }
           // Track BlackHole mic routing state for SIGINT cleanup.
           if (cmd.includes('blackhole_audio_router.py')) {
@@ -468,32 +557,49 @@ for (const step of steps) {
           if (!fragmentRef) throw new Error('core:include requires "fragment" param');
           const fragmentPath = resolveFragmentPath(fragmentRef);
           if (!safeExistsSync(fragmentPath)) {
-            throw new Error(`core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`);
+            throw new Error(
+              `core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`
+            );
           }
           const includeStack = opts._includeStack ?? new Set<string>();
           if (includeStack.has(fragmentPath)) {
-            throw new Error(`core:include: circular reference detected — ${fragmentRef} is already in the include chain`);
+            throw new Error(
+              `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
+            );
           }
           const fragmentRaw = String(safeReadFile(fragmentPath, { encoding: 'utf8' }));
           const fragmentJson = (() => {
-            try { return JSON.parse(fragmentRaw); } catch { /* fall through */ }
+            try {
+              return JSON.parse(fragmentRaw);
+            } catch {
+              /* fall through */
+            }
             const repaired = tryRepairJson(fragmentRaw);
             if (repaired !== null) {
               logger.warn(`[pipeline] Auto-repaired malformed JSON in fragment: ${fragmentRef}`);
               return repaired;
             }
-            throw new Error(`core:include: fragment at ${fragmentRef} contains invalid JSON that could not be repaired`);
+            throw new Error(
+              `core:include: fragment at ${fragmentRef} contains invalid JSON that could not be repaired`
+            );
           })();
-          const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({ ...s, params: s.params || {} }));
-          const inlineCtx: Record<string, unknown> = params.context && typeof params.context === 'object'
-            ? Object.fromEntries(
-                Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
-                  k,
-                  typeof v === 'string' ? resolveVars(v, ctx) : v,
-                ]),
-              )
-            : {};
-          const childOpts: RunStepsOptions = { ...opts, _includeStack: new Set([...includeStack, fragmentPath]) };
+          const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
+            ...s,
+            params: s.params || {},
+          }));
+          const inlineCtx: Record<string, unknown> =
+            params.context && typeof params.context === 'object'
+              ? Object.fromEntries(
+                  Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
+                    k,
+                    typeof v === 'string' ? resolveVars(v, ctx) : v,
+                  ])
+                )
+              : {};
+          const childOpts: RunStepsOptions = {
+            ...opts,
+            _includeStack: new Set([...includeStack, fragmentPath]),
+          };
           const nested = await runSteps(fragmentSteps, { ...ctx, ...inlineCtx }, childOpts);
           ctx = nested.context;
           results.push(...nested.results);
@@ -503,6 +609,12 @@ for (const step of steps) {
         } else if (domain === 'core' && action === 'wait') {
           const ms = Number(resolveVars(params.duration_ms || params.ms || 1000, ctx));
           await new Promise((resolve) => setTimeout(resolve, ms));
+        } else if (domain === 'core' && (action === 'run_janitor' || action === 'run-janitor')) {
+          const dryRunParam = resolveVars(params.dry_run ?? params.dryRun ?? true, ctx);
+          const dryRun = dryRunParam === true || dryRunParam === 'true';
+          const report = runJanitor({ dryRun });
+          const exportKey = resolveExportKey(step, 'janitor_report');
+          ctx = { ...ctx, [exportKey]: report };
         } else if (domain === 'core' && action === 'transform') {
           const { Buffer } = await import('node:buffer');
           const vm = await import('node:vm');
@@ -516,8 +628,11 @@ for (const step of steps) {
             input,
             ctx: { ...ctx },
             console: {
-              log: (...args: any[]) => logger.info(`[TRANSFORM-LOG] ${args.map(a => typeof a === 'object' ? util.inspect(a) : a).join(' ')}`),
-            }
+              log: (...args: any[]) =>
+                logger.info(
+                  `[TRANSFORM-LOG] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
+                ),
+            },
           };
           vm.createContext(sandbox);
           const result = await new vm.Script(wrappedScript).runInContext(sandbox);
@@ -537,6 +652,7 @@ for (const step of steps) {
               });
             }
           }
+          await assertPipelineStepCapabilityAvailable(domain, action);
           const dispatch = await loadActuatorDispatch(domain);
           const result = await dispatch(action, params, ctx, effectiveType, opts.trace);
           if (!result.handled) {
@@ -546,14 +662,20 @@ for (const step of steps) {
           // CRITICAL: Safety check for source (capture) ops.
           // Resolve export key via produces > params.export_as > default.
           if (effectiveType === 'capture') {
-             const exportKey = resolveExportKey(step, 'last_capture');
-             const actualCtx = (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx)
-                               ? (result.ctx as any).context : result.ctx;
-             const data = actualCtx[exportKey];
-             if (data === undefined) {
-                logger.warn(`  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`);
-                throw new Error(`Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`);
-             }
+            const exportKey = resolveExportKey(step, 'last_capture');
+            const actualCtx =
+              result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx
+                ? (result.ctx as any).context
+                : result.ctx;
+            const data = actualCtx[exportKey];
+            if (data === undefined) {
+              logger.warn(
+                `  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`
+              );
+              throw new Error(
+                `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`
+              );
+            }
           }
 
           if (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx) {
@@ -566,31 +688,41 @@ for (const step of steps) {
       } catch (err: any) {
         lastError = err;
         const failure = classifyError(err);
-        
+
         // Don't repair if we already tried and the error message didn't change (prevents loops)
         if (attempt === 0 && failure.repairAction) {
-          logger.warn(`  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`);
+          logger.warn(
+            `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
+          );
           const repaired = await attemptAutonomousRepair(step, failure, ctx, opts.pipelinePath!);
           if (repaired) {
-            logger.success(`  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`);
-            
+            logger.success(
+              `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
+            );
+
             try {
               // Reload fully from disk to get the REPAIRED definition
               const refreshedPipeline = readValidatedPipelineAdf(opts.pipelinePath!);
-              const refreshedStep = refreshedPipeline.steps?.find((s: any) => s.id === step.id || s.op === step.op);
-              
+              const refreshedStep = refreshedPipeline.steps?.find(
+                (s: any) => s.id === step.id || s.op === step.op
+              );
+
               if (refreshedStep) {
                 // Update the step object in place for the NEXT iteration of the while loop
                 step.op = refreshedStep.op;
                 step.params = refreshedStep.params;
-                
-                logger.info(`  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${step.params.path}`);
-                
+
+                logger.info(
+                  `  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${step.params.path}`
+                );
+
                 attempt++;
                 continue; // This will re-evaluate normalizedOp/domain/action/params with NEW values
               }
             } catch (reloadErr: any) {
-              logger.warn(`  [SYS_PIPELINE] Failed to reload ADF after repair: ${reloadErr.message}.`);
+              logger.warn(
+                `  [SYS_PIPELINE] Failed to reload ADF after repair: ${reloadErr.message}.`
+              );
             }
           }
         }
@@ -601,9 +733,18 @@ for (const step of steps) {
     if (stepSucceeded) {
       // ── after hooks ─────────────────────────────────────────────
       if (step.hooks?.after?.length) {
-        const afterDecision = await runStepHooks(step.hooks.after, ctx, 'after', loadActuatorDispatch);
+        const afterDecision = await runStepHooks(
+          step.hooks.after,
+          ctx,
+          'after',
+          loadActuatorDispatch
+        );
         if (afterDecision === 'abort') {
-          results.push({ op: currentNormalizedOp, status: 'failed', error: 'aborted by after hook' });
+          results.push({
+            op: currentNormalizedOp,
+            status: 'failed',
+            error: 'aborted by after hook',
+          });
           finishStepTrace('step.aborted', 'failed');
           opts.trace?.endSpan('error', 'after hook abort');
           return { status: 'failed', results, context: ctx };
@@ -629,12 +770,19 @@ for (const step of steps) {
   return { status: derivePipelineStatus(results), results, context: ctx };
 }
 
-async function attemptAutonomousRepair(step: PipelineAdfStep, failure: any, ctx: any, pipelinePath: string): Promise<boolean> {
+async function attemptAutonomousRepair(
+  step: PipelineAdfStep,
+  failure: any,
+  ctx: any,
+  pipelinePath: string
+): Promise<boolean> {
   try {
     const { getReasoningBackend } = await import('@agent/core');
     const backend = getReasoningBackend();
 
-    const repairHint = failure.repairAction || 'Investigate the error and the pipeline ADF structure to identify a potential fix.';
+    const repairHint =
+      failure.repairAction ||
+      'Investigate the error and the pipeline ADF structure to identify a potential fix.';
 
     const instruction = `
 The following pipeline step failed in Kyberion:
@@ -662,7 +810,9 @@ Once finished, provide a brief summary of the changes you applied to fix the pip
     try {
       readValidatedPipelineAdf(pipelinePath);
     } catch (validationErr: any) {
-      logger.warn(`  [SYS_PIPELINE:REPAIR] Sub-agent finished but ADF is still invalid: ${validationErr.message}`);
+      logger.warn(
+        `  [SYS_PIPELINE:REPAIR] Sub-agent finished but ADF is still invalid: ${validationErr.message}`
+      );
       return false;
     }
     return true;
@@ -689,7 +839,11 @@ export async function main() {
 
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
-    .option('context', { alias: 'c', type: 'string', describe: 'JSON string merged into pipeline.context (overrides)' })
+    .option('context', {
+      alias: 'c',
+      type: 'string',
+      describe: 'JSON string merged into pipeline.context (overrides)',
+    })
     .parseSync();
 
   const pipeline = readValidatedPipelineAdf(argv.input as string);
@@ -709,7 +863,7 @@ export async function main() {
   const missionId = firstNonEmpty(
     overrideContext.mission_id as string | undefined,
     baseContext.mission_id as string | undefined,
-    process.env.MISSION_ID,
+    process.env.MISSION_ID
   );
   const autoContext: Record<string, unknown> = {};
   // Propagate missionId to env so tier-guard can resolve ${MISSION_ID} in default_allow paths.
@@ -720,11 +874,13 @@ export async function main() {
     const missionPath = findMissionPath(missionId);
     const evidenceDir = missionEvidenceDir(missionId);
     if (missionPath) {
-      autoContext.mission_dir = nodePath.relative(pathResolver.rootDir(), missionPath) || missionPath;
+      autoContext.mission_dir =
+        nodePath.relative(pathResolver.rootDir(), missionPath) || missionPath;
       autoContext.mission_tier = nodePath.basename(nodePath.dirname(missionPath));
     }
     if (evidenceDir) {
-      autoContext.mission_evidence_dir = nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
+      autoContext.mission_evidence_dir =
+        nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
     }
   }
   autoContext.browser_session_id = `${pipeline.pipeline_id || path.basename(String(argv.input), path.extname(String(argv.input)))}`;
@@ -754,7 +910,9 @@ export async function main() {
   logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
 
   const pipelineId = String(
-    pipeline.pipeline_id || pipeline.id || path.basename(String(argv.input), path.extname(String(argv.input))),
+    pipeline.pipeline_id ||
+      pipeline.id ||
+      path.basename(String(argv.input), path.extname(String(argv.input)))
   );
   const trace = new TraceContext(`pipeline:${pipelineId}`, {
     ...(missionId ? { missionId } : {}),
@@ -763,29 +921,36 @@ export async function main() {
   trace.addArtifact('file', String(argv.input), 'Pipeline ADF input');
 
   try {
-    const stepsToRun = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
+    const stepsToRun = (pipeline.steps || []).map((step) => ({
+      ...step,
+      params: step.params || {},
+    }));
     // Typed Flow: validate channel integrity before execution
     const flowErrors = validateFlow(stepsToRun, mergedContext);
     if (flowErrors.length > 0) {
       for (const e of flowErrors) {
-        logger.warn(`[FLOW_VALIDATION] Step "${e.stepId}" consumes unknown channel(s): ${e.missing.join(', ')} — ensure a preceding step produces them.`);
+        logger.warn(
+          `[FLOW_VALIDATION] Step "${e.stepId}" consumes unknown channel(s): ${e.missing.join(', ')} — ensure a preceding step produces them.`
+        );
       }
     }
-    const result = await runSteps(
-      stepsToRun,
-      mergedContext,
-      { trace, pipelinePath: argv.input as string },
-    );
+    const result = await runSteps(stepsToRun, mergedContext, {
+      trace,
+      pipelinePath: argv.input as string,
+    });
     const persisted = finalizeAndPersist(trace);
     result.context.trace_summary = persisted.trace.rootSpan.status;
-    result.context.trace_persisted_path = nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
+    result.context.trace_persisted_path =
+      nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     const pipelineStatus = result.status === 'succeeded' ? 'succeeded' : 'failed';
     runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
     if (result.status === 'succeeded') {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
       if (autoContext.__pipeline_options && (autoContext.__pipeline_options as any).keep_alive) {
-        logger.info('   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.');
+        logger.info(
+          '   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.'
+        );
       } else {
         process.exit(0);
       }
@@ -799,13 +964,19 @@ export async function main() {
           failure.classification.category === 'permission_denied' &&
           !process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
         ) {
-          logger.warn(`⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`);
-          const fallbackResult = safeExecResult('node', ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath], {
-            cwd: pathResolver.rootDir(),
-            env: {
-              KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
-            },
-          });
+          logger.warn(
+            `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
+          );
+          const fallbackResult = safeExecResult(
+            'node',
+            ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath],
+            {
+              cwd: pathResolver.rootDir(),
+              env: {
+                KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
+              },
+            }
+          );
           if (fallbackResult.status === 0) {
             logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
             process.exit(0);
@@ -828,13 +999,19 @@ export async function main() {
       failure.classification.category === 'permission_denied' &&
       !process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
     ) {
-      logger.warn(`⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`);
-      const fallbackResult = safeExecResult('node', ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath], {
-        cwd: pathResolver.rootDir(),
-        env: {
-          KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
-        },
-      });
+      logger.warn(
+        `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
+      );
+      const fallbackResult = safeExecResult(
+        'node',
+        ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath],
+        {
+          cwd: pathResolver.rootDir(),
+          env: {
+            KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
+          },
+        }
+      );
       if (fallbackResult.status === 0) {
         logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
         process.exit(0);
@@ -850,17 +1027,20 @@ export async function main() {
     });
     const persisted = finalizeAndPersist(trace);
     runFeedbackLoop(pipelineId, 'failed', persisted.trace);
-    logger.info(`   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`);
+    logger.info(
+      `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
+    );
     logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
     logNextActionForPipelineFailure(failure, String(argv.input));
     process.exit(1);
   }
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirectRun =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isDirectRun) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

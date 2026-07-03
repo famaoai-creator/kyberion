@@ -167,6 +167,7 @@ In practice this means:
 - `@agent/core` subpath imports are explicit and extensionless
 
 Reference:
+
 - `docs/PACKAGING_CONTRACT.md`
 
 ### Agent Runtime Supervisor
@@ -176,6 +177,10 @@ The operational front door for agent runtimes. It owns runtime ensure, ask, refr
 ### Service Runtime
 
 The governed lifecycle wrapper for long-lived services such as ComfyUI. It tracks probe availability, managed runtime paths, provisioning intent, and pinning separately from the service endpoint catalog.
+
+### Capability Boundary
+
+The canonical mapping from a user goal to the actuator that should own it; see [CAPABILITIES_GUIDE.md](../CAPABILITIES_GUIDE.md#capability-boundaries).
 
 ### Reflex
 

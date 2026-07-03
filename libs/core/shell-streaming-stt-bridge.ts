@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * ShellStreamingSpeechToTextBridge — pluggable subprocess adapter.
  *
@@ -57,14 +58,10 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
 
   async *transcribeStream(audio: AsyncIterable<AudioChunk>): AsyncIterable<TranscriptChunk> {
     const command = validateShellCommand(this.opts.command);
-    const proc: ChildProcessWithoutNullStreams = spawn(
-      command,
-      [...(this.opts.args ?? [])],
-      {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: buildSafeExecEnv(this.opts.env),
-      },
-    );
+    const proc: ChildProcessWithoutNullStreams = spawn(command, [...(this.opts.args ?? [])], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: buildSafeExecEnv(this.opts.env),
+    });
     let stderrTail = '';
     proc.stderr.on('data', (buf) => {
       stderrTail += buf.toString('utf8');
@@ -98,13 +95,17 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
           if (resolvers.length) resolvers.shift()!(chunk);
           else queue.push(chunk);
         } catch (err: any) {
-          logger.warn(`[shell-stt] non-JSON stdout: ${err?.message ?? err}; line="${line.slice(0, 200)}"`);
+          logger.warn(
+            `[shell-stt] non-JSON stdout: ${err?.message ?? err}; line="${line.slice(0, 200)}"`
+          );
         }
       }
     });
     proc.on('exit', (code) => {
       if (code !== 0) {
-        logger.warn(`[shell-stt] command "${command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`);
+        logger.warn(
+          `[shell-stt] command "${command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`
+        );
       }
       drained = true;
       while (resolvers.length) resolvers.shift()!(null);
@@ -148,7 +149,10 @@ export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): 
 export function installShellStreamingSttBridgeFromEnv(): { installed: boolean; reason?: string } {
   const command = process.env.KYBERION_STT_COMMAND;
   if (!command) return { installed: false, reason: 'KYBERION_STT_COMMAND not set' };
-  const args = (process.env.KYBERION_STT_ARGS ?? '').split(',').map((a) => a.trim()).filter(Boolean);
+  const args = (process.env.KYBERION_STT_ARGS ?? '')
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean);
   installShellStreamingSttBridge({ bridge_id: 'shell', command, args });
   return { installed: true };
 }

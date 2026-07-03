@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Shell Claude CLI Backend — spawns the local `claude` CLI in `-p --output-format json`
  * mode to run structured-output reasoning tasks. Designed for environments that
@@ -99,7 +100,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
           proposed_by: z.string(),
           content: z.string(),
           status: z.enum(['pending', 'survived', 'rejected']).optional(),
-        }),
+        })
       ),
     });
     const result = await this.runStructured({
@@ -134,10 +135,8 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
           status: z.enum(['pending', 'survived', 'rejected']),
           survived: z.boolean(),
           rejection_reason: z.string().optional(),
-          critiques: z
-            .array(z.object({ by: z.string(), content: z.string() }))
-            .optional(),
-        }),
+          critiques: z.array(z.object({ by: z.string(), content: z.string() })).optional(),
+        })
       ),
     });
     const result = await this.runStructured({
@@ -191,7 +190,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
           branch_id: z.string(),
           hypothesis_ref: z.string(),
           worktree_path: z.string(),
-        }),
+        })
       ),
     });
     const result = await this.runStructured({
@@ -223,7 +222,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
           first_failure_mode: z.string().nullable(),
           first_success_mode: z.string().nullable(),
           terminated_at_step: z.number().nullable(),
-        }),
+        })
       ),
     });
     return (await this.runStructured({
@@ -269,7 +268,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         'Source text:',
         input.sourceText,
         '',
-        input.priorDraft ? `Prior draft to refine:\n${JSON.stringify(input.priorDraft, null, 2)}` : '',
+        input.priorDraft
+          ? `Prior draft to refine:\n${JSON.stringify(input.priorDraft, null, 2)}`
+          : '',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -355,11 +356,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
-    const args = [
-      '-p',
-      `${instruction}\n\nContext: ${context ?? 'none'}`,
-      ...this.extraArgs,
-    ];
+    const args = ['-p', `${instruction}\n\nContext: ${context ?? 'none'}`, ...this.extraArgs];
     return this.spawnCli(args, '');
   }
 
@@ -373,10 +370,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * artifact generation without using the reasoning-only structured backend.
    */
   async runDocumentAgentTask(input: DocumentAgentTaskInput): Promise<string> {
-    const prompt = [
-      input.instruction.trim(),
-      input.context ? `Context: ${input.context}` : '',
-    ]
+    const prompt = [input.instruction.trim(), input.context ? `Context: ${input.context}` : '']
       .filter(Boolean)
       .join('\n\n');
 
@@ -396,10 +390,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * agent session.
    */
   async runBrowserAgentTask(input: BrowserAgentTaskInput): Promise<string> {
-    const prompt = [
-      input.instruction.trim(),
-      input.context ? `Context: ${input.context}` : '',
-    ]
+    const prompt = [input.instruction.trim(), input.context ? `Context: ${input.context}` : '']
       .filter(Boolean)
       .join('\n\n');
 
@@ -441,20 +432,24 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       cliResult = JSON.parse(stdout);
     } catch (err: any) {
       throw new Error(
-        `[shell-claude-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`,
+        `[shell-claude-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
       );
     }
     if (cliResult.is_error) {
-      throw new Error(`[shell-claude-cli] CLI reported error: ${cliResult.result ?? JSON.stringify(cliResult)}`);
+      throw new Error(
+        `[shell-claude-cli] CLI reported error: ${cliResult.result ?? JSON.stringify(cliResult)}`
+      );
     }
     const structured = cliResult.structured_output;
     if (structured === undefined) {
-      throw new Error(`[shell-claude-cli] CLI did not emit structured_output. Result: ${cliResult.result}`);
+      throw new Error(
+        `[shell-claude-cli] CLI did not emit structured_output. Result: ${cliResult.result}`
+      );
     }
     const parsed = params.schema.safeParse(structured);
     if (!parsed.success) {
       throw new Error(
-        `[shell-claude-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`,
+        `[shell-claude-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
       );
     }
     return parsed.data;
@@ -477,7 +472,11 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       child.on('close', (code) => {
         clearTimeout(timer);
         if (code !== 0) {
-          reject(new Error(`[shell-claude-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 500)}`));
+          reject(
+            new Error(
+              `[shell-claude-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 500)}`
+            )
+          );
           return;
         }
         resolve(stdout);
@@ -494,19 +493,23 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
 
 export function probeShellClaudeCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
-  options: { bin?: string; timeoutMs?: number } = {},
+  options: { bin?: string; timeoutMs?: number } = {}
 ): ShellClaudeCliAvailability {
   const bin = options.bin?.trim() || env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude';
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   try {
-    const result = spawnSync(bin, ['-p', 'Return the word ok.', '--output-format', 'json', '--model', 'opus'], {
-      encoding: 'utf8',
-      env: { ...process.env, ...env },
-      shell: false,
-      timeout: timeoutMs,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const result = spawnSync(
+      bin,
+      ['-p', 'Return the word ok.', '--output-format', 'json', '--model', 'opus'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, ...env },
+        shell: false,
+        timeout: timeoutMs,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
 
     if (result.error) {
       return { available: false, reason: result.error.message };
@@ -543,7 +546,7 @@ export async function runClaudeCliQuery<T>({
 }
 
 export function buildClaudeCliOptionsFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): ShellClaudeCliBackendOptions {
   const bin = env.KYBERION_CLAUDE_CLI_BIN?.trim();
   const model = env.KYBERION_CLAUDE_CLI_MODEL?.trim();
@@ -561,12 +564,12 @@ export function buildClaudeCliOptionsFromEnv(
 
 export function buildShellClaudeCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  probe: (env: NodeJS.ProcessEnv) => ShellClaudeCliAvailability = probeShellClaudeCliAvailability,
+  probe: (env: NodeJS.ProcessEnv) => ShellClaudeCliAvailability = probeShellClaudeCliAvailability
 ): ShellClaudeCliBackend | null {
   const availability = probe(env);
   if (!availability.available) {
     logger.warn(
-      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}`,
+      `[shell-claude-cli] backend unavailable (bin=${env.KYBERION_CLAUDE_CLI_BIN?.trim() || 'claude'}): ${availability.reason ?? 'failed health check'}`
     );
     return null;
   }
@@ -584,7 +587,7 @@ export function buildShellClaudeCliBackendFromEnv(
     ...(extraArgs ? { extraArgs } : {}),
   });
   logger.info(
-    `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`,
+    `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`
   );
   return backend;
 }

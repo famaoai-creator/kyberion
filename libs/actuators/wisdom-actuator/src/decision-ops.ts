@@ -104,6 +104,12 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function deriveReasoningMode(backendName: string, synthetic = false): 'placeholder' | 'model' {
+  if (synthetic) return 'placeholder';
+  const normalized = String(backendName || '').toLowerCase();
+  return normalized === 'stub' || normalized.endsWith('-stub') ? 'placeholder' : 'model';
+}
+
 function generateHeuristicId(): string {
   // Short ULID-ish id: time-ordered, url-safe.
   const time = Date.now().toString(36).toUpperCase();
@@ -122,7 +128,13 @@ export interface ExtractRequirementsOpInput {
   mission_id: string;
   project_name: string;
   source_path: string;
-  source_type?: 'call_recording' | 'call_transcript' | 'meeting_notes' | 'document_pack' | 'chat_log' | 'mixed';
+  source_type?:
+    | 'call_recording'
+    | 'call_transcript'
+    | 'meeting_notes'
+    | 'document_pack'
+    | 'chat_log'
+    | 'mixed';
   language?: string;
   customer_name?: string;
   customer_person_slug?: string;
@@ -131,12 +143,15 @@ export interface ExtractRequirementsOpInput {
 }
 
 export async function extractRequirementsOp(
-  input: ExtractRequirementsOpInput,
-): Promise<{ mission_id: string; version: string; draft_path: string; completeness: { passed: boolean; reasons: string[] } }> {
+  input: ExtractRequirementsOpInput
+): Promise<{
+  mission_id: string;
+  version: string;
+  draft_path: string;
+  completeness: { passed: boolean; reasons: string[] };
+}> {
   if (!input.mission_id || !input.project_name || !input.source_path) {
-    throw new Error(
-      '[extract_requirements] requires mission_id, project_name, and source_path',
-    );
+    throw new Error('[extract_requirements] requires mission_id, project_name, and source_path');
   }
   const backend = getReasoningBackend();
   const sourceAbs = pathResolver.rootResolve(input.source_path);
@@ -216,16 +231,14 @@ export async function extractDesignSpecOp(input: ExtractDesignSpecOpInput): Prom
   }
   const backend = getReasoningBackend();
   const requirementsPath =
-    input.requirements_draft_path
-      ?? `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
+    input.requirements_draft_path ??
+    `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
   const abs = pathResolver.rootResolve(requirementsPath);
   if (!safeExistsSync(abs)) {
     // Fall back to the store helper — may return null if evidence dir differs
     const fromStore = readRequirementsDraft(input.mission_id);
     if (!fromStore) {
-      throw new Error(
-        `[extract_design_spec] requirements draft not found at ${requirementsPath}`,
-      );
+      throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);
     }
     const extracted = await backend.extractDesignSpec({
       requirementsDraft: fromStore,
@@ -293,8 +306,13 @@ export async function extractTestPlanOp(input: ExtractTestPlanOpInput): Promise<
   const backend = getReasoningBackend();
   const requirementsDraft =
     readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path && safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), { encoding: 'utf8' }) as string)
+    (input.requirements_draft_path &&
+    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
+      ? JSON.parse(
+          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
+            encoding: 'utf8',
+          }) as string
+        )
       : null);
   if (!requirementsDraft) {
     throw new Error('[extract_test_plan] requirements draft not found');
@@ -302,7 +320,11 @@ export async function extractTestPlanOp(input: ExtractTestPlanOpInput): Promise<
   const designSpec =
     readDesignSpec(input.mission_id) ??
     (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(safeReadFile(pathResolver.rootResolve(input.design_spec_path), { encoding: 'utf8' }) as string)
+      ? JSON.parse(
+          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
+            encoding: 'utf8',
+          }) as string
+        )
       : undefined);
 
   const extracted = await backend.extractTestPlan({
@@ -324,7 +346,12 @@ export async function extractTestPlanOp(input: ExtractTestPlanOpInput): Promise<
 
   // Must-have FR ids for coverage check
   const mustHaveIds: string[] = Array.isArray((requirementsDraft as any).functional_requirements)
-    ? ((requirementsDraft as any).functional_requirements as Array<{ id: string; priority: string }>)
+    ? (
+        (requirementsDraft as any).functional_requirements as Array<{
+          id: string;
+          priority: string;
+        }>
+      )
         .filter((r) => r.priority === 'must')
         .map((r) => r.id)
     : [];
@@ -361,8 +388,13 @@ export async function decomposeIntoTasksOp(input: DecomposeIntoTasksOpInput): Pr
   const backend = getReasoningBackend();
   const requirementsDraft =
     readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path && safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), { encoding: 'utf8' }) as string)
+    (input.requirements_draft_path &&
+    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
+      ? JSON.parse(
+          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
+            encoding: 'utf8',
+          }) as string
+        )
       : null);
   if (!requirementsDraft) {
     throw new Error('[decompose_into_tasks] requirements draft not found');
@@ -370,7 +402,11 @@ export async function decomposeIntoTasksOp(input: DecomposeIntoTasksOpInput): Pr
   const designSpec =
     readDesignSpec(input.mission_id) ??
     (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(safeReadFile(pathResolver.rootResolve(input.design_spec_path), { encoding: 'utf8' }) as string)
+      ? JSON.parse(
+          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
+            encoding: 'utf8',
+          }) as string
+        )
       : undefined);
 
   const decomposed = await backend.decomposeIntoTasks({
@@ -411,7 +447,9 @@ export interface RegisterPresentationPreferenceProfileOpInput {
   registry_path?: string;
 }
 
-export async function registerPresentationPreferenceProfileOp(input: RegisterPresentationPreferenceProfileOpInput): Promise<{
+export async function registerPresentationPreferenceProfileOp(
+  input: RegisterPresentationPreferenceProfileOpInput
+): Promise<{
   profile_id: string;
   registry_path: string;
   default_profile_id: string;
@@ -419,15 +457,19 @@ export async function registerPresentationPreferenceProfileOp(input: RegisterPre
   const profile =
     input.profile ??
     (input.profile_path && safeExistsSync(pathResolver.rootResolve(input.profile_path))
-      ? JSON.parse(safeReadFile(pathResolver.rootResolve(input.profile_path), { encoding: 'utf8' }) as string)
+      ? JSON.parse(
+          safeReadFile(pathResolver.rootResolve(input.profile_path), { encoding: 'utf8' }) as string
+        )
       : null);
   if (!profile || typeof profile !== 'object') {
-    throw new Error('[register_presentation_preference_profile] requires a presentation-preference-profile');
+    throw new Error(
+      '[register_presentation_preference_profile] requires a presentation-preference-profile'
+    );
   }
 
   const registryPath = registerPresentationPreferenceProfile(
     profile as PresentationPreferenceProfile,
-    input.registry_path ? pathResolver.rootResolve(input.registry_path) : undefined,
+    input.registry_path ? pathResolver.rootResolve(input.registry_path) : undefined
   );
 
   return {
@@ -459,7 +501,7 @@ export function captureIntuition(input: CaptureIntuitionInput): {
 } {
   if (!input.decision || !input.anchor || !input.analogy) {
     throw new Error(
-      '[capture_intuition] requires decision, anchor, and analogy (the three Intuition Capture answers)',
+      '[capture_intuition] requires decision, anchor, and analogy (the three Intuition Capture answers)'
     );
   }
   const id = generateHeuristicId();
@@ -487,7 +529,9 @@ export function captureIntuition(input: CaptureIntuitionInput): {
 // _synthetic, warn logs when unregistered). The warnStub helper is preserved
 // for call sites that still need to mark bespoke stub paths.
 function warnStub(op: string, note?: string): void {
-  logger.warn(`[DECISION_OPS:STUB] ${op} executed in stub mode${note ? ` — ${note}` : ''}. Replace with LLM/voice integration before production use.`);
+  logger.warn(
+    `[DECISION_OPS:STUB] ${op} executed in stub mode${note ? ` — ${note}` : ''}. Replace with LLM/voice integration before production use.`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -503,10 +547,10 @@ export function stakeholderGridSort(nodes: any[]): any[] {
   const rank = (n: any): number => {
     const p = (n.power_level || n.power || 'low').toLowerCase();
     const i = (n.interest_level || n.interest || 'low').toLowerCase();
-    if (p === 'high' && i === 'high') return 0;  // manage closely
-    if (p === 'high' && i === 'low') return 1;   // keep satisfied
-    if (p === 'low' && i === 'high') return 2;   // keep informed
-    return 3;                                     // monitor
+    if (p === 'high' && i === 'high') return 0; // manage closely
+    if (p === 'high' && i === 'low') return 1; // keep satisfied
+    if (p === 'low' && i === 'high') return 2; // keep informed
+    return 3; // monitor
   };
   return [...nodes].sort((a, b) => rank(a) - rank(b));
 }
@@ -597,7 +641,9 @@ export function renderHypothesisReport(input: {
   if (generatedAt) lines.push(`- Generated at: ${generatedAt}`);
   lines.push(`- Personas: ${byPersona.size}`);
   lines.push(`- Total hypotheses: ${hypotheses.length}`);
-  lines.push(`- Survived: ${survivedCount} / Rejected: ${rejectedCount} / Pending: ${pendingCount}`);
+  lines.push(
+    `- Survived: ${survivedCount} / Rejected: ${rejectedCount} / Pending: ${pendingCount}`
+  );
   lines.push('');
 
   lines.push('## Hypotheses by persona');
@@ -630,13 +676,19 @@ export function renderHypothesisReport(input: {
   lines.push('## Summary');
   lines.push('');
   if (survivedCount > 0) {
-    lines.push(`${survivedCount} hypothes${survivedCount === 1 ? 'is' : 'es'} survived cross-critique and warrant further investigation.`);
+    lines.push(
+      `${survivedCount} hypothes${survivedCount === 1 ? 'is' : 'es'} survived cross-critique and warrant further investigation.`
+    );
   }
   if (rejectedCount > 0) {
-    lines.push(`${rejectedCount} hypothes${rejectedCount === 1 ? 'is was' : 'es were'} rejected — see \`dissent-log.json\` for revisit triggers.`);
+    lines.push(
+      `${rejectedCount} hypothes${rejectedCount === 1 ? 'is was' : 'es were'} rejected — see \`dissent-log.json\` for revisit triggers.`
+    );
   }
   if (pendingCount > 0) {
-    lines.push(`${pendingCount} hypothes${pendingCount === 1 ? 'is remains' : 'es remain'} pending (no critique pass yet).`);
+    lines.push(
+      `${pendingCount} hypothes${pendingCount === 1 ? 'is remains' : 'es remain'} pending (no critique pass yet).`
+    );
   }
   lines.push('');
 
@@ -654,19 +706,25 @@ export function computeReadinessMatrix(input: {
   proposal_ref?: string;
   deadline?: string;
   output_path: string;
-}): { readiness_score: number; recommendation: 'proceed' | 'delay' | 'redesign'; written_to: string } {
+}): {
+  readiness_score: number;
+  recommendation: 'proceed' | 'delay' | 'redesign';
+  written_to: string;
+} {
   const dirAbs = pathResolver.rootResolve(input.visits_dir);
   const files = safeExistsSync(dirAbs)
     ? getAllFiles(dirAbs).filter((f) => f.endsWith('.json'))
     : [];
 
-  const visits = files.map((f) => {
-    try {
-      return JSON.parse(safeReadFile(f, { encoding: 'utf8' }) as string);
-    } catch {
-      return null;
-    }
-  }).filter(Boolean);
+  const visits = files
+    .map((f) => {
+      try {
+        return JSON.parse(safeReadFile(f, { encoding: 'utf8' }) as string);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 
   const stanceWeight: Record<string, number> = {
     support: 100,
@@ -675,7 +733,10 @@ export function computeReadinessMatrix(input: {
     oppose: 0,
   };
 
-  const totalWeight = visits.reduce((sum: number, v: any) => sum + (stanceWeight[v.stance] ?? 30), 0);
+  const totalWeight = visits.reduce(
+    (sum: number, v: any) => sum + (stanceWeight[v.stance] ?? 30),
+    0
+  );
   const readinessScore = visits.length === 0 ? 0 : Math.round(totalWeight / visits.length);
 
   let recommendation: 'proceed' | 'delay' | 'redesign';
@@ -705,18 +766,20 @@ export function computeReadinessMatrix(input: {
  * Deterministic recommender that maps readiness_score to an action label.
  * No LLM — driven purely by the thresholds in readiness matrix output.
  */
-export function recommend(input: {
-  readiness_ref: string;
-  options?: string[];
-}): { choice: string; reason: string } {
+export function recommend(input: { readiness_ref: string; options?: string[] }): {
+  choice: string;
+  reason: string;
+} {
   const matrix = readJSON<any>(input.readiness_ref);
   const score = Number(matrix.readiness_score ?? 0);
-  const choice: string = matrix.recommendation || (
-    score >= 70 ? 'proceed' : score >= 40 ? 'delay' : 'redesign'
-  );
+  const choice: string =
+    matrix.recommendation || (score >= 70 ? 'proceed' : score >= 40 ? 'delay' : 'redesign');
   const allowed = input.options || ['proceed', 'delay', 'redesign'];
   if (!allowed.includes(choice)) {
-    return { choice: allowed[allowed.length - 1], reason: `score ${score} did not map to any allowed option; falling back` };
+    return {
+      choice: allowed[allowed.length - 1],
+      reason: `score ${score} did not map to any allowed option; falling back`,
+    };
   }
   return { choice, reason: `readiness_score=${score}` };
 }
@@ -806,8 +869,14 @@ export function pptxDiff(input: {
   for (const idx of Array.from(allIndices).sort((a, b) => a - b)) {
     const b = byIndexBefore.get(idx);
     const a = byIndexAfter.get(idx);
-    if (!b && a) { added.push(idx); continue; }
-    if (b && !a) { removed.push(idx); continue; }
+    if (!b && a) {
+      added.push(idx);
+      continue;
+    }
+    if (b && !a) {
+      removed.push(idx);
+      continue;
+    }
     if (!b || !a) continue;
 
     const beforeRuns = new Set(b.text_runs || []);
@@ -837,27 +906,29 @@ export async function a2aFanout(input: {
   min_hypotheses_per_persona: number;
   topic: string;
   output_path: string;
-}): Promise<{ written_to: string }> {
+}): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
   const backend = getReasoningBackend();
   const hypotheses = await backend.divergePersonas({
     topic: input.topic,
     personas: input.personas,
     minPerPersona: input.min_hypotheses_per_persona,
   });
+  const reasoningMode = deriveReasoningMode(backend.name);
   writeJSON(input.output_path, {
     topic: input.topic,
     hypotheses,
     generated_by: backend.name,
     generated_at: nowIso(),
+    reasoning_mode: reasoningMode,
   });
-  return { written_to: input.output_path };
+  return { written_to: input.output_path, reasoning_mode: reasoningMode };
 }
 
 export async function crossCritique(input: {
   source_path: string;
   personas: string[];
   output_path: string;
-}): Promise<{ written_to: string }> {
+}): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
   const backend = getReasoningBackend();
   const src = readJSON<any>(input.source_path);
   const { hypotheses } = await backend.crossCritique({
@@ -865,19 +936,21 @@ export async function crossCritique(input: {
     hypotheses: src.hypotheses ?? [],
     personas: input.personas,
   });
+  const reasoningMode = deriveReasoningMode(backend.name);
   writeJSON(input.output_path, {
     topic: src.topic,
     hypotheses,
     generated_by: backend.name,
     generated_at: nowIso(),
+    reasoning_mode: reasoningMode,
   });
-  return { written_to: input.output_path };
+  return { written_to: input.output_path, reasoning_mode: reasoningMode };
 }
 
 export async function synthesizeCounterpartyPersona(input: {
   source_path: string;
   fidelity?: string;
-}): Promise<{ persona_spec: any }> {
+}): Promise<{ persona_spec: any; reasoning_mode: 'placeholder' | 'model' }> {
   const backend = getReasoningBackend();
   const node = readJSON<any>(input.source_path);
   const fidelity = (input.fidelity as 'low' | 'medium' | 'high') || 'high';
@@ -885,7 +958,11 @@ export async function synthesizeCounterpartyPersona(input: {
     relationshipNode: node,
     fidelity,
   });
-  return { persona_spec: { ...persona, generated_by: backend.name } };
+  const reasoningMode = deriveReasoningMode(backend.name);
+  return {
+    persona_spec: { ...persona, generated_by: backend.name, reasoning_mode: reasoningMode },
+    reasoning_mode: reasoningMode,
+  };
 }
 
 export async function a2aRoleplay(input: {
@@ -893,7 +970,7 @@ export async function a2aRoleplay(input: {
   objective: string;
   time_budget_minutes: number;
   output_path: string;
-}): Promise<{ written_to: string }> {
+}): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
   const bridge = getVoiceBridge();
   const result = await bridge.runRoleplaySession({
     objective: input.objective,
@@ -901,6 +978,7 @@ export async function a2aRoleplay(input: {
     personaSpec: input.persona ?? {},
     outputPath: input.output_path,
   });
+  const reasoningMode = deriveReasoningMode(bridge.name, Boolean(result._synthetic));
   writeJSON(input.output_path, {
     objective: input.objective,
     time_budget_minutes: input.time_budget_minutes,
@@ -909,9 +987,10 @@ export async function a2aRoleplay(input: {
     engine_id: result.engine_id ?? null,
     generated_by: bridge.name,
     generated_at: nowIso(),
+    reasoning_mode: reasoningMode,
     ...(result._synthetic ? { _synthetic: true } : {}),
   });
-  return { written_to: input.output_path };
+  return { written_to: input.output_path, reasoning_mode: reasoningMode };
 }
 
 export async function conduct1on1(input: {
@@ -919,7 +998,7 @@ export async function conduct1on1(input: {
   proposal_draft_ref: string;
   structure: string[];
   output_path: string;
-}): Promise<{ written_to: string }> {
+}): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
   const bridge = getVoiceBridge();
   const result = await bridge.runOneOnOneSession({
     counterpartyRef: input.counterparty_ref,
@@ -927,6 +1006,7 @@ export async function conduct1on1(input: {
     structure: input.structure,
     outputPath: input.output_path,
   });
+  const reasoningMode = deriveReasoningMode(bridge.name, Boolean(result._synthetic));
   writeJSON(input.output_path, {
     person_slug: result.person_slug,
     visited_at: result.visited_at,
@@ -937,15 +1017,15 @@ export async function conduct1on1(input: {
     dissent_signals: result.dissent_signals,
     engine_id: result.engine_id ?? null,
     generated_by: bridge.name,
+    reasoning_mode: reasoningMode,
     ...(result._synthetic ? { _synthetic: true } : {}),
   });
-  return { written_to: input.output_path };
+  return { written_to: input.output_path, reasoning_mode: reasoningMode };
 }
 
-export function extractDissentSignals(input: {
-  session_log_path: string;
-  output_path: string;
-}): { written_to: string } {
+export function extractDissentSignals(input: { session_log_path: string; output_path: string }): {
+  written_to: string;
+} {
   const log = readJSON<any>(input.session_log_path);
   writeJSON(input.output_path, {
     person_slug: log.person_slug,
@@ -964,7 +1044,7 @@ export async function forkBranches(input: {
   cost_cap_tokens: number;
   max_steps_per_branch: number;
   output_dir: string;
-}): Promise<{ written_to: string; branch_count: number }> {
+}): Promise<{ written_to: string; branch_count: number; reasoning_mode: 'placeholder' | 'model' }> {
   const backend = getReasoningBackend();
   const src = readJSON<any>(input.source);
   const branches = await backend.forkBranches({
@@ -973,6 +1053,7 @@ export async function forkBranches(input: {
     costCapTokens: input.cost_cap_tokens,
     maxStepsPerBranch: input.max_steps_per_branch,
   });
+  const reasoningMode = deriveReasoningMode(backend.name);
   const rebased = branches.map((b) => ({
     ...b,
     worktree_path: `${input.output_dir}/branch-${b.branch_id}/`,
@@ -984,30 +1065,39 @@ export async function forkBranches(input: {
     branches: rebased,
     generated_by: backend.name,
     generated_at: nowIso(),
+    reasoning_mode: reasoningMode,
   };
   const manifestPath = `${input.output_dir.replace(/\/$/, '')}/branches.manifest.json`;
   writeJSON(manifestPath, manifest);
-  return { written_to: manifestPath, branch_count: rebased.length };
+  return { written_to: manifestPath, branch_count: rebased.length, reasoning_mode: reasoningMode };
 }
 
 export async function simulateAll(input: {
   manifest_path?: string;
   goal: string;
   output_dir: string;
-}): Promise<{ written_to: string; quality_written_to: string; quality_severity: 'ok' | 'warn' | 'poor' }> {
+}): Promise<{
+  written_to: string;
+  quality_written_to: string;
+  quality_severity: 'ok' | 'warn' | 'poor';
+  reasoning_mode: 'placeholder' | 'model';
+}> {
   const backend = getReasoningBackend();
-  const manifest = input.manifest_path && safeExistsSync(pathResolver.rootResolve(input.manifest_path))
-    ? readJSON<any>(input.manifest_path)
-    : { branches: [] };
+  const manifest =
+    input.manifest_path && safeExistsSync(pathResolver.rootResolve(input.manifest_path))
+      ? readJSON<any>(input.manifest_path)
+      : { branches: [] };
   const { branches: simulated } = await backend.simulateBranches({
     branches: manifest.branches ?? [],
     goal: input.goal,
   });
+  const reasoningMode = deriveReasoningMode(backend.name);
   const summary = {
     goal: input.goal,
     branches: simulated,
     generated_by: backend.name,
     timestamp: nowIso(),
+    reasoning_mode: reasoningMode,
   };
   const outDir = input.output_dir.replace(/\/$/, '');
   const outPath = `${outDir}/simulation-summary.json`;
@@ -1021,6 +1111,7 @@ export async function simulateAll(input: {
     written_to: outPath,
     quality_written_to: qualityPath,
     quality_severity: quality.severity,
+    reasoning_mode: reasoningMode,
   };
 }
 
@@ -1097,7 +1188,7 @@ export async function extractActionItemsOp(input: {
           (a) =>
             `  - ${a.name}${a.person_slug ? ` (slug=${a.person_slug})` : ''}${
               a.channel_handle ? ` (channel=${a.channel_handle})` : ''
-            }`,
+            }`
         )
         .join('\n')
     : '  (none provided)';
@@ -1146,7 +1237,9 @@ export async function extractActionItemsOp(input: {
       throw new Error('expected array');
     }
   } catch (err: any) {
-    logger.warn(`[extract_action_items] parse failed: ${err?.message ?? err}; raw="${raw.slice(0, 200)}"`);
+    logger.warn(
+      `[extract_action_items] parse failed: ${err?.message ?? err}; raw="${raw.slice(0, 200)}"`
+    );
     return {
       items: [],
       written_count: 0,
@@ -1157,7 +1250,13 @@ export async function extractActionItemsOp(input: {
   }
 
   const operatorTokens = new Set([operatorLabel.toLowerCase(), 'operator', 'self', 'me']);
-  const validModalities = new Set(['declarative', 'conditional', 'hypothetical', 'rhetorical', 'humor']);
+  const validModalities = new Set([
+    'declarative',
+    'conditional',
+    'hypothetical',
+    'rhetorical',
+    'humor',
+  ]);
   const items: ActionItem[] = [];
   let i = 0;
   let pendingReview = 0;
@@ -1166,9 +1265,9 @@ export async function extractActionItemsOp(input: {
     if (!entry || typeof entry !== 'object') continue;
     const title = String(entry.title ?? '').trim();
     if (title.length < 5) continue;
-    const assigneeLabel = String(
-      entry.assignee_label ?? input.default_assignee_label ?? 'unassigned',
-    ).trim() || 'unassigned';
+    const assigneeLabel =
+      String(entry.assignee_label ?? input.default_assignee_label ?? 'unassigned').trim() ||
+      'unassigned';
     let kind: ActionItemAssigneeKind =
       entry.assignee_kind &&
       ['operator_self', 'team_member', 'external', 'unassigned'].includes(entry.assignee_kind)
@@ -1178,7 +1277,7 @@ export async function extractActionItemsOp(input: {
       kind = 'operator_self';
     }
     const matchedAttendee = attendees.find(
-      (a) => a.name.toLowerCase() === assigneeLabel.toLowerCase(),
+      (a) => a.name.toLowerCase() === assigneeLabel.toLowerCase()
     );
     if (matchedAttendee && kind !== 'operator_self') {
       kind = 'team_member';
@@ -1248,8 +1347,7 @@ export async function extractActionItemsOp(input: {
       title: title.slice(0, 120),
       ...(summaryParts.length ? { summary: summaryParts.join('\n') } : {}),
       assignee,
-      ...(entry.priority &&
-      ['must', 'should', 'could', 'wont'].includes(entry.priority)
+      ...(entry.priority && ['must', 'should', 'could', 'wont'].includes(entry.priority)
         ? { priority: entry.priority }
         : {}),
       ...(entry.due_at_iso ? { due_at: entry.due_at_iso } : {}),
@@ -1277,11 +1375,15 @@ export async function generateFacilitationScriptOp(input: {
   remaining_minutes?: number;
   facilitator_persona_label?: string;
   language?: string;
-}): Promise<{ speech_text: string; next_action: 'continue_listen' | 'transition_topic' | 'wrap_up' | 'pause' }> {
+}): Promise<{
+  speech_text: string;
+  next_action: 'continue_listen' | 'transition_topic' | 'wrap_up' | 'pause';
+}> {
   const backend = getReasoningBackend();
   const persona = input.facilitator_persona_label ?? 'a calm professional facilitator';
   const remaining = input.remaining_minutes ?? 30;
-  const agendaBlock = (input.agenda ?? []).map((a, i) => `  ${i + 1}. ${a}`).join('\n') || '  (no agenda provided)';
+  const agendaBlock =
+    (input.agenda ?? []).map((a, i) => `  ${i + 1}. ${a}`).join('\n') || '  (no agenda provided)';
   const language = input.language ?? 'ja';
   const prompt = [
     `You generate the next short facilitation utterance for ${persona} in an online meeting.`,
@@ -1324,7 +1426,7 @@ export async function generateFacilitationScriptOp(input: {
  */
 export function applyRestrictedActionGate(
   items: ActionItem[],
-  opts: { approved_item_ids: ReadonlySet<string>; sudo_override: boolean },
+  opts: { approved_item_ids: ReadonlySet<string>; sudo_override: boolean }
 ): {
   allowed: ActionItem[];
   blocked: Array<{
@@ -1413,7 +1515,7 @@ export async function executeSelfActionItemsOp(input: {
         ]
           .filter(Boolean)
           .join('\n'),
-        `self-exec:${item.item_id}`,
+        `self-exec:${item.item_id}`
       );
       let summary = '';
       try {
@@ -1603,8 +1705,7 @@ export function auditSpeakerFairnessOp(input: {
   const totalThreshold = input.total_threshold ?? policy.speaker_fairness_total_threshold;
   const mustThreshold = input.must_threshold ?? policy.speaker_fairness_must_threshold;
   const warn = Boolean(
-    dominant &&
-      (dominant.share_total > totalThreshold || dominant.share_must > mustThreshold),
+    dominant && (dominant.share_total > totalThreshold || dominant.share_must > mustThreshold)
   );
   return {
     mission_id: input.mission_id,
@@ -1803,9 +1904,7 @@ export function evaluateEnsembleConvergence(input: {
     const seen = counts.failure + counts.success + counts.pending;
     const max = Math.max(counts.failure, counts.success, counts.pending);
     let dominant: 'failure' | 'success' | 'pending' | 'tie' = 'tie';
-    const ties = ['failure', 'success', 'pending'].filter(
-      (k) => (counts as any)[k] === max,
-    );
+    const ties = ['failure', 'success', 'pending'].filter((k) => (counts as any)[k] === max);
     if (ties.length === 1) dominant = ties[0] as any;
     perBranch.push({
       branch_id: branchId,
@@ -1815,17 +1914,19 @@ export function evaluateEnsembleConvergence(input: {
       convergence: total > 0 ? max / total : 0,
     });
   }
-  const meanConvergence = perBranch.length === 0
-    ? 1
-    : perBranch.reduce((acc, b) => acc + b.convergence, 0) / perBranch.length;
+  const meanConvergence =
+    perBranch.length === 0
+      ? 1
+      : perBranch.reduce((acc, b) => acc + b.convergence, 0) / perBranch.length;
   const divergentWarning = meanConvergence < threshold;
-  const severity: 'ok' | 'warn' | 'poor' = perBranch.length === 0
-    ? 'poor'
-    : meanConvergence >= threshold
-      ? 'ok'
-      : meanConvergence >= threshold / 2
-        ? 'warn'
-        : 'poor';
+  const severity: 'ok' | 'warn' | 'poor' =
+    perBranch.length === 0
+      ? 'poor'
+      : meanConvergence >= threshold
+        ? 'ok'
+        : meanConvergence >= threshold / 2
+          ? 'warn'
+          : 'poor';
   return {
     severity,
     mean_convergence: Number(meanConvergence.toFixed(4)),
@@ -1879,22 +1980,22 @@ export function evaluateSimulationQuality(summary: {
     id: 'has_branches',
     severity: 'hard',
     passed: branches.length > 0,
-    detail: branches.length > 0
-      ? `${branches.length} branches simulated`
-      : 'simulation produced zero branches',
+    detail:
+      branches.length > 0
+        ? `${branches.length} branches simulated`
+        : 'simulation produced zero branches',
   });
 
   // Hard 2 — no branch may report both a failure and a success mode (logical XOR).
-  const xorViolators = branches.filter(
-    (b) => b.first_failure_mode && b.first_success_mode,
-  );
+  const xorViolators = branches.filter((b) => b.first_failure_mode && b.first_success_mode);
   checks.push({
     id: 'failure_xor_success',
     severity: 'hard',
     passed: xorViolators.length === 0,
-    detail: xorViolators.length === 0
-      ? 'every branch has at most one terminal mode'
-      : `${xorViolators.length} branches report both failure and success modes (${xorViolators.map((b) => b.branch_id).join(', ')})`,
+    detail:
+      xorViolators.length === 0
+        ? 'every branch has at most one terminal mode'
+        : `${xorViolators.length} branches report both failure and success modes (${xorViolators.map((b) => b.branch_id).join(', ')})`,
   });
 
   // Hard 3 — branch_id values must be unique.
@@ -1904,23 +2005,21 @@ export function evaluateSimulationQuality(summary: {
     id: 'unique_branch_ids',
     severity: 'hard',
     passed: dupCount === 0,
-    detail: dupCount === 0
-      ? 'branch ids are unique'
-      : `${dupCount} duplicate branch_id values detected`,
+    detail:
+      dupCount === 0 ? 'branch ids are unique' : `${dupCount} duplicate branch_id values detected`,
   });
 
   // Soft 4 — at least one branch must reach a terminal mode (otherwise the
   // simulation produced no usable signal).
-  const terminated = branches.filter(
-    (b) => b.first_failure_mode || b.first_success_mode,
-  );
+  const terminated = branches.filter((b) => b.first_failure_mode || b.first_success_mode);
   checks.push({
     id: 'reaches_terminal_mode',
     severity: 'soft',
     passed: terminated.length > 0,
-    detail: terminated.length > 0
-      ? `${terminated.length}/${branches.length} branches reached a terminal mode`
-      : 'no branch reached a terminal mode — simulation is vacuous',
+    detail:
+      terminated.length > 0
+        ? `${terminated.length}/${branches.length} branches reached a terminal mode`
+        : 'no branch reached a terminal mode — simulation is vacuous',
   });
 
   // Soft 5 — outcome balance: if N>=3 branches and all terminated as
@@ -1948,24 +2047,21 @@ export function evaluateSimulationQuality(summary: {
   // non-zero `terminated_at_step` (zero usually means the model gave up
   // immediately rather than simulating).
   const zeroDepth = terminated.filter(
-    (b) => b.terminated_at_step !== null && b.terminated_at_step <= 0,
+    (b) => b.terminated_at_step !== null && b.terminated_at_step <= 0
   );
   checks.push({
     id: 'non_trivial_termination_depth',
     severity: 'soft',
     passed: zeroDepth.length === 0,
-    detail: zeroDepth.length === 0
-      ? 'all terminated branches reached at least one step'
-      : `${zeroDepth.length} branches terminated at step <= 0 (likely vacuous)`,
+    detail:
+      zeroDepth.length === 0
+        ? 'all terminated branches reached at least one step'
+        : `${zeroDepth.length} branches terminated at step <= 0 (likely vacuous)`,
   });
 
   const hardFailed = checks.some((c) => c.severity === 'hard' && !c.passed);
   const softFailed = checks.some((c) => c.severity === 'soft' && !c.passed);
-  const severity: 'ok' | 'warn' | 'poor' = hardFailed
-    ? 'poor'
-    : softFailed
-      ? 'warn'
-      : 'ok';
+  const severity: 'ok' | 'warn' | 'poor' = hardFailed ? 'poor' : softFailed ? 'warn' : 'ok';
 
   return {
     severity,
@@ -2004,7 +2100,7 @@ const RATE_LIMITED_OPS = new Set([
 export async function dispatchDecisionOp(
   op: string,
   params: any,
-  ctx: Ctx,
+  ctx: Ctx
 ): Promise<{ handled: boolean; ctx: Ctx }> {
   const resolved = (k: string) => resolveVars(params[k], ctx);
   const exportAs = params.export_as;
@@ -2017,11 +2113,7 @@ export async function dispatchDecisionOp(
    */
   const assign = (value: any): Ctx => {
     if (exportAs) return { ...ctx, [exportAs]: value };
-    if (
-      value &&
-      typeof value === 'object' &&
-      !Array.isArray(value)
-    ) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
       return { ...ctx, ...(value as Record<string, unknown>) };
     }
     return ctx;
@@ -2041,17 +2133,22 @@ export async function dispatchDecisionOp(
 
   switch (op) {
     case 'stakeholder_grid_sort': {
-      const nodes = Array.isArray(params.nodes) ? params.nodes : (ctx[params.from || 'stakeholder_nodes'] || []);
+      const nodes = Array.isArray(params.nodes)
+        ? params.nodes
+        : ctx[params.from || 'stakeholder_nodes'] || [];
       const sorted = stakeholderGridSort(nodes);
       return { handled: true, ctx: assign(sorted) };
     }
 
     case 'find_slides_by_owner': {
-      const slides = Array.isArray(params.slides) ? params.slides : (ctx[params.slides_from || 'slides'] || ctx['last_pptx_slides'] || []);
-      const ownerLabels: string[] = params.owner_labels
-        || (params.owner_label ? [params.owner_label] : [])
-        || ctx[params.owner_labels_from || 'owner_labels']
-        || [];
+      const slides = Array.isArray(params.slides)
+        ? params.slides
+        : ctx[params.slides_from || 'slides'] || ctx['last_pptx_slides'] || [];
+      const ownerLabels: string[] =
+        params.owner_labels ||
+        (params.owner_label ? [params.owner_label] : []) ||
+        ctx[params.owner_labels_from || 'owner_labels'] ||
+        [];
       const result = findSlidesByOwner({
         slides,
         owner_labels: ownerLabels,
@@ -2061,8 +2158,12 @@ export async function dispatchDecisionOp(
     }
 
     case 'pptx_diff': {
-      const before = Array.isArray(params.before) ? params.before : (ctx[params.before_from || 'before_slides'] || []);
-      const after = Array.isArray(params.after) ? params.after : (ctx[params.after_from || 'after_slides'] || []);
+      const before = Array.isArray(params.before)
+        ? params.before
+        : ctx[params.before_from || 'before_slides'] || [];
+      const after = Array.isArray(params.after)
+        ? params.after
+        : ctx[params.after_from || 'after_slides'] || [];
       const result = pptxDiff({ before, after });
       return { handled: true, ctx: assign(result) };
     }
@@ -2108,11 +2209,15 @@ export async function dispatchDecisionOp(
           return true;
         })
         .slice(0, limit);
-      const body = records.length === 0
-        ? '_(no distilled lessons available yet — run missions and `mission_controller distill` to populate)_'
-        : records
-            .map((r) => `- **${r.title || r.candidate_id}** (${r.target_kind || 'lesson'}, ${r.status}) — ${r.summary || ''}`)
-            .join('\n');
+      const body =
+        records.length === 0
+          ? '_(no distilled lessons available yet — run missions and `mission_controller distill` to populate)_'
+          : records
+              .map(
+                (r) =>
+                  `- **${r.title || r.candidate_id}** (${r.target_kind || 'lesson'}, ${r.status}) — ${r.summary || ''}`
+              )
+              .join('\n');
       const markdown = `_Distilled from ${records.length} recent lesson(s) (scope: ${scope}), generated ${nowIso()}._\n\n${body}`;
       // run_pipeline bridges produces.channel → params.export_as, so `assign`
       // lands this markdown at the declared channel (e.g. "lessons_learned").
@@ -2124,18 +2229,17 @@ export async function dispatchDecisionOp(
       const tagsParam = resolved('tags');
       const tags = Array.isArray(tagsParam) ? tagsParam : [];
       const limit = Number(resolved('limit')) || 5;
-      const minScore = params.min_score !== undefined
-        ? Number(resolved('min_score'))
-        : 0.0001;
+      const minScore = params.min_score !== undefined ? Number(resolved('min_score')) : 0.0001;
       const entries = await findRelevantDistilledKnowledge({
         topic,
         tags,
         limit,
         minScore,
       });
-      const summary = entries.length === 0
-        ? '(no relevant prior distilled knowledge found)'
-        : entries.map((e) => formatDistilledKnowledgeSummary(e)).join('\n');
+      const summary =
+        entries.length === 0
+          ? '(no relevant prior distilled knowledge found)'
+          : entries.map((e) => formatDistilledKnowledgeSummary(e)).join('\n');
       const outputPath = resolved('output_path');
       if (outputPath) {
         writeJSON(outputPath, {
@@ -2183,9 +2287,7 @@ export async function dispatchDecisionOp(
           ? ((listenResult as any).partial_reason as string | undefined)
           : undefined;
       const partialState =
-        params.partial_state !== undefined
-          ? Boolean(resolved('partial_state'))
-          : partialFromCtx;
+        params.partial_state !== undefined ? Boolean(resolved('partial_state')) : partialFromCtx;
       const partialReason =
         params.partial_reason !== undefined
           ? String(resolved('partial_reason') ?? '')
@@ -2194,9 +2296,7 @@ export async function dispatchDecisionOp(
         mission_id: resolved('mission_id') || process.env.MISSION_ID || '',
         transcript,
         attendees,
-        ...(params.operator_label
-          ? { operator_label: resolved('operator_label') }
-          : {}),
+        ...(params.operator_label ? { operator_label: resolved('operator_label') } : {}),
         ...(params.default_assignee_label
           ? { default_assignee_label: resolved('default_assignee_label') }
           : {}),
@@ -2413,7 +2513,8 @@ export async function dispatchDecisionOp(
     }
 
     case 'a2a_fanout': {
-      const personasResolved = resolved('personas') || ctx[params.personas_from || 'personas'] || [];
+      const personasResolved =
+        resolved('personas') || ctx[params.personas_from || 'personas'] || [];
       const minResolved = resolved('min_hypotheses_per_persona') || 2;
       const result = await a2aFanout({
         personas: Array.isArray(personasResolved) ? personasResolved : [],
@@ -2425,7 +2526,8 @@ export async function dispatchDecisionOp(
     }
 
     case 'cross_critique': {
-      const personasResolved = resolved('personas') || ctx[params.personas_from || 'personas'] || [];
+      const personasResolved =
+        resolved('personas') || ctx[params.personas_from || 'personas'] || [];
       const result = await crossCritique({
         source_path: resolved('input') || resolved('source_path'),
         personas: Array.isArray(personasResolved) ? personasResolved : [],
@@ -2495,7 +2597,8 @@ export async function dispatchDecisionOp(
         decision: resolved('decision'),
         anchor: resolved('anchor'),
         analogy: resolved('analogy'),
-        vetoed_options: params.vetoed_options || ctx[params.vetoed_options_from || 'vetoed_options'],
+        vetoed_options:
+          params.vetoed_options || ctx[params.vetoed_options_from || 'vetoed_options'],
         mission_id: resolved('mission_id'),
         trigger: resolved('trigger') as CaptureIntuitionInput['trigger'],
         tags: params.tags || ctx[params.tags_from || 'tags'],
@@ -2560,7 +2663,7 @@ export async function dispatchDecisionOp(
         : ctx[params.must_have_ids_from || 'must_have_ids'];
       const result = evaluateQaReadyGate(
         resolved('mission_id'),
-        Array.isArray(mustIds) ? mustIds : [],
+        Array.isArray(mustIds) ? mustIds : []
       );
       return { handled: true, ctx: assign(result) };
     }
@@ -2577,7 +2680,10 @@ export async function dispatchDecisionOp(
 
     case 'register_presentation_preference_profile': {
       const result = await registerPresentationPreferenceProfileOp({
-        profile: params.profile !== undefined ? resolved('profile') : ctx[params.profile_from || 'presentation_preference_profile'],
+        profile:
+          params.profile !== undefined
+            ? resolved('profile')
+            : ctx[params.profile_from || 'presentation_preference_profile'],
         profile_path: resolved('profile_path'),
         registry_path: resolved('registry_path'),
       });
@@ -2659,20 +2765,24 @@ export async function dispatchDecisionOp(
     // where wisdom:reasoning fell through to default with handled=false.
     case 'reasoning': {
       const backend = getReasoningBackend();
-      const instruction = typeof params.instruction === 'string'
-        ? resolveVars(params.instruction, ctx)
-        : 'Analyze the context.';
-      const contextRaw = typeof params.context === 'string'
-        ? resolveVars(params.context, ctx)
-        : JSON.stringify(params.context ?? ctx);
+      const instruction =
+        typeof params.instruction === 'string'
+          ? resolveVars(params.instruction, ctx)
+          : 'Analyze the context.';
+      const contextRaw =
+        typeof params.context === 'string'
+          ? resolveVars(params.context, ctx)
+          : JSON.stringify(params.context ?? ctx);
       // Adaptive Prompting: optional system_prompt param overrides default framing
-      const systemPrompt = typeof params.system_prompt === 'string'
-        ? resolveVars(params.system_prompt, ctx)
-        : undefined;
+      const systemPrompt =
+        typeof params.system_prompt === 'string'
+          ? resolveVars(params.system_prompt, ctx)
+          : undefined;
       const fullPrompt = systemPrompt
         ? `[SYSTEM: ${systemPrompt}]\n\nInstruction: ${instruction}\nContext: ${contextRaw}`
         : `Instruction: ${instruction}\nContext: ${contextRaw}`;
-      const useSubagent = params.use_subagent === true ||
+      const useSubagent =
+        params.use_subagent === true ||
         String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
         String(params.execution_mode ?? params.mode ?? '') === 'delegate';
       const response = useSubagent
@@ -2689,7 +2799,7 @@ export async function dispatchDecisionOp(
       if (!backend.generateWithTools) {
         throw new Error(
           '[wisdom:tool_use] Active backend does not support generateWithTools. ' +
-          'Set KYBERION_REASONING_BACKEND=anthropic.',
+            'Set KYBERION_REASONING_BACKEND=anthropic.'
         );
       }
       const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
@@ -2729,7 +2839,10 @@ export async function dispatchDecisionOp(
         }
         if (response.toolCalls?.length) {
           for (const call of response.toolCalls) {
-            history.push({ role: 'observation', content: `Tool "${call.name}" → ${JSON.stringify(call.input)}` });
+            history.push({
+              role: 'observation',
+              content: `Tool "${call.name}" → ${JSON.stringify(call.input)}`,
+            });
           }
         }
       }
@@ -2754,7 +2867,8 @@ export async function dispatchDecisionOp(
       const rawSeverity = ctx[severityKey] ?? params.convergence_severity;
       const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore ?? '1'));
       const threshold = typeof params.threshold === 'number' ? params.threshold : 0.7;
-      const yellowThreshold = typeof params.yellow_threshold === 'number' ? params.yellow_threshold : 0.5;
+      const yellowThreshold =
+        typeof params.yellow_threshold === 'number' ? params.yellow_threshold : 0.5;
 
       let verdict: 'ready' | 'concerns' | 'blocked';
       if (!isNaN(score)) {
@@ -2780,11 +2894,17 @@ export async function dispatchDecisionOp(
       if (outputPath) writeJSON(outputPath, gateResult);
 
       if (verdict === 'blocked') {
-        logger.warn(`[uncertainty_gate] BLOCKED: mean_convergence=${score.toFixed?.(3) ?? score} < yellow_threshold=${yellowThreshold}`);
+        logger.warn(
+          `[uncertainty_gate] BLOCKED: mean_convergence=${score.toFixed?.(3) ?? score} < yellow_threshold=${yellowThreshold}`
+        );
       } else if (verdict === 'concerns') {
-        logger.warn(`[uncertainty_gate] YELLOW-CARD: mean_convergence=${score.toFixed?.(3) ?? score} < threshold=${threshold}`);
+        logger.warn(
+          `[uncertainty_gate] YELLOW-CARD: mean_convergence=${score.toFixed?.(3) ?? score} < threshold=${threshold}`
+        );
       } else {
-        logger.success(`[uncertainty_gate] READY: mean_convergence=${score.toFixed?.(3) ?? score} ≥ threshold=${threshold}`);
+        logger.success(
+          `[uncertainty_gate] READY: mean_convergence=${score.toFixed?.(3) ?? score} ≥ threshold=${threshold}`
+        );
       }
 
       return { handled: true, ctx: assign(gateResult) };
@@ -2799,7 +2919,7 @@ export async function dispatchDecisionOp(
       const evidenceKey = String(params.evidence_from ?? 'evidence');
       const evidence = params.evidence
         ? resolveVars(String(params.evidence), ctx)
-        : ctx[evidenceKey] ?? '';
+        : (ctx[evidenceKey] ?? '');
       const missionId = resolveVars(String(params.mission_id ?? ctx.mission_id ?? ''), ctx);
       const reviewId = `review-${Date.now()}`;
 

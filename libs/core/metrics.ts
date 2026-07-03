@@ -1,9 +1,4 @@
-import { 
-  safeReadFile, 
-  safeAppendFileSync, 
-  safeMkdir, 
-  safeExistsSync 
-} from './secure-io.js';
+import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
@@ -17,7 +12,10 @@ const DEFAULT_METRICS_DIR = pathResolver.resolve('work/metrics');
 const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
-interface CostRate { prompt: number; completion: number }
+interface CostRate {
+  prompt: number;
+  completion: number;
+}
 interface ModelCostRegistry {
   models: Record<string, CostRate>;
   aliases?: Record<string, string>;
@@ -26,16 +24,17 @@ interface ModelCostRegistry {
 
 // Model pricing is data, not code: it lives in a knowledge-tier registry so models
 // can be added / repriced without a source change or redeploy. The file is the
-// source of truth; this small built-in fallback is used only when it is
-// absent/invalid. All rates are per-1k tokens.
-const COST_REGISTRY_PATH = pathResolver.resolve('knowledge/product/governance/model-cost-registry.json');
-const FALLBACK_COST_REGISTRY: ModelCostRegistry = {
-  models: {
-    'claude-opus-4-8': { prompt: 0.015, completion: 0.075 },
-    'claude-sonnet-4-6': { prompt: 0.003, completion: 0.015 },
-    'gpt-4o': { prompt: 0.005, completion: 0.015 },
-  },
-  aliases: { opus: 'claude-opus-4-8', sonnet: 'claude-sonnet-4-6' },
+// source of truth; the fallback file keeps the runtime working when the primary
+// registry is missing or malformed. All rates are per-1k tokens.
+const COST_REGISTRY_PATH = pathResolver.resolve(
+  'knowledge/product/governance/model-cost-registry.json'
+);
+const FALLBACK_COST_REGISTRY_PATH = pathResolver.resolve(
+  'knowledge/product/governance/model-cost-registry.fallback.json'
+);
+const EMPTY_COST_REGISTRY: ModelCostRegistry = {
+  models: {},
+  aliases: {},
   default: { prompt: 0.001, completion: 0.003 },
 };
 
@@ -45,25 +44,43 @@ function isCostRate(value: any): value is CostRate {
   return value && typeof value.prompt === 'number' && typeof value.completion === 'number';
 }
 
+function readCostRegistry(filePath: string): ModelCostRegistry | null {
+  try {
+    if (!safeExistsSync(filePath)) return null;
+    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    if (parsed && typeof parsed.models === 'object' && isCostRate(parsed.default)) {
+      const models: Record<string, CostRate> = {};
+      for (const [id, rate] of Object.entries(parsed.models)) {
+        if (isCostRate(rate)) models[id] = rate as CostRate;
+      }
+      return { models, aliases: parsed.aliases ?? {}, default: parsed.default };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 /** Load (and cache) the model-cost registry from the knowledge tier, with fallback. */
 export function loadModelCostRegistry(): ModelCostRegistry {
   if (_cachedCostRegistry) return _cachedCostRegistry;
-  try {
-    if (safeExistsSync(COST_REGISTRY_PATH)) {
-      const parsed = JSON.parse(safeReadFile(COST_REGISTRY_PATH, { encoding: 'utf8' }) as string);
-      if (parsed && typeof parsed.models === 'object' && isCostRate(parsed.default)) {
-        const models: Record<string, CostRate> = {};
-        for (const [id, rate] of Object.entries(parsed.models)) {
-          if (isCostRate(rate)) models[id] = rate as CostRate;
-        }
-        _cachedCostRegistry = { models, aliases: parsed.aliases ?? {}, default: parsed.default };
-        return _cachedCostRegistry;
-      }
-    }
-  } catch {
-    // fall through to the built-in fallback
+  const fallback = readCostRegistry(FALLBACK_COST_REGISTRY_PATH);
+  const primary = readCostRegistry(COST_REGISTRY_PATH);
+  if (fallback || primary) {
+    _cachedCostRegistry = {
+      models: {
+        ...(fallback?.models ?? {}),
+        ...(primary?.models ?? {}),
+      },
+      aliases: {
+        ...(fallback?.aliases ?? {}),
+        ...(primary?.aliases ?? {}),
+      },
+      default: primary?.default ?? fallback?.default ?? EMPTY_COST_REGISTRY.default,
+    };
+    return _cachedCostRegistry;
   }
-  _cachedCostRegistry = FALLBACK_COST_REGISTRY;
+  _cachedCostRegistry = EMPTY_COST_REGISTRY;
   return _cachedCostRegistry;
 }
 
@@ -77,11 +94,10 @@ function resolvePer1kRate(reg: ModelCostRegistry, model: string): CostRate {
   if (!id) return reg.default;
   if (reg.models[id]) return reg.models[id];
   if (reg.aliases?.[id] && reg.models[reg.aliases[id]]) return reg.models[reg.aliases[id]];
-  // Versioned ids (claude-opus-4-8-YYYYMMDD, gemini-2.0-flash-exp) never exact-match:
-  // take the longest model-id or alias contained in the given id.
+  // Versioned ids never exact-match; take the longest model-id or alias contained in the given id.
   const lower = id.toLowerCase();
   const candidates = [...Object.keys(reg.models), ...Object.keys(reg.aliases ?? {})].sort(
-    (a, b) => b.length - a.length,
+    (a, b) => b.length - a.length
   );
   for (const key of candidates) {
     if (lower.includes(key.toLowerCase())) {
@@ -133,7 +149,11 @@ export class MetricsCollector {
     };
 
     if (memory.heapUsedMB > this._memoryBudgetMB) {
-      console.warn(chalk.yellow(`[${componentName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`));
+      console.warn(
+        chalk.yellow(
+          `[${componentName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`
+        )
+      );
     }
 
     let agg = this._aggregates.get(componentName);
@@ -165,7 +185,7 @@ export class MetricsCollector {
     if (status === 'error') agg.errors++;
     if (extra.recovered) agg.recoveries++;
     if (extra.intervention) agg.interventions++;
-    
+
     agg.totalMs += durationMs;
     agg.minMs = Math.min(agg.minMs, durationMs);
     agg.maxMs = Math.max(agg.maxMs, durationMs);
@@ -178,11 +198,11 @@ export class MetricsCollector {
       const cTokens = extra.usage.completion_tokens || 0;
       agg.promptTokens += pTokens;
       agg.completionTokens += cTokens;
-      agg.totalTokens += (pTokens + cTokens);
+      agg.totalTokens += pTokens + cTokens;
 
       const model = extra.model || 'default';
       const rates = resolveCostRates(model);
-      const cost = (pTokens * rates.prompt) + (cTokens * rates.completion);
+      const cost = pTokens * rates.prompt + cTokens * rates.completion;
       agg.totalCostUSD += cost;
       extra.cost_usd = Math.round(cost * 100000) / 100000;
     }
@@ -294,7 +314,7 @@ export class MetricsCollector {
       pathResolver.resolve('knowledge/product/orchestration/slo-targets.json'),
       pathResolver.resolve('knowledge/orchestration/slo-targets.json'),
     ];
-    const sloPath = sloPathCandidates.find(candidate => safeExistsSync(candidate));
+    const sloPath = sloPathCandidates.find((candidate) => safeExistsSync(candidate));
     const sloTargets = sloPath
       ? JSON.parse(safeReadFile(sloPath, { encoding: 'utf8' }) as string)
       : { default: { latency_ms: 5000, success_rate: 99 } };
@@ -321,7 +341,8 @@ export class MetricsCollector {
       s.minMs = Math.min(s.minMs, entry.duration_ms || 0);
       s.maxMs = Math.max(s.maxMs, entry.duration_ms || 0);
 
-      const target = (sloTargets.critical_path && sloTargets.critical_path[componentName]) || sloTargets.default;
+      const target =
+        (sloTargets.critical_path && sloTargets.critical_path[componentName]) || sloTargets.default;
       const isLatencyOk = (entry.duration_ms || 0) <= target.latency_ms;
       if (isLatencyOk && entry.status !== 'error') s.sloPasses++;
 
@@ -338,8 +359,10 @@ export class MetricsCollector {
       const sloCompliance = s.count > 0 ? Math.round((s.sloPasses / s.count) * 100) : 0;
 
       let manualMs = 300000;
-      if (name.includes('audit') || name.includes('scan') || name.includes('check')) manualMs = 900000;
-      else if (name.includes('generate') || name.includes('create') || name.includes('artisan')) manualMs = 1800000;
+      if (name.includes('audit') || name.includes('scan') || name.includes('check'))
+        manualMs = 900000;
+      else if (name.includes('generate') || name.includes('create') || name.includes('artisan'))
+        manualMs = 1800000;
       else if (name.includes('analyze') || name.includes('optimize')) manualMs = 3600000;
 
       const savedMs = Math.max(0, manualMs * s.count - s.totalMs);
@@ -371,7 +394,10 @@ export class MetricsCollector {
     return {
       totalEntries: entries.length,
       uniqueSkills: skills.length,
-      dateRange: entries.length > 0 ? { from: entries[0].timestamp, to: entries[entries.length - 1].timestamp } : null,
+      dateRange:
+        entries.length > 0
+          ? { from: entries[0].timestamp, to: entries[entries.length - 1].timestamp }
+          : null,
       skills: skills.sort((a, b) => b.executions - a.executions),
     };
   }

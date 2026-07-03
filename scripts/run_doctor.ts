@@ -1,11 +1,20 @@
 #!/usr/bin/env node
-import { listEnvironmentManifestIds, loadEnvironmentManifest, probeManifest } from '@agent/core';
+import {
+  listEnvironmentManifestIds,
+  listScheduledPipelines,
+  loadEnvironmentManifest,
+  probeManifest,
+} from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
-const MISSION_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend', 'meeting-participation-runtime'];
+const MISSION_MANIFESTS = [
+  'kyberion-runtime-baseline',
+  'reasoning-backend',
+  'meeting-participation-runtime',
+];
 const RUNTIME_PRESETS: Record<string, string[]> = {
   meeting: ['meeting-participation-runtime'],
   voice: ['meeting-participation-runtime'],
@@ -20,6 +29,29 @@ export interface DoctorRunReport {
     lines: string[];
     counts: { must: number; should: number; nice: number };
   }>;
+  scheduleLines: string[];
+}
+
+export function collectPipelineScheduleDoctorLines(): string[] {
+  const schedules = listScheduledPipelines().sort((a, b) => a.id.localeCompare(b.id));
+  const lines = [`Pipeline schedules: ${schedules.length} registered`];
+  if (schedules.length === 0) {
+    lines.push(
+      '  - none registered; start `node dist/scripts/chronos_daemon.js` to sync scheduled pipeline ADFs'
+    );
+    return lines;
+  }
+  for (const schedule of schedules.slice(0, 8)) {
+    const trigger =
+      schedule.trigger.type === 'cron'
+        ? `${schedule.trigger.cron}${schedule.trigger.timezone ? ` ${schedule.trigger.timezone}` : ''}`
+        : `${schedule.trigger.intervalMs ?? 0}ms`;
+    lines.push(
+      `  - ${schedule.id}: ${schedule.enabled ? 'enabled' : 'disabled'}; ${trigger}; last=${schedule.lastRun ?? 'never'}; status=${schedule.lastStatus ?? 'unknown'}`
+    );
+  }
+  if (schedules.length > 8) lines.push(`  - ... ${schedules.length - 8} more`);
+  return lines;
 }
 
 export async function collectDoctorReport(argv: {
@@ -37,7 +69,9 @@ export async function collectDoctorReport(argv: {
       ? [String(argv.manifest)]
       : argv.runtime
         ? (RUNTIME_PRESETS[String(argv.runtime)] ?? [String(argv.runtime)])
-        : missionId ? MISSION_MANIFESTS : DEFAULT_MANIFESTS;
+        : missionId
+          ? MISSION_MANIFESTS
+          : DEFAULT_MANIFESTS;
 
   const summaries: DoctorRunReport['summaries'] = [];
   let totalMissing = 0;
@@ -53,7 +87,7 @@ export async function collectDoctorReport(argv: {
     totalMissing += summary.counts.must + summary.counts.should;
   }
 
-  return { totalMissing, summaries };
+  return { totalMissing, summaries, scheduleLines: collectPipelineScheduleDoctorLines() };
 }
 
 async function main(): Promise<void> {
@@ -75,27 +109,42 @@ async function main(): Promise<void> {
     }
     console.log('');
   }
+  for (const line of report.scheduleLines) {
+    console.log(line);
+  }
+  console.log('');
 
   if (report.totalMissing === 0) {
     console.log('All required capabilities are satisfied.');
     if (!argv.manifest && !argv.runtime && !argv.all) {
-      console.log('Want the right surface next? Run `pnpm setup:report --persona first-time-user` for a recommended surface guide.');
+      console.log(
+        'Want the right surface next? Run `pnpm setup:report --persona first-time-user` for a recommended surface guide.'
+      );
     }
     process.exit(0);
   }
 
   const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
   if (!missionId && !argv.manifest && !argv.runtime && !argv.all) {
-    console.log('Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.');
+    console.log(
+      'Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.'
+    );
   }
-  const needsMeetingHint = argv.mission
-    || (argv.runtime && ['meeting', 'voice', 'browser'].includes(String(argv.runtime)));
+  const needsMeetingHint =
+    argv.mission ||
+    (argv.runtime && ['meeting', 'voice', 'browser'].includes(String(argv.runtime)));
   const meetingHint = needsMeetingHint
     ? ' or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps'
     : '';
-  console.log(`Next step: run \`pnpm env:bootstrap --manifest <id> --apply\` for missing must/should items${meetingHint}.`);
-  console.log('Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.');
-  const firstMissingSummary = report.summaries.find((summary) => summary.counts.must + summary.counts.should > 0);
+  console.log(
+    `Next step: run \`pnpm env:bootstrap --manifest <id> --apply\` for missing must/should items${meetingHint}.`
+  );
+  console.log(
+    'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
+  );
+  const firstMissingSummary = report.summaries.find(
+    (summary) => summary.counts.must + summary.counts.should > 0
+  );
   if (firstMissingSummary) {
     const nextAction = buildNextAction({
       title: `Bootstrap ${firstMissingSummary.manifestId}`,

@@ -61,10 +61,7 @@ import {
   buildOpenAiCompatibleBackendFromEnv,
   buildNemotronBackendFromEnv,
 } from './openai-compatible-backend.js';
-import {
-  OpenRouterBackend,
-  buildOpenRouterBackendFromEnv,
-} from './openrouter-backend.js';
+import { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
 import { maybeWrapWithDispatcher } from './agent-dispatch.js';
 import { registerReasoningBackend } from './reasoning-backend.js';
 import { registerIntentExtractor } from './intent-extractor.js';
@@ -83,6 +80,7 @@ import {
   resolveReasoningBackendModeFromContext,
   type ReasoningBackendMode,
 } from './reasoning-backend-policy.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
@@ -90,7 +88,7 @@ let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
 
 export function normalizeReasoningBackendMode(
-  mode: ReasoningBackendMode,
+  mode: ReasoningBackendMode
 ): Exclude<ReasoningBackendMode, 'gemini-api'> {
   if (mode === 'gemini-api') {
     logger.warn('[reasoning-bootstrap] mode=gemini-api is deprecated; using gemini-cli instead.');
@@ -124,8 +122,18 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
 }
 
 const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([
-  'claude-cli', 'codex-cli', 'claude-agent', 'anthropic', 'gemini-cli', 'gemini-api',
-  'agy-cli', 'local', 'nemotron', 'nemotron-api', 'openrouter', 'stub',
+  'claude-cli',
+  'codex-cli',
+  'claude-agent',
+  'anthropic',
+  'gemini-cli',
+  'gemini-api',
+  'agy-cli',
+  'local',
+  'nemotron',
+  'nemotron-api',
+  'openrouter',
+  'stub',
 ]);
 
 /**
@@ -136,7 +144,9 @@ const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<Reaso
  * the broker only OVERRIDES when a frozen pin names a usable reasoning mode.
  * Skipped in stub/offline mode and never fatal.
  */
-export function consultCapabilityBrokerForMode(resolvedMode: ReasoningBackendMode): ReasoningBackendMode {
+export function consultCapabilityBrokerForMode(
+  resolvedMode: ReasoningBackendMode
+): ReasoningBackendMode {
   if (resolvedMode === 'stub') return resolvedMode;
   try {
     const decision = resolveProviderDecision({
@@ -146,12 +156,16 @@ export function consultCapabilityBrokerForMode(resolvedMode: ReasoningBackendMod
     });
     if (decision.pinned && REASONING_BACKEND_MODES.has(decision.provider as ReasoningBackendMode)) {
       if (decision.provider !== resolvedMode) {
-        logger.info(`[reasoning-bootstrap] capability-broker pin overrides mode ${resolvedMode} → ${decision.provider}`);
+        logger.info(
+          `[reasoning-bootstrap] capability-broker pin overrides mode ${resolvedMode} → ${decision.provider}`
+        );
       }
       return decision.provider as ReasoningBackendMode;
     }
   } catch (err) {
-    logger.warn(`[reasoning-bootstrap] capability-broker consult skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(
+      `[reasoning-bootstrap] capability-broker consult skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+    );
   }
   return resolvedMode;
 }
@@ -190,7 +204,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     const key = process.env.ANTHROPIC_API_KEY;
     if (!options.anthropicClient && !key && !options.force) {
       logger.info(
-        '[reasoning-bootstrap] mode=anthropic selected but ANTHROPIC_API_KEY unset — keeping stubs.',
+        '[reasoning-bootstrap] mode=anthropic selected but ANTHROPIC_API_KEY unset — keeping stubs.'
       );
       installed = true;
       installedMode = 'stub';
@@ -203,7 +217,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installed = true;
     installedMode = 'anthropic';
     logger.success(
-      `[reasoning-bootstrap] mode=anthropic — direct @anthropic-ai/sdk (model=${options.model ?? 'claude-opus-4-7'})`,
+      `[reasoning-bootstrap] mode=anthropic — direct @anthropic-ai/sdk (model=${options.model ?? resolveRuntimeModelId('anthropic-default')})`
     );
     return true;
   }
@@ -212,7 +226,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     const cliBackend = buildShellClaudeCliBackendFromEnv();
     if (!cliBackend) {
       logger.warn(
-        '[reasoning-bootstrap] mode=claude-cli selected but the Claude CLI is not usable — keeping stubs.',
+        '[reasoning-bootstrap] mode=claude-cli selected but the Claude CLI is not usable — keeping stubs.'
       );
       installed = true;
       installedMode = 'stub';
@@ -225,16 +239,20 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installed = true;
     installedMode = 'claude-cli';
     logger.success(
-      `[reasoning-bootstrap] mode=claude-cli — shell claude CLI (model=${options.model ?? 'opus'})`,
+      `[reasoning-bootstrap] mode=claude-cli — shell claude CLI (model=${options.model ?? 'opus'})`
     );
     return true;
   }
 
   if (mode === 'codex-cli') {
     const providers = discoverProviders(shouldRefreshProviders(options));
-    const codexHealthy = providers.some((provider) => provider.provider === 'codex' && provider.installed && provider.healthy);
+    const codexHealthy = providers.some(
+      (provider) => provider.provider === 'codex' && provider.installed && provider.healthy
+    );
     if (!codexHealthy && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=codex-cli selected but Codex CLI is not usable — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=codex-cli selected but Codex CLI is not usable — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
@@ -250,7 +268,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installed = true;
     installedMode = 'codex-cli';
     logger.success(
-      `[reasoning-bootstrap] mode=codex-cli — shell codex CLI (model=${mergedCodexOptions.model ?? 'gpt-5.4'})`,
+      `[reasoning-bootstrap] mode=codex-cli — shell codex CLI (model=${mergedCodexOptions.model ?? resolveRuntimeModelId('codex-default')})`
     );
     return true;
   }
@@ -260,7 +278,9 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     // or ANTHROPIC_API_KEY. Without either it cannot run, so fall back to stubs
     // rather than registering a backend that would fail at delegate time.
     if (!process.env.CLAUDECODE && !process.env.ANTHROPIC_API_KEY && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=claude-agent selected but no Claude Code harness (CLAUDECODE) or ANTHROPIC_API_KEY — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=claude-agent selected but no Claude Code harness (CLAUDECODE) or ANTHROPIC_API_KEY — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
@@ -271,16 +291,20 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installed = true;
     installedMode = 'claude-agent';
     logger.success(
-      `[reasoning-bootstrap] mode=claude-agent — @anthropic-ai/claude-agent-sdk sub-agent delegation (model=${options.model ?? 'opus'})`,
+      `[reasoning-bootstrap] mode=claude-agent — @anthropic-ai/claude-agent-sdk sub-agent delegation (model=${options.model ?? 'opus'})`
     );
     return true;
   }
 
   if (mode === 'gemini-cli') {
     const providers = discoverProviders(shouldRefreshProviders(options));
-    const geminiHealthy = providers.some((provider) => provider.provider === 'gemini' && provider.installed && provider.healthy);
+    const geminiHealthy = providers.some(
+      (provider) => provider.provider === 'gemini' && provider.installed && provider.healthy
+    );
     if (!geminiHealthy && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=gemini-cli selected but Gemini CLI is not usable — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=gemini-cli selected but Gemini CLI is not usable — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
@@ -299,20 +323,24 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     };
     registerIntentExtractor(new GeminiCliIntentExtractor(geminiOptions));
     registerVoiceBridge(new GeminiCliVoiceBridge(geminiOptions));
-    
+
     installed = true;
     installedMode = 'gemini-cli';
     logger.success(
-      `[reasoning-bootstrap] mode=gemini-cli — shell gemini CLI (model=${options.model ?? 'gemini-2.0-flash-exp'})`,
+      `[reasoning-bootstrap] mode=gemini-cli — shell gemini CLI (model=${options.model ?? resolveRuntimeModelId('gemini-default')})`
     );
     return true;
   }
 
   if (mode === 'agy-cli') {
     const providers = discoverProviders(shouldRefreshProviders(options));
-    const agyHealthy = providers.some((provider) => provider.provider === 'agy' && provider.installed && provider.healthy);
+    const agyHealthy = providers.some(
+      (provider) => provider.provider === 'agy' && provider.installed && provider.healthy
+    );
     if (!agyHealthy && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=agy-cli selected but Agy CLI is not usable — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=agy-cli selected but Agy CLI is not usable — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
@@ -326,23 +354,25 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
 
     registerReasoningBackend(agyBackend);
     const agyOptions = {
-      bin: (process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN)?.trim() || undefined,
+      bin:
+        (process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN)?.trim() ||
+        undefined,
     };
     registerIntentExtractor(new AgyCliIntentExtractor(agyOptions));
     registerVoiceBridge(new AgyCliVoiceBridge(agyOptions));
-    
+
     installed = true;
     installedMode = 'agy-cli';
-    logger.success(
-      `[reasoning-bootstrap] mode=agy-cli — shell agy CLI`
-    );
+    logger.success(`[reasoning-bootstrap] mode=agy-cli — shell agy CLI`);
     return true;
   }
 
   if (mode === 'local') {
     const localBackend = buildOpenAiCompatibleBackendFromEnv(process.env);
     if (!localBackend && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=local selected but KYBERION_LOCAL_LLM_URL is unset — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=local selected but KYBERION_LOCAL_LLM_URL is unset — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
@@ -354,7 +384,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installed = true;
     installedMode = 'local';
     logger.success(
-      `[reasoning-bootstrap] mode=local — OpenAI-compatible local server (${baseURL}, model=${model})`,
+      `[reasoning-bootstrap] mode=local — OpenAI-compatible local server (${baseURL}, model=${model})`
     );
     return true;
   }
@@ -362,19 +392,29 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   if (mode === 'nemotron-api') {
     const nemotronBackend = buildNemotronBackendFromEnv(process.env);
     if (!nemotronBackend && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=nemotron-api selected but KYBERION_NEMOTRON_URL is unset — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=nemotron-api selected but KYBERION_NEMOTRON_URL is unset — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
     }
-    const baseURL = process.env.KYBERION_NEMOTRON_URL || process.env.KYBERION_LOCAL_LLM_URL || 'http://localhost:11434/v1';
-    const apiKey = process.env.KYBERION_NEMOTRON_KEY || process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
-    const model = options.model || process.env.KYBERION_NEMOTRON_MODEL || process.env.KYBERION_LOCAL_LLM_MODEL || 'nemotron';
+    const baseURL =
+      process.env.KYBERION_NEMOTRON_URL ||
+      process.env.KYBERION_LOCAL_LLM_URL ||
+      'http://localhost:11434/v1';
+    const apiKey =
+      process.env.KYBERION_NEMOTRON_KEY || process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
+    const model =
+      options.model ||
+      process.env.KYBERION_NEMOTRON_MODEL ||
+      process.env.KYBERION_LOCAL_LLM_MODEL ||
+      'nemotron';
     registerReasoningBackend(new OpenAiCompatibleBackend({ baseURL, apiKey, model }));
     installed = true;
     installedMode = 'nemotron-api';
     logger.success(
-      `[reasoning-bootstrap] mode=nemotron-api — OpenAI-compatible Nemotron endpoint (${baseURL}, model=${model})`,
+      `[reasoning-bootstrap] mode=nemotron-api — OpenAI-compatible Nemotron endpoint (${baseURL}, model=${model})`
     );
     return true;
   }
@@ -382,21 +422,29 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   if (mode === 'openrouter') {
     const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
     if (!openrouterBackend && !options.force) {
-      logger.warn('[reasoning-bootstrap] mode=openrouter selected but OPENROUTER_API_KEY is unset — keeping stubs.');
+      logger.warn(
+        '[reasoning-bootstrap] mode=openrouter selected but OPENROUTER_API_KEY is unset — keeping stubs.'
+      );
       installed = true;
       installedMode = 'stub';
       return false;
     }
-    const apiKey = process.env.KYBERION_OPENROUTER_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() || 'not-needed';
+    const apiKey =
+      process.env.KYBERION_OPENROUTER_KEY?.trim() ||
+      process.env.OPENROUTER_API_KEY?.trim() ||
+      'not-needed';
     const baseURL = process.env.KYBERION_OPENROUTER_URL?.trim();
-    const model = options.model || process.env.KYBERION_OPENROUTER_MODEL?.trim() || 'meta-llama/llama-3-70b-instruct';
+    const model =
+      options.model ||
+      process.env.KYBERION_OPENROUTER_MODEL?.trim() ||
+      'meta-llama/llama-3-70b-instruct';
     registerReasoningBackend(
-      openrouterBackend ?? new OpenRouterBackend({ baseURL, apiKey, model }),
+      openrouterBackend ?? new OpenRouterBackend({ baseURL, apiKey, model })
     );
     installed = true;
     installedMode = 'openrouter';
     logger.success(
-      `[reasoning-bootstrap] mode=openrouter — OpenRouter API backend (model=${model})`,
+      `[reasoning-bootstrap] mode=openrouter — OpenRouter API backend (model=${model})`
     );
     return true;
   }
@@ -408,11 +456,15 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
 }
 
 function shouldRefreshProviders(options: InstallReasoningOptions): boolean {
-  return options.refreshProviders === true || process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1';
+  return (
+    options.refreshProviders === true || process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1'
+  );
 }
 
 /** @deprecated Use installReasoningBackends */
-export function installAnthropicBackendsIfAvailable(options: InstallReasoningOptions = {}): boolean {
+export function installAnthropicBackendsIfAvailable(
+  options: InstallReasoningOptions = {}
+): boolean {
   return installReasoningBackends(options);
 }
 

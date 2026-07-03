@@ -32,12 +32,17 @@ describe('router-contract', () => {
   it('emits pipeline and mission routing hints for governed process intents', () => {
     const baseline = resolveSurfaceIntent('Kyberionのベースライン状態を確認して');
     const createMission = resolveSurfaceIntent('ミッションを作成して');
+    const inventory = resolveSurfaceIntent('ミッション一覧を教えて');
     expect(baseline.intentId).toBe('check-kyberion-baseline');
     expect(baseline.shape).toBe('pipeline');
     expect(baseline.pipelineId).toBe('baseline-check');
     expect(createMission.intentId).toBe('create-mission');
     expect(createMission.shape).toBe('mission');
     expect(createMission.missionAction).toBe('create');
+    expect(inventory.intentId).toBe('inspect-mission-inventory');
+    expect(inventory.shape).toBe('task_session');
+    expect(inventory.routeFamily).toBe('pipeline');
+    expect(inventory.pipelineId).toBe('inspect-mission-inventory');
   });
 
   it('maps extended mission-process intents to direct mission actions', () => {

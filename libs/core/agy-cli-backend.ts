@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
@@ -51,10 +52,7 @@ const SourceRefSchema = z.object({
 });
 
 const OptionalArraySchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
-  z.preprocess(
-    (value) => (value === null ? undefined : value),
-    z.array(itemSchema).optional(),
-  );
+  z.preprocess((value) => (value === null ? undefined : value), z.array(itemSchema).optional());
 
 const OptionalSchema = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => (value === null ? undefined : value), schema.optional());
@@ -136,10 +134,12 @@ export class AgyCliBackend implements ReasoningBackend {
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
     this.sandbox = options.sandbox ?? process.env.KYBERION_AGY_SANDBOX !== '0';
-    this.logFile = options.logFile ?? path.join(
-      pathResolver.sharedTmp(),
-      `agy-cli-${Date.now()}-${Math.random().toString(36).slice(2)}.log`,
-    );
+    this.logFile =
+      options.logFile ??
+      path.join(
+        pathResolver.sharedTmp(),
+        `agy-cli-${Date.now()}-${Math.random().toString(36).slice(2)}.log`
+      );
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -150,7 +150,7 @@ export class AgyCliBackend implements ReasoningBackend {
           proposed_by: z.string(),
           content: z.string(),
           status: z.enum(['pending', 'survived', 'rejected']).optional(),
-        }),
+        })
       ),
     });
     const result = await this.runStructured({
@@ -177,7 +177,7 @@ export class AgyCliBackend implements ReasoningBackend {
           survived: z.boolean(),
           rejection_reason: OptionalSchema(z.string()),
           critiques: z.array(z.object({ by: z.string(), content: z.string() })).optional(),
-        }),
+        })
       ),
     });
     return (await this.runStructured({
@@ -289,10 +289,9 @@ export class AgyCliBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
-    return this.runPrompt([
-      instruction,
-      context ? `Context: ${context}` : '',
-    ].filter(Boolean).join('\n\n'));
+    return this.runPrompt(
+      [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n')
+    );
   }
 
   async prompt(prompt: string): Promise<string> {
@@ -339,15 +338,19 @@ export class AgyCliBackend implements ReasoningBackend {
       cliResult = JSON.parse(extractJsonPayload(stdout));
     } catch (err: any) {
       throw new Error(
-        `[agy-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`,
+        `[agy-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
       );
     }
     if (cliResult.is_error) {
-      throw new Error(`[agy-cli] CLI reported error: ${cliResult.result ?? JSON.stringify(cliResult)}`);
+      throw new Error(
+        `[agy-cli] CLI reported error: ${cliResult.result ?? JSON.stringify(cliResult)}`
+      );
     }
     const structured = cliResult.structured_output ?? cliResult.response ?? cliResult;
     if (structured === undefined || structured === null) {
-      throw new Error(`[agy-cli] CLI did not emit structured output. Result: ${cliResult.result ?? stdout.slice(0, 500)}`);
+      throw new Error(
+        `[agy-cli] CLI did not emit structured output. Result: ${cliResult.result ?? stdout.slice(0, 500)}`
+      );
     }
     let structuredValue: unknown = structured;
     if (typeof structured === 'string') {
@@ -355,14 +358,14 @@ export class AgyCliBackend implements ReasoningBackend {
         structuredValue = JSON.parse(extractJsonPayload(structured));
       } catch (err: any) {
         throw new Error(
-          `[agy-cli] structured output was not valid JSON: ${err?.message ?? String(err)}. Structured: ${structured.slice(0, 500)}`,
+          `[agy-cli] structured output was not valid JSON: ${err?.message ?? String(err)}. Structured: ${structured.slice(0, 500)}`
         );
       }
     }
     const parsed = params.schema.safeParse(structuredValue);
     if (!parsed.success) {
       throw new Error(
-        `[agy-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`,
+        `[agy-cli] schema validation failed: ${parsed.error.message}. Structured: ${JSON.stringify(structured).slice(0, 500)}`
       );
     }
     return parsed.data;
@@ -427,7 +430,7 @@ export class AgyCliBackend implements ReasoningBackend {
 }
 
 export function buildAgyCliBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): AgyCliBackend | null {
   const bin = env.KYBERION_ANTIGRAVITY_CLI_BIN?.trim() || env.KYBERION_AGY_CLI_BIN?.trim();
   const model = env.KYBERION_AGY_CLI_MODEL?.trim();
@@ -450,7 +453,11 @@ export function buildAgyCliBackendFromEnv(
 export async function runAgyCliQuery<T>(params: RunAgyCliQueryParams<T>): Promise<T> {
   const backendOptions = params.options || {};
   const backend = new AgyCliBackend(backendOptions);
-  return backend.runStructured({ systemPrompt: params.systemPrompt, userPrompt: params.userPrompt, schema: params.schema });
+  return backend.runStructured({
+    systemPrompt: params.systemPrompt,
+    userPrompt: params.userPrompt,
+    schema: params.schema,
+  });
 }
 
 function extractJsonPayload(raw: string): string {

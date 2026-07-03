@@ -7,9 +7,12 @@ const rootDir = process.cwd();
 
 const allowedRuntimeChildProcessConsumers = [
   'libs/actuators/browser-actuator/src/index.ts',
-  'libs/actuators/code-actuator/src/index.ts',
-  'libs/actuators/modeling-actuator/src/index.ts',
-  'libs/actuators/orchestrator-actuator/src/index.ts',
+  'libs/actuators/code-actuator/src/code-pipeline-helpers.ts',
+  'libs/actuators/media-actuator/src/artisan/pptx-extraction.ts',
+  'libs/actuators/media-actuator/src/artisan/xlsx-extraction.ts',
+  'libs/actuators/media-actuator/src/index.test.ts',
+  'libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts',
+  'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.test.ts',
   'libs/core/agent-adapter.ts',
@@ -58,7 +61,9 @@ function read(relPath: string): string {
 
 describe('Runtime child_process boundary', () => {
   it('confines direct child_process imports in production runtime code to declared boundaries', () => {
-    const codeFiles = getAllFiles(rootDir).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
+    const codeFiles = getAllFiles(rootDir).filter((filePath) =>
+      /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath)
+    );
     const actual = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => !relPath.endsWith('.d.ts'))
@@ -68,7 +73,11 @@ describe('Runtime child_process boundary', () => {
       .filter((relPath) => !relPath.includes('/.next/'))
       .filter((relPath) => !relPath.startsWith('vault/'))
       .filter((relPath) => !relPath.startsWith('scripts/'))
-      .filter((relPath) => /\bfrom ['"]node:child_process['"]|require\(['"]node:child_process['"]\)/.test(read(relPath)))
+      .filter((relPath) =>
+        /\bfrom ['"]node:child_process['"]|require\(['"]node:child_process['"]\)/.test(
+          read(relPath)
+        )
+      )
       .sort((a, b) => a.localeCompare(b));
 
     expect(actual).toEqual(allowedRuntimeChildProcessConsumers);

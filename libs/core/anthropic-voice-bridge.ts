@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type {
   OneOnOneSessionInput,
   OneOnOneSessionResult,
@@ -19,7 +20,7 @@ import type {
   VoiceBridge,
 } from './voice-bridge.js';
 
-const DEFAULT_MODEL = 'claude-opus-4-7' as const;
+const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 8000;
 
 const SYSTEM_PROMPT = `You generate text-based rehearsal and 1-on-1 session transcripts for a CEO work-automation platform.

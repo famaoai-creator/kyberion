@@ -12,7 +12,7 @@ const { resolveAgentProviderTargetMock } = vi.hoisted(() => ({
       modelId: preferredModelId || preferredProvider,
       strategy: 'preferred' as const,
       availableProviders: [preferredProvider],
-    }),
+    })
   ),
 }));
 
@@ -24,6 +24,7 @@ import { agentLifecycle } from '@agent/core/agent-lifecycle';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { agentRegistry } from '@agent/core/agent-registry';
 import { ACPMediator } from '@agent/core/acp-mediator';
+import { CodexAppServerAdapter } from '@agent/core/agent-adapter';
 
 describe('agent runtime observability', () => {
   beforeEach(async () => {
@@ -47,6 +48,8 @@ describe('agent runtime observability', () => {
       sessionId: 'session-1',
       usage: { inputTokens: 12, outputTokens: 7, totalTokens: 19 },
       supportsSoftRefresh: true,
+      alive: true,
+      crashed: false,
     });
 
     const handle = await agentLifecycle.spawn({
@@ -78,8 +81,10 @@ describe('agent runtime observability', () => {
     vi.spyOn(ACPMediator.prototype, 'getRuntimeInfo').mockReturnValue({
       pid: 12345,
       sessionId: 'session-2',
-      usage: null,
+      usage: {},
       supportsSoftRefresh: true,
+      alive: true,
+      crashed: false,
     });
 
     await agentLifecycle.spawn({
@@ -102,8 +107,10 @@ describe('agent runtime observability', () => {
     vi.spyOn(ACPMediator.prototype, 'getRuntimeInfo').mockReturnValue({
       pid: 12345,
       sessionId: 'session-3',
-      usage: null,
+      usage: {},
       supportsSoftRefresh: true,
+      alive: true,
+      crashed: false,
     });
 
     await agentLifecycle.spawn({
@@ -130,8 +137,10 @@ describe('agent runtime observability', () => {
     vi.spyOn(ACPMediator.prototype, 'getRuntimeInfo').mockReturnValue({
       pid: 12345,
       sessionId: 'session-4',
-      usage: null,
+      usage: {},
       supportsSoftRefresh: true,
+      alive: true,
+      crashed: false,
     });
 
     await agentLifecycle.spawn({
@@ -149,5 +158,100 @@ describe('agent runtime observability', () => {
     expect(snapshot?.metrics.refreshCount).toBe(1);
     expect(snapshot?.metrics.lastRefreshedAt).toBeDefined();
     expect(snapshot?.metrics.restartCount).toBe(1);
+  });
+
+  it('marks ACP agents unhealthy when the provider process is gone', async () => {
+    vi.spyOn(ACPMediator.prototype, 'boot').mockResolvedValue();
+    vi.spyOn(ACPMediator.prototype, 'ask').mockResolvedValue('ok');
+    vi.spyOn(ACPMediator.prototype, 'shutdown').mockResolvedValue();
+    vi.spyOn(ACPMediator.prototype, 'isProcessAlive').mockReturnValue(false);
+    vi.spyOn(ACPMediator.prototype, 'getRuntimeInfo').mockReturnValue({
+      pid: 999999,
+      sessionId: 'session-dead',
+      usage: {},
+      supportsSoftRefresh: true,
+      alive: false,
+      crashed: true,
+    });
+
+    await agentLifecycle.spawn({
+      agentId: 'dead-agent',
+      provider: 'gemini',
+      modelId: 'gemini-2.5-flash',
+    });
+
+    const health = await agentLifecycle.healthCheck();
+
+    expect(health.get('dead-agent')).toBe('error');
+    expect(agentRegistry.get('dead-agent')?.status).toBe('error');
+  });
+
+  it('marks exec app-server agents unhealthy when the provider process is gone', async () => {
+    vi.spyOn(CodexAppServerAdapter.prototype, 'boot').mockResolvedValue();
+    vi.spyOn(CodexAppServerAdapter.prototype, 'ask').mockResolvedValue({
+      text: 'ok',
+      stopReason: 'completed',
+    } as any);
+    vi.spyOn(CodexAppServerAdapter.prototype, 'shutdown').mockResolvedValue();
+    vi.spyOn(CodexAppServerAdapter.prototype, 'getRuntimeInfo').mockReturnValue({
+      pid: 424242,
+      threadId: 'thread-dead',
+      usage: {},
+      supportsSoftRefresh: true,
+    });
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new Error('ESRCH');
+    });
+
+    await agentLifecycle.spawn({
+      agentId: 'codex-dead-agent',
+      provider: 'codex',
+      modelId: 'gpt-5.5',
+    });
+
+    const health = await agentLifecycle.healthCheck();
+
+    expect(killSpy).toHaveBeenCalledWith(424242, 0);
+    expect(health.get('codex-dead-agent')).toBe('error');
+    expect(agentRegistry.get('codex-dead-agent')?.status).toBe('error');
+  });
+
+  it('auto-restarts crashed ACP agents within the restart budget', async () => {
+    vi.spyOn(ACPMediator.prototype, 'boot').mockResolvedValue();
+    vi.spyOn(ACPMediator.prototype, 'ask').mockResolvedValue('ok');
+    vi.spyOn(ACPMediator.prototype, 'shutdown').mockResolvedValue();
+    vi.spyOn(ACPMediator.prototype, 'getRuntimeInfo').mockReturnValue({
+      pid: 12345,
+      sessionId: 'session-restart',
+      usage: {},
+      supportsSoftRefresh: true,
+      alive: true,
+      crashed: false,
+    });
+    vi.spyOn(ACPMediator.prototype, 'isProcessAlive').mockReturnValue(false);
+    const restartSpy = vi.spyOn(agentLifecycle, 'restart').mockResolvedValue({
+      agentId: 'restart-agent',
+      ask: async () => 'ok',
+      shutdown: async () => {},
+      getRecord: () => agentRegistry.get('restart-agent'),
+    } as any);
+
+    await agentLifecycle.spawn({
+      agentId: 'restart-agent',
+      provider: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      restartPolicy: {
+        maxRestarts: 1,
+        windowMs: 10 * 60 * 1000,
+      },
+    });
+
+    const firstHealth = await agentLifecycle.healthCheck();
+    expect(firstHealth.get('restart-agent')).toBe('ready');
+    expect(restartSpy).toHaveBeenCalledTimes(1);
+
+    const secondHealth = await agentLifecycle.healthCheck();
+    expect(secondHealth.get('restart-agent')).toBe('error');
+    expect(restartSpy).toHaveBeenCalledTimes(1);
   });
 });

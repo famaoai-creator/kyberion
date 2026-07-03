@@ -3,15 +3,15 @@
  * Reads the same JSON files as the runtime, exercises the same logic,
  * and prints a resolution table without building a full PPTX.
  */
-import { readFileSync } from 'fs';
 import { resolve, join } from 'path';
 import { fileURLToPath } from 'url';
+import { safeExistsSync, safeReadFile } from '@agent/core';
 
 const moduleDir = fileURLToPath(new URL('.', import.meta.url));
 const rootDir = resolve(moduleDir, '..');
 
 function safeRead(p) {
-  return JSON.parse(readFileSync(resolve(rootDir, p), 'utf8'));
+  return JSON.parse(String(safeReadFile(resolve(rootDir, p), { encoding: 'utf8' }) || ''));
 }
 
 // --- replica of the runtime resolution logic ---
@@ -24,21 +24,28 @@ function resolveConfidentialTenant(brandName, designSystemId) {
       _cachedRegistry = safeRead('knowledge/confidential/tenants/index.json');
     }
     const key = brandName.toLowerCase();
-    for (const entry of (_cachedRegistry.tenants || [])) {
+    for (const entry of _cachedRegistry.tenants || []) {
       try {
         const ov = safeRead(entry.override_path);
-        if (designSystemId && ov.design_system_id && ov.design_system_id !== designSystemId) continue;
-        if (Array.isArray(ov.matchers) && ov.matchers.some(m => key.includes(m.toLowerCase()))) {
+        if (designSystemId && ov.design_system_id && ov.design_system_id !== designSystemId)
+          continue;
+        if (Array.isArray(ov.matchers) && ov.matchers.some((m) => key.includes(m.toLowerCase()))) {
           return { ...ov, _source: entry.override_path };
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
-  } catch { /* registry unavailable */ }
+  } catch {
+    /* registry unavailable */
+  }
   return null;
 }
 
 function resolveLayoutTemplate(brief, tenantOverride) {
-  const systems = safeRead('knowledge/public/design-patterns/media-templates/media-design-systems/systems.json');
+  const systems = safeRead(
+    'knowledge/public/design-patterns/media-templates/media-design-systems/systems.json'
+  );
   const system = systems.systems?.[brief.design_system_id];
 
   // Priority 1: tenant confidential catalog
@@ -49,13 +56,17 @@ function resolveLayoutTemplate(brief, tenantOverride) {
       if (catalog.templates?.[id]) {
         return { templateId: id, source: tenantOverride.layout_template_catalog };
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   // Priority 2: system-level public catalog
   const templateId = tenantOverride?.layout_template_id || system?.layout_template_id || null;
   if (templateId) {
-    const publicCatalog = safeRead('knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json');
+    const publicCatalog = safeRead(
+      'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
+    );
     if (publicCatalog.templates?.[templateId]) {
       return { templateId, source: 'public/layout-templates.json' };
     }
@@ -65,14 +76,24 @@ function resolveLayoutTemplate(brief, tenantOverride) {
 }
 
 const FALLBACK_ZONE_MAP = {
-  hero: 'hero', problem: 'two_column_callout', evidence: 'two_column_callout',
-  roi: 'two_column_callout', control: 'two_column_risk', plan: 'timeline',
-  roadmap: 'timeline', solution: 'architecture_panel', architecture: 'architecture_panel',
-  decision: 'decision_cta', cta: 'decision_cta', summary: 'single_column',
+  hero: 'hero',
+  problem: 'two_column_callout',
+  evidence: 'two_column_callout',
+  roi: 'two_column_callout',
+  control: 'two_column_risk',
+  plan: 'timeline',
+  roadmap: 'timeline',
+  solution: 'architecture_panel',
+  architecture: 'architecture_panel',
+  decision: 'decision_cta',
+  cta: 'decision_cta',
+  summary: 'single_column',
 };
 
 function resolveBodyZoneKey(semanticType, designSystemId) {
-  const systems = safeRead('knowledge/public/design-patterns/media-templates/media-design-systems/systems.json');
+  const systems = safeRead(
+    'knowledge/public/design-patterns/media-templates/media-design-systems/systems.json'
+  );
   const system = systems.systems?.[designSystemId];
   if (system?.body_zone_map?.[semanticType]) {
     return { key: system.body_zone_map[semanticType], source: 'body_zone_map' };
@@ -83,10 +104,19 @@ function resolveBodyZoneKey(semanticType, designSystemId) {
 // --- scenario runner ---
 
 const SCENARIOS = [
-  { name: 'ソリューション提案（SBISS）',   brief: 'active/shared/tmp/verify-scenarios/solution-proposal-sbiss/deck-brief.json' },
-  { name: 'システム提案',                   brief: 'active/shared/tmp/verify-scenarios/system-proposal/deck-brief.json' },
-  { name: '設計書',                         brief: 'active/shared/tmp/verify-scenarios/design-document/deck-brief.json' },
-  { name: '調査報告レポート',               brief: 'active/shared/tmp/verify-scenarios/research-report/deck-brief.json' },
+  {
+    name: 'ソリューション提案（SBISS）',
+    brief: 'active/shared/tmp/verify-scenarios/solution-proposal-sbiss/deck-brief.json',
+  },
+  {
+    name: 'システム提案',
+    brief: 'active/shared/tmp/verify-scenarios/system-proposal/deck-brief.json',
+  },
+  { name: '設計書', brief: 'active/shared/tmp/verify-scenarios/design-document/deck-brief.json' },
+  {
+    name: '調査報告レポート',
+    brief: 'active/shared/tmp/verify-scenarios/research-report/deck-brief.json',
+  },
 ];
 
 const PAD = 26;
@@ -95,6 +125,12 @@ for (const scenario of SCENARIOS) {
   console.log('\n' + '═'.repeat(72));
   console.log(`  ${scenario.name}`);
   console.log('═'.repeat(72));
+
+  if (!safeExistsSync(scenario.brief)) {
+    console.log(`  missing brief     : ${scenario.brief}`);
+    console.log('  → skipped (fixture not present)');
+    continue;
+  }
 
   const brief = safeRead(scenario.brief);
   const brandName = brief.branding?.brand_name || brief.client || '';
@@ -123,7 +159,7 @@ for (const scenario of SCENARIOS) {
   console.log(`  ${'semantic_type'.padEnd(PAD)} → ${'body_zone_key'.padEnd(22)} (source)`);
   console.log('  ' + '─'.repeat(68));
 
-  for (const slide of (brief.slides || [])) {
+  for (const slide of brief.slides || []) {
     const st = slide.semantic_type;
     if (!st || st === 'hero') continue; // hero uses its own zone
     const bz = resolveBodyZoneKey(st, dsId);

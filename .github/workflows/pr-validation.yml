@@ -49,8 +49,17 @@ jobs:
       - name: Lint check
         run: pnpm run lint
 
+      - name: Format check
+        run: pnpm run format:check:ci
+
       - name: Run core tests
         run: pnpm run test:core
+
+      - name: Run actuator tests
+        run: pnpm run test:actuators
+
+      - name: Run governance boundary tests
+        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
 
       - name: Check golden outputs
         env:

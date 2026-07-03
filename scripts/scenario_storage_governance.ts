@@ -5,13 +5,17 @@
  */
 
 import { auditChain } from '@agent/core';
-import { fetchWithVaultCache, getVaultEntry, invalidateVaultEntry, listVaultEntries } from '@agent/core';
+import {
+  fetchWithVaultCache,
+  getVaultEntry,
+  invalidateVaultEntry,
+  listVaultEntries,
+} from '@agent/core';
 import { createProcessLogger } from '@agent/core';
 import { runJanitor } from '@agent/core';
 import { sharedLogsAudit, sharedLogsProcess } from '@agent/core';
 import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 
 function hr(label: string) {
   console.log(`\n${'─'.repeat(56)}`);
@@ -19,9 +23,15 @@ function hr(label: string) {
   console.log('─'.repeat(56));
 }
 
-function ok(msg: string) { console.log(`  ✓ ${msg}`); }
-function info(msg: string) { console.log(`  · ${msg}`); }
-function warn(msg: string) { console.log(`  ⚠ ${msg}`); }
+function ok(msg: string) {
+  console.log(`  ✓ ${msg}`);
+}
+function info(msg: string) {
+  console.log(`  · ${msg}`);
+}
+function warn(msg: string) {
+  console.log(`  ⚠ ${msg}`);
+}
 
 // ── Scenario 1: AuditChain ───────────────────────────────────
 
@@ -57,7 +67,9 @@ ok(`recorded tenant-scoped entry ${e3.id} (tenant: sbijsm)`);
 
 // Verify
 const verification = auditChain.verify();
-ok(`chain integrity: ${verification.valid}/${verification.total} valid${verification.corrupted.length > 0 ? ` (${verification.corrupted.length} corrupted!)` : ''}`);
+ok(
+  `chain integrity: ${verification.valid}/${verification.total} valid${verification.corrupted.length > 0 ? ` (${verification.corrupted.length} corrupted!)` : ''}`
+);
 
 // Check files
 const auditDir = sharedLogsAudit();
@@ -73,7 +85,9 @@ if (safeExistsSync(sbissMirror)) {
   const files = safeReaddir(sbissMirror);
   ok(`tenant mirror sbiss: ${files.join(', ')}`);
   const lines = (safeReadFile(path.join(sbissMirror, files[0]), { encoding: 'utf8' }) as string)
-    .trim().split('\n').filter(Boolean);
+    .trim()
+    .split('\n')
+    .filter(Boolean);
   info(`  → ${lines.length} mirrored entry(ies)`);
 } else {
   warn('sbiss tenant mirror not created yet');
@@ -91,10 +105,16 @@ if (safeExistsSync(sbijsmMirror)) {
 hr('Scenario 2 — Data Vault: cache miss → hit → TTL expiry → invalidate');
 
 let fetchCount = 0;
-async function simulatedConfluenceFetch(pageId: string): Promise<{ id: string; title: string; body: string }> {
+async function simulatedConfluenceFetch(
+  pageId: string
+): Promise<{ id: string; title: string; body: string }> {
   fetchCount++;
-  await new Promise(r => setTimeout(r, 10)); // simulate latency
-  return { id: pageId, title: `Page ${pageId}`, body: `Content fetched at ${new Date().toISOString()}` };
+  await new Promise((r) => setTimeout(r, 10)); // simulate latency
+  return {
+    id: pageId,
+    title: `Page ${pageId}`,
+    body: `Content fetched at ${new Date().toISOString()}`,
+  };
 }
 
 // Miss
@@ -147,13 +167,11 @@ const result3 = await fetchWithVaultCache(
 ok(`post-invalidate fetch (fetchCount=${fetchCount}, fromCache=${result3.fromCache})`);
 
 // TTL expiry scenario (1ms TTL)
-await fetchWithVaultCache(
-  'web',
-  'url:short-lived',
-  async () => ({ content: 'ephemeral' }),
-  { ttlMs: 1, projectId: 'scenario-test' }
-);
-await new Promise(r => setTimeout(r, 10));
+await fetchWithVaultCache('web', 'url:short-lived', async () => ({ content: 'ephemeral' }), {
+  ttlMs: 1,
+  projectId: 'scenario-test',
+});
+await new Promise((r) => setTimeout(r, 10));
 const expired = getVaultEntry('web', 'url:short-lived', 'scenario-test');
 ok(`expired entry returns null: ${expired === null}`);
 
@@ -169,9 +187,13 @@ procLog.error('connection reset', { host: 'api.example.com', attempt: 3 });
 
 const logPath = path.join(path.dirname(sharedLogsProcess()), 'scenario-daemon.log');
 if (safeExistsSync(sharedLogsProcess('scenario-daemon.log'))) {
-  const raw = safeReadFile(sharedLogsProcess('scenario-daemon.log'), { encoding: 'utf8' }) as string;
+  const raw = safeReadFile(sharedLogsProcess('scenario-daemon.log'), {
+    encoding: 'utf8',
+  }) as string;
   const lines = raw.trim().split('\n').filter(Boolean);
-  ok(`process log written: ${lines.length} entries at active/shared/logs/process/scenario-daemon.log`);
+  ok(
+    `process log written: ${lines.length} entries at active/shared/logs/process/scenario-daemon.log`
+  );
   for (const line of lines) {
     const entry = JSON.parse(line);
     info(`  [${entry.level}] ${entry.msg}${entry.meta ? ' ' + JSON.stringify(entry.meta) : ''}`);

@@ -1,7 +1,7 @@
 {
   "v": "3.0.0",
-  "t": 28,
-  "u": "2026-06-20T13:55:24.307Z",
+  "t": 29,
+  "u": "2026-07-02T15:44:26.735Z",
   "s": [
     {
       "n": "agent-actuator",
@@ -48,7 +48,7 @@
       "path": "libs/actuators/browser-actuator",
       "d": "Pipeline-driven Playwright browser execution and session artifact actuator",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 2
     },
     {
@@ -64,7 +64,7 @@
       "path": "libs/actuators/code-actuator",
       "d": "ADF-driven code analysis and refactoring pipeline engine",
       "s": "implemented",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "capability_count": 3
     },
     {
@@ -226,6 +226,14 @@
       "s": "implemented",
       "version": "1.2.1",
       "capability_count": 33
+    },
+    {
+      "n": "working-memory-actuator",
+      "path": "libs/actuators/working-memory-actuator",
+      "d": "Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>').",
+      "s": "implemented",
+      "version": "1.1.0",
+      "capability_count": 14
     }
   ]
 }

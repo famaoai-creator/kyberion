@@ -5,7 +5,7 @@
  * 3. Print comparison summary
  */
 import * as path from 'path';
-import * as fs from 'fs';
+import { safeStat } from '../../../secure-io.js';
 import { distillDocxDesign } from '../../docx-utils.js';
 import { generateNativeDocx } from '../engine.js';
 
@@ -18,7 +18,7 @@ async function main() {
 
   const absSource = path.resolve(sourcePath);
   console.log(`📄 Source: ${absSource}`);
-  console.log(`   Size: ${fs.statSync(absSource).size} bytes\n`);
+  console.log(`   Size: ${safeStat(absSource).size} bytes\n`);
 
   // Step 1: Extract
   console.log('Step 1: Extracting DocxDesignProtocol...');
@@ -49,7 +49,7 @@ async function main() {
   console.log(`\nStep 2: Generating ${outputPath}...`);
   await generateNativeDocx(protocol, outputPath);
 
-  const outSize = fs.statSync(outputPath).size;
+  const outSize = safeStat(outputPath).size;
   console.log(`  - Output size: ${outSize} bytes`);
 
   // Step 3: Re-extract and compare
@@ -57,9 +57,13 @@ async function main() {
   const reExtracted = await distillDocxDesign(outputPath);
 
   console.log(`  - Body blocks: ${protocol.body.length} → ${reExtracted.body.length}`);
-  console.log(`  - Styles: ${protocol.styles.definitions.length} → ${reExtracted.styles.definitions.length}`);
+  console.log(
+    `  - Styles: ${protocol.styles.definitions.length} → ${reExtracted.styles.definitions.length}`
+  );
   console.log(`  - Sections: ${protocol.sections.length} → ${reExtracted.sections.length}`);
-  console.log(`  - Relationships: ${protocol.relationships.length} → ${reExtracted.relationships.length}`);
+  console.log(
+    `  - Relationships: ${protocol.relationships.length} → ${reExtracted.relationships.length}`
+  );
 
   // Count text
   function countText(body: typeof protocol.body): number {
@@ -86,7 +90,7 @@ async function main() {
   console.log(`   ${outputPath}`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('❌ Error:', err.message);
   process.exit(1);
 });

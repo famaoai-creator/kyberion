@@ -1,11 +1,37 @@
-import { logger, safeExec, safeReadFile, safeWriteFile, safeAppendFile, safeExistsSync, safeMkdir, safeOpenAppendFile, withRetry, runtimeSupervisor, spawnManagedProcess, stopManagedProcess, derivePipelineStatus, resolveServiceBinding, capabilityEntry, executeServicePreset, executeMcp, beginServiceOAuth, exchangeServiceOAuthCode, refreshServiceOAuthToken, validateServiceAuth, pathResolver, loadServiceEndpointsCatalog, classifyError, getServicePresetRecord } from '@agent/core';
+import {
+  logger,
+  safeExec,
+  safeReadFile,
+  safeWriteFile,
+  safeAppendFile,
+  safeExistsSync,
+  safeMkdir,
+  safeOpenAppendFile,
+  withRetry,
+  runtimeSupervisor,
+  spawnManagedProcess,
+  stopManagedProcess,
+  derivePipelineStatus,
+  resolveServiceBinding,
+  capabilityEntry,
+  executeServicePreset,
+  executeMcp,
+  beginServiceOAuth,
+  exchangeServiceOAuthCode,
+  refreshServiceOAuthToken,
+  validateServiceAuth,
+  pathResolver,
+  loadServiceEndpointsCatalog,
+  classifyError,
+  getServicePresetRecord,
+} from '@agent/core';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
 export interface ServiceAction {
   service_id: string;
-  mode: 'API' | 'CLI' | 'SDK' | 'STREAM' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP';
+  mode: 'API' | 'CLI' | 'SDK' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP';
   action: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   params: any;
@@ -26,7 +52,9 @@ type RetryPolicy = {
   jitter?: boolean;
 };
 
-const SERVICE_ACTUATOR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/service-actuator/manifest.json');
+const SERVICE_ACTUATOR_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/service-actuator/manifest.json'
+);
 const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -73,8 +101,16 @@ function emitRecoveryStimulus(serviceId: string) {
     ts: date.toISOString(),
     ttl: 600,
     origin: { channel: 'system', source_id: 'service-actuator' },
-    signal: { intent: 'alert', priority: 8, payload: `[SELF_HEALING] Service '${serviceId}' crash detected.` },
-    control: { status: 'pending', feedback: 'auto', evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-actuator' }] },
+    signal: {
+      intent: 'alert',
+      priority: 8,
+      payload: `[SELF_HEALING] Service '${serviceId}' crash detected.`,
+    },
+    control: {
+      status: 'pending',
+      feedback: 'auto',
+      evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-actuator' }],
+    },
   };
   safeAppendFile(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
 }
@@ -82,8 +118,11 @@ function emitRecoveryStimulus(serviceId: string) {
 function loadPipelineRetryPolicy(): RetryPolicy {
   if (cachedPipelineRetryPolicy) return cachedPipelineRetryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(SERVICE_ACTUATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    const policy = manifest?.recovery_policy?.retry || manifest?.recovery_policy?.default_retry || {};
+    const manifest = JSON.parse(
+      safeReadFile(SERVICE_ACTUATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
+    const policy =
+      manifest?.recovery_policy?.retry || manifest?.recovery_policy?.default_retry || {};
     cachedPipelineRetryPolicy = policy;
     return policy;
   } catch (_) {
@@ -102,10 +141,12 @@ function buildPipelineRetryPolicy(stepRetry: RetryPolicy | undefined): Required<
 
 function shouldRetryServiceAction(error: Error): boolean {
   const classification = classifyError(error);
-  return classification.category === 'network'
-    || classification.category === 'rate_limit'
-    || classification.category === 'timeout'
-    || classification.category === 'resource_unavailable';
+  return (
+    classification.category === 'network' ||
+    classification.category === 'rate_limit' ||
+    classification.category === 'timeout' ||
+    classification.category === 'resource_unavailable'
+  );
 }
 
 function resolveServiceBaseUrl(serviceId: string): string {
@@ -199,26 +240,32 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     const steps = input.steps || [];
     for (const step of steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
-      const stepResult = await withRetry(async () => {
-        return await handleSingleAction({
-          service_id: step.params.service_id,
-          mode: step.op.toUpperCase() as ServiceAction['mode'],
-          action: step.params.action,
-          params: step.params.params,
-          auth: step.params.auth,
-          method: step.params.method,
-        });
-      }, {
-        ...buildPipelineRetryPolicy(step.params.retry),
-        shouldRetry: shouldRetryServiceAction,
-      });
+      const stepResult = await withRetry(
+        async () => {
+          return await handleSingleAction({
+            service_id: step.params.service_id,
+            mode: step.op.toUpperCase() as ServiceAction['mode'],
+            action: step.params.action,
+            params: step.params.params,
+            auth: step.params.auth,
+            method: step.params.method,
+          });
+        },
+        {
+          ...buildPipelineRetryPolicy(step.params.retry),
+          shouldRetry: shouldRetryServiceAction,
+        }
+      );
 
       const exportKey = step.params.export_as || 'last_service_result';
       ctx[exportKey] = stepResult;
       results.push({ op: step.op, status: 'success' });
     }
     if (input.context?.context_path) {
-      safeWriteFile(pathResolver.rootResolve(input.context.context_path), JSON.stringify(ctx, null, 2));
+      safeWriteFile(
+        pathResolver.rootResolve(input.context.context_path),
+        JSON.stringify(ctx, null, 2)
+      );
     }
     return { status: derivePipelineStatus(results), results, ...ctx };
   }
@@ -226,11 +273,18 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
 }
 
 async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) => void) {
-  logger.info(`🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`);
+  logger.info(
+    `🔌 [SERVICE] Dispatching to ${input.service_id} (Mode: ${input.mode}, Action: ${input.action})`
+  );
 
   switch (input.mode) {
     case 'PRESET':
-      return await executeServicePreset(input.service_id, input.action, input.params, input.auth === 'secret-guard' ? 'secret-guard' : 'none');
+      return await executeServicePreset(
+        input.service_id,
+        input.action,
+        input.params,
+        input.auth === 'secret-guard' ? 'secret-guard' : 'none'
+      );
 
     case 'MCP':
       assertUnsafeCliAllowed();
@@ -256,12 +310,6 @@ async function handleSingleAction(input: ServiceAction, onEvent?: (data: any) =>
 
     case 'RECONCILE':
       return await reconcileServices(input);
-
-    case 'STREAM':
-      if ((loadServiceEndpointsCatalog().services[input.service_id]?.allow_stream_ingress ?? true) === false) {
-        throw new Error(`Streaming ingress is disabled for ${input.service_id}; use the service gateway instead.`);
-      }
-      throw new Error(`Streaming not implemented for ${input.service_id}`);
 
     case 'API':
       return await executeApiRequest(input);
@@ -294,7 +342,9 @@ async function reconcileServices(input: ServiceAction) {
     if (!pids[id] || !isRunning(pids[id])) {
       const authRes = await validateServiceAuth(id, (service as any).preset_path);
       if (!authRes.valid) {
-        logger.error(`⚠️ [RECONCILE] Auth validation failed for ${id}: ${authRes.reason}. Skipping start.`);
+        logger.error(
+          `⚠️ [RECONCILE] Auth validation failed for ${id}: ${authRes.reason}. Skipping start.`
+        );
         continue;
       }
 
@@ -310,7 +360,9 @@ async function reconcileServices(input: ServiceAction) {
     for (const [id, pid] of Object.entries(pids)) {
       if (!manifest[id]) {
         if (isRunning(pid as number)) {
-          try { process.kill(pid as number, 'SIGTERM'); } catch (_) {}
+          try {
+            process.kill(pid as number, 'SIGTERM');
+          } catch (_) {}
           logger.info(`  - ${id} stopped (not in manifest).`);
         }
         stopManagedProcess(serviceResourceId(id), null);
@@ -326,22 +378,27 @@ async function reconcileServices(input: ServiceAction) {
 }
 
 async function executeApiRequest(input: ServiceAction) {
-  const binding = input.auth ? resolveServiceBinding(input.service_id, input.auth) : resolveServiceBinding(input.service_id, 'none');
+  const binding = input.auth
+    ? resolveServiceBinding(input.service_id, input.auth)
+    : resolveServiceBinding(input.service_id, 'none');
   const token: string | null = binding.accessToken || null;
   const baseUrl = resolveServiceBaseUrl(input.service_id);
   const httpMethod = input.method || (input.params ? 'POST' : 'GET');
-  return await withRetry(async () => {
-    return await secureFetch({
-      method: httpMethod,
-      url: `${baseUrl}/${input.action}`,
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      data: httpMethod !== 'GET' ? input.params : undefined,
-      params: httpMethod === 'GET' ? input.params : undefined,
-    });
-  }, {
-    ...buildPipelineRetryPolicy(input.params?.retry),
-    shouldRetry: shouldRetryServiceAction,
-  });
+  return await withRetry(
+    async () => {
+      return await secureFetch({
+        method: httpMethod,
+        url: `${baseUrl}/${input.action}`,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        data: httpMethod !== 'GET' ? input.params : undefined,
+        params: httpMethod === 'GET' ? input.params : undefined,
+      });
+    },
+    {
+      ...buildPipelineRetryPolicy(input.params?.retry),
+      shouldRetry: shouldRetryServiceAction,
+    }
+  );
 }
 
 async function executeCliRequest(input: ServiceAction) {
@@ -356,11 +413,13 @@ async function executeCliRequest(input: ServiceAction) {
         input.service_id,
         input.action,
         input.params,
-        input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+        input.auth === 'secret-guard' ? 'secret-guard' : 'none'
       );
       return presetResult;
     } catch (_) {
-      logger.info(`  - CLI preset delegation failed for ${input.service_id}:${input.action}; falling back to raw CLI.`);
+      logger.info(
+        `  - CLI preset delegation failed for ${input.service_id}:${input.action}; falling back to raw CLI.`
+      );
     }
   }
   const cliBin = `${input.service_id}`;
@@ -375,6 +434,8 @@ function isUnsafeCliAllowed(): boolean {
 
 function assertUnsafeCliAllowed() {
   if (!isUnsafeCliAllowed()) {
-    throw new Error('[SECURITY] CLI execution disabled. Set KYBERION_ALLOW_UNSAFE_CLI=true to enable.');
+    throw new Error(
+      '[SECURITY] CLI execution disabled. Set KYBERION_ALLOW_UNSAFE_CLI=true to enable.'
+    );
   }
 }

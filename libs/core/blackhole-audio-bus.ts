@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * BlackHole AudioBus (macOS).
  *
@@ -26,10 +27,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from './core.js';
 import { safeExec } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
-import type {
-  AudioBus,
-  AudioBusProbe,
-} from './audio-bus.js';
+import type { AudioBus, AudioBusProbe } from './audio-bus.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 
 export interface BlackHoleBusOptions {
@@ -65,9 +63,13 @@ export class BlackHoleAudioBus implements AudioBus {
     try {
       const ffmpeg = this.opts.ffmpeg_bin ?? 'ffmpeg';
       // -hide_banner -devices keeps ffmpeg from being chatty.
-      const out = safeExec(ffmpeg, ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""'], {
-        env: process.env,
-      });
+      const out = safeExec(
+        ffmpeg,
+        ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""'],
+        {
+          env: process.env,
+        }
+      );
       const devices = (out as string) || '';
       if (!devices.includes(label)) {
         return {
@@ -90,7 +92,10 @@ export class BlackHoleAudioBus implements AudioBus {
         return {
           bus_id: 'blackhole',
           available: true,
-          devices: { input: this.opts.device_label ?? DEFAULT_DEVICE_LABEL, output: this.opts.device_label ?? DEFAULT_DEVICE_LABEL },
+          devices: {
+            input: this.opts.device_label ?? DEFAULT_DEVICE_LABEL,
+            output: this.opts.device_label ?? DEFAULT_DEVICE_LABEL,
+          },
         };
       }
       return {
@@ -105,7 +110,7 @@ export class BlackHoleAudioBus implements AudioBus {
     if (this.opened) return;
     if (format.encoding !== 'pcm_s16le') {
       throw new Error(
-        `[blackhole-audio-bus] only pcm_s16le is supported in this driver; got ${format.encoding}`,
+        `[blackhole-audio-bus] only pcm_s16le is supported in this driver; got ${format.encoding}`
       );
     }
     const probe = await this.probe();
@@ -121,19 +126,25 @@ export class BlackHoleAudioBus implements AudioBus {
       ffmpeg,
       [
         '-hide_banner',
-        '-loglevel', 'error',
-        '-f', 'avfoundation',
-        '-i', `:${label}`,
-        '-ac', channels,
-        '-ar', rate,
-        '-f', 's16le',
+        '-loglevel',
+        'error',
+        '-f',
+        'avfoundation',
+        '-i',
+        `:${label}`,
+        '-ac',
+        channels,
+        '-ar',
+        rate,
+        '-f',
+        's16le',
         '-',
       ],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'pipe'] }
     );
     this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
     this.inputProc.stderr?.on('data', (buf: Buffer) =>
-      logger._log('debug', `[blackhole input] ${buf.toString('utf8').trim()}`),
+      logger._log('debug', `[blackhole input] ${buf.toString('utf8').trim()}`)
     );
     this.inputProc.on('exit', (code) => {
       logger.info(`[blackhole-audio-bus] input ffmpeg exited with code ${code}`);
@@ -145,18 +156,24 @@ export class BlackHoleAudioBus implements AudioBus {
       ffmpeg,
       [
         '-hide_banner',
-        '-loglevel', 'error',
-        '-f', 's16le',
-        '-ac', channels,
-        '-ar', rate,
-        '-i', 'pipe:0',
-        '-f', 'avfoundation',
+        '-loglevel',
+        'error',
+        '-f',
+        's16le',
+        '-ac',
+        channels,
+        '-ar',
+        rate,
+        '-i',
+        'pipe:0',
+        '-f',
+        'avfoundation',
         `:${label}`,
       ],
-      { stdio: ['pipe', 'ignore', 'pipe'] },
+      { stdio: ['pipe', 'ignore', 'pipe'] }
     );
     this.outputProc.stderr?.on('data', (buf: Buffer) =>
-      logger._log('debug', `[blackhole output] ${buf.toString('utf8').trim()}`),
+      logger._log('debug', `[blackhole output] ${buf.toString('utf8').trim()}`)
     );
     this.outputProc.on('exit', (code) => {
       logger.info(`[blackhole-audio-bus] output ffmpeg exited with code ${code}`);

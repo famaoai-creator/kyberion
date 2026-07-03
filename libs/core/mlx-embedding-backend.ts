@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- uses child_process for the Python bridge; IP-08 will move this to a governed exec wrapper */
 /**
  * MLX Embedding Backend — Apple Silicon / macOS implementation.
  *
@@ -12,10 +13,10 @@
  *   KYBERION_PYTHON          — Legacy Python override
  */
 
-import * as fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { rootResolve } from './path-resolver.js';
+import { safeExistsSync } from './secure-io.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import type { EmbeddingBackend } from './embedding-backend.js';
 
@@ -41,13 +42,14 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
     this.dimensions = options.dimensions ?? DEFAULT_DIMS;
     this.scriptPath = rootResolve('scripts/mlx_embed.py');
 
-    const candidate = options.pythonBin
-      ?? process.env.KYBERION_PYTHON_BIN
-      ?? process.env.KYBERION_PYTHON
-      ?? resolveManagedToolPythonBin('mlx_audio')
-      ?? resolveManagedToolPythonBin('mlx_whisper')
-      ?? rootResolve('.venv/bin/python3');
-    this.pythonBin = fs.existsSync(candidate) ? candidate : 'python3';
+    const candidate =
+      options.pythonBin ??
+      process.env.KYBERION_PYTHON_BIN ??
+      process.env.KYBERION_PYTHON ??
+      resolveManagedToolPythonBin('mlx_audio') ??
+      resolveManagedToolPythonBin('mlx_whisper') ??
+      rootResolve('.venv/bin/python3');
+    this.pythonBin = safeExistsSync(candidate) ? candidate : 'python3';
   }
 
   async embed(text: string): Promise<Float32Array> {
@@ -72,7 +74,7 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
       try {
         const parsed = JSON.parse(line) as { vectors?: number[][]; error?: string };
         if (parsed.error) throw new Error(`[mlx-embedding] ${parsed.error}`);
-        if (parsed.vectors) return parsed.vectors.map(v => new Float32Array(v));
+        if (parsed.vectors) return parsed.vectors.map((v) => new Float32Array(v));
       } catch (e) {
         if (e instanceof SyntaxError) continue;
         throw e;
@@ -85,7 +87,7 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
 /** Returns true when macOS + mlx_embed.py script is present. */
 export function isMlxAvailable(): boolean {
   if (process.platform !== 'darwin') return false;
-  return fs.existsSync(rootResolve('scripts/mlx_embed.py'));
+  return safeExistsSync(rootResolve('scripts/mlx_embed.py'));
 }
 
 /** Log which Python binary and model will be used (for diagnostics). */
@@ -96,7 +98,7 @@ export function probeMlxEmbeddingBackend(env: NodeJS.ProcessEnv = process.env): 
 } {
   const scriptPath = rootResolve('scripts/mlx_embed.py');
   return {
-    available: process.platform === 'darwin' && fs.existsSync(scriptPath),
+    available: process.platform === 'darwin' && safeExistsSync(scriptPath),
     model: env.KYBERION_MLX_EMBED_MODEL ?? DEFAULT_MODEL,
     scriptPath,
   };

@@ -15,19 +15,27 @@ describe('Release operations contract', () => {
     expect(workflow).toContain('contents: write');
     expect(workflow).toContain('pnpm run validate');
     expect(workflow).toContain('pnpm run check:golden');
-    expect(workflow).toContain('pnpm run release:notes -- --ref "${{ github.ref_name }}" --output active/shared/tmp/release-notes.md');
+    expect(workflow).toContain(
+      'pnpm run release:notes -- --ref "${{ github.ref_name }}" --output active/shared/tmp/release-notes.md'
+    );
     expect(workflow).toContain('gh release create "${{ github.ref_name }}"');
   });
 
   it('documents the release notes extractor and migration runner contract', () => {
     const packageJson = read('package.json');
-    expect(packageJson).toContain('"release:notes": "node dist/scripts/extract_changelog_section.js"');
-    expect(packageJson).toContain('"check:pr-title": "pnpm tsx scripts/check_pr_title.ts"');
-    expect(packageJson).toContain('"migration:run": "pnpm tsx scripts/run_migrations.ts"');
-    expect(packageJson).toContain('"migration:rollback": "pnpm tsx scripts/run_migrations.ts --rollback"');
+    expect(packageJson).toContain(
+      '"release:notes": "node dist/scripts/extract_changelog_section.js"'
+    );
+    expect(packageJson).toContain('"check:pr-title": "pnpm exec tsx scripts/check_pr_title.ts"');
+    expect(packageJson).toContain('"migration:run": "pnpm exec tsx scripts/run_migrations.ts"');
+    expect(packageJson).toContain(
+      '"migration:rollback": "pnpm exec tsx scripts/run_migrations.ts --rollback"'
+    );
 
     const releaseOps = read('docs/developer/RELEASE_OPERATIONS.md');
-    expect(releaseOps).toContain('pnpm run release:notes -- --ref "v${NEW_VERSION}" --output active/shared/tmp/release-notes.md');
+    expect(releaseOps).toContain(
+      'pnpm run release:notes -- --ref "v${NEW_VERSION}" --output active/shared/tmp/release-notes.md'
+    );
     expect(releaseOps).toContain('Automated release workflow (`.github/workflows/release.yml`)');
     expect(releaseOps).toContain('Migration runner (`scripts/run_migrations.ts`)');
     expect(releaseOps).toContain('PR titles that do not match the pattern');
@@ -38,7 +46,8 @@ describe('Release operations contract', () => {
   });
 
   it('extracts a tagged changelog section with the built helper contract', async () => {
-    const { extractReleaseSection, normalizeRef } = await import('../scripts/extract_changelog_section.js');
+    const { extractReleaseSection, normalizeRef } =
+      await import('../scripts/extract_changelog_section.js');
     expect(normalizeRef('v0.1.2')).toBe('0.1.2');
 
     const changelog = read('CHANGELOG.md');

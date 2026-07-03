@@ -30,6 +30,7 @@ import {
 } from './reasoning-level-policy.js';
 import {
   resolveReasoningModelRoute,
+  resolveRuntimeModelId,
   type ReasoningModelRoute,
 } from './reasoning-model-routing.js';
 import {
@@ -42,9 +43,7 @@ import {
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
 } from './execution-brief.js';
-import {
-  resolveQuestionInteractionPacket,
-} from './question-resolver.js';
+import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
@@ -110,7 +109,11 @@ export interface IntentDeliveryDecision {
 }
 
 export type AgentRoutingMode = 'prompt' | 'subagent' | 'coordination';
-export type AgentRoutingScope = 'single_artifact' | 'multi_artifact' | 'stateful_flow' | 'boundary_crossing';
+export type AgentRoutingScope =
+  | 'single_artifact'
+  | 'multi_artifact'
+  | 'stateful_flow'
+  | 'boundary_crossing';
 export type AgentRoutingAutonomy = 'low' | 'medium' | 'high';
 export type AgentRoutingFanout = 'none' | 'parallel' | 'review' | 'cross_critique';
 
@@ -355,12 +358,15 @@ function parseJsonObject<T>(text: string): T | null {
   }
 }
 
-function summarizeRelevantIntents(text: string, packet?: ReturnType<typeof resolveIntentResolutionPacket>): string {
+function summarizeRelevantIntents(
+  text: string,
+  packet?: ReturnType<typeof resolveIntentResolutionPacket>
+): string {
   const policy = loadIntentPolicy();
   const intents = loadStandardIntentCatalog();
   const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
-  const scored = (packet || resolveIntentResolutionPacket(text))
-    .candidates.slice(0, policy.compiler.relevant_intent_limit)
+  const scored = (packet || resolveIntentResolutionPacket(text)).candidates
+    .slice(0, policy.compiler.relevant_intent_limit)
     .map((candidate) => catalogById.get(candidate.intent_id))
     .filter((intent): intent is NonNullable<typeof intent> => Boolean(intent))
     .map((intent) => ({
@@ -378,9 +384,7 @@ function summarizeRelevantIntents(text: string, packet?: ReturnType<typeof resol
 }
 
 function summarizeRelevantCapabilityBundlesByIntentIds(intentIds: string[]): string {
-  return summarizeRelevantCapabilityBundlesForIntentIdsCompact(
-    intentIds
-  );
+  return summarizeRelevantCapabilityBundlesForIntentIdsCompact(intentIds);
 }
 
 function summarizeRelevantExecutionProfilesByIntentIds(
@@ -577,7 +581,9 @@ function resolveTenantId(input: CompileUserIntentFlowInput): string | undefined 
     process.env.KYBERION_TENANT,
     process.env.KYBERION_CUSTOMER,
   ];
-  return candidates.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
+  return candidates
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    ?.trim();
 }
 
 function resolveIntentPacketForInput(input: CompileUserIntentFlowInput): IntentResolutionPacket {
@@ -606,8 +612,11 @@ function buildFallbackIntentContract(
     packet.selected_intent_id === 'resolve-approval' ||
     packet.selected_intent_id === 'request-approval'
   ) {
-    const requiredInputs = [...(executionBrief?.missing_inputs || ['approval_system', 'approval_scope'])];
-    const approvalSystem = executionBrief?.approval_system || packet.selected_parameters?.platform_id;
+    const requiredInputs = [
+      ...(executionBrief?.missing_inputs || ['approval_system', 'approval_scope']),
+    ];
+    const approvalSystem =
+      executionBrief?.approval_system || packet.selected_parameters?.platform_id;
     const clarificationAssessment = assessContextualClarification({
       intentId: executionBrief?.archetype_id || packet.selected_intent_id || 'resolve-approval',
       text: input.text,
@@ -617,35 +626,43 @@ function buildFallbackIntentContract(
       contextualFrame,
     });
     const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
-    const intentId = executionBrief?.archetype_id || packet.selected_intent_id || 'resolve-approval';
-    return attachExecutionProfile(attachCapabilityBundle({
-      kind: 'intent-contract',
-      source_text: input.text,
-      intent_id: intentId,
-      goal: {
-        summary:
-          executionBrief?.summary ||
-          (approvalSystem ? `Process the approval queue in ${approvalSystem}` : undefined) ||
-          'Process the approval queue and resolve the requested ringi item(s).',
-        success_condition:
-          'The target approval system and approval scope are identified and the requested approvals are handled safely.',
-      },
-      resolution: {
-        execution_shape: 'task_session',
-        task_type: 'service_operation',
-      },
-      required_inputs: effectiveRequiredInputs,
-      outcome_ids: executionBrief?.deliverables || ['approval_resolved'],
-      approval: {
-        requires_approval: false,
-      },
-      delivery_mode: inferGovernedDeliveryMode(input.text, 'task_session', effectiveRequiredInputs),
-      clarification_needed: clarificationAssessment.shouldClarify,
-      confidence: executionBrief?.confidence || 0.3,
-      why: clarificationAssessment.shouldClarify
-        ? 'Fallback approval workflow request was normalized into the governed intent-contract schema.'
-        : `Fallback approval workflow request was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`,
-    }), input);
+    const intentId =
+      executionBrief?.archetype_id || packet.selected_intent_id || 'resolve-approval';
+    return attachExecutionProfile(
+      attachCapabilityBundle({
+        kind: 'intent-contract',
+        source_text: input.text,
+        intent_id: intentId,
+        goal: {
+          summary:
+            executionBrief?.summary ||
+            (approvalSystem ? `Process the approval queue in ${approvalSystem}` : undefined) ||
+            'Process the approval queue and resolve the requested ringi item(s).',
+          success_condition:
+            'The target approval system and approval scope are identified and the requested approvals are handled safely.',
+        },
+        resolution: {
+          execution_shape: 'task_session',
+          task_type: 'service_operation',
+        },
+        required_inputs: effectiveRequiredInputs,
+        outcome_ids: executionBrief?.deliverables || ['approval_resolved'],
+        approval: {
+          requires_approval: false,
+        },
+        delivery_mode: inferGovernedDeliveryMode(
+          input.text,
+          'task_session',
+          effectiveRequiredInputs
+        ),
+        clarification_needed: clarificationAssessment.shouldClarify,
+        confidence: executionBrief?.confidence || 0.3,
+        why: clarificationAssessment.shouldClarify
+          ? 'Fallback approval workflow request was normalized into the governed intent-contract schema.'
+          : `Fallback approval workflow request was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`,
+      }),
+      input
+    );
   }
   if (classified) {
     const classifiedShape =
@@ -654,7 +671,9 @@ function buildFallbackIntentContract(
         : 'task_session';
     const shape = packet.selected_resolution?.shape ? selectedShape : classifiedShape;
     const normalizedShape = toWorkflowShape(shape);
-    const requiredInputs = [...(executionBrief?.missing_inputs || classified.requirements?.missing || [])];
+    const requiredInputs = [
+      ...(executionBrief?.missing_inputs || classified.requirements?.missing || []),
+    ];
     if (packet.selected_intent_id === 'setup-messaging-bridge') {
       if (selectedPlatformId) {
         const platformIndex = requiredInputs.indexOf('platform_id');
@@ -672,41 +691,40 @@ function buildFallbackIntentContract(
       contextualFrame,
     });
     const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
-    return attachExecutionProfile(attachCapabilityBundle({
-      kind: 'intent-contract',
-      source_text: input.text,
-      intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
-      goal: {
-        summary: executionBrief?.summary || classified.goal.summary,
-        success_condition: classified.goal.success_condition,
-      },
-      resolution: {
-        execution_shape: normalizedShape,
-        task_type: executionBrief?.target_actuators?.includes('pptx-generator')
-          ? 'presentation_deck'
-          : classified.taskType,
-      },
-      required_inputs: effectiveRequiredInputs,
-      outcome_ids: executionBrief?.deliverables || [],
-      approval: {
-        requires_approval: Boolean(classified.payload?.approval_required),
-      },
-      delivery_mode:
-        normalizedShape === 'project_bootstrap'
-          ? 'managed_program'
-          : inferGovernedDeliveryMode(
-              input.text,
-              normalizedShape,
-              effectiveRequiredInputs
-            ),
-      clarification_needed: clarificationAssessment.shouldClarify,
-      confidence: 0.55,
-      why: executionBrief
-        ? clarificationAssessment.shouldClarify
-          ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
-          : `Fallback classifier and execution brief were normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
-        : 'Fallback classifier mapped the request to the nearest governed task session contract.',
-    }), input);
+    return attachExecutionProfile(
+      attachCapabilityBundle({
+        kind: 'intent-contract',
+        source_text: input.text,
+        intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
+        goal: {
+          summary: executionBrief?.summary || classified.goal.summary,
+          success_condition: classified.goal.success_condition,
+        },
+        resolution: {
+          execution_shape: normalizedShape,
+          task_type: executionBrief?.target_actuators?.includes('pptx-generator')
+            ? 'presentation_deck'
+            : classified.taskType,
+        },
+        required_inputs: effectiveRequiredInputs,
+        outcome_ids: executionBrief?.deliverables || [],
+        approval: {
+          requires_approval: Boolean(classified.payload?.approval_required),
+        },
+        delivery_mode:
+          normalizedShape === 'project_bootstrap'
+            ? 'managed_program'
+            : inferGovernedDeliveryMode(input.text, normalizedShape, effectiveRequiredInputs),
+        clarification_needed: clarificationAssessment.shouldClarify,
+        confidence: 0.55,
+        why: executionBrief
+          ? clarificationAssessment.shouldClarify
+            ? 'Fallback classifier and execution brief were normalized into the governed intent-contract schema.'
+            : `Fallback classifier and execution brief were normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
+          : 'Fallback classifier mapped the request to the nearest governed task session contract.',
+      }),
+      input
+    );
   }
 
   const requiredInputs = (() => {
@@ -730,39 +748,43 @@ function buildFallbackIntentContract(
     contextualFrame,
   });
   const effectiveRequiredInputs = clarificationAssessment.shouldClarify ? requiredInputs : [];
-  const resolvedExecutionBrief = executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(input));
+  const resolvedExecutionBrief =
+    executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(input));
 
-  return attachExecutionProfile(attachCapabilityBundle({
-    kind: 'intent-contract',
-    source_text: input.text,
-    intent_id: resolvedExecutionBrief.archetype_id || 'general_request',
-    goal: {
-      summary: resolvedExecutionBrief.summary || 'Clarify and respond to the current request',
-      success_condition:
-        'The request is either clarified or answered without violating governance constraints.',
-    },
-    required_inputs: effectiveRequiredInputs,
-    resolution: {
-      execution_shape: toWorkflowShape(selectedShape),
-      task_type: resolvedExecutionBrief.target_actuators?.includes('pptx-generator')
-        ? 'presentation_deck'
-        : undefined,
-    },
-    outcome_ids: resolvedExecutionBrief.deliverables || [],
-    approval: {
-      requires_approval: false,
-    },
-    delivery_mode: inferGovernedDeliveryMode(input.text, selectedShape, effectiveRequiredInputs),
-    clarification_needed: clarificationAssessment.shouldClarify,
-    confidence: 0.25,
-    why: resolvedExecutionBrief
-      ? clarificationAssessment.shouldClarify
-        ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
-        : `Fallback execution brief was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
-      : clarificationAssessment.shouldClarify
-        ? 'Fallback could not derive a safe execution contract from the current request.'
-        : `Fallback could not derive a safe execution contract from the current request, but clarification was skipped by policy (${clarificationAssessment.reason}).`,
-  }), input);
+  return attachExecutionProfile(
+    attachCapabilityBundle({
+      kind: 'intent-contract',
+      source_text: input.text,
+      intent_id: resolvedExecutionBrief.archetype_id || 'general_request',
+      goal: {
+        summary: resolvedExecutionBrief.summary || 'Clarify and respond to the current request',
+        success_condition:
+          'The request is either clarified or answered without violating governance constraints.',
+      },
+      required_inputs: effectiveRequiredInputs,
+      resolution: {
+        execution_shape: toWorkflowShape(selectedShape),
+        task_type: resolvedExecutionBrief.target_actuators?.includes('pptx-generator')
+          ? 'presentation_deck'
+          : undefined,
+      },
+      outcome_ids: resolvedExecutionBrief.deliverables || [],
+      approval: {
+        requires_approval: false,
+      },
+      delivery_mode: inferGovernedDeliveryMode(input.text, selectedShape, effectiveRequiredInputs),
+      clarification_needed: clarificationAssessment.shouldClarify,
+      confidence: 0.25,
+      why: resolvedExecutionBrief
+        ? clarificationAssessment.shouldClarify
+          ? 'Fallback execution brief was normalized into the governed intent-contract schema.'
+          : `Fallback execution brief was normalized into the governed intent-contract schema; clarification was skipped by policy (${clarificationAssessment.reason}).`
+        : clarificationAssessment.shouldClarify
+          ? 'Fallback could not derive a safe execution contract from the current request.'
+          : `Fallback could not derive a safe execution contract from the current request, but clarification was skipped by policy (${clarificationAssessment.reason}).`,
+    }),
+    input
+  );
 }
 
 function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
@@ -995,7 +1017,7 @@ export function resolveIntentCompilerTarget(
   if (provider === 'gemini') {
     return {
       provider,
-      model: explicitModel || process.env.KYBERION_GEMINI_MODEL || 'gemini-2.5-flash',
+      model: explicitModel || resolveRuntimeModelId('gemini-default'),
     };
   }
 
@@ -1010,8 +1032,7 @@ async function compileExecutionBriefWithLlm(
   input: CompileUserIntentFlowInput,
   options: LlmCompileOptions = {}
 ): Promise<ActuatorExecutionBrief | null> {
-  const ask =
-    options.askFn || ((prompt: string) => defaultAsk(prompt));
+  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt));
   const raw = await ask(buildExecutionBriefPrompt(input));
   const parsed = parseJsonObject<ActuatorExecutionBrief>(raw);
   return parsed ? normalizeExecutionBrief(parsed, toExecutionBriefSeed(input)) : null;
@@ -1022,8 +1043,7 @@ async function compileIntentContractWithLlm(
   executionBrief: ActuatorExecutionBrief,
   options: LlmCompileOptions = {}
 ): Promise<IntentContract | null> {
-  const ask =
-    options.askFn || ((prompt: string) => defaultAsk(prompt));
+  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt));
   const raw = await ask(buildIntentContractPrompt(input, executionBrief));
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
@@ -1037,8 +1057,7 @@ async function compileWorkLoopWithLlm(
   contract: IntentContract,
   options: LlmCompileOptions = {}
 ): Promise<OrganizationWorkLoopSummary | null> {
-  const ask =
-    options.askFn || ((prompt: string) => defaultAsk(prompt));
+  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt));
   const raw = await ask(buildWorkLoopPrompt(input, executionBrief, contract));
   const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
   if (!parsed) return null;
@@ -1133,20 +1152,14 @@ export function formatClarificationPacketConcise(
 
   if (locale === 'ja') {
     const moreHint = remaining > 0 ? `（他 ${remaining} 件）` : '';
-    const lines = [
-      `次に必要な情報${moreHint}: \`${first.id}\``,
-      first.question,
-    ];
+    const lines = [`次に必要な情報${moreHint}: \`${first.id}\``, first.question];
     if (first.reason) lines.push(`理由: ${first.reason}`);
     if (first.default_assumption) lines.push(`デフォルト: ${first.default_assumption}`);
     return lines.join('\n');
   }
 
   const moreHint = remaining > 0 ? ` (+ ${remaining} more)` : '';
-  const lines = [
-    `Next required${moreHint}: \`${first.id}\``,
-    first.question,
-  ];
+  const lines = [`Next required${moreHint}: \`${first.id}\``, first.question];
   if (first.reason) lines.push(`Reason: ${first.reason}`);
   if (first.default_assumption) lines.push(`Default: ${first.default_assumption}`);
   return lines.join('\n');
@@ -1229,8 +1242,7 @@ export function deriveAgentRoutingDecision(
     durableShape ||
     workLoop.runtime_design.coordination.bus === 'mission_coordination_bus' ||
     workLoop.runtime_design.memory.store === 'mission_working_memory';
-  const browserSession =
-    intent?.execution_shape === 'browser_session';
+  const browserSession = intent?.execution_shape === 'browser_session';
   const lowRiskSimpleIntent =
     intent?.risk_profile === 'low' &&
     contract.outcome_ids.length <= 1 &&
@@ -1246,9 +1258,9 @@ export function deriveAgentRoutingDecision(
     ? 'coordination'
     : browserSession && lowRiskSimpleIntent
       ? 'prompt'
-    : reviewHeavy
-      ? 'subagent'
-      : 'prompt';
+      : reviewHeavy
+        ? 'subagent'
+        : 'prompt';
 
   const scope: AgentRoutingScope = boundaryCrossing
     ? 'boundary_crossing'
@@ -1259,13 +1271,7 @@ export function deriveAgentRoutingDecision(
         : 'single_artifact';
 
   const autonomy: AgentRoutingAutonomy =
-    mode === 'prompt'
-      ? 'low'
-      : mode === 'subagent'
-        ? reviewHeavy
-          ? 'high'
-          : 'medium'
-        : 'high';
+    mode === 'prompt' ? 'low' : mode === 'subagent' ? (reviewHeavy ? 'high' : 'medium') : 'high';
 
   const fanout: AgentRoutingFanout =
     mode === 'coordination'
@@ -1274,11 +1280,11 @@ export function deriveAgentRoutingDecision(
         ? 'parallel'
         : browserSession && lowRiskSimpleIntent
           ? 'none'
-        : workLoop.review_design.review_mode === 'strict'
-          ? 'cross_critique'
-          : reviewHeavy
-            ? 'review'
-            : 'none';
+          : workLoop.review_design.review_mode === 'strict'
+            ? 'cross_critique'
+            : reviewHeavy
+              ? 'review'
+              : 'none';
 
   const owner =
     workLoop.teaming.specialist_id ||
@@ -1290,10 +1296,7 @@ export function deriveAgentRoutingDecision(
     managedProgram ? 'mission-controller' : undefined,
   ].filter((value): value is string => Boolean(value) && value !== owner);
 
-  const artifactCount = Math.max(
-    contract.outcome_ids.length,
-    mode === 'coordination' ? 1 : 1
-  );
+  const artifactCount = Math.max(contract.outcome_ids.length, mode === 'coordination' ? 1 : 1);
 
   const stopCondition =
     mode === 'coordination'
@@ -1326,7 +1329,8 @@ export function deriveAgentRoutingDecision(
   };
 }
 
-const SIMPLE_GREETING_REGEX = /^(こんにちは|おはよう|こんばんは|ありがとう|さようなら|バイバイ|お疲れ様|おつかれ|hello|hi|thanks|thank you|bye)[！!！？?]?$/i;
+const SIMPLE_GREETING_REGEX =
+  /^(こんにちは|おはよう|こんばんは|ありがとう|さようなら|バイバイ|お疲れ様|おつかれ|hello|hi|thanks|thank you|bye)[！!！？?]?$/i;
 
 function emitIntentCompilationCompletedEvent(
   trace: Pick<TraceContext, 'addEvent'> | undefined,
@@ -1341,7 +1345,7 @@ function emitIntentCompilationCompletedEvent(
     compilerModel: string;
     fallbackReason: CompilationFallbackReason;
     reasoningPolicyVersion: string;
-  },
+  }
 ): void {
   trace?.addEvent('intent_compilation.completed', {
     reasoning_level: input.reasoningDecision.level,
@@ -1373,12 +1377,17 @@ export async function compileUserIntentFlow(
   const selectedIntent = resolutionPacket.selected_intent_id
     ? findStandardIntentById(resolutionPacket.selected_intent_id)
     : undefined;
-  const reasoningDecision = resolveReasoningLevelDecision({
-    isSimpleGreeting: SIMPLE_GREETING_REGEX.test(input.text.trim()),
-    resolutionPacket,
-    selectedIntent,
-  }, reasoningPolicy);
-  const shadowModelRoute = resolveReasoningModelRoute(reasoningDecision, { policy: reasoningPolicy });
+  const reasoningDecision = resolveReasoningLevelDecision(
+    {
+      isSimpleGreeting: SIMPLE_GREETING_REGEX.test(input.text.trim()),
+      resolutionPacket,
+      selectedIntent,
+    },
+    reasoningPolicy
+  );
+  const shadowModelRoute = resolveReasoningModelRoute(reasoningDecision, {
+    policy: reasoningPolicy,
+  });
   const cacheEligibility = buildIntentFlowCacheEligibility({
     text: input.text,
     locale: input.locale,
@@ -1391,7 +1400,10 @@ export async function compileUserIntentFlow(
     reasoningDecision,
     shadowModelRoute,
   });
-  const cacheLookup = lookupIntentFlowCache({ eligibility: cacheEligibility, inputText: input.text });
+  const cacheLookup = lookupIntentFlowCache({
+    eligibility: cacheEligibility,
+    inputText: input.text,
+  });
   if (cacheLookup.status === 'hit' && cacheLookup.cachedFlow) {
     emitIntentCompilationCompletedEvent(options.trace, {
       reasoningDecision: cacheLookup.cachedFlow.reasoningDecision,
@@ -1447,7 +1459,12 @@ export async function compileUserIntentFlow(
       }
       intentContract = await compileIntentContractWithLlm(resolvedInput, executionBrief, options);
       if (intentContract) {
-        workLoop = await compileWorkLoopWithLlm(resolvedInput, executionBrief, intentContract, options);
+        workLoop = await compileWorkLoopWithLlm(
+          resolvedInput,
+          executionBrief,
+          intentContract,
+          options
+        );
       } else if (fallbackReason === 'none') {
         source = 'fallback';
         fallbackReason = 'intent_contract_invalid';
@@ -1470,7 +1487,8 @@ export async function compileUserIntentFlow(
     workLoop = buildFallbackWorkLoop(resolvedInput, intentContract);
   }
   const routingDecision = deriveAgentRoutingDecision(intentContract, workLoop, resolvedInput.text);
-  const finalExecutionBrief = executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
+  const finalExecutionBrief =
+    executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
   if (cacheEligibility.eligible) {
     const writeResult = storeIntentFlowCache({
       eligibility: cacheEligibility,
@@ -1481,7 +1499,11 @@ export async function compileUserIntentFlow(
         routingDecision,
         reasoningDecision,
         shadowModelRoute,
-        clarificationPacket: buildClarificationPacket(intentContract, workLoop, finalExecutionBrief),
+        clarificationPacket: buildClarificationPacket(
+          intentContract,
+          workLoop,
+          finalExecutionBrief
+        ),
         source,
       },
     });

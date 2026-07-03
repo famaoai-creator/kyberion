@@ -3,7 +3,7 @@
  *
  * Invoked by the kyberion-claude-code plugin's hooks. Reads the hook event JSON
  * from stdin and the event name from argv[2], dispatches to the governed
- * handlers in `@agent/core/claude-code-hook.js`, and writes the hook response
+ * handlers in `@agent/core/claude-code-hook`, and writes the hook response
  * JSON to stdout.
  *
  *   node dist/scripts/claude_code_hook.js SessionStart  < event.json
@@ -24,8 +24,8 @@ import {
   recordCliUsage,
   recordPostToolUse,
   summarizeTranscriptUsage,
-} from '@agent/core/claude-code-hook.js';
-import { rawExistsSync, rawReadTextFile } from '@agent/core/fs-primitives.js';
+} from '@agent/core/claude-code-hook';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
@@ -48,16 +48,22 @@ async function main(): Promise<void> {
     case 'SessionStart': {
       process.stdout.write(
         JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: buildSessionStartContext() },
-        }),
+          hookSpecificOutput: {
+            hookEventName: 'SessionStart',
+            additionalContext: buildSessionStartContext(),
+          },
+        })
       );
       return;
     }
     case 'UserPromptSubmit': {
       process.stdout.write(
         JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: buildUserPromptSubmitContext(payload) },
-        }),
+          hookSpecificOutput: {
+            hookEventName: 'UserPromptSubmit',
+            additionalContext: buildUserPromptSubmitContext(payload),
+          },
+        })
       );
       return;
     }
@@ -76,17 +82,23 @@ async function main(): Promise<void> {
     case 'Stop': {
       // Capture this CLI session's token usage into metrics (best-effort).
       try {
-        const transcriptPath = typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
-        if (transcriptPath && rawExistsSync(transcriptPath)) {
-          recordCliUsage(summarizeTranscriptUsage(rawReadTextFile(transcriptPath)));
+        const transcriptPath =
+          typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
+        if (transcriptPath && safeExistsSync(transcriptPath)) {
+          recordCliUsage(
+            summarizeTranscriptUsage(safeReadFile(transcriptPath, { encoding: 'utf8' }) as string)
+          );
         }
       } catch {
         // usage capture is best-effort; never block session close
       }
       process.stdout.write(
         JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'Stop', additionalContext: buildStopContext(payload) },
-        }),
+          hookSpecificOutput: {
+            hookEventName: 'Stop',
+            additionalContext: buildStopContext(payload),
+          },
+        })
       );
       return;
     }
@@ -105,7 +117,7 @@ main().catch((err) => {
           permissionDecision: 'allow',
           permissionDecisionReason: `Kyberion hook errored (failing open): ${String(err)}`,
         },
-      }),
+      })
     );
   } else {
     process.stderr.write(`[claude_code_hook] ${String(err)}\n`);

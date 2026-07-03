@@ -1,13 +1,21 @@
-import { logger, safeReadFile, createStandardYargs, pathResolver } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  createStandardYargs,
+  pathResolver,
+  resolveServiceBinding,
+} from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './presence-actuator-helpers.js';
 
 const main = async () => {
+  const binding = resolveServiceBinding('slack', 'secret-guard');
+  void binding;
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  
+
   const inputPath = pathResolver.rootResolve(argv.input as string);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
@@ -18,11 +26,10 @@ const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
 const modulePath = fileURLToPath(import.meta.url);
 
 if (entrypoint && modulePath === entrypoint) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });
 }
 
 export { handleAction, MessagingMode } from './presence-actuator-helpers.js';
-

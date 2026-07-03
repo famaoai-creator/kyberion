@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec/managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
@@ -11,6 +12,7 @@ import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_AGENT_IDLE_TIMEOUT_MS || 20 * 60 * 1000);
@@ -30,11 +32,16 @@ export interface SpawnOptions {
   parentAgentId?: string;
   missionId?: string;
   trustRequired?: number;
+  turnTimeoutMs?: number;
+  restartPolicy?: {
+    maxRestarts: number;
+    windowMs: number;
+  };
 }
 
 export interface AgentHandle {
   agentId: string;
-  ask(prompt: string): Promise<string>;
+  ask(prompt: string, options?: { timeoutMs?: number }): Promise<string>;
   shutdown(): Promise<void>;
   getRecord(): AgentRecord | undefined;
 }
@@ -79,8 +86,14 @@ export interface AgentRuntimeSnapshot {
   supportsSoftRefresh: boolean;
 }
 
-interface LifecycleEntry { boot_command: string; boot_args: string[]; default_model: string }
-interface ProviderLifecycleFile { lifecycle: Record<string, LifecycleEntry> }
+interface LifecycleEntry {
+  boot_command: string;
+  boot_args: string[];
+  default_model: string;
+}
+interface ProviderLifecycleFile {
+  lifecycle: Record<string, LifecycleEntry>;
+}
 
 let _cachedLifecycle: Record<string, LifecycleEntry> | null = null;
 
@@ -88,14 +101,28 @@ function loadProviderLifecycle(): Record<string, LifecycleEntry> {
   if (_cachedLifecycle) return _cachedLifecycle;
   try {
     const filePath = pathResolver.knowledge('product/governance/provider-config.json');
-    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ProviderLifecycleFile;
+    const data = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as ProviderLifecycleFile;
     _cachedLifecycle = data.lifecycle || {};
   } catch (err) {
     const defaults = {
-      gemini: { boot_command: 'gemini', boot_args: ['--acp', '-y'], default_model: 'gemini-2.5-flash' },
-      copilot: { boot_command: 'gh', boot_args: ['copilot', '--', '--acp', '--allow-all'], default_model: 'claude-sonnet-4' },
+      gemini: {
+        boot_command: 'gemini',
+        boot_args: ['--acp', '-y'],
+        default_model: resolveRuntimeModelId('gemini-default'),
+      },
+      copilot: {
+        boot_command: 'gh',
+        boot_args: ['copilot', '--', '--acp', '--allow-all'],
+        default_model: resolveRuntimeModelId('copilot-default'),
+      },
     };
-    recordConfigFallback({ knowledgePath: 'product/governance/provider-config.json', error: err, defaults: { lifecycle: defaults } });
+    recordConfigFallback({
+      knowledgePath: 'product/governance/provider-config.json',
+      error: err,
+      defaults: { lifecycle: defaults },
+    });
     _cachedLifecycle = defaults;
   }
   return _cachedLifecycle;
@@ -103,12 +130,14 @@ function loadProviderLifecycle(): Record<string, LifecycleEntry> {
 
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
-  private execAdapters: Map<string, CodexAdapter | CodexAppServerAdapter | ClaudeAdapter> = new Map();
+  private execAdapters: Map<string, CodexAdapter | CodexAppServerAdapter | ClaudeAdapter> =
+    new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private pendingSpawns: Map<string, Promise<AgentHandle>> = new Map();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private spawnOptions: Map<string, SpawnOptions> = new Map();
   private runtimeMetrics: Map<string, AgentRuntimeMetrics> = new Map();
+  private restartHistory: Map<string, number[]> = new Map();
 
   private ensureMetrics(agentId: string): AgentRuntimeMetrics {
     let metrics = this.runtimeMetrics.get(agentId);
@@ -136,20 +165,55 @@ class AgentLifecycleManagerImpl {
     return undefined;
   }
 
-  private recordUsage(metrics: AgentRuntimeMetrics, providerRuntime?: Record<string, unknown>): void {
+  private recordUsage(
+    metrics: AgentRuntimeMetrics,
+    providerRuntime?: Record<string, unknown>
+  ): void {
     const usage = providerRuntime?.usage as Record<string, unknown> | undefined;
     if (!usage) return;
     metrics.usage = {
       promptChars: metrics.lastPromptChars,
       responseChars: metrics.lastResponseChars,
-      inputTokens: coerceUsageNumber(usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens),
-      outputTokens: coerceUsageNumber(usage.outputTokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.completion_tokens),
+      inputTokens: coerceUsageNumber(
+        usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens
+      ),
+      outputTokens: coerceUsageNumber(
+        usage.outputTokens ??
+          usage.output_tokens ??
+          usage.completionTokens ??
+          usage.completion_tokens
+      ),
       totalTokens: coerceUsageNumber(usage.totalTokens ?? usage.total_tokens),
       raw: usage,
     };
   }
 
-  private observeSuccess(agentId: string, prompt: string, responseText: string, stopReason: string): void {
+  private recordAutoRestart(agentId: string): number[] {
+    const now = Date.now();
+    const history = this.restartHistory.get(agentId) || [];
+    history.push(now);
+    this.restartHistory.set(agentId, history);
+    return history;
+  }
+
+  private canAutoRestart(
+    agentId: string,
+    policy: NonNullable<SpawnOptions['restartPolicy']>
+  ): boolean {
+    const now = Date.now();
+    const history = (this.restartHistory.get(agentId) || []).filter(
+      (ts) => now - ts <= policy.windowMs
+    );
+    this.restartHistory.set(agentId, history);
+    return history.length < policy.maxRestarts;
+  }
+
+  private observeSuccess(
+    agentId: string,
+    prompt: string,
+    responseText: string,
+    stopReason: string
+  ): void {
     const metrics = this.ensureMetrics(agentId);
     metrics.turnCount += 1;
     metrics.lastPromptChars = prompt.length;
@@ -176,7 +240,12 @@ class AgentLifecycleManagerImpl {
     const agentId = options.agentId || `${options.provider}-${crypto.randomUUID().slice(0, 8)}`;
     const existingHandle = this.handles.get(agentId);
     const existingRecord = agentRegistry.get(agentId);
-    if (existingHandle && (existingRecord?.status === 'ready' || existingRecord?.status === 'busy' || existingRecord?.status === 'booting')) {
+    if (
+      existingHandle &&
+      (existingRecord?.status === 'ready' ||
+        existingRecord?.status === 'busy' ||
+        existingRecord?.status === 'booting')
+    ) {
       return existingHandle;
     }
     const pending = this.pendingSpawns.get(agentId);
@@ -200,11 +269,16 @@ class AgentLifecycleManagerImpl {
       ? resolveAgentProviderTarget({
           preferredProvider: options.provider,
           preferredModelId: options.modelId,
-          providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as 'strict' | 'preferred' | 'adaptive',
+          providerStrategy: String(runtimeMetadata.provider_strategy || 'adaptive') as
+            | 'strict'
+            | 'preferred'
+            | 'adaptive',
           fallbackProviders: Array.isArray(runtimeMetadata.fallback_providers)
             ? (runtimeMetadata.fallback_providers as string[])
             : undefined,
-          requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : undefined,
+          requiredCapabilities: Array.isArray(options.capabilities)
+            ? options.capabilities
+            : undefined,
         })
       : {
           provider: options.provider,
@@ -255,22 +329,22 @@ class AgentLifecycleManagerImpl {
       threadId: agentId,
       parentAgentId: resolvedOptions.parentAgentId,
       missionId: resolvedOptions.missionId,
-        metadata: {
-          provider_resolution: {
-            preferredProvider: options.provider,
-            preferredModelId: options.modelId || null,
-            strategy: resolvedTarget.strategy,
-            availableProviders: resolvedTarget.availableProviders,
-            requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : [],
-          },
+      metadata: {
+        provider_resolution: {
+          preferredProvider: options.provider,
+          preferredModelId: options.modelId || null,
+          strategy: resolvedTarget.strategy,
+          availableProviders: resolvedTarget.availableProviders,
+          requiredCapabilities: Array.isArray(options.capabilities) ? options.capabilities : [],
         },
-      });
+      },
+    });
 
     agentRegistry.updateStatus(agentId, 'booting');
 
     if (resolvedTarget.strategy === 'fallback') {
       logger.info(
-        `[LIFECYCLE] Falling back agent ${agentId} from ${options.provider}/${options.modelId || '-'} to ${resolvedOptions.provider}/${resolvedOptions.modelId || '-'}`,
+        `[LIFECYCLE] Falling back agent ${agentId} from ${options.provider}/${options.modelId || '-'} to ${resolvedOptions.provider}/${resolvedOptions.modelId || '-'}`
       );
     }
 
@@ -302,7 +376,10 @@ class AgentLifecycleManagerImpl {
             modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
             cwd: resolvedOptions.cwd || PROJECT_ROOT,
             systemPrompt: resolvedOptions.systemPrompt,
-            approvalMode: (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed' ? 'relaxed' : 'strict',
+            approvalMode:
+              (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
+                ? 'relaxed'
+                : 'strict',
           });
         }
       }
@@ -316,7 +393,10 @@ class AgentLifecycleManagerImpl {
         ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
-        metadata: { provider: resolvedOptions.provider, modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider },
+        metadata: {
+          provider: resolvedOptions.provider,
+          modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider,
+        },
         cleanup: async () => this.shutdown(agentId),
       });
       agentRegistry.updateStatus(agentId, 'ready');
@@ -358,7 +438,9 @@ class AgentLifecycleManagerImpl {
     // ACP-based agents (gemini, claude, etc.)
     if (!config) {
       agentRegistry.updateStatus(agentId, 'error');
-      throw new Error(`Unknown provider: ${resolvedOptions.provider}. Supported: ${Object.keys(lifecycleMap).join(', ')}, codex`);
+      throw new Error(
+        `Unknown provider: ${resolvedOptions.provider}. Supported: ${Object.keys(lifecycleMap).join(', ')}, codex`
+      );
     }
 
     const mediatorOpts: ACPMediatorOptions = {
@@ -368,6 +450,24 @@ class AgentLifecycleManagerImpl {
       modelId: resolvedOptions.modelId || config.default_model,
       systemPrompt: resolvedOptions.systemPrompt,
       cwd: resolvedOptions.cwd || PROJECT_ROOT,
+      turnTimeoutMs: resolvedOptions.turnTimeoutMs,
+      onCrash: async ({ agentId: crashedAgentId }) => {
+        const policy = resolvedOptions.restartPolicy;
+        if (!policy) return;
+        if (!this.canAutoRestart(crashedAgentId, policy)) {
+          logger.warn(`[LIFECYCLE] Restart budget exhausted for ${crashedAgentId}`);
+          return;
+        }
+        this.recordAutoRestart(crashedAgentId);
+        try {
+          await this.restart(crashedAgentId);
+          logger.info(`[LIFECYCLE] Auto-restarted ${crashedAgentId} after crash.`);
+        } catch (error: any) {
+          logger.error(
+            `[LIFECYCLE] Auto-restart failed for ${crashedAgentId}: ${error?.message || error}`
+          );
+        }
+      },
     };
 
     const mediator = new ACPMediator(mediatorOpts);
@@ -386,7 +486,9 @@ class AgentLifecycleManagerImpl {
         cleanup: async () => this.shutdown(agentId),
       });
       agentRegistry.updateStatus(agentId, 'ready');
-      logger.info(`[LIFECYCLE] Agent ${agentId} (${resolvedOptions.provider}/${mediatorOpts.modelId}) ready.`);
+      logger.info(
+        `[LIFECYCLE] Agent ${agentId} (${resolvedOptions.provider}/${mediatorOpts.modelId}) ready.`
+      );
     } catch (e: any) {
       agentRegistry.updateStatus(agentId, 'error');
       this.mediators.delete(agentId);
@@ -395,12 +497,14 @@ class AgentLifecycleManagerImpl {
 
     const handle: AgentHandle = {
       agentId,
-      ask: async (prompt: string) => {
+      ask: async (prompt: string, askOptions: { timeoutMs?: number } = {}) => {
         agentRegistry.updateStatus(agentId, 'busy');
         agentRegistry.touch(agentId);
         runtimeSupervisor.touch(agentId);
         try {
-          const result = await mediator.ask(prompt);
+          const result = await mediator.ask(prompt, {
+            timeoutMs: askOptions.timeoutMs ?? resolvedOptions.turnTimeoutMs,
+          });
           agentRegistry.updateStatus(agentId, 'ready');
           this.observeSuccess(agentId, prompt, result, 'completed');
           return result;
@@ -440,7 +544,7 @@ class AgentLifecycleManagerImpl {
 
   async shutdownAll(): Promise<void> {
     const agents = agentRegistry.list();
-    await Promise.allSettled(agents.map(a => this.shutdown(a.agentId)));
+    await Promise.allSettled(agents.map((a) => this.shutdown(a.agentId)));
     this.stopHealthMonitor();
     logger.info(`[LIFECYCLE] All agents shutdown.`);
   }
@@ -452,10 +556,37 @@ class AgentLifecycleManagerImpl {
       if (record.status === 'shutdown') continue;
 
       if (mediator) {
-        // Check if child process is still alive
-        results.set(record.agentId, record.status);
+        if (mediator.isProcessAlive()) {
+          results.set(record.agentId, record.status);
+        } else {
+          const policy = this.spawnOptions.get(record.agentId)?.restartPolicy;
+          if (policy && this.canAutoRestart(record.agentId, policy)) {
+            this.recordAutoRestart(record.agentId);
+            try {
+              await this.restart(record.agentId);
+              agentRegistry.updateStatus(record.agentId, 'ready');
+              results.set(record.agentId, 'ready');
+              continue;
+            } catch (error: any) {
+              logger.error(
+                `[LIFECYCLE] Auto-restart failed for ${record.agentId}: ${error?.message || error}`
+              );
+            }
+          }
+          agentRegistry.updateStatus(record.agentId, 'error');
+          results.set(record.agentId, 'error');
+        }
       } else if (this.execAdapters.has(record.agentId)) {
-        results.set(record.agentId, record.status);
+        const providerRuntime = this.getProviderRuntime(record.agentId);
+        const pid = typeof providerRuntime?.pid === 'number' ? providerRuntime.pid : undefined;
+        if (pid && isProcessAlive(pid)) {
+          results.set(record.agentId, record.status);
+        } else if (providerRuntime?.stateless === true) {
+          results.set(record.agentId, record.status);
+        } else {
+          agentRegistry.updateStatus(record.agentId, 'error');
+          results.set(record.agentId, 'error');
+        }
       } else if (record.status !== 'error') {
         agentRegistry.updateStatus(record.agentId, 'error');
         results.set(record.agentId, 'error');
@@ -506,10 +637,12 @@ class AgentLifecycleManagerImpl {
     const pid = typeof providerRuntime?.pid === 'number' ? providerRuntime.pid : runtime?.pid;
     return {
       agent,
-      runtime: runtime ? {
-        ...runtime,
-        idleForMs: Math.max(0, Date.now() - runtime.lastActiveAt),
-      } : undefined,
+      runtime: runtime
+        ? {
+            ...runtime,
+            idleForMs: Math.max(0, Date.now() - runtime.lastActiveAt),
+          }
+        : undefined,
       metrics: { ...this.ensureMetrics(agentId) },
       logs: this.getLog(agentId, logLimit),
       process: probeProcessStats(pid),
@@ -519,10 +652,18 @@ class AgentLifecycleManagerImpl {
   }
 
   listSnapshots(logLimit = 20): AgentRuntimeSnapshot[] {
-    return agentRegistry.list().map((agent) => this.getSnapshot(agent.agentId, logLimit)).filter(Boolean) as AgentRuntimeSnapshot[];
+    return agentRegistry
+      .list()
+      .map((agent) => this.getSnapshot(agent.agentId, logLimit))
+      .filter(Boolean) as AgentRuntimeSnapshot[];
   }
 
-  async refreshContext(agentId: string): Promise<{ mode: 'soft' | 'restart' | 'stateless'; snapshot: AgentRuntimeSnapshot | undefined }> {
+  async refreshContext(
+    agentId: string
+  ): Promise<{
+    mode: 'soft' | 'restart' | 'stateless';
+    snapshot: AgentRuntimeSnapshot | undefined;
+  }> {
     const mediator: any = this.mediators.get(agentId);
     const adapter: any = this.execAdapters.get(agentId);
     const metrics = this.ensureMetrics(agentId);
@@ -581,6 +722,16 @@ function probeProcessStats(pid?: number): AgentProcessStats | undefined {
     };
   } catch {
     return undefined;
+  }
+}
+
+function isProcessAlive(pid?: number): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
   }
 }
 

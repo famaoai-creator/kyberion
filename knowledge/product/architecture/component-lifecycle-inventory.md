@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-06-20
+last_updated: 2026-07-02
 ---
 
 # Component Lifecycle Inventory
@@ -14,7 +14,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 ## Current Runtime Surface
 
 - Source of truth: `libs/actuators/*/manifest.json`
-- Count: 28
+- Count: 29
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (6 ops, v1.0.0, schema schemas/agent-action.schema.json)
@@ -22,9 +22,9 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `approval-actuator`: Human approval request state transitions and decision handling (4 ops, v1.0.0, schema schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Immutable Ledger Anchoring System (2 ops, v1.0.0, schema schemas/blockchain-action.schema.json)
-- `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.0.0, schema schemas/browser-pipeline.schema.json)
+- `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.1.0, schema schemas/browser-pipeline.schema.json)
 - `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
-- `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (3 ops, v2.1.0, schema schemas/code-pipeline.schema.json)
+- `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (3 ops, v2.2.0, schema schemas/code-pipeline.schema.json)
 - `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
@@ -45,10 +45,11 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
 - `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (8 ops, v1.2.0, schema schemas/voice-action.schema.json)
 - `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (33 ops, v1.2.1, schema schemas/wisdom-action.schema.json)
+- `working-memory-actuator`: Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>'). (14 ops, v1.1.0, schema schemas/working-memory-action.schema.json)
 
 ## Legacy Review Queue
 
-- Source of truth: [legacy_component_index.json](/Users/famao/kyberion/knowledge/product/orchestration/legacy_component_index.json)
+- Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 1
 
 - `daemon-actuator`: Launchd-era runtime management overlaps with surface-runtime and managed process supervision.
@@ -60,4 +61,3 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - Treat `vision-actuator` as compatibility-only and continue moving generation concerns into `media-generation-actuator` while keeping perception-oriented work elsewhere.
 - Keep `approval-actuator`, `code-actuator`, `network-actuator`, and `process-actuator` manifest-backed because governance or runtime layers still reference them directly.
 - Do not use `CAPABILITIES_GUIDE.md` as the source of truth for runtime discovery; it is broader and currently includes historical capability names that do not map 1:1 to actuator packages.
-

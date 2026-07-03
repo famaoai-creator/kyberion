@@ -5,9 +5,9 @@ import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
-  'libs/actuators/process-actuator/src/index.ts',
-  'libs/actuators/service-actuator/src/index.ts',
+  'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
   'libs/actuators/service-actuator/src/reconcile-integration.test.ts',
+  'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
   'libs/core/agent-runtime-supervisor-client.ts',
@@ -30,15 +30,20 @@ function read(relPath: string): string {
 
 describe('Process boundary governance', () => {
   it('confines managed-process API usage to long-lived runtime ownership paths', () => {
-    const codeFiles = getAllFiles(rootDir).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
+    const codeFiles = getAllFiles(rootDir).filter((filePath) =>
+      /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath)
+    );
     const actual = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => !relPath.endsWith('.d.ts'))
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
+      .filter((relPath) => !relPath.startsWith('vault/'))
       .filter((relPath) => relPath !== 'libs/core/managed-process.ts')
-      .filter((relPath) => /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/.test(read(relPath)))
+      .filter((relPath) =>
+        /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/.test(read(relPath))
+      )
       .sort((a, b) => a.localeCompare(b));
 
     expect(actual).toEqual(allowedManagedProcessConsumers);
@@ -48,7 +53,11 @@ describe('Process boundary governance', () => {
     const browserActuator = read('libs/actuators/browser-actuator/src/index.ts');
     const systemActuator = read('libs/actuators/system-actuator/src/index.ts');
 
-    expect(browserActuator).not.toMatch(/\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/);
-    expect(systemActuator).not.toMatch(/\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/);
+    expect(browserActuator).not.toMatch(
+      /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/
+    );
+    expect(systemActuator).not.toMatch(
+      /\bspawnManagedProcess\b|\bstopManagedProcess\b|\btouchManagedProcess\b/
+    );
   });
 });

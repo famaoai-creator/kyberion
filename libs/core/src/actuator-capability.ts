@@ -9,14 +9,14 @@
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import * as path from 'path';
-import { safeExistsSync, safeReadFile } from '../secure-io.js';
+import { safeExec, safeExistsSync, safeReadFile } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
 
 export interface ActuatorCapability {
   op: string;
   available: boolean;
-  reason?: string;              // why unavailable
-  prerequisites?: string[];     // what's needed to make it available
+  reason?: string; // why unavailable
+  prerequisites?: string[]; // what's needed to make it available
   cost?: 'free' | 'api_call' | 'compute_light' | 'compute_intensive';
 }
 
@@ -25,6 +25,23 @@ export interface ActuatorStatus {
   version: string;
   capabilities: ActuatorCapability[];
   checkedAt: string;
+}
+
+interface ManifestCapability {
+  op: string;
+  platforms?: string[];
+  requirements?: {
+    bin?: string[];
+    env?: string[];
+    lib?: string[];
+  };
+  prerequisites?: {
+    binaries?: string[];
+    platforms?: string[];
+    env?: string[];
+    services?: string[];
+    install?: string[] | Record<string, string>;
+  };
 }
 
 // Registry of capability probe functions
@@ -61,6 +78,86 @@ function compareActuatorCatalogOrder(left: string, right: string): number {
   return left.localeCompare(right);
 }
 
+function hasBinary(binary: string): boolean {
+  try {
+    safeExec('which', [binary], { timeoutMs: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function prerequisiteInstallHints(capability: ManifestCapability): string[] {
+  const install = capability.prerequisites?.install;
+  if (Array.isArray(install)) return install;
+  if (install && typeof install === 'object') return Object.values(install).filter(Boolean);
+  const binaries = [
+    ...(capability.prerequisites?.binaries || []),
+    ...(capability.requirements?.bin || []),
+  ];
+  return binaries.map((binary) => `Install ${binary} and ensure it is on PATH.`);
+}
+
+function evaluateManifestCapability(capability: ManifestCapability): ActuatorCapability {
+  const platformRequirements = capability.prerequisites?.platforms || capability.platforms || [];
+  const binaryRequirements = [
+    ...(capability.prerequisites?.binaries || []),
+    ...(capability.requirements?.bin || []),
+  ];
+  const envRequirements = [
+    ...(capability.prerequisites?.env || []),
+    ...(capability.requirements?.env || []),
+  ];
+  const serviceRequirements = capability.prerequisites?.services || [];
+
+  const missing: string[] = [];
+
+  if (platformRequirements.length > 0 && !platformRequirements.includes(process.platform)) {
+    missing.push(
+      `requires platform ${platformRequirements.join('|')} (current: ${process.platform})`
+    );
+  }
+  for (const binary of binaryRequirements) {
+    if (!hasBinary(binary)) missing.push(`missing binary: ${binary}`);
+  }
+  for (const envName of envRequirements) {
+    if (!process.env[envName]) missing.push(`missing env: ${envName}`);
+  }
+  for (const service of serviceRequirements) {
+    missing.push(`service prerequisite requires a dedicated probe: ${service}`);
+  }
+
+  return {
+    op: capability.op,
+    available: missing.length === 0,
+    reason: missing.length > 0 ? missing.join('; ') : undefined,
+    prerequisites: missing.length > 0 ? prerequisiteInstallHints(capability) : undefined,
+    cost: 'free',
+  };
+}
+
+function mergeCapabilityProbeResult(
+  manifestCapability: ActuatorCapability | undefined,
+  probedCapability: ActuatorCapability
+): ActuatorCapability {
+  if (!manifestCapability) return probedCapability;
+  if (manifestCapability.available && probedCapability.available) {
+    return { ...manifestCapability, ...probedCapability, available: true };
+  }
+  const reasons = [manifestCapability.reason, probedCapability.reason].filter(Boolean) as string[];
+  const prerequisites = [
+    ...(manifestCapability.prerequisites || []),
+    ...(probedCapability.prerequisites || []),
+  ];
+  return {
+    ...manifestCapability,
+    ...probedCapability,
+    available: false,
+    reason: reasons.join('; ') || 'capability unavailable',
+    prerequisites: prerequisites.length > 0 ? Array.from(new Set(prerequisites)) : undefined,
+  };
+}
+
 /**
  * Check capabilities for a specific actuator by running environment probes.
  * Each actuator can register a checkFn, or fall back to manifest-based static check.
@@ -71,26 +168,40 @@ export async function checkActuatorCapabilities(
 ): Promise<ActuatorStatus> {
   // Read manifest
   const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
-  const capabilities: ActuatorCapability[] = [];
+  const manifestCapabilities = ((manifest.capabilities || []) as ManifestCapability[]).map(
+    evaluateManifestCapability
+  );
+  const manifestByOp = new Map(
+    manifestCapabilities.map((capability) => [capability.op, capability])
+  );
 
   // Run registered probe if exists
   const probe = capabilityProbes.get(actuatorId);
   if (probe) {
     const probed = await probe();
-    capabilities.push(...probed);
+    const probedOps = new Set(probed.map((capability) => capability.op));
+    const capabilities = [
+      ...probed.map((capability) =>
+        mergeCapabilityProbeResult(manifestByOp.get(capability.op), capability)
+      ),
+      ...manifestCapabilities.filter((capability) => !probedOps.has(capability.op)),
+    ];
+    return {
+      actuatorId: manifest.actuator_id || actuatorId,
+      version: manifest.version || '0.0.0',
+      capabilities,
+      checkedAt: new Date().toISOString(),
+    };
   } else {
-    // Fallback: mark all manifest capabilities as available (static)
-    for (const cap of manifest.capabilities || []) {
-      capabilities.push({ op: cap.op, available: true, cost: 'free' });
-    }
+    // Fallback: evaluate manifest prerequisites. Capabilities without
+    // prerequisites remain available for backward compatibility.
+    return {
+      actuatorId: manifest.actuator_id || actuatorId,
+      version: manifest.version || '0.0.0',
+      capabilities: manifestCapabilities,
+      checkedAt: new Date().toISOString(),
+    };
   }
-
-  return {
-    actuatorId: manifest.actuator_id || actuatorId,
-    version: manifest.version || '0.0.0',
-    capabilities,
-    checkedAt: new Date().toISOString(),
-  };
 }
 
 /**
@@ -99,20 +210,27 @@ export async function checkActuatorCapabilities(
 export async function checkAllActuatorCapabilities(
   actuatorsDir?: string
 ): Promise<ActuatorStatus[]> {
-  const dir = actuatorsDir ? pathResolver.rootResolve(actuatorsDir) : pathResolver.rootResolve('libs/actuators');
+  const dir = actuatorsDir
+    ? pathResolver.rootResolve(actuatorsDir)
+    : pathResolver.rootResolve('libs/actuators');
   const results: ActuatorStatus[] = [];
 
   const catalog = loadActuatorManifestCatalog(dir);
   for (const entry of catalog) {
     try {
-      const status = await checkActuatorCapabilities(entry.n, pathResolver.rootResolve(entry.manifest_path));
+      const status = await checkActuatorCapabilities(
+        entry.n,
+        pathResolver.rootResolve(entry.manifest_path)
+      );
       results.push(status);
     } catch (e: any) {
       logger.error(`Failed to check ${entry.n}: ${e.message}`);
     }
   }
 
-  return results.sort((left, right) => compareActuatorCatalogOrder(left.actuatorId, right.actuatorId));
+  return results.sort((left, right) =>
+    compareActuatorCatalogOrder(left.actuatorId, right.actuatorId)
+  );
 }
 
 // ─── Built-in Probes ───────────────────────────────────────────────────────────
@@ -123,13 +241,19 @@ registerCapabilityProbe('browser-actuator', async () => {
     const pwPath = pathResolver.rootResolve('node_modules/playwright-core');
     const pwTestPath = pathResolver.rootResolve('node_modules/@playwright/test');
     const available = safeExistsSync(pwPath) || safeExistsSync(pwTestPath);
-    return [{
-      op: 'pipeline',
-      available,
-      reason: available ? undefined : '@playwright/test or playwright-core not installed',
-      prerequisites: available ? undefined : ['pnpm add -D @playwright/test', 'npx playwright install chromium'],
-    }];
-  } catch { return [{ op: 'pipeline', available: false, reason: 'check failed' }]; }
+    return [
+      {
+        op: 'pipeline',
+        available,
+        reason: available ? undefined : '@playwright/test or playwright-core not installed',
+        prerequisites: available
+          ? undefined
+          : ['pnpm add -D @playwright/test', 'npx playwright install chromium'],
+      },
+    ];
+  } catch {
+    return [{ op: 'pipeline', available: false, reason: 'check failed' }];
+  }
 });
 
 // Voice actuator: check if TTS server is reachable
@@ -157,8 +281,17 @@ registerCapabilityProbe('voice-actuator', async () => {
 registerCapabilityProbe('vision-actuator', async () => {
   const isDarwin = process.platform === 'darwin';
   return [
-    { op: 'capture', available: isDarwin, reason: isDarwin ? undefined : 'screencapture requires macOS', prerequisites: isDarwin ? undefined : ['Run on macOS'] },
-    { op: 'pipeline', available: isDarwin, reason: isDarwin ? undefined : 'vision pipeline requires macOS screen capture' },
+    {
+      op: 'capture',
+      available: isDarwin,
+      reason: isDarwin ? undefined : 'screencapture requires macOS',
+      prerequisites: isDarwin ? undefined : ['Run on macOS'],
+    },
+    {
+      op: 'pipeline',
+      available: isDarwin,
+      reason: isDarwin ? undefined : 'vision pipeline requires macOS screen capture',
+    },
   ];
 });
 

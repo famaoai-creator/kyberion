@@ -489,6 +489,30 @@ describe('orchestrator-actuator', () => {
       'phase or gate',
       'related missions',
     ]);
+    expect(result.context.brief.reasoning_mode).toBe('model');
+  });
+
+  it('marks execution briefs with missing inputs as placeholder reasoning', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        request_text: '新しいプロジェクト PRJ-SIM-2026 を開始します。',
+        project_name: 'Simulation Project 2026',
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'request_to_execution_brief',
+          params: {
+            export_as: 'brief',
+          },
+        },
+      ],
+    } as any);
+
+    expect(result.context.brief.reasoning_mode).toBe('placeholder');
+    expect(result.context.brief.clarification_questions.length).toBeGreaterThan(0);
   });
 
   it('falls back to brief when pipeline bundle step omits brief_from', async () => {
@@ -717,6 +741,7 @@ describe('orchestrator-actuator', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.operator_packet.kind).toBe('operator-interaction-packet');
     expect(result.context.operator_packet.interaction_type).toBe('execution-preview');
+    expect(result.context.operator_packet.reasoning_mode).toBe('model');
   });
 
   it('handles execution_brief_to_resolution_plan transform', async () => {
@@ -773,7 +798,9 @@ describe('orchestrator-actuator', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.context.response_preview.kind).toBe('operator-response-preview');
+    expect(result.context.response_preview.reasoning_mode).toBe('model');
     expect(result.context.response_preview.text).toContain('Test headline');
+    expect(result.context.response_preview.text).toContain('Reasoning mode: model');
   });
 
   it('handles status_report_to_operator_packet transform', async () => {

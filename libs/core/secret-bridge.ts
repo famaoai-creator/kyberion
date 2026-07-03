@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
@@ -16,7 +17,9 @@ interface KeychainRegistry {
 function loadRegistry(): KeychainRegistry {
   if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
   try {
-    return JSON.parse(safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string) as KeychainRegistry;
+    return JSON.parse(
+      safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string
+    ) as KeychainRegistry;
   } catch {
     return { entries: [] };
   }
@@ -30,7 +33,9 @@ function saveRegistry(registry: KeychainRegistry): void {
 
 export function registryAdd(service: string, account: string): void {
   const registry = loadRegistry();
-  const existing = registry.entries.findIndex(e => e.service === service && e.account === account);
+  const existing = registry.entries.findIndex(
+    (e) => e.service === service && e.account === account
+  );
   const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
   if (existing >= 0) {
     registry.entries[existing] = entry;
@@ -42,7 +47,9 @@ export function registryAdd(service: string, account: string): void {
 
 export function registryRemove(service: string, account: string): void {
   const registry = loadRegistry();
-  registry.entries = registry.entries.filter(e => !(e.service === service && e.account === account));
+  registry.entries = registry.entries.filter(
+    (e) => !(e.service === service && e.account === account)
+  );
   saveRegistry(registry);
 }
 
@@ -56,11 +63,17 @@ export class MacKeychainSecretProvider implements SecretProvider {
 
   async get(service: string, account: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const child = spawn('security', ['find-generic-password', '-a', account, '-s', service, '-w'], {
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
+      const child = spawn(
+        'security',
+        ['find-generic-password', '-a', account, '-s', service, '-w'],
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
       let stdout = '';
-      child.stdout.on('data', (chunk) => { stdout += String(chunk); });
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk);
+      });
       child.on('close', (code) => {
         if (code === 0 && stdout.trim()) {
           resolve(stdout.trim());
@@ -76,9 +89,13 @@ export class MacKeychainSecretProvider implements SecretProvider {
     await this.delete(service, account);
 
     return new Promise((resolve, reject) => {
-      const child = spawn('security', ['add-generic-password', '-a', account, '-s', service, '-w', value], {
-        stdio: ['ignore', 'ignore', 'pipe']
-      });
+      const child = spawn(
+        'security',
+        ['add-generic-password', '-a', account, '-s', service, '-w', value],
+        {
+          stdio: ['ignore', 'ignore', 'pipe'],
+        }
+      );
       child.on('close', (code) => {
         if (code === 0) {
           registryAdd(service, account);
@@ -93,7 +110,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
   async delete(service: string, account: string): Promise<void> {
     return new Promise((resolve) => {
       const child = spawn('security', ['delete-generic-password', '-a', account, '-s', service], {
-        stdio: ['ignore', 'ignore', 'ignore']
+        stdio: ['ignore', 'ignore', 'ignore'],
       });
       child.on('close', () => {
         registryRemove(service, account);
@@ -212,7 +229,7 @@ function getRouter(): SecretPolicyRouter {
     globalRouter = new SecretPolicyRouter([
       new MacKeychainSecretProvider(),
       new FileSecretProvider(),
-      new EnvSecretProvider()
+      new EnvSecretProvider(),
     ]);
   }
   return globalRouter;
@@ -239,7 +256,7 @@ export async function removeSecret(service: string, account: string): Promise<vo
 export function listSecrets(service?: string): { status: string; entries: RegistryEntry[] } {
   const registry = loadRegistry();
   const entries = service
-    ? registry.entries.filter(e => e.service === service)
+    ? registry.entries.filter((e) => e.service === service)
     : registry.entries;
   return { status: 'success', entries };
 }

@@ -15,7 +15,11 @@ import {
   readGovernedArtifactJson,
   writeGovernedArtifactJson,
 } from '@agent/core/artifacts';
-import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
+import {
+  createApprovalRequest,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from '@agent/core/governance';
 
 const rootDir = process.cwd();
 
@@ -25,8 +29,12 @@ function loadJson(filePath: string) {
 
 describe('Approval and artifact actuator contracts', () => {
   const contractChannel = 'contract-test';
-  const contractCoordination = pathResolver.rootResolve(`active/shared/coordination/channels/${contractChannel}`);
-  const contractObservability = pathResolver.rootResolve(`active/shared/observability/channels/${contractChannel}`);
+  const contractCoordination = pathResolver.rootResolve(
+    `active/shared/coordination/channels/${contractChannel}`
+  );
+  const contractObservability = pathResolver.rootResolve(
+    `active/shared/observability/channels/${contractChannel}`
+  );
   const createdSlackRequestPaths = new Set<string>();
 
   afterEach(() => {
@@ -43,25 +51,29 @@ describe('Approval and artifact actuator contracts', () => {
     const written = writeGovernedArtifactJson(
       'infrastructure_sentinel',
       `active/shared/coordination/channels/${contractChannel}/inbox/test.json`,
-      { ok: true },
+      { ok: true }
     );
     appendGovernedArtifactJsonl(
       'infrastructure_sentinel',
       `active/shared/observability/channels/${contractChannel}/events.jsonl`,
-      { event: 'x' },
+      { event: 'x' }
     );
 
     expect(safeExistsSync(written)).toBe(true);
     expect(
-      readGovernedArtifactJson<{ ok: boolean }>(`active/shared/coordination/channels/${contractChannel}/inbox/test.json`)?.ok,
+      readGovernedArtifactJson<{ ok: boolean }>(
+        `active/shared/coordination/channels/${contractChannel}/inbox/test.json`
+      )?.ok
     ).toBe(true);
-    expect(listGovernedArtifacts(`active/shared/coordination/channels/${contractChannel}/inbox`)).toContain('test.json');
+    expect(
+      listGovernedArtifacts(`active/shared/coordination/channels/${contractChannel}/inbox`)
+    ).toContain('test.json');
   });
 
   it('creates and decides approval requests through the generic store', () => {
-    const request = createApprovalRequest('slack_bridge', {
+    const request = createApprovalRequest('infrastructure_sentinel', {
       channel: 'C123',
-      storageChannel: 'slack',
+      storageChannel: contractChannel,
       threadTs: '1.234',
       correlationId: 'corr-1',
       requestedBy: 'slack-surface-agent',
@@ -72,27 +84,34 @@ describe('Approval and artifact actuator contracts', () => {
       sourceText: 'deploy please',
     });
 
-    createdSlackRequestPaths.add(`active/shared/coordination/channels/slack/approvals/requests/${request.id}.json`);
-    expect(loadApprovalRequest('slack', request.id)?.status).toBe('pending');
+    createdSlackRequestPaths.add(
+      `active/shared/coordination/channels/${contractChannel}/approvals/requests/${request.id}.json`
+    );
+    expect(loadApprovalRequest(contractChannel, request.id)?.status).toBe('pending');
 
-    const decided = decideApprovalRequest('slack_bridge', {
+    const decided = decideApprovalRequest('infrastructure_sentinel', {
       channel: 'C123',
-      storageChannel: 'slack',
+      storageChannel: contractChannel,
       requestId: request.id,
       decision: 'approved',
       decidedBy: 'U123',
     });
 
     expect(decided.status).toBe('approved');
-    const events = safeReadFile(pathResolver.rootResolve('active/shared/observability/channels/slack/approvals.jsonl'), { encoding: 'utf8' }) as string;
+    const events = safeReadFile(
+      pathResolver.rootResolve(
+        `active/shared/observability/channels/${contractChannel}/approvals.jsonl`
+      ),
+      { encoding: 'utf8' }
+    ) as string;
     expect(events).toContain('approval_requested');
     expect(events).toContain('approved');
   });
 
   it('stores a secret mutation approval request with a sovereign-only workflow', () => {
-    const request = createApprovalRequest('slack_bridge', {
+    const request = createApprovalRequest('infrastructure_sentinel', {
       channel: 'C123',
-      storageChannel: 'slack',
+      storageChannel: contractChannel,
       threadTs: '9.876',
       correlationId: 'corr-secret-1',
       requestedBy: 'slack-bridge',
@@ -131,12 +150,8 @@ describe('Approval and artifact actuator contracts', () => {
         mode: 'all_required',
         requiredRoles: ['sovereign'],
         currentStage: 'primary_approval',
-        stages: [
-          { stageId: 'primary_approval', requiredRoles: ['sovereign'] },
-        ],
-        approvals: [
-          { role: 'sovereign', status: 'pending' },
-        ],
+        stages: [{ stageId: 'primary_approval', requiredRoles: ['sovereign'] }],
+        approvals: [{ role: 'sovereign', status: 'pending' }],
       },
     });
 
@@ -199,9 +214,9 @@ describe('Approval and artifact actuator contracts', () => {
 
     expect(validate(canonical), ajv.errorsText(validate.errors)).toBe(true);
 
-    const decided = decideApprovalRequest('slack_bridge', {
+    const decided = decideApprovalRequest('infrastructure_sentinel', {
       channel: 'C123',
-      storageChannel: 'slack',
+      storageChannel: contractChannel,
       requestId: request.id,
       decision: 'approved',
       decidedBy: 'sovereign-user',
@@ -218,7 +233,9 @@ describe('Approval and artifact actuator contracts', () => {
       note: 'approved from terminal',
     });
 
-    createdSlackRequestPaths.add(`active/shared/coordination/channels/slack/approvals/requests/${request.id}.json`);
-    expect(loadApprovalRequest('slack', request.id)?.status).toBe('approved');
+    createdSlackRequestPaths.add(
+      `active/shared/coordination/channels/${contractChannel}/approvals/requests/${request.id}.json`
+    );
+    expect(loadApprovalRequest(contractChannel, request.id)?.status).toBe('approved');
   });
 });

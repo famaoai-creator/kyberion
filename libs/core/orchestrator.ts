@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec/managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { execSync, exec, spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
@@ -17,7 +18,9 @@ export function resolveCapabilityScript(capabilityName: string): string {
 
   let capability;
   if (capabilityName.includes('/')) {
-    capability = capabilities.find((s) => (s.path || '').includes(capabilityName) || s.n === capabilityName);
+    capability = capabilities.find(
+      (s) => (s.path || '').includes(capabilityName) || s.n === capabilityName
+    );
   } else {
     capability = capabilities.find((s) => s.n === capabilityName);
   }
@@ -167,7 +170,7 @@ export function runParallel(steps: any[]): Promise<any> {
     const timeout = step.timeout || 60000;
     const capabilityDir = path.dirname(path.dirname(script));
 
-      return new Promise<{ skill: string; [key: string]: unknown }>((resolve) => {
+    return new Promise<{ skill: string; [key: string]: unknown }>((resolve) => {
       exec(
         `node "${script}" ${args}`,
         {

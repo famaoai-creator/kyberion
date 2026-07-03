@@ -21,7 +21,7 @@ function writePublicFile(relPath: string, body: string): string {
   return abs;
 }
 
-describe('check_tier_hygiene', () => {
+describe.sequential('check_tier_hygiene', () => {
   it('passes on the current tree (baseline)', async () => {
     const violations = await scan();
     expect(violations).toEqual([]);
@@ -30,12 +30,16 @@ describe('check_tier_hygiene', () => {
   it('detects an injected internal Atlassian subdomain', async () => {
     const temp = writePublicFile(
       `knowledge/public/__tier_hygiene_probe_${process.pid}.md`,
-      '# Temp probe\nReference: https://acme-internal.atlassian.net/browse/ABC-123\n',
+      '# Temp probe\nReference: https://acme-internal.atlassian.net/browse/ABC-123\n'
     );
     try {
       const violations = await scan();
-      expect(violations.some((entry) => entry.pattern === 'internal-atlassian-subdomain')).toBe(true);
-      expect(violations.some((entry) => entry.matched.includes('acme-internal.atlassian.net'))).toBe(true);
+      expect(violations.some((entry) => entry.pattern === 'internal-atlassian-subdomain')).toBe(
+        true
+      );
+      expect(
+        violations.some((entry) => entry.matched.includes('acme-internal.atlassian.net'))
+      ).toBe(true);
     } finally {
       fs.unlinkSync(temp);
     }
@@ -44,11 +48,13 @@ describe('check_tier_hygiene', () => {
   it('detects an injected denied substring', async () => {
     const temp = writePublicFile(
       `knowledge/public/__tier_hygiene_probe2_${process.pid}.md`,
-      '# Temp probe\nRepository: sbisecuritysolutions/demo-repo.\n',
+      '# Temp probe\nRepository: sbisecuritysolutions/demo-repo.\n'
     );
     try {
       const violations = await scan();
-      expect(violations.some((entry) => entry.pattern === 'substring:sbisecuritysolutions')).toBe(true);
+      expect(violations.some((entry) => entry.pattern === 'substring:sbisecuritysolutions')).toBe(
+        true
+      );
     } finally {
       fs.unlinkSync(temp);
     }
@@ -57,7 +63,7 @@ describe('check_tier_hygiene', () => {
   it('allows framework placeholders and industry-standard terms', async () => {
     const temp = writePublicFile(
       `knowledge/public/__tier_hygiene_probe3_${process.pid}.md`,
-      '# Temp probe\n${ATLASSIAN_BASE_URL}, <REPO_NAME>, kyberion.local, SBI Model.\n',
+      '# Temp probe\n${ATLASSIAN_BASE_URL}, <REPO_NAME>, kyberion.local, SBI Model.\n'
     );
     try {
       const violations = await scan();
