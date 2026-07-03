@@ -69,7 +69,7 @@ const CritiqueResultSchema = z.object({
       survived: z.boolean(),
       rejection_reason: z.string().optional(),
       critiques: z.array(z.object({ by: z.string(), content: z.string() })).optional(),
-    }),
+    })
   ),
 });
 
@@ -168,7 +168,7 @@ const DesignSpecComponentSchema = z.object({
         kind: z.enum(['rest', 'grpc', 'event', 'function_call', 'cli', 'ui', 'file', 'other']),
         description: z.string().optional(),
         contract_ref: z.string().optional(),
-      }),
+      })
     )
     .optional(),
   depends_on: z.array(z.string()).optional(),
@@ -187,7 +187,7 @@ const ExtractedDesignSpecSchema = z.object({
         payload: z.string(),
         protocol: z.string().optional(),
         triggers: z.array(z.string()).optional(),
-      }),
+      })
     )
     .default([]),
   cross_cutting_concerns: z
@@ -207,7 +207,7 @@ const ExtractedDesignSpecSchema = z.object({
         options_considered: z.array(z.string()).optional(),
         chosen: z.string(),
         rationale: z.string(),
-      }),
+      })
     )
     .default([]),
   risks: z
@@ -216,7 +216,7 @@ const ExtractedDesignSpecSchema = z.object({
         description: z.string(),
         severity: z.enum(['low', 'medium', 'high', 'critical']),
         mitigation: z.string().optional(),
-      }),
+      })
     )
     .default([]),
   open_decisions: z
@@ -226,7 +226,7 @@ const ExtractedDesignSpecSchema = z.object({
         options: z.array(z.string()).optional(),
         current_lean: z.string().optional(),
         blocking: z.boolean().optional(),
-      }),
+      })
     )
     .default([]),
 });
@@ -238,9 +238,7 @@ const TestCaseSchema = z.object({
   steps: z.array(z.string()).min(1),
   expected: z.string().min(1),
   priority: z.enum(['must', 'should', 'could']).optional(),
-  type: z
-    .enum(['unit', 'integration', 'e2e', 'acceptance', 'performance', 'security'])
-    .optional(),
+  type: z.enum(['unit', 'integration', 'e2e', 'acceptance', 'performance', 'security']).optional(),
   covers_requirements: z.array(z.string()).optional(),
 });
 
@@ -289,7 +287,7 @@ const SimulationResultSchema = z.object({
       first_failure_mode: z.string().optional(),
       first_success_mode: z.string().optional(),
       terminated_at_step: z.number().optional(),
-    }),
+    })
   ),
 });
 
@@ -413,6 +411,7 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
       `Decide first failure mode, first success mode, and termination step.`,
       `Either failure or success (not both) may be non-null per branch.`,
       `terminated_at_step is a small positive integer or null.`,
+      `MAX STEPS PER BRANCH: ${input.maxStepsPerBranch ?? 10}`,
       ``,
       `GOAL: ${input.goal}`,
       `BRANCHES:`,
@@ -539,7 +538,9 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
     return {
       app_id: result.parsed.app_id || input.appId || 'unnamed-app',
       cases: result.parsed.cases,
-      ...(result.parsed.coverage_strategy ? { coverage_strategy: result.parsed.coverage_strategy } : {}),
+      ...(result.parsed.coverage_strategy
+        ? { coverage_strategy: result.parsed.coverage_strategy }
+        : {}),
     };
   }
 

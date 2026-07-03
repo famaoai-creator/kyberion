@@ -1,3 +1,4 @@
+import { logger } from './core.js';
 import type { NarratedVideoPreferenceProfile } from './src/types/narrated-video-preference-profile.js';
 
 export type NarratedVideoPurpose =
@@ -37,9 +38,19 @@ export function selectNarratedVideoBriefQuestionSet(
 
 export function getNarratedVideoBriefQuestions(
   profile: NarratedVideoPreferenceProfile,
-  purpose?: NarratedVideoPurpose | string | null
-): string[] {
-  return selectNarratedVideoBriefQuestionSet(profile, purpose)?.questions || [];
+  purpose?: NarratedVideoPurpose | string | null,
+  maxQuestions?: number
+): { questions: string[]; omitted_count: number } {
+  const questions = selectNarratedVideoBriefQuestionSet(profile, purpose)?.questions || [];
+  const limit = Math.max(1, (maxQuestions ?? questions.length) || 1);
+  const selected = questions.slice(0, limit);
+  const omittedCount = Math.max(0, questions.length - selected.length);
+  if (omittedCount > 0) {
+    logger.info?.(
+      `[narrated-video-preference-profile] omitted ${omittedCount} brief question(s) for purpose=${purpose || 'default'}`
+    );
+  }
+  return { questions: selected, omitted_count: omittedCount };
 }
 
 export function selectNarratedVideoThemeSet(

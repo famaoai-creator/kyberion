@@ -89,7 +89,10 @@ vi.mock('./surface-runtime-router.js', () => ({
   resolveSurfaceConversationReceiver: () => undefined,
   shouldCompileSurfaceIntent: () => true,
   surfaceChannelFromAgentId: mocks.surfaceChannelFromAgentId,
-  surfaceRoutingText: (input: { query: string }) => ({ text: input.query, parsedSlackPrompt: null }),
+  surfaceRoutingText: (input: { query: string }) => ({
+    text: input.query,
+    parsedSlackPrompt: null,
+  }),
 }));
 
 describe('surface-runtime-orchestrator fast-path', () => {
@@ -235,7 +238,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       ['dist/scripts/run_pipeline.js', '--input', 'pipelines/baseline-check.json'],
-      expect.any(Object),
+      expect.any(Object)
     );
   });
 
@@ -258,7 +261,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       ['dist/scripts/mission_controller.js', 'classify', 'MSN-TEST'],
-      expect.any(Object),
+      expect.any(Object)
     );
   });
 
@@ -276,13 +279,15 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'mission authority を教えて',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('Here is the short summary from context_ranker: I found 1 item(s).');
+    expect(result.text).toContain(
+      'Here is the short summary from context_ranker: I found 1 item(s).'
+    );
     expect(result.text).toContain('- mission authority');
     expect(result.text).toContain("If you'd like, I can narrow this down further.");
     expect(mocks.queryKnowledge).toHaveBeenCalledWith(
       expect.anything(),
       'mission authority',
-      expect.objectContaining({ maxResults: 5 }),
+      expect.objectContaining({ maxResults: 5 })
     );
   });
 
@@ -305,12 +310,12 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://geocoding-api.open-meteo.com/v1/search',
-      }),
+      })
     );
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://api.open-meteo.com/v1/forecast',
-      }),
+      })
     );
   });
 
@@ -348,12 +353,12 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://ipapi.co/json/',
-      }),
+      })
     );
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://ipwho.is/',
-      }),
+      })
     );
   });
 
@@ -405,12 +410,12 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://geocoding-api.open-meteo.com/v1/search',
-      }),
+      })
     );
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://ipwho.is/',
-      }),
+      })
     );
   });
 
@@ -472,7 +477,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.compileUserIntentFlow).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining('Current incoming message:'),
-      }),
+      })
     );
   });
 
@@ -506,7 +511,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       expect.objectContaining({
         session_id: 'TSK-TEST-SESSION',
         task_type: 'service_operation',
-      }),
+      })
     );
   });
 
@@ -539,7 +544,46 @@ describe('surface-runtime-orchestrator fast-path', () => {
       expect.objectContaining({
         session_id: 'TSK-TEST-SESSION',
         task_type: 'analysis',
-      }),
+      })
+    );
+  });
+
+  it('logs omitted counts for long external-data fetch summaries', async () => {
+    mocks.classifyTaskSessionIntent.mockReturnValue({
+      intentId: 'fetch-external-data',
+      taskType: 'service_operation',
+      goal: {
+        summary: 'Collect the external page text',
+        success_condition: 'A summarized artifact is saved',
+      },
+      requirements: {
+        missing: [],
+        collected: {
+          source_url: 'https://example.com/long',
+        },
+      },
+      payload: {
+        source_url: 'https://example.com/long',
+        data_topic: 'Long article',
+        service_id_hint: 'long-article',
+      },
+    });
+    mocks.secureFetch.mockResolvedValueOnce(`<article>${'x'.repeat(5000)}</article>`);
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: 'この長い記事を要約して',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.text).toContain('...(以降 2500 文字省略)');
+    expect(mocks.updateTaskSession).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          omitted_count: 3500,
+        }),
+      })
     );
   });
 
@@ -577,11 +621,8 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(result.text).toContain('"accumulation-trigger-promotion"');
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
-      expect.arrayContaining([
-        'dist/scripts/mission_controller.js',
-        'create',
-      ]),
-      expect.any(Object),
+      expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
+      expect.any(Object)
     );
     expect(mocks.createTaskSession).not.toHaveBeenCalled();
   });
@@ -620,7 +661,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           task_type: 'capture_photo',
         }),
         queryText: '記録用に写真を1枚撮って',
-      }),
+      })
     );
   });
 
@@ -648,7 +689,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           intent: 'surface_handoff',
           text: '日経新聞を開いて',
         }),
-      }),
+      })
     );
   });
 
@@ -676,7 +717,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
           intent: 'surface_handoff',
           text: '左下の承認ボタンを押して',
         }),
-      }),
+      })
     );
   });
 
@@ -702,7 +743,12 @@ describe('surface-runtime-orchestrator fast-path', () => {
       session_id: 'TSK-ACTIVE-1',
       task_type: 'service_operation',
       requirements: { missing: [] },
-      payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve', requestId: 'REQ-FINAL-789' },
+      payload: {
+        intent_id: 'resolve-approval',
+        channel: 'slack',
+        decision: 'approve',
+        requestId: 'REQ-FINAL-789',
+      },
       status: 'planning',
       goal: 'resolve approval request',
     });
@@ -717,17 +763,23 @@ describe('surface-runtime-orchestrator fast-path', () => {
     });
 
     expect(result.text).toContain('オペレーション [resolve-approval] が正常に完了しました。');
-    expect(mocks.updateTaskSession).toHaveBeenCalledWith('TSK-ACTIVE-1', expect.objectContaining({
-      payload: expect.objectContaining({ requestId: 'REQ-FINAL-789' }),
-      requirements: expect.objectContaining({ missing: [] }),
-    }));
+    expect(mocks.updateTaskSession).toHaveBeenCalledWith(
+      'TSK-ACTIVE-1',
+      expect.objectContaining({
+        payload: expect.objectContaining({ requestId: 'REQ-FINAL-789' }),
+        requirements: expect.objectContaining({ missing: [] }),
+      })
+    );
   });
 
   it('routes voice input toggle tasks through the system actuator', async () => {
     mocks.classifyTaskSessionIntent.mockReturnValue({
       taskType: 'service_operation',
       intentId: 'enable-voice-input',
-      goal: { summary: 'Switch Kyberion to voice input mode', success_condition: 'Voice input is enabled.' },
+      goal: {
+        summary: 'Switch Kyberion to voice input mode',
+        success_condition: 'Voice input is enabled.',
+      },
       requirements: { missing: [] },
       payload: {
         intent_id: 'enable-voice-input',
@@ -749,7 +801,10 @@ describe('surface-runtime-orchestrator fast-path', () => {
       task_type: 'service_operation',
       requirements: update.requirements || { missing: [] },
       payload: update.payload || { intent_id: 'enable-voice-input' },
-      goal: { summary: 'Switch Kyberion to voice input mode', success_condition: 'Voice input is enabled.' },
+      goal: {
+        summary: 'Switch Kyberion to voice input mode',
+        success_condition: 'Voice input is enabled.',
+      },
       status: update.status,
     }));
     mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'voice_input_enabled' }));
@@ -764,8 +819,12 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(result.text).toContain('音声入力を有効化しました');
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
-      ['dist/libs/actuators/system-actuator/src/index.js', '--input', expect.stringContaining('input-TSK-VOICE-1.json')],
-      expect.objectContaining({ cwd: expect.any(String) }),
+      [
+        'dist/libs/actuators/system-actuator/src/index.js',
+        '--input',
+        expect.stringContaining('input-TSK-VOICE-1.json'),
+      ],
+      expect.objectContaining({ cwd: expect.any(String) })
     );
   });
 });

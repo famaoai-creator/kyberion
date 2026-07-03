@@ -58,6 +58,113 @@ function resolveExportKey(step: PipelineAdfStep, defaultKey: string): string {
   return String(step.params?.export_as ?? defaultKey);
 }
 
+export interface NormalizedStepBudget {
+  cost_cap_tokens?: number;
+  max_prompt_chars?: number;
+  max_response_chars?: number;
+  max_combined_chars?: number;
+  approval_required?: boolean;
+}
+
+export interface ReasoningStepPolicy {
+  effort?: 'low' | 'medium' | 'high';
+  budget?: NormalizedStepBudget;
+}
+
+export function normalizeStepBudget(raw: unknown): NormalizedStepBudget | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const budget = raw as Record<string, unknown>;
+  const normalized: NormalizedStepBudget = {};
+  const coercePositiveInt = (value: unknown): number | undefined => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+    const rounded = Math.floor(value);
+    return rounded > 0 ? rounded : undefined;
+  };
+  const costCapTokens = coercePositiveInt(budget.cost_cap_tokens ?? budget.costCapTokens);
+  const maxPromptChars = coercePositiveInt(budget.max_prompt_chars ?? budget.maxPromptChars);
+  const maxResponseChars = coercePositiveInt(budget.max_response_chars ?? budget.maxResponseChars);
+  const maxCombinedChars = coercePositiveInt(budget.max_combined_chars ?? budget.maxCombinedChars);
+  if (costCapTokens !== undefined) normalized.cost_cap_tokens = costCapTokens;
+  if (maxPromptChars !== undefined) normalized.max_prompt_chars = maxPromptChars;
+  if (maxResponseChars !== undefined) normalized.max_response_chars = maxResponseChars;
+  if (maxCombinedChars !== undefined) normalized.max_combined_chars = maxCombinedChars;
+  if (budget.approval_required === true || budget.approvalRequired === true) {
+    normalized.approval_required = true;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+export function normalizeReasoningPolicy(step: PipelineAdfStep): ReasoningStepPolicy {
+  return {
+    effort:
+      step.effort === 'low' || step.effort === 'medium' || step.effort === 'high'
+        ? step.effort
+        : undefined,
+    budget: normalizeStepBudget(step.budget),
+  };
+}
+
+export function summarizeReasoningPolicy(
+  policy: ReasoningStepPolicy
+): Record<string, string | number | boolean> {
+  const summary: Record<string, string | number | boolean> = {};
+  if (policy.effort) summary.step_effort = policy.effort;
+  if (policy.budget?.cost_cap_tokens !== undefined)
+    summary.budget_cost_cap_tokens = policy.budget.cost_cap_tokens;
+  if (policy.budget?.max_prompt_chars !== undefined)
+    summary.budget_max_prompt_chars = policy.budget.max_prompt_chars;
+  if (policy.budget?.max_response_chars !== undefined)
+    summary.budget_max_response_chars = policy.budget.max_response_chars;
+  if (policy.budget?.max_combined_chars !== undefined)
+    summary.budget_max_combined_chars = policy.budget.max_combined_chars;
+  if (policy.budget?.approval_required) summary.budget_approval_required = true;
+  return summary;
+}
+
+export function buildReasoningPolicyNote(policy: ReasoningStepPolicy): string {
+  const parts: string[] = [];
+  if (policy.effort) parts.push(`effort=${policy.effort}`);
+  if (policy.budget?.cost_cap_tokens !== undefined)
+    parts.push(`cost_cap_tokens=${policy.budget.cost_cap_tokens}`);
+  if (policy.budget?.max_prompt_chars !== undefined)
+    parts.push(`max_prompt_chars=${policy.budget.max_prompt_chars}`);
+  if (policy.budget?.max_response_chars !== undefined)
+    parts.push(`max_response_chars=${policy.budget.max_response_chars}`);
+  if (policy.budget?.max_combined_chars !== undefined)
+    parts.push(`max_combined_chars=${policy.budget.max_combined_chars}`);
+  if (policy.budget?.approval_required) parts.push('approval_required=true');
+  return parts.length > 0 ? `\n\n[policy ${parts.join(' ')}]` : '';
+}
+
+export function isReasoningBudgetExceeded(
+  policy: ReasoningStepPolicy,
+  prompt: string,
+  responseText: string
+): string | null {
+  const promptChars = prompt.length;
+  const responseChars = responseText.length;
+  const combinedChars = promptChars + responseChars;
+  if (
+    policy.budget?.max_prompt_chars !== undefined &&
+    promptChars > policy.budget.max_prompt_chars
+  ) {
+    return `prompt budget exceeded (${promptChars}/${policy.budget.max_prompt_chars} chars)`;
+  }
+  if (
+    policy.budget?.max_response_chars !== undefined &&
+    responseChars > policy.budget.max_response_chars
+  ) {
+    return `response budget exceeded (${responseChars}/${policy.budget.max_response_chars} chars)`;
+  }
+  if (
+    policy.budget?.max_combined_chars !== undefined &&
+    combinedChars > policy.budget.max_combined_chars
+  ) {
+    return `combined budget exceeded (${combinedChars}/${policy.budget.max_combined_chars} chars)`;
+  }
+  return null;
+}
+
 export interface FlowValidationError {
   stepId: string;
   missing: string[];
@@ -107,7 +214,8 @@ type DispatchFunc = (
   params: any,
   ctx: Record<string, unknown>,
   type?: string,
-  trace?: TraceContext
+  trace?: TraceContext,
+  policy?: ReasoningStepPolicy
 ) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 
 const dispatchCache: Record<string, DispatchFunc> = {};
@@ -136,7 +244,7 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
   if (dispatchCache[domain]) return dispatchCache[domain];
 
   if (domain === 'reasoning') {
-    dispatchCache[domain] = async (op, params, ctx, type, _trace?) => {
+    dispatchCache[domain] = async (op, params, ctx, type, _trace?, policy?) => {
       const { getReasoningBackend } = await import('@agent/core');
       const backend = getReasoningBackend();
       if (op === 'analyze' || op === 'transform' || op === 'synthesize') {
@@ -149,13 +257,26 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
           : typeof params.context === 'string'
             ? resolveVars(params.context, ctx)
             : params.context || ctx;
-        const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}`;
+        const reasoningPolicy =
+          (params._reasoning_policy as ReasoningStepPolicy | undefined) ?? policy;
+        const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(reasoningPolicy || {})}`;
+        const reasoningCallOptions = {
+          effort: reasoningPolicy?.effort,
+          budget: reasoningPolicy?.budget,
+        };
+        const preCallBudgetError = isReasoningBudgetExceeded(reasoningPolicy || {}, prompt, '');
+        if (preCallBudgetError) {
+          throw new Error(
+            `Reasoning budget exceeded${reasoningPolicy?.budget?.approval_required ? '; approval required' : ''}: ${preCallBudgetError}`
+          );
+        }
         const rawResponse = shouldUseSubagentForReasoningStep(params)
           ? await backend.delegateTask(
               String(resolvedInstruction || 'Analyze the context.'),
-              JSON.stringify(resolvedContext)
+              JSON.stringify(resolvedContext),
+              reasoningCallOptions as any
             )
-          : await withRetry(() => backend.prompt(prompt), {
+          : await withRetry(() => backend.prompt(prompt, reasoningCallOptions as any), {
               maxRetries: 2,
               initialDelayMs: 3000,
               maxDelayMs: 15000,
@@ -170,6 +291,16 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
                   `  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`
                 ),
             });
+        const postCallBudgetError = isReasoningBudgetExceeded(
+          reasoningPolicy || {},
+          prompt,
+          String(rawResponse || '')
+        );
+        if (postCallBudgetError) {
+          throw new Error(
+            `Reasoning budget exceeded${reasoningPolicy?.budget?.approval_required ? '; approval required' : ''}: ${postCallBudgetError}`
+          );
+        }
         return {
           handled: true,
           ctx: { ...ctx, [params.export_as || 'last_reasoning']: rawResponse },
@@ -291,6 +422,9 @@ export function normalizePipelineOp(op: string): string {
     return op;
   }
   if (op === 'if') return 'core:if';
+  if (op === 'while' || op === 'loop_until') return 'core:while';
+  if (op === 'retry_until_quality') return 'core:retry_until_quality';
+  if (op === 'parallel_foreach') return 'core:parallel_foreach';
   return `system:${op}`;
 }
 
@@ -367,6 +501,28 @@ function shouldUseSubagentForReasoningStep(params: Record<string, unknown>): boo
   return mode === 'subagent' || mode === 'delegate';
 }
 
+function coercePositiveInt(value: unknown, fallback: number): number {
+  const parsed = typeof value === 'number' ? Math.floor(value) : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function runParallelBatches<T>(
+  items: T[],
+  concurrency: number,
+  runner: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  const limit = Math.max(1, Math.floor(concurrency));
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      await runner(items[current], current);
+    }
+  });
+  await Promise.all(workers);
+}
+
 export function formatPipelineFailure(err: unknown): {
   classification: ReturnType<typeof classifyError>;
   summary: string;
@@ -402,11 +558,13 @@ export async function runSteps(
   const rootDir = pathResolver.rootDir();
   for (const step of steps) {
     const stepStartedAtMs = Date.now();
+    const stepPolicy = normalizeReasoningPolicy(step);
     const stepTraceBase = {
       step_index: results.length,
       step_id: step.id || step.op,
       op: step.op,
       ...(step.role ? { step_role: step.role } : step.type ? { step_type: step.type } : {}),
+      ...summarizeReasoningPolicy(stepPolicy),
     };
     // Normalize: role → effective type for downstream dispatch
     const effectiveType = resolveStepType(step);
@@ -537,6 +695,62 @@ export async function runSteps(
             ctx = nested.context;
             results.push(...nested.results);
           }
+        } else if (
+          domain === 'core' &&
+          (action === 'while' || action === 'loop_until' || action === 'retry_until_quality')
+        ) {
+          const body = Array.isArray(params.pipeline)
+            ? (params.pipeline as PipelineAdfStep[])
+            : undefined;
+          if (!body) {
+            throw new Error(`${step.op} requires "pipeline" param`);
+          }
+          const maxIterations = coercePositiveInt(params.max_iterations ?? params.maxIterations, 1);
+          const condition = params.condition ?? params.until ?? params.quality_condition;
+          const exportKey = resolveExportKey(step, 'last_loop_result');
+          const iterations: Array<{
+            iteration: number;
+            context: Record<string, unknown>;
+            results: typeof results;
+          }> = [];
+          let loopCount = 0;
+          while (loopCount < maxIterations) {
+            if (condition !== undefined && action !== 'retry_until_quality') {
+              const shouldContinue = Boolean(evaluateCondition(condition, ctx));
+              if (!shouldContinue) break;
+            }
+            const nested = await runSteps(body, ctx, opts);
+            ctx = nested.context;
+            results.push(...nested.results);
+            iterations.push({
+              iteration: loopCount + 1,
+              context: nested.context,
+              results: nested.results,
+            });
+            loopCount += 1;
+            if (action === 'retry_until_quality') {
+              const verdict = String(
+                (ctx as Record<string, unknown>).verdict ||
+                  (ctx as Record<string, unknown>).quality ||
+                  ''
+              );
+              if (verdict === 'ok' || verdict === 'pass' || verdict === 'passed') {
+                break;
+              }
+            }
+            if (condition !== undefined && action === 'retry_until_quality') {
+              const shouldContinue = Boolean(evaluateCondition(condition, ctx));
+              if (!shouldContinue) break;
+            }
+          }
+          ctx = {
+            ...ctx,
+            [exportKey]: {
+              iterations: loopCount,
+              history: iterations,
+              final_context: ctx,
+            },
+          };
         } else if (domain === 'core' && action === 'foreach') {
           const items = resolveVars(params.items, ctx);
           const subSteps = params.do as PipelineAdfStep[];
@@ -551,6 +765,55 @@ export async function runSteps(
               else ctx[itemName] = originalItemValue;
               results.push(...nested.results);
               if (nested.status === 'failed') break;
+            }
+          }
+        } else if (domain === 'core' && action === 'parallel_foreach') {
+          const items = resolveVars(params.items, ctx);
+          const subSteps = params.do as PipelineAdfStep[];
+          if (Array.isArray(items) && Array.isArray(subSteps)) {
+            const itemName = (params.as as string) || 'item';
+            const concurrency = coercePositiveInt(params.concurrency ?? params.parallelism, 2);
+            const exportKey = resolveExportKey(step, 'last_parallel_foreach');
+            const originalItemValue = ctx[itemName];
+            const originalSharedCtx = { ...ctx };
+            const perItemContexts: Array<Record<string, unknown>> = [];
+            const perItemResults: Array<
+              { op: string; status: 'success' | 'failed'; error?: string }[]
+            > = [];
+            const perItemOutputs: Array<{
+              index: number;
+              item: unknown;
+              context: Record<string, unknown>;
+              results: { op: string; status: 'success' | 'failed'; error?: string }[];
+            }> = [];
+
+            await runParallelBatches(items, concurrency, async (item, index) => {
+              const loopCtx = { ...originalSharedCtx, [itemName]: item };
+              const nested = await runSteps(subSteps, loopCtx, opts);
+              if (nested.status === 'failed') {
+                throw new Error(
+                  `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
+                );
+              }
+              perItemContexts[index] = nested.context;
+              perItemResults[index] = nested.results;
+              perItemOutputs[index] = {
+                index,
+                item,
+                context: nested.context,
+                results: nested.results,
+              };
+            });
+
+            ctx = {
+              ...ctx,
+              [exportKey]: perItemOutputs,
+            };
+            if (originalItemValue === undefined) delete ctx[itemName];
+            else ctx[itemName] = originalItemValue;
+            results.push(...perItemResults.flat());
+            if (perItemContexts.length > 0) {
+              ctx = { ...ctx, ...perItemContexts[perItemContexts.length - 1] };
             }
           }
         } else if (domain === 'core' && action === 'include') {
@@ -639,6 +902,70 @@ export async function runSteps(
           const result = await new vm.Script(wrappedScript).runInContext(sandbox);
           const transformKey = resolveExportKey(step, 'last_transform');
           ctx = { ...ctx, [transformKey]: result };
+        } else if (
+          domain === 'reasoning' &&
+          (action === 'analyze' || action === 'transform' || action === 'synthesize')
+        ) {
+          const { getReasoningBackend } = await import('@agent/core');
+          const backend = getReasoningBackend();
+          const resolvedInstruction =
+            typeof params.instruction === 'string'
+              ? resolveVars(params.instruction, ctx)
+              : params.instruction;
+          const resolvedContext = Array.isArray(params.context)
+            ? params.context.map((item) =>
+                typeof item === 'string' ? resolveVars(item, ctx) : item
+              )
+            : typeof params.context === 'string'
+              ? resolveVars(params.context, ctx)
+              : params.context || ctx;
+          const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(stepPolicy)}`;
+          const reasoningCallOptions = {
+            effort: stepPolicy.effort,
+            budget: stepPolicy.budget,
+          };
+          const preCallBudgetError = isReasoningBudgetExceeded(stepPolicy, prompt, '');
+          if (preCallBudgetError) {
+            throw new Error(
+              `Reasoning budget exceeded${stepPolicy.budget?.approval_required ? '; approval required' : ''}: ${preCallBudgetError}`
+            );
+          }
+          const rawResponse = shouldUseSubagentForReasoningStep(params)
+            ? await backend.delegateTask(
+                String(resolvedInstruction || 'Analyze the context.'),
+                JSON.stringify(resolvedContext),
+                reasoningCallOptions as any
+              )
+            : await withRetry(() => backend.prompt(prompt, reasoningCallOptions as any), {
+                maxRetries: 2,
+                initialDelayMs: 3000,
+                maxDelayMs: 15000,
+                factor: 2,
+                shouldRetry: (err: Error) =>
+                  err.message.includes('timed out') ||
+                  err.message.includes('INVALID_STREAM') ||
+                  err.message.includes('empty response') ||
+                  err.message.includes('missing "response"'),
+                onRetry: (err: Error, attempt: number) =>
+                  logger.warn(
+                    `  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`
+                  ),
+              });
+          const postCallBudgetError = isReasoningBudgetExceeded(
+            stepPolicy,
+            prompt,
+            String(rawResponse || '')
+          );
+          if (postCallBudgetError) {
+            throw new Error(
+              `Reasoning budget exceeded${stepPolicy.budget?.approval_required ? '; approval required' : ''}: ${postCallBudgetError}`
+            );
+          }
+          const reasoningExportKey =
+            typeof params.export_as === 'string' && params.export_as
+              ? params.export_as
+              : 'last_reasoning';
+          ctx = { ...ctx, [reasoningExportKey]: rawResponse };
         } else {
           // Emit capability.missing before dispatch so the trace records the gap
           // even if the subsequent import throws and the step is classified generically.
@@ -655,7 +982,14 @@ export async function runSteps(
           }
           await assertPipelineStepCapabilityAvailable(domain, action);
           const dispatch = await loadActuatorDispatch(domain);
-          const result = await dispatch(action, params, ctx, effectiveType, opts.trace);
+          const result = await dispatch(
+            action,
+            { ...params, _reasoning_policy: stepPolicy },
+            ctx,
+            effectiveType,
+            opts.trace,
+            stepPolicy
+          );
           if (!result.handled) {
             throw new Error(`Unsupported pipeline op: ${step.op}`);
           }
@@ -695,7 +1029,13 @@ export async function runSteps(
           logger.warn(
             `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
           );
-          const repaired = await attemptAutonomousRepair(step, failure, ctx, opts.pipelinePath!);
+          const repaired = await attemptAutonomousRepair(
+            step,
+            failure,
+            ctx,
+            opts.pipelinePath!,
+            stepPolicy
+          );
           if (repaired) {
             logger.success(
               `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
@@ -775,7 +1115,8 @@ async function attemptAutonomousRepair(
   step: PipelineAdfStep,
   failure: any,
   ctx: any,
-  pipelinePath: string
+  pipelinePath: string,
+  policy?: ReasoningStepPolicy
 ): Promise<boolean> {
   try {
     const { getReasoningBackend } = await import('@agent/core');
@@ -793,6 +1134,7 @@ Error Category: ${failure.category}
 Error Detail: ${failure.detail}
 
 Repair Hint: ${repairHint}
+${policy ? `Step Policy: ${JSON.stringify(policy)}` : ''}
 
 Repair Action Goal:
 1. ANALYZE the error and parameters.
@@ -804,7 +1146,11 @@ Assume the persona of a "Sovereign System Recovery Agent".
 Once finished, provide a brief summary of the changes you applied to fix the pipeline.
 `.trim();
 
-    const report = await backend.delegateTask(instruction, `Self-Healing Mission for ${step.op}`);
+    const report = await backend.delegateTask(
+      instruction,
+      `Self-Healing Mission for ${step.op}`,
+      policy ? { effort: policy.effort, budget: policy.budget } : undefined
+    );
     logger.info(`  [SYS_PIPELINE:REPAIR] Sub-agent report: ${report}`);
 
     // Confirm the ADF is actually valid after the repair attempt before signalling success.

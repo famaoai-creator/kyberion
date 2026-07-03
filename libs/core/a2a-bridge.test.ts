@@ -195,7 +195,10 @@ describe('a2a-bridge', () => {
     expect(mocks.askAgentRuntime).toHaveBeenCalledWith(
       'codex-nerve',
       'delegate this',
-      'a2a_bridge'
+      'a2a_bridge',
+      expect.objectContaining({
+        correlationId: expect.any(String),
+      })
     );
     expect(mocks.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -241,10 +244,24 @@ describe('a2a-bridge', () => {
       },
       payload: {
         intent: 'request_marketing_material',
+        task_model_hint: {
+          tier: 'small',
+          effort: 'low',
+          model_id: 'openai:gpt-5.4-mini',
+          route_reason: 'phase_kind=mechanical -> small/low',
+        },
+        objective: 'create a concise product brief',
+        acceptance_criteria: ['brief is concise', 'brief is actionable'],
+        expected_outputs: ['product brief markdown'],
+        rationale: 'The requester needs a concise report',
+        prior_decisions: ['Prefer summary-first output'],
         text: 'Kyberionの資料を作って欲しいんだけど可能かな？',
         context: {
+          mission_id: 'MSN-A2A-1',
+          team_role: 'mission-controller',
           channel: 'slack',
           execution_mode: 'conversation',
+          correlation_id: 'corr-a2a-1',
           user_language: 'ja',
         },
       },
@@ -252,21 +269,75 @@ describe('a2a-bridge', () => {
 
     expect(mocks.askAgentRuntime).toHaveBeenCalledWith(
       'nerve-agent',
-      [
-        'Intent: request_marketing_material',
-        '',
-        'Context:',
-        '{',
-        '  "channel": "slack",',
-        '  "execution_mode": "conversation",',
-        '  "user_language": "ja"',
-        '}',
-        '',
-        'Request:',
-        'Kyberionの資料を作って欲しいんだけど可能かな？',
-      ].join('\n'),
-      'a2a_bridge'
+      expect.stringContaining('Objective: create a concise product brief'),
+      'a2a_bridge',
+      expect.objectContaining({
+        correlationId: 'corr-a2a-1',
+        taskModelHint: expect.objectContaining({
+          model_id: 'openai:gpt-5.4-mini',
+          tier: 'small',
+          effort: 'low',
+          route_reason: 'phase_kind=mechanical -> small/low',
+        }),
+      })
     );
+    expect(mocks.askAgentRuntime.mock.calls[0][1]).toContain('Acceptance criteria:');
+    expect(mocks.askAgentRuntime.mock.calls[0][1]).toContain('Expected outputs:');
+    expect(mocks.askAgentRuntime.mock.calls[0][1]).toContain('Prior decisions:');
+
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtimeMetadata: expect.objectContaining({
+          task_model_hint: expect.objectContaining({
+            model_id: 'openai:gpt-5.4-mini',
+            tier: 'small',
+            effort: 'low',
+            route_reason: 'phase_kind=mechanical -> small/low',
+          }),
+        }),
+      })
+    );
+  });
+
+  it('rejects structured task payloads that miss required contract fields', async () => {
+    const { a2aBridge } = await import('./a2a-bridge.js');
+    mocks.getAgentManifest.mockReturnValue({
+      provider: 'gemini',
+      modelId: 'gemini-2.5-pro',
+      systemPrompt: 'agent',
+      capabilities: ['delegate'],
+    });
+    mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.ensureAgentRuntime.mockResolvedValue({ ask: vi.fn(async () => 'ok') });
+    mocks.getAgentRuntimeHandle.mockReturnValue(null);
+    mocks.get.mockReturnValue({ status: 'ready' });
+
+    await expect(
+      a2aBridge.route({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-BAD-1',
+          sender: 'sender-x',
+          receiver: 'nerve-agent',
+          performative: 'request',
+        },
+        payload: {
+          intent: 'request_marketing_material',
+          text: 'Kyberionの資料を作って',
+          context: {
+            mission_id: 'MSN-1',
+            execution_mode: 'conversation',
+          },
+        },
+      })
+    ).rejects.toThrow('A2A task contract validation failed');
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'a2a_task_contract_invalid',
+        result: 'denied',
+      })
+    );
+    expect(mocks.logAction).toHaveBeenCalledWith('sender-x', 'a2a_task_contract_invalid', true);
   });
 
   it('spawns conversation-mode agents inside a conversation sandbox cwd', async () => {
@@ -299,6 +370,8 @@ describe('a2a-bridge', () => {
         intent: 'request_marketing_material',
         text: 'Kyberionのコンセプトを説明して',
         context: {
+          mission_id: 'MSN-A2A-2',
+          team_role: 'mission-controller',
           channel: 'slack',
           thread: '1773596301.435519',
           execution_mode: 'conversation',
@@ -402,6 +475,7 @@ describe('a2a-bridge', () => {
       agentId: 'nerve-agent',
       prompt: 'delegate this through daemon',
       requestedBy: 'a2a_bridge',
+      correlationId: expect.any(String),
     });
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.payload).toEqual({ text: 'daemon-ok' });

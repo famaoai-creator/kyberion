@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
+import { loadProviderConfig } from './provider-config.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
 
@@ -88,17 +88,6 @@ export interface AgentRuntimeSnapshot {
   supportsSoftRefresh: boolean;
 }
 
-interface LifecycleEntry {
-  boot_command: string;
-  boot_args: string[];
-  default_model: string;
-}
-interface ProviderLifecycleFile {
-  lifecycle: Record<string, LifecycleEntry>;
-}
-
-let _cachedLifecycle: Record<string, LifecycleEntry> | null = null;
-
 function readTaskModelHint(runtimeMetadata?: Record<string, unknown>): TaskModelHint | undefined {
   const candidate = runtimeMetadata?.task_model_hint;
   if (!candidate || typeof candidate !== 'object') return undefined;
@@ -133,36 +122,7 @@ export function resolveAgentLifecycleModelId(
   return options.modelId;
 }
 
-function loadProviderLifecycle(): Record<string, LifecycleEntry> {
-  if (_cachedLifecycle) return _cachedLifecycle;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/provider-config.json');
-    const data = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ProviderLifecycleFile;
-    _cachedLifecycle = data.lifecycle || {};
-  } catch (err) {
-    const defaults = {
-      gemini: {
-        boot_command: 'gemini',
-        boot_args: ['--acp', '-y'],
-        default_model: resolveRuntimeModelId('gemini-default'),
-      },
-      copilot: {
-        boot_command: 'gh',
-        boot_args: ['copilot', '--', '--acp', '--allow-all'],
-        default_model: resolveRuntimeModelId('copilot-default'),
-      },
-    };
-    recordConfigFallback({
-      knowledgePath: 'product/governance/provider-config.json',
-      error: err,
-      defaults: { lifecycle: defaults },
-    });
-    _cachedLifecycle = defaults;
-  }
-  return _cachedLifecycle;
-}
+const loadProviderLifecycle = () => loadProviderConfig().lifecycle;
 
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
@@ -394,6 +354,7 @@ class AgentLifecycleManagerImpl {
       let adapter: CodexAdapter | CodexAppServerAdapter | ClaudeAdapter;
 
       if (resolvedOptions.provider === 'claude') {
+        const taskModelHint = readTaskModelHint(runtimeMetadata);
         // Resolve tool restrictions from manifest
         const { allowedTools, disallowedTools } = ClaudeAdapter.resolveToolRestrictions(
           manifest?.allowedActuators || [],
@@ -403,6 +364,7 @@ class AgentLifecycleManagerImpl {
           systemPrompt: resolvedOptions.systemPrompt,
           cwd: resolvedOptions.cwd || PROJECT_ROOT,
           model: resolvedOptions.modelId,
+          effort: taskModelHint?.effort,
           allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
           disallowedTools: disallowedTools.length > 0 ? disallowedTools : undefined,
           permissionMode: 'auto',

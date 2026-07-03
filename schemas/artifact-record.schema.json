@@ -3,13 +3,7 @@
   "$id": "https://kyberion.local/schemas/artifact-record.schema.json",
   "title": "Artifact Ownership Record",
   "type": "object",
-  "required": [
-    "artifact_id",
-    "kind",
-    "storage_class",
-    "created_at",
-    "evidence_refs"
-  ],
+  "required": ["artifact_id", "kind", "storage_class", "created_at", "evidence_refs"],
   "properties": {
     "artifact_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
@@ -26,6 +20,10 @@
     "evidence_refs": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
     }
   },
   "additionalProperties": false,

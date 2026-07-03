@@ -115,4 +115,74 @@ describe('memory-promotion-queue', () => {
     expect(updated?.ratified_at).toBeTruthy();
     expect(updated?.ratification_note).toContain('governance reviewer');
   });
+
+  it('deduplicates queued candidates by source_ref and content hash', () => {
+    const first = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-DEDUP',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Reuse the weekly review summary step.',
+      evidenceRefs: ['active/missions/MSN-TEST-DEDUP/evidence/one.jsonl'],
+      sensitivityTier: 'personal',
+      queuedAt: '2026-07-01T00:00:00.000Z',
+    });
+    enqueueMemoryPromotionCandidate(first);
+
+    const second = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-DEDUP',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Reuse the weekly review summary step.',
+      evidenceRefs: ['active/missions/MSN-TEST-DEDUP/evidence/two.jsonl'],
+      sensitivityTier: 'personal',
+      queuedAt: '2026-07-02T00:00:00.000Z',
+    });
+    enqueueMemoryPromotionCandidate(second);
+
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.candidate_id).toBe(first.candidate_id);
+    expect(rows[0]?.occurrences).toBe(2);
+    expect(rows[0]?.last_seen).toBe('2026-07-02T00:00:00.000Z');
+    expect(rows[0]?.evidence_refs).toEqual([
+      'active/missions/MSN-TEST-DEDUP/evidence/one.jsonl',
+      'active/missions/MSN-TEST-DEDUP/evidence/two.jsonl',
+    ]);
+  });
+
+  it('deduplicates against legacy queue rows without content_hash', () => {
+    safeWriteFile(
+      queuePath,
+      `${JSON.stringify({
+        candidate_id: 'MEM-LEGACY-1',
+        source_type: 'mission',
+        source_ref: 'mission:MSN-TEST-LEGACY',
+        proposed_memory_kind: 'heuristic',
+        summary: 'Reuse the weekly review summary step.',
+        evidence_refs: ['active/missions/MSN-TEST-LEGACY/evidence/one.jsonl'],
+        sensitivity_tier: 'personal',
+        ratification_required: false,
+        status: 'queued',
+        queued_at: '2026-07-01T00:00:00.000Z',
+      })}\n`
+    );
+
+    const candidate = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-LEGACY',
+      proposedMemoryKind: 'heuristic',
+      summary: 'Reuse the weekly review summary step.',
+      evidenceRefs: ['active/missions/MSN-TEST-LEGACY/evidence/two.jsonl'],
+      sensitivityTier: 'personal',
+      queuedAt: '2026-07-03T00:00:00.000Z',
+    });
+    enqueueMemoryPromotionCandidate(candidate);
+
+    const rows = listMemoryPromotionCandidates();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.candidate_id).toBe('MEM-LEGACY-1');
+    expect(rows[0]?.content_hash).toBeTruthy();
+    expect(rows[0]?.occurrences).toBe(2);
+    expect(rows[0]?.last_seen).toBe('2026-07-03T00:00:00.000Z');
+  });
 });

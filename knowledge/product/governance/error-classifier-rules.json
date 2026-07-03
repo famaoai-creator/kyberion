@@ -7,7 +7,9 @@
       "category": "resource_unavailable",
       "label": "Service endpoint not configured",
       "remediation": "The requested service (e.g., Image Generation) has no active endpoints. Start your local Service Engine (e.g., ComfyUI) or configure a cloud API in `knowledge/product/orchestration/service-endpoints`.",
-      "patterns": ["Service endpoints directory produced no services|no available services for domain|media-generation"],
+      "patterns": [
+        "Service endpoints directory produced no services|no available services for domain|media-generation"
+      ],
       "repairAction": "Locate available service endpoints in knowledge/product/orchestration/service-presets/ and suggest a configuration for service-endpoints/."
     },
     {
@@ -54,14 +56,18 @@
       "category": "governance_block",
       "label": "Approval required",
       "remediation": "This action requires explicit approval per `approval-policy.json`. Run `pnpm cli approval` or follow the prompt to grant approval.",
-      "patterns": ["approval[\\s_-]?required|enforceApprovalGate|approval gate"]
+      "patterns": [
+        "approval[\\s_-]?required|enforceApprovalGate|approval gate|Reasoning budget exceeded|prompt budget exceeded|response budget exceeded|combined budget exceeded"
+      ]
     },
     {
       "id": "kyberion.policy-violation",
       "category": "governance_block",
       "label": "Governance policy denied action",
       "remediation": "Review the policy denial and either change the requested action or obtain the required approval before retrying.",
-      "patterns": ["POLICY_VIOLATION|policy (violation|denied|refused)|not allowed by policy|governance policy"]
+      "patterns": [
+        "POLICY_VIOLATION|policy (violation|denied|refused)|not allowed by policy|governance policy"
+      ]
     },
     {
       "id": "pipeline.hook-abort",
@@ -93,7 +99,9 @@
       "category": "timeout",
       "label": "Provider timed out",
       "remediation": "The provider did not return before its timeout. Retry with a larger provider timeout or switch to another configured backend.",
-      "patterns": ["\\b(provider|anthropic|openai|claude|gemini|codex|shell-claude-cli|gemini-cli|codex-cli)\\b.*\\b(timed out|timeout|deadline exceeded)\\b"]
+      "patterns": [
+        "\\b(provider|anthropic|openai|claude|gemini|codex|shell-claude-cli|gemini-cli|codex-cli)\\b.*\\b(timed out|timeout|deadline exceeded)\\b"
+      ]
     },
     {
       "id": "network.timeout",
@@ -131,7 +139,9 @@
       "category": "missing_dependency",
       "label": "Required binary not installed",
       "remediation": "Install the missing binary. Run `pnpm doctor` to see all dependency gaps with install commands.",
-      "patterns": ["command not found|spawn .* ENOENT|playwright.*not[\\s_-]?installed|tesseract.*not[\\s_-]?found"]
+      "patterns": [
+        "command not found|spawn .* ENOENT|playwright.*not[\\s_-]?installed|tesseract.*not[\\s_-]?found"
+      ]
     },
     {
       "id": "dep.missing-module",
@@ -146,7 +156,9 @@
       "category": "missing_dependency",
       "label": "Kyberion capability missing",
       "remediation": "Run `pnpm capabilities` or `pnpm doctor` to confirm the missing capability, then install or enable the referenced actuator/runtime.",
-      "patterns": ["(capability|actuator|runtime).*(missing|not found|unavailable|not registered)|no capability registered"]
+      "patterns": [
+        "(capability|actuator|runtime).*(missing|not found|unavailable|not registered)|no capability registered"
+      ]
     },
     {
       "id": "resource.eaddrinuse",
@@ -177,7 +189,9 @@
       "category": "invalid_input",
       "label": "Schema validation failed",
       "remediation": "The input does not match the required schema. Fix the highlighted fields and retry.",
-      "patterns": ["schema validation|ajv|zod|invalid (input|payload|adf)|preflight failed|schema violation|must have required property|additional propert(y|ies)|must match schema|should match"]
+      "patterns": [
+        "schema validation|ajv|zod|invalid (input|payload|adf)|preflight failed|schema violation|must have required property|additional propert(y|ies)|must match schema|should match"
+      ]
     },
     {
       "id": "input.unsupported-op",
@@ -212,21 +226,27 @@
       "category": "invalid_input",
       "label": "pnpm workspace resolution error",
       "remediation": "Run `pnpm install` from the repo root to sync workspace packages. If the error persists, delete `node_modules` and retry.",
-      "patterns": ["ERR_PNPM_|workspace.*not found|pnpm.*install failed|Cannot find package.*workspace"]
+      "patterns": [
+        "ERR_PNPM_|workspace.*not found|pnpm.*install failed|Cannot find package.*workspace"
+      ]
     },
     {
       "id": "actuator.contract-mismatch",
       "category": "invalid_input",
       "label": "Actuator contract mismatch",
       "remediation": "The action or params do not match the actuator's contract schema. Run `pnpm cli info <actuator-name>` to see the contract schema path and verify the required fields.",
-      "patterns": ["contract.*schema|schema.*contract|actuator.*contract|required field.*missing|unexpected.*action.?type"]
+      "patterns": [
+        "contract.*schema|schema.*contract|actuator.*contract|required field.*missing|unexpected.*action.?type"
+      ]
     },
     {
       "id": "env.missing-var",
       "category": "missing_secret",
       "label": "Required environment variable not set",
       "remediation": "Set the missing environment variable in your shell or `.env` file. See `docs/INITIALIZATION.md` for the full list of required variables.",
-      "patterns": ["environment variable.*not set|env.*required.*not set|process\\.env\\.\\w+ is undefined|missing.*env(ironment)? var(iable)?"]
+      "patterns": [
+        "environment variable.*not set|env.*required.*not set|process\\.env\\.\\w+ is undefined|missing.*env(ironment)? var(iable)?"
+      ]
     },
     {
       "id": "mission.not-found",

@@ -9,6 +9,10 @@ export interface OrchestrationScenarioRunRecord {
   policy_violations: number;
   contract_valid: boolean;
   operator_corrections: number;
+  context_chars?: number;
+  rollup_used?: boolean;
+  result_schema_ok?: boolean;
+  needs_count?: number;
 }
 
 export interface OrchestrationModeMetrics {
@@ -18,6 +22,10 @@ export interface OrchestrationModeMetrics {
   clarification_count_per_run: number;
   contract_validity_rate: number;
   operator_correction_rate: number;
+  average_context_chars_per_run: number;
+  rollup_used_rate: number;
+  result_schema_ok_rate: number;
+  needs_rate_per_run: number;
 }
 
 export interface OrchestrationScenarioDelta {
@@ -55,14 +63,36 @@ function round3(value: number): number {
   return Number(value.toFixed(3));
 }
 
-function modeMetrics(records: OrchestrationScenarioRunRecord[], mode: OrchestrationEvaluationMode): OrchestrationModeMetrics {
+function modeMetrics(
+  records: OrchestrationScenarioRunRecord[],
+  mode: OrchestrationEvaluationMode
+): OrchestrationModeMetrics {
   const filtered = records.filter((record) => record.mode === mode);
   const runCount = filtered.length;
   const completed = filtered.filter((record) => record.completion_status === 'completed').length;
   const contractValid = filtered.filter((record) => record.contract_valid).length;
-  const policyViolations = filtered.reduce((sum, record) => sum + Math.max(0, record.policy_violations || 0), 0);
-  const clarificationCount = filtered.reduce((sum, record) => sum + Math.max(0, record.clarification_count || 0), 0);
-  const correctionCount = filtered.reduce((sum, record) => sum + Math.max(0, record.operator_corrections || 0), 0);
+  const policyViolations = filtered.reduce(
+    (sum, record) => sum + Math.max(0, record.policy_violations || 0),
+    0
+  );
+  const clarificationCount = filtered.reduce(
+    (sum, record) => sum + Math.max(0, record.clarification_count || 0),
+    0
+  );
+  const correctionCount = filtered.reduce(
+    (sum, record) => sum + Math.max(0, record.operator_corrections || 0),
+    0
+  );
+  const contextChars = filtered.reduce(
+    (sum, record) => sum + Math.max(0, record.context_chars || 0),
+    0
+  );
+  const rollupUsedCount = filtered.filter((record) => record.rollup_used).length;
+  const resultSchemaOkCount = filtered.filter((record) => record.result_schema_ok).length;
+  const needsCount = filtered.reduce(
+    (sum, record) => sum + Math.max(0, record.needs_count || 0),
+    0
+  );
   return {
     run_count: runCount,
     completion_rate: round3(safeDivide(completed, runCount)),
@@ -70,27 +100,46 @@ function modeMetrics(records: OrchestrationScenarioRunRecord[], mode: Orchestrat
     clarification_count_per_run: round3(safeDivide(clarificationCount, runCount)),
     contract_validity_rate: round3(safeDivide(contractValid, runCount)),
     operator_correction_rate: round3(safeDivide(correctionCount, runCount)),
+    average_context_chars_per_run: round3(safeDivide(contextChars, runCount)),
+    rollup_used_rate: round3(safeDivide(rollupUsedCount, runCount)),
+    result_schema_ok_rate: round3(safeDivide(resultSchemaOkCount, runCount)),
+    needs_rate_per_run: round3(safeDivide(needsCount, runCount)),
   };
 }
 
-function scenarioDelta(records: OrchestrationScenarioRunRecord[], scenarioId: string): OrchestrationScenarioDelta {
-  const baselineRecords = records.filter((record) => record.scenario_id === scenarioId && record.mode === 'baseline');
-  const orchestratedRecords = records.filter((record) => record.scenario_id === scenarioId && record.mode === 'orchestrated');
+function scenarioDelta(
+  records: OrchestrationScenarioRunRecord[],
+  scenarioId: string
+): OrchestrationScenarioDelta {
+  const baselineRecords = records.filter(
+    (record) => record.scenario_id === scenarioId && record.mode === 'baseline'
+  );
+  const orchestratedRecords = records.filter(
+    (record) => record.scenario_id === scenarioId && record.mode === 'orchestrated'
+  );
   const baseline = modeMetrics(baselineRecords, 'baseline');
   const orchestrated = modeMetrics(orchestratedRecords, 'orchestrated');
   return {
     scenario_id: scenarioId,
     completion_improved: orchestrated.completion_rate > baseline.completion_rate,
-    policy_violations_delta: round3(orchestrated.policy_violations_per_run - baseline.policy_violations_per_run),
-    clarification_count_delta: round3(orchestrated.clarification_count_per_run - baseline.clarification_count_per_run),
-    contract_validity_delta: round3(orchestrated.contract_validity_rate - baseline.contract_validity_rate),
-    operator_correction_rate_delta: round3(orchestrated.operator_correction_rate - baseline.operator_correction_rate),
+    policy_violations_delta: round3(
+      orchestrated.policy_violations_per_run - baseline.policy_violations_per_run
+    ),
+    clarification_count_delta: round3(
+      orchestrated.clarification_count_per_run - baseline.clarification_count_per_run
+    ),
+    contract_validity_delta: round3(
+      orchestrated.contract_validity_rate - baseline.contract_validity_rate
+    ),
+    operator_correction_rate_delta: round3(
+      orchestrated.operator_correction_rate - baseline.operator_correction_rate
+    ),
   };
 }
 
 export function buildMissionOrchestrationEvaluationReport(
   records: OrchestrationScenarioRunRecord[],
-  evaluatedAt = new Date().toISOString(),
+  evaluatedAt = new Date().toISOString()
 ): MissionOrchestrationEvaluationReport {
   const baseline = modeMetrics(records, 'baseline');
   const orchestrated = modeMetrics(records, 'orchestrated');
@@ -100,11 +149,21 @@ export function buildMissionOrchestrationEvaluationReport(
     kind: 'mission-orchestration-evaluation-report',
     evaluated_at: evaluatedAt,
     summary: {
-      orchestrated_completion_rate_delta: round3(orchestrated.completion_rate - baseline.completion_rate),
-      orchestrated_policy_violations_delta: round3(orchestrated.policy_violations_per_run - baseline.policy_violations_per_run),
-      orchestrated_clarification_count_delta: round3(orchestrated.clarification_count_per_run - baseline.clarification_count_per_run),
-      orchestrated_contract_validity_delta: round3(orchestrated.contract_validity_rate - baseline.contract_validity_rate),
-      orchestrated_operator_correction_rate_delta: round3(orchestrated.operator_correction_rate - baseline.operator_correction_rate),
+      orchestrated_completion_rate_delta: round3(
+        orchestrated.completion_rate - baseline.completion_rate
+      ),
+      orchestrated_policy_violations_delta: round3(
+        orchestrated.policy_violations_per_run - baseline.policy_violations_per_run
+      ),
+      orchestrated_clarification_count_delta: round3(
+        orchestrated.clarification_count_per_run - baseline.clarification_count_per_run
+      ),
+      orchestrated_contract_validity_delta: round3(
+        orchestrated.contract_validity_rate - baseline.contract_validity_rate
+      ),
+      orchestrated_operator_correction_rate_delta: round3(
+        orchestrated.operator_correction_rate - baseline.operator_correction_rate
+      ),
     },
     mode_metrics: {
       baseline,

@@ -20,8 +20,15 @@ import {
   TraceContext,
   persistTrace,
   type MissionActorType,
+  loadMissionOrchestrationReplayPlan,
+  recoverMissionRequestedTasks,
 } from '@agent/core';
-import { listActiveMissions, listMissionsInSearchDirs, loadState, saveState } from './mission-state.js';
+import {
+  listActiveMissions,
+  listMissionsInSearchDirs,
+  loadState,
+  saveState,
+} from './mission-state.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import { readJsonFile } from './cli-input.js';
 
@@ -199,7 +206,7 @@ async function recordCheckpointForMission(
       persistTrace(trace);
     } catch (persistErr: any) {
       logger.warn(
-        `[mission-maintenance] Failed to persist checkpoint trace: ${persistErr?.message || persistErr}`,
+        `[mission-maintenance] Failed to persist checkpoint trace: ${persistErr?.message || persistErr}`
       );
     }
   }
@@ -220,7 +227,7 @@ export const RESUME_IDEMPOTENCY_WINDOW_MS = 60_000;
 export function shouldSkipResumeEntry(
   history: Array<{ ts: string; event: string }>,
   now: Date = new Date(),
-  windowMs: number = RESUME_IDEMPOTENCY_WINDOW_MS,
+  windowMs: number = RESUME_IDEMPOTENCY_WINDOW_MS
 ): boolean {
   const last = history[history.length - 1];
   if (!last || last.event !== 'RESUME') return false;
@@ -260,6 +267,19 @@ export async function resumeMission(
   const missionPath = findMissionPath(targetId);
   if (!missionPath) throw new Error(`Mission ${targetId} path not found.`);
 
+  const replayPlan = loadMissionOrchestrationReplayPlan(targetId);
+  if (replayPlan.next_event) {
+    logger.info(
+      `journal から再開: 次イベント=${replayPlan.next_event.event_type} (${replayPlan.next_event.event_id}) / 回収タスク=${replayPlan.replay_count} 件`
+    );
+  } else {
+    logger.info('journal から再開: 再開対象の orchestration event はありません。');
+  }
+  const recovery = recoverMissionRequestedTasks(targetId);
+  logger.info(
+    `lease 回収: requested=${recovery.requested_count} / waiting=${recovery.waiting_count} / reissued=${recovery.reissued_count}`
+  );
+
   const currentBranch = args.getCurrentBranch(missionPath);
   if (currentBranch !== preState.git.branch) {
     safeExec('git', ['checkout', preState.git.branch], { cwd: missionPath });
@@ -281,8 +301,8 @@ export async function resumeMission(
       const lastTs = new Date(fresh.history[fresh.history.length - 1].ts).getTime();
       logger.info(
         `↳ Skipping RESUME entry (last RESUME was ${Math.round(
-          (now.getTime() - lastTs) / 1000,
-        )}s ago, within idempotency window).`,
+          (now.getTime() - lastTs) / 1000
+        )}s ago, within idempotency window).`
       );
     } else {
       fresh.history.push({
@@ -307,7 +327,8 @@ export async function recordTask(
   const upperId = missionId.toUpperCase();
   const missionDir = findMissionPath(upperId);
   if (!missionDir) throw new Error(`Mission ${upperId} not found.`);
-  const detailRecord = details && typeof details === 'object' ? details as Record<string, unknown> : {};
+  const detailRecord =
+    details && typeof details === 'object' ? (details as Record<string, unknown>) : {};
 
   const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
   safeWriteFile(
@@ -331,31 +352,74 @@ export async function recordTask(
     if (typeof detailRecord.next_step === 'string' && detailRecord.next_step.trim()) {
       context.next_step = detailRecord.next_step.trim();
     }
-    if (typeof detailRecord.routing_decision_summary === 'string' && detailRecord.routing_decision_summary.trim()) {
+    if (
+      typeof detailRecord.routing_decision_summary === 'string' &&
+      detailRecord.routing_decision_summary.trim()
+    ) {
       context.routing_decision_summary = detailRecord.routing_decision_summary.trim();
     }
     if (typeof detailRecord.context_pack_id === 'string' && detailRecord.context_pack_id.trim()) {
       context.context_pack_id = detailRecord.context_pack_id.trim();
     }
-    if (typeof detailRecord.context_pack_path === 'string' && detailRecord.context_pack_path.trim()) {
+    if (
+      typeof detailRecord.context_pack_path === 'string' &&
+      detailRecord.context_pack_path.trim()
+    ) {
       context.context_pack_path = detailRecord.context_pack_path.trim();
     }
-    if (typeof detailRecord.context_pack_summary === 'string' && detailRecord.context_pack_summary.trim()) {
+    if (
+      typeof detailRecord.context_pack_summary === 'string' &&
+      detailRecord.context_pack_summary.trim()
+    ) {
       context.context_pack_summary = detailRecord.context_pack_summary.trim();
     }
-    if (detailRecord.context_pack_pruning_summary && typeof detailRecord.context_pack_pruning_summary === 'object') {
+    if (
+      typeof detailRecord.context_chars === 'number' &&
+      Number.isFinite(detailRecord.context_chars)
+    ) {
+      context.context_chars = detailRecord.context_chars;
+    }
+    if (
+      typeof detailRecord.pruned_chars === 'number' &&
+      Number.isFinite(detailRecord.pruned_chars)
+    ) {
+      context.pruned_chars = detailRecord.pruned_chars;
+    }
+    if (typeof detailRecord.rollup_used === 'boolean') {
+      context.rollup_used = detailRecord.rollup_used;
+    }
+    if (typeof detailRecord.result_schema_ok === 'boolean') {
+      context.result_schema_ok = detailRecord.result_schema_ok;
+    }
+    if (typeof detailRecord.needs_count === 'number' && Number.isFinite(detailRecord.needs_count)) {
+      context.needs_count = detailRecord.needs_count;
+    }
+    if (
+      detailRecord.context_pack_pruning_summary &&
+      typeof detailRecord.context_pack_pruning_summary === 'object'
+    ) {
       context.context_pack_pruning_summary = detailRecord.context_pack_pruning_summary;
     }
-    if (detailRecord.work_item_dispatch_summary && typeof detailRecord.work_item_dispatch_summary === 'object') {
+    if (
+      detailRecord.work_item_dispatch_summary &&
+      typeof detailRecord.work_item_dispatch_summary === 'object'
+    ) {
       context.work_item_dispatch_summary = detailRecord.work_item_dispatch_summary;
     }
-    if (detailRecord.ticket_dispatch_summary && typeof detailRecord.ticket_dispatch_summary === 'object') {
+    if (
+      detailRecord.ticket_dispatch_summary &&
+      typeof detailRecord.ticket_dispatch_summary === 'object'
+    ) {
       context.ticket_dispatch_summary = detailRecord.ticket_dispatch_summary;
     }
-    if (typeof detailRecord.drift_watchdog_summary === 'string' && detailRecord.drift_watchdog_summary.trim()) {
+    if (
+      typeof detailRecord.drift_watchdog_summary === 'string' &&
+      detailRecord.drift_watchdog_summary.trim()
+    ) {
       context.work_item_dispatch_summary = {
-        ...(context.work_item_dispatch_summary && typeof context.work_item_dispatch_summary === 'object'
-          ? context.work_item_dispatch_summary as Record<string, unknown>
+        ...(context.work_item_dispatch_summary &&
+        typeof context.work_item_dispatch_summary === 'object'
+          ? (context.work_item_dispatch_summary as Record<string, unknown>)
           : {}),
         drift_watchdog_summary: detailRecord.drift_watchdog_summary.trim(),
       };

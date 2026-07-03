@@ -15,13 +15,28 @@
       }
     },
     {
-      "id": "persist_hints",
+      "id": "write_distill_summary",
       "role": "sink",
       "op": "system:write_artifact",
       "consumes": "lessons_learned",
       "params": {
-        "path": "knowledge/product/governance/HINTS.md",
-        "content": "# Operational Hints\n\n{{lessons_learned}}"
+        "path": "active/shared/tmp/memory-distillation-summary.md",
+        "content": "{{lessons_learned}}"
+      }
+    },
+    {
+      "id": "nominate_promotion",
+      "role": "sink",
+      "op": "working-memory:nominate-promotion",
+      "consumes": "lessons_learned",
+      "params": {
+        "mdPath": "active/shared/tmp/memory-distillation-summary.md",
+        "source_ref": "pipeline:memory-distillation",
+        "summary": "Distilled operational lesson from recent missions",
+        "source_type": "artifact",
+        "evidence_refs": ["active/shared/tmp/memory-distillation-summary.md"],
+        "proposed_memory_kind": "heuristic",
+        "sensitivity_tier": "confidential"
       }
     }
   ]

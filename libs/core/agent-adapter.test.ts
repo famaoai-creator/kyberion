@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AgyAdapter } from './agent-adapter.js';
+import { AgyAdapter, ClaudeAdapter } from './agent-adapter.js';
 import { spawnSync } from 'node:child_process';
 
 vi.mock('node:child_process', () => ({
@@ -31,7 +31,7 @@ describe('AgyAdapter', () => {
     expect(spawnSync).toHaveBeenCalledWith(
       'agy',
       ['-p', 'Say hello', '--dangerously-skip-permissions'],
-      expect.any(Object),
+      expect.any(Object)
     );
   });
 
@@ -50,7 +50,7 @@ describe('AgyAdapter', () => {
     expect(spawnSync).toHaveBeenCalledWith(
       'agy',
       ['-p', 'Continuing...', '--dangerously-skip-permissions', '--conversation', 'session-123'],
-      expect.any(Object),
+      expect.any(Object)
     );
 
     const runtimeInfo = adapter.getRuntimeInfo();
@@ -72,8 +72,16 @@ describe('AgyAdapter', () => {
 
     expect(spawnSync).toHaveBeenCalledWith(
       'agy',
-      ['-p', 'Check files', '--dangerously-skip-permissions', '--add-dir', '/path/to/dir1', '--add-dir', '/path/to/dir2'],
-      expect.any(Object),
+      [
+        '-p',
+        'Check files',
+        '--dangerously-skip-permissions',
+        '--add-dir',
+        '/path/to/dir1',
+        '--add-dir',
+        '/path/to/dir2',
+      ],
+      expect.any(Object)
     );
   });
 
@@ -92,7 +100,7 @@ describe('AgyAdapter', () => {
     expect(spawnSync).toHaveBeenCalledWith(
       'agy',
       ['-p', 'Risky run', '--dangerously-skip-permissions', '--sandbox'],
-      expect.any(Object),
+      expect.any(Object)
     );
   });
 
@@ -113,7 +121,44 @@ describe('AgyAdapter', () => {
     expect(spawnSync).toHaveBeenCalledWith(
       'agy',
       ['-i', 'Interactive prompt', '--dangerously-skip-permissions'],
-      expect.objectContaining({ stdio: 'inherit' }),
+      expect.objectContaining({ stdio: 'inherit' })
+    );
+  });
+
+  it('passes effort to the Claude CLI when configured', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: JSON.stringify({ result: 'ok' }),
+      stderr: '',
+      output: [],
+      pid: 123,
+      signal: null,
+    } as any);
+
+    const adapter = new ClaudeAdapter({
+      model: 'sonnet',
+      effort: 'high',
+      systemPrompt: 'system',
+    });
+
+    const response = await adapter.ask('Do the thing');
+    expect(response.text).toBe('ok');
+
+    expect(spawnSync).toHaveBeenCalledWith(
+      'claude',
+      [
+        '-p',
+        'Do the thing',
+        '--output-format',
+        'json',
+        '--system-prompt',
+        'system',
+        '--model',
+        'sonnet',
+        '--effort',
+        'high',
+      ],
+      expect.any(Object)
     );
   });
 });
