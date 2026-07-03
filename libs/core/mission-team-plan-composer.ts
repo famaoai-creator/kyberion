@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
-import { selectAgentForTeamRole, type AuthorityRoleRecord, type AgentProfileRecord, type MissionTeamAssignment, type TeamRoleRecord } from './team-role-assignment-selection.js';
+import {
+  selectAgentForTeamRole,
+  type AuthorityRoleRecord,
+  type AgentProfileRecord,
+  type MissionTeamAssignment,
+  type TeamRoleRecord,
+} from './team-role-assignment-selection.js';
+import { resolveTaskModelHint } from './reasoning-model-routing.js';
 import {
   mapMissionClassToMissionTypeTemplate,
   resolveMissionClassification,
@@ -83,7 +90,10 @@ function loadJson<T>(filePath: string): T {
   return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
 }
 
-function buildTeamGovernance(template: MissionTeamTemplateRecord, assignments: MissionTeamAssignment[]): MissionTeamGovernance {
+function buildTeamGovernance(
+  template: MissionTeamTemplateRecord,
+  assignments: MissionTeamAssignment[]
+): MissionTeamGovernance {
   const lifecycle = template.lifecycle || {
     max_parallel_members: template.required_roles.length,
     max_members: template.required_roles.length + template.optional_roles.length,
@@ -94,7 +104,9 @@ function buildTeamGovernance(template: MissionTeamTemplateRecord, assignments: M
     resume_policy: 'checkpoint_resume',
     cooldown_minutes: 5,
   };
-  const assignedRoles = assignments.filter((entry) => entry.status === 'assigned').map((entry) => entry.team_role);
+  const assignedRoles = assignments
+    .filter((entry) => entry.status === 'assigned')
+    .map((entry) => entry.team_role);
   const unfilledRequiredRoles = assignments
     .filter((entry) => entry.required && entry.status !== 'assigned')
     .map((entry) => entry.team_role);
@@ -110,13 +122,15 @@ function buildTeamGovernance(template: MissionTeamTemplateRecord, assignments: M
 }
 
 export function summarizeMissionOrganizationProfile(
-  organizationProfile?: OrganizationProfile | null,
+  organizationProfile?: OrganizationProfile | null
 ): MissionTeamOrganizationProfileSummary | undefined {
   if (!organizationProfile) return undefined;
   return {
     organization_id: organizationProfile.organization_id,
     name: organizationProfile.name,
-    default_team_template: organizationProfile.mission_defaults?.default_team_template || organizationProfile.team_defaults?.default_team_template,
+    default_team_template:
+      organizationProfile.mission_defaults?.default_team_template ||
+      organizationProfile.team_defaults?.default_team_template,
     team_template_catalog_id: organizationProfile.team_defaults?.team_template_catalog_id,
     default_agent_profile: organizationProfile.mission_defaults?.default_agent_profile,
   };
@@ -145,15 +159,40 @@ export function composeMissionTeamPlan(input: {
     artifactPaths: input.artifactPaths,
     progressSignals: input.progressSignals,
   });
-  const missionType = input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
+  const missionType =
+    input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
   const templates = loadMissionTeamTemplates(organizationProfile);
   const teamRoles = loadTeamRoleIndex();
   const authorityRoles = loadAuthorityRoleIndex();
   const agents = loadAgentProfileIndex();
   const organizationDefaultTemplate = organizationProfile?.mission_defaults?.default_team_template;
-  const template = (templates[missionType] || (organizationDefaultTemplate ? templates[organizationDefaultTemplate] : undefined) || templates.default) as MissionTeamTemplateRecord;
+  const template = (templates[missionType] ||
+    (organizationDefaultTemplate ? templates[organizationDefaultTemplate] : undefined) ||
+    templates.default) as MissionTeamTemplateRecord;
   const assignments: MissionTeamAssignment[] = [];
-  const preferredAgentId = organizationProfile?.mission_defaults?.default_agent_profile?.trim().toLowerCase();
+  const preferredAgentId = organizationProfile?.mission_defaults?.default_agent_profile
+    ?.trim()
+    .toLowerCase();
+  const missionTaskModelHint = resolveTaskModelHint({
+    phase_kind:
+      missionClassification.stage === 'planning' ||
+      missionClassification.stage === 'contract_authoring'
+        ? 'plan'
+        : missionClassification.stage === 'verification' ||
+            missionClassification.stage === 'retrospective'
+          ? 'review'
+          : missionClassification.stage === 'execution'
+            ? 'implement'
+            : 'mechanical',
+    estimated_scope:
+      missionClassification.delivery_shape === 'long_running_job' ||
+      missionClassification.delivery_shape === 'cross_system_change'
+        ? 'L'
+        : missionClassification.delivery_shape === 'single_artifact'
+          ? 'S'
+          : 'M',
+    risk: missionClassification.risk_profile,
+  });
 
   for (const role of template.required_roles) {
     const roleRecord = teamRoles[role];
@@ -169,28 +208,33 @@ export function composeMissionTeamPlan(input: {
         modelId: null,
         required_capabilities: [],
         notes: 'Team role not found in team-role-index',
+        model_hint: missionTaskModelHint,
       });
       continue;
     }
-    assignments.push(
-      selectAgentForTeamRole(
+    assignments.push({
+      ...selectAgentForTeamRole(
         role,
-        preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
+        preferredAgentId &&
+          !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
           ? {
               ...roleRecord,
               selection_hints: {
                 ...(roleRecord.selection_hints || {}),
                 preferred_agents: [
                   preferredAgentId,
-                  ...((roleRecord.selection_hints?.preferred_agents || []).filter((agent) => agent !== preferredAgentId)),
+                  ...(roleRecord.selection_hints?.preferred_agents || []).filter(
+                    (agent) => agent !== preferredAgentId
+                  ),
                 ],
               },
             }
           : roleRecord,
         authorityRoles,
-        agents,
-      )
-    );
+        agents
+      ),
+      model_hint: missionTaskModelHint,
+    });
   }
 
   for (const role of template.optional_roles) {
@@ -205,15 +249,18 @@ export function composeMissionTeamPlan(input: {
               ...(roleRecord.selection_hints || {}),
               preferred_agents: [
                 preferredAgentId,
-                ...((roleRecord.selection_hints?.preferred_agents || []).filter((agent) => agent !== preferredAgentId)),
+                ...(roleRecord.selection_hints?.preferred_agents || []).filter(
+                  (agent) => agent !== preferredAgentId
+                ),
               ],
             },
           }
         : roleRecord,
       authorityRoles,
-      agents,
+      agents
     );
     assignment.required = false;
+    assignment.model_hint = missionTaskModelHint;
     assignments.push(assignment);
   }
 
@@ -237,7 +284,7 @@ export function composeMissionTeamPlan(input: {
 
 export function enrichMissionTeamPlanWithOrganizationProfile(
   plan: MissionTeamPlan,
-  organizationProfile?: OrganizationProfile | null,
+  organizationProfile?: OrganizationProfile | null
 ): MissionTeamPlan {
   const organization_profile = summarizeMissionOrganizationProfile(organizationProfile);
   if (!organization_profile) return plan;
@@ -245,8 +292,10 @@ export function enrichMissionTeamPlanWithOrganizationProfile(
     plan.organization_profile &&
     plan.organization_profile.organization_id === organization_profile.organization_id &&
     plan.organization_profile.name === organization_profile.name &&
-    plan.organization_profile.default_team_template === organization_profile.default_team_template &&
-    plan.organization_profile.team_template_catalog_id === organization_profile.team_template_catalog_id &&
+    plan.organization_profile.default_team_template ===
+      organization_profile.default_team_template &&
+    plan.organization_profile.team_template_catalog_id ===
+      organization_profile.team_template_catalog_id &&
     plan.organization_profile.default_agent_profile === organization_profile.default_agent_profile
   ) {
     return plan;
@@ -297,7 +346,7 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
 
 export function getMissionTeamAssignment(
   plan: MissionTeamPlan,
-  teamRole: string,
+  teamRole: string
 ): MissionTeamAssignment | null {
   return plan.assignments.find((entry) => entry.team_role === teamRole) || null;
 }
@@ -313,7 +362,12 @@ export function resolveMissionTeamReceiver(input: {
   return assignment;
 }
 
-export type { AuthorityRoleRecord, AgentProfileRecord, MissionTeamAssignment, TeamRoleRecord } from './team-role-assignment-selection.js';
+export type {
+  AuthorityRoleRecord,
+  AgentProfileRecord,
+  MissionTeamAssignment,
+  TeamRoleRecord,
+} from './team-role-assignment-selection.js';
 
 export function buildMissionTeamView(plan: MissionTeamPlan): Record<string, string> {
   const view: Record<string, string> = {};
