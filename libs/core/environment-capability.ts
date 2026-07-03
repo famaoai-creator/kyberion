@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * EnvironmentCapability — declarative environment prerequisite.
  *
@@ -54,7 +55,11 @@ export type CapabilityProbe =
   /** Check that a process.env entry is set (and optionally non-empty). */
   | { kind: 'env'; name: string; require_non_empty?: boolean }
   /** Look for a file under the mission evidence dir. */
-  | { kind: 'mission-evidence'; filename: string; require_field?: { path: string; equals: unknown } }
+  | {
+      kind: 'mission-evidence';
+      filename: string;
+      require_field?: { path: string; equals: unknown };
+    }
   /** Plug-in: caller-registered probe id. */
   | { kind: 'probe'; probe_id: string };
 
@@ -135,10 +140,7 @@ const DEFAULT_RECEIPT_TTL_MINUTES = 60 * 24 * 7;
 export type RegisteredProbe = () => Promise<{ available: boolean; reason?: string }>;
 const _probeRegistry = new Map<string, RegisteredProbe>();
 
-export function registerEnvironmentCapabilityProbe(
-  probe_id: string,
-  probe: RegisteredProbe,
-): void {
+export function registerEnvironmentCapabilityProbe(probe_id: string, probe: RegisteredProbe): void {
   _probeRegistry.set(probe_id, probe);
 }
 
@@ -178,7 +180,7 @@ function stableHostFingerprint(): string {
         platform: process.platform,
         arch: process.arch,
         node: process.versions.node,
-      }),
+      })
     )
     .digest('hex');
 }
@@ -193,7 +195,10 @@ function parseIsoDate(value: unknown): { ok: true; ms: number } | { ok: false } 
   return Number.isFinite(ms) ? { ok: true, ms } : { ok: false };
 }
 
-async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ available: boolean; reason?: string }> {
+async function runProbe(
+  probe: CapabilityProbe,
+  missionId?: string
+): Promise<{ available: boolean; reason?: string }> {
   switch (probe.kind) {
     case 'command': {
       const result = spawnSync(probe.command, [...(probe.args ?? [])], { stdio: 'ignore' });
@@ -209,7 +214,10 @@ async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ a
         await import(probe.specifier);
         return { available: true };
       } catch (err: any) {
-        return { available: false, reason: `cannot import '${probe.specifier}': ${err?.message ?? err}` };
+        return {
+          available: false,
+          reason: `cannot import '${probe.specifier}': ${err?.message ?? err}`,
+        };
       }
     }
     case 'env': {
@@ -223,9 +231,11 @@ async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ a
       return { available: true };
     }
     case 'mission-evidence': {
-      if (!missionId) return { available: false, reason: 'mission-evidence probe requires a mission id' };
+      if (!missionId)
+        return { available: false, reason: 'mission-evidence probe requires a mission id' };
       const evidenceDir = pathResolver.missionEvidenceDir(missionId);
-      if (!evidenceDir) return { available: false, reason: `mission '${missionId}' has no evidence dir` };
+      if (!evidenceDir)
+        return { available: false, reason: `mission '${missionId}' has no evidence dir` };
       const file = path.join(evidenceDir, probe.filename);
       if (!safeExistsSync(file)) return { available: false, reason: `${probe.filename} missing` };
       if (!probe.require_field) return { available: true };
@@ -242,16 +252,23 @@ async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ a
         }
         return { available: true };
       } catch (err: any) {
-        return { available: false, reason: `failed to read ${probe.filename}: ${err?.message ?? err}` };
+        return {
+          available: false,
+          reason: `failed to read ${probe.filename}: ${err?.message ?? err}`,
+        };
       }
     }
     case 'probe': {
       const fn = _probeRegistry.get(probe.probe_id);
-      if (!fn) return { available: false, reason: `no probe registered for id '${probe.probe_id}'` };
+      if (!fn)
+        return { available: false, reason: `no probe registered for id '${probe.probe_id}'` };
       try {
         return await fn();
       } catch (err: any) {
-        return { available: false, reason: `probe '${probe.probe_id}' threw: ${err?.message ?? err}` };
+        return {
+          available: false,
+          reason: `probe '${probe.probe_id}' threw: ${err?.message ?? err}`,
+        };
       }
     }
     default: {
@@ -267,7 +284,7 @@ async function runProbe(probe: CapabilityProbe, missionId?: string): Promise<{ a
 
 export async function probeManifest(
   manifest: EnvironmentManifest,
-  opts: { mission_id?: string } = {},
+  opts: { mission_id?: string } = {}
 ): Promise<CapabilityStatus[]> {
   const out: CapabilityStatus[] = [];
   for (const cap of manifest.capabilities) {
@@ -297,7 +314,7 @@ export interface BootstrapOptions {
 
 export async function bootstrapManifest(
   manifest: EnvironmentManifest,
-  opts: BootstrapOptions,
+  opts: BootstrapOptions
 ): Promise<SetupReceipt> {
   const probes = await probeManifest(manifest, opts);
   const satisfied: CapabilityStatus[] = [];
@@ -397,7 +414,7 @@ export async function bootstrapManifest(
         reason: status.reason,
       },
       'failed',
-      status.reason,
+      status.reason
     );
   }
   // Only persist when something was actually installed (or attempted).
@@ -409,7 +426,7 @@ export async function bootstrapManifest(
 
 export function verifyReady(
   manifest: EnvironmentManifest,
-  opts: { mission_id?: string; max_age_minutes?: number } = {},
+  opts: { mission_id?: string; max_age_minutes?: number } = {}
 ): ReadinessReport {
   const receipt = readReceipt(manifest.manifest_id, opts.mission_id);
   if (!receipt) {
@@ -428,15 +445,18 @@ export function verifyReady(
   }
   const satisfiedEntries = Array.isArray(receipt.satisfied) ? receipt.satisfied : null;
   const unsatisfiedEntries = Array.isArray(receipt.unsatisfied) ? receipt.unsatisfied : null;
-  const installsPerformedEntries = Array.isArray(receipt.installs_performed) ? receipt.installs_performed : null;
+  const installsPerformedEntries = Array.isArray(receipt.installs_performed)
+    ? receipt.installs_performed
+    : null;
   const generatedAt = parseIsoDate(receipt.generated_at);
   const expiresAt = parseIsoDate(receipt.expires_at);
   const ageMin = generatedAt.ok ? (Date.now() - generatedAt.ms) / 60_000 : Number.NaN;
   const manifestFingerprint = stableManifestFingerprint(manifest);
   const hostFingerprint = stableHostFingerprint();
-  const receiptExpiresAt = typeof receipt.expires_at === 'string' && receipt.expires_at.trim() !== ''
-    ? receipt.expires_at
-    : null;
+  const receiptExpiresAt =
+    typeof receipt.expires_at === 'string' && receipt.expires_at.trim() !== ''
+      ? receipt.expires_at
+      : null;
   const expiresAtMs = expiresAt.ok ? expiresAt.ms : Number.NaN;
   const stale =
     !generatedAt.ok ||
@@ -467,7 +487,8 @@ export function verifyReady(
     blocking.push({
       capability_id: '__receipt_installs_performed__',
       satisfied: false,
-      reason: 'receipt installs_performed entries are missing or invalid — re-run pnpm env:bootstrap',
+      reason:
+        'receipt installs_performed entries are missing or invalid — re-run pnpm env:bootstrap',
     });
   }
   if (!generatedAt.ok) {
@@ -531,9 +552,7 @@ function receiptPath(manifestId: string, missionId?: string): string {
       pathResolver.rootResolve(`active/missions/confidential/${missionId}/evidence`);
     return path.join(evidenceDir, `env-setup-receipt.${manifestId}.json`);
   }
-  return pathResolver.rootResolve(
-    `active/shared/state/env-setup-receipts/${manifestId}.json`,
-  );
+  return pathResolver.rootResolve(`active/shared/state/env-setup-receipts/${manifestId}.json`);
 }
 
 function writeReceipt(receipt: SetupReceipt, missionId?: string): void {
@@ -565,7 +584,7 @@ const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/environment-manifests
  */
 export function listEnvironmentManifestIds(): string[] {
   const dir = pathResolver.rootResolve(
-    process.env.KYBERION_ENVIRONMENT_MANIFEST_DIR ?? DEFAULT_MANIFEST_DIR,
+    process.env.KYBERION_ENVIRONMENT_MANIFEST_DIR ?? DEFAULT_MANIFEST_DIR
   );
   if (!safeExistsSync(dir)) return [];
   const ids: string[] = [];
@@ -585,7 +604,7 @@ export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentMa
     : [
         path.join(
           process.env.KYBERION_ENVIRONMENT_MANIFEST_DIR ?? DEFAULT_MANIFEST_DIR,
-          `${manifestIdOrPath}.json`,
+          `${manifestIdOrPath}.json`
         ),
         path.join(DEFAULT_MANIFEST_DIR, `${manifestIdOrPath}.json`),
       ];
@@ -606,7 +625,7 @@ function safeEmitAudit(
   capabilityId: string,
   metadata: Record<string, unknown>,
   result: 'allowed' | 'denied' | 'error' | 'completed' | 'failed' = 'allowed',
-  reason?: string,
+  reason?: string
 ): string | null {
   try {
     const entry = auditChain.record({

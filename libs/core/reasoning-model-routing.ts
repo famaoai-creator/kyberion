@@ -3,14 +3,21 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import type { ReasoningLevel, ReasoningLevelDecision, ReasoningLevelPolicy } from './reasoning-level-policy.js';
+import type {
+  ReasoningLevel,
+  ReasoningLevelDecision,
+  ReasoningLevelPolicy,
+} from './reasoning-level-policy.js';
 import { loadReasoningLevelPolicy } from './reasoning-level-policy.js';
+export { resolveRuntimeModelId, type RuntimeModelRole } from './runtime-model-defaults.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const MODEL_REGISTRY_PATH = pathResolver.knowledge('product/governance/model-registry.json');
-const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/model-registry.schema.json');
+const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-registry.schema.json'
+);
 
 type ModelRoleFit = 'primary' | 'secondary' | 'not_recommended';
 type ModelStatus = 'approved' | 'candidate' | 'deprecated' | 'blocked';
@@ -95,10 +102,16 @@ function findPrimaryIntentCompilerModel(registry: ModelRegistryFile): ModelRegis
   throw new Error('Model registry does not contain an eligible primary intent compiler model.');
 }
 
-function findEligibleFastModel(registry: ModelRegistryFile, modelId: string): ModelRegistryEntry | null {
+function findEligibleFastModel(
+  registry: ModelRegistryFile,
+  modelId: string
+): ModelRegistryEntry | null {
   const model = registry.models.find((entry) => entry.model_id === modelId);
   if (!model) return null;
-  if (model.role_fit.intent_compiler !== 'primary' && model.role_fit.intent_compiler !== 'secondary') {
+  if (
+    model.role_fit.intent_compiler !== 'primary' &&
+    model.role_fit.intent_compiler !== 'secondary'
+  ) {
     return null;
   }
   if (model.status === 'blocked' || model.status === 'deprecated') {
@@ -112,7 +125,7 @@ export function resolveReasoningModelRoute(
   options: {
     policy?: ReasoningLevelPolicy;
     registry?: ModelRegistryFile;
-  } = {},
+  } = {}
 ): ReasoningModelRoute {
   const policy = options.policy ?? loadReasoningLevelPolicy();
   const registry = options.registry ?? loadModelRegistry();
@@ -134,7 +147,8 @@ export function resolveReasoningModelRoute(
       return {
         recommended_model_id: primaryModel.model_id,
         model_route_status: 'shadow',
-        route_reason: 'No fast-lane shadow model was configured; fell back to the approved primary compiler.',
+        route_reason:
+          'No fast-lane shadow model was configured; fell back to the approved primary compiler.',
         route_kind: 'primary',
         policy_version: policy.version,
       };
@@ -169,7 +183,10 @@ export function resolveReasoningModelRoute(
         policy_version: policy.version,
       };
     }
-    if (configuredModel.status !== 'approved' && configuredModel.role_fit.intent_compiler !== 'primary') {
+    if (
+      configuredModel.status !== 'approved' &&
+      configuredModel.role_fit.intent_compiler !== 'primary'
+    ) {
       return {
         recommended_model_id: primaryModel.model_id,
         model_route_status: 'shadow',

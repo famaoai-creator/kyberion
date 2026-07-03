@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Secret Resolver — pluggable front-door for secret-guard.getSecret().
  *
@@ -61,14 +62,14 @@ export function resolveSecretSync(input: ResolveSecretInput): string | null {
     if (result instanceof Promise) {
       // Can't block a sync caller; surface a warning and fall through.
       logger.warn(
-        `[secret-resolver] ${resolver.name} is async; sync callers fall back to vault. Use resolveSecretAsync instead.`,
+        `[secret-resolver] ${resolver.name} is async; sync callers fall back to vault. Use resolveSecretAsync instead.`
       );
       return null;
     }
     return result;
   } catch (err: any) {
     logger.warn(
-      `[secret-resolver] ${resolver.name} failed for ${input.key}: ${err?.message ?? err}`,
+      `[secret-resolver] ${resolver.name} failed for ${input.key}: ${err?.message ?? err}`
     );
     return null;
   }
@@ -82,7 +83,7 @@ export async function resolveSecretAsync(input: ResolveSecretInput): Promise<str
     return result ?? null;
   } catch (err: any) {
     logger.warn(
-      `[secret-resolver] ${resolver.name} failed for ${input.key}: ${err?.message ?? err}`,
+      `[secret-resolver] ${resolver.name} failed for ${input.key}: ${err?.message ?? err}`
     );
     return null;
   }
@@ -90,7 +91,10 @@ export async function resolveSecretAsync(input: ResolveSecretInput): Promise<str
 
 export class ChainSecretResolver implements SecretResolver {
   readonly name: string;
-  constructor(private readonly resolvers: SecretResolver[], name = 'chain') {
+  constructor(
+    private readonly resolvers: SecretResolver[],
+    name = 'chain'
+  ) {
     this.name = `${name}(${resolvers.map((r) => r.name).join('→')})`;
   }
   async resolve(input: ResolveSecretInput): Promise<string | null> {
@@ -100,7 +104,7 @@ export class ChainSecretResolver implements SecretResolver {
         if (result != null) return result;
       } catch (err: any) {
         logger.warn(
-          `[secret-resolver:chain] ${resolver.name} threw for ${input.key}: ${err?.message ?? err}`,
+          `[secret-resolver:chain] ${resolver.name} threw for ${input.key}: ${err?.message ?? err}`
         );
       }
     }
@@ -153,9 +157,7 @@ export class ShellSecretResolver implements SecretResolver {
  * Bootstrap — installs ShellSecretResolver when
  * KYBERION_SECRET_RESOLVER_COMMAND is set.
  */
-export function installSecretResolverIfAvailable(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function installSecretResolverIfAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
   const command = env.KYBERION_SECRET_RESOLVER_COMMAND?.trim();
   if (!command) return false;
   registerSecretResolver(
@@ -164,8 +166,10 @@ export function installSecretResolverIfAvailable(
       ...(env.KYBERION_SECRET_RESOLVER_TIMEOUT_MS
         ? { timeoutMs: parseInt(env.KYBERION_SECRET_RESOLVER_TIMEOUT_MS, 10) }
         : {}),
-    }),
+    })
   );
-  logger.success('[secret-resolver] installed ShellSecretResolver from KYBERION_SECRET_RESOLVER_COMMAND');
+  logger.success(
+    '[secret-resolver] installed ShellSecretResolver from KYBERION_SECRET_RESOLVER_COMMAND'
+  );
   return true;
 }

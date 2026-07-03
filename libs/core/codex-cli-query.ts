@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
@@ -10,6 +11,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export interface CodexCliQueryOptions {
   bin?: string;
@@ -47,7 +49,7 @@ class CodexCliQuery {
 
   constructor(options: CodexCliQueryOptions = {}) {
     this.bin = options.bin ?? resolveCodexBinary();
-    this.model = options.model ?? 'gpt-5.4';
+    this.model = options.model ?? resolveRuntimeModelId('codex-default');
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
     this.cwd = options.cwd ?? pathResolver.rootDir();
@@ -60,7 +62,7 @@ class CodexCliQuery {
     mode: 'read-only' | 'workspace-write';
   }): Promise<T> {
     const schemaJson = normalizeCodexSchema(
-      z.toJSONSchema(params.schema) as Record<string, unknown>,
+      z.toJSONSchema(params.schema) as Record<string, unknown>
     );
     const schemaPath = this.tempFilePath('codex-schema', 'json');
     const outputPath = this.tempFilePath('codex-output', 'json');
@@ -136,8 +138,8 @@ class CodexCliQuery {
         if (code !== 0) {
           reject(
             new Error(
-              `[codex-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 1000)} stdout: ${stdout.slice(0, 500)}`,
-            ),
+              `[codex-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 1000)} stdout: ${stdout.slice(0, 500)}`
+            )
           );
           return;
         }
@@ -183,10 +185,18 @@ function normalizeSchemaNode(node: unknown): void {
 
   const record = node as Record<string, unknown>;
 
-  if (record.properties && typeof record.properties === 'object' && !Array.isArray(record.properties)) {
+  if (
+    record.properties &&
+    typeof record.properties === 'object' &&
+    !Array.isArray(record.properties)
+  ) {
     const properties = record.properties as Record<string, unknown>;
     const originalRequired = Array.isArray(record.required)
-      ? new Set((record.required as unknown[]).filter((value): value is string => typeof value === 'string'))
+      ? new Set(
+          (record.required as unknown[]).filter(
+            (value): value is string => typeof value === 'string'
+          )
+        )
       : new Set<string>();
     for (const [key, value] of Object.entries(properties)) {
       normalizeSchemaNode(value);
@@ -237,11 +247,16 @@ function ensureNullable(node: unknown): unknown {
 }
 
 function isNullSchema(node: unknown): boolean {
-  return Boolean(node && typeof node === 'object' && !Array.isArray(node) && (node as Record<string, unknown>).type === 'null');
+  return Boolean(
+    node &&
+    typeof node === 'object' &&
+    !Array.isArray(node) &&
+    (node as Record<string, unknown>).type === 'null'
+  );
 }
 
 export function buildCodexCliQueryOptionsFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): CodexCliQueryOptions {
   const bin = env.KYBERION_CODEX_CLI_BIN?.trim();
   const model = env.KYBERION_CODEX_CLI_MODEL?.trim();
@@ -251,7 +266,7 @@ export function buildCodexCliQueryOptionsFromEnv(
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
 
   logger.info(
-    `[codex-cli] query helper ready (bin=${bin ?? resolveCodexBinary(env)}, model=${model ?? 'gpt-5.4'})`,
+    `[codex-cli] query helper ready (bin=${bin ?? resolveCodexBinary(env)}, model=${model ?? resolveRuntimeModelId('codex-default', env)})`
   );
 
   return {
@@ -276,10 +291,7 @@ function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
     cwd: repoRoot,
     timeoutMs: 5000,
   });
-  const candidates = [
-    ...whichResult.stdout.split(/\r?\n/u),
-    ...whichResult.stderr.split(/\r?\n/u),
-  ]
+  const candidates = [...whichResult.stdout.split(/\r?\n/u), ...whichResult.stderr.split(/\r?\n/u)]
     .map((line) => line.trim())
     .filter(Boolean);
 

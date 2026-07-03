@@ -25,6 +25,7 @@ const ROOT = pathResolver.rootDir();
 const PIPELINE_ROOTS = [
   path.join(ROOT, 'pipelines'),
   path.join(ROOT, 'pipelines', 'fragments'),
+  path.join(ROOT, 'knowledge', 'product', 'pipeline-templates'),
 ];
 
 const FORBIDDEN_PATTERNS: Array<{ pattern: string; regex: RegExp }> = [
@@ -35,7 +36,10 @@ const FORBIDDEN_PATTERNS: Array<{ pattern: string; regex: RegExp }> = [
   { pattern: 'dev-fd', regex: /\/dev\/fd\//i },
   { pattern: 'mktemp', regex: /\bmktemp\b/i },
   { pattern: 'shell-interpreter', regex: /\b(?:bash|zsh|sh)\s+-c\b/i },
-  { pattern: 'implicit-host-temp-path', regex: /(?:^|[\s"'=:])(?:\/tmp|\/var\/tmp|\$TMPDIR|\$\{TMPDIR\})(?:\/|\b)/i },
+  {
+    pattern: 'implicit-host-temp-path',
+    regex: /(?:^|[\s"'=:])(?:\/tmp|\/var\/tmp|\$TMPDIR|\$\{TMPDIR\})(?:\/|\b)/i,
+  },
 ];
 
 function listPipelineFiles(roots: string[] = PIPELINE_ROOTS): string[] {
@@ -85,7 +89,9 @@ function scanValue(file: string, value: unknown, violations: ShellViolation[]): 
   }
 }
 
-export function scanPipelineShellIndependence(files: string[] = listPipelineFiles()): ShellViolation[] {
+export function scanPipelineShellIndependence(
+  files: string[] = listPipelineFiles()
+): ShellViolation[] {
   const violations: ShellViolation[] = [];
   for (const file of files) {
     if (!safeExistsSync(file)) continue;
@@ -109,7 +115,8 @@ export function main(): void {
   console.log('[check:pipeline-shell-independence] OK');
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirectRun =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) {
   main();
 }

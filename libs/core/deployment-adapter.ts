@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Deployment Adapter — contract for triggering the actual deploy (CI/CD
  * pipeline, kubectl apply, serverless deploy, etc.) from a Kyberion
@@ -63,7 +64,7 @@ export const stubDeploymentAdapter: DeploymentAdapter = {
   name: 'stub',
   async deploy(input) {
     logger.warn(
-      `[deployment-adapter:stub] no adapter registered — dry run. Would deploy ${input.projectName}@${input.version} to ${input.environment}.`,
+      `[deployment-adapter:stub] no adapter registered — dry run. Would deploy ${input.projectName}@${input.version} to ${input.environment}.`
     );
     return {
       adapter: 'stub',
@@ -107,7 +108,9 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
       return {
         adapter: 'shell',
         status: 'triggered',
-        message: stdout.trim() || `deploy triggered for ${input.projectName}@${input.version} → ${input.environment}`,
+        message:
+          stdout.trim() ||
+          `deploy triggered for ${input.projectName}@${input.version} → ${input.environment}`,
         started_at: startedAt,
         raw: stdout,
       };
@@ -124,7 +127,7 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
 }
 
 export function installShellDeploymentAdapterIfAvailable(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const command = env.KYBERION_DEPLOY_COMMAND?.trim();
   if (!command) return false;
@@ -134,8 +137,10 @@ export function installShellDeploymentAdapterIfAvailable(
       ...(env.KYBERION_DEPLOY_TIMEOUT_MS
         ? { timeoutMs: parseInt(env.KYBERION_DEPLOY_TIMEOUT_MS, 10) }
         : {}),
-    }),
+    })
   );
-  logger.success('[deployment-adapter] installed ShellDeploymentAdapter from KYBERION_DEPLOY_COMMAND');
+  logger.success(
+    '[deployment-adapter] installed ShellDeploymentAdapter from KYBERION_DEPLOY_COMMAND'
+  );
   return true;
 }

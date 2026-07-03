@@ -8,10 +8,12 @@
  *   pnpm knowledge:cowork-sync -- --max-hints 20
  */
 
-import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
+import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge';
 
 function printUsage(): void {
-  console.log('Usage: pnpm knowledge:cowork-sync -- [--direction cowork-to-kyberion|kyberion-to-cowork|both] [--paths <paths...>] [--max-hints <n>]');
+  console.log(
+    'Usage: pnpm knowledge:cowork-sync -- [--direction cowork-to-kyberion|kyberion-to-cowork|both] [--paths <paths...>] [--max-hints <n>]'
+  );
 }
 
 function parseArgs(argv: string[]): {
@@ -60,10 +62,14 @@ const result = runCoworkKnowledgeSync({
 process.stdout.write(JSON.stringify(result, null, 2) + '\n');
 
 if (result.ingest) {
-  process.stderr.write(`[cowork-sync] Ingest: ${result.ingest.enqueued} enqueued, ${result.ingest.skipped_duplicate} skipped (dup), ${result.ingest.skipped_tier_violation} skipped (tier)\n`);
+  process.stderr.write(
+    `[cowork-sync] Ingest: ${result.ingest.enqueued} enqueued, ${result.ingest.skipped_duplicate} skipped (dup), ${result.ingest.skipped_tier_violation} skipped (tier)\n`
+  );
 }
 if (result.supply) {
-  process.stderr.write(`[cowork-sync] Supply: ${result.supply.delivered} hints delivered, ${result.supply.skipped_unchanged} unchanged\n`);
+  process.stderr.write(
+    `[cowork-sync] Supply: ${result.supply.delivered} hints delivered, ${result.supply.skipped_unchanged} unchanged\n`
+  );
 }
 if (result.ingest?.errors.length || result.supply?.errors.length) {
   const errs = [...(result.ingest?.errors ?? []), ...(result.supply?.errors ?? [])];

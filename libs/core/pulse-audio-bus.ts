@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * PulseAudio AudioBus (Linux container).
  *
@@ -88,7 +89,7 @@ export class PulseAudioBus implements AudioBus {
     if (this.opened) return;
     if (format.encoding !== 'pcm_s16le') {
       throw new Error(
-        `[pulse-audio-bus] only pcm_s16le is supported in this driver; got ${format.encoding}`,
+        `[pulse-audio-bus] only pcm_s16le is supported in this driver; got ${format.encoding}`
       );
     }
     const probe = await this.probe();
@@ -97,7 +98,8 @@ export class PulseAudioBus implements AudioBus {
 
     // 1. Create the virtual sink the meeting client will play into.
     const sinkArgs = [
-      'load-module', 'module-null-sink',
+      'load-module',
+      'module-null-sink',
       `sink_name=${this.sink}`,
       `sink_properties=device.description=${this.sink}`,
     ];
@@ -106,7 +108,8 @@ export class PulseAudioBus implements AudioBus {
 
     // 2. Create the virtual source the meeting client uses as a mic.
     const srcArgs = [
-      'load-module', 'module-null-sink',
+      'load-module',
+      'module-null-sink',
       `sink_name=${this.source}`,
       `sink_properties=device.description=${this.source}`,
     ];
@@ -122,15 +125,21 @@ export class PulseAudioBus implements AudioBus {
       this.ffmpegBin,
       [
         '-hide_banner',
-        '-loglevel', 'error',
-        '-f', 'pulse',
-        '-i', `${this.sink}.monitor`,
-        '-ac', channels,
-        '-ar', rate,
-        '-f', 's16le',
+        '-loglevel',
+        'error',
+        '-f',
+        'pulse',
+        '-i',
+        `${this.sink}.monitor`,
+        '-ac',
+        channels,
+        '-ar',
+        rate,
+        '-f',
+        's16le',
         '-',
       ],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'pipe'] }
     );
     this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
     this.inputProc.on('exit', (code) => {
@@ -143,15 +152,21 @@ export class PulseAudioBus implements AudioBus {
       this.ffmpegBin,
       [
         '-hide_banner',
-        '-loglevel', 'error',
-        '-f', 's16le',
-        '-ac', channels,
-        '-ar', rate,
-        '-i', 'pipe:0',
-        '-f', 'pulse',
+        '-loglevel',
+        'error',
+        '-f',
+        's16le',
+        '-ac',
+        channels,
+        '-ar',
+        rate,
+        '-i',
+        'pipe:0',
+        '-f',
+        'pulse',
         this.source,
       ],
-      { stdio: ['pipe', 'ignore', 'pipe'] },
+      { stdio: ['pipe', 'ignore', 'pipe'] }
     );
     this.outputProc.on('exit', (code) => {
       logger.info(`[pulse-audio-bus] output ffmpeg exited with code ${code}`);

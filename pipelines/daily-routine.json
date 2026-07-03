@@ -8,6 +8,12 @@
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
   },
+  "schedule": {
+    "id": "daily-routine",
+    "cron": "0 6 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "steps": [
     {
       "id": "open_today",

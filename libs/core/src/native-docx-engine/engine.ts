@@ -4,8 +4,8 @@
  * Follows the same architecture pattern as native-pptx-engine and native-xlsx-engine.
  */
 import AdmZip from 'adm-zip';
-import * as fs from 'fs';
 import * as path from 'path';
+import { safeExistsSync, safeReadFile } from '../../secure-io.js';
 import type {
   DocxDesignProtocol,
   DocxBlockContent,
@@ -34,7 +34,11 @@ const PKG_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships
 const RT_BASE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 function escXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // ─── XML Generators ─────────────────────────────────────────
@@ -284,7 +288,8 @@ function tableXml(table: DocxTable): string {
     } else {
       xml += '<w:tblPr>';
       if (table.tblPr.tblStyle) xml += `<w:tblStyle w:val="${escXml(table.tblPr.tblStyle)}"/>`;
-      if (table.tblPr.tblW) xml += `<w:tblW w:w="${table.tblPr.tblW.w}" w:type="${table.tblPr.tblW.type}"/>`;
+      if (table.tblPr.tblW)
+        xml += `<w:tblW w:w="${table.tblPr.tblW.w}" w:type="${table.tblPr.tblW.type}"/>`;
       if (table.tblPr.jc) xml += `<w:jc w:val="${table.tblPr.jc}"/>`;
       if (table.tblPr.tblBorders) {
         xml += '<w:tblBorders>';
@@ -407,10 +412,11 @@ function generateContentTypes(
   }
 
   for (const hf of headersFooters) {
-    const target = relationships.find(r => r.id === hf.rId)?.target || `${hf.type}1.xml`;
-    const contentType = hf.type === 'header'
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml'
-      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml';
+    const target = relationships.find((r) => r.id === hf.rId)?.target || `${hf.type}1.xml`;
+    const contentType =
+      hf.type === 'header'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml';
     xml += `\n  <Override PartName="/word/${target}" ContentType="${contentType}"/>`;
   }
 
@@ -577,36 +583,53 @@ function generateFontTable(): string {
 
 // ─── Main Generation ────────────────────────────────────────
 
-export async function generateNativeDocx(protocol: DocxDesignProtocol, outputPath: string): Promise<void> {
+export async function generateNativeDocx(
+  protocol: DocxDesignProtocol,
+  outputPath: string
+): Promise<void> {
   if (!protocol?.body?.length) {
     throw new Error('generateNativeDocx: protocol must have at least one body block');
   }
   const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
+  if (!safeExistsSync(dir)) {
     throw new Error(`generateNativeDocx: output directory does not exist: ${dir}`);
   }
   const zip = new AdmZip();
 
   // Content types (header/footer overrides are now generated inside the function)
   const hasNumbering = !!protocol.numbering;
-  const contentTypes = generateContentTypes(hasNumbering, protocol.headersFooters, protocol.relationships);
+  const contentTypes = generateContentTypes(
+    hasNumbering,
+    protocol.headersFooters,
+    protocol.relationships
+  );
 
   zip.addFile('[Content_Types].xml', Buffer.from(contentTypes, 'utf8'));
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
 
   // Doc props
-  zip.addFile('docProps/core.xml', Buffer.from(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  zip.addFile(
+    'docProps/core.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:title>Kyberion Native Document</dc:title>
   <dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || new Date().toISOString()}</dcterms:created>
-</cp:coreProperties>`, 'utf8'));
+</cp:coreProperties>`,
+      'utf8'
+    )
+  );
 
-  zip.addFile('docProps/app.xml', Buffer.from(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  zip.addFile(
+    'docProps/app.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
   <Application>Kyberion Native DOCX Engine</Application>
-</Properties>`, 'utf8'));
+</Properties>`,
+      'utf8'
+    )
+  );
 
   // Word parts
   zip.addFile('word/document.xml', Buffer.from(generateDocument(protocol), 'utf8'));
@@ -619,8 +642,10 @@ export async function generateNativeDocx(protocol: DocxDesignProtocol, outputPat
   for (const [key, val] of Object.entries(protocol.theme.colors)) {
     themeColors[key] = val;
   }
-  zip.addFile('word/theme/theme1.xml', Buffer.from(
-    protocol.theme.rawXml || generateTheme(themeColors), 'utf8'));
+  zip.addFile(
+    'word/theme/theme1.xml',
+    Buffer.from(protocol.theme.rawXml || generateTheme(themeColors), 'utf8')
+  );
 
   // Numbering
   if (protocol.numbering) {
@@ -629,7 +654,7 @@ export async function generateNativeDocx(protocol: DocxDesignProtocol, outputPat
 
   // Headers and Footers
   for (const hf of protocol.headersFooters) {
-    const target = protocol.relationships.find(r => r.id === hf.rId)?.target || `${hf.type}1.xml`;
+    const target = protocol.relationships.find((r) => r.id === hf.rId)?.target || `${hf.type}1.xml`;
     if (hf.rawXml) {
       zip.addFile(`word/${target}`, Buffer.from(hf.rawXml, 'utf8'));
     } else {
@@ -677,8 +702,11 @@ function embedImages(
                 const target = imageRels.get(c.drawing.imageRId);
                 if (target && c.drawing.imageData) {
                   zip.addFile(`word/${target}`, Buffer.from(c.drawing.imageData, 'base64'));
-                } else if (target && c.drawing.imagePath && fs.existsSync(c.drawing.imagePath)) {
-                  zip.addFile(`word/${target}`, fs.readFileSync(c.drawing.imagePath));
+                } else if (target && c.drawing.imagePath && safeExistsSync(c.drawing.imagePath)) {
+                  zip.addFile(
+                    `word/${target}`,
+                    safeReadFile(c.drawing.imagePath, { encoding: null }) as Buffer
+                  );
                 }
               }
             }

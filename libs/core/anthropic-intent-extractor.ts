@@ -9,8 +9,9 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import type { IntentBody } from './intent-delta.js';
 import type { ExtractIntentInput, IntentExtractor } from './intent-extractor.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
-const DEFAULT_MODEL = 'claude-opus-4-7' as const;
+const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 2000;
 
 const SYSTEM_PROMPT = `You extract structured intent from a user utterance in a CEO work-automation platform.

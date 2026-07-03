@@ -1,10 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { ensureMissionTeamRuntime, type EnsureMissionTeamRuntimeOptions, type MissionTeamRuntimePlan } from './mission-team-orchestrator.js';
-import { agentLifecycle, type SpawnOptions, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  ensureMissionTeamRuntime,
+  type EnsureMissionTeamRuntimeOptions,
+  type MissionTeamRuntimePlan,
+} from './mission-team-orchestrator.js';
+import {
+  agentLifecycle,
+  type SpawnOptions,
+  type AgentHandle,
+  type AgentRuntimeSnapshot,
+} from './agent-lifecycle.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
+import { logger } from './core.js';
 
 export interface AgentRuntimeEnsureRequest {
   request_id: string;
@@ -42,8 +58,11 @@ interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeam
 
 const REQUESTS_DIR = pathResolver.shared('coordination/agent-runtime/requests');
 const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
-const EVENTS_PATH = pathResolver.shared('observability/mission-control/agent-runtime-supervisor-events.jsonl');
+const EVENTS_PATH = pathResolver.shared(
+  'observability/mission-control/agent-runtime-supervisor-events.jsonl'
+);
 const EVENTS_DIR = pathResolver.shared('observability/mission-control');
+let supervisorEventWriteWarned = false;
 
 function ensureQueueDirs(): void {
   safeMkdir(REQUESTS_DIR);
@@ -57,13 +76,22 @@ function ensureEventDir(): void {
 export function appendSupervisorEvent(event: Record<string, unknown>): void {
   try {
     ensureEventDir();
-    safeAppendFileSync(EVENTS_PATH, `${JSON.stringify({
-      ts: new Date().toISOString(),
-      ...event,
-    })}\n`);
-  } catch {
+    safeAppendFileSync(
+      EVENTS_PATH,
+      `${JSON.stringify({
+        ts: new Date().toISOString(),
+        ...event,
+      })}\n`
+    );
+  } catch (error: any) {
     // Some narrow authority roles can ensure/stop runtimes without observability write scope.
     // Runtime control should still succeed even if supervisor event logging is unavailable.
+    if (!supervisorEventWriteWarned) {
+      supervisorEventWriteWarned = true;
+      logger.warn(
+        `[agent-runtime-supervisor] failed to write supervisor event: ${error?.message || error}`
+      );
+    }
   }
 }
 
@@ -92,7 +120,10 @@ export function enqueueMissionTeamPrewarmRequest(input: {
     reason: input.reason,
     created_at: new Date().toISOString(),
   };
-  safeWriteFile(getAgentRuntimeEnsureRequestPath(request.request_id), JSON.stringify(request, null, 2));
+  safeWriteFile(
+    getAgentRuntimeEnsureRequestPath(request.request_id),
+    JSON.stringify(request, null, 2)
+  );
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_requested',
     request_id: request.request_id,
@@ -104,10 +135,14 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  return JSON.parse(safeReadFile(requestPath, { encoding: 'utf8' }) as string) as AgentRuntimeEnsureRequest;
+  return JSON.parse(
+    safeReadFile(requestPath, { encoding: 'utf8' }) as string
+  ) as AgentRuntimeEnsureRequest;
 }
 
-export async function processMissionTeamPrewarmRequest(requestPath: string): Promise<AgentRuntimeEnsureResult> {
+export async function processMissionTeamPrewarmRequest(
+  requestPath: string
+): Promise<AgentRuntimeEnsureResult> {
   const request = loadMissionTeamPrewarmRequest(requestPath);
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_started',
@@ -127,7 +162,10 @@ export async function processMissionTeamPrewarmRequest(requestPath: string): Pro
     organization_profile: runtime_plan.organization_profile,
     runtime_plan,
   };
-  safeWriteFile(getAgentRuntimeEnsureResultPath(request.request_id), JSON.stringify(result, null, 2));
+  safeWriteFile(
+    getAgentRuntimeEnsureResultPath(request.request_id),
+    JSON.stringify(result, null, 2)
+  );
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_completed',
     request_id: request.request_id,
@@ -167,14 +205,16 @@ export function startAgentRuntimeSupervisorForRequest(request: AgentRuntimeEnsur
 export async function waitForMissionTeamPrewarmResult(
   requestId: string,
   timeoutMs = 600_000,
-  pollIntervalMs = 1_000,
+  pollIntervalMs = 1_000
 ): Promise<AgentRuntimeEnsureResult> {
   const resultPath = getAgentRuntimeEnsureResultPath(requestId);
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     if (safeExistsSync(resultPath)) {
-      return JSON.parse(safeReadFile(resultPath, { encoding: 'utf8' }) as string) as AgentRuntimeEnsureResult;
+      return JSON.parse(
+        safeReadFile(resultPath, { encoding: 'utf8' }) as string
+      ) as AgentRuntimeEnsureResult;
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
@@ -187,7 +227,7 @@ export async function waitForMissionTeamPrewarmResult(
 }
 
 export async function ensureMissionTeamRuntimeViaSupervisor(
-  options: EnsureMissionTeamRuntimeViaSupervisorOptions,
+  options: EnsureMissionTeamRuntimeViaSupervisorOptions
 ): Promise<AgentRuntimeEnsureResult> {
   const request = enqueueMissionTeamPrewarmRequest({
     missionId: options.missionId,
@@ -199,7 +239,7 @@ export async function ensureMissionTeamRuntimeViaSupervisor(
   return waitForMissionTeamPrewarmResult(
     request.request_id,
     options.timeoutMs,
-    options.pollIntervalMs,
+    options.pollIntervalMs
   );
 }
 
@@ -270,15 +310,21 @@ export function listAgentRuntimeLeaseSummaries(): Array<{
   owner_type: string;
   metadata?: Record<string, unknown>;
 }> {
-  return runtimeSupervisor.snapshot().filter((entry) => entry.kind === 'agent').map((entry) => ({
-    agent_id: entry.resourceId,
-    owner_id: entry.ownerId,
-    owner_type: entry.ownerType,
-    metadata: entry.metadata,
-  }));
+  return runtimeSupervisor
+    .snapshot()
+    .filter((entry) => entry.kind === 'agent')
+    .map((entry) => ({
+      agent_id: entry.resourceId,
+      owner_id: entry.ownerId,
+      owner_type: entry.ownerType,
+      metadata: entry.metadata,
+    }));
 }
 
-export function getAgentRuntimeSnapshot(agentId: string, logLimit?: number): AgentRuntimeSnapshot | null {
+export function getAgentRuntimeSnapshot(
+  agentId: string,
+  logLimit?: number
+): AgentRuntimeSnapshot | null {
   return agentLifecycle.getSnapshot(agentId, logLimit) || null;
 }
 
@@ -290,7 +336,12 @@ export function getAgentRuntimeLog(agentId: string, limit = 50) {
   return agentLifecycle.getLog(agentId, limit);
 }
 
-export async function askAgentRuntime(agentId: string, prompt: string, requestedBy: string): Promise<string> {
+export async function askAgentRuntime(
+  agentId: string,
+  prompt: string,
+  requestedBy: string,
+  options: { timeoutMs?: number } = {}
+): Promise<string> {
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_requested',
     agent_id: agentId,
@@ -300,7 +351,7 @@ export async function askAgentRuntime(agentId: string, prompt: string, requested
   if (!handle) {
     throw new Error(`Agent ${agentId} not found or not ready`);
   }
-  const response = await handle.ask(prompt);
+  const response = await handle.ask(prompt, { timeoutMs: options.timeoutMs });
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_completed',
     agent_id: agentId,
@@ -325,7 +376,10 @@ export async function refreshAgentRuntime(agentId: string, requestedBy: string) 
   return result;
 }
 
-export async function restartAgentRuntime(agentId: string, requestedBy: string): Promise<AgentHandle> {
+export async function restartAgentRuntime(
+  agentId: string,
+  requestedBy: string
+): Promise<AgentHandle> {
   appendSupervisorEvent({
     decision: 'agent_runtime_restart_requested',
     agent_id: agentId,
