@@ -46,6 +46,24 @@ describe('question-resolver', () => {
     expect(packet?.llm_touchpoints?.[0]?.stage).toBe('question_resolution');
   });
 
+  it('renders clarification text in Japanese when locale is ja', () => {
+    const packet = resolveQuestionInteractionPacket({
+      text: '会議の準備をして',
+      requiredInputs: ['meeting_url'],
+      executionShape: 'task_session',
+      confidence: 0.3,
+      locale: 'ja',
+      maxQuestions: 1,
+    });
+
+    expect(packet?.headline).toBe('実行前に追加の確認が必要です');
+    expect(packet?.summary).toBe('実行を続ける前に入力内容の確認が必要です。');
+    expect(packet?.questions?.[0]?.question).toBe('meeting url を確認してください。');
+    expect(packet?.questions?.[0]?.reason).toBe(
+      '不足している入力は確認しきい値を超えています(1 > 1)'
+    );
+  });
+
   it('tracks omitted clarification questions when maxQuestions truncates the packet', () => {
     const result = resolveQuestionResolution({
       text: '会議の準備をして',
