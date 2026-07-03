@@ -8,6 +8,12 @@
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 5"
   },
+  "schedule": {
+    "id": "volatile-index-daily",
+    "cron": "0 5 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "steps": [
     {
       "id": "build_index",

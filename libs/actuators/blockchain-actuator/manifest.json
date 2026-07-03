@@ -1,7 +1,8 @@
 {
   "actuator_id": "blockchain-actuator",
   "version": "1.0.0",
-  "description": "Immutable Ledger Anchoring System",
+  "description": "Local Ledger Anchoring Simulation",
+  "simulated": true,
   "contract_schema": "schemas/blockchain-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -23,6 +24,11 @@
     },
     {
       "op": "anchor_trust",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {}
+    },
+    {
+      "op": "verify_anchor",
       "platforms": ["darwin", "linux", "win32"],
       "requirements": {}
     }

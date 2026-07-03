@@ -1,4 +1,14 @@
-import { logger, safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync, createStandardYargs, pathResolver, classifyError, withRetry } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeAppendFileSync,
+  safeMkdir,
+  safeExistsSync,
+  createStandardYargs,
+  pathResolver,
+  classifyError,
+  withRetry,
+} from '@agent/core';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +20,9 @@ import { fileURLToPath } from 'node:url';
  */
 
 const MOCK_CHAIN_PATH = pathResolver.active('audit/mock_blockchain.jsonl');
-const BLOCKCHAIN_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/blockchain-actuator/manifest.json');
+const BLOCKCHAIN_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/blockchain-actuator/manifest.json'
+);
 const DEFAULT_BLOCKCHAIN_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -39,7 +51,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(BLOCKCHAIN_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(BLOCKCHAIN_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -52,7 +66,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_BLOCKCHAIN_RETRY,
@@ -66,19 +82,39 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
 
 async function handleAction(input: BlockchainAction) {
   switch (input.action) {
-    case 'anchor_mission': return await anchorMission(input.params);
-    case 'anchor_trust': return await anchorTrust(input.params);
-    default: throw new Error(`Unsupported blockchain action: ${input.action}`);
+    case 'anchor_mission':
+      return await anchorMission(input.params);
+    case 'anchor_trust':
+      return await anchorTrust(input.params);
+    case 'verify_anchor':
+      return await verifyAnchor(input.params);
+    default:
+      throw new Error(`Unsupported blockchain action: ${input.action}`);
+  }
+}
+
+function readMockChainEntries(): any[] {
+  if (!safeExistsSync(MOCK_CHAIN_PATH)) return [];
+  try {
+    return String(safeReadFile(MOCK_CHAIN_PATH, { encoding: 'utf8' }) || '')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
   }
 }
 
@@ -86,8 +122,10 @@ async function anchorMission(params: any) {
   const { mission_id, hash } = params;
   if (!mission_id || !hash) throw new Error('mission_id and hash are required for anchoring.');
 
-  logger.info(`🔗 [Blockchain] Anchoring mission ${mission_id} (Hash: ${hash.substring(0, 10)}...)`);
-  
+  logger.info(
+    `🔗 [Blockchain] Anchoring mission ${mission_id} (Hash: ${hash.substring(0, 10)}...)`
+  );
+
   const tx = {
     block_number: Math.floor(Date.now() / 10000),
     tx_id: createHash('sha256').update(`tx-${Date.now()}-${mission_id}`).digest('hex'),
@@ -95,13 +133,13 @@ async function anchorMission(params: any) {
     type: 'MISSION_ANCHOR',
     mission_id,
     data_hash: hash,
-    contract_address: '0xKyberionSovereignEvidenceContractV1'
+    contract_address: '0xKyberionSovereignEvidenceContractV1',
   };
 
   await withRetry(async () => {
     _writeToMockChain(tx);
   }, buildRetryOptions());
-  return { status: 'success', tx_id: tx.tx_id, block: tx.block_number };
+  return { status: 'success', simulated: true, tx_id: tx.tx_id, block: tx.block_number };
 }
 
 async function anchorTrust(params: any) {
@@ -117,13 +155,37 @@ async function anchorTrust(params: any) {
     type: 'TRUST_SCORE_ANCHOR',
     agent_id,
     new_score: score,
-    contract_address: '0xKyberionTrustGovernanceContractV1'
+    contract_address: '0xKyberionTrustGovernanceContractV1',
   };
 
   await withRetry(async () => {
     _writeToMockChain(tx);
   }, buildRetryOptions());
-  return { status: 'success', tx_id: tx.tx_id, block: tx.block_number };
+  return { status: 'success', simulated: true, tx_id: tx.tx_id, block: tx.block_number };
+}
+
+async function verifyAnchor(params: any) {
+  const { mission_id, agent_id, hash } = params;
+  if (!mission_id && !agent_id) throw new Error('mission_id or agent_id is required.');
+
+  const entries = readMockChainEntries();
+  const matching = entries.filter((entry) => {
+    if (mission_id) {
+      return (
+        entry.type === 'MISSION_ANCHOR' &&
+        entry.mission_id === mission_id &&
+        (hash ? entry.data_hash === hash : true)
+      );
+    }
+    return entry.type === 'TRUST_SCORE_ANCHOR' && entry.agent_id === agent_id;
+  });
+
+  return {
+    status: matching.length > 0 ? 'verified' : 'not_found',
+    simulated: true,
+    verified: matching.length > 0,
+    matches: matching.length,
+  };
 }
 
 function _writeToMockChain(tx: any) {
@@ -136,8 +198,10 @@ const main = async () => {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-    
-  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
+
+  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), {
+    encoding: 'utf8',
+  }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));
 };
@@ -146,7 +210,7 @@ const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
 const modulePath = fileURLToPath(import.meta.url);
 
 if (entrypoint && modulePath === entrypoint) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

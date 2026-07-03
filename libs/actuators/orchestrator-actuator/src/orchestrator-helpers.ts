@@ -1,4 +1,19 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, safeMkdir, safeExistsSync, safeUnlinkSync, safeSymlinkSync, resolveVars, evaluateCondition, withRetry, derivePipelineStatus, pathResolver, validatePipelineAdf } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeExec,
+  safeMkdir,
+  safeExistsSync,
+  safeUnlinkSync,
+  safeSymlinkSync,
+  resolveVars,
+  evaluateCondition,
+  withRetry,
+  derivePipelineStatus,
+  pathResolver,
+  validatePipelineAdf,
+} from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import yaml from 'js-yaml';
@@ -51,8 +66,12 @@ export type ExecutionPlanPreflightReport = {
   issues: ExecutionPlanPreflightIssue[];
 };
 
-const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge('product/orchestration/actuator-request-archetypes.json');
-const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/orchestrator-actuator/manifest.json');
+const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
+  'product/orchestration/actuator-request-archetypes.json'
+);
+const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/orchestrator-actuator/manifest.json'
+);
 const DEFAULT_ORCHESTRATOR_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -70,7 +89,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(ORCHESTRATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(ORCHESTRATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -83,7 +104,9 @@ export function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_ORCHESTRATOR_RETRY,
@@ -95,14 +118,18 @@ export function buildRetryOptions(override?: Record<string, any>) {
     shouldRetry: (error: Error) => {
       const message = String(error?.message || '');
       if (retryableCategories.size > 0) {
-        const category =
-          /ETIMEDOUT|timeout|network/i.test(message) ? 'timeout' :
-          /ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN/i.test(message) ? 'network' :
-          /EADDRINUSE|ENOSPC|resource unavailable|busy/i.test(message) ? 'resource_unavailable' :
-          'unknown';
+        const category = /ETIMEDOUT|timeout|network/i.test(message)
+          ? 'timeout'
+          : /ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN/i.test(message)
+            ? 'network'
+            : /EADDRINUSE|ENOSPC|resource unavailable|busy/i.test(message)
+              ? 'resource_unavailable'
+              : 'unknown';
         return retryableCategories.has(category);
       }
-      return /ETIMEDOUT|timeout|network|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EADDRINUSE|ENOSPC/i.test(message);
+      return /ETIMEDOUT|timeout|network|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EADDRINUSE|ENOSPC/i.test(
+        message
+      );
     },
   };
 }
@@ -114,7 +141,7 @@ export async function executePipeline(
   steps: PipelineStep[],
   initialCtx: any = {},
   options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() },
+  state: any = { stepCount: 0, startTime: Date.now() }
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
@@ -123,15 +150,19 @@ export async function executePipeline(
   let ctx = { ...initialCtx, root: rootDir, HOME: process.env.HOME || '/Users' };
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    const saved = JSON.parse(
+      safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string
+    );
     ctx = { ...ctx, ...saved };
   }
 
   const results = [];
   for (const step of steps) {
     state.stepCount++;
-    if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
+    if (state.stepCount > MAX_STEPS)
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
+    if (Date.now() - state.startTime > TIMEOUT)
+      throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
 
     try {
       logger.info(`  [ORCH_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
@@ -140,9 +171,15 @@ export async function executePipeline(
         ctx = await opControl(step.op, step.params, ctx, options, state);
       } else {
         switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx); break;
-          case 'apply': await opApply(step.op, step.params, ctx); break;
+          case 'capture':
+            ctx = await opCapture(step.op, step.params, ctx);
+            break;
+          case 'transform':
+            ctx = await opTransform(step.op, step.params, ctx);
+            break;
+          case 'apply':
+            await opApply(step.op, step.params, ctx);
+            break;
         }
       }
       results.push({ op: step.op, status: 'success' });
@@ -157,7 +194,12 @@ export async function executePipeline(
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
 }
 
 async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
@@ -182,7 +224,8 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       }
       return ctx;
 
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -190,19 +233,42 @@ async function opCapture(op: string, params: any, ctx: any) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json':
-      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) as string) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture_data']: JSON.parse(
+          safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), {
+            encoding: 'utf8',
+          }) as string
+        ),
+      };
     case 'read_file':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolveVars(params.path, ctx)), { encoding: 'utf8' }) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: safeReadFile(
+          path.resolve(rootDir, resolveVars(params.path, ctx)),
+          { encoding: 'utf8' }
+        ),
+      };
     case 'shell':
       const cmd = resolveVars(params.cmd, ctx);
-      const shellResult = await withRetry(async () => safeExec(cmd), buildRetryOptions(params.retry));
+      const shellResult = await withRetry(
+        async () => safeExec(cmd),
+        buildRetryOptions(params.retry)
+      );
       return { ...ctx, [params.export_as || 'last_capture']: shellResult.trim() };
     case 'intent_detect':
-      const mapping = yaml.load(safeReadFile(path.resolve(rootDir, resolveVars(params.mapping_path, ctx)), { encoding: 'utf8' }) as string) as any;
+      const mapping = yaml.load(
+        safeReadFile(path.resolve(rootDir, resolveVars(params.mapping_path, ctx)), {
+          encoding: 'utf8',
+        }) as string
+      ) as any;
       const query = resolveVars(params.query, ctx).toLowerCase();
-      const detected = mapping.intents.find((i: any) => i.trigger_phrases.some((p: string) => query.includes(p.toLowerCase())));
+      const detected = mapping.intents.find((i: any) =>
+        i.trigger_phrases.some((p: string) => query.includes(p.toLowerCase()))
+      );
       return { ...ctx, [params.export_as || 'detected_intent']: detected };
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -213,16 +279,28 @@ async function opTransform(op: string, params: any, ctx: any) {
       const result = params.path.split('.').reduce((o: any, i: string) => o?.[i], data);
       return { ...ctx, [params.export_as]: result };
     case 'variable_hydrate':
-      const input = typeof ctx[params.from] === 'object' ? JSON.stringify(ctx[params.from]) : String(ctx[params.from]);
+      const input =
+        typeof ctx[params.from] === 'object'
+          ? JSON.stringify(ctx[params.from])
+          : String(ctx[params.from]);
       const hydrated = resolveVars(input, ctx);
-      return { ...ctx, [params.export_as || 'last_transform']: params.is_json ? JSON.parse(hydrated) : hydrated };
+      return {
+        ...ctx,
+        [params.export_as || 'last_transform']: params.is_json ? JSON.parse(hydrated) : hydrated,
+      };
     case 'request_to_execution_brief': {
       const catalog = loadActuatorRequestArchetypes();
-      const requestText = String(resolveVars(params.request_text || ctx.request_text || '', ctx)).trim();
+      const requestText = String(
+        resolveVars(params.request_text || ctx.request_text || '', ctx)
+      ).trim();
       if (!requestText) throw new Error('request_to_execution_brief requires request_text');
       const archetype = detectRequestArchetype(requestText, catalog);
       const providedInputs = resolveExecutionBriefInputs(params, ctx, archetype);
-      const missingInputs = (archetype.required_inputs || []).filter((item: string) => !providedInputs.provided.includes(item));
+      const missingInputs = (archetype.required_inputs || []).filter(
+        (item: string) => !providedInputs.provided.includes(item)
+      );
+      const reasoningMode: 'placeholder' | 'model' =
+        missingInputs.length > 0 ? 'placeholder' : 'model';
       const assumptions = missingInputs.map((item: string) => `Missing input: ${item}`);
       const clarificationQuestions = missingInputs.map((item: string) => ({
         id: item,
@@ -265,67 +343,86 @@ async function opTransform(op: string, params: any, ctx: any) {
           provided_inputs: providedInputs.provided,
           inferred_inputs: providedInputs.inferred,
           input_bindings: providedInputs.bindings,
+          reasoning_mode: reasoningMode,
           assumptions,
           clarification_questions: clarificationQuestions,
           readiness: readiness.level,
           readiness_reason: readiness.reason,
           llm_touchpoints: llmTouchpoints,
-          recommended_next_step: missingInputs.length > 0 ? 'clarify_missing_inputs' : 'build_resolution_plan',
+          recommended_next_step:
+            missingInputs.length > 0 ? 'clarify_missing_inputs' : 'build_resolution_plan',
         },
       };
     }
     case 'execution_brief_to_operator_packet': {
       const brief = ctx[params.from || 'execution_brief'];
-      if (!brief || typeof brief !== 'object') throw new Error('execution_brief_to_operator_packet requires actuator-execution-brief');
+      if (!brief || typeof brief !== 'object')
+        throw new Error('execution_brief_to_operator_packet requires actuator-execution-brief');
       const missingInputs = Array.isArray(brief.missing_inputs) ? brief.missing_inputs : [];
-      const nextActions = missingInputs.length > 0
-        ? [{
-            id: 'answer-clarifications',
-            priority: 'now',
-            next_action_type: 'clarify',
-            action: 'Answer the clarification questions',
-            reason: 'The request still has blocking ambiguity.',
-            suggested_followup_request: `Please provide the following missing inputs: ${missingInputs.join(', ')}`,
-          }]
-        : [{
-            id: 'review-plan',
-            priority: 'next',
-            next_action_type: 'execute_now',
-            action: 'Review the execution preview and start execution',
-            reason: 'The request is sufficiently structured.',
-            suggested_followup_request: 'Please proceed with this plan.',
-          }];
+      const reasoningMode: 'placeholder' | 'model' =
+        brief.reasoning_mode || (missingInputs.length > 0 ? 'placeholder' : 'model');
+      const nextActions =
+        missingInputs.length > 0
+          ? [
+              {
+                id: 'answer-clarifications',
+                priority: 'now',
+                next_action_type: 'clarify',
+                action: 'Answer the clarification questions',
+                reason: 'The request still has blocking ambiguity.',
+                suggested_followup_request: `Please provide the following missing inputs: ${missingInputs.join(', ')}`,
+              },
+            ]
+          : [
+              {
+                id: 'review-plan',
+                priority: 'next',
+                next_action_type: 'execute_now',
+                action: 'Review the execution preview and start execution',
+                reason: 'The request is sufficiently structured.',
+                suggested_followup_request: 'Please proceed with this plan.',
+              },
+            ];
       return {
         ...ctx,
         [params.export_as || 'operator_packet']: {
           kind: 'operator-interaction-packet',
           interaction_type: missingInputs.length > 0 ? 'clarification' : 'execution-preview',
-          headline: missingInputs.length > 0 ? 'Additional input required' : 'Execution preview is ready',
+          headline:
+            missingInputs.length > 0 ? 'Additional input required' : 'Execution preview is ready',
           summary: brief.user_facing_summary || brief.summary || '',
           readiness: brief.readiness || 'needs_clarification',
           confidence: brief.confidence || 0,
+          reasoning_mode: reasoningMode,
           questions: brief.clarification_questions || [],
           next_actions: nextActions,
-          suggested_response_style: missingInputs.length > 0 ? 'clarify-first' : 'preview-and-confirm',
+          suggested_response_style:
+            missingInputs.length > 0 ? 'clarify-first' : 'preview-and-confirm',
           llm_touchpoints: brief.llm_touchpoints || [],
         },
       };
     }
     case 'request_to_status_brief': {
-      const requestText = String(resolveVars(params.request_text || ctx.request_text || '', ctx)).trim();
+      const requestText = String(
+        resolveVars(params.request_text || ctx.request_text || '', ctx)
+      ).trim();
       if (!requestText) throw new Error('request_to_status_brief requires request_text');
       const lowered = requestText.toLowerCase();
       const targetMissionId = requestText.match(/MSN-[A-Z0-9-]+/i)?.[0] || null;
       const targetProjectId = requestText.match(/PRJ-[A-Z0-9-]+/i)?.[0] || null;
       const scope =
-        targetMissionId || lowered.includes('mission') || lowered.includes('ミッション') ? 'missions' :
-        targetProjectId || lowered.includes('project') || lowered.includes('プロジェクト') ? 'projects' :
-        lowered.includes('actuator') || lowered.includes('アクチュエータ') ? 'actuators' :
-        lowered.includes('surface') || lowered.includes('サービス') || lowered.includes('稼働') ? 'surfaces' :
-        'system';
-      const focusAreas = scope === 'system'
-        ? ['surfaces', 'catalogs', 'esm-integrity']
-        : [scope];
+        targetMissionId || lowered.includes('mission') || lowered.includes('ミッション')
+          ? 'missions'
+          : targetProjectId || lowered.includes('project') || lowered.includes('プロジェクト')
+            ? 'projects'
+            : lowered.includes('actuator') || lowered.includes('アクチュエータ')
+              ? 'actuators'
+              : lowered.includes('surface') ||
+                  lowered.includes('サービス') ||
+                  lowered.includes('稼働')
+                ? 'surfaces'
+                : 'system';
+      const focusAreas = scope === 'system' ? ['surfaces', 'catalogs', 'esm-integrity'] : [scope];
       return {
         ...ctx,
         [params.export_as || 'status_brief']: {
@@ -345,7 +442,13 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'execution_brief_to_resolution_plan': {
       const brief = ctx[params.from || 'execution_brief'];
-      if (!brief || typeof brief !== 'object') throw new Error('execution_brief_to_resolution_plan requires actuator-execution-brief');
+      if (!brief || typeof brief !== 'object')
+        throw new Error('execution_brief_to_resolution_plan requires actuator-execution-brief');
+      const reasoningMode: 'placeholder' | 'model' =
+        brief.reasoning_mode ||
+        (Array.isArray(brief.missing_inputs) && brief.missing_inputs.length > 0
+          ? 'placeholder'
+          : 'model');
       const phases = [
         {
           id: 'normalize',
@@ -375,25 +478,33 @@ async function opTransform(op: string, params: any, ctx: any) {
           kind: 'actuator-resolution-plan',
           archetype_id: brief.archetype_id,
           summary: brief.summary,
+          reasoning_mode: reasoningMode,
           phases,
         },
       };
     }
     case 'collect_system_status_snapshot': {
       const brief = ctx[params.from || 'status_brief'];
-      if (!brief || typeof brief !== 'object') throw new Error('collect_system_status_snapshot requires system-status-brief');
-      const surfaceStatus = parseJsonCommandOutput(safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'status'], {
-        cwd: pathResolver.rootDir(),
-        timeoutMs: 120000,
-      }));
+      if (!brief || typeof brief !== 'object')
+        throw new Error('collect_system_status_snapshot requires system-status-brief');
+      const surfaceStatus = parseJsonCommandOutput(
+        safeExec('node', ['dist/scripts/surface_runtime.js', '--action', 'status'], {
+          cwd: pathResolver.rootDir(),
+          timeoutMs: 120000,
+        })
+      );
       const esmIntegrity = collectCommandHealth('pnpm', ['run', 'check:esm']);
       const catalogIntegrity = collectCommandHealth('pnpm', ['run', 'check:catalogs']);
-      const missionStatus = brief.scope === 'missions' || brief.scope === 'system'
-        ? collectMissionStatusSnapshot(brief.target_mission_id || brief.target_project_id || undefined)
-        : undefined;
-      const projectStatus = brief.scope === 'projects' || brief.scope === 'system'
-        ? collectProjectStatusSnapshot(brief.target_project_id || undefined)
-        : undefined;
+      const missionStatus =
+        brief.scope === 'missions' || brief.scope === 'system'
+          ? collectMissionStatusSnapshot(
+              brief.target_mission_id || brief.target_project_id || undefined
+            )
+          : undefined;
+      const projectStatus =
+        brief.scope === 'projects' || brief.scope === 'system'
+          ? collectProjectStatusSnapshot(brief.target_project_id || undefined)
+          : undefined;
       return {
         ...ctx,
         [params.export_as || 'system_status_snapshot']: {
@@ -410,9 +521,12 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'status_snapshot_to_report': {
       const snapshot = ctx[params.from || 'system_status_snapshot'];
-      if (!snapshot || typeof snapshot !== 'object') throw new Error('status_snapshot_to_report requires system_status_snapshot');
+      if (!snapshot || typeof snapshot !== 'object')
+        throw new Error('status_snapshot_to_report requires system_status_snapshot');
       const health = snapshot.surface_status?.health || {};
-      const healthEntries = Object.entries(health as Record<string, { status?: string; detail?: string }>);
+      const healthEntries = Object.entries(
+        health as Record<string, { status?: string; detail?: string }>
+      );
       const unhealthy = healthEntries.filter(([, value]) => value?.status === 'unhealthy');
       const unknown = healthEntries.filter(([, value]) => value?.status === 'unknown');
       const findings = [
@@ -517,7 +631,8 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'status_report_to_operator_packet': {
       const report = ctx[params.from || 'system_status_report'];
-      if (!report || typeof report !== 'object') throw new Error('status_report_to_operator_packet requires system-status-report');
+      if (!report || typeof report !== 'object')
+        throw new Error('status_report_to_operator_packet requires system-status-report');
       return {
         ...ctx,
         [params.export_as || 'operator_packet']: {
@@ -529,8 +644,10 @@ async function opTransform(op: string, params: any, ctx: any) {
           confidence: 5,
           next_actions: Array.isArray(report.next_actions) ? report.next_actions : [],
           suggested_response_style: 'status-summary',
-          refresh_command: 'node dist/libs/actuators/orchestrator-actuator/src/index.js --input libs/actuators/orchestrator-actuator/examples/request-to-status-operator-packet.json',
-          refresh_packet_path: 'active/shared/tmp/orchestrator/status-operator-interaction-packet.json',
+          refresh_command:
+            'node dist/libs/actuators/orchestrator-actuator/src/index.js --input libs/actuators/orchestrator-actuator/examples/request-to-status-operator-packet.json',
+          refresh_packet_path:
+            'active/shared/tmp/orchestrator/status-operator-interaction-packet.json',
           llm_touchpoints: [
             {
               stage: 'status-collection',
@@ -539,7 +656,8 @@ async function opTransform(op: string, params: any, ctx: any) {
             },
             {
               stage: 'status-explanation',
-              purpose: 'Summarize current state and recommend next actions in human-facing language.',
+              purpose:
+                'Summarize current state and recommend next actions in human-facing language.',
               output_contract: 'operator-interaction-packet',
             },
           ],
@@ -548,12 +666,16 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'operator_packet_to_response_preview': {
       const packet = ctx[params.from || 'operator_packet'];
-      if (!packet || typeof packet !== 'object') throw new Error('operator_packet_to_response_preview requires operator-interaction-packet');
+      if (!packet || typeof packet !== 'object')
+        throw new Error('operator_packet_to_response_preview requires operator-interaction-packet');
+      const reasoningMode: 'placeholder' | 'model' = packet.reasoning_mode || 'model';
       const lines: string[] = [];
       lines.push(String(packet.headline || ''));
       if (packet.summary) lines.push(String(packet.summary));
+      lines.push(`Reasoning mode: ${reasoningMode}`);
       if (packet.readiness) lines.push(`Readiness: ${String(packet.readiness)}`);
-      if (typeof packet.confidence === 'number') lines.push(`Confidence: ${String(packet.confidence)}`);
+      if (typeof packet.confidence === 'number')
+        lines.push(`Confidence: ${String(packet.confidence)}`);
       if (Array.isArray(packet.questions) && packet.questions.length > 0) {
         lines.push('');
         lines.push('Questions:');
@@ -568,7 +690,8 @@ async function opTransform(op: string, params: any, ctx: any) {
         for (const action of packet.next_actions) {
           lines.push(`- ${String(action.action || action.id || 'Action')}`);
           if (action.reason) lines.push(`  reason: ${String(action.reason)}`);
-          if (action.suggested_followup_request) lines.push(`  follow-up: ${String(action.suggested_followup_request)}`);
+          if (action.suggested_followup_request)
+            lines.push(`  follow-up: ${String(action.suggested_followup_request)}`);
         }
       }
       return {
@@ -576,21 +699,32 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'response_preview']: {
           kind: 'operator-response-preview',
           format: 'plain-text',
+          reasoning_mode: reasoningMode,
           text: lines.join('\n').trim(),
         },
       };
     }
     case 'delivery_pack_to_operator_packet': {
       const pack = ctx[params.from || 'delivery_pack'];
-      if (!pack || typeof pack !== 'object') throw new Error('delivery_pack_to_operator_packet requires delivery-pack');
+      if (!pack || typeof pack !== 'object')
+        throw new Error('delivery_pack_to_operator_packet requires delivery-pack');
       const artifacts = Array.isArray(pack.artifacts) ? pack.artifacts : [];
       const mainArtifactId = String(pack.main_artifact_id || artifacts[0]?.id || '');
-      const mainArtifact = artifacts.find((artifact: any) => artifact?.id === mainArtifactId) || artifacts[0] || null;
+      const mainArtifact =
+        artifacts.find((artifact: any) => artifact?.id === mainArtifactId) || artifacts[0] || null;
       const nextActions = [];
       if (mainArtifact?.path) {
         const mainArtifactPath = String(mainArtifact.path);
         const mainArtifactExt = path.extname(mainArtifactPath).toLowerCase();
-        const isLikelyBinaryArtifact = !['.json', '.md', '.txt', '.log', '.xml', '.yaml', '.yml'].includes(mainArtifactExt);
+        const isLikelyBinaryArtifact = ![
+          '.json',
+          '.md',
+          '.txt',
+          '.log',
+          '.xml',
+          '.yaml',
+          '.yml',
+        ].includes(mainArtifactExt);
         nextActions.push({
           id: 'review-main-artifact',
           priority: 'now',
@@ -604,21 +738,30 @@ async function opTransform(op: string, params: any, ctx: any) {
             id: 'open-main-artifact',
             priority: 'next',
             action: `Open main artifact ${String(mainArtifact.id || 'artifact')}`,
-            reason: 'The primary deliverable is a binary artifact and may be easier to review in a local viewer.',
+            reason:
+              'The primary deliverable is a binary artifact and may be easier to review in a local viewer.',
             suggested_command: `node dist/scripts/cli.js open-artifact ${mainArtifactPath}`,
             suggested_followup_request: `Please open the main deliverable ${String(mainArtifact.id || 'artifact')} in a local viewer.`,
           });
         }
       }
-      if (Array.isArray(pack.artifacts_by_role?.evidence) && pack.artifacts_by_role.evidence.length > 0) {
+      if (
+        Array.isArray(pack.artifacts_by_role?.evidence) &&
+        pack.artifacts_by_role.evidence.length > 0
+      ) {
         const evidenceArtifactId = String(pack.artifacts_by_role.evidence[0] || '');
-        const evidenceArtifact = artifacts.find((artifact: any) => artifact?.id === evidenceArtifactId) || null;
+        const evidenceArtifact =
+          artifacts.find((artifact: any) => artifact?.id === evidenceArtifactId) || null;
         nextActions.push({
           id: 'review-evidence',
           priority: 'next',
           action: 'Review evidence and validation artifacts',
           reason: 'Evidence artifacts are available in the delivery pack.',
-          ...(evidenceArtifact?.path ? { suggested_command: `node dist/scripts/cli.js artifact ${String(evidenceArtifact.path)}` } : {}),
+          ...(evidenceArtifact?.path
+            ? {
+                suggested_command: `node dist/scripts/cli.js artifact ${String(evidenceArtifact.path)}`,
+              }
+            : {}),
           suggested_followup_request: 'Please review the evidence and validation artifacts.',
         });
       }
@@ -650,15 +793,23 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'resolution_plan_to_pipeline_bundle': {
       const plan = ctx[params.from || 'resolution_plan'];
-      const brief = resolveExecutionBriefReference(ctx, params.brief_from) as Record<string, unknown> | undefined;
-      if (!plan || typeof plan !== 'object') throw new Error('resolution_plan_to_pipeline_bundle requires actuator-resolution-plan');
+      const brief = resolveExecutionBriefReference(ctx, params.brief_from) as
+        | Record<string, unknown>
+        | undefined;
+      if (!plan || typeof plan !== 'object')
+        throw new Error('resolution_plan_to_pipeline_bundle requires actuator-resolution-plan');
       if (!brief || typeof brief !== 'object') {
-        throw new Error('resolution_plan_to_pipeline_bundle requires actuator-execution-brief. Provide params.brief_from or export the brief as "execution_brief" or "brief".');
+        throw new Error(
+          'resolution_plan_to_pipeline_bundle requires actuator-execution-brief. Provide params.brief_from or export the brief as "execution_brief" or "brief".'
+        );
       }
-      const missingInputs = Array.isArray(brief.missing_inputs) ? brief.missing_inputs.map(String) : [];
-      const jobs = missingInputs.length === 0
-        ? buildPipelineBundleJobs(String(plan.archetype_id || 'structured-delivery'))
+      const missingInputs = Array.isArray(brief.missing_inputs)
+        ? brief.missing_inputs.map(String)
         : [];
+      const jobs =
+        missingInputs.length === 0
+          ? buildPipelineBundleJobs(String(plan.archetype_id || 'structured-delivery'))
+          : [];
       return {
         ...ctx,
         [params.export_as || 'pipeline_bundle']: {
@@ -673,11 +824,18 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'pipeline_bundle_to_execution_plan_set': {
       const bundle = ctx[params.from || 'pipeline_bundle'];
-      if (!bundle || typeof bundle !== 'object') throw new Error('pipeline_bundle_to_execution_plan_set requires actuator-pipeline-bundle');
-      const variables = typeof params.variables === 'object' && params.variables !== null ? params.variables : {};
-      const outputDir = String(params.output_dir || `active/shared/runtime/generated-pipelines/${bundle.archetype_id || 'bundle'}`);
+      if (!bundle || typeof bundle !== 'object')
+        throw new Error('pipeline_bundle_to_execution_plan_set requires actuator-pipeline-bundle');
+      const variables =
+        typeof params.variables === 'object' && params.variables !== null ? params.variables : {};
+      const outputDir = String(
+        params.output_dir ||
+          `active/shared/runtime/generated-pipelines/${bundle.archetype_id || 'bundle'}`
+      );
       const jobs = Array.isArray(bundle.jobs)
-        ? bundle.jobs.map((job: PipelineBundleJob) => renderPipelineBundleJob(job, variables, outputDir))
+        ? bundle.jobs.map((job: PipelineBundleJob) =>
+            renderPipelineBundleJob(job, variables, outputDir)
+          )
         : [];
       return {
         ...ctx,
@@ -693,17 +851,19 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'run_execution_plan_set': {
       const planSet = ctx[params.from || 'execution_plan_set'];
-      if (!planSet || typeof planSet !== 'object') throw new Error('run_execution_plan_set requires execution_plan_set');
+      if (!planSet || typeof planSet !== 'object')
+        throw new Error('run_execution_plan_set requires execution_plan_set');
       const { planSet: validatedPlanSet, report } = preflightExecutionPlanSet(planSet);
-      const runReport = report.status === 'invalid'
-        ? {
-            kind: 'actuator-execution-run-report',
-            status: 'failed',
-            total_jobs: 0,
-            preflight_report: report,
-            results: [],
-          }
-        : executeExecutionPlanSet(validatedPlanSet, report);
+      const runReport =
+        report.status === 'invalid'
+          ? {
+              kind: 'actuator-execution-run-report',
+              status: 'failed',
+              total_jobs: 0,
+              preflight_report: report,
+              results: [],
+            }
+          : executeExecutionPlanSet(validatedPlanSet, report);
       return {
         ...ctx,
         execution_plan_preflight: report,
@@ -713,7 +873,8 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'preflight_execution_plan_set': {
       const planSet = ctx[params.from || 'execution_plan_set'];
-      if (!planSet || typeof planSet !== 'object') throw new Error('preflight_execution_plan_set requires execution_plan_set');
+      if (!planSet || typeof planSet !== 'object')
+        throw new Error('preflight_execution_plan_set requires execution_plan_set');
       const { planSet: validatedPlanSet, report } = preflightExecutionPlanSet(planSet);
       return {
         ...ctx,
@@ -721,7 +882,8 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'execution_plan_preflight']: report,
       };
     }
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -733,30 +895,48 @@ async function opApply(op: string, params: any, ctx: any) {
       const content = params.from ? ctx[params.from] : (ctx.last_transform ?? ctx.last_capture);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
       await withRetry(async () => {
-        safeWriteFile(out, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+        safeWriteFile(
+          out,
+          typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+        );
       }, buildRetryOptions(params.retry));
       break;
-    case 'mkdir': safeMkdir(path.resolve(rootDir, resolveVars(params.path, ctx)), { recursive: true }); break;
+    case 'mkdir':
+      safeMkdir(path.resolve(rootDir, resolveVars(params.path, ctx)), { recursive: true });
+      break;
     case 'symlink':
       const target = path.resolve(rootDir, resolveVars(params.target, ctx));
       const source = path.resolve(rootDir, resolveVars(params.source, ctx));
       if (safeExistsSync(target)) safeUnlinkSync(target);
-      if (!safeExistsSync(path.dirname(target))) safeMkdir(path.dirname(target), { recursive: true });
+      if (!safeExistsSync(path.dirname(target)))
+        safeMkdir(path.dirname(target), { recursive: true });
       safeSymlinkSync(source, target, params.type || 'dir');
       break;
     case 'git_checkpoint':
-      await withRetry(async () => {
-        safeExec('git', ['add', '.'], { cwd: rootDir });
-        safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], { cwd: rootDir });
-      }, buildRetryOptions({ maxRetries: 2, initialDelayMs: 1000 }));
+      await withRetry(
+        async () => {
+          safeExec('git', ['add', '.'], { cwd: rootDir });
+          safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], {
+            cwd: rootDir,
+          });
+        },
+        buildRetryOptions({ maxRetries: 2, initialDelayMs: 1000 })
+      );
       break;
-    case 'log': logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
+    case 'log':
+      logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
+      break;
     case 'write_execution_plan_set': {
-      const planSet = ctx[params.from || 'validated_execution_plan_set'] || ctx[params.from || 'execution_plan_set'];
-      if (!planSet || typeof planSet !== 'object') throw new Error('write_execution_plan_set requires execution_plan_set');
+      const planSet =
+        ctx[params.from || 'validated_execution_plan_set'] ||
+        ctx[params.from || 'execution_plan_set'];
+      if (!planSet || typeof planSet !== 'object')
+        throw new Error('write_execution_plan_set requires execution_plan_set');
       const { planSet: validatedPlanSet, report } = preflightExecutionPlanSet(planSet);
       if (report.status === 'invalid') {
-        throw new Error(`write_execution_plan_set blocked by preflight: ${report.issues.map((issue) => issue.message).join('; ')}`);
+        throw new Error(
+          `write_execution_plan_set blocked by preflight: ${report.issues.map((issue) => issue.message).join('; ')}`
+        );
       }
       for (const job of Array.isArray(validatedPlanSet.jobs) ? validatedPlanSet.jobs : []) {
         if (!job?.output_path || !job?.rendered_pipeline || job.skipped_reason) continue;
@@ -781,28 +961,45 @@ export function detectRequestArchetype(requestText: string, catalog: any): any {
   const text = normalizeRequestTextForArchetypeDetection(requestText);
   const archetypes = Array.isArray(catalog?.archetypes) ? catalog.archetypes : [];
   const scored = archetypes.map((archetype: any) => {
-    const hits = (archetype.trigger_keywords || []).filter((keyword: string) => text.includes(String(keyword).toLowerCase())).length;
+    const hits = (archetype.trigger_keywords || []).filter((keyword: string) =>
+      text.includes(String(keyword).toLowerCase())
+    ).length;
     return { ...archetype, score: hits };
   });
   scored.sort((a: any, b: any) => b.score - a.score);
   const best = scored[0];
   if (best && best.score > 0) return best;
-  return scored.find((item: any) => item.id === catalog.default_archetype) || {
-    id: 'structured-delivery',
-    score: 0,
-    summary_template: 'Generic structured delivery request requiring normalization before execution.',
-    normalized_scope: ['request-normalization'],
-    target_actuators: ['orchestrator-actuator'],
-    deliverables: ['execution brief'],
-    required_inputs: ['objective'],
-  };
+  return (
+    scored.find((item: any) => item.id === catalog.default_archetype) || {
+      id: 'structured-delivery',
+      score: 0,
+      summary_template:
+        'Generic structured delivery request requiring normalization before execution.',
+      normalized_scope: ['request-normalization'],
+      target_actuators: ['orchestrator-actuator'],
+      deliverables: ['execution brief'],
+      required_inputs: ['objective'],
+    }
+  );
 }
 
 const ARCHETYPE_DETECTION_BRIDGE: Array<{ pattern: RegExp; hints: string[] }> = [
-  { pattern: /(プロジェクト|要件定義|設計書|運用設計|ゲート|トレーサビリティ)/i, hints: ['project', 'requirements', 'design', 'gate'] },
-  { pattern: /(提案書|提案資料|営業資料|ピッチ|デッキ|スライド|プレゼン)/i, hints: ['proposal', 'deck', 'pitch'] },
-  { pattern: /(サイト|webサイト|lp|landing page|価格ページ|pricing page|デザインをクローン|踏襲)/i, hints: ['website', 'landing page', 'design', 'reference source'] },
-  { pattern: /(モバイル|アプリ|ios|android|webview)/i, hints: ['mobile', 'app', 'ios', 'android', 'webview'] },
+  {
+    pattern: /(プロジェクト|要件定義|設計書|運用設計|ゲート|トレーサビリティ)/i,
+    hints: ['project', 'requirements', 'design', 'gate'],
+  },
+  {
+    pattern: /(提案書|提案資料|営業資料|ピッチ|デッキ|スライド|プレゼン)/i,
+    hints: ['proposal', 'deck', 'pitch'],
+  },
+  {
+    pattern: /(サイト|webサイト|lp|landing page|価格ページ|pricing page|デザインをクローン|踏襲)/i,
+    hints: ['website', 'landing page', 'design', 'reference source'],
+  },
+  {
+    pattern: /(モバイル|アプリ|ios|android|webview)/i,
+    hints: ['mobile', 'app', 'ios', 'android', 'webview'],
+  },
   { pattern: /(状態|健全性|ヘルス|readiness|稼働状況)/i, hints: ['status', 'health', 'readiness'] },
   { pattern: /(作って|作成して|生成して|まとめて|build|deliver)/i, hints: ['build', 'deliver'] },
 ];
@@ -819,41 +1016,89 @@ export function normalizeRequestTextForArchetypeDetection(requestText: string): 
 }
 
 export const EXECUTION_BRIEF_INPUT_ALIASES: Record<string, string[]> = {
-  'reference source': ['reference_source', 'reference source', 'reference', 'url', 'source_url', 'source', 'app', 'app_name'],
-  'preserved elements': ['preserved_elements', 'preserved elements', 'keep', 'elements_to_preserve'],
+  'reference source': [
+    'reference_source',
+    'reference source',
+    'reference',
+    'url',
+    'source_url',
+    'source',
+    'app',
+    'app_name',
+  ],
+  'preserved elements': [
+    'preserved_elements',
+    'preserved elements',
+    'keep',
+    'elements_to_preserve',
+  ],
   'new concept': ['new_concept', 'new concept', 'concept', 'objective', 'goal'],
-  'target environment': ['target_environment', 'target environment', 'environment', 'target', 'deployment_target'],
-  'execution environment': ['execution_environment', 'execution environment', 'runtime_environment'],
-  'source materials': ['source_materials', 'source materials', 'materials', 'brief_path', 'proposal_brief_path', 'input_files'],
+  'target environment': [
+    'target_environment',
+    'target environment',
+    'environment',
+    'target',
+    'deployment_target',
+  ],
+  'execution environment': [
+    'execution_environment',
+    'execution environment',
+    'runtime_environment',
+  ],
+  'source materials': [
+    'source_materials',
+    'source materials',
+    'materials',
+    'brief_path',
+    'proposal_brief_path',
+    'input_files',
+  ],
   'target audience': ['target_audience', 'target audience', 'audience', 'reader'],
-  'storyline': ['storyline', 'outline', 'narrative', 'chapter_plan'],
-  'required output format': ['required_output_format', 'required output format', 'output_format', 'format'],
+  storyline: ['storyline', 'outline', 'narrative', 'chapter_plan'],
+  'required output format': [
+    'required_output_format',
+    'required output format',
+    'output_format',
+    'format',
+  ],
   'project name': ['project_name', 'project name', 'name'],
   'delivery scope': ['delivery_scope', 'delivery scope', 'scope'],
   'phase or gate': ['phase_or_gate', 'phase or gate', 'phase', 'gate'],
   'related missions': ['related_missions', 'related missions', 'missions', 'mission_ids'],
-  'objective': ['objective', 'goal', 'intent'],
+  objective: ['objective', 'goal', 'intent'],
   'target artifact': ['target_artifact', 'artifact', 'deliverable'],
-  'environment': ['environment', 'target_environment', 'execution_environment'],
+  environment: ['environment', 'target_environment', 'execution_environment'],
   'acceptance criteria': ['acceptance_criteria', 'acceptance criteria', 'definition_of_done'],
 };
 
-export function resolveExecutionBriefInputs(params: any, ctx: any, archetype: any): {
+export function resolveExecutionBriefInputs(
+  params: any,
+  ctx: any,
+  archetype: any
+): {
   provided: string[];
   inferred: string[];
   bindings: Array<{ input: string; source: string; value_preview: string }>;
 } {
-  const explicitInputs = Array.isArray(params.provided_inputs) ? params.provided_inputs.map((item: unknown) => String(item).trim()).filter(Boolean) : [];
+  const explicitInputs = Array.isArray(params.provided_inputs)
+    ? params.provided_inputs.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : [];
   const explicitSet = new Set(explicitInputs.map((item) => normalizeExecutionBriefInputName(item)));
   const provided = new Set<string>();
   const inferred = new Set<string>();
   const bindings: Array<{ input: string; source: string; value_preview: string }> = [];
 
-  for (const requiredInput of Array.isArray(archetype?.required_inputs) ? archetype.required_inputs.map(String) : []) {
+  for (const requiredInput of Array.isArray(archetype?.required_inputs)
+    ? archetype.required_inputs.map(String)
+    : []) {
     const canonical = normalizeExecutionBriefInputName(requiredInput);
     if (explicitSet.has(canonical)) {
       provided.add(requiredInput);
-      bindings.push({ input: requiredInput, source: 'provided_inputs', value_preview: 'explicitly provided' });
+      bindings.push({
+        input: requiredInput,
+        source: 'provided_inputs',
+        value_preview: 'explicitly provided',
+      });
       continue;
     }
     const binding = inferExecutionBriefInputBinding(requiredInput, params, ctx);
@@ -872,13 +1117,16 @@ export function resolveExecutionBriefInputs(params: any, ctx: any, archetype: an
 }
 
 export function normalizeExecutionBriefInputName(input: string): string {
-  return String(input || '').trim().toLowerCase().replace(/[_\s-]+/g, ' ');
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s-]+/g, ' ');
 }
 
 export function inferExecutionBriefInputBinding(
   requiredInput: string,
   params: any,
-  ctx: any,
+  ctx: any
 ): { input: string; source: string; value_preview: string } | null {
   const aliases = EXECUTION_BRIEF_INPUT_ALIASES[requiredInput] || [requiredInput];
   const sources: Array<{ source: string; object: Record<string, unknown> | null | undefined }> = [
@@ -899,7 +1147,10 @@ export function inferExecutionBriefInputBinding(
   return null;
 }
 
-export function lookupAliasValue(target: Record<string, unknown> | null | undefined, alias: string): unknown {
+export function lookupAliasValue(
+  target: Record<string, unknown> | null | undefined,
+  alias: string
+): unknown {
   if (!target) return undefined;
   if (alias in target) return target[alias];
   const normalizedAlias = normalizeExecutionBriefInputName(alias);
@@ -920,7 +1171,10 @@ export function isMeaningfulInputValue(value: unknown): boolean {
 export function previewExecutionBriefInputValue(value: unknown): string {
   if (typeof value === 'string') return value.trim().slice(0, 120);
   if (Array.isArray(value)) return `${value.length} item(s)`;
-  if (typeof value === 'object' && value) return `object:${Object.keys(value as Record<string, unknown>).slice(0, 3).join(',')}`;
+  if (typeof value === 'object' && value)
+    return `object:${Object.keys(value as Record<string, unknown>)
+      .slice(0, 3)
+      .join(',')}`;
   return String(value);
 }
 
@@ -928,9 +1182,12 @@ export function resolveExecutionBriefReference(ctx: any, explicitKey?: string): 
   if (explicitKey && ctx?.[explicitKey]) return ctx[explicitKey];
   if (ctx?.execution_brief) return ctx.execution_brief;
   if (ctx?.brief) return ctx.brief;
-  const briefCandidates = Object.entries(ctx || {}).filter(([, value]) => (
-    value && typeof value === 'object' && (value as Record<string, unknown>).kind === 'actuator-execution-brief'
-  ));
+  const briefCandidates = Object.entries(ctx || {}).filter(
+    ([, value]) =>
+      value &&
+      typeof value === 'object' &&
+      (value as Record<string, unknown>).kind === 'actuator-execution-brief'
+  );
   if (briefCandidates.length === 1) return briefCandidates[0]?.[1];
   return undefined;
 }
@@ -943,7 +1200,8 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           id: 'collect-system-status',
           title: 'Collect runtime and integrity status',
           actuator: 'orchestrator-actuator',
-          template_path: 'libs/actuators/orchestrator-actuator/examples/request-to-status-report.json',
+          template_path:
+            'libs/actuators/orchestrator-actuator/examples/request-to-status-report.json',
           recommended_procedure: 'knowledge/product/orchestration/actuator-intent-normalization.md',
           parameter_overrides: {
             'context.request_text': '{{request_text}}',
@@ -958,12 +1216,15 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           title: 'Observe the reference Web experience',
           actuator: 'browser-actuator',
           template_path: 'libs/actuators/browser-actuator/examples/explore-and-export.json',
-          recommended_procedure: 'knowledge/public/procedures/service/design-clone-and-build-web.md',
+          recommended_procedure:
+            'knowledge/public/procedures/service/design-clone-and-build-web.md',
           parameter_overrides: {
             'steps[0].params.url': '{{reference_source}}',
             'steps[3].params.path': 'active/shared/tmp/browser/{{delivery_pack_id}}-reference.png',
-            'steps[4].params.path': 'active/shared/tmp/browser/{{delivery_pack_id}}-reference.spec.ts',
-            'steps[5].params.path': 'active/shared/tmp/browser/{{delivery_pack_id}}-reference.adf.json',
+            'steps[4].params.path':
+              'active/shared/tmp/browser/{{delivery_pack_id}}-reference.spec.ts',
+            'steps[5].params.path':
+              'active/shared/tmp/browser/{{delivery_pack_id}}-reference.adf.json',
           },
           outputs: [
             'active/shared/tmp/browser/{{delivery_pack_id}}-reference.png',
@@ -975,30 +1236,34 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           id: 'model-web-flow',
           title: 'Generate UI flow and browser execution plan',
           actuator: 'modeling-actuator',
-          template_path: 'libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json',
+          template_path:
+            'libs/actuators/modeling-actuator/examples/web-profile-to-browser-plan.json',
           recommended_procedure: 'knowledge/product/orchestration/design-clone-delivery-flow.md',
           parameter_overrides: {
             'steps[0].params.path': '{{web_profile_path}}',
-            'steps[3].params.handoff_output_path': 'active/shared/tmp/browser/{{delivery_pack_id}}-handoff.json',
-            'steps[4].params.path': 'active/shared/tmp/modeling/{{delivery_pack_id}}-browser-plan.json',
+            'steps[3].params.handoff_output_path':
+              'active/shared/tmp/browser/{{delivery_pack_id}}-handoff.json',
+            'steps[4].params.path':
+              'active/shared/tmp/modeling/{{delivery_pack_id}}-browser-plan.json',
           },
-          outputs: [
-            'active/shared/tmp/modeling/{{delivery_pack_id}}-browser-plan.json',
-          ],
+          outputs: ['active/shared/tmp/modeling/{{delivery_pack_id}}-browser-plan.json'],
         },
         {
           id: 'package-deliverables',
           title: 'Write governed delivery pack',
           actuator: 'artifact-actuator',
           template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
-          recommended_procedure: 'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
+          recommended_procedure:
+            'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
           parameter_overrides: {
             'params.packId': '{{delivery_pack_id}}',
             'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
             'params.summary': '{{delivery_summary}}',
             'params.requestText': '{{request_text}}',
           },
-          outputs: ['active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json'],
+          outputs: [
+            'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
+          ],
         },
       ];
     case 'mobile-design-clone-delivery':
@@ -1007,11 +1272,14 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           id: 'capture-mobile-ui',
           title: 'Capture native UI and profile-driven interaction surface',
           actuator: 'android-actuator',
-          template_path: 'libs/actuators/android-actuator/examples/android-login-passkey-flow-template.json',
-          recommended_procedure: 'knowledge/public/procedures/service/design-clone-and-build-mobile.md',
+          template_path:
+            'libs/actuators/android-actuator/examples/android-login-passkey-flow-template.json',
+          recommended_procedure:
+            'knowledge/public/procedures/service/design-clone-and-build-mobile.md',
           parameter_overrides: {
             'steps[0].params.path': '{{mobile_profile_path}}',
-            'context.context_path': 'active/shared/tmp/android/{{delivery_pack_id}}-flow.context.json',
+            'context.context_path':
+              'active/shared/tmp/android/{{delivery_pack_id}}-flow.context.json',
             'steps[7].params.path': 'active/shared/tmp/android/{{delivery_pack_id}}.png',
           },
           outputs: [
@@ -1024,14 +1292,17 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           title: 'Write governed delivery pack',
           actuator: 'artifact-actuator',
           template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
-          recommended_procedure: 'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
+          recommended_procedure:
+            'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
           parameter_overrides: {
             'params.packId': '{{delivery_pack_id}}',
             'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
             'params.summary': '{{delivery_summary}}',
             'params.requestText': '{{request_text}}',
           },
-          outputs: ['active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json'],
+          outputs: [
+            'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
+          ],
         },
       ];
     case 'proposal-storyline-delivery':
@@ -1041,7 +1312,8 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           title: 'Generate proposal deck through the canonical media route',
           actuator: 'media-actuator',
           template_path: 'libs/actuators/media-actuator/examples/document-brief-proposal-pptx.json',
-          recommended_procedure: 'knowledge/public/procedures/service/design-clone-and-build-proposal.md',
+          recommended_procedure:
+            'knowledge/public/procedures/service/design-clone-and-build-proposal.md',
           parameter_overrides: {
             'steps[0].params.path': '{{proposal_brief_path}}',
             'context.context_path': 'active/shared/tmp/media/{{delivery_pack_id}}.context.json',
@@ -1057,14 +1329,17 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           title: 'Write governed delivery pack',
           actuator: 'artifact-actuator',
           template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
-          recommended_procedure: 'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
+          recommended_procedure:
+            'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
           parameter_overrides: {
             'params.packId': '{{delivery_pack_id}}',
             'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
             'params.summary': '{{delivery_summary}}',
             'params.requestText': '{{request_text}}',
           },
-          outputs: ['active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json'],
+          outputs: [
+            'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
+          ],
         },
       ];
     case 'project-document-pack':
@@ -1085,14 +1360,17 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
           title: 'Write governed delivery pack',
           actuator: 'artifact-actuator',
           template_path: 'libs/actuators/artifact-actuator/examples/write-delivery-pack.json',
-          recommended_procedure: 'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
+          recommended_procedure:
+            'knowledge/public/procedures/service/deliver-design-spec-and-test-pack.md',
           parameter_overrides: {
             'params.packId': '{{delivery_pack_id}}',
             'params.logicalDir': 'active/shared/runtime/delivery-packs/{{delivery_pack_id}}',
             'params.summary': '{{delivery_summary}}',
             'params.requestText': '{{request_text}}',
           },
-          outputs: ['active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json'],
+          outputs: [
+            'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
+          ],
         },
       ];
     default:
@@ -1109,13 +1387,19 @@ export function buildPipelineBundleJobs(archetypeId: string): PipelineBundleJob[
             'params.summary': '{{delivery_summary}}',
             'params.requestText': '{{request_text}}',
           },
-          outputs: ['active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json'],
+          outputs: [
+            'active/shared/runtime/delivery-packs/{{delivery_pack_id}}/{{delivery_pack_id}}.json',
+          ],
         },
       ];
   }
 }
 
-export function renderPipelineBundleJob(job: PipelineBundleJob, variables: Record<string, unknown>, outputDir: string): ExecutionPlanSetJob {
+export function renderPipelineBundleJob(
+  job: PipelineBundleJob,
+  variables: Record<string, unknown>,
+  outputDir: string
+): ExecutionPlanSetJob {
   const renderedOutputPath = path.join(outputDir, `${job.id}.json`);
   if (!job.template_path.endsWith('.json')) {
     return {
@@ -1134,7 +1418,10 @@ export function renderPipelineBundleJob(job: PipelineBundleJob, variables: Recor
     };
   }
 
-  const raw = JSON.parse(safeReadFile(templateFullPath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+  const raw = JSON.parse(safeReadFile(templateFullPath, { encoding: 'utf8' }) as string) as Record<
+    string,
+    unknown
+  >;
   const renderedPipeline = applyPathOverrides(raw, job.parameter_overrides || {}, variables);
   return {
     ...job,
@@ -1144,14 +1431,20 @@ export function renderPipelineBundleJob(job: PipelineBundleJob, variables: Recor
   };
 }
 
-export function normalizeOutputPath(planSet: any, job: ExecutionPlanSetJob): { outputPath: string; repairApplied?: string } {
+export function normalizeOutputPath(
+  planSet: any,
+  job: ExecutionPlanSetJob
+): { outputPath: string; repairApplied?: string } {
   const configured = String(job.output_path || '').trim();
   if (configured) {
     return configured.endsWith('.json')
       ? { outputPath: configured }
       : { outputPath: `${configured}.json`, repairApplied: 'normalized output_path to .json' };
   }
-  const outputDir = String(planSet?.output_dir || `active/shared/runtime/generated-pipelines/${String(planSet?.archetype_id || 'bundle')}`);
+  const outputDir = String(
+    planSet?.output_dir ||
+      `active/shared/runtime/generated-pipelines/${String(planSet?.archetype_id || 'bundle')}`
+  );
   return {
     outputPath: path.posix.join(outputDir, `${String(job.id || 'job')}.json`),
     repairApplied: 'derived missing output_path from output_dir and job id',
@@ -1169,11 +1462,18 @@ export function repairRenderedPipelineContract(renderedPipeline: Record<string, 
     pipeline.action = 'pipeline';
     repairs.push('inferred action=pipeline from steps array');
   }
-  if (pipeline.action === 'pipeline' && (!pipeline.context || typeof pipeline.context !== 'object')) {
+  if (
+    pipeline.action === 'pipeline' &&
+    (!pipeline.context || typeof pipeline.context !== 'object')
+  ) {
     pipeline.context = {};
     repairs.push('added empty context for pipeline action');
   }
-  if (typeof pipeline.action === 'string' && pipeline.action !== 'pipeline' && (!pipeline.params || typeof pipeline.params !== 'object')) {
+  if (
+    typeof pipeline.action === 'string' &&
+    pipeline.action !== 'pipeline' &&
+    (!pipeline.params || typeof pipeline.params !== 'object')
+  ) {
     pipeline.params = {};
     repairs.push('added empty params object for direct actuator action');
   }
@@ -1181,7 +1481,10 @@ export function repairRenderedPipelineContract(renderedPipeline: Record<string, 
   return { pipeline, repairs };
 }
 
-export function validateRenderedPipelineContract(jobId: string, renderedPipeline: Record<string, unknown>): ExecutionPlanPreflightIssue[] {
+export function validateRenderedPipelineContract(
+  jobId: string,
+  renderedPipeline: Record<string, unknown>
+): ExecutionPlanPreflightIssue[] {
   const issues: ExecutionPlanPreflightIssue[] = [];
   const serialized = JSON.stringify(renderedPipeline);
 
@@ -1220,7 +1523,10 @@ export function validateRenderedPipelineContract(jobId: string, renderedPipeline
   return issues;
 }
 
-export function preflightExecutionPlanSet(planSet: any): { planSet: any; report: ExecutionPlanPreflightReport } {
+export function preflightExecutionPlanSet(planSet: any): {
+  planSet: any;
+  report: ExecutionPlanPreflightReport;
+} {
   const issues: ExecutionPlanPreflightIssue[] = [];
   const repairedJobs = Array.isArray(planSet?.jobs)
     ? planSet.jobs.map((job: ExecutionPlanSetJob) => {
@@ -1260,7 +1566,9 @@ export function preflightExecutionPlanSet(planSet: any): { planSet: any; report:
           });
         }
 
-        issues.push(...validateRenderedPipelineContract(String(nextJob.id || 'job'), repaired.pipeline));
+        issues.push(
+          ...validateRenderedPipelineContract(String(nextJob.id || 'job'), repaired.pipeline)
+        );
         return nextJob;
       })
     : [];
@@ -1283,7 +1591,10 @@ export function preflightExecutionPlanSet(planSet: any): { planSet: any; report:
   };
 }
 
-export function executeExecutionPlanSet(planSet: any, preflightReport?: ExecutionPlanPreflightReport) {
+export function executeExecutionPlanSet(
+  planSet: any,
+  preflightReport?: ExecutionPlanPreflightReport
+) {
   const jobs = Array.isArray(planSet.jobs) ? planSet.jobs : [];
   const results: ExecutionPlanRunResult[] = [];
   for (const job of jobs) {
@@ -1302,17 +1613,23 @@ export function executeExecutionPlanSet(planSet: any, preflightReport?: Executio
       const actuator = String(job.actuator || '');
       const inputPath = String(job.output_path || '');
       const entryPath = resolveActuatorEntryPath(actuator);
-      const rawOutput = safeExec('node', [entryPath, '--input', inputPath], { cwd: pathResolver.rootDir(), timeoutMs: 120000 });
+      const rawOutput = safeExec('node', [entryPath, '--input', inputPath], {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 120000,
+      });
       let parsed: unknown = rawOutput.trim();
       try {
         parsed = JSON.parse(rawOutput);
       } catch {
         // leave as raw string
       }
-      const reportedStatus = typeof parsed === 'object' && parsed && 'status' in (parsed as Record<string, unknown>)
-        ? String((parsed as Record<string, unknown>).status)
-        : null;
-      const succeeded = reportedStatus ? ['ok', 'success', 'succeeded', 'ready'].includes(reportedStatus) : true;
+      const reportedStatus =
+        typeof parsed === 'object' && parsed && 'status' in (parsed as Record<string, unknown>)
+          ? String((parsed as Record<string, unknown>).status)
+          : null;
+      const succeeded = reportedStatus
+        ? ['ok', 'success', 'succeeded', 'ready'].includes(reportedStatus)
+        : true;
       results.push({
         id: String(job.id || 'unknown'),
         actuator,
@@ -1360,20 +1677,34 @@ export function parseJsonCommandOutput(output: string): unknown {
 
 export function buildClarificationQuestion(inputName: string): string {
   switch (inputName) {
-    case 'reference source': return '参照元となる画面、URL、資料、またはアプリ名を指定してください。';
-    case 'preserved elements': return '踏襲したい要素は何ですか。配色、レイアウト、トーン、導線などを指定してください。';
-    case 'new concept': return '新しく実現したいコンセプトや目的を一文で指定してください。';
-    case 'target environment': return '対象環境を指定してください。例: local / staging / production-like。';
-    case 'execution environment': return '実行環境を指定してください。例: simulator / emulator / local browser。';
-    case 'source materials': return 'ベースにする資料や入力ファイルを指定してください。';
-    case 'target audience': return '想定読者または利用者を指定してください。';
-    case 'storyline': return 'どういう流れで伝えたいか、章立てまたは要点を指定してください。';
-    case 'required output format': return '必要な出力形式を指定してください。例: pptx / docx / pdf。';
-    case 'project name': return 'プロジェクト名を指定してください。正式名または運用名で構いません。';
-    case 'delivery scope': return '今回の納品範囲を指定してください。例: project OS / document pack / design pack。';
-    case 'phase or gate': return '対象の phase または gate を指定してください。例: define / design / gate-requirements-baseline。';
-    case 'related missions': return '関連する mission があれば指定してください。無ければ none と答えてください。';
-    default: return `${inputName} を指定してください。`;
+    case 'reference source':
+      return '参照元となる画面、URL、資料、またはアプリ名を指定してください。';
+    case 'preserved elements':
+      return '踏襲したい要素は何ですか。配色、レイアウト、トーン、導線などを指定してください。';
+    case 'new concept':
+      return '新しく実現したいコンセプトや目的を一文で指定してください。';
+    case 'target environment':
+      return '対象環境を指定してください。例: local / staging / production-like。';
+    case 'execution environment':
+      return '実行環境を指定してください。例: simulator / emulator / local browser。';
+    case 'source materials':
+      return 'ベースにする資料や入力ファイルを指定してください。';
+    case 'target audience':
+      return '想定読者または利用者を指定してください。';
+    case 'storyline':
+      return 'どういう流れで伝えたいか、章立てまたは要点を指定してください。';
+    case 'required output format':
+      return '必要な出力形式を指定してください。例: pptx / docx / pdf。';
+    case 'project name':
+      return 'プロジェクト名を指定してください。正式名または運用名で構いません。';
+    case 'delivery scope':
+      return '今回の納品範囲を指定してください。例: project OS / document pack / design pack。';
+    case 'phase or gate':
+      return '対象の phase または gate を指定してください。例: define / design / gate-requirements-baseline。';
+    case 'related missions':
+      return '関連する mission があれば指定してください。無ければ none と答えてください。';
+    default:
+      return `${inputName} を指定してください。`;
   }
 }
 
@@ -1387,7 +1718,8 @@ export function deriveExecutionBriefReadiness(missingInputs: string[], requestTe
   if (/production|本番/i.test(requestText)) {
     return {
       level: 'needs_external_asset',
-      reason: 'The request references a higher-risk environment and should be confirmed before execution.',
+      reason:
+        'The request references a higher-risk environment and should be confirmed before execution.',
     };
   }
   return {
@@ -1396,7 +1728,10 @@ export function deriveExecutionBriefReadiness(missingInputs: string[], requestTe
   };
 }
 
-export function deriveStatusNextActions(snapshot: any, findings: Array<{ id: string; severity: string; message: string; detail?: string }>) {
+export function deriveStatusNextActions(
+  snapshot: any,
+  findings: Array<{ id: string; severity: string; message: string; detail?: string }>
+) {
   const actions: Array<{
     id: string;
     priority: 'now' | 'next' | 'later';
@@ -1452,11 +1787,15 @@ export function deriveStatusNextActions(snapshot: any, findings: Array<{ id: str
         next_action_type: 'inspect',
         action: 'Review active missions and confirm checkpoints or finish criteria',
         reason: finding.detail || finding.message,
-        suggested_followup_request: 'active な mission の checkpoint または finish 条件を確認してください。',
+        suggested_followup_request:
+          'active な mission の checkpoint または finish 条件を確認してください。',
       });
       continue;
     }
-    if (finding.id === 'target-mission' && snapshot.mission_status?.target?.status === 'completed') {
+    if (
+      finding.id === 'target-mission' &&
+      snapshot.mission_status?.target?.status === 'completed'
+    ) {
       const missionId = String(snapshot.mission_status.target.mission_id);
       actions.push({
         id: 'review-target-mission-artifacts',
@@ -1490,8 +1829,11 @@ export function deriveStatusNextActions(snapshot: any, findings: Array<{ id: str
         next_action_type: 'inspect',
         action: 'Inspect the project mission ledger and gate artifacts',
         reason: finding.detail || finding.message,
-        suggested_followup_request: '対象 project の mission ledger と gate 資料を確認してください。',
-        ...(projectPath ? { suggested_command: `sed -n '1,220p' ${projectPath}/04_control/mission-ledger.md` } : {}),
+        suggested_followup_request:
+          '対象 project の mission ledger と gate 資料を確認してください。',
+        ...(projectPath
+          ? { suggested_command: `sed -n '1,220p' ${projectPath}/04_control/mission-ledger.md` }
+          : {}),
       });
     }
   }
@@ -1502,7 +1844,8 @@ export function deriveStatusNextActions(snapshot: any, findings: Array<{ id: str
       next_action_type: 'inspect',
       action: 'No immediate action required',
       reason: 'The status report did not identify corrective work.',
-      suggested_followup_request: '必要なら別の mission または project を指定して詳細状態を確認してください。',
+      suggested_followup_request:
+        '必要なら別の mission または project を指定して詳細状態を確認してください。',
     });
   }
   return actions;
@@ -1513,11 +1856,15 @@ export function collectMissionStatusSnapshot(targetId?: string) {
   if (!safeExistsSync(missionRoot)) {
     return { metrics: { total: 0, active: 0, completed: 0 }, missions: [] };
   }
-  const missionFiles = getAllFiles(missionRoot, { maxDepth: 4 })
-    .filter((filePath) => filePath.endsWith('mission-state.json'));
+  const missionFiles = getAllFiles(missionRoot, { maxDepth: 4 }).filter((filePath) =>
+    filePath.endsWith('mission-state.json')
+  );
   const missions = missionFiles.map((filePath) => {
     const logicalPath = path.relative(pathResolver.rootDir(), filePath);
-    const state = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<string, any>;
+    const state = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as Record<
+      string,
+      any
+    >;
     return {
       mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
       tier: String(state.tier || 'unknown'),
@@ -1545,20 +1892,19 @@ export function collectMissionStatusSnapshot(targetId?: string) {
 }
 
 export function collectProjectStatusSnapshot(targetProjectId?: string) {
-  const candidateRoots = [
-    pathResolver.active('projects'),
-    pathResolver.sharedTmp('project-os'),
-  ];
+  const candidateRoots = [pathResolver.active('projects'), pathResolver.sharedTmp('project-os')];
   const projectEntries: Array<Record<string, any>> = [];
   for (const root of candidateRoots) {
     if (!safeExistsSync(root)) continue;
-    const readmes = getAllFiles(root, { maxDepth: 3 })
-      .filter((filePath) => filePath.endsWith('README.md'));
+    const readmes = getAllFiles(root, { maxDepth: 3 }).filter((filePath) =>
+      filePath.endsWith('README.md')
+    );
     for (const readmePath of readmes) {
       const projectRoot = path.dirname(readmePath);
       const ledgerPath = path.join(projectRoot, '04_control', 'mission-ledger.json');
       const readme = safeReadFile(readmePath, { encoding: 'utf8' }) as string;
-      const titleLine = readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
+      const titleLine =
+        readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
       const ledger = safeExistsSync(ledgerPath)
         ? JSON.parse(safeReadFile(ledgerPath, { encoding: 'utf8' }) as string)
         : { entries: [] };
@@ -1572,19 +1918,23 @@ export function collectProjectStatusSnapshot(targetProjectId?: string) {
       });
     }
   }
-  const deduped = Array.from(new Map(projectEntries.map((item) => [String(item.path), item])).values());
+  const deduped = Array.from(
+    new Map(projectEntries.map((item) => [String(item.path), item])).values()
+  );
   const target = targetProjectId
-    ? deduped.find((item) =>
-        String(item.project_id || '') === targetProjectId ||
-        String(item.project_name).includes(targetProjectId) ||
-        String(item.path).includes(targetProjectId.toLowerCase()),
+    ? deduped.find(
+        (item) =>
+          String(item.project_id || '') === targetProjectId ||
+          String(item.project_name).includes(targetProjectId) ||
+          String(item.path).includes(targetProjectId.toLowerCase())
       ) || null
     : null;
   const filtered = targetProjectId
-    ? deduped.filter((item) =>
-        String(item.project_id || '') === targetProjectId ||
-        String(item.project_name).includes(targetProjectId) ||
-        String(item.path).includes(targetProjectId.toLowerCase()),
+    ? deduped.filter(
+        (item) =>
+          String(item.project_id || '') === targetProjectId ||
+          String(item.project_name).includes(targetProjectId) ||
+          String(item.path).includes(targetProjectId.toLowerCase())
       )
     : deduped;
   return {
@@ -1610,7 +1960,7 @@ export function resolveActuatorEntryPath(actuator: string): string {
 export function applyPathOverrides(
   template: Record<string, unknown>,
   overrides: Record<string, unknown>,
-  variables: Record<string, unknown>,
+  variables: Record<string, unknown>
 ): Record<string, unknown> {
   const clone = JSON.parse(JSON.stringify(template)) as Record<string, unknown>;
   for (const [overridePath, overrideValue] of Object.entries(overrides)) {
@@ -1628,7 +1978,10 @@ export function renderTemplateValue(value: unknown, variables: Record<string, un
   }
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [key, renderTemplateValue(nested, variables)]),
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
+        key,
+        renderTemplateValue(nested, variables),
+      ])
     );
   }
   return value;

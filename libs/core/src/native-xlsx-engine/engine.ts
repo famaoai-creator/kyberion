@@ -4,8 +4,8 @@
  * Follows the same architecture pattern as native-pptx-engine.
  */
 import AdmZip from 'adm-zip';
-import * as fs from 'fs';
 import * as path from 'path';
+import { safeExistsSync, safeMkdir } from '../../secure-io.js';
 import type { XlsxDesignProtocol } from '../types/xlsx-protocol.js';
 import { generateContentTypes } from './content-types.js';
 import { generateGlobalRels, generateWorkbookRels, generateSheetRels } from './rels.js';
@@ -19,12 +19,15 @@ import { generateTable } from './table.js';
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
 import { generateTheme } from '../native-pptx-engine/theme.js';
 
-export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPath: string): Promise<void> {
+export async function generateNativeXlsx(
+  protocol: XlsxDesignProtocol,
+  outputPath: string
+): Promise<void> {
   if (!protocol?.sheets?.length) {
     throw new Error('generateNativeXlsx: protocol must have at least one sheet');
   }
   const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
+  if (!safeExistsSync(dir)) {
     throw new Error(`generateNativeXlsx: output directory does not exist: ${dir}`);
   }
   const zip = new AdmZip();
@@ -33,8 +36,8 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
   // Count drawings and tables across all sheets
   let totalDrawings = 0;
   let totalTables = 0;
-  const sheetDrawingIndex: number[] = [];     // per-sheet: drawing index (1-based) or 0
-  const sheetTableIndices: number[][] = [];   // per-sheet: array of table indices (1-based)
+  const sheetDrawingIndex: number[] = []; // per-sheet: drawing index (1-based) or 0
+  const sheetTableIndices: number[][] = []; // per-sheet: array of table indices (1-based)
 
   for (const sheet of protocol.sheets) {
     if (sheet.drawing && sheet.drawing.elements.length > 0) {
@@ -53,19 +56,32 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
   }
 
   // 1. Core package files
-  zip.addFile('[Content_Types].xml', Buffer.from(generateContentTypes(sheetCount, totalDrawings, totalTables), 'utf8'));
+  zip.addFile(
+    '[Content_Types].xml',
+    Buffer.from(generateContentTypes(sheetCount, totalDrawings, totalTables), 'utf8')
+  );
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
-  zip.addFile('docProps/core.xml', Buffer.from(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  zip.addFile(
+    'docProps/core.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:title>Kyberion Native Spreadsheet</dc:title>
   <dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || new Date().toISOString()}</dcterms:created>
-</cp:coreProperties>`, 'utf8'));
-  zip.addFile('docProps/app.xml', Buffer.from(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+</cp:coreProperties>`,
+      'utf8'
+    )
+  );
+  zip.addFile(
+    'docProps/app.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
   <Application>Kyberion Native XLSX Engine</Application>
-</Properties>`, 'utf8'));
+</Properties>`,
+      'utf8'
+    )
+  );
 
   // 2. Workbook
   zip.addFile('xl/workbook.xml', Buffer.from(generateWorkbook(protocol), 'utf8'));
@@ -76,8 +92,10 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
   for (const [key, val] of Object.entries(protocol.theme.colors)) {
     themeColors[key] = val;
   }
-  zip.addFile('xl/theme/theme1.xml', Buffer.from(
-    protocol.theme.rawXml || generateTheme(themeColors), 'utf8'));
+  zip.addFile(
+    'xl/theme/theme1.xml',
+    Buffer.from(protocol.theme.rawXml || generateTheme(themeColors), 'utf8')
+  );
 
   // 4. Styles
   zip.addFile('xl/styles.xml', Buffer.from(generateStyles(protocol), 'utf8'));
@@ -85,7 +103,9 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
   // 5. Shared Strings
   // Build SST map for cell value → index lookup
   const sstMap = new Map<string, number>();
-  protocol.sharedStrings.forEach((s, i) => { sstMap.set(s, i); });
+  protocol.sharedStrings.forEach((s, i) => {
+    sstMap.set(s, i);
+  });
   zip.addFile('xl/sharedStrings.xml', Buffer.from(generateSharedStrings(protocol), 'utf8'));
 
   // 6. Worksheets, Drawings, Tables
@@ -116,8 +136,10 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
 
     // Worksheet XML
     const drawingRId = drawingIdx > 0 ? 'rId1' : undefined;
-    zip.addFile(`xl/worksheets/sheet${sheetNum}.xml`,
-      Buffer.from(generateWorksheet(sheet, drawingRId, sstMap), 'utf8'));
+    zip.addFile(
+      `xl/worksheets/sheet${sheetNum}.xml`,
+      Buffer.from(generateWorksheet(sheet, drawingRId, sstMap), 'utf8')
+    );
 
     // Sheet rels: prefer rawParts version (preserves VML/comment/printerSettings refs)
     const sheetRelsPath = `xl/worksheets/_rels/sheet${sheetNum}.xml.rels`;
@@ -129,15 +151,16 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
 
     // Drawing XML
     if (drawingIdx > 0 && sheet.drawing) {
-      zip.addFile(`xl/drawings/drawing${drawingIdx}.xml`,
-        Buffer.from(generateDrawing(sheet.drawing), 'utf8'));
+      zip.addFile(
+        `xl/drawings/drawing${drawingIdx}.xml`,
+        Buffer.from(generateDrawing(sheet.drawing), 'utf8')
+      );
     }
 
     // Table XMLs
     sheet.tables.forEach((table, tableLocalIdx) => {
       const globalTableId = tableIds[tableLocalIdx];
-      zip.addFile(`xl/tables/table${globalTableId}.xml`,
-        Buffer.from(generateTable(table), 'utf8'));
+      zip.addFile(`xl/tables/table${globalTableId}.xml`, Buffer.from(generateTable(table), 'utf8'));
     });
   });
 
@@ -152,6 +175,6 @@ export async function generateNativeXlsx(protocol: XlsxDesignProtocol, outputPat
   }
 
   // Write ZIP to output
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   zip.writeZip(outputPath);
 }

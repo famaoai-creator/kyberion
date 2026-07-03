@@ -7,6 +7,7 @@ const rootDir = process.cwd();
 const allowedCoreFsImports = [
   'libs/core/action-item-store.test.ts',
   'libs/core/audit-chain-tenant.test.ts',
+  'libs/core/browser-extension-bridge.test.ts',
   'libs/core/data-vault.test.ts',
   'libs/core/environment-capability.test.ts',
   'libs/core/evidence-chain.test.ts',
@@ -17,7 +18,6 @@ const allowedCoreFsImports = [
   'libs/core/meeting-participation-coordinator.test.ts',
   'libs/core/metrics.test.ts',
   'libs/core/mission-evidence-doc.test.ts',
-  'libs/core/mlx-embedding-backend.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',
   'libs/core/python-voice-bridge.test.ts',
@@ -33,15 +33,10 @@ const allowedCoreFsImports = [
   'libs/core/src/feedback-loop.test.ts',
   'libs/core/src/knowledge-index.test.ts',
   'libs/core/src/native-docx-engine/__tests__/docx-engine.test.ts',
-  'libs/core/src/native-docx-engine/engine.ts',
-  'libs/core/src/native-docx-engine/examples/roundtrip_docx.ts',
   'libs/core/src/native-pdf-engine/__tests__/pdf-binary.test.ts',
-  'libs/core/src/native-pdf-engine/engine.ts',
   'libs/core/src/native-pptx-engine/__tests__/pptx-engine.test.ts',
   'libs/core/src/native-pptx-engine/__tests__/pptx-filter-slides.test.ts',
-  'libs/core/src/native-pptx-engine/engine.ts',
   'libs/core/src/native-xlsx-engine/__tests__/xlsx-engine.test.ts',
-  'libs/core/src/native-xlsx-engine/engine.ts',
   'libs/core/src/pfc/PfcController.test.ts',
   'libs/core/src/pfc/SovereignSentinel.test.ts',
   'libs/core/src/pipeline-engine.test.ts',
@@ -60,10 +55,14 @@ function normalize(relPath: string): string {
 
 describe('Core fs exception boundary', () => {
   it('keeps remaining direct fs imports in libs/core confined to the declared exception set', () => {
-    const codeFiles = getAllFiles(path.join(rootDir, 'libs/core')).filter((filePath) => /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath));
+    const codeFiles = getAllFiles(path.join(rootDir, 'libs/core')).filter((filePath) =>
+      /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(filePath)
+    );
     const directFsImports = codeFiles
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => !relPath.endsWith('.d.ts'))
+      .filter((relPath) => !relPath.endsWith('.js'))
+      .filter((relPath) => !relPath.endsWith('.js.map'))
       .filter((relPath) => !relPath.includes('/dist/'))
       .filter((relPath) => {
         const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;

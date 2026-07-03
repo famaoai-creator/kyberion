@@ -14,10 +14,10 @@
  *   - Digital Signatures ByteRange placeholder (ISO/TS 32002:2022)
  *   - Document Parts (§14.12)
  */
-import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import * as crypto from 'crypto';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import type {
   PdfDesignProtocol,
   PdfRenderOptions,
@@ -57,15 +57,21 @@ class PdfWriter {
     this.raw('%PDF-2.0\n%\u00E2\u00E3\u00CF\u00D3\n');
   }
 
-  get nextId(): number { return this._nextId; }
-  get currentOffset(): number { return this.buf.length; }
+  get nextId(): number {
+    return this._nextId;
+  }
+  get currentOffset(): number {
+    return this.buf.length;
+  }
 
   private raw(data: string | Buffer) {
     const b = typeof data === 'string' ? Buffer.from(data, 'binary') : data;
     this.buf = Buffer.concat([this.buf, b]);
   }
 
-  reserveId(): number { return this._nextId++; }
+  reserveId(): number {
+    return this._nextId++;
+  }
 
   /** Write a regular (non-stream) object */
   writeObj(id: number, content: string) {
@@ -93,7 +99,9 @@ class PdfWriter {
     }
     dict['/Length'] = String(body.length);
 
-    const dictStr = Object.entries(dict).map(([k, v]) => `${k} ${v}`).join('\n');
+    const dictStr = Object.entries(dict)
+      .map(([k, v]) => `${k} ${v}`)
+      .join('\n');
     this.raw(`${id} 0 obj\n<<\n${dictStr}\n>>\nstream\n`);
     this.raw(body);
     this.raw('\nendstream\nendobj\n');
@@ -121,10 +129,12 @@ class PdfWriter {
     const full = Buffer.from(header + bodies.join(''), 'binary');
     let body = full;
     let filter = '';
-    if (compress) { body = zlib.deflateSync(full); filter = '\n/Filter /FlateDecode'; }
+    if (compress) {
+      body = zlib.deflateSync(full);
+      filter = '\n/Filter /FlateDecode';
+    }
 
-    const dictStr =
-      `/Type /ObjStm\n/N ${objects.length}\n/First ${Buffer.byteLength(header, 'binary')}${filter}\n/Length ${body.length}`;
+    const dictStr = `/Type /ObjStm\n/N ${objects.length}\n/First ${Buffer.byteLength(header, 'binary')}${filter}\n/Length ${body.length}`;
     this.raw(`${streamId} 0 obj\n<<\n${dictStr}\n>>\nstream\n`);
     this.raw(body);
     this.raw('\nendstream\nendobj\n');
@@ -142,29 +152,43 @@ class PdfWriter {
     const total = xrefId; // IDs 0..xrefId-1
 
     const byId = new Map<number, ObjEntry>();
-    for (const r of this.reg) { if (!byId.has(r.id)) byId.set(r.id, r); }
+    for (const r of this.reg) {
+      if (!byId.has(r.id)) byId.set(r.id, r);
+    }
 
     const xd = Buffer.alloc(total * ES, 0);
     // Entry 0: free
-    xd[0] = 0; xd.writeUInt32BE(0, 1); xd.writeUInt16BE(0xFFFF, 5);
+    xd[0] = 0;
+    xd.writeUInt32BE(0, 1);
+    xd.writeUInt16BE(0xffff, 5);
 
     for (let id = 1; id < xrefId; id++) {
       const r = byId.get(id);
       const p = id * ES;
       if (!r) {
-        xd[p] = 0; xd.writeUInt32BE(0, p + 1); xd.writeUInt16BE(0xFFFF, p + 5);
+        xd[p] = 0;
+        xd.writeUInt32BE(0, p + 1);
+        xd.writeUInt16BE(0xffff, p + 5);
       } else if (r.inStream !== undefined) {
-        xd[p] = 2; xd.writeUInt32BE(r.inStream, p + 1); xd.writeUInt16BE(r.indexInStream ?? 0, p + 5);
+        xd[p] = 2;
+        xd.writeUInt32BE(r.inStream, p + 1);
+        xd.writeUInt16BE(r.indexInStream ?? 0, p + 5);
       } else {
-        xd[p] = 1; xd.writeUInt32BE(r.offset, p + 1); xd.writeUInt16BE(0, p + 5);
+        xd[p] = 1;
+        xd.writeUInt32BE(r.offset, p + 1);
+        xd.writeUInt16BE(0, p + 5);
       }
     }
 
     const cxd = zlib.deflateSync(xd);
     const xdict = [
-      `/Type /XRef`, `/Size ${xrefId}`, `/W [${W.join(' ')}]`,
-      `/Root ${rootId} 0 R`, `/Info ${infoId} 0 R`,
-      `/Filter /FlateDecode`, `/Length ${cxd.length}`,
+      `/Type /XRef`,
+      `/Size ${xrefId}`,
+      `/W [${W.join(' ')}]`,
+      `/Root ${rootId} 0 R`,
+      `/Info ${infoId} 0 R`,
+      `/Filter /FlateDecode`,
+      `/Length ${cxd.length}`,
     ].join('\n');
 
     this.raw(`${xrefId} 0 obj\n<<\n${xdict}\n>>\nstream\n`);
@@ -184,7 +208,8 @@ function hasNonAscii(s: string): boolean {
 function encodePdfString(s: string, unicode: boolean): string {
   if (unicode || hasNonAscii(s)) {
     let hex = 'FEFF';
-    for (let i = 0; i < s.length; i++) hex += s.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
+    for (let i = 0; i < s.length; i++)
+      hex += s.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
     return `<${hex}>`;
   }
   return `(${escapeLit(s)})`;
@@ -195,14 +220,22 @@ function escapeLit(s: string): string {
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 // ─── XMP Metadata ────────────────────────────────────────────
 
 function buildXmp(meta: {
-  title?: string; author?: string; subject?: string; producer?: string; creationDate?: string;
+  title?: string;
+  author?: string;
+  subject?: string;
+  producer?: string;
+  creationDate?: string;
 }): string {
   const now = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
   const created = meta.creationDate || now;
@@ -223,12 +256,15 @@ function buildXmp(meta: {
 // ─── Page Labels ─────────────────────────────────────────────
 
 const LABEL_STYLE: Record<string, string> = {
-  'decimal': '/D', 'roman-upper': '/R', 'roman-lower': '/r',
-  'alpha-upper': '/A', 'alpha-lower': '/a',
+  decimal: '/D',
+  'roman-upper': '/R',
+  'roman-lower': '/r',
+  'alpha-upper': '/A',
+  'alpha-lower': '/a',
 };
 
 function buildPageLabelsDict(labels: PdfPageLabel[]): string {
-  const entries = labels.map(l => {
+  const entries = labels.map((l) => {
     const parts: string[] = [];
     if (l.style && l.style !== 'none') parts.push(`/S ${LABEL_STYLE[l.style] ?? '/D'}`);
     if (l.prefix) parts.push(`/P (${escapeLit(l.prefix)})`);
@@ -241,14 +277,17 @@ function buildPageLabelsDict(labels: PdfPageLabel[]): string {
 // ─── Image XObject ────────────────────────────────────────────
 
 interface ImageInfo {
-  width: number; height: number;
-  colorSpace: string; bitsPerComponent: number;
-  filter?: string; data: Buffer;
+  width: number;
+  height: number;
+  colorSpace: string;
+  bitsPerComponent: number;
+  filter?: string;
+  data: Buffer;
 }
 
 function decodeImage(imgPath: string): ImageInfo {
-  const raw = fs.readFileSync(imgPath);
-  if (raw[0] === 0xFF && raw[1] === 0xD8) return decodeJpeg(raw);
+  const raw = safeReadFile(imgPath, { encoding: null }) as Buffer;
+  if (raw[0] === 0xff && raw[1] === 0xd8) return decodeJpeg(raw);
   if (raw[0] === 0x89 && raw[1] === 0x50) return decodePng(raw);
   throw new Error(`Unsupported image: ${imgPath}`);
 }
@@ -256,13 +295,22 @@ function decodeImage(imgPath: string): ImageInfo {
 function decodeJpeg(buf: Buffer): ImageInfo {
   let off = 2;
   while (off < buf.length - 8) {
-    if (buf[off] !== 0xFF) break;
+    if (buf[off] !== 0xff) break;
     const marker = buf[off + 1];
     const len = buf.readUInt16BE(off + 2);
-    if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC9 && marker <= 0xCB)) {
-      const h = buf.readUInt16BE(off + 5), w = buf.readUInt16BE(off + 7), c = buf[off + 9];
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc9 && marker <= 0xcb)) {
+      const h = buf.readUInt16BE(off + 5),
+        w = buf.readUInt16BE(off + 7),
+        c = buf[off + 9];
       const cs = c === 4 ? '/DeviceCMYK' : c === 1 ? '/DeviceGray' : '/DeviceRGB';
-      return { width: w, height: h, colorSpace: cs, bitsPerComponent: 8, filter: '/DCTDecode', data: buf };
+      return {
+        width: w,
+        height: h,
+        colorSpace: cs,
+        bitsPerComponent: 8,
+        filter: '/DCTDecode',
+        data: buf,
+      };
     }
     off += 2 + len;
   }
@@ -270,10 +318,18 @@ function decodeJpeg(buf: Buffer): ImageInfo {
 }
 
 function decodePng(buf: Buffer): ImageInfo {
-  const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
-  const bd = buf[24], ct = buf[25];
+  const w = buf.readUInt32BE(16),
+    h = buf.readUInt32BE(20);
+  const bd = buf[24],
+    ct = buf[25];
   const compMap: Record<number, number> = { 0: 1, 2: 3, 3: 3, 4: 2, 6: 4 };
-  const csMap: Record<number, string> = { 0: '/DeviceGray', 2: '/DeviceRGB', 3: '/DeviceRGB', 4: '/DeviceGray', 6: '/DeviceRGB' };
+  const csMap: Record<number, string> = {
+    0: '/DeviceGray',
+    2: '/DeviceRGB',
+    3: '/DeviceRGB',
+    4: '/DeviceGray',
+    6: '/DeviceRGB',
+  };
   const nc = compMap[ct] ?? 3;
 
   const idats: Buffer[] = [];
@@ -287,7 +343,8 @@ function decodePng(buf: Buffer): ImageInfo {
   }
 
   const inflated = zlib.inflateSync(Buffer.concat(idats));
-  const rw = w * nc, raw = Buffer.alloc(h * rw);
+  const rw = w * nc,
+    raw = Buffer.alloc(h * rw);
 
   for (let row = 0; row < h; row++) {
     const src = inflated.subarray(row * (rw + 1) + 1, (row + 1) * (rw + 1));
@@ -295,19 +352,41 @@ function decodePng(buf: Buffer): ImageInfo {
     const dst = raw.subarray(row * rw, (row + 1) * rw);
     const prev = row > 0 ? raw.subarray((row - 1) * rw, row * rw) : null;
     if (ft === 0) src.copy(dst);
-    else if (ft === 1) { for (let x = 0; x < rw; x++) dst[x] = (src[x] + (x >= nc ? dst[x - nc] : 0)) & 0xFF; }
-    else if (ft === 2) { for (let x = 0; x < rw; x++) dst[x] = (src[x] + (prev ? prev[x] : 0)) & 0xFF; }
-    else if (ft === 3) { for (let x = 0; x < rw; x++) { const a = x >= nc ? dst[x - nc] : 0; const b = prev ? prev[x] : 0; dst[x] = (src[x] + Math.floor((a + b) / 2)) & 0xFF; } }
-    else if (ft === 4) { for (let x = 0; x < rw; x++) { const a = x >= nc ? dst[x - nc] : 0; const b = prev ? prev[x] : 0; const c = (prev && x >= nc) ? prev[x - nc] : 0; dst[x] = (src[x] + paeth(a, b, c)) & 0xFF; } }
-    else src.copy(dst);
+    else if (ft === 1) {
+      for (let x = 0; x < rw; x++) dst[x] = (src[x] + (x >= nc ? dst[x - nc] : 0)) & 0xff;
+    } else if (ft === 2) {
+      for (let x = 0; x < rw; x++) dst[x] = (src[x] + (prev ? prev[x] : 0)) & 0xff;
+    } else if (ft === 3) {
+      for (let x = 0; x < rw; x++) {
+        const a = x >= nc ? dst[x - nc] : 0;
+        const b = prev ? prev[x] : 0;
+        dst[x] = (src[x] + Math.floor((a + b) / 2)) & 0xff;
+      }
+    } else if (ft === 4) {
+      for (let x = 0; x < rw; x++) {
+        const a = x >= nc ? dst[x - nc] : 0;
+        const b = prev ? prev[x] : 0;
+        const c = prev && x >= nc ? prev[x - nc] : 0;
+        dst[x] = (src[x] + paeth(a, b, c)) & 0xff;
+      }
+    } else src.copy(dst);
   }
 
-  return { width: w, height: h, colorSpace: csMap[ct] ?? '/DeviceRGB', bitsPerComponent: bd, filter: '/FlateDecode', data: zlib.deflateSync(raw) };
+  return {
+    width: w,
+    height: h,
+    colorSpace: csMap[ct] ?? '/DeviceRGB',
+    bitsPerComponent: bd,
+    filter: '/FlateDecode',
+    data: zlib.deflateSync(raw),
+  };
 }
 
 function paeth(a: number, b: number, c: number): number {
   const p = a + b - c;
-  const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+  const pa = Math.abs(p - a),
+    pb = Math.abs(p - b),
+    pc = Math.abs(p - c);
   return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
@@ -333,8 +412,8 @@ function buildVectorStream(vectors: PdfVectorElement[], pageHeight: number): str
     // Colors
     const fc = v.fillColor;
     const sc = v.strokeColor;
-    if (fc) s += `${fc.map(c => c.toFixed(4)).join(' ')} rg\n`;   // fill (RGB)
-    if (sc) s += `${sc.map(c => c.toFixed(4)).join(' ')} RG\n`;   // stroke (RGB)
+    if (fc) s += `${fc.map((c) => c.toFixed(4)).join(' ')} rg\n`; // fill (RGB)
+    if (sc) s += `${sc.map((c) => c.toFixed(4)).join(' ')} RG\n`; // stroke (RGB)
 
     // Shape
     const sh = v.shape;
@@ -342,7 +421,8 @@ function buildVectorStream(vectors: PdfVectorElement[], pageHeight: number): str
       const pdfY = pageHeight - sh.y - sh.height;
       s += `${sh.x} ${pdfY} ${sh.width} ${sh.height} re\n`;
     } else if (sh.kind === 'line') {
-      const pdfY1 = pageHeight - sh.y1, pdfY2 = pageHeight - sh.y2;
+      const pdfY1 = pageHeight - sh.y1,
+        pdfY2 = pageHeight - sh.y2;
       s += `${sh.x1} ${pdfY1} m ${sh.x2} ${pdfY2} l\n`;
     } else if (sh.kind === 'path') {
       s += convertSvgPath(sh.d, pageHeight) + '\n';
@@ -385,15 +465,24 @@ function convertSvgPath(d: string, pageHeight: number): string {
   while (i < tokens.length) {
     const cmd = tokens[i++];
     if (cmd === 'M' || cmd === 'm') {
-      const x = parseFloat(tokens[i++]), y = parseFloat(tokens[i++]);
+      const x = parseFloat(tokens[i++]),
+        y = parseFloat(tokens[i++]);
       out += `${x} ${pageHeight - y} m `;
     } else if (cmd === 'L' || cmd === 'l') {
-      const x = parseFloat(tokens[i++]), y = parseFloat(tokens[i++]);
+      const x = parseFloat(tokens[i++]),
+        y = parseFloat(tokens[i++]);
       out += `${x} ${pageHeight - y} l `;
     } else if (cmd === 'Z' || cmd === 'z') {
       out += 'h ';
     } else if (cmd === 'C') {
-      const [x1, y1, x2, y2, x, y] = [parseFloat(tokens[i++]), parseFloat(tokens[i++]), parseFloat(tokens[i++]), parseFloat(tokens[i++]), parseFloat(tokens[i++]), parseFloat(tokens[i++])];
+      const [x1, y1, x2, y2, x, y] = [
+        parseFloat(tokens[i++]),
+        parseFloat(tokens[i++]),
+        parseFloat(tokens[i++]),
+        parseFloat(tokens[i++]),
+        parseFloat(tokens[i++]),
+        parseFloat(tokens[i++]),
+      ];
       out += `${x1} ${pageHeight - y1} ${x2} ${pageHeight - y2} ${x} ${pageHeight - y} c `;
     }
   }
@@ -409,7 +498,7 @@ function buildAnnotationDict(ann: PdfAnnotation, pageHeight: number, pageIds: nu
   const rect = `[${ax} ${pdfY1} ${ax + aw} ${pdfY2}]`;
 
   const borderArr = ann.borderWidth !== undefined ? `[0 0 ${ann.borderWidth}]` : '[0 0 1]';
-  const color = ann.color ? `[${ann.color.map(c => c.toFixed(4)).join(' ')}]` : '[0 0 1]';
+  const color = ann.color ? `[${ann.color.map((c) => c.toFixed(4)).join(' ')}]` : '[0 0 1]';
 
   let dict = `<< /Type /Annot /Subtype /${ann.type} /Rect ${rect} /Border ${borderArr} /C ${color}`;
 
@@ -505,7 +594,7 @@ function buildEmbeddedFileStream(
   af: PdfAssociatedFile,
   compress: boolean
 ): number {
-  const raw = fs.readFileSync(af.path);
+  const raw = safeReadFile(af.path, { encoding: null }) as Buffer;
   const size = raw.length;
   const dictEntries: Record<string, string> = { '/Type': '/EmbeddedFile' };
   if (af.mimeType) dictEntries['/Subtype'] = `(${af.mimeType})`;
@@ -551,7 +640,7 @@ function buildStructElem(
   if (elem.alt) content += ` /Alt ${encodePdfString(elem.alt, true)}`;
   if (elem.actualText) content += ` /ActualText ${encodePdfString(elem.actualText, true)}`;
   if (elem.lang) content += ` /Lang (${escapeLit(elem.lang)})`;
-  if (childIds.length > 0) content += ` /K [${childIds.map(i => `${i} 0 R`).join(' ')}]`;
+  if (childIds.length > 0) content += ` /K [${childIds.map((i) => `${i} 0 R`).join(' ')}]`;
   content += ' >>';
 
   pendingObjStm.push([id, content]);
@@ -579,9 +668,10 @@ function buildAestheticContent(
     if ((el.type === 'text' || el.type === 'heading') && el.text) {
       const fontSize = el.fontSize || 12;
       s += `/F1 ${fontSize} Tf\n1 0 0 1 ${el.x} ${pageHeight - el.y} Tm\n`;
-      s += unicode && hasNonAscii(el.text)
-        ? `${encodePdfString(el.text, true)} Tj\n`
-        : `(${escapeLit(el.text)}) Tj\n`;
+      s +=
+        unicode && hasNonAscii(el.text)
+          ? `${encodePdfString(el.text, true)} Tj\n`
+          : `(${escapeLit(el.text)}) Tj\n`;
     }
   }
   return s + 'ET';
@@ -597,7 +687,11 @@ function protocolRequiresCjkFont(protocol: PdfDesignProtocol): boolean {
     if (hasNonAscii(page.text || '')) return true;
   }
   for (const element of protocol.aesthetic?.elements ?? []) {
-    if ((element.type === 'text' || element.type === 'heading') && hasNonAscii((element as any).text || '')) return true;
+    if (
+      (element.type === 'text' || element.type === 'heading') &&
+      hasNonAscii((element as any).text || '')
+    )
+      return true;
   }
   return false;
 }
@@ -624,7 +718,11 @@ function buildPrimaryFontObject(protocol: PdfDesignProtocol): string {
   ].join(' ');
 }
 
-function buildImageContent(images: PdfImageElement[], pageHeight: number, imgMap: Map<string, { id: number; name: string }>): string {
+function buildImageContent(
+  images: PdfImageElement[],
+  pageHeight: number,
+  imgMap: Map<string, { id: number; name: string }>
+): string {
   let s = '';
   for (const img of images) {
     const reg = imgMap.get(img.path);
@@ -689,24 +787,34 @@ function buildAcroForm(
 
     // Field type → /FT
     const ftMap: Record<string, string> = {
-      text: 'Tx', checkbox: 'Btn', radio: 'Btn', button: 'Btn',
-      dropdown: 'Ch', listbox: 'Ch', signature: 'Sig',
+      text: 'Tx',
+      checkbox: 'Btn',
+      radio: 'Btn',
+      button: 'Btn',
+      dropdown: 'Ch',
+      listbox: 'Ch',
+      signature: 'Sig',
     };
     const ft = `/FT /${ftMap[field.type] ?? 'Tx'}`;
 
     // Appearance Stream
     const apContent = buildFieldAppearance(field, fontId);
-    const apId = writer.addStream({
-      '/Type': '/XObject', '/Subtype': '/Form',
-      '/BBox': `[0 0 ${fw} ${fh}]`,
-      '/Resources': `<< /Font << /F1 ${fontId} 0 R /ZaDb ${fontId} 0 R >> >>`,
-    }, Buffer.from(apContent, 'binary'), compress);
+    const apId = writer.addStream(
+      {
+        '/Type': '/XObject',
+        '/Subtype': '/Form',
+        '/BBox': `[0 0 ${fw} ${fh}]`,
+        '/Resources': `<< /Font << /F1 ${fontId} 0 R /ZaDb ${fontId} 0 R >> >>`,
+      },
+      Buffer.from(apContent, 'binary'),
+      compress
+    );
 
     // Flags
     let flags = field.flags ?? 0;
-    if (field.type === 'radio') flags |= (1 << 15); // Radio flag
-    if (field.type === 'dropdown') flags |= (1 << 17); // Combo flag
-    if (field.type === 'button') flags |= (1 << 16); // Pushbutton flag
+    if (field.type === 'radio') flags |= 1 << 15; // Radio flag
+    if (field.type === 'dropdown') flags |= 1 << 17; // Combo flag
+    if (field.type === 'button') flags |= 1 << 16; // Pushbutton flag
 
     let fieldDict = `<< /Type /Annot /Subtype /Widget ${ft}`;
     fieldDict += ` /T ${encodePdfString(field.name, false)}`;
@@ -714,11 +822,12 @@ function buildAcroForm(
     fieldDict += ` /Rect [${fx} ${fy} ${fx + fw} ${fy + fh}]`; // raw coords — engine caller handles page
     fieldDict += ` /P ${pageRef} 0 R`;
     if (field.value) fieldDict += ` /V ${encodePdfString(field.value, hasNonAscii(field.value))}`;
-    if (field.defaultValue) fieldDict += ` /DV ${encodePdfString(field.defaultValue, hasNonAscii(field.defaultValue))}`;
+    if (field.defaultValue)
+      fieldDict += ` /DV ${encodePdfString(field.defaultValue, hasNonAscii(field.defaultValue))}`;
     if (flags) fieldDict += ` /Ff ${flags}`;
     fieldDict += ` /AP << /N ${apId} 0 R >>`;
     if (field.options?.length) {
-      const opts = field.options.map(o => `(${escapeLit(o)})`).join(' ');
+      const opts = field.options.map((o) => `(${escapeLit(o)})`).join(' ');
       fieldDict += ` /Opt [${opts}]`;
     }
     fieldDict += ` /DA (${escapeLit(field.defaultAppearance || '/F1 10 Tf 0 g')})`;
@@ -734,7 +843,7 @@ function buildAcroForm(
   // AcroForm root dict
   const da = acroForm.defaultDA || '/F1 10 Tf 0 g';
   const na = acroForm.needAppearances !== false;
-  const acroFormContent = `<< /Fields [${rootFieldIds.map(id => `${id} 0 R`).join(' ')}] /DA (${escapeLit(da)}) /NeedAppearances ${na} /DR << /Font << /F1 ${fontId} 0 R >> >> >>`;
+  const acroFormContent = `<< /Fields [${rootFieldIds.map((id) => `${id} 0 R`).join(' ')}] /DA (${escapeLit(da)}) /NeedAppearances ${na} /DR << /Font << /F1 ${fontId} 0 R >> >> >>`;
 
   const acroFormId = writer.reserveId();
   pendingObjStm.push([acroFormId, acroFormContent]);
@@ -768,10 +877,10 @@ function buildOCG(
 
   const allIds = [...ocgIds.values()];
   // Build /OCProperties dict
-  let ocProps = `<< /OCGs [${allIds.map(id => `${id} 0 R`).join(' ')}]`;
-  ocProps += ` /D << /BaseState /ON /ON [${onIds.map(id => `${id} 0 R`).join(' ')}]`;
-  if (offIds.length) ocProps += ` /OFF [${offIds.map(id => `${id} 0 R`).join(' ')}]`;
-  ocProps += ` /Order [${allIds.map(id => `${id} 0 R`).join(' ')}]`;
+  let ocProps = `<< /OCGs [${allIds.map((id) => `${id} 0 R`).join(' ')}]`;
+  ocProps += ` /D << /BaseState /ON /ON [${onIds.map((id) => `${id} 0 R`).join(' ')}]`;
+  if (offIds.length) ocProps += ` /OFF [${offIds.map((id) => `${id} 0 R`).join(' ')}]`;
+  ocProps += ` /Order [${allIds.map((id) => `${id} 0 R`).join(' ')}]`;
   ocProps += ' >> >>';
 
   const ocPropertiesId = writer.reserveId();
@@ -811,10 +920,14 @@ function deriveEncryptionKey(password: string, salt: Buffer, uValue?: Buffer): B
  * Build PDF /Encrypt dictionary for AES-256 with standard security handler (V=5, R=7).
  * Returns an /Encrypt dict string and a 32-byte encryption key.
  */
-function buildEncryptDict(encOpts: PdfEncryptOptions): { dictStr: string; key: Buffer; encryptId: string } {
+function buildEncryptDict(encOpts: PdfEncryptOptions): {
+  dictStr: string;
+  key: Buffer;
+  encryptId: string;
+} {
   const ownerPw = encOpts.ownerPassword || 'owner';
   const userPw = encOpts.userPassword || '';
-  const perms = encOpts.permissions ?? 0xFFFFFFFC;
+  const perms = encOpts.permissions ?? 0xfffffffc;
 
   // Generate random salts and key (32 bytes = 256 bits)
   const eSalt = crypto.randomBytes(8);
@@ -822,7 +935,11 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): { dictStr: string; key: B
   const encKey = crypto.randomBytes(32);
 
   // U hash: SHA256(userPw + vSalt)
-  const uHash = crypto.createHash('sha256').update(Buffer.from(userPw, 'utf8')).update(vSalt).digest();
+  const uHash = crypto
+    .createHash('sha256')
+    .update(Buffer.from(userPw, 'utf8'))
+    .update(vSalt)
+    .digest();
   // UK (user key enc with AES256): AES256CBC(encKey, key=SHA256(userPw + eSalt))
   const uEncKey = deriveEncryptionKey(userPw, eSalt);
   const uCipher = crypto.createCipheriv('aes-256-cbc', uEncKey, Buffer.alloc(16));
@@ -833,7 +950,12 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): { dictStr: string; key: B
   const UE = uKeyEncrypted.subarray(0, 32).toString('hex').toUpperCase();
 
   // O hash: SHA256(ownerPw + vSalt + U-value)
-  const oHash = crypto.createHash('sha256').update(Buffer.from(ownerPw, 'utf8')).update(vSalt).update(uHash).digest();
+  const oHash = crypto
+    .createHash('sha256')
+    .update(Buffer.from(ownerPw, 'utf8'))
+    .update(vSalt)
+    .update(uHash)
+    .digest();
   const oEncKey = deriveEncryptionKey(ownerPw, eSalt, uHash);
   const oCipher = crypto.createCipheriv('aes-256-cbc', oEncKey, Buffer.alloc(16));
   const oKeyEncrypted = Buffer.concat([oCipher.update(encKey), oCipher.final()]);
@@ -844,13 +966,18 @@ function buildEncryptDict(encOpts: PdfEncryptOptions): { dictStr: string; key: B
   // Perms: AES256CBC-encrypted (16 bytes)
   const permsBuf = Buffer.alloc(16);
   permsBuf.writeUInt32LE(perms >>> 0, 0); // Use unsigned int32LE for PDF permissions bitfield
-  permsBuf[4] = 0xFF; permsBuf[5] = 0xFF; permsBuf[6] = 0xFF; permsBuf[7] = 0xFF;
+  permsBuf[4] = 0xff;
+  permsBuf[5] = 0xff;
+  permsBuf[6] = 0xff;
+  permsBuf[7] = 0xff;
   permsBuf.write('adb', 8, 'ascii');
   permsBuf[11] = 1; // EncryptMetadata = true
   crypto.randomBytes(4).copy(permsBuf, 12);
 
   const pCipher = crypto.createCipheriv('aes-256-ecb', encKey, null);
-  const Perms = Buffer.concat([pCipher.update(permsBuf), pCipher.final()]).toString('hex').toUpperCase();
+  const Perms = Buffer.concat([pCipher.update(permsBuf), pCipher.final()])
+    .toString('hex')
+    .toUpperCase();
 
   const encryptId = crypto.randomBytes(16).toString('hex').toUpperCase();
 
@@ -908,12 +1035,16 @@ function buildSignaturePlaceholder(
   const dateStr = `D:${now}Z`;
 
   let sigDict = `<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /${subFilter}`;
-  sigDict += ` /ByteRange [0 0 0 0]`;  // Placeholder — real implementations patch this
-  sigDict += ` /Contents <${'00'.repeat(4096)}>`;  // 8192-byte PKCS#7 placeholder
-  if (sigOpts.signerName) sigDict += ` /Name ${encodePdfString(sigOpts.signerName, hasNonAscii(sigOpts.signerName))}`;
-  if (sigOpts.reason) sigDict += ` /Reason ${encodePdfString(sigOpts.reason, hasNonAscii(sigOpts.reason))}`;
-  if (sigOpts.location) sigDict += ` /Location ${encodePdfString(sigOpts.location, hasNonAscii(sigOpts.location))}`;
-  if (sigOpts.contactInfo) sigDict += ` /ContactInfo ${encodePdfString(sigOpts.contactInfo, hasNonAscii(sigOpts.contactInfo))}`;
+  sigDict += ` /ByteRange [0 0 0 0]`; // Placeholder — real implementations patch this
+  sigDict += ` /Contents <${'00'.repeat(4096)}>`; // 8192-byte PKCS#7 placeholder
+  if (sigOpts.signerName)
+    sigDict += ` /Name ${encodePdfString(sigOpts.signerName, hasNonAscii(sigOpts.signerName))}`;
+  if (sigOpts.reason)
+    sigDict += ` /Reason ${encodePdfString(sigOpts.reason, hasNonAscii(sigOpts.reason))}`;
+  if (sigOpts.location)
+    sigDict += ` /Location ${encodePdfString(sigOpts.location, hasNonAscii(sigOpts.location))}`;
+  if (sigOpts.contactInfo)
+    sigDict += ` /ContactInfo ${encodePdfString(sigOpts.contactInfo, hasNonAscii(sigOpts.contactInfo))}`;
   sigDict += ` /M (${dateStr}) >>`;
 
   const sigValueId = writer.addObj(sigDict);
@@ -930,8 +1061,7 @@ function buildSignaturePlaceholder(
 
   // AcroForm sig root
   const sigFieldId = writer.reserveId();
-  const sigFieldContent =
-    `<< /FT /Sig /T (Sig1) /V ${sigValueId} 0 R /Kids [${widgetId} 0 R] /P ${pageRef} 0 R >>`;
+  const sigFieldContent = `<< /FT /Sig /T (Sig1) /V ${sigValueId} 0 R /Kids [${widgetId} 0 R] /P ${pageRef} 0 R >>`;
   pendingObjStm.push([sigFieldId, sigFieldContent]);
 
   return sigFieldId;
@@ -951,16 +1081,17 @@ function buildDocumentParts(
 
   for (const part of parts) {
     const pageRefs = part.pageIndices
-      .filter(i => i < pageIds.length)
-      .map(i => `${pageIds[i]} 0 R`)
+      .filter((i) => i < pageIds.length)
+      .map((i) => `${pageIds[i]} 0 R`)
       .join(' ');
 
     let entry = `<< /Pages [${pageRefs}]`;
-    if (part.name) entry += ` /DMeta << /Title ${encodePdfString(part.name, hasNonAscii(part.name))} >>`;
+    if (part.name)
+      entry += ` /DMeta << /Title ${encodePdfString(part.name, hasNonAscii(part.name))} >>`;
     if (part.metadata) {
-      const metaEntries = Object.entries(part.metadata).map(([k, v]) =>
-        `/${escapeLit(k)} ${encodePdfString(v, hasNonAscii(v))}`
-      ).join(' ');
+      const metaEntries = Object.entries(part.metadata)
+        .map(([k, v]) => `/${escapeLit(k)} ${encodePdfString(v, hasNonAscii(v))}`)
+        .join(' ');
       entry += ` /DPM << ${metaEntries} >>`;
     }
     if (part.children?.length) {
@@ -978,7 +1109,6 @@ function buildDocumentParts(
 
 // ─── Public API ──────────────────────────────────────────────
 
-
 export async function generateNativePdf(
   protocol: PdfDesignProtocol,
   outputPath: string,
@@ -989,20 +1119,22 @@ export async function generateNativePdf(
   const hasPages = protocol.content?.pages?.length;
   const hasAesthetic = protocol.aesthetic?.elements?.length;
   if (!hasBody && !hasPages && !hasAesthetic) {
-    throw new Error('source.body is required when no content pages or aesthetic elements are provided');
+    throw new Error(
+      'source.body is required when no content pages or aesthetic elements are provided'
+    );
   }
   const outDir = path.dirname(outputPath);
-  if (!fs.existsSync(outDir)) throw new Error(`output directory does not exist: ${outDir}`);
+  if (!safeExistsSync(outDir)) throw new Error(`output directory does not exist: ${outDir}`);
 
   // ── Options ──────────────────────────────────────────────
   const opts: Required<PdfRenderOptions> = {
-    compress:      options?.compress      ?? protocol.renderOptions?.compress      ?? true,
-    unicode:       options?.unicode       ?? protocol.renderOptions?.unicode       ?? true,
-    objectStreams: options?.objectStreams  ?? protocol.renderOptions?.objectStreams ?? false,
-    xmpMetadata:  options?.xmpMetadata   ?? protocol.renderOptions?.xmpMetadata   ?? true,
-    tagged:        options?.tagged        ?? protocol.renderOptions?.tagged        ?? !!protocol.structTree,
-    linearize:     options?.linearize     ?? protocol.renderOptions?.linearize     ?? false,
-    encrypt:       options?.encrypt       ?? protocol.renderOptions?.encrypt       ?? undefined as any,
+    compress: options?.compress ?? protocol.renderOptions?.compress ?? true,
+    unicode: options?.unicode ?? protocol.renderOptions?.unicode ?? true,
+    objectStreams: options?.objectStreams ?? protocol.renderOptions?.objectStreams ?? false,
+    xmpMetadata: options?.xmpMetadata ?? protocol.renderOptions?.xmpMetadata ?? true,
+    tagged: options?.tagged ?? protocol.renderOptions?.tagged ?? !!protocol.structTree,
+    linearize: options?.linearize ?? protocol.renderOptions?.linearize ?? false,
+    encrypt: options?.encrypt ?? protocol.renderOptions?.encrypt ?? (undefined as any),
   };
 
   const writer = new PdfWriter();
@@ -1024,21 +1156,25 @@ export async function generateNativePdf(
   }
 
   // ── Reserve structural IDs ───────────────────────────────
-  const catalogId   = writer.reserveId();
+  const catalogId = writer.reserveId();
   const pagesRootId = writer.reserveId();
-  const infoId      = writer.reserveId();
-  const fontId      = writer.reserveId();
+  const infoId = writer.reserveId();
+  const fontId = writer.reserveId();
 
   // ── XMP Metadata Stream (P1-1) ───────────────────────────
   let metadataId: number | undefined;
   if (opts.xmpMetadata) {
     const xmpStr = buildXmp({
-      title:        protocol.metadata?.title    || protocol.source?.title,
-      author:       protocol.metadata?.author   as string | undefined,
-      subject:      protocol.metadata?.subject  as string | undefined,
+      title: protocol.metadata?.title || protocol.source?.title,
+      author: protocol.metadata?.author as string | undefined,
+      subject: protocol.metadata?.subject as string | undefined,
       creationDate: protocol.metadata?.creationDate as string | undefined,
     });
-    metadataId = writer.addStream({ '/Type': '/Metadata', '/Subtype': '/XML' }, Buffer.from(xmpStr, 'utf8'), false);
+    metadataId = writer.addStream(
+      { '/Type': '/Metadata', '/Subtype': '/XML' },
+      Buffer.from(xmpStr, 'utf8'),
+      false
+    );
   }
 
   // ── Page Labels (P1-5) ───────────────────────────────────
@@ -1088,9 +1224,12 @@ export async function generateNativePdf(
     try {
       const info = decodeImage(imgPath);
       const dictEntries: Record<string, string> = {
-        '/Type': '/XObject', '/Subtype': '/Image',
-        '/Width': String(info.width), '/Height': String(info.height),
-        '/ColorSpace': info.colorSpace, '/BitsPerComponent': String(info.bitsPerComponent),
+        '/Type': '/XObject',
+        '/Subtype': '/Image',
+        '/Width': String(info.width),
+        '/Height': String(info.height),
+        '/ColorSpace': info.colorSpace,
+        '/BitsPerComponent': String(info.bitsPerComponent),
       };
       if (info.filter) dictEntries['/Filter'] = info.filter;
       const useCompress = !info.filter;
@@ -1099,7 +1238,9 @@ export async function generateNativePdf(
       let body = useCompress ? zlib.deflateSync(info.data) : info.data;
       if (useCompress) dictEntries['/Filter'] = '/FlateDecode';
       dictEntries['/Length'] = String(body.length);
-      const ds = Object.entries(dictEntries).map(([k, v]) => `${k} ${v}`).join('\n');
+      const ds = Object.entries(dictEntries)
+        .map(([k, v]) => `${k} ${v}`)
+        .join('\n');
       writer['raw'](`${id} 0 obj\n<<\n${ds}\n>>\nstream\n`);
       writer['raw'](body);
       writer['raw']('\nendstream\nendobj\n');
@@ -1117,7 +1258,14 @@ export async function generateNativePdf(
   if (protocol.outlines?.length) {
     outlineRootId = writer.reserveId();
     // Build outline items (deferred until pageIds are set)
-    outlineItems = buildOutlineTree(writer, protocol.outlines, pageIds, outlineRootId, opts, pendingObjStm);
+    outlineItems = buildOutlineTree(
+      writer,
+      protocol.outlines,
+      pageIds,
+      outlineRootId,
+      opts,
+      pendingObjStm
+    );
   }
 
   // ── Tagged PDF: StructTreeRoot (P2-6) ───────────────────
@@ -1145,7 +1293,14 @@ export async function generateNativePdf(
   let acroFormId: number | undefined;
   const acroFieldAnnotIds = new Map<string, number[]>(); // 'page-N' → field widget IDs
   if (protocol.acroForm?.fields.length) {
-    const result = buildAcroForm(writer, protocol.acroForm, pageIds, fontId, opts.compress, pendingObjStm);
+    const result = buildAcroForm(
+      writer,
+      protocol.acroForm,
+      pageIds,
+      fontId,
+      opts.compress,
+      pendingObjStm
+    );
     acroFormId = result.acroFormId;
     for (const [k, v] of result.fieldAnnotIds) acroFieldAnnotIds.set(k, v);
   }
@@ -1200,32 +1355,39 @@ export async function generateNativePdf(
     const gsList = page.vectors?.length ? collectExtGState(page.vectors) : [];
 
     // Build image resource dict
-    const imgRes = [...(page.images ?? [])].map(img => {
-      const reg = imgMap.get(img.path);
-      return reg ? `/${reg.name} ${reg.id} 0 R` : '';
-    }).filter(Boolean);
+    const imgRes = [...(page.images ?? [])]
+      .map((img) => {
+        const reg = imgMap.get(img.path);
+        return reg ? `/${reg.name} ${reg.id} 0 R` : '';
+      })
+      .filter(Boolean);
 
     // Build Form XObject resource dict
-    const fxoRes = (page.text || '').match(/\/(Fxo_\w+) Do/g)?.map(m => {
-      const n = m.match(/\/(\w+) Do/)?.[1];
-      return n && fxoMap.has(n) ? `/${n} ${fxoMap.get(n)} 0 R` : '';
-    }).filter(Boolean) ?? [];
+    const fxoRes =
+      (page.text || '')
+        .match(/\/(Fxo_\w+) Do/g)
+        ?.map((m) => {
+          const n = m.match(/\/(\w+) Do/)?.[1];
+          return n && fxoMap.has(n) ? `/${n} ${fxoMap.get(n)} 0 R` : '';
+        })
+        .filter(Boolean) ?? [];
     // Also include protocol-level form XObjects
     const allFxoRes = [...fxoRes, ...[...fxoMap.entries()].map(([n, fid]) => `/${n} ${fid} 0 R`)];
     const uniqueFxoRes = [...new Set(allFxoRes)];
 
     // Build resources dict
     let resources = `<< /Font << /F1 ${fontId} 0 R >>`;
-    if (imgRes.length > 0) resources += ` /XObject << ${imgRes.join(' ')} ${uniqueFxoRes.join(' ')} >>`;
+    if (imgRes.length > 0)
+      resources += ` /XObject << ${imgRes.join(' ')} ${uniqueFxoRes.join(' ')} >>`;
     else if (uniqueFxoRes.length > 0) resources += ` /XObject << ${uniqueFxoRes.join(' ')} >>`;
     if (gsList.length > 0) {
-      const gsEntries = gsList.map(g => `/${g.name} << ${g.entries} >>`).join(' ');
+      const gsEntries = gsList.map((g) => `/${g.name} << ${g.entries} >>`).join(' ');
       resources += ` /ExtGState << ${gsEntries} >>`;
     }
     resources += ' /ProcSet [/PDF /Text /ImageC /ImageB] >>';
 
     let pageContent = `<< /Type /Page /Parent ${pagesRootId} 0 R /MediaBox [0 0 ${page.width} ${page.height}] /Contents ${contentId} 0 R /Resources ${resources}`;
-    if (annIds.length > 0) pageContent += ` /Annots [${annIds.map(id => `${id} 0 R`).join(' ')}]`;
+    if (annIds.length > 0) pageContent += ` /Annots [${annIds.map((id) => `${id} 0 R`).join(' ')}]`;
     pageContent += ' >>';
 
     writeReserved(pageId, pageContent);
@@ -1233,7 +1395,10 @@ export async function generateNativePdf(
 
   // ── Write Outlines Root (P2-1) ───────────────────────────
   if (outlineRootId !== undefined && outlineItems.length > 0) {
-    const totalCount = (protocol.outlines ?? []).reduce((n, item) => n + 1 + countDescendants(item), 0);
+    const totalCount = (protocol.outlines ?? []).reduce(
+      (n, item) => n + 1 + countDescendants(item),
+      0
+    );
     const rootContent =
       `<< /Type /Outlines /Count ${totalCount} ` +
       `/First ${outlineItems[0].id} 0 R ` +
@@ -1256,10 +1421,12 @@ export async function generateNativePdf(
   const catalogParts = ['/Type /Catalog', `/Pages ${pagesRootId} 0 R`];
   if (metadataId !== undefined) catalogParts.push(`/Metadata ${metadataId} 0 R`);
   if (pageLabelsId !== undefined) catalogParts.push(`/PageLabels ${pageLabelsId} 0 R`);
-  if (outlineRootId !== undefined) catalogParts.push(`/Outlines ${outlineRootId} 0 R /PageMode /UseOutlines`);
+  if (outlineRootId !== undefined)
+    catalogParts.push(`/Outlines ${outlineRootId} 0 R /PageMode /UseOutlines`);
   if (structTreeRootId !== undefined) catalogParts.push(`/StructTreeRoot ${structTreeRootId} 0 R`);
   if (opts.tagged) catalogParts.push('/MarkInfo << /Marked true >>');
-  if (efNameTreeId !== undefined) catalogParts.push(`/Names << /EmbeddedFiles ${efNameTreeId} 0 R >>`);
+  if (efNameTreeId !== undefined)
+    catalogParts.push(`/Names << /EmbeddedFiles ${efNameTreeId} 0 R >>`);
   if (afList.length > 0) {
     const afRefs = afList.map(({ streamId }) => `${streamId} 0 R`).join(' ');
     catalogParts.push(`/AF [${afRefs}]`);
@@ -1282,18 +1449,27 @@ export async function generateNativePdf(
   }
   if (dpartRootId !== undefined) catalogParts.push(`/DPartRoot ${dpartRootId} 0 R`);
   if (encryptId !== undefined) catalogParts.push(`/Encrypt ${encryptId} 0 R`);
-  writeReserved(catalogId, `<<\n${catalogParts.map(p => `  ${p}`).join('\n')}\n>>`);
+  writeReserved(catalogId, `<<\n${catalogParts.map((p) => `  ${p}`).join('\n')}\n>>`);
 
   // Info (with PDF MAC token appended as comment if mac options provided)
   const title = protocol.metadata?.title || protocol.source?.title || 'Kyberion PDF';
-  const dateStr = `D:${new Date().toISOString().replace(/[-T:Z.]/g, '').substring(0, 14)}Z`;
-  writeReserved(infoId, `<< /Title ${encodePdfString(title, opts.unicode)} /Producer (Kyberion Native PDF 2.0 Engine) /CreationDate (${dateStr}) >>`);
+  const dateStr = `D:${new Date()
+    .toISOString()
+    .replace(/[-T:Z.]/g, '')
+    .substring(0, 14)}Z`;
+  writeReserved(
+    infoId,
+    `<< /Title ${encodePdfString(title, opts.unicode)} /Producer (Kyberion Native PDF 2.0 Engine) /CreationDate (${dateStr}) >>`
+  );
 
   // Font
   writeReserved(fontId, buildPrimaryFontObject(protocol));
 
   // Pages Root
-  writeReserved(pagesRootId, `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`);
+  writeReserved(
+    pagesRootId,
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`
+  );
 
   // Page Labels
   if (pageLabelsId !== undefined && protocol.pageLabels) {
@@ -1341,5 +1517,5 @@ export async function generateNativePdf(
   const macToken = computePdfMac(finalBuf, macKey);
   finalBuf = Buffer.concat([finalBuf, Buffer.from(`%% PdfMac: ${macToken}\n`, 'binary')]);
 
-  fs.writeFileSync(outputPath, finalBuf);
+  safeWriteFile(outputPath, finalBuf);
 }

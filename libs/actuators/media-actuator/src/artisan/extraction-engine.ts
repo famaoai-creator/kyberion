@@ -6,7 +6,7 @@ import { safeWriteFile, safeReadFile, safeUnlink, pathResolver } from '@agent/co
 import AdmZip from 'adm-zip';
 // @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { distillPdfDesign } from '@agent/core/media-contracts';
+import { distillPdfDesign, distillPptxDesign } from '@agent/core/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
 
 /**
@@ -23,10 +23,10 @@ export interface ExtractionOptions {
 export interface ExtractionResult {
   file: string;
   layers: {
-    content?: string;      // High-fidelity Markdown/Structure
+    content?: string; // High-fidelity Markdown/Structure
     aesthetic?: Aesthetic; // Design, Layout, Branding
-    metadata?: any;        // Context, Properties
-    raw?: any;             // Lossless protocol / raw passthrough layer
+    metadata?: any; // Context, Properties
+    raw?: any; // Lossless protocol / raw passthrough layer
   };
 }
 
@@ -63,7 +63,7 @@ export interface LayoutElement {
 export async function extract(
   filePath: string,
   mode: ExtractionMode = 'all',
-  options: ExtractionOptions = {},
+  options: ExtractionOptions = {}
 ): Promise<ExtractionResult> {
   const ext = path.extname(filePath).toLowerCase();
   const buffer = safeReadFile(filePath) as Buffer;
@@ -71,7 +71,7 @@ export async function extract(
   const normalizedMode: ExtractionMode = mode === 'raw' ? 'all' : mode;
   const result: ExtractionResult = {
     file: path.basename(filePath),
-    layers: {}
+    layers: {},
   };
 
   try {
@@ -120,7 +120,9 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
   if (mode === 'aesthetic' || mode === 'all') {
     try {
       // Use a governed temp path so extraction stays within Kyberion's write policy.
-      const tmpPath = pathResolver.sharedTmp(`actuators/media-actuator/pdf-extract-${Date.now()}.pdf`);
+      const tmpPath = pathResolver.sharedTmp(
+        `actuators/media-actuator/pdf-extract-${Date.now()}.pdf`
+      );
       let protocol;
       try {
         safeWriteFile(tmpPath, buffer);
@@ -138,10 +140,12 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
       result.layers.aesthetic = {
         fonts: aesthetic?.fonts,
         layout: aesthetic?.layout || 'unknown',
-        elements: aesthetic?.elements?.map(e => ({
+        elements: aesthetic?.elements?.map((e) => ({
           type: e.type,
-          x: e.x, y: e.y,
-          width: e.width, height: e.height,
+          x: e.x,
+          y: e.y,
+          width: e.width,
+          height: e.height,
           text: e.text,
           font_name: e.fontName,
           font_size: e.fontSize,
@@ -174,12 +178,17 @@ async function processDocx(buffer: Buffer, mode: ExtractionMode, result: Extract
   if (mode === 'aesthetic' || mode === 'all') {
     result.layers.aesthetic = {
       layout: 'single-column',
-      branding: { logo_presence: false }
+      branding: { logo_presence: false },
     };
   }
 }
 
-async function processXlsx(filePath: string, mode: ExtractionMode, result: ExtractionResult, opts: { preserveRaw?: boolean } = {}) {
+async function processXlsx(
+  filePath: string,
+  mode: ExtractionMode,
+  result: ExtractionResult,
+  opts: { preserveRaw?: boolean } = {}
+) {
   const protocol = await distillExcelDesign(filePath);
 
   if (opts.preserveRaw) {
@@ -231,23 +240,30 @@ async function processXlsx(filePath: string, mode: ExtractionMode, result: Extra
   }
 }
 
-async function processPptx(filePath: string, mode: ExtractionMode, result: ExtractionResult, opts: { preserveRaw?: boolean } = {}) {
+async function processPptx(
+  filePath: string,
+  mode: ExtractionMode,
+  result: ExtractionResult,
+  opts: { preserveRaw?: boolean } = {}
+) {
   try {
     const buffer = safeReadFile(filePath, { encoding: null }) as Buffer;
     const zip = new AdmZip(buffer);
 
     if (opts.preserveRaw) {
-      result.layers.raw = buffer;
+      result.layers.raw = await distillPptxDesign(filePath);
     }
 
     if (mode === 'content' || mode === 'all') {
       let content = '';
-      const slides = zip.getEntries().filter(e => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/));
+      const slides = zip
+        .getEntries()
+        .filter((e) => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/));
       for (const slide of slides) {
         const xml = slide.getData().toString('utf8');
         const textMatches = xml.match(/<a:t>([^<]*)<\/a:t>/g);
         if (textMatches) {
-          content += textMatches.map(t => t.replace(/<\/?a:t>/g, '')).join(' ') + '\n\n';
+          content += textMatches.map((t) => t.replace(/<\/?a:t>/g, '')).join(' ') + '\n\n';
         }
       }
       result.layers.content = content.trim() || 'No text content found in PowerPoint.';
@@ -272,16 +288,18 @@ async function processPptx(filePath: string, mode: ExtractionMode, result: Extra
         const tsXml = tableStylesEntry.getData().toString('utf8');
         const styleMatches = tsXml.match(/styleName="([^"]+)"/g);
         if (styleMatches) {
-          styleMatches.forEach(m => tableStyles.add(m.replace(/styleName="|"/g, '')));
+          styleMatches.forEach((m) => tableStyles.add(m.replace(/styleName="|"/g, '')));
         }
       }
 
-      const slides = zip.getEntries().filter(e => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/));
+      const slides = zip
+        .getEntries()
+        .filter((e) => e.entryName.match(/^ppt\/slides\/slide\d+\.xml$/));
       for (const slide of slides) {
         const xml = slide.getData().toString('utf8');
         const styleIdMatches = xml.match(/<a:tblStyleId>([^<]+)<\/a:tblStyleId>/g);
         if (styleIdMatches) {
-          styleIdMatches.forEach(m => tableStyles.add(m.replace(/<\/?a:tblStyleId>/g, '')));
+          styleIdMatches.forEach((m) => tableStyles.add(m.replace(/<\/?a:tblStyleId>/g, '')));
         }
       }
 
@@ -299,7 +317,9 @@ async function processPptx(filePath: string, mode: ExtractionMode, result: Extra
 }
 async function processImage(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   if (mode === 'content' || mode === 'all') {
-    const { data: { text } } = await Tesseract.recognize(buffer, 'eng+jpn');
+    const {
+      data: { text },
+    } = await Tesseract.recognize(buffer, 'eng+jpn');
     result.layers.content = text;
   }
   if (mode === 'aesthetic' || mode === 'all') {

@@ -1,19 +1,28 @@
 import AdmZip from 'adm-zip';
-import * as fs from 'fs';
 import * as path from 'path';
+import { safeExistsSync, safeReadFile } from '../../secure-io.js';
 import type { PptxDesignProtocol } from '../types/pptx-protocol.js';
 import { generateContentTypes } from './content-types.js';
-import { generateGlobalRels, generatePresentationRels, generateSlideRels, generateLayoutRels, generateMasterRels } from './rels.js';
+import {
+  generateGlobalRels,
+  generatePresentationRels,
+  generateSlideRels,
+  generateLayoutRels,
+  generateMasterRels,
+} from './rels.js';
 import { generatePresentation } from './presentation.js';
 import { generateTheme } from './theme.js';
 import { buildShape, buildConnector, buildImage, buildTable, buildSmartArt } from './builders.js';
 
-export async function generateNativePptx(protocol: PptxDesignProtocol, outputPath: string): Promise<void> {
+export async function generateNativePptx(
+  protocol: PptxDesignProtocol,
+  outputPath: string
+): Promise<void> {
   if (!protocol?.slides?.length) {
     throw new Error('generateNativePptx: protocol must have at least one slide');
   }
   const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
+  if (!safeExistsSync(dir)) {
     throw new Error(`generateNativePptx: output directory does not exist: ${dir}`);
   }
 
@@ -39,8 +48,8 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
       // Extract original text from raw XML for comparison
       const origTexts = extractTextFromSlideXml(slide.rawSlideXml || '');
       const newTexts = slide.elements
-        .filter(el => el.type === 'text' && el.text)
-        .map(el => el.text!);
+        .filter((el) => el.type === 'text' && el.text)
+        .map((el) => el.text!);
 
       // Build replacement map: original text → new text (for changed entries)
       const textReplacements: { [key: string]: string } = {};
@@ -68,7 +77,7 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
           for (const para of paragraphs) {
             const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
             if (!textParts) continue;
-            const combined = textParts.map(t => t.replace(/<\/?a:t>/g, '')).join('');
+            const combined = textParts.map((t) => t.replace(/<\/?a:t>/g, '')).join('');
             if (combined === escapedOrig) {
               let newPara = para;
               let firstRun = true;
@@ -90,7 +99,10 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
 
       // Write slide rels
       if (slide.rawSlideRelsXml) {
-        zip.addFile(`ppt/slides/_rels/slide${slideNumber}.xml.rels`, Buffer.from(slide.rawSlideRelsXml, 'utf8'));
+        zip.addFile(
+          `ppt/slides/_rels/slide${slideNumber}.xml.rels`,
+          Buffer.from(slide.rawSlideRelsXml, 'utf8')
+        );
       }
     }
 
@@ -118,18 +130,76 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
   }
 
   // 1. Core package files
-  zip.addFile('[Content_Types].xml', Buffer.from(generateContentTypes(slideCount, layoutCount, masterCount, totalDiagrams, totalCharts, totalNotes), 'utf8'));
+  zip.addFile(
+    '[Content_Types].xml',
+    Buffer.from(
+      generateContentTypes(
+        slideCount,
+        layoutCount,
+        masterCount,
+        totalDiagrams,
+        totalCharts,
+        totalNotes
+      ),
+      'utf8'
+    )
+  );
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
-  zip.addFile('docProps/core.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Kyberion Native Presentation</dc:title></cp:coreProperties>`, 'utf8'));
-  zip.addFile('docProps/app.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Kyberion Native PPTX Engine</Application></Properties>`, 'utf8'));
+  zip.addFile(
+    'docProps/core.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Kyberion Native Presentation</dc:title></cp:coreProperties>`,
+      'utf8'
+    )
+  );
+  zip.addFile(
+    'docProps/app.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Kyberion Native PPTX Engine</Application></Properties>`,
+      'utf8'
+    )
+  );
 
   // 2. Presentation Root
-  zip.addFile('ppt/presentation.xml', Buffer.from(generatePresentation(slideCount, masterCount, Math.round(protocol.canvas.w * 914400), Math.round(protocol.canvas.h * 914400), protocol.extensions), 'utf8'));
-  zip.addFile('ppt/_rels/presentation.xml.rels', Buffer.from(generatePresentationRels(slideCount, masterCount), 'utf8'));
-  zip.addFile('ppt/presProps.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:extLst><p:ext uri="{E76CE94A-603C-4142-B9EB-6D1370010A27}"><p14:discardImageEditData xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext></p:extLst></p:presentationPr>`, 'utf8'));
-  zip.addFile('ppt/viewProps.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:normalViewPr><p:restoredLeft sz="15620"/><p:restoredTop sz="94660"/></p:normalViewPr><p:slideViewPr><p:cSldViewPr><p:cViewPr><p:scale><a:sx n="102" d="100"/><a:sy n="102" d="100"/></p:scale><p:origin x="-108" y="-120"/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr><p:notesTextViewPr><p:cViewPr><p:scale><a:sx n="100" d="100"/><a:sy n="100" d="100"/></p:scale><p:origin x="0" y="0"/></p:cViewPr></p:notesTextViewPr><p:gridSpacing cx="76200" cy="76200"/></p:viewPr>`, 'utf8'));
-  zip.addFile('ppt/tableStyles.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`, 'utf8'));
-  
+  zip.addFile(
+    'ppt/presentation.xml',
+    Buffer.from(
+      generatePresentation(
+        slideCount,
+        masterCount,
+        Math.round(protocol.canvas.w * 914400),
+        Math.round(protocol.canvas.h * 914400),
+        protocol.extensions
+      ),
+      'utf8'
+    )
+  );
+  zip.addFile(
+    'ppt/_rels/presentation.xml.rels',
+    Buffer.from(generatePresentationRels(slideCount, masterCount), 'utf8')
+  );
+  zip.addFile(
+    'ppt/presProps.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:extLst><p:ext uri="{E76CE94A-603C-4142-B9EB-6D1370010A27}"><p14:discardImageEditData xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext></p:extLst></p:presentationPr>`,
+      'utf8'
+    )
+  );
+  zip.addFile(
+    'ppt/viewProps.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:normalViewPr><p:restoredLeft sz="15620"/><p:restoredTop sz="94660"/></p:normalViewPr><p:slideViewPr><p:cSldViewPr><p:cViewPr><p:scale><a:sx n="102" d="100"/><a:sy n="102" d="100"/></p:scale><p:origin x="-108" y="-120"/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr><p:notesTextViewPr><p:cViewPr><p:scale><a:sx n="100" d="100"/><a:sy n="100" d="100"/></p:scale><p:origin x="0" y="0"/></p:cViewPr></p:notesTextViewPr><p:gridSpacing cx="76200" cy="76200"/></p:viewPr>`,
+      'utf8'
+    )
+  );
+  zip.addFile(
+    'ppt/tableStyles.xml',
+    Buffer.from(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`,
+      'utf8'
+    )
+  );
+
   // 3. Theme (use raw XML if available for faithful round-trip)
   const themeXml = protocol.rawThemeXml || generateTheme(protocol.theme);
   zip.addFile('ppt/theme/theme1.xml', Buffer.from(themeXml, 'utf8'));
@@ -146,7 +216,10 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
         const num = i + 1;
         zip.addFile(`ppt/slideMasters/slideMaster${num}.xml`, Buffer.from(master.xml, 'utf8'));
         if (master.relsXml) {
-          zip.addFile(`ppt/slideMasters/_rels/slideMaster${num}.xml.rels`, Buffer.from(master.relsXml, 'utf8'));
+          zip.addFile(
+            `ppt/slideMasters/_rels/slideMaster${num}.xml.rels`,
+            Buffer.from(master.relsXml, 'utf8')
+          );
         }
         // Inject associated themes (theme2.xml, theme3.xml, etc. for masters beyond the first)
         if (master.themeXml && num > 1) {
@@ -157,9 +230,15 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
       // Legacy single-master fallback
       zip.addFile('ppt/slideMasters/slideMaster1.xml', Buffer.from(protocol.rawMasterXml, 'utf8'));
       if (protocol.rawMasterRelsXml) {
-        zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(protocol.rawMasterRelsXml, 'utf8'));
+        zip.addFile(
+          'ppt/slideMasters/_rels/slideMaster1.xml.rels',
+          Buffer.from(protocol.rawMasterRelsXml, 'utf8')
+        );
       } else {
-        zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(generateMasterRels(layoutCount), 'utf8'));
+        zip.addFile(
+          'ppt/slideMasters/_rels/slideMaster1.xml.rels',
+          Buffer.from(generateMasterRels(layoutCount), 'utf8')
+        );
       }
     }
 
@@ -167,9 +246,15 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
       const num = i + 1;
       zip.addFile(`ppt/slideLayouts/slideLayout${num}.xml`, Buffer.from(layout.xml, 'utf8'));
       if (layout.relsXml) {
-        zip.addFile(`ppt/slideLayouts/_rels/slideLayout${num}.xml.rels`, Buffer.from(layout.relsXml, 'utf8'));
+        zip.addFile(
+          `ppt/slideLayouts/_rels/slideLayout${num}.xml.rels`,
+          Buffer.from(layout.relsXml, 'utf8')
+        );
       } else {
-        zip.addFile(`ppt/slideLayouts/_rels/slideLayout${num}.xml.rels`, Buffer.from(generateLayoutRels(1), 'utf8'));
+        zip.addFile(
+          `ppt/slideLayouts/_rels/slideLayout${num}.xml.rels`,
+          Buffer.from(generateLayoutRels(1), 'utf8')
+        );
       }
     });
 
@@ -204,7 +289,11 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
         } else {
           // Layout-derived placeholder elements go to layouts, not master
           standardLayoutSpTree += shapeXml;
-          if (el.placeholderType === 'ctrTitle' || el.placeholderType === 'title' || el.placeholderType === 'subTitle') {
+          if (
+            el.placeholderType === 'ctrTitle' ||
+            el.placeholderType === 'title' ||
+            el.placeholderType === 'subTitle'
+          ) {
             titleLayoutSpTree += shapeXml;
           }
         }
@@ -217,7 +306,10 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
             const ext = path.extname(imgPath).toLowerCase() || '.png';
             const targetName = `image${imageCounter}${ext}`;
             const newRId = `rId${masterIdCounter++}`;
-            finalXml = finalXml.replace(new RegExp(`r:embed="${oldRId}"`, 'g'), `r:embed="${newRId}"`);
+            finalXml = finalXml.replace(
+              new RegExp(`r:embed="${oldRId}"`, 'g'),
+              `r:embed="${newRId}"`
+            );
           }
         }
         if (isMasterOnly) masterSpTree += finalXml;
@@ -227,9 +319,15 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
     titleLayoutSpTree += `</p:spTree>`;
     standardLayoutSpTree += `</p:spTree>`;
 
-    const masterBg = protocol.master.bgXml || `<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>`;
-    const masterClrMap = protocol.master.clrMapXml || `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>`;
-    const masterTxStyles = protocol.master.txStylesXml || `<p:txStyles>
+    const masterBg =
+      protocol.master.bgXml ||
+      `<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>`;
+    const masterClrMap =
+      protocol.master.clrMapXml ||
+      `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>`;
+    const masterTxStyles =
+      protocol.master.txStylesXml ||
+      `<p:txStyles>
     <p:titleStyle>
       <a:lvl1pPr algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1">
         <a:lnSpc><a:spcPct val="90000"/></a:lnSpc>
@@ -290,11 +388,20 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
 </p:sldLayout>`;
 
     zip.addFile('ppt/slideMasters/slideMaster1.xml', Buffer.from(masterXml, 'utf8'));
-    zip.addFile('ppt/slideMasters/_rels/slideMaster1.xml.rels', Buffer.from(generateMasterRels(layoutCount), 'utf8'));
+    zip.addFile(
+      'ppt/slideMasters/_rels/slideMaster1.xml.rels',
+      Buffer.from(generateMasterRels(layoutCount), 'utf8')
+    );
     zip.addFile('ppt/slideLayouts/slideLayout1.xml', Buffer.from(titleLayoutXml, 'utf8'));
-    zip.addFile('ppt/slideLayouts/_rels/slideLayout1.xml.rels', Buffer.from(generateLayoutRels(1), 'utf8'));
+    zip.addFile(
+      'ppt/slideLayouts/_rels/slideLayout1.xml.rels',
+      Buffer.from(generateLayoutRels(1), 'utf8')
+    );
     zip.addFile('ppt/slideLayouts/slideLayout2.xml', Buffer.from(standardLayoutXml, 'utf8'));
-    zip.addFile('ppt/slideLayouts/_rels/slideLayout2.xml.rels', Buffer.from(generateLayoutRels(1), 'utf8'));
+    zip.addFile(
+      'ppt/slideLayouts/_rels/slideLayout2.xml.rels',
+      Buffer.from(generateLayoutRels(1), 'utf8')
+    );
   }
 
   // 5. Slides (imageCounter declared here, also used by master raw elements above via hoisting)
@@ -302,15 +409,19 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
   protocol.slides.forEach((slide, sIdx) => {
     const slideNumber = sIdx + 1;
     let slideSpTree = `<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
-    
-    const slideExtras: { id: string, type: string, target: string }[] = [];
+
+    const slideExtras: { id: string; type: string; target: string }[] = [];
     let slideIdCounter = 2;
 
-    slide.elements.forEach(el => {
+    slide.elements.forEach((el) => {
       let rIdLink: string | undefined = undefined;
       if (el.linkTarget) {
         rIdLink = `rId${slideIdCounter++}`;
-        slideExtras.push({ id: rIdLink, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', target: el.linkTarget });
+        slideExtras.push({
+          id: rIdLink,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+          target: el.linkTarget,
+        });
       }
 
       if (el.type === 'shape' || el.type === 'text') {
@@ -324,14 +435,21 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
         const targetName = `image${imageCounter}${ext}`;
         const rId = `rId${slideIdCounter++}`;
 
-        slideExtras.push({ id: rId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image', target: `../media/${targetName}` });
+        slideExtras.push({
+          id: rId,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+          target: `../media/${targetName}`,
+        });
         slideSpTree += buildImage(el, slideIdCounter++, rId, rIdLink);
 
         // Prefer imageData (base64) for lossless round-trip; fall back to imagePath
         if (el.imageData) {
           zip.addFile(`ppt/media/${targetName}`, Buffer.from(el.imageData, 'base64'));
-        } else if (el.imagePath && fs.existsSync(el.imagePath)) {
-          zip.addFile(`ppt/media/${targetName}`, fs.readFileSync(el.imagePath));
+        } else if (el.imagePath && safeExistsSync(el.imagePath)) {
+          zip.addFile(
+            `ppt/media/${targetName}`,
+            safeReadFile(el.imagePath, { encoding: null }) as Buffer
+          );
         }
         imageCounter++;
       } else if (el.type === 'smartart' && el.smartArtData) {
@@ -339,18 +457,47 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
         const loId = `rId${slideIdCounter++}`;
         const qsId = `rId${slideIdCounter++}`;
         const csId = `rId${slideIdCounter++}`;
-        
-        const dNum = diagramCounter++;
-        
-        if (el.smartArtData.dataXml) zip.addFile(`ppt/diagrams/data${dNum}.xml`, Buffer.from(el.smartArtData.dataXml, 'utf8'));
-        if (el.smartArtData.layoutXml) zip.addFile(`ppt/diagrams/layout${dNum}.xml`, Buffer.from(el.smartArtData.layoutXml, 'utf8'));
-        if (el.smartArtData.quickStyleXml) zip.addFile(`ppt/diagrams/quickStyle${dNum}.xml`, Buffer.from(el.smartArtData.quickStyleXml, 'utf8'));
-        if (el.smartArtData.colorsXml) zip.addFile(`ppt/diagrams/colors${dNum}.xml`, Buffer.from(el.smartArtData.colorsXml, 'utf8'));
 
-        slideExtras.push({ id: dmId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData', target: `../diagrams/data${dNum}.xml` });
-        slideExtras.push({ id: loId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout', target: `../diagrams/layout${dNum}.xml` });
-        slideExtras.push({ id: qsId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle', target: `../diagrams/quickStyle${dNum}.xml` });
-        slideExtras.push({ id: csId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors', target: `../diagrams/colors${dNum}.xml` });
+        const dNum = diagramCounter++;
+
+        if (el.smartArtData.dataXml)
+          zip.addFile(`ppt/diagrams/data${dNum}.xml`, Buffer.from(el.smartArtData.dataXml, 'utf8'));
+        if (el.smartArtData.layoutXml)
+          zip.addFile(
+            `ppt/diagrams/layout${dNum}.xml`,
+            Buffer.from(el.smartArtData.layoutXml, 'utf8')
+          );
+        if (el.smartArtData.quickStyleXml)
+          zip.addFile(
+            `ppt/diagrams/quickStyle${dNum}.xml`,
+            Buffer.from(el.smartArtData.quickStyleXml, 'utf8')
+          );
+        if (el.smartArtData.colorsXml)
+          zip.addFile(
+            `ppt/diagrams/colors${dNum}.xml`,
+            Buffer.from(el.smartArtData.colorsXml, 'utf8')
+          );
+
+        slideExtras.push({
+          id: dmId,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData',
+          target: `../diagrams/data${dNum}.xml`,
+        });
+        slideExtras.push({
+          id: loId,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout',
+          target: `../diagrams/layout${dNum}.xml`,
+        });
+        slideExtras.push({
+          id: qsId,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle',
+          target: `../diagrams/quickStyle${dNum}.xml`,
+        });
+        slideExtras.push({
+          id: csId,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors',
+          target: `../diagrams/colors${dNum}.xml`,
+        });
 
         if (el.smartArtData.rels && Object.keys(el.smartArtData.rels).length > 0) {
           let dataRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
@@ -365,14 +512,19 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
       } else if (el.type === 'chart' && el.chartData) {
         const cId = `rId${slideIdCounter++}`;
         const cNum = diagramCounter++; // reuse counter for generic elements
-        
-        if (el.chartData.chartXml) zip.addFile(`ppt/charts/chart${cNum}.xml`, Buffer.from(el.chartData.chartXml, 'utf8'));
+
+        if (el.chartData.chartXml)
+          zip.addFile(`ppt/charts/chart${cNum}.xml`, Buffer.from(el.chartData.chartXml, 'utf8'));
         if (el.chartData.workbookBlob && el.chartData.workbookTarget) {
           const wbPath = `ppt/embeddings/${path.basename(el.chartData.workbookTarget)}`;
           zip.addFile(wbPath, Buffer.from(el.chartData.workbookBlob, 'base64'));
         }
 
-        slideExtras.push({ id: cId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart', target: `../charts/chart${cNum}.xml` });
+        slideExtras.push({
+          id: cId,
+          type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart',
+          target: `../charts/chart${cNum}.xml`,
+        });
 
         if (el.chartData.rels && Object.keys(el.chartData.rels).length > 0) {
           let chartRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
@@ -394,12 +546,22 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
             const ext = path.extname(imgPath).toLowerCase() || '.png';
             const targetName = `image${imageCounter}${ext}`;
             const newRId = `rId${slideIdCounter++}`;
-            
-            slideExtras.push({ id: newRId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image', target: `../media/${targetName}` });
-            finalXml = finalXml.replace(new RegExp(`r:embed="${oldRId}"`, 'g'), `r:embed="${newRId}"`);
-            
-            if (fs.existsSync(imgPath)) {
-              zip.addFile(`ppt/media/${targetName}`, fs.readFileSync(imgPath));
+
+            slideExtras.push({
+              id: newRId,
+              type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+              target: `../media/${targetName}`,
+            });
+            finalXml = finalXml.replace(
+              new RegExp(`r:embed="${oldRId}"`, 'g'),
+              `r:embed="${newRId}"`
+            );
+
+            if (safeExistsSync(imgPath)) {
+              zip.addFile(
+                `ppt/media/${targetName}`,
+                safeReadFile(imgPath, { encoding: null }) as Buffer
+              );
             }
             imageCounter++;
           }
@@ -415,7 +577,7 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
     if (slide.bgXml) {
       bgXml = slide.bgXml;
     } else if (slide.backgroundFill) {
-      bgXml = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${slide.backgroundFill.replace('#','')}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
+      bgXml = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${slide.backgroundFill.replace('#', '')}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
     }
 
     const layoutId = slide.layoutIndex ?? (slideNumber === 1 ? 1 : 2);
@@ -430,12 +592,22 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
 
     if (slide.notesXml) {
       const nId = `rId${slideIdCounter++}`;
-      zip.addFile(`ppt/notesSlides/notesSlide${slideNumber}.xml`, Buffer.from(slide.notesXml, 'utf8'));
-      slideExtras.push({ id: nId, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide', target: `../notesSlides/notesSlide${slideNumber}.xml` });
+      zip.addFile(
+        `ppt/notesSlides/notesSlide${slideNumber}.xml`,
+        Buffer.from(slide.notesXml, 'utf8')
+      );
+      slideExtras.push({
+        id: nId,
+        type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide',
+        target: `../notesSlides/notesSlide${slideNumber}.xml`,
+      });
     }
 
     zip.addFile(`ppt/slides/slide${slideNumber}.xml`, Buffer.from(slideXml, 'utf8'));
-    zip.addFile(`ppt/slides/_rels/slide${slideNumber}.xml.rels`, Buffer.from(generateSlideRels(layoutId, slideExtras), 'utf8'));
+    zip.addFile(
+      `ppt/slides/_rels/slide${slideNumber}.xml.rels`,
+      Buffer.from(generateSlideRels(layoutId, slideExtras), 'utf8')
+    );
   });
 
   zip.writeZip(outputPath);
@@ -460,13 +632,17 @@ export async function generateNativePptx(protocol: PptxDesignProtocol, outputPat
 export function patchPptxParagraphs(
   sourcePath: string,
   outputPath: string,
-  paragraphReplacements: Array<{ original: string; replacement: string; mode?: 'exact' | 'contains' }>,
+  paragraphReplacements: Array<{
+    original: string;
+    replacement: string;
+    mode?: 'exact' | 'contains';
+  }>
 ): { modified_slides: string[]; match_count: number } {
-  if (!fs.existsSync(sourcePath)) {
+  if (!safeExistsSync(sourcePath)) {
     throw new Error(`patchPptxParagraphs: source file does not exist: ${sourcePath}`);
   }
   const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
+  if (!safeExistsSync(dir)) {
     throw new Error(`patchPptxParagraphs: output directory does not exist: ${dir}`);
   }
 
@@ -474,9 +650,9 @@ export function patchPptxParagraphs(
   const modifiedSlides = new Set<string>();
   let matchCount = 0;
 
-  const slideEntries = zip.getEntries().filter(e =>
-    e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'),
-  );
+  const slideEntries = zip
+    .getEntries()
+    .filter((e) => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'));
 
   for (const entry of slideEntries) {
     let xml = entry.getData().toString('utf8');
@@ -486,31 +662,33 @@ export function patchPptxParagraphs(
     for (const para of paragraphs) {
       const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
       if (!textParts || textParts.length === 0) continue;
-      const combined = textParts
-        .map(t => unescapeXml(t.replace(/<\/?a:t>/g, '')))
-        .join('');
+      const combined = textParts.map((t) => unescapeXml(t.replace(/<\/?a:t>/g, ''))).join('');
 
       for (const { original, replacement, mode = 'exact' } of paragraphReplacements) {
         const match =
-          mode === 'exact' ? combined === original :
-          mode === 'contains' ? combined.includes(original) :
-          false;
+          mode === 'exact'
+            ? combined === original
+            : mode === 'contains'
+              ? combined.includes(original)
+              : false;
         if (!match) continue;
 
-        const newCombined = mode === 'contains'
-          ? combined.split(original).join(replacement)
-          : replacement;
+        const newCombined =
+          mode === 'contains' ? combined.split(original).join(replacement) : replacement;
         const escapedNew = escapeXml(newCombined);
 
         let firstRun = true;
         const newPara = para.replace(/<a:t>[^<]*<\/a:t>/g, () => {
-          if (firstRun) { firstRun = false; return `<a:t>${escapedNew}</a:t>`; }
+          if (firstRun) {
+            firstRun = false;
+            return `<a:t>${escapedNew}</a:t>`;
+          }
           return '<a:t></a:t>';
         });
         xml = xml.replace(para, newPara);
         slideModified = true;
         matchCount++;
-        break;  // one replacement per paragraph per pass
+        break; // one replacement per paragraph per pass
       }
     }
 
@@ -532,28 +710,28 @@ export function patchPptxParagraphs(
 export function patchPptxText(
   sourcePath: string,
   outputPath: string,
-  textReplacements: { [original: string]: string },
+  textReplacements: { [original: string]: string }
 ): void {
-  if (!fs.existsSync(sourcePath)) {
+  if (!safeExistsSync(sourcePath)) {
     throw new Error(`patchPptxText: source file does not exist: ${sourcePath}`);
   }
   const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
+  if (!safeExistsSync(dir)) {
     throw new Error(`patchPptxText: output directory does not exist: ${dir}`);
   }
 
   const zip = new AdmZip(sourcePath);
 
   // Build a mapping of escaped XML text for safe replacement
-  const xmlReplacements: { original: string, replacement: string }[] = [];
+  const xmlReplacements: { original: string; replacement: string }[] = [];
   for (const [orig, repl] of Object.entries(textReplacements)) {
     xmlReplacements.push({ original: escapeXml(orig), replacement: escapeXml(repl) });
   }
 
   // Process each slide XML
-  const slideEntries = zip.getEntries().filter(e =>
-    e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml')
-  );
+  const slideEntries = zip
+    .getEntries()
+    .filter((e) => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'));
 
   for (const entry of slideEntries) {
     let xml = entry.getData().toString('utf8');
@@ -578,7 +756,7 @@ export function patchPptxText(
       for (const para of paragraphs) {
         const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
         if (!textParts) continue;
-        const combined = textParts.map(t => t.replace(/<\/?a:t>/g, '')).join('');
+        const combined = textParts.map((t) => t.replace(/<\/?a:t>/g, '')).join('');
         if (combined === escapedOrig) {
           // Replace: keep the first run's formatting, put all text there, empty others
           const escapedRepl = escapeXml(repl);
@@ -638,20 +816,18 @@ function extractTextFromSlideXml(xml: string): string[] {
     if (!txBody) continue;
     const textParts = txBody[0].match(/<a:t>([^<]*)<\/a:t>/g);
     if (!textParts || textParts.length === 0) continue;
-    const combined = textParts
-      .map(t => unescapeXml(t.replace(/<\/?a:t>/g, '')))
-      .join('');
+    const combined = textParts.map((t) => unescapeXml(t.replace(/<\/?a:t>/g, ''))).join('');
     if (combined.trim()) results.push(combined);
   }
   return results;
 }
 
 export interface ExtractedSlide {
-  slide_index: number;        // 1-based, matches slide file name
-  entry_name: string;         // e.g., "ppt/slides/slide4.xml"
-  text_runs: string[];        // every <a:t> text node in document order
-  shapes_text: string[];      // one concatenated string per text-bearing shape
-  concatenated: string;       // all text joined with newlines
+  slide_index: number; // 1-based, matches slide file name
+  entry_name: string; // e.g., "ppt/slides/slide4.xml"
+  text_runs: string[]; // every <a:t> text node in document order
+  shapes_text: string[]; // one concatenated string per text-bearing shape
+  concatenated: string; // all text joined with newlines
 }
 
 /**
@@ -659,12 +835,13 @@ export interface ExtractedSlide {
  * Slide ordering follows the slide{N}.xml numeric suffix.
  */
 export function extractPptxSlides(sourcePath: string): ExtractedSlide[] {
-  if (!fs.existsSync(sourcePath)) {
+  if (!safeExistsSync(sourcePath)) {
     throw new Error(`extractPptxSlides: source file does not exist: ${sourcePath}`);
   }
   const zip = new AdmZip(sourcePath);
-  const slideEntries = zip.getEntries()
-    .filter(e => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'))
+  const slideEntries = zip
+    .getEntries()
+    .filter((e) => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'))
     .sort((a, b) => {
       const aNum = parseInt(a.entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
       const bNum = parseInt(b.entryName.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
@@ -677,8 +854,9 @@ export function extractPptxSlides(sourcePath: string): ExtractedSlide[] {
     const idxMatch = entry.entryName.match(/slide(\d+)\.xml$/);
     const slideIndex = idxMatch ? parseInt(idxMatch[1], 10) : results.length + 1;
 
-    const runs = (xml.match(/<a:t>([^<]*)<\/a:t>/g) || [])
-      .map(t => unescapeXml(t.replace(/<\/?a:t>/g, '')));
+    const runs = (xml.match(/<a:t>([^<]*)<\/a:t>/g) || []).map((t) =>
+      unescapeXml(t.replace(/<\/?a:t>/g, ''))
+    );
     const shapesText = extractTextFromSlideXml(xml);
     const concatenated = shapesText.join('\n');
 
@@ -704,26 +882,26 @@ export function extractPptxSlides(sourcePath: string): ExtractedSlide[] {
 export function filterPptxSlides(
   sourcePath: string,
   outputPath: string,
-  keepIndices: number[],
+  keepIndices: number[]
 ): void {
-  if (!fs.existsSync(sourcePath)) {
+  if (!safeExistsSync(sourcePath)) {
     throw new Error(`filterPptxSlides: source file does not exist: ${sourcePath}`);
   }
   if (!Array.isArray(keepIndices) || keepIndices.length === 0) {
     throw new Error('filterPptxSlides: keepIndices must be a non-empty array of 1-based indices');
   }
   const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) {
+  if (!safeExistsSync(dir)) {
     throw new Error(`filterPptxSlides: output directory does not exist: ${dir}`);
   }
 
   const zip = new AdmZip(sourcePath);
 
   // Locate source slide entries, keyed by original index
-  const slideEntries = zip.getEntries().filter(e =>
-    e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'),
-  );
-  const byIndex = new Map<number, typeof slideEntries[number]>();
+  const slideEntries = zip
+    .getEntries()
+    .filter((e) => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'));
+  const byIndex = new Map<number, (typeof slideEntries)[number]>();
   for (const e of slideEntries) {
     const m = e.entryName.match(/slide(\d+)\.xml$/);
     if (m) byIndex.set(parseInt(m[1], 10), e);
@@ -732,7 +910,9 @@ export function filterPptxSlides(
   // Validate requested indices
   for (const idx of keepIndices) {
     if (!byIndex.has(idx)) {
-      throw new Error(`filterPptxSlides: slide ${idx} not found (source has ${slideEntries.length} slides)`);
+      throw new Error(
+        `filterPptxSlides: slide ${idx} not found (source has ${slideEntries.length} slides)`
+      );
     }
   }
 
@@ -754,8 +934,8 @@ export function filterPptxSlides(
     newRelsEntry: `ppt/slides/_rels/slide${i + 1}.xml.rels`,
   }));
 
-  const keepOldEntries = new Set(plan.map(p => p.oldEntry));
-  const keepOldRels = new Set(plan.map(p => p.oldRelsEntry));
+  const keepOldEntries = new Set(plan.map((p) => p.oldEntry));
+  const keepOldRels = new Set(plan.map((p) => p.oldRelsEntry));
 
   // Snapshot of content we must carry forward, then delete all slide artifacts
   // from the zip before re-inserting with new numbering. We cannot do in-place
@@ -773,7 +953,10 @@ export function filterPptxSlides(
   for (const entry of zip.getEntries()) {
     if (entry.entryName.startsWith('ppt/slides/slide') && entry.entryName.endsWith('.xml')) {
       zip.deleteFile(entry.entryName);
-    } else if (entry.entryName.startsWith('ppt/slides/_rels/slide') && entry.entryName.endsWith('.xml.rels')) {
+    } else if (
+      entry.entryName.startsWith('ppt/slides/_rels/slide') &&
+      entry.entryName.endsWith('.xml.rels')
+    ) {
       zip.deleteFile(entry.entryName);
     }
   }
@@ -792,11 +975,13 @@ export function filterPptxSlides(
   }
   const sldIdEntries = sldIdListMatch[1].match(/<p:sldId[^/]*\/>/g) || [];
   if (sldIdEntries.length < Math.max(...keepIndices)) {
-    throw new Error(`filterPptxSlides: presentation.xml lists ${sldIdEntries.length} slides, insufficient for requested indices`);
+    throw new Error(
+      `filterPptxSlides: presentation.xml lists ${sldIdEntries.length} slides, insufficient for requested indices`
+    );
   }
   // Pick in the user's order, renumber ids to keep them unique-and-monotonic
   let nextId = 256;
-  const newSldIdEntries = keepIndices.map(oldIdx => {
+  const newSldIdEntries = keepIndices.map((oldIdx) => {
     const entry = sldIdEntries[oldIdx - 1];
     const idBump = (nextId++).toString();
     return entry.replace(/\sid="\d+"/, ` id="${idBump}"`);
@@ -821,7 +1006,7 @@ export function filterPptxSlides(
   }
   // Sanity check: every kept slide must have a matching rel entry.
   for (const idx of keepIndices) {
-    if (!slideRels.some(r => r.oldIdx === idx)) {
+    if (!slideRels.some((r) => r.oldIdx === idx)) {
       throw new Error(`filterPptxSlides: presentation.xml.rels has no rel for slide ${idx}`);
     }
   }
@@ -834,10 +1019,12 @@ export function filterPptxSlides(
     const n = parseInt(m.match(/rId(\d+)/)![1], 10);
     if (n > maxRid) maxRid = n;
   }
-  const newSlideRels = plan.map(p => {
-    const ridNum = ++maxRid;
-    return `<Relationship Id="rId${ridNum}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${p.newIdx}.xml"/>`;
-  }).join('');
+  const newSlideRels = plan
+    .map((p) => {
+      const ridNum = ++maxRid;
+      return `<Relationship Id="rId${ridNum}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${p.newIdx}.xml"/>`;
+    })
+    .join('');
   relsXml = relsXml.replace(/<\/Relationships>\s*$/, `${newSlideRels}</Relationships>`);
   zip.updateFile('ppt/_rels/presentation.xml.rels', Buffer.from(relsXml, 'utf8'));
 
@@ -847,12 +1034,17 @@ export function filterPptxSlides(
   const sldIdListMatch2 = presXmlSecond.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/);
   if (sldIdListMatch2) {
     const firstKeptRid = maxRid - plan.length + 1;
-    const updatedEntries = keepIndices.map((_, i) => {
-      const idBump = 256 + i;
-      const rid = `rId${firstKeptRid + i}`;
-      return `<p:sldId id="${idBump}" r:id="${rid}"/>`;
-    }).join('');
-    presXmlSecond = presXmlSecond.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, `<p:sldIdLst>${updatedEntries}</p:sldIdLst>`);
+    const updatedEntries = keepIndices
+      .map((_, i) => {
+        const idBump = 256 + i;
+        const rid = `rId${firstKeptRid + i}`;
+        return `<p:sldId id="${idBump}" r:id="${rid}"/>`;
+      })
+      .join('');
+    presXmlSecond = presXmlSecond.replace(
+      /<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/,
+      `<p:sldIdLst>${updatedEntries}</p:sldIdLst>`
+    );
     zip.updateFile('ppt/presentation.xml', Buffer.from(presXmlSecond, 'utf8'));
   }
 
@@ -862,9 +1054,12 @@ export function filterPptxSlides(
   let ctXml = ctEntry.getData().toString('utf8');
   // Drop every slide Override, then add one per kept slide.
   ctXml = ctXml.replace(/<Override[^>]*PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*\/>/g, '');
-  const slideCt = plan.map(p =>
-    `<Override PartName="/ppt/slides/slide${p.newIdx}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`,
-  ).join('');
+  const slideCt = plan
+    .map(
+      (p) =>
+        `<Override PartName="/ppt/slides/slide${p.newIdx}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+    )
+    .join('');
   ctXml = ctXml.replace(/<\/Types>\s*$/, `${slideCt}</Types>`);
   zip.updateFile('[Content_Types].xml', Buffer.from(ctXml, 'utf8'));
 

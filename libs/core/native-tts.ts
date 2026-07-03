@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Native OS Text-to-Speech wrapper (Phase A-5, voice tier 0).
  *
@@ -94,36 +95,46 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<Spea
     return { ok: false, platform: PLATFORM, command: 'unsupported', error: err };
   }
 
-  return await new Promise<SpeakResult>(resolve => {
+  return await new Promise<SpeakResult>((resolve) => {
     let resolved = false;
     const child = spawn(built.cmd, built.args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
-    child.stderr?.on('data', chunk => { stderr += chunk.toString(); });
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
 
     const timer = setTimeout(() => {
       if (resolved) return;
       resolved = true;
-      try { child.kill('SIGTERM'); } catch (_) { /* ignore */ }
+      try {
+        child.kill('SIGTERM');
+      } catch (_) {
+        /* ignore */
+      }
       const err = `TTS timed out after ${timeoutMs}ms`;
       if (!silent) {
         // Defer the throw to next tick so the caller's await still observes the resolution path.
-        Promise.resolve().then(() => { throw new Error(err); });
+        Promise.resolve().then(() => {
+          throw new Error(err);
+        });
       }
       resolve({ ok: false, platform: PLATFORM, command: built.cmd, error: err });
     }, timeoutMs);
 
-    child.on('error', err => {
+    child.on('error', (err) => {
       if (resolved) return;
       resolved = true;
       clearTimeout(timer);
       const message = err.message;
       if (!silent) {
-        Promise.resolve().then(() => { throw err; });
+        Promise.resolve().then(() => {
+          throw err;
+        });
       }
       resolve({ ok: false, platform: PLATFORM, command: built.cmd, error: message });
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       if (resolved) return;
       resolved = true;
       clearTimeout(timer);
@@ -132,9 +143,17 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<Spea
       } else {
         const err = `${built.cmd} exited ${code}: ${stderr.slice(0, 500)}`;
         if (!silent) {
-          Promise.resolve().then(() => { throw new Error(err); });
+          Promise.resolve().then(() => {
+            throw new Error(err);
+          });
         }
-        resolve({ ok: false, platform: PLATFORM, command: built.cmd, exitCode: code ?? -1, error: err });
+        resolve({
+          ok: false,
+          platform: PLATFORM,
+          command: built.cmd,
+          exitCode: code ?? -1,
+          error: err,
+        });
       }
     });
   });
@@ -148,13 +167,22 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<Spea
  * output is actually working (TTS through SSH / containers / muted speakers
  * will still report "available").
  */
-export async function probeNativeTts(): Promise<{ available: boolean; platform: Platform; command: string; reason?: string }> {
+export async function probeNativeTts(): Promise<{
+  available: boolean;
+  platform: Platform;
+  command: string;
+  reason?: string;
+}> {
   const cmd = (() => {
     switch (PLATFORM) {
-      case 'darwin': return 'say';
-      case 'linux': return 'espeak';
-      case 'win32': return 'powershell';
-      default: return null;
+      case 'darwin':
+        return 'say';
+      case 'linux':
+        return 'espeak';
+      case 'win32':
+        return 'powershell';
+      default:
+        return null;
     }
   })();
   if (!cmd) {
@@ -166,13 +194,13 @@ export async function probeNativeTts(): Promise<{ available: boolean; platform: 
     };
   }
 
-  return await new Promise(resolve => {
+  return await new Promise((resolve) => {
     const probeArgs =
       PLATFORM === 'win32'
         ? ['-NoProfile', '-Command', "Add-Type -AssemblyName System.Speech | Out-Null; 'ok'"]
         : ['--version'];
     const child = spawn(cmd, probeArgs, { stdio: 'ignore' });
-    child.on('error', err => {
+    child.on('error', (err) => {
       resolve({
         available: false,
         platform: PLATFORM,
@@ -183,7 +211,7 @@ export async function probeNativeTts(): Promise<{ available: boolean; platform: 
             : err.message,
       });
     });
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({
         available: code === 0 || code === 1, // some `--version` exit non-zero but binary works
         platform: PLATFORM,

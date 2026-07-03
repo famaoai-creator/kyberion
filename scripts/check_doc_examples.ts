@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Doc Example Check (Phase C'-6)
  *
@@ -36,7 +37,7 @@ const DOCS_DIRS = [path.join(ROOT, 'docs'), path.join(ROOT, 'README.md')];
 interface CodeBlock {
   file: string;
   startLine: number;
-  fence: string;        // the language tag, e.g. "bash check"
+  fence: string; // the language tag, e.g. "bash check"
   body: string;
 }
 
@@ -135,8 +136,7 @@ function main(): void {
   if (listMode) {
     for (const b of allBlocks) {
       const fence = b.fence || '<empty>';
-      const tagged =
-        /(bash|sh)\s+(check|check-syntax|skip)$/i.test(fence) ? '🏷' : '  ';
+      const tagged = /(bash|sh)\s+(check|check-syntax|skip)$/i.test(fence) ? '🏷' : '  ';
       console.log(`${tagged}  ${path.relative(ROOT, b.file)}:${b.startLine}  [${fence}]`);
     }
     console.log(`\nTotal: ${allBlocks.length} code blocks across ${files.length} markdown files.`);
@@ -144,19 +144,23 @@ function main(): void {
   }
 
   const results = allBlocks.map(evaluate);
-  const failed = results.filter(r => r.status === 'failed');
-  const ok = results.filter(r => r.status === 'ok').length;
-  const skipped = results.filter(r => r.status === 'skipped').length;
-  const notTagged = results.filter(r => r.status === 'not-tagged').length;
+  const failed = results.filter((r) => r.status === 'failed');
+  const ok = results.filter((r) => r.status === 'ok').length;
+  const skipped = results.filter((r) => r.status === 'skipped').length;
+  const notTagged = results.filter((r) => r.status === 'not-tagged').length;
 
   console.log(`📚 Doc example check`);
   console.log(`   Files scanned: ${files.length}`);
-  console.log(`   Code blocks:   ${allBlocks.length} (${notTagged} untagged, ${ok} passed, ${skipped} skipped, ${failed.length} failed)`);
+  console.log(
+    `   Code blocks:   ${allBlocks.length} (${notTagged} untagged, ${ok} passed, ${skipped} skipped, ${failed.length} failed)`
+  );
 
   if (failed.length > 0) {
     console.error('\nFailures:');
     for (const f of failed) {
-      console.error(`  ❌ ${path.relative(ROOT, f.block.file)}:${f.block.startLine}  [${f.block.fence}]`);
+      console.error(
+        `  ❌ ${path.relative(ROOT, f.block.file)}:${f.block.startLine}  [${f.block.fence}]`
+      );
       console.error(`     ${f.detail}`);
     }
     process.exit(1);

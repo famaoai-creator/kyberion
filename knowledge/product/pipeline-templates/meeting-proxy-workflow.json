@@ -46,20 +46,18 @@
     },
     {
       "id": "join_session",
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "join_result", "type": "ShellResult" },
+      "role": "sink",
+      "op": "system:log",
       "params": {
-        "cmd": "node libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs --url '{{meeting_url}}' --name '{{display_name}}' --meeting-id '{{meeting_id}}' --passcode '{{passcode}}' --wait {{listen_duration_sec}} --python '{{python_bin}}' --screenshot '{{screenshot_path}}'"
+        "message": "Meeting browser join CLI was retired; instantiate this template with meeting-actuator join_backend=browser-playwright before live use."
       }
     },
     {
       "id": "log_session",
       "role": "sink",
       "op": "system:log",
-      "consumes": "join_result",
       "params": {
-        "message": "✅ Session complete: {{join_result}}"
+        "message": "Meeting join skipped: browser join CLI is retired until this template is instantiated with meeting-actuator."
       }
     },
     {

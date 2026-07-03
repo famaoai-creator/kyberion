@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Audit Forwarder — pluggable publish bridge for the hash-chained audit log.
  * Forwards each AuditEntry to an external SIEM / log-sink after it has been
@@ -51,7 +52,10 @@ export const stubAuditForwarder: AuditForwarder = {
 
 export class ChainAuditForwarder implements AuditForwarder {
   readonly name: string;
-  constructor(private readonly forwarders: AuditForwarder[], name = 'chain') {
+  constructor(
+    private readonly forwarders: AuditForwarder[],
+    name = 'chain'
+  ) {
     this.name = `${name}(${forwarders.map((f) => f.name).join('→')})`;
   }
   async publish(entry: AuditEntry): Promise<void> {
@@ -60,7 +64,7 @@ export class ChainAuditForwarder implements AuditForwarder {
         await f.publish(entry);
       } catch (err: any) {
         logger.warn(
-          `[audit-forwarder:chain] ${f.name} failed for ${entry.id}: ${err?.message ?? err}`,
+          `[audit-forwarder:chain] ${f.name} failed for ${entry.id}: ${err?.message ?? err}`
         );
       }
     }
@@ -81,7 +85,7 @@ export class TenantFilteringAuditForwarder implements AuditForwarder {
   constructor(
     private readonly inner: AuditForwarder,
     private readonly tenantSlugs: string[],
-    private readonly passThroughTenantless: boolean = false,
+    private readonly passThroughTenantless: boolean = false
   ) {
     this.name = `tenant-filter(${tenantSlugs.join(',')}→${inner.name})`;
   }
@@ -168,7 +172,7 @@ export class HttpAuditForwarder implements AuditForwarder {
       });
       if (!response.ok) {
         logger.warn(
-          `[audit-forwarder:http] non-OK ${response.status} for ${entry.id}: ${await response.text().catch(() => '')}`,
+          `[audit-forwarder:http] non-OK ${response.status} for ${entry.id}: ${await response.text().catch(() => '')}`
         );
       }
     } catch (err: any) {
@@ -188,9 +192,7 @@ export class HttpAuditForwarder implements AuditForwarder {
  *                                        KYBERION_AUDIT_FORWARDER_HEADERS
  *                                        as a JSON string of headers)
  */
-export function installAuditForwarderIfAvailable(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function installAuditForwarderIfAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
   const command = env.KYBERION_AUDIT_FORWARDER_COMMAND?.trim();
   const url = env.KYBERION_AUDIT_FORWARDER_URL?.trim();
   const forwarders: AuditForwarder[] = [];
@@ -201,7 +203,7 @@ export function installAuditForwarderIfAvailable(
         ...(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS
           ? { timeoutMs: parseInt(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS, 10) }
           : {}),
-      }),
+      })
     );
   }
   if (url) {
@@ -211,7 +213,9 @@ export function installAuditForwarderIfAvailable(
         headers = JSON.parse(env.KYBERION_AUDIT_FORWARDER_HEADERS);
       }
     } catch (err: any) {
-      logger.warn(`[audit-forwarder] failed to parse KYBERION_AUDIT_FORWARDER_HEADERS: ${err?.message ?? err}`);
+      logger.warn(
+        `[audit-forwarder] failed to parse KYBERION_AUDIT_FORWARDER_HEADERS: ${err?.message ?? err}`
+      );
     }
     forwarders.push(
       new HttpAuditForwarder({
@@ -220,15 +224,15 @@ export function installAuditForwarderIfAvailable(
         ...(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS
           ? { timeoutMs: parseInt(env.KYBERION_AUDIT_FORWARDER_TIMEOUT_MS, 10) }
           : {}),
-      }),
+      })
     );
   }
   if (forwarders.length === 0) return false;
   registerAuditForwarder(
-    forwarders.length === 1 ? forwarders[0] : new ChainAuditForwarder(forwarders),
+    forwarders.length === 1 ? forwarders[0] : new ChainAuditForwarder(forwarders)
   );
   logger.success(
-    `[audit-forwarder] installed ${forwarders.map((f) => f.name).join(' + ')} forwarder`,
+    `[audit-forwarder] installed ${forwarders.map((f) => f.name).join(' + ')} forwarder`
   );
   return true;
 }

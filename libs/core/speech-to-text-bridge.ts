@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Speech-to-Text Bridge — contract for transcribing audio files into text
  * so downstream pipelines (requirements-elicitation etc.) can consume
@@ -79,7 +80,7 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
     if (safeExistsSync(sidecar)) {
       const text = safeReadFile(sidecar, { encoding: 'utf8' }) as string;
       logger.warn(
-        `[stt-bridge:stub] using pre-baked sidecar ${sidecar} — register a real SpeechToTextBridge to decode audio.`,
+        `[stt-bridge:stub] using pre-baked sidecar ${sidecar} — register a real SpeechToTextBridge to decode audio.`
       );
       return {
         text,
@@ -91,7 +92,7 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
     }
     throw new Error(
       `[stt-bridge:stub] no transcript backend registered and no sidecar at ${sidecar}. ` +
-        `Register a ShellSpeechToTextBridge or drop a pre-made transcript next to the audio.`,
+        `Register a ShellSpeechToTextBridge or drop a pre-made transcript next to the audio.`
     );
   },
 };
@@ -134,7 +135,9 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
       maxBuffer: 64 * 1024 * 1024,
     });
     const text = stdout.trim();
-    const outputPath = input.outputPath ? rootResolve(input.outputPath) : defaultTranscriptPath(audioAbs);
+    const outputPath = input.outputPath
+      ? rootResolve(input.outputPath)
+      : defaultTranscriptPath(audioAbs);
     safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
     return {
       text,
@@ -151,7 +154,7 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
  * a real backend was installed; false when the stub remains.
  */
 export function installShellSpeechToTextBridgeIfAvailable(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): boolean {
   const command = env.KYBERION_STT_COMMAND?.trim();
   if (!command) return false;
@@ -161,10 +164,8 @@ export function installShellSpeechToTextBridgeIfAvailable(
       ...(env.KYBERION_STT_TIMEOUT_MS
         ? { timeoutMs: parseInt(env.KYBERION_STT_TIMEOUT_MS, 10) }
         : {}),
-    }),
+    })
   );
-  logger.success(
-    `[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`,
-  );
+  logger.success(`[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`);
   return true;
 }

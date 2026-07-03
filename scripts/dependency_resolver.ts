@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-restricted-imports -- uses child_process for dependency probes; IP-08 will move this to a governed exec wrapper */
 /**
  * Dependency Resolver — Phase A-3 (on-demand pull)
  *
@@ -21,9 +22,11 @@
  */
 
 import { execSync, spawnSync } from 'node:child_process';
-import * as path from 'node:path';
-import * as fs from 'node:fs';
-import { getActuatorDependencyBundle, loadActuatorDependencyBundles, type ActuatorDependencyBundleEntry } from '@agent/core';
+import {
+  getActuatorDependencyBundle,
+  loadActuatorDependencyBundles,
+  type ActuatorDependencyBundleEntry,
+} from '@agent/core';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -96,9 +99,16 @@ const PLAYWRIGHT_BROWSER: Dependency = {
     if (!result.ok) return { ok: false, detail: 'playwright CLI not found' };
     // Check if at least one browser binary exists
     const chromiumResult = tryExec('npx playwright install --dry-run chromium 2>&1');
-    const alreadyInstalled = chromiumResult.stdout.includes('already installed') ||
-      tryExec('ls "$(npx playwright install --dry-run chromium 2>&1 | grep -o \'/.*chromium[^\\n]*\')" 2>/dev/null').ok;
-    return { ok: true, version: result.stdout, detail: alreadyInstalled ? 'installed' : 'may need install' };
+    const alreadyInstalled =
+      chromiumResult.stdout.includes('already installed') ||
+      tryExec(
+        'ls "$(npx playwright install --dry-run chromium 2>&1 | grep -o \'/.*chromium[^\\n]*\')" 2>/dev/null'
+      ).ok;
+    return {
+      ok: true,
+      version: result.stdout,
+      detail: alreadyInstalled ? 'installed' : 'may need install',
+    };
   },
   installCommand: 'pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force',
   installSizeHint: '~200 MB, ~30s',
@@ -175,7 +185,11 @@ const NATIVE_TTS: Dependency = {
       const r = tryExec('which espeak');
       if (r.ok) return { ok: true, version: 'espeak' };
       const r2 = tryExec('which espeak-ng');
-      return { ok: r2.ok, version: r2.ok ? 'espeak-ng' : undefined, detail: r2.ok ? undefined : 'espeak/espeak-ng not found' };
+      return {
+        ok: r2.ok,
+        version: r2.ok ? 'espeak-ng' : undefined,
+        detail: r2.ok ? undefined : 'espeak/espeak-ng not found',
+      };
     } else if (platform === 'win32') {
       return { ok: true, version: 'Windows SAPI (powershell)' };
     }
@@ -272,17 +286,24 @@ export async function resolveDependencies(deps: Dependency[]): Promise<Resolutio
     });
   }
 
-  const mustMissing = reports.filter(r => r.level === 'must' && r.status !== 'ok');
-  const shouldMissing = reports.filter(r => r.level === 'should' && r.status !== 'ok');
-  const niceMissing = reports.filter(r => r.level === 'nice' && r.status !== 'ok');
+  const mustMissing = reports.filter((r) => r.level === 'must' && r.status !== 'ok');
+  const shouldMissing = reports.filter((r) => r.level === 'should' && r.status !== 'ok');
+  const niceMissing = reports.filter((r) => r.level === 'nice' && r.status !== 'ok');
 
-  return { allMustsSatisfied: mustMissing.length === 0, reports, mustMissing, shouldMissing, niceMissing };
+  return {
+    allMustsSatisfied: mustMissing.length === 0,
+    reports,
+    mustMissing,
+    shouldMissing,
+    niceMissing,
+  };
 }
 
 export function formatResolutionReport(result: ResolutionResult): string {
   const lines: string[] = [];
-  const icon = (s: DependencyStatus) => s === 'ok' ? '✓' : '✗';
-  const levelPad = (l: DependencyLevel) => l === 'must' ? 'MUST  ' : l === 'should' ? 'SHOULD' : 'NICE  ';
+  const icon = (s: DependencyStatus) => (s === 'ok' ? '✓' : '✗');
+  const levelPad = (l: DependencyLevel) =>
+    l === 'must' ? 'MUST  ' : l === 'should' ? 'SHOULD' : 'NICE  ';
 
   for (const r of result.reports) {
     const status = `[${icon(r.status)}] ${levelPad(r.level)}  ${r.name}`;
@@ -303,7 +324,9 @@ export function formatResolutionReport(result: ResolutionResult): string {
     lines.push(`⚠  ${result.mustMissing.length} must-have dep(s) missing — actuator cannot start.`);
   } else if (result.shouldMissing.length > 0) {
     lines.push('');
-    lines.push(`⚡ ${result.shouldMissing.length} should-have dep(s) missing — running in degraded mode.`);
+    lines.push(
+      `⚡ ${result.shouldMissing.length} should-have dep(s) missing — running in degraded mode.`
+    );
   } else {
     lines.push('');
     lines.push('✓ All required dependencies satisfied.');
@@ -322,7 +345,9 @@ async function main() {
 
   const deps = ACTUATOR_DEPS[actuator ?? 'all'];
   if (!deps) {
-    console.error(`Unknown actuator: ${actuator}. Available: ${Object.keys(ACTUATOR_DEPS).join(', ')}`);
+    console.error(
+      `Unknown actuator: ${actuator}. Available: ${Object.keys(ACTUATOR_DEPS).join(', ')}`
+    );
     process.exit(1);
   }
 

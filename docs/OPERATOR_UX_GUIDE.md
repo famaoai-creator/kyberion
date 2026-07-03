@@ -123,6 +123,16 @@ Use `pnpm setup:report` when you want a consolidated readiness view across surfa
 
 `pnpm doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 
+`pnpm doctor` also reports the pipeline schedule registry maintained by Chronos. For the volatile memory layer, expect these scheduled entries after `node dist/scripts/chronos_daemon.js` has started at least once:
+
+| Schedule                |          Cadence | Purpose                                                                                |
+| ----------------------- | ---------------: | -------------------------------------------------------------------------------------- |
+| `volatile-gc-daily`     |  Daily 04:00 JST | Expire and roll over volatile working-memory faces.                                    |
+| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, data-vault, and runtime retention directories. |
+| `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                  |
+| `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                   |
+| `weekly-review`         | Monday 07:00 JST | Open weekly review and nominate promotion candidates.                                  |
+
 Typical managed entries include:
 
 - `slack-bridge`

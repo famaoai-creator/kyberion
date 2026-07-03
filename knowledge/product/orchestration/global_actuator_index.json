@@ -1,7 +1,7 @@
 {
   "v": "2.0.0",
   "t": 29,
-  "u": "2026-06-24T01:45:25.658Z",
+  "u": "2026-07-02T15:44:26.721Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -10,7 +10,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 6,
-      "contract_schema": "schemas/agent-action.schema.json"
+      "contract_schema": "schemas/agent-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "android-actuator",
@@ -19,7 +20,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 1,
-      "contract_schema": "schemas/mobile-device-pipeline.schema.json"
+      "contract_schema": "schemas/mobile-device-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "approval-actuator",
@@ -28,7 +30,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 4,
-      "contract_schema": "schemas/approval-action.schema.json"
+      "contract_schema": "schemas/approval-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "artifact-actuator",
@@ -37,7 +40,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 4,
-      "contract_schema": "schemas/artifact-action.schema.json"
+      "contract_schema": "schemas/artifact-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "blockchain-actuator",
@@ -46,7 +50,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 2,
-      "contract_schema": "schemas/blockchain-action.schema.json"
+      "contract_schema": "schemas/blockchain-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "browser-actuator",
@@ -55,7 +60,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 2,
-      "contract_schema": "schemas/browser-pipeline.schema.json"
+      "contract_schema": "schemas/browser-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "calendar-actuator",
@@ -64,7 +70,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 3,
-      "contract_schema": "schemas/calendar-action.schema.json"
+      "contract_schema": "schemas/calendar-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "code-actuator",
@@ -73,7 +80,8 @@
       "s": "implemented",
       "version": "2.2.0",
       "capability_count": 3,
-      "contract_schema": "schemas/code-pipeline.schema.json"
+      "contract_schema": "schemas/code-pipeline.schema.json",
+      "prerequisites_summary": "bin:semgrep, os:darwin, os:linux"
     },
     {
       "n": "email-actuator",
@@ -82,7 +90,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 3,
-      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json"
+      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "file-actuator",
@@ -91,7 +100,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 1,
-      "contract_schema": "schemas/file-pipeline.schema.json"
+      "contract_schema": "schemas/file-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "ios-actuator",
@@ -100,7 +110,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 1,
-      "contract_schema": "schemas/mobile-device-pipeline.schema.json"
+      "contract_schema": "schemas/mobile-device-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "media-actuator",
@@ -109,7 +120,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 1,
-      "contract_schema": "schemas/media-pipeline.schema.json"
+      "contract_schema": "schemas/media-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "media-generation-actuator",
@@ -118,7 +130,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 10,
-      "contract_schema": "schemas/media-generation-action.schema.json"
+      "contract_schema": "schemas/media-generation-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "meeting-actuator",
@@ -127,7 +140,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 6,
-      "contract_schema": "schemas/meeting-action.schema.json"
+      "contract_schema": "schemas/meeting-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "meeting-browser-driver",
@@ -135,7 +149,8 @@
       "d": "Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus.",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 2
+      "capability_count": 2,
+      "prerequisites_summary": "-"
     },
     {
       "n": "modeling-actuator",
@@ -144,7 +159,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 2,
-      "contract_schema": "schemas/modeling-pipeline.schema.json"
+      "contract_schema": "schemas/modeling-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "network-actuator",
@@ -153,7 +169,8 @@
       "s": "implemented",
       "version": "2.2.0",
       "capability_count": 1,
-      "contract_schema": "schemas/network-pipeline.schema.json"
+      "contract_schema": "schemas/network-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "orchestrator-actuator",
@@ -162,7 +179,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 2,
-      "contract_schema": "schemas/orchestrator-pipeline.schema.json"
+      "contract_schema": "schemas/orchestrator-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "presence-actuator",
@@ -171,7 +189,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 3,
-      "contract_schema": "schemas/presence-action.schema.json"
+      "contract_schema": "schemas/presence-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "process-actuator",
@@ -180,7 +199,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 4,
-      "contract_schema": "schemas/process-action.schema.json"
+      "contract_schema": "schemas/process-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "secret-actuator",
@@ -189,7 +209,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 4,
-      "contract_schema": "schemas/secret-action.schema.json"
+      "contract_schema": "schemas/secret-action.schema.json",
+      "prerequisites_summary": "bin:security"
     },
     {
       "n": "service-actuator",
@@ -198,7 +219,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 7,
-      "contract_schema": "schemas/service-action.schema.json"
+      "contract_schema": "schemas/service-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "system-actuator",
@@ -207,7 +229,8 @@
       "s": "implemented",
       "version": "1.2.0",
       "capability_count": 16,
-      "contract_schema": "schemas/system-pipeline.schema.json"
+      "contract_schema": "schemas/system-pipeline.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "terminal-actuator",
@@ -216,7 +239,8 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 5,
-      "contract_schema": "schemas/terminal-action.schema.json"
+      "contract_schema": "schemas/terminal-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "video-composition-actuator",
@@ -224,7 +248,8 @@
       "d": "Governed deterministic composed-video bundle preparation actuator",
       "s": "implemented",
       "version": "1.1.0",
-      "capability_count": 9
+      "capability_count": 9,
+      "prerequisites_summary": "-"
     },
     {
       "n": "vision-actuator",
@@ -233,7 +258,8 @@
       "s": "implemented",
       "version": "1.3.0",
       "capability_count": 2,
-      "contract_schema": "schemas/vision-action.schema.json"
+      "contract_schema": "schemas/vision-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "voice-actuator",
@@ -242,7 +268,8 @@
       "s": "implemented",
       "version": "1.2.0",
       "capability_count": 8,
-      "contract_schema": "schemas/voice-action.schema.json"
+      "contract_schema": "schemas/voice-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "wisdom-actuator",
@@ -251,7 +278,8 @@
       "s": "implemented",
       "version": "1.2.1",
       "capability_count": 33,
-      "contract_schema": "schemas/wisdom-action.schema.json"
+      "contract_schema": "schemas/wisdom-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "working-memory-actuator",
@@ -260,7 +288,8 @@
       "s": "implemented",
       "version": "1.1.0",
       "capability_count": 14,
-      "contract_schema": "schemas/working-memory-action.schema.json"
+      "contract_schema": "schemas/working-memory-action.schema.json",
+      "prerequisites_summary": "-"
     }
   ]
 }

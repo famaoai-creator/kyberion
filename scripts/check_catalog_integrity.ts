@@ -1,6 +1,12 @@
 import * as AjvModule from 'ajv';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
+import {
+  loadActuatorManifestCatalog,
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+} from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
@@ -72,12 +78,17 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
   const ok = validate(data);
   if (!ok) {
     for (const error of validate.errors || []) {
-      violations.push(`${check.id}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      violations.push(
+        `${check.id}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+      );
     }
   }
 
   if (check.id === 'service-endpoints') {
-    const typed = data as { default_pattern?: string; services?: Record<string, { base_url?: string; intent_aliases?: string[] }> };
+    const typed = data as {
+      default_pattern?: string;
+      services?: Record<string, { base_url?: string; intent_aliases?: string[] }>;
+    };
     const services = typed.services || {};
     if (Object.keys(services).length === 0) {
       violations.push('service-endpoints: services must not be empty');
@@ -89,7 +100,9 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       return;
     }
 
-    const fileNames = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+    const fileNames = safeReaddir(directory)
+      .filter((entry) => entry.endsWith('.json'))
+      .sort();
     if (fileNames.length === 0) {
       violations.push('service-endpoints: canonical directory is empty');
       return;
@@ -98,12 +111,17 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
     const directoryServiceIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { default_pattern?: string; services?: Record<string, unknown> };
+      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+        default_pattern?: string;
+        services?: Record<string, unknown>;
+      };
       const snapshotServices = typed.services || {};
       const payloadValidate = ajv.compile(schema);
       if (!payloadValidate(payload)) {
         for (const error of payloadValidate.errors || []) {
-          violations.push(`service-endpoints: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+          violations.push(
+            `service-endpoints: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`
+          );
         }
       }
       const payloadServices = payload.services || {};
@@ -120,7 +138,9 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
         violations.push(`service-endpoints: ${fileName} default_pattern must match the snapshot`);
       }
       const snapshotAliasList = snapshotServices[serviceId]?.intent_aliases || [];
-      const payloadAliasList = (payloadServices[serviceId] as { intent_aliases?: string[] } | undefined)?.intent_aliases || [];
+      const payloadAliasList =
+        (payloadServices[serviceId] as { intent_aliases?: string[] } | undefined)?.intent_aliases ||
+        [];
       if (JSON.stringify(snapshotAliasList) !== JSON.stringify(payloadAliasList)) {
         violations.push(`service-endpoints: ${fileName} intent_aliases must match the snapshot`);
       }
@@ -179,7 +199,9 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
     for (const [domainName, domainEntries] of Object.entries(domains)) {
       for (const [entryKey, localized] of Object.entries(domainEntries || {})) {
         if (!localized[defaultLocale]) {
-          violations.push(`user-facing-vocabulary: ${domainName}.${entryKey} must define the default locale "${defaultLocale}"`);
+          violations.push(
+            `user-facing-vocabulary: ${domainName}.${entryKey} must define the default locale "${defaultLocale}"`
+          );
         }
       }
     }
@@ -198,7 +220,9 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
       return;
     }
 
-    const fileNames = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+    const fileNames = safeReaddir(directory)
+      .filter((entry) => entry.endsWith('.json'))
+      .sort();
     if (fileNames.length === 0) {
       violations.push('specialist-catalog: canonical directory is empty');
       return;
@@ -207,11 +231,16 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
     const directoryIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as { version?: string; specialists?: Record<string, unknown> };
+      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+        version?: string;
+        specialists?: Record<string, unknown>;
+      };
       const payloadValidate = ajv.compile(schema);
       if (!payloadValidate(payload)) {
         for (const error of payloadValidate.errors || []) {
-          violations.push(`specialist-catalog: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+          violations.push(
+            `specialist-catalog: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`
+          );
         }
       }
       const payloadSpecialists = payload.specialists || {};
@@ -236,11 +265,41 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
   }
 }
 
+function validateCapabilitiesGuideDrift(violations: string[]) {
+  const guidePath = pathResolver.rootResolve('CAPABILITIES_GUIDE.md');
+  if (!safeExistsSync(guidePath)) {
+    violations.push('capabilities-guide: CAPABILITIES_GUIDE.md is missing');
+    return;
+  }
+  const guide = safeReadFile(guidePath, { encoding: 'utf8' }) as string;
+  const catalog = loadActuatorManifestCatalog();
+  const totalMatch = guide.match(/Total Actuators:\s*(\d+)/u);
+  const guideTotal = totalMatch ? Number(totalMatch[1]) : NaN;
+  if (guideTotal !== catalog.length) {
+    violations.push(
+      `capabilities-guide: Total Actuators mismatch (${guideTotal} !== ${catalog.length})`
+    );
+  }
+  if (
+    !guide.includes(
+      '| Actuator | Description | Version | Ops | Prerequisites | Contract Schema | Path |'
+    )
+  ) {
+    violations.push('capabilities-guide: generated table must include Prerequisites column');
+  }
+  for (const entry of catalog) {
+    if (!guide.includes(`\`${entry.n}\``)) {
+      violations.push(`capabilities-guide: missing actuator ${entry.n}`);
+    }
+  }
+}
+
 function main() {
   const violations: string[] = [];
   for (const check of CHECKS) {
     validateCatalog(check, violations);
   }
+  validateCapabilitiesGuideDrift(violations);
 
   if (violations.length > 0) {
     console.error('[check:catalogs] violations detected:');

@@ -19,11 +19,21 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeReadFile,
   safeRmSync,
+  safeWriteFile,
 } from '@agent/core';
 import { loadState, saveState } from './mission-state.js';
-import { readTrustLedger, recordAgentRuntimeEvent, updateTrustScore, validateMissionQuality } from './mission-governance.js';
-import { emitMissionLifecycleIntentSnapshot, evaluateMissionIntentDrift } from './mission-intent-delta.js';
+import {
+  readTrustLedger,
+  recordAgentRuntimeEvent,
+  updateTrustScore,
+  validateMissionQuality,
+} from './mission-governance.js';
+import {
+  emitMissionLifecycleIntentSnapshot,
+  evaluateMissionIntentDrift,
+} from './mission-intent-delta.js';
 
 function collectMissionEvidenceRefs(missionDir: string): string[] {
   const evidenceDir = path.join(missionDir, 'evidence');
@@ -33,11 +43,86 @@ function collectMissionEvidenceRefs(missionDir: string): string[] {
     .map((entry) => path.join(missionDir, 'evidence', entry));
 }
 
+function sidecarPathForMarkdown(mdPath: string): string {
+  return mdPath.endsWith('.md')
+    ? mdPath.slice(0, -3) + '.volatile.json'
+    : `${mdPath}.volatile.json`;
+}
+
+function extractPromotableMissionMemory(raw: string): string | null {
+  const lines = raw.split(/\r?\n/u);
+  const collected: string[] = [];
+  let capturing = false;
+
+  for (const line of lines) {
+    if (/^##\s+(Decisions|Lessons Learned)\s*$/iu.test(line.trim())) {
+      capturing = true;
+      continue;
+    }
+    if (capturing && /^##\s+/u.test(line.trim())) {
+      capturing = false;
+    }
+    if (capturing && line.trim() && !/^<!--.*-->$/u.test(line.trim())) {
+      collected.push(line.trim());
+    }
+  }
+
+  const summary = collected.join('\n').trim();
+  return summary ? summary.slice(0, 1200) : null;
+}
+
+function updateMissionMemorySidecar(mdPath: string, candidateId: string): void {
+  const sidecarPath = sidecarPathForMarkdown(mdPath);
+  if (!safeExistsSync(sidecarPath)) return;
+  const sidecar = JSON.parse(safeReadFile(sidecarPath, { encoding: 'utf8' }) as string) as Record<
+    string,
+    unknown
+  >;
+  safeWriteFile(
+    sidecarPath,
+    JSON.stringify(
+      {
+        ...sidecar,
+        promotion_candidate_id: candidateId,
+        status: 'promoted',
+        updated_at: new Date().toISOString(),
+      },
+      null,
+      2
+    )
+  );
+}
+
+function maybeRunVolatileGc(
+  upperId: string,
+  traceCtx: ReturnType<typeof createActuatorTrace>
+): void {
+  try {
+    const runnerPath = pathResolver.rootResolve('dist/scripts/run_pipeline.js');
+    if (!safeExistsSync(runnerPath)) {
+      logger.warn(
+        `⚠️ [VOLATILE_GC] skipped for ${upperId}: dist/scripts/run_pipeline.js not found.`
+      );
+      traceCtx.addEvent('volatile_gc.skipped', { reason: 'runner_not_built' });
+      return;
+    }
+    traceCtx.startSpan('mission:volatile-gc');
+    safeExec(process.execPath, [runnerPath, '--input', 'pipelines/volatile-gc.json'], {
+      cwd: pathResolver.rootDir(),
+      timeoutMs: 120000,
+    });
+    traceCtx.endSpan('ok');
+  } catch (err: any) {
+    logger.warn(`⚠️ [VOLATILE_GC] skipped for ${upperId}: ${err?.message || err}`);
+    traceCtx.endSpan('error', err?.message || String(err));
+  }
+}
+
 export async function delegateMission(
   id: string,
   agentId: string,
   a2aMessageId: string,
-  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>,
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>
 ): Promise<void> {
   if (!id || !agentId || !a2aMessageId) {
     logger.error('Usage: mission_controller delegate <MISSION_ID> <AGENT_ID> <A2A_MESSAGE_ID>');
@@ -52,8 +137,14 @@ export async function delegateMission(
 
   const trustLedger = readTrustLedger();
   const agent = trustLedger[agentId];
-  if (agent && agent.current_score < 300 && (state.tier === 'personal' || state.tier === 'confidential')) {
-    throw new Error(`CRITICAL: Agent ${agentId} has insufficient trust score (${agent.current_score}) for ${state.tier} tier mission.`);
+  if (
+    agent &&
+    agent.current_score < 300 &&
+    (state.tier === 'personal' || state.tier === 'confidential')
+  ) {
+    throw new Error(
+      `CRITICAL: Agent ${agentId} has insufficient trust score (${agent.current_score}) for ${state.tier} tier mission.`
+    );
   }
 
   logger.info(`📤 Delegating Mission ${upperId} to agent ${agentId}...`);
@@ -81,7 +172,7 @@ export async function importMission(
   id: string,
   remoteUrl: string,
   transitionStatus: (current: string, next: string) => any,
-  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>,
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>
 ): Promise<void> {
   if (!id || !remoteUrl) {
     logger.error('Usage: mission_controller import <MISSION_ID> <REMOTE_URL>');
@@ -134,7 +225,7 @@ export async function verifyMission(
   result: 'verified' | 'rejected',
   note: string,
   transitionStatus: (current: string, next: string) => any,
-  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>,
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>
 ): Promise<void> {
   if (!id || !result || !['verified', 'rejected'].includes(result)) {
     logger.error('Usage: mission_controller verify <MISSION_ID> <verified|rejected> <note>');
@@ -148,7 +239,9 @@ export async function verifyMission(
   }
 
   if (state.status !== 'active' && state.status !== 'validating') {
-    logger.error(`❌ Cannot verify mission ${upperId} (status: ${state.status}). Only active or validating missions can be verified.`);
+    logger.error(
+      `❌ Cannot verify mission ${upperId} (status: ${state.status}). Only active or validating missions can be verified.`
+    );
     return;
   }
 
@@ -192,7 +285,7 @@ export async function finishMission(
     sealMission: (missionId: string) => Promise<string | undefined>;
     syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
     transitionStatus: (current: string, next: string) => any;
-  },
+  }
 ): Promise<void> {
   if (!id) {
     logger.error('Usage: mission_controller finish <MISSION_ID> [--seal]');
@@ -216,7 +309,9 @@ export async function finishMission(
       paused: 'Run "start" to resume, then complete the lifecycle.',
       failed: 'Run "start" to retry, then complete the lifecycle.',
     };
-    logger.error(`❌ Cannot finish mission ${upperId} (status: ${preState.status}). ${steps[preState.status] || ''}`);
+    logger.error(
+      `❌ Cannot finish mission ${upperId} (status: ${preState.status}). ${steps[preState.status] || ''}`
+    );
     return;
   }
 
@@ -234,7 +329,9 @@ export async function finishMission(
 
   const quality = await validateMissionQuality(upperId);
   if (!quality.ok) {
-    logger.error(`❌ [QUALITY_REJECTION] Mission ${upperId} does not meet governance requirements: ${quality.reason}`);
+    logger.error(
+      `❌ [QUALITY_REJECTION] Mission ${upperId} does not meet governance requirements: ${quality.reason}`
+    );
     return;
   }
 
@@ -275,7 +372,11 @@ export async function finishMission(
   if (state.status !== 'completed') {
     traceCtx.startSpan('mission:complete-state');
     state.status = args.transitionStatus(state.status, 'completed');
-    state.history.push({ ts: new Date().toISOString(), event: 'FINISH', note: 'Mission completed.' });
+    state.history.push({
+      ts: new Date().toISOString(),
+      event: 'FINISH',
+      note: 'Mission completed.',
+    });
     traceCtx.endSpan('ok');
   }
   traceCtx.startSpan('mission:evidence');
@@ -295,22 +396,40 @@ export async function finishMission(
 
   try {
     traceCtx.startSpan('mission:memory-promotion');
+    const memoryPath = path.join(
+      pathResolver.volatile('mission', upperId, { tier: state.tier }),
+      'MEMORY.md'
+    );
+    const memorySummary = safeExistsSync(memoryPath)
+      ? extractPromotableMissionMemory(safeReadFile(memoryPath, { encoding: 'utf8' }) as string)
+      : null;
+    const memoryEvidenceRefs = memorySummary ? [...evidenceRefs, memoryPath] : evidenceRefs;
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: upperId,
       missionType: state.mission_type,
       tier: state.tier,
-      summary: state.outcome_contract?.requested_result || `Mission ${upperId} completed and yielded reusable operational memory.`,
-      evidenceRefs,
+      summary:
+        memorySummary ||
+        state.outcome_contract?.requested_result ||
+        `Mission ${upperId} completed and yielded reusable operational memory.`,
+      evidenceRefs: memoryEvidenceRefs,
     });
-    logger.info(`🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`);
+    if (memorySummary) updateMissionMemorySidecar(memoryPath, queued.candidate_id);
+    logger.info(
+      `🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`
+    );
     traceCtx.endSpan('ok');
   } catch (err: any) {
     logger.warn(`⚠️ [MEMORY_PROMOTION] queue skipped for ${upperId}: ${err?.message || err}`);
     traceCtx.endSpan('error', err?.message || String(err));
   }
 
+  maybeRunVolatileGc(upperId, traceCtx);
+
   if (!ledger.verifyIntegrity()) {
-    logger.warn(`⚠️ [LEDGER_INTEGRITY] Global ledger integrity check failed for mission ${upperId}. The ledger may be corrupted — review ${upperId} audit trail before relying on it.`);
+    logger.warn(
+      `⚠️ [LEDGER_INTEGRITY] Global ledger integrity check failed for mission ${upperId}. The ledger may be corrupted — review ${upperId} audit trail before relying on it.`
+    );
     traceCtx.addEvent('ledger.integrity_failed');
   }
 
@@ -347,7 +466,11 @@ export async function finishMission(
   traceCtx.endSpan('ok');
 
   state.status = args.transitionStatus(state.status, 'archived');
-  state.history.push({ ts: new Date().toISOString(), event: 'ARCHIVE', note: `Mission archived to ${archivePath}.` });
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'ARCHIVE',
+    note: `Mission archived to ${archivePath}.`,
+  });
   await saveState(upperId, state);
   traceCtx.endSpan('ok');
   const traceResult = finalizeActuatorTrace(traceCtx);
@@ -360,7 +483,11 @@ export async function finishMission(
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
 
-export async function grantMissionAccess(missionId: string, serviceId: string, ttl = 30): Promise<void> {
+export async function grantMissionAccess(
+  missionId: string,
+  serviceId: string,
+  ttl = 30
+): Promise<void> {
   const upperId = missionId.toUpperCase();
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
@@ -380,8 +507,12 @@ export async function grantMissionSudo(missionId: string, on = true, ttl = 15): 
       agentId: 'mission_controller',
       correlationId: `${upperId}:SUDO`,
     });
-    logger.warn(`⚠️ [SUDO] Full system authority granted to mission ${upperId} for ${ttl} minutes!`);
+    logger.warn(
+      `⚠️ [SUDO] Full system authority granted to mission ${upperId} for ${ttl} minutes!`
+    );
   } else {
-    logger.info('[SUDO] Sudo will expire naturally or can be revoked by clearing auth-grants.json.');
+    logger.info(
+      '[SUDO] Sudo will expire naturally or can be revoked by clearing auth-grants.json.'
+    );
   }
 }

@@ -1,10 +1,14 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { loadReasoningLevelPolicy, resetReasoningLevelPolicyCache } from './reasoning-level-policy.js';
+import {
+  loadReasoningLevelPolicy,
+  resetReasoningLevelPolicyCache,
+} from './reasoning-level-policy.js';
 import {
   loadModelRegistry,
   resetReasoningModelRoutingCache,
   resolveReasoningModelRoute,
+  resolveRuntimeModelId,
 } from './reasoning-model-routing.js';
 
 describe('reasoning-model-routing', () => {
@@ -26,9 +30,9 @@ describe('reasoning-model-routing', () => {
           policy_version: policy.version,
           advisory: true,
         },
-        { policy, registry },
-      ).recommended_model_id,
-    ).toBe('openai:gpt-5.4');
+        { policy, registry }
+      ).recommended_model_id
+    ).toBe('openai:gpt-5.5');
 
     expect(
       resolveReasoningModelRoute(
@@ -39,9 +43,9 @@ describe('reasoning-model-routing', () => {
           policy_version: policy.version,
           advisory: true,
         },
-        { policy, registry },
-      ).recommended_model_id,
-    ).toBe('openai:gpt-5.4');
+        { policy, registry }
+      ).recommended_model_id
+    ).toBe('openai:gpt-5.5');
 
     expect(
       resolveReasoningModelRoute(
@@ -52,8 +56,8 @@ describe('reasoning-model-routing', () => {
           policy_version: policy.version,
           advisory: true,
         },
-        { policy, registry },
-      ).recommended_model_id,
+        { policy, registry }
+      ).recommended_model_id
     ).toBe('openai:gpt-5.4-mini');
 
     expect(
@@ -65,8 +69,8 @@ describe('reasoning-model-routing', () => {
           policy_version: policy.version,
           advisory: true,
         },
-        { policy, registry },
-      ).recommended_model_id,
+        { policy, registry }
+      ).recommended_model_id
     ).toBeNull();
   });
 
@@ -99,11 +103,29 @@ describe('reasoning-model-routing', () => {
         policy_version: policy.version,
         advisory: true,
       },
-      { policy, registry },
+      { policy, registry }
     );
 
     expect(route.recommended_model_id).toBe('openai:gpt-5.4');
     expect(route.route_kind).toBe('primary');
     expect(route.route_reason).toMatch(/fell back/i);
+  });
+
+  it('centralizes runtime model defaults and respects env overrides', () => {
+    expect(resolveRuntimeModelId('anthropic-default', {})).toBe('claude-opus-4-8');
+    expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.5-flash');
+    expect(resolveRuntimeModelId('openai-vision', {})).toBe('gpt-5.5');
+    expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.5');
+
+    expect(
+      resolveRuntimeModelId('anthropic-default', {
+        KYBERION_ANTHROPIC_MODEL: ' claude-fable-5 ',
+      })
+    ).toBe('claude-fable-5');
+    expect(
+      resolveRuntimeModelId('gemini-default', {
+        KYBERION_GEMINI_MODEL: 'gemini-custom',
+      })
+    ).toBe('gemini-custom');
   });
 });

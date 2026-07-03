@@ -22,20 +22,54 @@ interface ReconcileResult {
   proposals_written: { miss_type: string; key: string; proposal_path: string }[];
   skipped: { miss_type: string; key: string; reason: string }[];
   total_unreconciled: number;
+  top_unreconciled: null | {
+    miss_type: string;
+    key: string;
+    occurrence_count: number;
+    utterance_sample: string;
+  };
+  summary_line: string;
 }
 
 const PROPOSALS_RELATIVE = path.join('active', 'shared', 'tmp', 'unhandled-intent-proposals');
+const SUMMARY_RELATIVE = path.join(
+  'active',
+  'shared',
+  'tmp',
+  'unhandled-intent-last-run.summary.txt'
+);
 
 function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 60).replace(/^_|_$/g, '');
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .slice(0, 60)
+    .replace(/^_|_$/g, '');
 }
 
 function run(): void {
-  const entries = listUnhandledIntents().filter(e => !e.reconciled);
+  const entries = listUnhandledIntents().filter((e) => !e.reconciled);
+  const top =
+    entries.slice().sort((a, b) => {
+      const countDiff = (b.occurrence_count || 0) - (a.occurrence_count || 0);
+      if (countDiff !== 0) return countDiff;
+      return String(a.last_seen || '').localeCompare(String(b.last_seen || ''));
+    })[0] || null;
   const result: ReconcileResult = {
     proposals_written: [],
     skipped: [],
     total_unreconciled: entries.length,
+    top_unreconciled: top
+      ? {
+          miss_type: top.miss_type,
+          key: top.intent_id ?? top.utterance_samples[0] ?? 'unknown',
+          occurrence_count: top.occurrence_count,
+          utterance_sample: top.utterance_samples[0] ?? '',
+        }
+      : null,
+    summary_line: top
+      ? `[UNHANDLED-INTENT] unreconciled=${entries.length} top=${top.intent_id ?? top.utterance_samples[0] ?? 'unknown'} (${top.occurrence_count})`
+      : '[UNHANDLED-INTENT] unreconciled=0 top=none',
   };
 
   const absProposalsDir = path.join(pathResolver.rootDir(), PROPOSALS_RELATIVE);
@@ -44,13 +78,14 @@ function run(): void {
     writeProposal(entry, absProposalsDir, result);
   }
 
+  safeWriteFile(path.join(pathResolver.rootDir(), SUMMARY_RELATIVE), `${result.summary_line}\n`);
   process.stdout.write(JSON.stringify(result, null, 2));
 }
 
 function writeProposal(
   entry: UnhandledIntentEntry,
   proposalsDir: string,
-  result: ReconcileResult,
+  result: ReconcileResult
 ): void {
   const key = entry.intent_id ?? entry.utterance_samples[0] ?? 'unknown';
   try {
@@ -89,20 +124,30 @@ function buildUnroutedProposal(entry: UnhandledIntentEntry, key: string): object
     occurrence_count: entry.occurrence_count,
     first_seen: entry.first_seen,
     last_seen: entry.last_seen,
-    suggested_routing: suggestedShape === 'mission'
-      ? {
-          map: 'mission_intent_action_map',
-          entry: { [key]: '' },
-          valid_actions: [
-            'create', 'classify', 'workflow', 'compose_team', 'prewarm_team',
-            'delegate_task', 'review_output', 'handoff', 'distill', 'close', 'inspect_state',
-          ],
-        }
-      : {
-          map: 'pipeline_intent_map',
-          entry: { [key]: '' },
-          note: 'Set value to the pipeline filename without path or .json extension (e.g. "generate-report")',
-        },
+    suggested_routing:
+      suggestedShape === 'mission'
+        ? {
+            map: 'mission_intent_action_map',
+            entry: { [key]: '' },
+            valid_actions: [
+              'create',
+              'classify',
+              'workflow',
+              'compose_team',
+              'prewarm_team',
+              'delegate_task',
+              'review_output',
+              'handoff',
+              'distill',
+              'close',
+              'inspect_state',
+            ],
+          }
+        : {
+            map: 'pipeline_intent_map',
+            entry: { [key]: '' },
+            note: 'Set value to the pipeline filename without path or .json extension (e.g. "generate-report")',
+          },
     _instructions: [
       `intent_id "${entry.intent_id}" was recognized but has no routing entry.`,
       `Shape is "${entry.shape ?? 'unknown'}".`,
@@ -133,7 +178,7 @@ function buildUnrecognizedProposal(entry: UnhandledIntentEntry, key: string): ob
       'These utterances scored below the confidence threshold for all known intents.',
       'Option A: Add suggested_intent to knowledge/product/governance/standard-intents.json',
       '  and add a routing entry to intent-routing-map.json.',
-      'Option B: If this utterance matches an existing intent, add it to that intent\'s',
+      "Option B: If this utterance matches an existing intent, add it to that intent's",
       '  surface_examples or trigger_keywords to improve matching.',
       'Then call markIntentsReconciled([utterance_sample]) to clear this entry.',
     ],

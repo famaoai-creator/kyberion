@@ -35,6 +35,9 @@ jobs:
       - name: Validate release surface
         run: pnpm run validate
 
+      - name: Run full test suite
+        run: pnpm run test:all
+
       - name: Check golden outputs
         run: pnpm run check:golden
 

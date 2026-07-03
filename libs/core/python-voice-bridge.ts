@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,11 +55,9 @@ export class PythonVoiceBridge implements VoiceBridge {
       params: { text, output_path: outputPath, language: this.language },
     });
     try {
-      const raw = execFileSync(
-        this.pythonBin,
-        [this.voiceBridgePath, payload],
-        { encoding: 'utf8' },
-      );
+      const raw = execFileSync(this.pythonBin, [this.voiceBridgePath, payload], {
+        encoding: 'utf8',
+      });
       const result = JSON.parse(raw.trim());
       if (result.status !== 'success' && result.status !== 'ok') return undefined;
       return outputPath;
@@ -105,11 +104,11 @@ export class PythonVoiceBridge implements VoiceBridge {
 
 const DEFAULT_VOICE_BRIDGE_SCRIPT = path.join(
   moduleDir,
-  '../../actuators/voice-actuator/scripts/voice_learning_bridge.py',
+  '../../actuators/voice-actuator/scripts/voice_learning_bridge.py'
 );
 
 export function installPythonVoiceBridgeIfAvailable(
-  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>
 ): boolean {
   const profileId = env.KYBERION_VOICE_PROFILE_ID;
   if (!profileId) return false;
@@ -117,7 +116,8 @@ export function installPythonVoiceBridgeIfAvailable(
   const bridgePath = env.KYBERION_VOICE_BRIDGE_PATH ?? DEFAULT_VOICE_BRIDGE_SCRIPT;
   if (!safeExistsSync(bridgePath)) return false;
 
-  const audioOutputDir = env.KYBERION_VOICE_OUTPUT_DIR ?? path.join(process.cwd(), 'active/shared/tmp/voice-out');
+  const audioOutputDir =
+    env.KYBERION_VOICE_OUTPUT_DIR ?? path.join(process.cwd(), 'active/shared/tmp/voice-out');
   const blackholePath = env.KYBERION_BLACKHOLE_SCRIPT ?? null;
   const playThroughBlackhole = env.KYBERION_VOICE_PLAY_BLACKHOLE === '1';
 

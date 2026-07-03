@@ -1,8 +1,10 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
+import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { OcrRequest, OcrResult, OcrProvider } from './ocr-types.js';
 
 function getMimeType(filePath: string): string {
@@ -71,7 +73,9 @@ export class TesseractOcrProvider implements OcrProvider {
         try {
           await worker.terminate();
         } catch (terminateError: any) {
-          logger.warn(`[ocr_bridge] Tesseract worker terminate failed: ${terminateError?.message || terminateError}`);
+          logger.warn(
+            `[ocr_bridge] Tesseract worker terminate failed: ${terminateError?.message || terminateError}`
+          );
         }
       }
     }
@@ -176,9 +180,7 @@ export class LlmApiOcrProvider implements OcrProvider {
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
-      process.env.GEMINI_API_KEY ||
-      process.env.ANTHROPIC_API_KEY ||
-      process.env.OPENAI_API_KEY
+      process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
     );
   }
 
@@ -214,20 +216,30 @@ export class LlmApiOcrProvider implements OcrProvider {
     throw new Error('No Cloud LLM API key available for OCR.');
   }
 
-  private async callGemini(apiKey: string, base64Data: string, mimeType: string, startedAt: number): Promise<OcrResult> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  private async callGemini(
+    apiKey: string,
+    base64Data: string,
+    mimeType: string,
+    startedAt: number
+  ): Promise<OcrResult> {
+    const model = resolveRuntimeModelId('gemini-default');
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const payload = {
-      contents: [{
-        parts: [
-          { text: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks, explanation, or notes. Preserve layout and linebreaks if possible.' },
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data
-            }
-          }
-        ]
-      }]
+      contents: [
+        {
+          parts: [
+            {
+              text: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks, explanation, or notes. Preserve layout and linebreaks if possible.',
+            },
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data,
+              },
+            },
+          ],
+        },
+      ],
     };
 
     const res = await fetch(url, {
@@ -240,7 +252,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       throw new Error(`Gemini API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     return {
       status: 'succeeded',
@@ -251,28 +263,35 @@ export class LlmApiOcrProvider implements OcrProvider {
     };
   }
 
-  private async callClaude(apiKey: string, base64Data: string, mimeType: string, startedAt: number): Promise<OcrResult> {
+  private async callClaude(
+    apiKey: string,
+    base64Data: string,
+    mimeType: string,
+    startedAt: number
+  ): Promise<OcrResult> {
     const url = 'https://api.anthropic.com/v1/messages';
     const payload = {
-      model: 'claude-3-5-sonnet-20241022',
+      model: resolveRuntimeModelId('anthropic-fast'),
       max_tokens: 4000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mimeType,
-              data: base64Data
-            }
-          },
-          {
-            type: 'text',
-            text: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks, explanation, or notes. Preserve layout and linebreaks if possible.'
-          }
-        ]
-      }]
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mimeType,
+                data: base64Data,
+              },
+            },
+            {
+              type: 'text',
+              text: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks, explanation, or notes. Preserve layout and linebreaks if possible.',
+            },
+          ],
+        },
+      ],
     };
 
     const res = await fetch(url, {
@@ -280,7 +299,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify(payload),
     });
@@ -289,7 +308,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       throw new Error(`Claude API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const text = data.content?.[0]?.text || '';
     return {
       status: 'succeeded',
@@ -300,32 +319,39 @@ export class LlmApiOcrProvider implements OcrProvider {
     };
   }
 
-  private async callOpenAI(apiKey: string, base64Data: string, mimeType: string, startedAt: number): Promise<OcrResult> {
+  private async callOpenAI(
+    apiKey: string,
+    base64Data: string,
+    mimeType: string,
+    startedAt: number
+  ): Promise<OcrResult> {
     const url = 'https://api.openai.com/v1/chat/completions';
     const payload = {
-      model: 'gpt-4o-mini',
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks, explanation, or notes. Preserve layout and linebreaks if possible.'
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:${mimeType};base64,${base64Data}`
-            }
-          }
-        ]
-      }]
+      model: resolveRuntimeModelId('openai-vision'),
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks, explanation, or notes. Preserve layout and linebreaks if possible.',
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`,
+              },
+            },
+          ],
+        },
+      ],
     };
 
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
     });
@@ -334,7 +360,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       throw new Error(`OpenAI API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const text = data.choices?.[0]?.message?.content || '';
     return {
       status: 'succeeded',
@@ -376,9 +402,10 @@ export class LocalVlmOcrProvider implements OcrProvider {
 
     const payload = {
       model: this.model,
-      prompt: 'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks or explanations.',
+      prompt:
+        'Perform OCR on this image. Return ONLY the recognized text. Do not add markdown code blocks or explanations.',
       images: [base64Data],
-      stream: false
+      stream: false,
     };
 
     const res = await fetch(this.endpoint, {
@@ -391,7 +418,7 @@ export class LocalVlmOcrProvider implements OcrProvider {
       throw new Error(`Ollama VLM error: ${res.statusText} (${res.status})`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const text = data.response || '';
     return {
       status: 'succeeded',
@@ -413,9 +440,10 @@ export class AdaptivePolicyRouter {
   }
 
   private getProviderIds(request: OcrRequest): string[] {
-    const preferred = request.providerPreference && request.providerPreference.length > 0
-      ? request.providerPreference
-      : [];
+    const preferred =
+      request.providerPreference && request.providerPreference.length > 0
+        ? request.providerPreference
+        : [];
     const mode = request.mode || 'balanced';
 
     let defaultChain: string[] = [];
@@ -442,7 +470,7 @@ export class AdaptivePolicyRouter {
     const candidates: OcrProvider[] = [];
     for (const id of this.getProviderIds(request)) {
       const provider = this.providers.get(id);
-      if (provider && await provider.isAvailable()) {
+      if (provider && (await provider.isAvailable())) {
         candidates.push(provider);
       }
     }
@@ -467,7 +495,7 @@ function getRouter(): AdaptivePolicyRouter {
       new AppleVisionOcrProvider(),
       new LlmApiOcrProvider(),
       new LocalVlmOcrProvider(),
-      new TesseractOcrProvider()
+      new TesseractOcrProvider(),
     ]);
   }
   return globalRouter;
@@ -477,7 +505,10 @@ export async function ocrImage(request: OcrRequest): Promise<OcrResult> {
   return await ocrImageWithRouter(request, getRouter());
 }
 
-export async function ocrImageWithRouter(request: OcrRequest, router: AdaptivePolicyRouter): Promise<OcrResult> {
+export async function ocrImageWithRouter(
+  request: OcrRequest,
+  router: AdaptivePolicyRouter
+): Promise<OcrResult> {
   const candidates = await router.resolveCandidates(request);
   if (candidates.length === 0) {
     throw new Error('No available OCR provider could be resolved.');
@@ -492,7 +523,9 @@ export async function ocrImageWithRouter(request: OcrRequest, router: AdaptivePo
         return result;
       }
       lastError = new Error(result.error || `${provider.id}_ocr_failed`);
-      logger.warn(`[ocr_bridge] OCR provider ${provider.id} returned status=${result.status}; trying next provider if available.`);
+      logger.warn(
+        `[ocr_bridge] OCR provider ${provider.id} returned status=${result.status}; trying next provider if available.`
+      );
     } catch (error: any) {
       lastError = error instanceof Error ? error : new Error(String(error));
       logger.warn(`[ocr_bridge] OCR provider ${provider.id} failed: ${lastError.message}`);

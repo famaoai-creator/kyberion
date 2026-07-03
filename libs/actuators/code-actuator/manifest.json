@@ -16,8 +16,23 @@
     "retryable_categories": ["resource_unavailable", "timeout"]
   },
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/code-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "semgrep_scan", "platforms": ["darwin", "linux"] },
+    {
+      "op": "pipeline",
+      "schema_ref": "schemas/code-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "semgrep_scan",
+      "platforms": ["darwin", "linux"],
+      "prerequisites": {
+        "binaries": ["semgrep"],
+        "platforms": ["darwin", "linux"],
+        "install": {
+          "darwin": "brew install semgrep",
+          "linux": "python -m pip install semgrep"
+        }
+      }
+    },
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

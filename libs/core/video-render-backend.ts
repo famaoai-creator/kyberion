@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process/safeExec 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import * as path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -13,7 +14,10 @@ import {
   pathResolver,
 } from './index.js';
 import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
-import type { VideoCompositionRenderPlan, VideoRenderRuntimePolicy } from './video-composition-contract.js';
+import type {
+  VideoCompositionRenderPlan,
+  VideoRenderRuntimePolicy,
+} from './video-composition-contract.js';
 
 export interface VideoRenderBackendResult {
   executed: boolean;
@@ -37,12 +41,15 @@ export class VideoRenderBackendCommandError extends Error {
   public readonly signal: string | null;
   public readonly exit_code: number | null;
 
-  constructor(message: string, options: {
-    cancelled?: boolean;
-    timed_out?: boolean;
-    signal?: string | null;
-    exit_code?: number | null;
-  } = {}) {
+  constructor(
+    message: string,
+    options: {
+      cancelled?: boolean;
+      timed_out?: boolean;
+      signal?: string | null;
+      exit_code?: number | null;
+    } = {}
+  ) {
     super(message);
     this.name = 'VideoRenderBackendCommandError';
     this.cancelled = Boolean(options.cancelled);
@@ -54,7 +61,7 @@ export class VideoRenderBackendCommandError extends Error {
 
 export async function renderVideoCompositionBundle(
   plan: VideoCompositionRenderPlan,
-  policy: VideoRenderRuntimePolicy,
+  policy: VideoRenderRuntimePolicy
 ): Promise<VideoRenderBackendResult> {
   return renderVideoCompositionBundleImpl(plan, policy, { cancellable: false });
 }
@@ -62,7 +69,7 @@ export async function renderVideoCompositionBundle(
 export async function renderVideoCompositionBundleAsync(
   plan: VideoCompositionRenderPlan,
   policy: VideoRenderRuntimePolicy,
-  options: VideoRenderBackendExecutionOptions = {},
+  options: VideoRenderBackendExecutionOptions = {}
 ): Promise<VideoRenderBackendResult> {
   return renderVideoCompositionBundleImpl(plan, policy, {
     cancellable: true,
@@ -78,7 +85,7 @@ async function renderVideoCompositionBundleImpl(
     cancellable: boolean;
     isCancelled?: () => boolean;
     pollIntervalMs?: number;
-  },
+  }
 ): Promise<VideoRenderBackendResult> {
   const rootDir = pathResolver.rootDir();
   if (!policy.render.enable_backend_rendering) {
@@ -107,7 +114,8 @@ async function renderVideoCompositionBundleImpl(
       return {
         executed: false,
         backend: 'hyperframes_cli',
-        reason: 'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
+        reason:
+          'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
         backend_id: backend.backend_id,
         backend_kind: backend.kind,
         backend_provider: backend.provider,
@@ -153,10 +161,14 @@ async function renderVideoCompositionBundleImpl(
         throw new Error(`Render backend completed without output artifact: ${outputPath}`);
       }
       if (!hasMinimumArtifactSize(outputPath, 1024)) {
-        throw new Error(`Render backend produced a suspiciously small output artifact: ${outputPath}`);
+        throw new Error(
+          `Render backend produced a suspiciously small output artifact: ${outputPath}`
+        );
       }
       if (!hasRequiredStreams(outputPath, true, false)) {
-        throw new Error(`Render backend produced an invalid video container without a video stream: ${outputPath}`);
+        throw new Error(
+          `Render backend produced an invalid video container without a video stream: ${outputPath}`
+        );
       }
 
       const audioRef = resolveMuxAudioRef(plan);
@@ -195,7 +207,7 @@ async function renderVideoCompositionBundleImpl(
 async function renderVideoCompositionFallback(
   plan: VideoCompositionRenderPlan,
   outputPath: string,
-  cause?: Error,
+  cause?: Error
 ): Promise<VideoRenderBackendResult> {
   return renderNarratedFallbackVideo(plan, outputPath, cause);
 }
@@ -203,7 +215,7 @@ async function renderVideoCompositionFallback(
 export async function renderNarratedFallbackVideo(
   plan: VideoCompositionRenderPlan,
   outputPath: string,
-  cause?: Error,
+  cause?: Error
 ): Promise<VideoRenderBackendResult> {
   const rootDir = pathResolver.rootDir();
   const outputDir = path.dirname(outputPath);
@@ -225,73 +237,80 @@ export async function renderNarratedFallbackVideo(
     const sceneVideoPath = path.join(sceneVideoDir, `scene-${sceneNumber}.mp4`);
     const sceneTitle = segment.title || `Scene ${sceneNumber}`;
     const sceneSubtitle = segment.subtitle || `${Math.max(1, Math.round(segment.duration_sec))}s`;
-    safeExec('python3', [
-      pathResolver.rootResolve('scripts/make_video_cover.py'),
-      '--out',
-      sceneImagePath,
-      '--title',
-      sceneTitle,
-      '--subtitle',
-      sceneSubtitle,
-    ], {
-      cwd: rootDir,
-      timeoutMs: 30_000,
-    });
+    safeExec(
+      'python3',
+      [
+        pathResolver.rootResolve('scripts/make_video_cover.py'),
+        '--out',
+        sceneImagePath,
+        '--title',
+        sceneTitle,
+        '--subtitle',
+        sceneSubtitle,
+      ],
+      {
+        cwd: rootDir,
+        timeoutMs: 30_000,
+      }
+    );
 
-    safeExec('ffmpeg', [
-      '-y',
-      '-loop',
-      '1',
-      '-i',
-      sceneImagePath,
-      '-t',
-      String(Math.max(1, segment.duration_sec)),
-      '-r',
-      String(Math.max(1, Math.round(plan.fps || 30))),
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-crf',
-      '28',
-      '-pix_fmt',
-      'yuv420p',
-      sceneVideoPath,
-    ], {
-      cwd: rootDir,
-      timeoutMs: 60_000,
-    });
+    safeExec(
+      'ffmpeg',
+      [
+        '-y',
+        '-loop',
+        '1',
+        '-i',
+        sceneImagePath,
+        '-t',
+        String(Math.max(1, segment.duration_sec)),
+        '-r',
+        String(Math.max(1, Math.round(plan.fps || 30))),
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-crf',
+        '28',
+        '-pix_fmt',
+        'yuv420p',
+        sceneVideoPath,
+      ],
+      {
+        cwd: rootDir,
+        timeoutMs: 60_000,
+      }
+    );
     sceneVideoPaths.push(sceneVideoPath);
   });
 
   safeWriteFile(
     concatListPath,
     `${sceneVideoPaths.map((sceneVideoPath) => `file '${sceneVideoPath.replace(/'/g, "'\\''")}'`).join('\n')}\n`,
-    { mkdir: true, encoding: 'utf8' },
+    { mkdir: true, encoding: 'utf8' }
   );
 
-  safeExec('ffmpeg', [
-    '-y',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    concatListPath,
-    '-c',
-    'copy',
-    silentPath,
-  ], {
-    cwd: rootDir,
-    timeoutMs: 60_000,
-  });
+  safeExec(
+    'ffmpeg',
+    ['-y', '-f', 'concat', '-safe', '0', '-i', concatListPath, '-c', 'copy', silentPath],
+    {
+      cwd: rootDir,
+      timeoutMs: 60_000,
+    }
+  );
 
   const audioRef = resolveMuxAudioRef(plan);
   if (audioRef) {
     if (safeExistsSync(outputPath)) {
       safeRmSync(outputPath);
     }
-    const muxArgs = buildMuxArgs(silentPath, audioRef, outputPath, plan.output_format, plan.duration_sec);
+    const muxArgs = buildMuxArgs(
+      silentPath,
+      audioRef,
+      outputPath,
+      plan.output_format,
+      plan.duration_sec
+    );
     safeExec('ffmpeg', muxArgs, {
       cwd: rootDir,
       timeoutMs: 60_000,
@@ -300,18 +319,34 @@ export async function renderNarratedFallbackVideo(
     safeMoveSync(silentPath, outputPath);
   }
 
-  if (audioRef && (!hasRequiredStreams(outputPath, true, true) || !hasMinimumArtifactSize(outputPath, 1024))) {
-    runDirectMuxRetry(rootDir, silentPath, audioRef, outputPath, plan.output_format, plan.duration_sec);
+  if (
+    audioRef &&
+    (!hasRequiredStreams(outputPath, true, true) || !hasMinimumArtifactSize(outputPath, 1024))
+  ) {
+    runDirectMuxRetry(
+      rootDir,
+      silentPath,
+      audioRef,
+      outputPath,
+      plan.output_format,
+      plan.duration_sec
+    );
   }
 
   if (!safeExistsSync(outputPath)) {
-    throw new Error(`Fallback render failed to produce output artifact: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`);
+    throw new Error(
+      `Fallback render failed to produce output artifact: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`
+    );
   }
   if (!hasMinimumArtifactSize(outputPath, 1024)) {
-    throw new Error(`Fallback render produced a suspiciously small output artifact: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`);
+    throw new Error(
+      `Fallback render produced a suspiciously small output artifact: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`
+    );
   }
   if (!hasRequiredStreams(outputPath, true, audioRef ? true : false)) {
-    throw new Error(`Fallback render produced an invalid container: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`);
+    throw new Error(
+      `Fallback render produced an invalid container: ${outputPath}${cause ? ` (cause: ${cause.message})` : ''}`
+    );
   }
 
   const backend = resolveVideoBackend('hyperframes_cli');
@@ -325,7 +360,9 @@ export async function renderNarratedFallbackVideo(
       'ffmpeg',
       'ffmpeg',
     ],
-    reason: cause ? `hyperframes backend failed; fallback rendered instead: ${cause.message}` : 'fallback render completed',
+    reason: cause
+      ? `hyperframes backend failed; fallback rendered instead: ${cause.message}`
+      : 'fallback render completed',
     backend_id: `${backend.backend_id}.fallback`,
     backend_kind: backend.kind,
     backend_provider: 'ffmpeg',
@@ -337,9 +374,7 @@ function buildFallbackSegments(plan: VideoCompositionRenderPlan): Array<{
   subtitle: string;
   duration_sec: number;
 }> {
-  const scenes = plan.scenes
-    .slice()
-    .sort((left, right) => left.start_sec - right.start_sec);
+  const scenes = plan.scenes.slice().sort((left, right) => left.start_sec - right.start_sec);
   const baseTitle = plan.title || 'Kyberion video';
   const segmentCount = scenes.length >= 3 ? Math.min(4, scenes.length) : 3;
   const durations = distributeDuration(plan.duration_sec || segmentCount, segmentCount);
@@ -379,9 +414,10 @@ function fallbackSceneTitle(
   scene: VideoCompositionRenderPlan['scenes'][number] | undefined,
   label: string,
   index: number,
-  baseTitle: string,
+  baseTitle: string
 ): string {
-  const headline = sceneText(scene, 'headline') || sceneText(scene, 'title') || sceneText(scene, 'eyebrow');
+  const headline =
+    sceneText(scene, 'headline') || sceneText(scene, 'title') || sceneText(scene, 'eyebrow');
   if (headline) return truncateText(headline, 54);
   if (index === 0) return truncateText(baseTitle, 54);
   return truncateText(label, 54);
@@ -390,7 +426,7 @@ function fallbackSceneTitle(
 function fallbackSceneSubtitle(
   scene: VideoCompositionRenderPlan['scenes'][number] | undefined,
   index: number,
-  fallbackText = '',
+  fallbackText = ''
 ): string {
   const parts = [
     sceneText(scene, 'body'),
@@ -404,7 +440,7 @@ function fallbackSceneSubtitle(
 
 function sceneText(
   scene: VideoCompositionRenderPlan['scenes'][number] | undefined,
-  key: string,
+  key: string
 ): string {
   if (!scene) return '';
   const value = scene.content?.[key];
@@ -440,17 +476,19 @@ function resolveOutputPath(plan: VideoCompositionRenderPlan): string {
 }
 
 function resolveMuxAudioRef(plan: VideoCompositionRenderPlan): string | undefined {
-  return plan.narration_ref
-    || plan.music_ref
-    || (plan as any).audio?.narration_ref
-    || (plan as any).audio?.music_ref;
+  return (
+    plan.narration_ref ||
+    plan.music_ref ||
+    (plan as any).audio?.narration_ref ||
+    (plan as any).audio?.music_ref
+  );
 }
 
 async function muxAudioTrack(
   outputPath: string,
   audioPath: string,
   outputFormat: VideoCompositionRenderPlan['output_format'],
-  durationSec: number,
+  durationSec: number
 ): Promise<void> {
   const tempOutputPath = buildMuxTempPath(outputPath);
   const args = buildMuxArgs(outputPath, audioPath, tempOutputPath, outputFormat, durationSec);
@@ -462,7 +500,7 @@ async function muxAudioTrackAsync(
   outputPath: string,
   audioPath: string,
   outputFormat: VideoCompositionRenderPlan['output_format'],
-  durationSec: number,
+  durationSec: number
 ): Promise<void> {
   const tempOutputPath = buildMuxTempPath(outputPath);
   const args = buildMuxArgs(outputPath, audioPath, tempOutputPath, outputFormat, durationSec);
@@ -475,7 +513,7 @@ function buildMuxArgs(
   narrationPath: string,
   outputPath: string,
   outputFormat: VideoCompositionRenderPlan['output_format'],
-  durationSec: number,
+  durationSec: number
 ): string[] {
   const args = [
     '-y',
@@ -515,7 +553,7 @@ function finalizeMuxedOutput(tempOutputPath: string, outputPath: string): void {
 function hasRequiredStreams(
   outputPath: string,
   requireVideo: boolean,
-  requireAudio: boolean,
+  requireAudio: boolean
 ): boolean {
   try {
     if (requireVideo) {
@@ -572,7 +610,7 @@ function runDirectMuxRetry(
   audioPath: string,
   outputPath: string,
   outputFormat: VideoCompositionRenderPlan['output_format'],
-  durationSec: number,
+  durationSec: number
 ): void {
   const args = buildMuxArgs(inputVideoPath, audioPath, outputPath, outputFormat, durationSec);
   const result = spawnSync('ffmpeg', args, {
@@ -585,7 +623,9 @@ function runDirectMuxRetry(
   }
   const stderr = result.stderr ? String(result.stderr).trim() : '';
   const detail = stderr ? `: ${stderr.split('\n').slice(-1)[0]}` : '';
-  throw new Error(`Direct mux retry failed (code=${String(result.status)}, signal=${String(result.signal)})${detail}`);
+  throw new Error(
+    `Direct mux retry failed (code=${String(result.status)}, signal=${String(result.signal)})${detail}`
+  );
 }
 
 async function runCancellableCommand(
@@ -597,7 +637,7 @@ async function runCancellableCommand(
     poll_interval_ms: number;
     env?: NodeJS.ProcessEnv;
     cwd: string;
-  },
+  }
 ): Promise<void> {
   if (options.is_cancelled?.()) {
     throw new VideoRenderBackendCommandError('video render cancelled', {
@@ -642,12 +682,14 @@ async function runCancellableCommand(
 
     child.on('close', (code, signal) => {
       if (cancelled) {
-        finish(new VideoRenderBackendCommandError('video render cancelled', {
-          cancelled: true,
-          timed_out: timedOut,
-          signal: signal || null,
-          exit_code: code,
-        }));
+        finish(
+          new VideoRenderBackendCommandError('video render cancelled', {
+            cancelled: true,
+            timed_out: timedOut,
+            signal: signal || null,
+            exit_code: code,
+          })
+        );
         return;
       }
       if (code === 0) {
@@ -656,15 +698,17 @@ async function runCancellableCommand(
       }
       const tail = stderr.trim();
       const detail = tail ? `: ${tail.split('\n').slice(-1)[0]}` : '';
-      finish(new VideoRenderBackendCommandError(
-        `video render backend command failed (code=${String(code)}, signal=${String(signal)})${detail}`,
-        {
-          cancelled: false,
-          timed_out: false,
-          signal: signal || null,
-          exit_code: code,
-        },
-      ));
+      finish(
+        new VideoRenderBackendCommandError(
+          `video render backend command failed (code=${String(code)}, signal=${String(signal)})${detail}`,
+          {
+            cancelled: false,
+            timed_out: false,
+            signal: signal || null,
+            exit_code: code,
+          }
+        )
+      );
     });
 
     timeoutHandle = setTimeout(() => {

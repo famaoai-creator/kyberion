@@ -26,7 +26,10 @@ import {
 } from './actuator-capability.js';
 
 const TMP_MANIFEST = path.resolve(process.cwd(), 'active/shared/tmp/test-actuator-manifest.json');
-const TMP_CATALOG_DIR = path.resolve(process.cwd(), 'active/shared/tmp/test-actuator-capability-catalog');
+const TMP_CATALOG_DIR = path.resolve(
+  process.cwd(),
+  'active/shared/tmp/test-actuator-capability-catalog'
+);
 
 describe('actuator-capability', () => {
   afterEach(() => {
@@ -43,10 +46,7 @@ describe('actuator-capability', () => {
       const manifest = {
         actuator_id: 'test-actuator',
         version: '1.2.3',
-        capabilities: [
-          { op: 'read' },
-          { op: 'write' },
-        ],
+        capabilities: [{ op: 'read' }, { op: 'write' }],
       };
       fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
 
@@ -60,13 +60,66 @@ describe('actuator-capability', () => {
       expect(status.capabilities[0].available).toBe(true);
       expect(status.checkedAt).toBeTruthy();
     });
+
+    it('evaluates manifest prerequisites in the generic fallback probe', async () => {
+      const missingBinary = `kyberion-missing-${process.pid}-${Date.now()}`;
+      const manifest = {
+        actuator_id: 'prereq-test-actuator',
+        version: '1.0.0',
+        capabilities: [
+          {
+            op: 'needs_binary',
+            platforms: ['darwin', 'linux', 'win32'],
+            prerequisites: {
+              binaries: [missingBinary],
+              install: [`Install ${missingBinary} for this test capability.`],
+            },
+          },
+          {
+            op: 'needs_env',
+            platforms: ['darwin', 'linux', 'win32'],
+            prerequisites: {
+              env: ['KYBERION_TEST_MISSING_ENV'],
+            },
+          },
+          {
+            op: 'wrong_platform',
+            platforms: ['darwin', 'linux', 'win32'],
+            prerequisites: {
+              platforms: [process.platform === 'darwin' ? 'linux' : 'darwin'],
+            },
+          },
+          {
+            op: 'no_prerequisites',
+            platforms: ['darwin', 'linux', 'win32'],
+          },
+        ],
+      };
+      fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
+
+      const status = await checkActuatorCapabilities('prereq-test-actuator', TMP_MANIFEST);
+      const byOp = Object.fromEntries(
+        status.capabilities.map((capability) => [capability.op, capability])
+      );
+
+      expect(byOp.needs_binary.available).toBe(false);
+      expect(byOp.needs_binary.reason).toContain('missing binary');
+      expect(byOp.needs_binary.prerequisites).toContain(
+        `Install ${missingBinary} for this test capability.`
+      );
+      expect(byOp.needs_env.available).toBe(false);
+      expect(byOp.needs_env.reason).toContain('missing env: KYBERION_TEST_MISSING_ENV');
+      expect(byOp.wrong_platform.available).toBe(false);
+      expect(byOp.wrong_platform.reason).toContain('requires platform');
+      expect(byOp.no_prerequisites.available).toBe(true);
+    });
   });
 
   describe('registerCapabilityProbe', () => {
     it('registers and is called during check', async () => {
-      const customProbe = vi.fn().mockResolvedValue([
-        { op: 'custom-op', available: true, cost: 'free' as const },
-      ]);
+      const customProbe = vi
+        .fn()
+        .mockResolvedValue([{ op: 'custom-op', available: true, cost: 'free' as const }]);
 
       registerCapabilityProbe('custom-test-actuator', customProbe);
 
@@ -126,11 +179,11 @@ describe('actuator-capability', () => {
 
       safeWriteFile(
         path.join(TMP_CATALOG_DIR, 'voice-actuator', 'manifest.json'),
-        JSON.stringify({ actuator_id: 'voice-actuator', version: '1.0.0', capabilities: [] }),
+        JSON.stringify({ actuator_id: 'voice-actuator', version: '1.0.0', capabilities: [] })
       );
       safeWriteFile(
         path.join(TMP_CATALOG_DIR, 'browser-actuator', 'manifest.json'),
-        JSON.stringify({ actuator_id: 'browser-actuator', version: '1.0.0', capabilities: [] }),
+        JSON.stringify({ actuator_id: 'browser-actuator', version: '1.0.0', capabilities: [] })
       );
 
       const statuses = await checkAllActuatorCapabilities(TMP_CATALOG_DIR);
@@ -149,7 +202,9 @@ describe('actuator-capability', () => {
 
       for (const entry of catalog) {
         const manifest = JSON.parse(
-          safeReadFile(pathResolver.rootResolve(entry.manifest_path), { encoding: 'utf8' }) as string,
+          safeReadFile(pathResolver.rootResolve(entry.manifest_path), {
+            encoding: 'utf8',
+          }) as string
         ) as Record<string, unknown>;
         expect(manifest.resilience_tier, entry.actuatorId).toBeDefined();
         expect(manifest.recovery_policy, entry.actuatorId).toBeDefined();
@@ -161,9 +216,14 @@ describe('actuator-capability', () => {
     it('actuator manifest schema accepts resilience declarations', () => {
       const ajv = new AjvCtor({ allErrors: true });
       addFormats(ajv);
-      const validate = compileSchemaFromPath(ajv, path.join(process.cwd(), 'schemas/actuator-manifest.schema.json'));
+      const validate = compileSchemaFromPath(
+        ajv,
+        path.join(process.cwd(), 'schemas/actuator-manifest.schema.json')
+      );
       const manifest = JSON.parse(
-        safeReadFile(path.join(process.cwd(), 'libs/actuators/file-actuator/manifest.json'), { encoding: 'utf8' }) as string,
+        safeReadFile(path.join(process.cwd(), 'libs/actuators/file-actuator/manifest.json'), {
+          encoding: 'utf8',
+        }) as string
       );
       expect(validate(manifest), JSON.stringify(validate.errors || [])).toBe(true);
     });

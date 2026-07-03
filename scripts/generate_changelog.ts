@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Generate CHANGELOG entries from Conventional Commits.
  *
@@ -33,10 +34,22 @@ interface ParsedCommit {
   body: string;
 }
 
-const ORDER = ['feat', 'fix', 'security', 'perf', 'refactor', 'docs', 'test', 'build', 'ci', 'chore', 'revert'];
+const ORDER = [
+  'feat',
+  'fix',
+  'security',
+  'perf',
+  'refactor',
+  'docs',
+  'test',
+  'build',
+  'ci',
+  'chore',
+  'revert',
+];
 
 function git(args: string[]): string {
-  return execSync(`git ${args.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`, { cwd: ROOT })
+  return execSync(`git ${args.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`, { cwd: ROOT })
     .toString()
     .trim();
 }
@@ -58,9 +71,9 @@ function listCommits(from: string | null, to: string): ParsedCommit[] {
   if (!raw) return [];
   return raw
     .split(sep)
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean)
-    .map(line => {
+    .map((line) => {
       const [hash, shortHash, subject, body] = line.split(fieldSep);
       return parseCommit(hash, shortHash, subject ?? '', body ?? '');
     });
@@ -153,7 +166,9 @@ function renderSection(commits: ParsedCommit[], from: string | null, to: string)
 
 function prependToChangelog(content: string): void {
   if (!safeExistsSync(CHANGELOG_PATH)) {
-    safeWriteFile(CHANGELOG_PATH, `# Changelog\n\n## [Unreleased]\n\n${content}`, { encoding: 'utf8' });
+    safeWriteFile(CHANGELOG_PATH, `# Changelog\n\n## [Unreleased]\n\n${content}`, {
+      encoding: 'utf8',
+    });
     return;
   }
   const existing = safeReadFile(CHANGELOG_PATH, { encoding: 'utf8' }) as string;
@@ -187,7 +202,9 @@ function main(): void {
     console.log(`✅ Prepended to ${CHANGELOG_PATH}`);
   } else {
     const policy = resolveChangelogPolicy();
-    console.log(`${policy.header_template.replace('{from}', from ?? 'root').replace('{count}', String(commits.length))}\n`);
+    console.log(
+      `${policy.header_template.replace('{from}', from ?? 'root').replace('{count}', String(commits.length))}\n`
+    );
     console.log(section);
   }
 }

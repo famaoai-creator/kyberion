@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import * as path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -30,7 +31,18 @@ import {
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
 
-type SurfaceAction = 'reconcile' | 'start' | 'stop' | 'status' | 'list-units' | 'setup' | 'repair' | 'enable' | 'disable' | 'register' | 'unregister';
+type SurfaceAction =
+  | 'reconcile'
+  | 'start'
+  | 'stop'
+  | 'status'
+  | 'list-units'
+  | 'setup'
+  | 'repair'
+  | 'enable'
+  | 'disable'
+  | 'register'
+  | 'unregister';
 
 type SurfaceSetupRow = {
   surface: string;
@@ -52,17 +64,24 @@ function setupRowPriority(row: Pick<SurfaceSetupRow, 'auth' | 'enabled' | 'surfa
 
 function sortSurfaceSetupRows(rows: SurfaceSetupRow[]): SurfaceSetupRow[] {
   return rows
-    .map((row) => ({ ...row, priority: setupRowPriority(row) } as RankedSurfaceSetupRow))
+    .map((row) => ({ ...row, priority: setupRowPriority(row) }) as RankedSurfaceSetupRow)
     .sort((a, b) => a.priority - b.priority || a.surface.localeCompare(b.surface))
     .map(({ priority: _priority, ...row }) => row);
 }
 
 const execFileAsync = promisify(execFile);
 
-async function describePortHolder(port: number): Promise<{ pid: number; cwd: string | null } | null> {
+async function describePortHolder(
+  port: number
+): Promise<{ pid: number; cwd: string | null } | null> {
   if (process.platform !== 'darwin' && process.platform !== 'linux') return null;
   try {
-    const { stdout } = await execFileAsync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fpn']);
+    const { stdout } = await execFileAsync('lsof', [
+      '-nP',
+      `-iTCP:${port}`,
+      '-sTCP:LISTEN',
+      '-Fpn',
+    ]);
     const lines = stdout.split('\n');
     const pidLine = lines.find((l) => l.startsWith('p'));
     if (!pidLine) return null;
@@ -70,7 +89,14 @@ async function describePortHolder(port: number): Promise<{ pid: number; cwd: str
     if (!Number.isFinite(pid) || pid <= 0) return null;
     let cwd: string | null = null;
     try {
-      const { stdout: cwdOut } = await execFileAsync('lsof', ['-a', '-d', 'cwd', '-p', String(pid), '-Fn']);
+      const { stdout: cwdOut } = await execFileAsync('lsof', [
+        '-a',
+        '-d',
+        'cwd',
+        '-p',
+        String(pid),
+        '-Fn',
+      ]);
       const nLine = cwdOut.split('\n').find((l) => l.startsWith('n'));
       if (nLine) cwd = nLine.slice(1);
     } catch {
@@ -92,35 +118,39 @@ function isRunning(pid: number): boolean {
 }
 
 function registerRunningSurfaceFromState(record: any) {
-  runtimeSupervisor.update(record.resourceId, {
-    pid: record.pid,
-    state: 'running',
-    metadata: {
-      ...record.metadata,
-      command: record.command,
-      args: record.args,
-      logPath: record.logPath,
-    },
-    lastActiveAt: Date.now(),
-  }) || runtimeSupervisor.register({
-    resourceId: record.resourceId,
-    kind: record.kind,
-    ownerId: record.id,
-    ownerType: 'surface-runtime-manifest',
-    pid: record.pid,
-    shutdownPolicy: record.shutdownPolicy,
-    metadata: {
-      ...record.metadata,
-      command: record.command,
-      args: record.args,
-      logPath: record.logPath,
-    },
-    cleanup: () => {
-      try {
-        process.kill(record.pid, 'SIGTERM');
-      } catch (_) {}
-    },
-  });
+  if (
+    !runtimeSupervisor.update(record.resourceId, {
+      pid: record.pid,
+      state: 'running',
+      metadata: {
+        ...record.metadata,
+        command: record.command,
+        args: record.args,
+        logPath: record.logPath,
+      },
+      lastActiveAt: Date.now(),
+    })
+  ) {
+    runtimeSupervisor.register({
+      resourceId: record.resourceId,
+      kind: record.kind,
+      ownerId: record.id,
+      ownerType: 'surface-runtime-manifest',
+      pid: record.pid,
+      shutdownPolicy: record.shutdownPolicy,
+      metadata: {
+        ...record.metadata,
+        command: record.command,
+        args: record.args,
+        logPath: record.logPath,
+      },
+      cleanup: () => {
+        try {
+          process.kill(record.pid, 'SIGTERM');
+        } catch (_) {}
+      },
+    });
+  }
 }
 
 function stopByPid(pid: number | undefined): void {
@@ -133,7 +163,7 @@ function stopByPid(pid: number | undefined): void {
 function buildSurfaceRepairHint(
   definition: SurfaceRuntimeDefinition,
   record: any,
-  health: Awaited<ReturnType<typeof probeSurfaceHealth>>,
+  health: Awaited<ReturnType<typeof probeSurfaceHealth>>
 ): string {
   if (record && !isRunning(record.pid)) {
     return 'stale state record: run pnpm surfaces:repair -- --surface <surface-id>';
@@ -152,7 +182,7 @@ function buildSurfaceRepairHint(
 function buildSurfaceNextAction(
   surfaceId: string,
   stateHealth: 'healthy' | 'degraded' | 'stale' | 'untracked',
-  repairHint: string,
+  repairHint: string
 ): ReturnType<typeof buildNextAction> {
   if (stateHealth === 'healthy') {
     return buildNextAction({
@@ -187,9 +217,13 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   const presetPath = (definition as any).preset_path;
   if (presetPath) {
     const authInspection = inspectServiceAuth(serviceId, presetPath);
-    const authRes = authInspection.valid ? { valid: true as const } : { valid: false as const, reason: authInspection.reason };
+    const authRes = authInspection.valid
+      ? { valid: true as const }
+      : { valid: false as const, reason: authInspection.reason };
     if (!authRes.valid) {
-      logger.error(`⚠️ [SURFACE] Auth validation failed for ${surfaceId}: ${authRes.reason}. ${authInspection.setupHint}`);
+      logger.error(
+        `⚠️ [SURFACE] Auth validation failed for ${surfaceId}: ${authRes.reason}. ${authInspection.setupHint}`
+      );
       return {
         status: 'skipped_auth_required',
         id: surfaceId,
@@ -232,12 +266,15 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
     if (portStatus.occupied) {
       const offender = await describePortHolder(normalized.port);
       const ownCwd = pathResolver.rootDir();
-      const foreignNote = offender && offender.cwd && offender.cwd !== ownCwd
-        ? ` Holder appears to run from ${offender.cwd} (pid ${offender.pid}) — different from this repo at ${ownCwd}. Stop the foreign process or change ${surfaceManifestFilePath(surfaceId)}.`
-        : offender
-          ? ` Held by pid ${offender.pid}.`
-          : '';
-      throw new Error(`Surface "${surfaceId}" port ${normalized.port} is already in use.${foreignNote}`);
+      const foreignNote =
+        offender && offender.cwd && offender.cwd !== ownCwd
+          ? ` Holder appears to run from ${offender.cwd} (pid ${offender.pid}) — different from this repo at ${ownCwd}. Stop the foreign process or change ${surfaceManifestFilePath(surfaceId)}.`
+          : offender
+            ? ` Held by pid ${offender.pid}.`
+            : '';
+      throw new Error(
+        `Surface "${surfaceId}" port ${normalized.port} is already in use.${foreignNote}`
+      );
     }
   }
 
@@ -345,7 +382,9 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
       results.push(started);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`⚠️  [SURFACE] Failed to start "${definition.id}": ${message}. Continuing with the next surface.`);
+      console.error(
+        `⚠️  [SURFACE] Failed to start "${definition.id}": ${message}. Continuing with the next surface.`
+      );
       results.push({ id: definition.id, status: 'failed', reason: message });
     }
   }
@@ -391,9 +430,9 @@ async function statusSurfaces() {
           ? surfaceHealth.status === 'healthy'
             ? 'healthy'
             : 'degraded'
-            : record
-              ? 'stale'
-              : 'untracked',
+          : record
+            ? 'stale'
+            : 'untracked',
       repairHint: buildSurfaceRepairHint(definition, record, surfaceHealth),
       nextAction: buildSurfaceNextAction(
         definition.id,
@@ -404,11 +443,11 @@ async function statusSurfaces() {
           : record
             ? 'stale'
             : 'untracked',
-        buildSurfaceRepairHint(definition, record, surfaceHealth),
+        buildSurfaceRepairHint(definition, record, surfaceHealth)
       ),
       lastKnownState: record
         ? {
-          pid: record.pid,
+            pid: record.pid,
             startedAt: record.startedAt,
             logPath: record.logPath,
             startupMode: record.metadata?.startupMode || definition.startupMode,
@@ -432,52 +471,57 @@ async function statusSurfaces() {
 async function listUnits() {
   const manifest = loadSurfaceManifest();
   const state = loadSurfaceState();
-  
-  const results = await Promise.all(manifest.surfaces.map(async (d) => {
-    const normalized = normalizeSurfaceDefinition(d);
-    const record = state.surfaces[d.id];
-    const running = record && isRunning(record.pid);
-    const health = await probeSurfaceHealth(normalized);
-    const auth = (d as any).preset_path ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path) : null;
-    
-    return {
-      unit: d.id,
-      kind: d.kind,
-      enabled: d.enabled !== false ? 'enabled' : 'disabled',
-      status: running ? 'running' : 'stopped',
-      health: health.status,
-      auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
-      port: d.port || '-',
-      hint: auth?.setupHint || '',
-      nextAction: auth && !auth.valid
-        ? buildNextAction({
-            title: `Fix surface auth for ${d.id}`,
-            reason: auth.setupHint,
-            next_action_type: 'bootstrap_environment',
-            suggested_command: 'pnpm surfaces:setup',
-          })
-        : health.status !== 'healthy'
-          ? buildNextAction({
-              title: `Repair surface ${d.id}`,
-              reason: health.detail,
-              next_action_type: 'repair_surface',
-              suggested_command: `pnpm surfaces:repair -- --surface ${d.id}`,
-            })
-          : buildNextAction({
-              title: `Inspect surface ${d.id}`,
-              reason: 'Surface is healthy.',
-              next_action_type: 'inspect_artifact',
-              suggested_command: `pnpm surfaces:status -- --surface ${d.id}`,
-            }),
-      pid: record?.pid || '-'
-    };
-  }));
+
+  const results = await Promise.all(
+    manifest.surfaces.map(async (d) => {
+      const normalized = normalizeSurfaceDefinition(d);
+      const record = state.surfaces[d.id];
+      const running = record && isRunning(record.pid);
+      const health = await probeSurfaceHealth(normalized);
+      const auth = (d as any).preset_path
+        ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path)
+        : null;
+
+      return {
+        unit: d.id,
+        kind: d.kind,
+        enabled: d.enabled !== false ? 'enabled' : 'disabled',
+        status: running ? 'running' : 'stopped',
+        health: health.status,
+        auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
+        port: d.port || '-',
+        hint: auth?.setupHint || '',
+        nextAction:
+          auth && !auth.valid
+            ? buildNextAction({
+                title: `Fix surface auth for ${d.id}`,
+                reason: auth.setupHint,
+                next_action_type: 'bootstrap_environment',
+                suggested_command: 'pnpm surfaces:setup',
+              })
+            : health.status !== 'healthy'
+              ? buildNextAction({
+                  title: `Repair surface ${d.id}`,
+                  reason: health.detail,
+                  next_action_type: 'repair_surface',
+                  suggested_command: `pnpm surfaces:repair -- --surface ${d.id}`,
+                })
+              : buildNextAction({
+                  title: `Inspect surface ${d.id}`,
+                  reason: 'Surface is healthy.',
+                  next_action_type: 'inspect_artifact',
+                  suggested_command: `pnpm surfaces:status -- --surface ${d.id}`,
+                }),
+        pid: record?.pid || '-',
+      };
+    })
+  );
 
   console.log('');
   const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
   console.log(header);
   console.log('-'.repeat(header.length + 5));
-  
+
   for (const r of results) {
     const statusColor = r.status === 'running' ? '🟢' : '⚪';
     const enabledColor = r.enabled === 'enabled' ? '✅' : '❌';
@@ -485,7 +529,10 @@ async function listUnits() {
     console.log(
       `${r.unit.padEnd(25)} ${r.kind.padEnd(10)} ${enabledColor} ${r.enabled.padEnd(8)} ${statusColor} ${r.status.padEnd(8)} ${authColor} ${r.auth.padEnd(8)} ${r.health.padEnd(10)} ${String(r.port).padEnd(6)} ${r.pid}`
     );
-    if (r.nextAction && (r.auth === 'missing' || r.health !== 'healthy' || r.enabled !== 'enabled')) {
+    if (
+      r.nextAction &&
+      (r.auth === 'missing' || r.health !== 'healthy' || r.enabled !== 'enabled')
+    ) {
       for (const line of formatNextAction(r.nextAction)) {
         console.log(`  ${line}`);
       }
@@ -496,39 +543,50 @@ async function listUnits() {
 
 export async function setupSurfaces(options: { quiet?: boolean } = {}) {
   const manifest = loadSurfaceManifest();
-  const rows = sortSurfaceSetupRows(await Promise.all(manifest.surfaces.map(async (d) => {
-    const auth = (d as any).preset_path ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path) : null;
-    return {
-      surface: d.id,
-      enabled: d.enabled !== false ? 'enabled' : 'disabled',
-      auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
-      strategy: auth?.authStrategy || 'host-managed',
-      secrets: auth?.requiredSecrets.join(', ') || '',
-      cli: auth?.cliFallbacks.join(', ') || '',
-      hint: auth?.setupHint || 'Host-managed surface or no preset path.',
-    };
-  })));
+  const rows = sortSurfaceSetupRows(
+    await Promise.all(
+      manifest.surfaces.map(async (d) => {
+        const auth = (d as any).preset_path
+          ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path)
+          : null;
+        return {
+          surface: d.id,
+          enabled: d.enabled !== false ? 'enabled' : 'disabled',
+          auth: auth ? (auth.valid ? 'ready' : 'missing') : 'n/a',
+          strategy: auth?.authStrategy || 'host-managed',
+          secrets: auth?.requiredSecrets.join(', ') || '',
+          cli: auth?.cliFallbacks.join(', ') || '',
+          hint: auth?.setupHint || 'Host-managed surface or no preset path.',
+        };
+      })
+    )
+  );
 
-  const summary = rows.reduce((acc, row) => {
-    acc.total += 1;
-    if (row.enabled === 'enabled') acc.enabled += 1;
-    if (row.enabled === 'disabled') acc.disabled += 1;
-    if (row.auth === 'ready') acc.ready += 1;
-    if (row.auth === 'missing') acc.missing += 1;
-    if (row.auth === 'n/a') acc.hostManaged += 1;
-    return acc;
-  }, { total: 0, enabled: 0, disabled: 0, ready: 0, missing: 0, hostManaged: 0 });
+  const summary = rows.reduce(
+    (acc, row) => {
+      acc.total += 1;
+      if (row.enabled === 'enabled') acc.enabled += 1;
+      if (row.enabled === 'disabled') acc.disabled += 1;
+      if (row.auth === 'ready') acc.ready += 1;
+      if (row.auth === 'missing') acc.missing += 1;
+      if (row.auth === 'n/a') acc.hostManaged += 1;
+      return acc;
+    },
+    { total: 0, enabled: 0, disabled: 0, ready: 0, missing: 0, hostManaged: 0 }
+  );
 
   if (!options.quiet) {
     console.log('');
-    console.log(`Setup summary: ${summary.missing} missing, ${summary.ready} ready, ${summary.hostManaged} host-managed, ${summary.disabled} disabled, ${summary.total} total`);
+    console.log(
+      `Setup summary: ${summary.missing} missing, ${summary.ready} ready, ${summary.hostManaged} host-managed, ${summary.disabled} disabled, ${summary.total} total`
+    );
     const header = `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`;
     console.log(header);
     console.log('-'.repeat(header.length + 8));
     for (const row of rows) {
       const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
       console.log(
-        `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`,
+        `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
       );
       if (row.auth === 'missing' || row.auth === 'n/a') {
         console.log(`  ↳ ${row.hint}`);
@@ -573,7 +631,10 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
     const started = await startSurfaceById(surfaceId, manifestPath);
     return {
       ...started,
-      repairHint: health.status === 'healthy' ? 'already healthy before repair' : `recovered from ${health.detail}`,
+      repairHint:
+        health.status === 'healthy'
+          ? 'already healthy before repair'
+          : `recovered from ${health.detail}`,
     };
   }
 
@@ -623,9 +684,9 @@ async function repairSurfaces(manifestPath: string, surfaceId?: string) {
 
 async function enableSurfaceById(surfaceId: string, manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
-  const definition = manifest.surfaces.find(s => s.id === surfaceId);
+  const definition = manifest.surfaces.find((s) => s.id === surfaceId);
   if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
-  
+
   if (definition.enabled === true) {
     logger.info(`Surface "${surfaceId}" is already enabled.`);
   } else {
@@ -636,19 +697,19 @@ async function enableSurfaceById(surfaceId: string, manifestPath: string) {
       action: 'surface.enable',
       operation: surfaceId,
       result: 'completed',
-      metadata: { surfaceId, manifestPath }
+      metadata: { surfaceId, manifestPath },
     });
     logger.success(`✅ Enabled surface "${surfaceId}".`);
   }
-  
+
   return startSurfaceById(surfaceId, manifestPath);
 }
 
 async function disableSurfaceById(surfaceId: string, manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
-  const definition = manifest.surfaces.find(s => s.id === surfaceId);
+  const definition = manifest.surfaces.find((s) => s.id === surfaceId);
   if (!definition) throw new Error(`Surface "${surfaceId}" not found.`);
-  
+
   if (definition.enabled === false) {
     logger.info(`Surface "${surfaceId}" is already disabled.`);
   } else {
@@ -659,28 +720,28 @@ async function disableSurfaceById(surfaceId: string, manifestPath: string) {
       action: 'surface.disable',
       operation: surfaceId,
       result: 'completed',
-      metadata: { surfaceId, manifestPath }
+      metadata: { surfaceId, manifestPath },
     });
     logger.success(`✅ Disabled surface "${surfaceId}".`);
   }
-  
+
   return stopSurfaceById(surfaceId);
 }
 
 async function registerSurface(params: {
-  id: string,
-  kind: SurfaceRuntimeKind,
-  command: string,
-  args?: string[],
-  port?: number,
-  description?: string,
-  manifestPath: string
+  id: string;
+  kind: SurfaceRuntimeKind;
+  command: string;
+  args?: string[];
+  port?: number;
+  description?: string;
+  manifestPath: string;
 }) {
   const manifest = loadSurfaceManifest(params.manifestPath);
-  if (manifest.surfaces.some(s => s.id === params.id)) {
+  if (manifest.surfaces.some((s) => s.id === params.id)) {
     throw new Error(`Surface "${params.id}" is already registered.`);
   }
-  
+
   const newSurface: SurfaceRuntimeDefinition = {
     id: params.id,
     kind: params.kind,
@@ -691,32 +752,32 @@ async function registerSurface(params: {
     enabled: true,
     startupMode: params.kind === 'ui' ? 'workspace-app' : 'background',
     shutdownPolicy: 'detached',
-    ownerType: 'surface-runtime-manifest'
+    ownerType: 'surface-runtime-manifest',
   };
-  
+
   manifest.surfaces.push(newSurface);
   saveSurfaceManifest(manifest, params.manifestPath);
-  
+
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'worker',
     action: 'surface.register',
     operation: params.id,
     result: 'completed',
-    metadata: { ...newSurface, manifestPath: params.manifestPath }
+    metadata: { ...newSurface, manifestPath: params.manifestPath },
   });
-  
+
   logger.success(`✅ Registered new surface "${params.id}".`);
   return reconcileSurfaces(params.manifestPath);
 }
 
 async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
   const manifest = loadSurfaceManifest(manifestPath);
-  const index = manifest.surfaces.findIndex(s => s.id === surfaceId);
+  const index = manifest.surfaces.findIndex((s) => s.id === surfaceId);
   if (index === -1) throw new Error(`Surface "${surfaceId}" not found.`);
-  
+
   const [removed] = manifest.surfaces.splice(index, 1);
   saveSurfaceManifest(manifest, manifestPath);
-  
+
   await stopSurfaceById(surfaceId);
 
   auditChain.record({
@@ -724,9 +785,9 @@ async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
     action: 'surface.unregister',
     operation: surfaceId,
     result: 'completed',
-    metadata: { surfaceId, removed, manifestPath }
+    metadata: { surfaceId, removed, manifestPath },
   });
-  
+
   logger.success(`✅ Unregistered surface "${surfaceId}".`);
 }
 
@@ -752,7 +813,23 @@ async function reconcileHealth(manifestPath: string) {
 
 const main = async () => {
   const argv = await createStandardYargs()
-    .option('action', { type: 'string', choices: ['reconcile', 'start', 'stop', 'status', 'list-units', 'setup', 'repair', 'enable', 'disable', 'register', 'unregister'] as const, required: true })
+    .option('action', {
+      type: 'string',
+      choices: [
+        'reconcile',
+        'start',
+        'stop',
+        'status',
+        'list-units',
+        'setup',
+        'repair',
+        'enable',
+        'disable',
+        'register',
+        'unregister',
+      ] as const,
+      required: true,
+    })
     .option('surface', { type: 'string' })
     .option('manifest', { type: 'string', default: surfaceManifestPath() })
     .option('cleanup', { type: 'boolean', default: false })
@@ -810,10 +887,18 @@ const main = async () => {
         id: argv.surface as string,
         kind: argv.kind as SurfaceRuntimeKind,
         command: argv.command as string,
-        args: argv.args ? (() => { try { return JSON.parse(argv.args as string); } catch { return (argv.args as string).split(' '); } })() : [],
+        args: argv.args
+          ? (() => {
+              try {
+                return JSON.parse(argv.args as string);
+              } catch {
+                return (argv.args as string).split(' ');
+              }
+            })()
+          : [],
         port: argv.port as number,
         description: argv.description as string,
-        manifestPath
+        manifestPath,
       });
       break;
     case 'unregister':
@@ -829,11 +914,11 @@ const main = async () => {
   }
 };
 
-const isMain = process.argv[1] && (
-  process.argv[1].endsWith('surface_runtime.ts') || 
-  process.argv[1].endsWith('surface_runtime.js') ||
-  process.argv[1].endsWith('surface_runtime.mts')
-);
+const isMain =
+  process.argv[1] &&
+  (process.argv[1].endsWith('surface_runtime.ts') ||
+    process.argv[1].endsWith('surface_runtime.js') ||
+    process.argv[1].endsWith('surface_runtime.mts'));
 
 if (isMain) {
   main().catch((err: any) => {
