@@ -160,5 +160,39 @@ describe('reasoning-backend', () => {
       });
       expect(result.branches[0].terminated_at_step).toBeNull();
     });
+
+    it('prefixes user-visible work responses with setup guidance when stub was not explicit', async () => {
+      const previous = process.env.KYBERION_REASONING_BACKEND;
+      delete process.env.KYBERION_REASONING_BACKEND;
+      try {
+        await expect(stubReasoningBackend.prompt('do work')).resolves.toContain(
+          'Run `pnpm reasoning:setup`'
+        );
+        await expect(stubReasoningBackend.delegateTask('do work')).resolves.toContain(
+          'Run `pnpm reasoning:setup`'
+        );
+      } finally {
+        if (previous === undefined) {
+          delete process.env.KYBERION_REASONING_BACKEND;
+        } else {
+          process.env.KYBERION_REASONING_BACKEND = previous;
+        }
+      }
+    });
+
+    it('keeps explicit stub mode deterministic without setup guidance', async () => {
+      const previous = process.env.KYBERION_REASONING_BACKEND;
+      process.env.KYBERION_REASONING_BACKEND = 'stub';
+      try {
+        const result = await stubReasoningBackend.prompt('offline test');
+        expect(result).toBe('[STUB] offline test');
+      } finally {
+        if (previous === undefined) {
+          delete process.env.KYBERION_REASONING_BACKEND;
+        } else {
+          process.env.KYBERION_REASONING_BACKEND = previous;
+        }
+      }
+    });
   });
 });

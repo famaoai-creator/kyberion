@@ -20,6 +20,16 @@
 4. スタブに着地した状態で実作業を依頼すると、`[STUB]` 出力の前に「推論バックエンド未設定です。`pnpm reasoning:setup` を実行してください」という明確な警告がユーザーに出る(黙ってプレースホルダを返さない)。
 5. `pnpm reasoning:setup`(既存 or 新設)が対話的にバックエンドを設定・疎通確認できる。
 
+## 実装状況 (2026-07-04)
+
+- **着手済み(Task 1)**: `reasoning-backend.any-real` を doctor severity の `must` として扱うようにし、実働 backend 不在を後回し可能な `should` ではなく致命的な readiness gap として表示する。
+- **着手済み(Task 1/4)**: `pnpm doctor` の reasoning backend 不在時 next action を、行き止まりになり得る `pnpm env:bootstrap --manifest reasoning-backend --apply` ではなく、実行可能な `pnpm reasoning:setup` と具体的な backend 選択肢へ誘導する。
+- **着手済み(Task 3)**: 未設定のまま stub backend が `prompt` / `delegateTask` の実作業応答に使われた場合、`[STUB]` 応答の前に `pnpm reasoning:setup` を促すユーザー可視警告を付与する。明示的な `KYBERION_REASONING_BACKEND=stub` の deterministic/offline 運用では従来通り警告を抑制する。
+- **着手済み(Task 2)**: `pnpm onboard` に `reasoning` フェーズを追加し、identity 後に real backend を検出する。未設定時は `pnpm reasoning:setup` を案内し、対話環境では stub-only 継続を明示確認するまで Welcome に進まない。結果は `onboarding-state.json` と summary に保存する。
+- **着手済み(Task 2)**: Path B (`pnpm onboard:apply`) も reasoning 状態を検出し、state/summary/JSON result に保存する。非対話フローでは設定変更はせず、現状を機械可読に報告する。
+- **着手済み(Task 4)**: `docs/INITIALIZATION.md` には `pnpm reasoning:setup` を初期化手順に組み込み済み。
+- **未実装**: `pnpm reasoning:setup` の対話的な設定書き込み・実 API 疎通確認、README/QUICKSTART/INITIALIZATION の完全な単一正本化までは未完。
+
 ## 実装タスク
 
 ### Task 1: severity 再分類と doctor 案内修正 — `claude-sonnet-4`

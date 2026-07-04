@@ -501,6 +501,15 @@ export function resetReasoningBackend(): void {
   registered = null;
 }
 
+const UNCONFIGURED_STUB_WARNING =
+  'Reasoning backend is not configured. Run `pnpm reasoning:setup` before using Kyberion for real work.';
+
+function stubText(message: string): string {
+  return process.env.KYBERION_REASONING_BACKEND === 'stub'
+    ? message
+    : `${UNCONFIGURED_STUB_WARNING}\n${message}`;
+}
+
 /** Deterministic, offline backend that emits structured placeholders. */
 export const stubReasoningBackend: ReasoningBackend = {
   name: 'stub',
@@ -673,13 +682,13 @@ export const stubReasoningBackend: ReasoningBackend = {
     logger.warn(
       `[reasoning-backend:stub] delegateTask — no real backend registered; instruction="${instruction}"`
     );
-    return `[STUB] Delegated task execution (stub). Context: ${context ?? 'none'}`;
+    return stubText(`[STUB] Delegated task execution (stub). Context: ${context ?? 'none'}`);
   },
 
   async prompt(prompt) {
     logger.warn(
       `[reasoning-backend:stub] prompt — no real backend registered; prompt="${prompt.slice(0, 80)}"`
     );
-    return `[STUB] ${prompt}`;
+    return stubText(`[STUB] ${prompt}`);
   },
 };
