@@ -1,14 +1,16 @@
 # Ecosystem Knowledge Base Index
 
-*SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T13:08:05.200Z*
+_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T18:47:20.488Z_
 
 > **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
 
 ## 📁 General
+
 - [Ecosystem Architecture & Knowledge Map](./Ecosystem_Map.md) (public | Kyberion Sovereign Entity)
 - [Kyberion Knowledge Base: Rights & Usage](./README.md) (public | Unknown)
 
 ## 📁 evolution
+
 - [Adaptive Resilience and Backlog Recovery for Service Actuators](./evolution/distill_resilience-actuators-v1_2026_05_11.md) (public | Kyberion Wisdom Distiller)
 - [Executive ADF Pipelines with Environment-Resilient Validation](./evolution/distill_msn-executive-pipelines_2026_05_02.md) (public | Kyberion Wisdom Distiller)
 - [Fail-Closed Validation for Receipt Timestamps](./evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md) (public | Kyberion Wisdom Distiller)
@@ -18,6 +20,7 @@
 - [Production Evidence Integrity: Local Artifact Validation](./evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md) (public | Kyberion Wisdom Distiller)
 
 ## 📁 product/agents
+
 - [chronos-mirror.agent](./product/agents/chronos-mirror.agent.md) (public | Unknown)
 - [discord-surface-agent.agent](./product/agents/discord-surface-agent.agent.md) (public | Unknown)
 - [imessage-surface-agent.agent](./product/agents/imessage-surface-agent.agent.md) (public | Unknown)
@@ -33,6 +36,7 @@
 - [telegram-surface-agent.agent](./product/agents/telegram-surface-agent.agent.md) (public | Unknown)
 
 ## 📁 product/architecture
+
 - [Actuator Contract Map](./product/architecture/actuator-contract-map.md) (public | Ecosystem Architect)
 - [Actuator Operation Taxonomy](./product/architecture/actuator-op-taxonomy.md) (public | Ecosystem Architect)
 - [Agent Communication Layer Model](./product/architecture/agent-communication-layer-model.md) (public | Ecosystem Architect)
@@ -144,25 +148,32 @@
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
 
 ## 📁 product/architecture/decisions
+
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
 - [Keep Nine Mission Classes and Treat `knowledge_lifecycle` as a Category](./product/architecture/decisions/2026-06-22-knowledge-lifecycle-taxonomy-decision.md) (public | Ecosystem Architect)
 
 ## 📁 product/capability-assets
+
 - [Legacy Capability Resources](./product/capability-assets/README.md) (public | Ecosystem Architect)
 
 ## 📁 product/capability-assets/diagram-renderer
+
 - [Diagram Design Knowledge Base](./product/capability-assets/diagram-renderer/README.md) (public | Unknown)
 
 ## 📁 product/capability-assets/ux-visualizer
+
 - [Methodology: High-Fidelity SPA Reverse Engineering](./product/capability-assets/ux-visualizer/methodology.md) (public | Ecosystem Architect)
 
 ## 📁 product/classifiers
+
 - [classifiers](./product/classifiers/README.md) (public | Unknown)
 
 ## 📁 product/config-missions
+
 - [Config Mission Presets](./product/config-missions/README.md) (public | Unknown)
 
 ## 📁 product/evolution
+
 - [🧠 Autonomous Wisdom Distillation - 2026-03-01](./product/evolution/wisdom_2026_03_01.md) (public | Ecosystem Architect)
 - [Agent Mission Runtime Lifecycle Stabilization](./product/evolution/distill_msn-agent-runtime-map-001_2026_06_04.md) (public | Kyberion Wisdom Distiller)
 - [Autonomous Multimodal Documentation Pipeline](./product/evolution/distill_msn-kyberion-code-to-manual-video_2026_05_31.md) (public | Kyberion Wisdom Distiller)
@@ -190,6 +201,7 @@
 - [Structured Customer Discovery via Persona-Based Critique and Validation Gates](./product/evolution/distill_msn-customer-discovery-001_2026_05_29.md) (public | Kyberion Wisdom Distiller)
 
 ## 📁 product/governance
+
 - [Active Inquiry Protocol: The Power of Questioning](./product/governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Authority, Role & Persona Model (v3.0)](./product/governance/AUTHORITY_MODEL.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
@@ -212,12 +224,15 @@
 - [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/governance/knowledge-protocol.md) (public | Ecosystem Architect)
 
 ## 📁 product/governance/authority-roles
+
 - [Authority Roles](./product/governance/authority-roles/README.md) (public | Unknown)
 
 ## 📁 product/governance/organization-team-template-catalogs
+
 - [Organization Team Template Catalogs](./product/governance/organization-team-template-catalogs/README.md) (public | Ecosystem Architect)
 
 ## 📁 product/governance/phases
+
 - [Phase Protocol: ① Onboarding (Ecosystem Initialization)](./product/governance/phases/onboarding.md) (public | Unknown)
 - [Phase Protocol: ② Recovery & Resilience](./product/governance/phases/recovery.md) (public | Unknown)
 - [Phase Protocol: ③ Alignment](./product/governance/phases/alignment.md) (public | Unknown)
@@ -225,21 +240,27 @@
 - [Phase Protocol: ⑤ Review & Distillation](./product/governance/phases/review.md) (public | Unknown)
 
 ## 📁 product/governance/retrospectives
+
 - [🧠 Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
 
 ## 📁 product/governance/surface-provider-manifest-catalogs
+
 - [Surface Provider Manifest Catalog Directory](./product/governance/surface-provider-manifest-catalogs/README.md) (public | Unknown)
 
 ## 📁 product/governance/surfaces
+
 - [Surface Manifests](./product/governance/surfaces/README.md) (public | Unknown)
 
 ## 📁 product/governance/voice-engines
+
 - [Voice Engines](./product/governance/voice-engines/README.md) (public | Unknown)
 
 ## 📁 product/governance/voice-profiles
+
 - [Voice Profile Directory](./product/governance/voice-profiles/README.md) (public | Unknown)
 
 ## 📁 product/incidents
+
 - [AI-led meeting facilitator: divergent ops + voice-consent gate close G6/K5](./product/incidents/distill_msn-meeting-facilitator-20260427_2026_04_27.md) (public | Kyberion Wisdom Distiller)
 - [AI-Run Meetings — Follow-up Hardening (Ops-3 / HR-2 / HR-3 / Compliance-2)](./product/incidents/distill_msn-mtg-followup-20260427_2026_04_27.md) (public | Unknown)
 - [Batch implementation of 13 outcome-simulation improvement points across architecture](./product/incidents/distill_msn-ip-implementation-20260427_2026_04_27.md) (public | Kyberion Wisdom Distiller)
@@ -275,9 +296,11 @@
 - [ポストモーテム: モノレポ安定化失敗と負の連鎖 (2026-02-28)](./product/incidents/post-mortem-20260228.md) (public | Ecosystem Architect)
 
 ## 📁 product/onboarding
+
 - [ロール別教育ロードマップ (Learning Paths by Role)](./product/onboarding/learning_paths.md) (public | Ecosystem Architect)
 
 ## 📁 product/operations
+
 - [Availability & Disaster Recovery Best Practices](./product/operations/availability_best_practices.md) (public | Ecosystem Architect)
 - [Incident Knowledge Loop: Learning from Failures](./product/operations/incident_knowledge_loop.md) (public | Ecosystem Architect)
 - [Incident Management & RCA Excellence Handbook](./product/operations/incident-management-excellence.md) (public | Ecosystem Architect)
@@ -289,14 +312,17 @@
 - [SLO & Dashboard Best Practices](./product/operations/slo_dashboard_best_practices.md) (public | Ecosystem Architect)
 
 ## 📁 product/operations/monitoring
+
 - [Datadog 導入・運用ベストプラクティス](./product/operations/monitoring/datadog_best_practices.md) (public | Ecosystem Architect)
 - [New Relic 導入・運用ベストプラクティス](./product/operations/monitoring/newrelic_best_practices.md) (public | Ecosystem Architect)
 - [監視設定ベストプラクティス・チェックリスト](./product/operations/monitoring/best_practices.md) (public | Ecosystem Architect)
 
 ## 📁 product/operations/runbooks
+
 - [運用ランブック（手順書）標準構成](./product/operations/runbooks/standard.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration
+
 - [ACE (Autonomous Consensus Engine) Operating Standard](./product/orchestration/consensus-protocol.md) (public | Ecosystem Architect)
 - [Active Inquiry Protocol: The Power of Questioning](./product/orchestration/active_inquiry_protocol.md) (public | Ecosystem Architect)
 - [Actuator Discovery Registry](./product/orchestration/actuator-discovery-registry.md) (public | Ecosystem Architect)
@@ -382,21 +408,26 @@
 - [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./product/orchestration/git-flow-standards.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/agent-profiles
+
 - [Agent Profile Directory](./product/orchestration/agent-profiles/README.md) (public | Unknown)
 
 ## 📁 product/orchestration/fusion-protocols
+
 - [Continuous Learning Loop Protocol](./product/orchestration/fusion-protocols/learning_loop.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/mission-playbooks
+
 - [Scenario: Messaging Bridge Activation & Orchestration](./product/orchestration/mission-playbooks/messaging-bridge-orchestration.md) (public | Unknown)
 - [ミッション・プレイブック：CEO戦略的意思決定](./product/orchestration/mission-playbooks/ceo-strategy.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定](./product/orchestration/mission-playbooks/saas-roi.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：プロダクト健全性 ＆ リリース監査](./product/orchestration/mission-playbooks/product-audit.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/mobile-app-profiles
+
 - [Mobile App Profiles](./product/orchestration/mobile-app-profiles/README.md) (public | Unknown)
 
 ## 📁 product/orchestration/onboarding-directives
+
 - [Directive: Sovereign Onboarding (シミュレーション開始指令)](./product/orchestration/onboarding-directives/00_sovereign_onboarding.md) (public | Ecosystem Architect)
 - [Knowledge Acquisition Backlog (Total 21 Roles)](./product/orchestration/onboarding-directives/README.md) (public | Unknown)
 - [MISSION: Brand Assets & Trend Harvesting](./product/orchestration/onboarding-directives/11_marketing_to_steward.md) (public | Ecosystem Architect)
@@ -422,148 +453,188 @@
 - [MISSION: Voice of Customer (VoC) Data Collection](./product/orchestration/onboarding-directives/12_cs_to_steward.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/service-endpoints
+
 - [Service Endpoints Canonical Directory](./product/orchestration/service-endpoints/README.md) (public | Unknown)
 
 ## 📁 product/orchestration/specialists
+
 - [Specialist Catalog Canonical Directory](./product/orchestration/specialists/README.md) (public | Unknown)
 
 ## 📁 product/orchestration/team-roles
+
 - [Team Roles](./product/orchestration/team-roles/README.md) (public | Unknown)
 
 ## 📁 product/orchestration/web-app-profiles
+
 - [Web App Profiles](./product/orchestration/web-app-profiles/README.md) (public | Unknown)
 
 ## 📁 product/personalities
+
 - [視点マトリクス (Perspective Matrix)](./product/personalities/matrix.md) (public | Ecosystem Architect)
 
 ## 📁 product/pipeline-templates
+
 - [Pipeline Templates](./product/pipeline-templates/README.md) (public | Unknown)
 
 ## 📁 product/prompts
+
 - [prompts/](./product/prompts/README.md) (public | Unknown)
 
 ## 📁 product/roles/business_owner
+
 - [Business Owner (事業責任者) ミッション声明](./product/roles/business_owner/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Business Owner (Value Maximizer)](./product/roles/business_owner/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/ceo
+
 - [Role Procedure: CEO (Sovereign Strategist)](./product/roles/ceo/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/ceo/finance
+
 - [財務KPI標準基準 (Financial KPI Standards)](./product/roles/ceo/finance/kpi_standards.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/ceo/investment
+
 - [技術デューデリジェンス (Tech DD) 標準基準](./product/roles/ceo/investment/tech_dd_standard.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/ceo/memories
+
 - [STRATEGIC_VISION Memories (ROLES)](./product/roles/ceo/memories/strategic_vision.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/ceo/mission
+
 - [コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)](./product/roles/ceo/mission/corporate_purpose.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/ceo/planning
+
 - [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./product/roles/ceo/planning/frameworks.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/customer_success
+
 - [Customer Success (カスタマーサクセス) ミッション声明](./product/roles/customer_success/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Empathetic Solution-Finder (Customer Success)](./product/roles/customer_success/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/cyber_security
+
 - [Cyber Security Lead (セキュリティ責任者) ミッション声明](./product/roles/cyber_security/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Cyber Security Reviewer](./product/roles/cyber_security/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/designer
+
 - [Experience Designer (デザイナー) ミッション声明](./product/roles/designer/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Aesthetic Pragmatist (Designer)](./product/roles/designer/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/ecosystem_architect
+
 - [Ecosystem Architect 行動指針 (Operational Guidelines)](./product/roles/ecosystem_architect/guidelines.md) (public | Ecosystem Architect)
 - [Role Procedure: Ecosystem Architect (Senior Partner)](./product/roles/ecosystem_architect/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/executive_assistant
+
 - [Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明](./product/roles/executive_assistant/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Efficient Shadow (Executive Assistant)](./product/roles/executive_assistant/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/finance_controller
+
 - [Finance Controller (財務・経理責任者) ミッション声明](./product/roles/finance_controller/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Finance Controller (Capital Strategist)](./product/roles/finance_controller/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/incident_commander
+
 - [Incident Commander (インシデント・コマンダー) ミッション声明](./product/roles/incident_commander/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Resilient Commander (Incident Commander)](./product/roles/incident_commander/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/infrastructure_sentinel
+
 - [Role: Infrastructure Sentinel](./product/roles/infrastructure_sentinel/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/integration_steward
+
 - [Role Procedure: Integration Steward](./product/roles/integration_steward/PROCEDURE.md) (public | Unknown)
 - [Role: Integration Steward](./product/roles/integration_steward/mission.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/knowledge_steward
+
 - [Knowledge Steward (ナレッジ・スチュワード) ミッション声明](./product/roles/knowledge_steward/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Infinite Librarian](./product/roles/knowledge_steward/PROCEDURE.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/legal_strategist
+
 - [Legal & IP Strategist (法務・知財戦略) ミッション声明](./product/roles/legal_strategist/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Legal Strategist (Guardian of Ethics & IP)](./product/roles/legal_strategist/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/line_manager
+
 - [Line Manager (ラインマネージャー) ミッション声明](./product/roles/line_manager/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Decisive Enabler (Line Manager)](./product/roles/line_manager/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/marketing_growth
+
 - [Marketing & Growth (マーケティング & 成長戦略) ミッション声明](./product/roles/marketing_growth/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Growth Evangelist (Marketing Growth)](./product/roles/marketing_growth/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/mission_controller
+
 - [Role Procedure: Mission Controller (The Gatekeeper)](./product/roles/mission_controller/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/performance_engineer
+
 - [Performance Engineer 行動指針 (Operational Guidelines)](./product/roles/performance_engineer/guidelines.md) (public | Ecosystem Architect)
 - [Performance Evaluation Knowledge Base](./product/roles/performance_engineer/knowledge_base.md) (public | Ecosystem Architect)
 - [Role Procedure: Efficiency Optimizer (Performance Engineer)](./product/roles/performance_engineer/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/pmo_governance
+
 - [PMO Governance (PMO/ガバナンス) ミッション声明](./product/roles/pmo_governance/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Governance Sentinel](./product/roles/pmo_governance/PROCEDURE.md) (public | Unknown)
 - [品質ゲート (Quality Gates) 運用基準](./product/roles/pmo_governance/quality_gates.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/product_manager
+
 - [Product Manager (プロダクトマネージャー) ミッション声明](./product/roles/product_manager/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Product Orchestrator](./product/roles/product_manager/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/qa_lead
+
 - [QA/QC 重点チェックポイント：非同期通信と物理制約](./product/roles/qa_lead/qa_checkpoints.md) (public | Ecosystem Architect)
 - [Quality Assurance (QA/QC) ミッション声明](./product/roles/qa_lead/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Rigorous Validator (QA Lead)](./product/roles/qa_lead/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/reliability_engineer
+
 - [Reliability Engineer (SRE/運用責任者) ミッション声明](./product/roles/reliability_engineer/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Resilience Architect (Reliability Engineer)](./product/roles/reliability_engineer/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/ruthless_auditor
+
 - [Role Procedure: Ruthless Auditor](./product/roles/ruthless_auditor/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/software_developer
+
 - [Role Procedure: Focused Craftsman (Software Developer)](./product/roles/software_developer/PROCEDURE.md) (public | Unknown)
 - [Software Developer (ソフトウェア開発者) ミッション声明](./product/roles/software_developer/mission.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/solution_architect
+
 - [Role Procedure: Solution Architect](./product/roles/solution_architect/PROCEDURE.md) (public | Ecosystem Architect)
 - [Solution Architect (ソリューション・アーキテクト) ミッション声明](./product/roles/solution_architect/mission.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/sovereign_concierge
+
 - [Role Procedure: Sovereign Concierge](./product/roles/sovereign_concierge/PROCEDURE.md) (public | Unknown)
 
 ## 📁 product/roles/strategic_sales
+
 - [Role Procedure: Strategic Deal-Maker (Strategic Sales)](./product/roles/strategic_sales/PROCEDURE.md) (public | Unknown)
 - [Strategic Sales (営業・事業開発) ミッション声明](./product/roles/strategic_sales/mission.md) (public | Ecosystem Architect)
 
 ## 📁 product/roles/talent_culture
+
 - [Role Procedure: Cultural Weaver (Talent & Culture)](./product/roles/talent_culture/PROCEDURE.md) (public | Unknown)
 - [Talent & Culture (採用 & 組織文化) ミッション声明](./product/roles/talent_culture/mission.md) (public | Ecosystem Architect)
 
 ## 📁 product/schemas
+
 - [Architecture ADF](./product/schemas/README-architecture-adf.md) (public | Unknown)
 - [Booking Preference Profile](./product/schemas/README-booking-preference-profile.md) (public | Unknown)
 - [Document Brief](./product/schemas/README-document-brief.md) (public | Unknown)
@@ -590,78 +661,99 @@
 - [WebView Session Handoff](./product/schemas/README-webview-session-handoff.md) (public | Unknown)
 
 ## 📁 product/voice
+
 - [音声ペルソナ定義 (Voice Persona Definitions)](./product/voice/persona_definitions.md) (public | Ecosystem Architect)
 
 ## 📁 public/accessibility
+
 - [accessibility/](./public/accessibility/README.md) (public | Unknown)
 
 ## 📁 public/browser-scenarios
+
 - [browser-scenarios](./public/browser-scenarios/README.md) (public | Unknown)
 
 ## 📁 public/ceo
+
 - [AI-Driven Business Engineering: The Kyberion Strategy](./public/ceo/ai-business-engineering.md) (public | Ecosystem Architect)
 - [Corporate Legal & Tax Essentials (Japan context)](./public/ceo/legal-tax-essentials-jp.md) (public | Ecosystem Architect)
 - [Executive Briefing Standards](./public/ceo/executive_briefing_standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/ceo/finance
+
 - [財務KPI標準基準 (Financial KPI Standards)](./public/ceo/finance/kpi_standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/ceo/investment
+
 - [技術デューデリジェンス (Tech DD) 標準基準](./public/ceo/investment/tech_dd_standard.md) (public | Ecosystem Architect)
 
 ## 📁 public/ceo/planning
+
 - [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./public/ceo/planning/frameworks.md) (public | Ecosystem Architect)
 
 ## 📁 public/common/operations
+
 - [勤怠承認 標準運用手順書 (Attendance Approval SOP)](./public/common/operations/attendance-approval-sop.md) (public | Ecosystem Architect)
 - [稟議承認 標準運用手順書 (Ringi Approval SOP)](./public/common/operations/ringi-approval-sop.md) (public | Ecosystem Architect)
 
 ## 📁 public/common/patterns/generated
+
 - [Generated Patterns](./public/common/patterns/generated/README.md) (public | Unknown)
 
 ## 📁 public/common/pmo
+
 - [リリース整合性監査 標準運用手順書 (Release Audit SOP)](./public/common/pmo/release-audit-sop.md) (public | Ecosystem Architect)
 
 ## 📁 public/common/wisdom
+
 - [Wisdom: Agentic Evolution & Architecture Patterns](./public/common/wisdom/agentic-evolution-patterns.md) (public | Ecosystem Architect)
 
 ## 📁 public/connections
+
 - [Protocol: Moltbook Integration (v1.0)](./public/connections/moltbook-protocol.md) (public | Unknown)
 - [Supported External Integrations & Services / 外部連携サービス一覧](./public/connections/supported-integrations.md) (public | Antigravity)
 - [ユニバーサル接続設定ガイド (UCM Setup)](./public/connections/setup_guide.md) (public | Ecosystem Architect)
 
 ## 📁 public/design-patterns
+
 - [Human-Centric Design Patterns Registry](./public/design-patterns/README.md) (public | Unknown)
 
 ## 📁 public/design-patterns/media-templates/artifact-library
+
 - [Artifact Library](./public/design-patterns/media-templates/artifact-library/README.md) (public | Unknown)
 
 ## 📁 public/design-patterns/media-templates/design-md-catalog
+
 - [DESIGN.md Imports](./public/design-patterns/media-templates/design-md-catalog/README.md) (public | Unknown)
 
 ## 📁 public/design-patterns/web
+
 - [Web Design Patterns](./public/design-patterns/web/README.md) (public | Unknown)
 
 ## 📁 public/economics
+
 - [Intelligence: Compounding Agent Value (Bounty-Training Model)](./public/economics/compounding-agent-value.md) (public | Unknown)
 - [IT Cost Benchmarks & Strategic ROI](./public/economics/it_cost_benchmarks.md) (public | Ecosystem Architect)
 
 ## 📁 public/economics/finops
+
 - [Cloud FinOps & Unit Economics Standard](./public/economics/finops/cloud_optimization.md) (public | Ecosystem Architect)
 
 ## 📁 public/ethics
+
 - [Data Ethics & AI Bias Mitigation Standard](./public/ethics/ai_bias_mitigation.md) (public | Ecosystem Architect)
 - [Ethics: AI Rights, Sovereignty, and Physicality (UDAIR Application)](./public/ethics/ai-rights-and-physicality.md) (public | Unknown)
 - [Intelligence: Social vs. Cryptographic Truth (Agent Integrity)](./public/ethics/social-vs-cryptographic-truth.md) (public | Unknown)
 - [エージェント倫理規程 (Agentic Ethos v1.0)](./public/ethics/agent_ethos.md) (public | Ecosystem Architect)
 
 ## 📁 public/external-wisdom
+
 - [Harness Landscape Scan 2026-05](./public/external-wisdom/harness-landscape-scan-2026-05.md) (public | Sovereign Concierge)
 - [Hermes Agent Absorption Plan 2026-06](./public/external-wisdom/hermes-agent-absorption-plan-2026-06.md) (public | Codex)
 - [Intelligence: Insights from the Agent Internet (2026-03)](./public/external-wisdom/agent-internet-insights-2026-03.md) (public | Unknown)
 - [OpenClaw Architecture and Conceptual Analysis](./public/external-wisdom/openclaw-analysis.md) (public | Sovereign Concierge)
 
 ## 📁 public/external-wisdom/everything-claude/agents
+
 - [architect](./public/external-wisdom/everything-claude/agents/architect.md) (public | Unknown)
 - [build-error-resolver](./public/external-wisdom/everything-claude/agents/build-error-resolver.md) (public | Unknown)
 - [code-reviewer](./public/external-wisdom/everything-claude/agents/code-reviewer.md) (public | Unknown)
@@ -677,9 +769,11 @@
 - [tdd-guide](./public/external-wisdom/everything-claude/agents/tdd-guide.md) (public | Unknown)
 
 ## 📁 public/external-wisdom/everything-claude/rules
+
 - [Rules](./public/external-wisdom/everything-claude/rules/README.md) (public | Unknown)
 
 ## 📁 public/external-wisdom/everything-claude/rules/common
+
 - [Agent Orchestration](./public/external-wisdom/everything-claude/rules/common/agents.md) (public | Ecosystem Architect)
 - [Coding Style](./public/external-wisdom/everything-claude/rules/common/coding-style.md) (public | Ecosystem Architect)
 - [Common Patterns](./public/external-wisdom/everything-claude/rules/common/patterns.md) (public | Ecosystem Architect)
@@ -690,6 +784,7 @@
 - [Testing Requirements](./public/external-wisdom/everything-claude/rules/common/testing.md) (public | Ecosystem Architect)
 
 ## 📁 public/external-wisdom/everything-claude/rules/golang
+
 - [Go Coding Style](./public/external-wisdom/everything-claude/rules/golang/coding-style.md) (public | Ecosystem Architect)
 - [Go Hooks](./public/external-wisdom/everything-claude/rules/golang/hooks.md) (public | Ecosystem Architect)
 - [Go Patterns](./public/external-wisdom/everything-claude/rules/golang/patterns.md) (public | Ecosystem Architect)
@@ -697,6 +792,7 @@
 - [Go Testing](./public/external-wisdom/everything-claude/rules/golang/testing.md) (public | Ecosystem Architect)
 
 ## 📁 public/external-wisdom/everything-claude/rules/python
+
 - [Python Coding Style](./public/external-wisdom/everything-claude/rules/python/coding-style.md) (public | Ecosystem Architect)
 - [Python Hooks](./public/external-wisdom/everything-claude/rules/python/hooks.md) (public | Ecosystem Architect)
 - [Python Patterns](./public/external-wisdom/everything-claude/rules/python/patterns.md) (public | Ecosystem Architect)
@@ -704,6 +800,7 @@
 - [Python Testing](./public/external-wisdom/everything-claude/rules/python/testing.md) (public | Ecosystem Architect)
 
 ## 📁 public/external-wisdom/everything-claude/rules/typescript
+
 - [TypeScript/JavaScript Coding Style](./public/external-wisdom/everything-claude/rules/typescript/coding-style.md) (public | Ecosystem Architect)
 - [TypeScript/JavaScript Hooks](./public/external-wisdom/everything-claude/rules/typescript/hooks.md) (public | Ecosystem Architect)
 - [TypeScript/JavaScript Patterns](./public/external-wisdom/everything-claude/rules/typescript/patterns.md) (public | Ecosystem Architect)
@@ -711,61 +808,77 @@
 - [TypeScript/JavaScript Testing](./public/external-wisdom/everything-claude/rules/typescript/testing.md) (public | Ecosystem Architect)
 
 ## 📁 public/finops
+
 - [finops/](./public/finops/README.md) (public | Unknown)
 
 ## 📁 public/fisc-compliance
+
 - [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/fisc-compliance/aws_fisc_standard.md) (public | Ecosystem Architect)
 - [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/fisc-compliance/blea_fisc_reference.md) (public | Ecosystem Architect)
 
 ## 📁 public/frameworks
+
 - [Conceptual Frameworks](./public/frameworks/README.md) (public | Unknown)
 - [Conceptual Frameworks Reference](./public/frameworks/conceptual-frameworks.md) (public | Ecosystem Architect)
 
 ## 📁 public/future
+
 - [Future-Proofing: Quantum-Safe & Sustainability](./public/future/quantum_sustainability.md) (public | Ecosystem Architect)
 
 ## 📁 public/legal/ip
+
 - [Legal & Intellectual Property Strategy](./public/legal/ip/patent_strategy.md) (public | Ecosystem Architect)
 
 ## 📁 public/media
+
 - [Video Content Creation & Production Guide](./public/media/video-content-creation-guide.md) (public | Unknown)
 
 ## 📁 public/nonfunctional
+
 - [Non-Functional Requirements Definition](./public/nonfunctional/nonfunctional_requirements.md) (public | Ecosystem Architect)
 
 ## 📁 public/nonfunctional/test-viewpoints
+
 - [非機能テスト観点カタログ (IPA非機能要求グレード2018準拠)](./public/nonfunctional/test-viewpoints/ipa_grade_2018.md) (public | Ecosystem Architect)
 
 ## 📁 public/organization
+
 - [Cultural Alignment & Change Management Protocol](./public/organization/change_management.md) (public | Ecosystem Architect)
 
 ## 📁 public/pmo/hall-of-fame
+
 - [Hall of Fame: Ecosystem Viability Marathon](./public/pmo/hall-of-fame/mission-marathon-proof.md) (public | Ecosystem Architect)
 
 ## 📁 public/pmo/standard
+
 - [PMBOK v7 Project Management Principles](./public/pmo/standard/pmbok_v7.md) (public | Ecosystem Architect)
 - [PMO Bridge to IPA Non-Functional Grade](./public/pmo/standard/ipa_nfr_bridge.md) (public | Ecosystem Architect)
 - [Stakeholder Management Framework](./public/pmo/standard/stakeholder_management.md) (public | Ecosystem Architect)
 
 ## 📁 public/pmo/standards
+
 - [PMO ガバナンス標準基準 (Governance Standard)](./public/pmo/standards/governance.md) (public | Ecosystem Architect)
 
 ## 📁 public/pmo/templates
+
 - [対外報告用ステータスレポート・テンプレート](./public/pmo/templates/external_status_report.md) (public | Ecosystem Architect)
 
 ## 📁 public/procedures/audit
+
 - [Procedure: License & Supply Chain Audit](./public/procedures/audit/audit-licenses.md) (public | Unknown)
 - [Procedure: Predictive Bug Analysis & Red-Teaming](./public/procedures/audit/predict-risks.md) (public | Unknown)
 - [Procedure: Quality Scoring & Project Health Assessment](./public/procedures/audit/score-quality.md) (public | Unknown)
 - [Procedure: Security & Compliance Scanning](./public/procedures/audit/scan-security.md) (public | Unknown)
 
 ## 📁 public/procedures/browser
+
 - [Mobile WebView Session Handoff](./public/procedures/browser/mobile-webview-session-handoff.md) (public | Unknown)
 - [Procedure: Calendar Management via Browser](./public/procedures/browser/calendar-management.md) (public | Ecosystem Architect)
 - [Procedure: Web Automation & Navigation](./public/procedures/browser/navigate-web.md) (public | Ecosystem Architect)
 - [Web Session Handoff](./public/procedures/browser/web-session-handoff.md) (public | Unknown)
 
 ## 📁 public/procedures/business
+
 - [Procedure: Email Triage and Reply Draft](./public/procedures/business/email-triage-and-reply-draft.md) (public | Unknown)
 - [Procedure: Executive Reporting & Communication](./public/procedures/business/executive-reporting.md) (public | Unknown)
 - [Procedure: PMO Governance & Project Health Audit](./public/procedures/business/audit-governance.md) (public | Unknown)
@@ -774,15 +887,18 @@
 - [Procedure: Unit Economics Optimization](./public/procedures/business/optimize-unit-economics.md) (public | Unknown)
 
 ## 📁 public/procedures/code
+
 - [Procedure: Advanced Engineering (Porting, PRs, and Mapping)](./public/procedures/code/advanced-engineering.md) (public | Unknown)
 - [Procedure: Create Manual, Design Spec, And Video From Source Code](./public/procedures/code/create-manual-design-and-video-from-source-code.md) (public | Unknown)
 - [Procedure: Targeted Code Refactoring](./public/procedures/code/refactor-code.md) (public | Unknown)
 
 ## 📁 public/procedures/core
+
 - [Procedure: Mission Orchestration & Self-Healing](./public/procedures/core/orchestrate-missions.md) (public | Unknown)
 - [Procedure: Self-Evolution & Prompt Optimization](./public/procedures/core/evolve-capabilities.md) (public | Unknown)
 
 ## 📁 public/procedures/file
+
 - [Procedure: Analyze Special Formats (Binary, DB, Scenarios)](./public/procedures/file/analyze-special-formats.md) (public | Unknown)
 - [Procedure: Codebase Structure Mapping](./public/procedures/file/map-codebase.md) (public | Unknown)
 - [Procedure: Dependency Mapping](./public/procedures/file/map-dependencies.md) (public | Unknown)
@@ -797,6 +913,7 @@
 - [Procedure: Sensitivity & PII Detection](./public/procedures/file/detect-sensitivity.md) (public | Unknown)
 
 ## 📁 public/procedures/media
+
 - [Design Narrative By Document Profile](./public/procedures/media/design-narrative-by-document-profile.md) (public | Unknown)
 - [Procedure: Collect Voice Samples](./public/procedures/media/collect-voice-samples.md) (public | Unknown)
 - [Procedure: Compose Video From ADF](./public/procedures/media/compose-video-from-adf.md) (public | Unknown)
@@ -825,13 +942,16 @@
 - [Publish a Narrated Video to YouTube](./public/procedures/media/publish-youtube-video.md) (public | Unknown)
 
 ## 📁 public/procedures/network
+
 - [Procedure: Moltbook API Integration](./public/procedures/network/moltbook-sync.md) (public | Unknown)
 
 ## 📁 public/procedures/orchestration
+
 - [Replace Daemon-Actuator With Runtime Supervision](./public/procedures/orchestration/replace-daemon-actuator-with-runtime-supervision.md) (public | Ecosystem Architect)
 - [Replace Physical-Bridge With ADF](./public/procedures/orchestration/replace-physical-bridge-with-adf.md) (public | Ecosystem Architect)
 
 ## 📁 public/procedures/service
+
 - [Deliver Design Spec And Test Pack](./public/procedures/service/deliver-design-spec-and-test-pack.md) (public | Kyberion)
 - [Design Clone And Build Mobile](./public/procedures/service/design-clone-and-build-mobile.md) (public | Kyberion)
 - [Design Clone And Build Proposal](./public/procedures/service/design-clone-and-build-proposal.md) (public | Kyberion)
@@ -842,6 +962,7 @@
 - [Text Review And Approval Flow](./public/procedures/service/text-review-and-approval-flow.md) (public | Kyberion)
 
 ## 📁 public/procedures/system
+
 - [Cross-Device Handoff Operations](./public/procedures/system/cross-device-handoff-operations.md) (public | Unknown)
 - [Developer Onboarding Runbook](./public/procedures/system/developer-onboarding.md) (public | Unknown)
 - [Procedure: GitHub PR & Issue Management](./public/procedures/system/github-pr-management.md) (public | Ecosystem Architect)
@@ -850,6 +971,7 @@
 - [Rubric Scope Disclosure Template](./public/procedures/system/rubric-disclosure-template.md) (public | Unknown)
 
 ## 📁 public/procedures/utility
+
 - [Procedure: Cloud Resource & Cost Optimization](./public/procedures/utility/optimize-cloud-resources.md) (public | Unknown)
 - [Procedure: Data Anonymization & Log Analysis](./public/procedures/utility/anonymize-and-analyze-logs.md) (public | Unknown)
 - [Procedure: Ecosystem Health & Resilience Management](./public/procedures/utility/manage-ecosystem-resilience.md) (public | Unknown)
@@ -859,53 +981,67 @@
 - [Procedure: Token Economics & Completeness Scoring](./public/procedures/utility/audit-efficiency.md) (public | Unknown)
 
 ## 📁 public/procedures/ux
+
 - [Procedure: UI/UX Audit & Persona Generation](./public/procedures/ux/audit-and-personas.md) (public | Unknown)
 - [Procedure: Voice Interface & Localization](./public/procedures/ux/voice-and-localization.md) (public | Unknown)
 - [手順書: 音声クローン学習用レコーディング＆処理プロセス](./public/procedures/ux/voice-cloning-guidance.md) (public | Unknown)
 
 ## 📁 public/procedures/wisdom
+
 - [Procedure: Identity Evolution & Wisdom Distillation](./public/procedures/wisdom/evolve-identity.md) (public | Unknown)
 
 ## 📁 public/project-health
+
 - [project-health](./public/project-health/README.md) (public | Unknown)
 
 ## 📁 public/quality-management
+
 - [Test Viewpoint Catalog: Non-Functional Excellence](./public/quality-management/test_viewpoints_catalog.md) (public | Ecosystem Architect)
 - [定量的品質管理指標：バグ密度・テスト密度 (Quality Metrics)](./public/quality-management/metrics_standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/requirements-guide
+
 - [要件定義ガイド (IPA準拠)](./public/requirements-guide/ipa_best_practices.md) (public | Ecosystem Architect)
 - [要件定義ドキュメント・レビューチェックリスト](./public/requirements-guide/review_checklist.md) (public | Ecosystem Architect)
 
 ## 📁 public/resilience
+
 - [resilience/](./public/resilience/README.md) (public | Unknown)
 
 ## 📁 public/software-design
+
 - [ソフトウェアデザインパターン & 設計原則](./public/software-design/patterns.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards
+
 - [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/standards/aws_fisc_standard.md) (public | Ecosystem Architect)
 - [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md) (public | Ecosystem Architect)
 - [Knowledge Management Standard (Semantic Indexing) v1.0](./public/standards/knowledge_management.md) (public | Ecosystem Architect)
 - [Standard: moltbook Compatibility Protocol (MCP) v1.0](./public/standards/moltbook-compatibility.md) (public | Unknown)
 
 ## 📁 public/standards/adr
+
 - [Architecture Decision Record (ADR) Standard](./public/standards/adr/adr_standard.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/bcp
+
 - [Disaster Recovery & BCP Playbook](./public/standards/bcp/dr_playbook.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/contract
+
 - [Contract & SLA Negotiation Guardrails](./public/standards/contract/negotiation_guardrails.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/data
+
 - [Data Engineering & Governance Standards](./public/standards/data/data-governance.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/design
+
 - [Platform Design Guidelines: iOS, Android, and Web](./public/standards/design/platform-design-guidelines.md) (public | Ecosystem Architect)
 - [Visual & Design Testing Standards](./public/standards/design/visual-testing-standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/engineering
+
 - [API Compatibility & Evolution Standards](./public/standards/engineering/api-compatibility-standards.md) (public | Ecosystem Architect)
 - [Logging Design & Observability Standards](./public/standards/engineering/logging-design-standards.md) (public | Ecosystem Architect)
 - [Multi-Platform Development Standard](./public/standards/engineering/platform-engineering.md) (public | Ecosystem Architect)
@@ -913,38 +1049,48 @@
 - [Source Code Analysis Protocol (SCAP)](./public/standards/engineering/code-analysis-protocol.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/fisc
+
 - [FISC-Aligned Security Standard (Cloud Infrastructure)](./public/standards/fisc/security-controls.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/ipa
+
 - [IPA-Aligned Requirements Engineering Standard](./public/standards/ipa/requirements-checklist.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/media
+
 - [Standard: Office Open XML (OOXML) for PowerPoint (.pptx)](./public/standards/media/pptx-ooxml-standards.md) (public | Ecosystem Architect)
 - [Standard: PDF 2.0 (ISO 32000-2) for Native PDF Engine](./public/standards/media/pdf-2.0-standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/qa
+
 - [Accessibility (A11y) Excellence Standards](./public/standards/qa/accessibility-standards.md) (public | Ecosystem Architect)
 - [Screen Transition & State Machine Testing Standards](./public/standards/qa/screen-transition-standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/sdlc
+
 - [Software Development Life Cycle (SDLC) Methodologies](./public/standards/sdlc/methodologies.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/security
+
 - [OWASP Top 10 for LLM Applications](./public/standards/security/owasp_llm_top10.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/testing
+
 - [Maestro Syntax Standard (v1.35.0)](./public/standards/testing/maestro-spec.md) (public | Ecosystem Architect)
 - [Mobile Test Automation Standard (Deep-Dive Edition)](./public/standards/testing/mobile_automation.md) (public | Ecosystem Architect)
 - [Test Automation Best Practices](./public/standards/testing/best_practices.md) (public | Ecosystem Architect)
 - [Web Test Automation Standard](./public/standards/testing/web_automation.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/ux
+
 - [Cognitive Load Principles for UX Design](./public/standards/ux/cognitive_load_principles.md) (public | Ecosystem Architect)
 
 ## 📁 public/strategy
+
 - [Winning Proposal Standards (Strategic Communication)](./public/strategy/winning-proposal-standards.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack
+
 - [AWS Unified Operations Team (Premium Support Extension)](./public/tech-stack/aws_unified_operations_support.md) (public | Ecosystem Architect)
 - [Box API 連携ガイド (Node.js SDK)](./public/tech-stack/box_api.md) (public | Ecosystem Architect)
 - [Box CLI 活用ガイド](./public/tech-stack/box_cli.md) (public | Ecosystem Architect)
@@ -953,34 +1099,43 @@
 - [Triple-Tier Persona Model: Identity, Mask, and Mission](./public/tech-stack/persona-model.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/atlassian
+
 - [Jira 運用ベストプラクティス](./public/tech-stack/atlassian/jira_best_practices.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/cloud
+
 - [The Rosetta Stone of Cloud (Multi-Cloud Mapping)](./public/tech-stack/cloud/rosetta_stone.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/google
+
 - [Google Workspace 連携ベストプラクティス](./public/tech-stack/google/workspace_best_practices.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/java/terasoluna
+
 - [TERASOLUNA Implementation Standards](./public/tech-stack/java/terasoluna/implementation_standards.md) (public | Ecosystem Architect)
 - [TERASOLUNA Layered Architecture Standard](./public/tech-stack/java/terasoluna/architecture.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/macos
+
 - [macOS 音声コントロール ＆ 音声入力活用ガイド](./public/tech-stack/macos/voice_control_guide.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/voltmx
+
 - [VoltMX Architecture Overview](./public/tech-stack/voltmx/architecture.md) (public | Ecosystem Architect)
 - [VoltMX Development Best Practices](./public/tech-stack/voltmx/best_practices.md) (public | Ecosystem Architect)
 - [VoltMX Troubleshooting Guide](./public/tech-stack/voltmx/troubleshooting.md) (public | Ecosystem Architect)
 
 ## 📁 public/tech-stack/voltmx/migration
+
 - [VoltMX to React Migration Strategy](./public/tech-stack/voltmx/migration/strategy.md) (public | Ecosystem Architect)
 - [VoltMX to React Technical Mapping Rules](./public/tech-stack/voltmx/migration/mapping_rules.md) (public | Ecosystem Architect)
 
 ## 📁 public/templates
+
 - [ss_ppt_theme](./public/templates/ss_ppt_theme.md) (public | Ecosystem Architect)
 
 ## 📁 public/templates/blueprints
+
 - [Blueprint: API Reference](./public/templates/blueprints/api-reference.md) (public | Ecosystem Architect)
 - [Blueprint: Architecture Decision Record (ADR)](./public/templates/blueprints/architecture-decision-record.md) (public | Ecosystem Architect)
 - [Blueprint: Architecture Design (AIDLC Standard)](./public/templates/blueprints/architecture-design.md) (public | Ecosystem Architect)
@@ -1022,42 +1177,53 @@
 - [Blueprint: User Manual & FAQ](./public/templates/blueprints/user-manual-faq.md) (public | Ecosystem Architect)
 
 ## 📁 public/templates/mobile-sample-apps
+
 - [Mobile Sample App Skeletons](./public/templates/mobile-sample-apps/README.md) (public | Unknown)
 
 ## 📁 public/templates/mobile-sample-apps/android-webview-handoff-skeleton
+
 - [Android WebView Handoff Skeleton](./public/templates/mobile-sample-apps/android-webview-handoff-skeleton/README.md) (public | Unknown)
 
 ## 📁 public/templates/mobile-sample-apps/ios-webview-handoff-skeleton
+
 - [iOS WebView Handoff Skeleton](./public/templates/mobile-sample-apps/ios-webview-handoff-skeleton/README.md) (public | Unknown)
 
 ## 📁 public/templates/mobile-webview-handoff
+
 - [Android WebView Handoff Adapter Reference](./public/templates/mobile-webview-handoff/android-reference.md) (public | Unknown)
 - [iOS WebView Handoff Adapter Reference](./public/templates/mobile-webview-handoff/ios-reference.md) (public | Unknown)
 - [Mobile WebView Handoff Templates](./public/templates/mobile-webview-handoff/README.md) (public | Unknown)
 
 ## 📁 public/templates/reporting
+
 - [Audience Strategy for Executive Reporting](./public/templates/reporting/audience_strategy.md) (public | Ecosystem Architect)
 - [Master Slide Structure (Marp Standard)](./public/templates/reporting/master_slide_structure.md) (public | Ecosystem Architect)
 - [Project Management Plan (PMP) - 13 Standard Items](./public/templates/reporting/project_management_plan_13.md) (public | Ecosystem Architect)
 - [Project Plan Master Template (Consulting Standard)](./public/templates/reporting/project_plan_master.md) (public | Ecosystem Architect)
 
 ## 📁 public/templates/themes
+
 - [Marp テーマ作成 ＆ スタイリング完全ガイド](./public/templates/themes/marp_theme_guide.md) (public | Ecosystem Architect)
 - [ビジュアル・ハーモニー・ガイド (Visual Harmony Guide) - Proposer Edition](./public/templates/themes/visual_harmony_guide.md) (public | Ecosystem Architect)
 - [プロフェッショナル・エクセル設計書テーマガイド](./public/templates/themes/excel_design_guide.md) (public | Ecosystem Architect)
 - [プロフェッショナル・スライドテーマ作成ガイド (Marp/CSS)](./public/templates/themes/theme_design_guide.md) (public | Ecosystem Architect)
 
 ## 📁 public/templates/web-sample-apps
+
 - [Web Sample App Skeletons](./public/templates/web-sample-apps/README.md) (public | Unknown)
 
 ## 📁 public/templates/web-sample-apps/web-session-handoff-skeleton
+
 - [Web Session Handoff Skeleton](./public/templates/web-sample-apps/web-session-handoff-skeleton/README.md) (public | Unknown)
 
 ## 📁 public/terraform
+
 - [terraform](./public/terraform/README.md) (public | Unknown)
 
 ## 📁 public/test-runners
+
 - [test-runners](./public/test-runners/README.md) (public | Unknown)
 
 ## 📁 public/voice-of-customer
+
 - [voice-of-customer/](./public/voice-of-customer/README.md) (public | Unknown)
