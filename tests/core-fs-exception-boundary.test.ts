@@ -13,6 +13,7 @@ const allowedCoreFsImports = [
   'libs/core/evidence-chain.test.ts',
   'libs/core/fs-primitives.ts',
   'libs/core/heuristic-feedback.test.ts',
+  'libs/core/intent-handoff.test.ts',
   'libs/core/intent-snapshot-store.test.ts',
   'libs/core/ledger.test.ts',
   'libs/core/meeting-participation-coordinator.test.ts',
