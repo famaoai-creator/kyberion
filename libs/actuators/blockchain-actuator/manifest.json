@@ -30,7 +30,8 @@
     {
       "op": "verify_anchor",
       "platforms": ["darwin", "linux", "win32"],
-      "requirements": {}
+      "requirements": {},
+      "implemented": false
     }
   ]
 }
