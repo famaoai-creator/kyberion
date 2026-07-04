@@ -273,10 +273,11 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
         shared(JANITOR_MARKER_SUBPATH),
         JSON.stringify({ completed_at: report.timestamp, errors: errors.length }, null, 2)
       );
-    } catch (err: any) {
+    } catch (err) {
       // The marker only powers the staleness gate; a real run without a marker
       // just means the next session re-runs the janitor.
-      logger.warn(`[JANITOR] failed to persist last-run marker: ${err?.message ?? String(err)}`);
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(`[JANITOR] failed to persist last-run marker: ${message}`);
     }
   }
 
