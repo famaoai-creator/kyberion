@@ -148,6 +148,9 @@ export type {
 export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
+export * from './daemon-heartbeat.js';
+export * from './ops-alert.js';
+export * from './chain-integrity.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';

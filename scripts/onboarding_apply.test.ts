@@ -32,6 +32,13 @@ const FIXTURE_INPUT = {
   },
 };
 
+const FIXTURE_REASONING = {
+  mode: 'real_backend_detected' as const,
+  backend_hint: 'codex-cli',
+  available: true,
+  checked_at: '2026-05-08T00:00:00.000Z',
+};
+
 describe('onboarding_apply', () => {
   it('rejects invalid tenant slugs', () => {
     expect(() =>
@@ -56,15 +63,30 @@ describe('onboarding_apply', () => {
       },
     ];
 
-    const summary = buildSummary(FIXTURE_INPUT, tenantEntries, FIXTURE_INPUT.tutorial);
-    const state = buildState(FIXTURE_INPUT, now, tenantEntries, {
-      ...FIXTURE_INPUT.tutorial,
-      plan_path: 'customer/acme/onboarding/tutorial-plan.md',
-    });
+    const summary = buildSummary(
+      FIXTURE_INPUT,
+      tenantEntries,
+      FIXTURE_INPUT.tutorial,
+      FIXTURE_REASONING
+    );
+    const state = buildState(
+      FIXTURE_INPUT,
+      now,
+      tenantEntries,
+      {
+        ...FIXTURE_INPUT.tutorial,
+        plan_path: 'customer/acme/onboarding/tutorial-plan.md',
+      },
+      FIXTURE_REASONING
+    );
 
     expect(summary).toContain('## Identity');
+    expect(summary).toContain('## Reasoning Backend');
+    expect(summary).toContain('- Status: real_backend_detected');
     expect(summary).toContain('Alpha Team');
     expect(state.status).toBe('complete');
+    expect(state.completed_phases).toContain('reasoning');
+    expect(state.reasoning.mode).toBe('real_backend_detected');
     expect(state.tenants.entries).toHaveLength(1);
     expect(state.identity.agent_id).toBe('agent-001');
   });
@@ -84,6 +106,7 @@ describe('onboarding_apply', () => {
         },
       ],
       FIXTURE_INPUT.tutorial,
+      FIXTURE_REASONING,
       {
         statePath: 'customer/acme/onboarding/onboarding-state.json',
         summaryPath: 'customer/acme/onboarding/onboarding-summary.md',
@@ -92,6 +115,7 @@ describe('onboarding_apply', () => {
 
     expect(summary).toContain('Onboarding applied successfully.');
     expect(summary).toContain('Identity: Famao (agent-001)');
+    expect(summary).toContain('Reasoning: real_backend_detected');
     expect(summary).toContain('Next steps:');
   });
 

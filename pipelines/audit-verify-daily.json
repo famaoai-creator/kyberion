@@ -1,0 +1,21 @@
+{
+  "schema": "kyberion.pipeline.v1",
+  "name": "audit-verify-daily",
+  "description": "Daily audit-chain and system-ledger integrity verification for SA-01.",
+  "schedule": {
+    "id": "audit-verify-daily",
+    "cron": "15 4 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "audit_verify",
+      "actuator": "system",
+      "op": "exec",
+      "params": {
+        "command": "node dist/scripts/audit_verify.js --json"
+      }
+    }
+  ]
+}

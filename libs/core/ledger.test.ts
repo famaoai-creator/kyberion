@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { record, verifyIntegrity } from './ledger.js';
+import { record, verifyIntegrity, verifyLedgerIntegrityDetailed } from './ledger.js';
 
 // We need to handle the hardcoded LEDGER_PATH in ledger.ts
 const LEDGER_FILE = path.join(process.cwd(), 'active/audit/system-ledger.jsonl');
@@ -43,6 +43,7 @@ describe('ledger core', () => {
     const content = fs.readFileSync(LEDGER_FILE, 'utf8');
     expect(content).toContain('TEST_EVENT');
     expect(content).toContain('foo');
+    expect(content).toContain('"chain_alg":"hmac-sha256"');
   });
 
   it('should maintain a valid integrity chain for multiple events', () => {
@@ -55,7 +56,7 @@ describe('ledger core', () => {
 
   it('should detect tampering in the ledger file', () => {
     record('SAFE_EVENT', { data: 'original' });
-    
+
     const content = fs.readFileSync(LEDGER_FILE, 'utf8');
     const tampered = content.replace('original', 'tampered');
     fs.writeFileSync(LEDGER_FILE, tampered);
@@ -72,9 +73,21 @@ describe('ledger core', () => {
     const entry2 = JSON.parse(lines[1]);
     entry2.parent_hash = 'badhash';
     lines[1] = JSON.stringify(entry2);
-    
+
     fs.writeFileSync(LEDGER_FILE, lines.join('\n') + '\n');
 
     expect(verifyIntegrity()).toBe(false);
+  });
+
+  it('returns detailed integrity findings', () => {
+    record('SAFE_EVENT', { data: 'original' });
+
+    const content = fs.readFileSync(LEDGER_FILE, 'utf8');
+    fs.writeFileSync(LEDGER_FILE, content.replace('SAFE_EVENT', 'TAMPERED_EVENT'));
+
+    const report = verifyLedgerIntegrityDetailed();
+    expect(report.ok).toBe(false);
+    expect(report.total).toBe(1);
+    expect(report.corrupted[0]).toContain('line:1');
   });
 });

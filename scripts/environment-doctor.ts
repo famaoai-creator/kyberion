@@ -27,15 +27,16 @@ const MUST_REQUIRED_FOR = new Set([
   'pulseaudio-audio-bus',
   'meeting-actuator.speak',
   'meeting-participation-coordinator',
+  'intent-extractor',
+  'meeting-participation',
+  'wisdom-actuator',
 ]);
 
-const SHOULD_REQUIRED_FOR = new Set([
-  'streaming-stt',
-  'streaming-tts',
-]);
+const SHOULD_REQUIRED_FOR = new Set(['streaming-stt', 'streaming-tts']);
 
 export function classifyDoctorSeverity(cap: EnvironmentCapability): DoctorSeverity {
   if (cap.optional) return 'nice';
+  if (cap.capability_id === 'reasoning-backend.any-real') return 'must';
   const requiredFor = new Set(cap.required_for || []);
   if ([...requiredFor].some((item) => MUST_REQUIRED_FOR.has(item))) return 'must';
   if ([...requiredFor].some((item) => SHOULD_REQUIRED_FOR.has(item))) return 'should';
@@ -43,25 +44,23 @@ export function classifyDoctorSeverity(cap: EnvironmentCapability): DoctorSeveri
 }
 
 export function classifyDoctorDomains(cap: EnvironmentCapability): DoctorDomain[] {
-  const haystack = [
-    cap.capability_id,
-    cap.kind,
-    cap.description,
-    ...(cap.required_for || []),
-  ].join(' ').toLowerCase();
+  const haystack = [cap.capability_id, cap.kind, cap.description, ...(cap.required_for || [])]
+    .join(' ')
+    .toLowerCase();
   const domains = new Set<DoctorDomain>();
   if (/(meeting|participation|join|speak)/.test(haystack)) domains.add('meeting');
   if (/(voice|stt|tts|speech|speak)/.test(haystack)) domains.add('voice');
   if (/(browser|playwright|chromium)/.test(haystack)) domains.add('browser');
   if (/(audio|ffmpeg|blackhole|pulse|pcm)/.test(haystack)) domains.add('audio');
-  if (/(reasoning|wisdom|claude|gemini|codex|anthropic|agy|antigravity)/.test(haystack)) domains.add('reasoning');
+  if (/(reasoning|wisdom|claude|gemini|codex|anthropic|agy|antigravity)/.test(haystack))
+    domains.add('reasoning');
   if (domains.size === 0) domains.add('core');
   return [...domains].sort();
 }
 
 export function summarizeManifestDoctor(
   manifest: EnvironmentManifest,
-  probeStatuses: CapabilityStatus[],
+  probeStatuses: CapabilityStatus[]
 ): DoctorSummary {
   const byId = new Map(probeStatuses.map((status) => [status.capability_id, status]));
   const findings: DoctorFinding[] = [];
@@ -95,7 +94,7 @@ export function formatDoctorSummary(summary: DoctorSummary): string[] {
   const lines: string[] = [];
   lines.push(`📋 ${summary.manifest_id} (${summary.version})`);
   lines.push(
-    `   must=${summary.counts.must} should=${summary.counts.should} nice=${summary.counts.nice}`,
+    `   must=${summary.counts.must} should=${summary.counts.should} nice=${summary.counts.nice}`
   );
   for (const severity of ['must', 'should', 'nice'] as const) {
     const entries = summary.findings.filter((finding) => finding.severity === severity);

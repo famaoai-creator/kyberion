@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { EnvironmentManifest } from '@agent/core';
-import { classifyDoctorDomains, classifyDoctorSeverity, formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
+import {
+  classifyDoctorDomains,
+  classifyDoctorSeverity,
+  formatDoctorSummary,
+  summarizeManifestDoctor,
+} from './environment-doctor.js';
 
 describe('environment-doctor', () => {
   it('classifies critical meeting/bootstrap capabilities as must and optional runtime knobs as nice', () => {
@@ -11,7 +16,7 @@ describe('environment-doctor', () => {
         description: 'node',
         required_for: ['all-of-kyberion'],
         probe: { kind: 'command', command: 'node' },
-      }),
+      })
     ).toBe('must');
     expect(
       classifyDoctorSeverity({
@@ -20,7 +25,7 @@ describe('environment-doctor', () => {
         description: 'voice consent',
         required_for: ['meeting-actuator.speak'],
         probe: { kind: 'mission-evidence', filename: 'voice-consent.json' },
-      }),
+      })
     ).toBe('must');
     expect(
       classifyDoctorSeverity({
@@ -30,8 +35,20 @@ describe('environment-doctor', () => {
         required_for: ['streaming-stt'],
         optional: true,
         probe: { kind: 'env', name: 'KYBERION_STT_COMMAND' },
-      }),
+      })
     ).toBe('nice');
+  });
+
+  it('classifies real reasoning backend absence as must', () => {
+    expect(
+      classifyDoctorSeverity({
+        capability_id: 'reasoning-backend.any-real',
+        kind: 'vendor-credential',
+        description: 'real reasoning backend',
+        required_for: ['wisdom-actuator', 'intent-extractor'],
+        probe: { kind: 'probe', probe_id: 'reasoning-backend.any-real' },
+      })
+    ).toBe('must');
   });
 
   it('groups missing capabilities into a concise doctor summary', () => {
@@ -86,7 +103,7 @@ describe('environment-doctor', () => {
         description: 'browser automation',
         required_for: ['browser-meeting-join-driver'],
         probe: { kind: 'module', specifier: 'playwright' },
-      }),
+      })
     ).toEqual(['browser', 'meeting']);
     expect(
       classifyDoctorDomains({
@@ -95,7 +112,7 @@ describe('environment-doctor', () => {
         description: 'voice consent',
         required_for: ['meeting-actuator.speak'],
         probe: { kind: 'mission-evidence', filename: 'voice-consent.json' },
-      }),
+      })
     ).toEqual(['meeting', 'voice']);
     expect(
       classifyDoctorDomains({
@@ -104,7 +121,7 @@ describe('environment-doctor', () => {
         description: 'audio bridge dependency',
         required_for: ['blackhole-audio-bus'],
         probe: { kind: 'command', command: 'ffmpeg' },
-      }),
+      })
     ).toEqual(['audio']);
   });
 });

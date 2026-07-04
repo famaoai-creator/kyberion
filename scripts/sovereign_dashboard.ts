@@ -11,6 +11,7 @@ import {
   safeReaddir,
 } from '@agent/core';
 import chalk from 'chalk';
+import { summarizeBackupStatus } from './backup.js';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 /**
@@ -55,8 +56,7 @@ function collectRuntimeDoctorFindings(): DashboardDoctorFinding[] {
     pathResolver.knowledge('personal/missions'),
   ];
   for (const dir of missionDirs) {
-    if (!safeExistsSync(dir)) continue;
-    for (const item of safeReaddir(dir)) {
+    for (const item of safeListDir(dir)) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (!safeExistsSync(statePath)) continue;
       const state = readJsonFile<any>(statePath);
@@ -166,6 +166,15 @@ function listJsonFiles(dir: string): string[] {
     return safeReaddir(dir)
       .filter((entry) => entry.endsWith('.json'))
       .map((entry) => path.join(dir, entry));
+  } catch {
+    return [];
+  }
+}
+
+function safeListDir(dir: string): string[] {
+  try {
+    if (!safeExistsSync(dir)) return [];
+    return safeReaddir(dir);
   } catch {
     return [];
   }
@@ -573,9 +582,7 @@ function drawMissions() {
   console.log(chalk.bold.yellow(' 📋 ACTIVE MISSIONS'));
   let count = 0;
   for (const dir of missionDirs) {
-    if (!safeExistsSync(dir)) continue;
-    const items = safeReaddir(dir);
-    for (const item of items) {
+    for (const item of safeListDir(dir)) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
         const state = readJsonFile<any>(statePath);
@@ -706,6 +713,31 @@ function drawRuntimeLeaseDoctor() {
   console.log('');
 }
 
+function drawBackupStatus() {
+  console.log(chalk.bold.cyan(' 💾 BACKUP STATUS'));
+  const status = summarizeBackupStatus();
+  if (status.status === 'missing') {
+    console.log(chalk.yellow('  No backup archives found.'));
+    console.log(
+      chalk.dim('  Run: KYBERION_BACKUP_PASSPHRASE=... pnpm backup create --scope all --encrypt')
+    );
+    console.log('');
+    return;
+  }
+  const color =
+    status.status === 'fresh' ? chalk.green : status.status === 'stale' ? chalk.yellow : chalk.red;
+  const age = status.latestAgeHours?.toFixed(1) ?? 'unknown';
+  const sizeMb =
+    status.latestSizeBytes === null ? 'unknown' : (status.latestSizeBytes / 1024 / 1024).toFixed(1);
+  console.log(`  Status: ${color(status.status.toUpperCase())}`);
+  console.log(
+    `  Latest: ${chalk.white(status.latestName || 'unknown')} ${chalk.dim(`${age}h ago`)}`
+  );
+  console.log(`  Archives: ${status.count} ${chalk.dim(`latest=${sizeMb}MB`)}`);
+  console.log(`  Dir: ${chalk.dim(status.backupDir)}`);
+  console.log('');
+}
+
 function drawSlackOutbox() {
   console.log(chalk.bold.green(' 📬 SURFACE OUTBOX'));
   const slackMessages = listSurfaceOutboxMessages('slack');
@@ -773,8 +805,8 @@ function drawRuntimeSurfaces() {
 function drawTrustBoard() {
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
-  if (safeExistsSync(ledgerPath)) {
-    const raw = readJsonFile<any>(ledgerPath);
+  const raw = readJsonIfExists<any>(ledgerPath);
+  if (raw) {
     const ledger = raw?.agents ?? raw ?? {};
     Object.keys(ledger).forEach((a) => {
       const score = ledger[a].current_score / 100;
@@ -820,6 +852,7 @@ function render() {
   drawMissionOrchestration();
   drawOwnerSummaries();
   drawRuntimeLeaseDoctor();
+  drawBackupStatus();
   drawRuntimeSurfaces();
   drawCapabilityLandscape();
   drawSkillLandscape();
