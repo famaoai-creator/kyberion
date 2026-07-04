@@ -1,8 +1,12 @@
-import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import type { OrganizationProfile } from './organization-profile.js';
-import type { AuthorityRoleRecord, AgentProfileRecord, TeamRoleRecord } from './team-role-assignment-selection.js';
+import type {
+  AuthorityRoleRecord,
+  AgentProfileRecord,
+  TeamRoleRecord,
+} from './team-role-assignment-selection.js';
 
 interface MissionTeamTemplate {
   required_roles: string[];
@@ -39,19 +43,15 @@ export interface OrganizationMissionTeamTemplateCatalogSelectionSummary extends 
 }
 
 export function resolveOrganizationMissionTeamTemplateCatalogId(
-  organizationProfile?: OrganizationProfile | null,
+  organizationProfile?: OrganizationProfile | null
 ): string | null {
   const catalogId = organizationProfile?.team_defaults?.team_template_catalog_id?.trim();
   return catalogId || null;
 }
 
-function loadJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
-
 function mergeMissionTeamTemplate(
   base: MissionTeamTemplate,
-  overlay: Partial<MissionTeamTemplate>,
+  overlay: Partial<MissionTeamTemplate>
 ): MissionTeamTemplate {
   return {
     ...base,
@@ -65,19 +65,25 @@ function mergeMissionTeamTemplate(
   };
 }
 
-export function loadAgentProfileDirectory(rootDir?: string): Record<string, AgentProfileRecord> | null {
+export function loadAgentProfileDirectory(
+  rootDir?: string
+): Record<string, AgentProfileRecord> | null {
   const dir = rootDir
     ? path.join(rootDir, 'knowledge', 'product', 'orchestration', 'agent-profiles')
     : pathResolver.knowledge('product/orchestration/agent-profiles');
   if (!safeExistsSync(dir)) return null;
 
   const profiles: Record<string, AgentProfileRecord> = {};
-  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   for (const file of files) {
     const fullPath = rootDir
       ? path.join(rootDir, 'knowledge', 'product', 'orchestration', 'agent-profiles', file)
       : pathResolver.knowledge(`product/orchestration/agent-profiles/${file}`);
-    const payload = loadJson<{ version?: string; agents?: Record<string, AgentProfileRecord> }>(fullPath);
+    const payload = loadJson<{ version?: string; agents?: Record<string, AgentProfileRecord> }>(
+      fullPath
+    );
     const agentIds = Object.keys(payload.agents || {});
     if (agentIds.length !== 1) {
       throw new Error(`Agent profile file ${file} must contain exactly one agent profile`);
@@ -96,7 +102,7 @@ export function loadAgentProfileSnapshot(rootDir?: string): Record<string, Agent
   const index = loadJson<{ agents: Record<string, AgentProfileRecord> }>(
     rootDir
       ? path.join(rootDir, 'knowledge', 'product', 'orchestration', 'agent-profile-index.json')
-      : pathResolver.knowledge('product/orchestration/agent-profile-index.json'),
+      : pathResolver.knowledge('product/orchestration/agent-profile-index.json')
   );
   return index.agents;
 }
@@ -105,11 +111,13 @@ export function loadAuthorityRoleIndex(): Record<string, AuthorityRoleRecord> {
   const directory = pathResolver.knowledge('product/governance/authority-roles');
   if (safeExistsSync(directory)) {
     const roles: Record<string, AuthorityRoleRecord> = {};
-    const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+    const files = safeReaddir(directory)
+      .filter((entry) => entry.endsWith('.json'))
+      .sort();
     if (files.length > 0) {
       for (const file of files) {
         const payload = loadJson<{ role?: string; [key: string]: unknown }>(
-          pathResolver.knowledge(`product/governance/authority-roles/${file}`),
+          pathResolver.knowledge(`product/governance/authority-roles/${file}`)
         );
         const role = String(payload.role || '').trim();
         if (!role) {
@@ -126,7 +134,7 @@ export function loadAuthorityRoleIndex(): Record<string, AuthorityRoleRecord> {
   }
 
   const index = loadJson<{ authority_roles: Record<string, AuthorityRoleRecord> }>(
-    pathResolver.knowledge('product/governance/authority-role-index.json'),
+    pathResolver.knowledge('product/governance/authority-role-index.json')
   );
   return index.authority_roles;
 }
@@ -136,10 +144,12 @@ export function loadTeamRoleDirectory(): Record<string, TeamRoleRecord> | null {
   if (!safeExistsSync(dir)) return null;
 
   const roles: Record<string, TeamRoleRecord> = {};
-  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   for (const file of files) {
     const payload = loadJson<{ role?: string; [key: string]: unknown }>(
-      pathResolver.knowledge(`product/orchestration/team-roles/${file}`),
+      pathResolver.knowledge(`product/orchestration/team-roles/${file}`)
     );
     const role = String(payload.role || '').trim();
     if (!role) {
@@ -157,7 +167,7 @@ export function loadTeamRoleDirectory(): Record<string, TeamRoleRecord> | null {
 
 export function loadTeamRoleSnapshot(): Record<string, TeamRoleRecord> {
   const index = loadJson<{ team_roles: Record<string, TeamRoleRecord> }>(
-    pathResolver.knowledge('product/orchestration/team-role-index.json'),
+    pathResolver.knowledge('product/orchestration/team-role-index.json')
   );
   return index.team_roles;
 }
@@ -173,16 +183,18 @@ export function loadAgentProfileIndex(rootDir?: string): Record<string, AgentPro
 }
 
 export function loadMissionTeamTemplates(
-  organizationProfile?: OrganizationProfile | null,
+  organizationProfile?: OrganizationProfile | null
 ): Record<string, MissionTeamTemplate> {
   const index = loadJson<{ templates: Record<string, MissionTeamTemplate> }>(
-    pathResolver.knowledge('product/orchestration/mission-team-templates.json'),
+    pathResolver.knowledge('product/orchestration/mission-team-templates.json')
   );
   const templates = { ...index.templates };
   const catalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile);
   if (!catalogId) return templates;
 
-  const catalogPath = pathResolver.knowledge(`product/governance/organization-team-template-catalogs/${catalogId}.json`);
+  const catalogPath = pathResolver.knowledge(
+    `product/governance/organization-team-template-catalogs/${catalogId}.json`
+  );
   if (!safeExistsSync(catalogPath)) return templates;
 
   const catalog = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
@@ -195,14 +207,18 @@ export function loadMissionTeamTemplates(
 }
 
 export function listOrganizationMissionTeamTemplateCatalogSummaries(): OrganizationMissionTeamTemplateCatalogSummary[] {
-  const catalogDir = pathResolver.knowledge('product/governance/organization-team-template-catalogs');
+  const catalogDir = pathResolver.knowledge(
+    'product/governance/organization-team-template-catalogs'
+  );
   if (!safeExistsSync(catalogDir)) return [];
 
   return safeReaddir(catalogDir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
     .map((file) => {
-      const catalogPath = pathResolver.knowledge(`product/governance/organization-team-template-catalogs/${file}`);
+      const catalogPath = pathResolver.knowledge(
+        `product/governance/organization-team-template-catalogs/${file}`
+      );
       const payload = loadJson<OrganizationMissionTeamTemplateCatalog>(catalogPath);
       const templateEntries = Object.entries(payload.templates || {});
       const templateIds = templateEntries.map(([templateId]) => templateId).sort();
@@ -224,7 +240,7 @@ export function listOrganizationMissionTeamTemplateCatalogSummaries(): Organizat
 }
 
 export function listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(
-  organizationProfile?: OrganizationProfile | null,
+  organizationProfile?: OrganizationProfile | null
 ): OrganizationMissionTeamTemplateCatalogSelectionSummary[] {
   const selectedCatalogId = resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile);
   return listOrganizationMissionTeamTemplateCatalogSummaries().map((catalog) => ({

@@ -1,36 +1,37 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, useCallback, PointerEvent as ReactPointerEvent } from "react";
-import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from "lucide-react";
-import { chronosSpeechLocale, uxText } from "../lib/ux-vocabulary";
-import { useChronosLocale } from "../lib/hooks";
+import { useState, useRef, useEffect, useCallback, PointerEvent as ReactPointerEvent } from 'react';
+import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from 'lucide-react';
+import { chronosSpeechLocale, uxText } from '../lib/ux-vocabulary';
+import { buildUserFacingError } from '../lib/user-facing-error';
+import { useChronosLocale } from '../lib/hooks';
 
-const AGENT_URL = "/api/agent";
+const AGENT_URL = '/api/agent';
 
 interface ChatMessage {
   id: string;
-  role: "user" | "agent";
+  role: 'user' | 'agent';
   content: string;
   timestamp: string;
-  status?: "pending" | "complete" | "error";
+  status?: 'pending' | 'complete' | 'error';
 }
 
 const GUIDED_PROMPTS = [
   {
-    label: "Health",
-    query: "Summarize system health and current blockers.",
+    label: 'Health',
+    query: 'Summarize system health and current blockers.',
   },
   {
-    label: "Missions",
-    query: "List the active missions and what needs attention.",
+    label: 'Missions',
+    query: 'List the active missions and what needs attention.',
   },
   {
-    label: "Traces",
-    query: "Show the latest trace issues and what failed.",
+    label: 'Traces',
+    query: 'Show the latest trace issues and what failed.',
   },
   {
-    label: "Next step",
-    query: "What should I do next to unblock delivery?",
+    label: 'Next step',
+    query: 'What should I do next to unblock delivery?',
   },
 ];
 
@@ -43,14 +44,16 @@ export function SovereignChat({
 }) {
   const locale = useChronosLocale();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 }); // offset from default bottom-right
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(
+    null
+  );
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
@@ -58,10 +61,13 @@ export function SovereignChat({
   }, []);
 
   // --- Drag to move ---
-  const onDragStart = useCallback((e: ReactPointerEvent) => {
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [pos]);
+  const onDragStart = useCallback(
+    (e: ReactPointerEvent) => {
+      dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [pos]
+  );
 
   const onDragMove = useCallback((e: ReactPointerEvent) => {
     if (!dragRef.current) return;
@@ -76,60 +82,72 @@ export function SovereignChat({
 
   // Auto-scroll on new messages
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  const sendQuery = useCallback(async (query: string) => {
-    if (!query || !query.trim() || isLoading) return;
+  const sendQuery = useCallback(
+    async (query: string) => {
+      if (!query || !query.trim() || isLoading) return;
 
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: query,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
-    setIsOpen(true);
-
-    try {
-      const res = await fetch(AGENT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, locale }),
-      });
-      const data = await res.json();
-
-      const agentMsg: ChatMessage = {
-        id: `agent-${Date.now()}`,
-        role: "agent",
-        content: data.response || data.error || uxText("chronos_chat_no_response", "No response", locale),
-        timestamp: data.timestamp || new Date().toISOString(),
-        status: res.ok ? "complete" : "error",
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: query,
+        timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, agentMsg]);
+      setMessages((prev) => [...prev, userMsg]);
+      setInput('');
+      setIsLoading(true);
+      setIsOpen(true);
 
-      if (data.a2ui && Array.isArray(data.a2ui) && onA2UIMessage) {
-        for (const msg of data.a2ui) {
-          onA2UIMessage(msg);
+      try {
+        const res = await fetch(AGENT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, locale }),
+        });
+        const data = await res.json();
+        const envelope = buildUserFacingError(
+          data.error || data.response || new Error('No response'),
+          {
+            locale,
+            surface: 'chronos',
+            traceId: data.traceId,
+          }
+        );
+
+        const agentMsg: ChatMessage = {
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          content: data.response || `${envelope.title}: ${envelope.body} ${envelope.nextAction}`,
+          timestamp: data.timestamp || new Date().toISOString(),
+          status: res.ok ? 'complete' : 'error',
+        };
+        setMessages((prev) => [...prev, agentMsg]);
+
+        if (data.a2ui && Array.isArray(data.a2ui) && onA2UIMessage) {
+          for (const msg of data.a2ui) {
+            onA2UIMessage(msg);
+          }
         }
+      } catch (err: any) {
+        const envelope = buildUserFacingError(err, { locale, surface: 'chronos' });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            role: 'agent',
+            content: `${envelope.title}: ${envelope.body} ${envelope.nextAction}`,
+            timestamp: new Date().toISOString(),
+            status: 'error',
+          },
+        ]);
       }
-    } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          role: "agent",
-          content: `${uxText("chronos_chat_connection_error", "Connection error", locale)}: ${err.message}`,
-          timestamp: new Date().toISOString(),
-          status: "error",
-        },
-      ]);
-    }
 
-    setIsLoading(false);
-  }, [isLoading, onA2UIMessage]);
+      setIsLoading(false);
+    },
+    [isLoading, onA2UIMessage]
+  );
 
   // Expose sendQuery to parent via onReady
   useEffect(() => {
@@ -140,7 +158,8 @@ export function SovereignChat({
 
   // --- Voice Input (Web Speech API) ---
   const toggleVoice = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
     if (isListening) {
@@ -157,7 +176,7 @@ export function SovereignChat({
     recognition.onresult = (event: any) => {
       const transcript = Array.from(event.results)
         .map((r: any) => r[0].transcript)
-        .join("");
+        .join('');
       setInput(transcript);
 
       // Auto-send on final result
@@ -213,7 +232,7 @@ export function SovereignChat({
           className="text-[10px] opacity-40 hover:opacity-80 transition"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {uxText("chronos_chat_minimize", "MINIMIZE", locale)}
+          {uxText('chronos_chat_minimize', 'MINIMIZE', locale)}
         </button>
       </div>
 
@@ -223,14 +242,16 @@ export function SovereignChat({
           <div className="flex flex-col gap-6 pt-4">
             <div className="text-center text-[11px] leading-6 text-white/45">
               {uxText(
-                "chronos_chat_welcome",
-                "Start with a short request or pick one of the guided prompts below.",
-                locale,
+                'chronos_chat_welcome',
+                'Start with a short request or pick one of the guided prompts below.',
+                locale
               )}
             </div>
-            
+
             <div className="space-y-3">
-              <div className="px-2 text-[9px] uppercase tracking-widest text-white/30">Guided prompts</div>
+              <div className="px-2 text-[9px] uppercase tracking-widest text-white/30">
+                Guided prompts
+              </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {GUIDED_PROMPTS.map((hint) => (
                   <button
@@ -238,7 +259,9 @@ export function SovereignChat({
                     onClick={() => void sendQuery(hint.query)}
                     className="rounded-xl border border-white/8 bg-white/5 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[0.06]"
                   >
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/72">{hint.label}</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/72">
+                      {hint.label}
+                    </div>
                     <div className="mt-1 text-[9px] leading-5 text-white/34">{hint.query}</div>
                   </button>
                 ))}
@@ -249,20 +272,20 @@ export function SovereignChat({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
               className={`max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-kyberion-gold/20 border border-kyberion-gold/20"
-                  : msg.status === "error"
-                  ? "bg-red-900/20 border border-red-500/20"
-                  : "bg-white/5 border border-white/5"
+                msg.role === 'user'
+                  ? 'bg-kyberion-gold/20 border border-kyberion-gold/20'
+                  : msg.status === 'error'
+                    ? 'bg-red-900/20 border border-red-500/20'
+                    : 'bg-white/5 border border-white/5'
               }`}
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
               <div className="text-[8px] opacity-30 mt-1 text-right">
-                {isMounted ? new Date(msg.timestamp).toLocaleTimeString() : ""}
+                {isMounted ? new Date(msg.timestamp).toLocaleTimeString() : ''}
               </div>
             </div>
           </div>
@@ -283,16 +306,24 @@ export function SovereignChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing && !e.shiftKey) {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
               }
             }}
-            placeholder={isListening
-              ? uxText("chronos_chat_listening", "Listening...", locale)
-              : uxText("chronos_chat_placeholder", "Ask for health, missions, traces, or a next step...", locale)}
+            placeholder={
+              isListening
+                ? uxText('chronos_chat_listening', 'Listening...', locale)
+                : uxText(
+                    'chronos_chat_placeholder',
+                    'Ask for health, missions, traces, or a next step...',
+                    locale
+                  )
+            }
             className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-[11px] outline-none transition ${
-              isListening ? "border-red-500/50 bg-red-900/10" : "border-white/10 focus:border-kyberion-gold/30"
+              isListening
+                ? 'border-red-500/50 bg-red-900/10'
+                : 'border-white/10 focus:border-kyberion-gold/30'
             }`}
             disabled={isLoading}
           />
@@ -300,8 +331,8 @@ export function SovereignChat({
             onClick={toggleVoice}
             className={`p-2 rounded-lg border transition ${
               isListening
-                ? "bg-red-900/30 border-red-500/30 text-red-400"
-                : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
+                ? 'bg-red-900/30 border-red-500/30 text-red-400'
+                : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20'
             }`}
           >
             {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}

@@ -1,17 +1,16 @@
 {
-  "name": "discord-bridge",
+  "name": "@kyberion/discord-bridge",
   "version": "1.0.0",
   "type": "module",
-  "description": "",
-  "main": "index.js",
+  "description": "Discord bridge for Kyberion runtime",
+  "main": "../../dist/satellites/discord-bridge/src/index.js",
+  "types": "../../dist/satellites/discord-bridge/src/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "test": "vitest run src/"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.30.3",
   "dependencies": {
+    "@agent/core": "workspace:*",
     "discord.js": "^14.26.4"
   },
   "devDependencies": {

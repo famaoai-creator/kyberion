@@ -9,6 +9,7 @@ const ROOT = pathResolver.rootDir();
 export interface ScriptIntegrityOptions {
   packageJsonPath?: string;
   pipelineRoots?: string[];
+  pathExists?: (repoRelativePath: string) => boolean;
 }
 
 const DEFAULT_PIPELINE_ROOTS = [
@@ -21,8 +22,11 @@ function toRepoRelative(targetPath: string): string {
   return path.relative(ROOT, path.resolve(targetPath)).split(path.sep).join('/');
 }
 
-function existingRepoPath(repoRelativePath: string): boolean {
-  return safeExistsSync(pathResolver.rootResolve(repoRelativePath));
+function existingRepoPath(
+  repoRelativePath: string,
+  pathExists: (repoRelativePath: string) => boolean
+): boolean {
+  return pathExists(repoRelativePath);
 }
 
 function sourceForDistScript(repoRelativePath: string): string | null {
@@ -31,17 +35,43 @@ function sourceForDistScript(repoRelativePath: string): string | null {
   return `scripts/${match[1]}.ts`;
 }
 
-function validateRepoPath(reference: string, owner: string, violations: string[]): void {
+function distForSourceScript(repoRelativePath: string): string | null {
+  const match = repoRelativePath.match(/^scripts\/(.+)\.ts$/);
+  if (!match) return null;
+  return `dist/scripts/${match[1]}.js`;
+}
+
+function validateRepoPath(
+  reference: string,
+  owner: string,
+  violations: string[],
+  pathExists: (repoRelativePath: string) => boolean
+): void {
   const normalized = reference.replace(/^\.\//, '');
   const sourcePath = sourceForDistScript(normalized);
   if (sourcePath) {
-    if (!existingRepoPath(sourcePath)) {
+    if (!existingRepoPath(sourcePath, pathExists)) {
       violations.push(`${owner}: ${normalized} has no source ${sourcePath}`);
     }
     return;
   }
-  if (!existingRepoPath(normalized)) {
+  if (!existingRepoPath(normalized, pathExists)) {
     violations.push(`${owner}: referenced path not found (${normalized})`);
+  }
+}
+
+function validateScriptBuildTarget(
+  reference: string,
+  owner: string,
+  violations: string[],
+  pathExists: (repoRelativePath: string) => boolean
+): void {
+  const normalized = reference.replace(/^\.\//, '');
+  const distPath = distForSourceScript(normalized);
+  if (!distPath) return;
+  if (!existingRepoPath(normalized, pathExists)) return;
+  if (!existingRepoPath(distPath, pathExists)) {
+    violations.push(`${owner}: ${normalized} has no build output ${distPath}`);
   }
 }
 
@@ -73,22 +103,28 @@ const COMMAND_REFERENCE_KEYS = new Set([
   'fallback_pipeline',
 ]);
 
-function scanValue(owner: string, value: unknown, violations: string[], keyHint = ''): void {
+function scanValue(
+  owner: string,
+  value: unknown,
+  violations: string[],
+  pathExists: (repoRelativePath: string) => boolean,
+  keyHint = ''
+): void {
   if (typeof value === 'string') {
     if (COMMAND_REFERENCE_KEYS.has(keyHint)) {
       for (const reference of collectCommandReferences(value)) {
-        validateRepoPath(reference, owner, violations);
+        validateRepoPath(reference, owner, violations, pathExists);
       }
     }
     return;
   }
   if (Array.isArray(value)) {
-    for (const item of value) scanValue(owner, item, violations, keyHint);
+    for (const item of value) scanValue(owner, item, violations, pathExists, keyHint);
     return;
   }
   if (value && typeof value === 'object') {
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      scanValue(owner, nested, violations, key);
+      scanValue(owner, nested, violations, pathExists, key);
     }
   }
 }
@@ -107,6 +143,9 @@ function listPipelineFiles(roots: string[]): string[] {
 
 export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): string[] {
   const violations: string[] = [];
+  const pathExists =
+    options.pathExists ||
+    ((repoRelativePath: string) => safeExistsSync(pathResolver.rootResolve(repoRelativePath)));
   const packageJsonPath = options.packageJsonPath || pathResolver.rootResolve('package.json');
   const packageJson = JSON.parse(safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string) as {
     scripts?: Record<string, string>;
@@ -115,7 +154,8 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   for (const [scriptName, command] of Object.entries(packageJson.scripts || {})) {
     const owner = `package.json scripts.${scriptName}`;
     for (const reference of collectCommandReferences(command)) {
-      validateRepoPath(reference, owner, violations);
+      validateRepoPath(reference, owner, violations, pathExists);
+      validateScriptBuildTarget(reference, owner, violations, pathExists);
     }
   }
 
@@ -123,7 +163,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   for (const file of listPipelineFiles(pipelineRoots)) {
     const owner = toRepoRelative(file);
     const payload = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as unknown;
-    scanValue(owner, payload, violations);
+    scanValue(owner, payload, violations, pathExists);
   }
 
   return violations;

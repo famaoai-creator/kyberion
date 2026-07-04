@@ -5,7 +5,7 @@ import {
   safeWriteFile,
   pathResolver,
   resolveVars,
-  withRetry,
+  retry,
 } from '@agent/core';
 import {
   generateNativeDocx,
@@ -27,9 +27,22 @@ import {
 export interface MediaDocumentPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
   loadDocumentCompositionCatalog: (rootDir: string) => any;
-  buildPptxSlideFromPattern: (rootDir: string, data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) => any;
+  buildPptxSlideFromPattern: (
+    rootDir: string,
+    data: any,
+    idx: number,
+    theme: any,
+    pattern: any,
+    activeMaster: any,
+    canvas: any
+  ) => any;
   buildProposalNarrativeOutline: (rootDir: string, brief: any) => any;
-  buildReportNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any, applyTemplate: any) => any;
+  buildReportNarrativeOutline: (
+    rootDir: string,
+    brief: any,
+    resolvePreset: any,
+    applyTemplate: any
+  ) => any;
   buildSpreadsheetNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
   buildDiagramNarrativeOutline: (rootDir: string, brief: any, resolvePreset: any) => any;
   buildReportDocxProtocol: (rootDir: string, brief: any) => any;
@@ -37,24 +50,40 @@ export interface MediaDocumentPipelineDeps {
   buildTrackerSpreadsheetProtocol: (rootDir: string, brief: any) => any;
   buildDocumentPdfProtocol: (rawBrief: any) => any;
   normalizeXlsxDesignProtocol: (protocol: any) => any;
-  resolveDocumentLayoutTemplate: (rootDir: string, brief: any) => { templateId: string; template: any };
-  resolveDocumentCompositionPreset: (rootDir: string, brief: any) => { profileId: string; preset: any };
-  applyCompositionTemplate: (template: any, tokens: Record<string, string>, fallback?: string) => string;
+  resolveDocumentLayoutTemplate: (
+    rootDir: string,
+    brief: any
+  ) => { templateId: string; template: any };
+  resolveDocumentCompositionPreset: (
+    rootDir: string,
+    brief: any
+  ) => { profileId: string; preset: any };
+  applyCompositionTemplate: (
+    template: any,
+    tokens: Record<string, string>,
+    fallback?: string
+  ) => string;
   buildMediaGenerationBoundary: (outline: any) => any;
   normalizeBriefForCategory: (rootDir: string, input: any) => any;
   resolveMediaBriefCategory: (input: any) => MediaBriefCategory;
   generateDrawioDocument: (
     graph: any,
-    options: { title: string; theme: any; iconMap: any; iconRoot?: string },
+    options: { title: string; theme: any; iconMap: any; iconRoot?: string }
   ) => string;
 }
 
 export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDeps) {
-  function resolveDocumentCompositionPreset(rootDir: string, brief: any): { profileId: string; preset: any } {
+  function resolveDocumentCompositionPreset(
+    rootDir: string,
+    brief: any
+  ): { profileId: string; preset: any } {
     return deps.resolveDocumentCompositionPreset(rootDir, brief);
   }
 
-  function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protocol: any; theme: any; themeName: string } {
+  function buildOutlineDrivenPptxProtocol(
+    rootDir: string,
+    outline: any
+  ): { protocol: any; theme: any; themeName: string } {
     const theme = deps.resolveNamedTheme(rootDir, outline.recommended_theme);
     const themeColors = theme?.colors || theme?.theme?.colors || {};
     const canvas = { w: 10, h: 5.625 };
@@ -86,7 +115,10 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
           branding: outline.branding || {},
           id: 'contents',
         };
-        const insertAt = contentData.length > 0 && String(contentData[0]?.layout_key || '').includes('cover') ? 1 : 0;
+        const insertAt =
+          contentData.length > 0 && String(contentData[0]?.layout_key || '').includes('cover')
+            ? 1
+            : 0;
         contentData.splice(insertAt, 0, contentsSlide);
       }
     }
@@ -95,7 +127,8 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       generatedAt: new Date().toISOString(),
       metadata: {
         composition: outline,
-        generationBoundary: outline.generation_boundary || deps.buildMediaGenerationBoundary(outline),
+        generationBoundary:
+          outline.generation_boundary || deps.buildMediaGenerationBoundary(outline),
         promptGuide: outline.prompt_guide || [],
         sourceDesign: outline.source_design || null,
         designRecommendations: outline.design_recommendations || [],
@@ -110,26 +143,59 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         accent2: (themeColors.secondary || '#334155').replace('#', ''),
       },
       master: { elements: [] },
-      slides: contentData.map((data: any, idx: number) => deps.buildPptxSlideFromPattern(rootDir, data, idx, theme, { page_layouts: {} }, null, canvas)),
+      slides: contentData.map((data: any, idx: number) =>
+        deps.buildPptxSlideFromPattern(
+          rootDir,
+          data,
+          idx,
+          theme,
+          { page_layouts: {} },
+          null,
+          canvas
+        )
+      ),
     };
     return { protocol, theme, themeName: outline.recommended_theme };
   }
 
-  function buildPresentationPptxProtocol(rootDir: string, brief: any): { protocol: any; outline: any; theme: any; themeName: string } {
+  function buildPresentationPptxProtocol(
+    rootDir: string,
+    brief: any
+  ): { protocol: any; outline: any; theme: any; themeName: string } {
     const outline = deps.buildProposalNarrativeOutline(rootDir, brief);
     const compiled = buildOutlineDrivenPptxProtocol(rootDir, outline);
     return { ...compiled, outline };
   }
 
-  function buildOutlineFromNormalizedBrief(rootDir: string, category: 'presentation' | 'document' | 'spreadsheet' | 'diagram', brief: any): any {
-    const outlineBuilders: Record<MediaBriefCategory, (builderRootDir: string, builderBrief: any) => any> = {
+  function buildOutlineFromNormalizedBrief(
+    rootDir: string,
+    category: 'presentation' | 'document' | 'spreadsheet' | 'diagram',
+    brief: any
+  ): any {
+    const outlineBuilders: Record<
+      MediaBriefCategory,
+      (builderRootDir: string, builderBrief: any) => any
+    > = {
       presentation: deps.buildProposalNarrativeOutline,
       document: (builderRootDir: string, builderBrief: any) =>
-        deps.buildReportNarrativeOutline(builderRootDir, builderBrief, deps.resolveDocumentCompositionPreset, deps.applyCompositionTemplate),
+        deps.buildReportNarrativeOutline(
+          builderRootDir,
+          builderBrief,
+          deps.resolveDocumentCompositionPreset,
+          deps.applyCompositionTemplate
+        ),
       spreadsheet: (builderRootDir: string, builderBrief: any) =>
-        deps.buildSpreadsheetNarrativeOutline(builderRootDir, builderBrief, deps.resolveDocumentCompositionPreset),
+        deps.buildSpreadsheetNarrativeOutline(
+          builderRootDir,
+          builderBrief,
+          deps.resolveDocumentCompositionPreset
+        ),
       diagram: (builderRootDir: string, builderBrief: any) =>
-        deps.buildDiagramNarrativeOutline(builderRootDir, builderBrief, deps.resolveDocumentCompositionPreset),
+        deps.buildDiagramNarrativeOutline(
+          builderRootDir,
+          builderBrief,
+          deps.resolveDocumentCompositionPreset
+        ),
     };
     return outlineBuilders[category](rootDir, brief);
   }
@@ -145,7 +211,10 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     const compiled = compileBriefToDesignProtocol(input.rootDir, normalizedBrief);
     return {
       ...input.ctx,
-      active_theme: input.ctx.active_theme || deps.resolveNamedTheme(input.rootDir, compiled.themeName) || input.ctx.active_theme,
+      active_theme:
+        input.ctx.active_theme ||
+        deps.resolveNamedTheme(input.rootDir, compiled.themeName) ||
+        input.ctx.active_theme,
       active_theme_name: input.ctx.active_theme_name || compiled.themeName,
       [input.exportAs || compiled.exportKey]: compiled.protocol,
       ...(input.briefContextKey ? { [input.briefContextKey]: normalizedBrief } : {}),
@@ -153,16 +222,30 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     };
   }
 
-  async function renderCompiledProtocol(compiled: {
-    protocol: any;
-    protocolKind: ProtocolKind;
-  }, outPath: string, options?: any): Promise<void> {
+  async function renderCompiledProtocol(
+    compiled: {
+      protocol: any;
+      protocolKind: ProtocolKind;
+    },
+    outPath: string,
+    options?: any
+  ): Promise<void> {
     safeMkdir(path.dirname(outPath), { recursive: true });
     const renderers: Record<ProtocolKind, () => Promise<void>> = {
-      pptx: async () => withRetry(async () => generateNativePptx(compiled.protocol, outPath), { maxRetries: 2 }),
-      xlsx: async () => withRetry(async () => generateNativeXlsx(deps.normalizeXlsxDesignProtocol(compiled.protocol), outPath), { maxRetries: 2 }),
-      docx: async () => withRetry(async () => generateNativeDocx(compiled.protocol, outPath), { maxRetries: 2 }),
-      pdf: async () => withRetry(async () => generateNativePdf(compiled.protocol, outPath, options), { maxRetries: 2 }),
+      pptx: async () =>
+        retry(async () => generateNativePptx(compiled.protocol, outPath), { maxRetries: 2 }),
+      xlsx: async () =>
+        retry(
+          async () =>
+            generateNativeXlsx(deps.normalizeXlsxDesignProtocol(compiled.protocol), outPath),
+          { maxRetries: 2 }
+        ),
+      docx: async () =>
+        retry(async () => generateNativeDocx(compiled.protocol, outPath), { maxRetries: 2 }),
+      pdf: async () =>
+        retry(async () => generateNativePdf(compiled.protocol, outPath, options), {
+          maxRetries: 2,
+        }),
     };
     const renderer = renderers[compiled.protocolKind];
     if (!renderer) {
@@ -171,11 +254,23 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     await renderer();
   }
 
-  async function renderDiagramDocumentBrief(rootDir: string, brief: any, outPath: string, params: any, ctx: any, resolve: Function): Promise<void> {
-    const iconMap = await import('./media-diagram-helpers.js').then((mod) => mod.resolveDrawioIconMap(rootDir, params, resolve));
-    const loadFallbackDrawioTheme = await import('./media-diagram-helpers.js').then((mod) => mod.loadFallbackDrawioTheme);
+  async function renderDiagramDocumentBrief(
+    rootDir: string,
+    brief: any,
+    outPath: string,
+    params: any,
+    ctx: any,
+    resolve: Function
+  ): Promise<void> {
+    const iconMap = await import('./media-diagram-helpers.js').then((mod) =>
+      mod.resolveDrawioIconMap(rootDir, params, resolve)
+    );
+    const loadFallbackDrawioTheme = await import('./media-diagram-helpers.js').then(
+      (mod) => mod.loadFallbackDrawioTheme
+    );
     safeMkdir(path.dirname(outPath), { recursive: true });
-    const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id, () => ({}));
+    const activeTheme =
+      ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id, () => ({}));
     const document = deps.generateDrawioDocument(brief.payload.graph, {
       title: brief.payload.title || brief.title || 'Diagram',
       theme: activeTheme,
@@ -185,11 +280,16 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     safeWriteFile(outPath, document);
   }
 
-  function resolveObjectInput(ctx: any, params: any, resolve: Function, defaults: {
-    paramKey?: string;
-    fromKey?: string;
-    opName: string;
-  }): any {
+  function resolveObjectInput(
+    ctx: any,
+    params: any,
+    resolve: Function,
+    defaults: {
+      paramKey?: string;
+      fromKey?: string;
+      opName: string;
+    }
+  ): any {
     const fromKey = resolve(defaults.fromKey || 'last_json');
     const inline = defaults.paramKey ? params[defaults.paramKey] : undefined;
     const value = inline && typeof inline === 'object' ? inline : ctx[fromKey];
@@ -199,8 +299,14 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     return value;
   }
 
-  function resolveDocumentLayoutTemplate(rootDir: string, brief: any): { templateId: string; template: any } {
-    const catalogPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/document-layouts.json');
+  function resolveDocumentLayoutTemplate(
+    rootDir: string,
+    brief: any
+  ): { templateId: string; template: any } {
+    const catalogPath = path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/document-layouts.json'
+    );
     if (!safeExistsSync(catalogPath)) {
       throw new Error(`Document layout catalog not found: ${catalogPath}`);
     }
@@ -240,10 +346,14 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
   function buildDocumentPdfProtocol(rawBrief: any): any {
     const brief = normalizeInvoiceDocumentBrief(rawBrief);
     if (brief.document_type !== 'invoice') {
-      throw new Error(`Unsupported document_type for document_pdf_from_brief: ${brief.document_type}`);
+      throw new Error(
+        `Unsupported document_type for document_pdf_from_brief: ${brief.document_type}`
+      );
     }
     if (brief.render_target && brief.render_target !== 'pdf') {
-      throw new Error(`Unsupported render_target for document_pdf_from_brief: ${brief.render_target}`);
+      throw new Error(
+        `Unsupported render_target for document_pdf_from_brief: ${brief.render_target}`
+      );
     }
     if (brief.document_profile !== 'qualified-invoice') {
       throw new Error(`Unsupported invoice document_profile: ${brief.document_profile}`);
@@ -329,7 +439,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       `小計(税抜): ${formatJpy(subtotal)}`,
       `消費税額計: ${formatJpy(totalTax)}`,
       `合計請求額: ${formatJpy(totalAmount)}`,
-    ].filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     return {
       version: '1.0.0',
@@ -367,7 +479,10 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     };
   }
 
-  function compileBriefToDesignProtocol(rootDir: string, rawBrief: any): {
+  function compileBriefToDesignProtocol(
+    rootDir: string,
+    rawBrief: any
+  ): {
     protocol: any;
     outline: any;
     theme: any;
@@ -390,7 +505,10 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
 
     if (category === 'document') {
-      const compilers: Record<string, () => { protocol: any; protocolKind: ProtocolKind; exportKey: string }> = {
+      const compilers: Record<
+        string,
+        () => { protocol: any; protocolKind: ProtocolKind; exportKey: string }
+      > = {
         pptx: () => ({
           protocol: buildOutlineDrivenPptxProtocol(rootDir, outline).protocol,
           protocolKind: 'pptx',
@@ -409,7 +527,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       };
       const compile = compilers[String(brief.render_target || '').trim()];
       if (!compile) {
-        throw new Error(`Unsupported document render_target: ${String(brief.render_target || 'unknown')}`);
+        throw new Error(
+          `Unsupported document render_target: ${String(brief.render_target || 'unknown')}`
+        );
       }
       return {
         ...compile(),
@@ -421,7 +541,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
     if (category === 'spreadsheet') {
       return {
-        protocol: deps.normalizeXlsxDesignProtocol(brief.payload.protocol || deps.buildTrackerSpreadsheetProtocol(rootDir, brief)),
+        protocol: deps.normalizeXlsxDesignProtocol(
+          brief.payload.protocol || deps.buildTrackerSpreadsheetProtocol(rootDir, brief)
+        ),
         outline,
         theme,
         themeName: outline.recommended_theme,
@@ -430,7 +552,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       };
     }
 
-    throw new Error(`Unsupported brief for compileBriefToDesignProtocol: ${String(rawBrief?.kind || 'unknown')}`);
+    throw new Error(
+      `Unsupported brief for compileBriefToDesignProtocol: ${String(rawBrief?.kind || 'unknown')}`
+    );
   }
 
   return {

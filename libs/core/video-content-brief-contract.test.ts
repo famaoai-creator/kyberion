@@ -1,12 +1,28 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { compileVideoContentBriefToStoryboard, compileVideoStoryboardToNarratedVideoBrief } from './video-content-brief-contract.js';
+import {
+  compileVideoContentBriefToStoryboard,
+  compileVideoStoryboardToNarratedVideoBrief,
+} from './video-content-brief-contract.js';
+import {
+  resolveDefaultVideoBackgroundColor,
+  resolveVideoModeDefaults,
+} from './video-design-system.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('video content brief contract', () => {
+  const tenantRoot = pathResolver.shared('tmp/video-tenant-fixture');
+  const tenantFixtureRoot = path.join(tenantRoot, 'knowledge/confidential/video-tenant-fixture');
+
+  afterEach(() => {
+    safeRmSync(tenantRoot, { recursive: true, force: true });
+  });
+
   it('compiles a how-to brief into a storyboard and narrated brief', () => {
     const storyboard = compileVideoContentBriefToStoryboard({
       kind: 'video-content-brief',
@@ -90,6 +106,232 @@ describe('video content brief contract', () => {
     expect(storyboard.beats[0].design_token_hints?.typography_scale).toBe('expressive');
   });
 
+  it('resolves the shared video mode defaults consistently', () => {
+    expect(resolveVideoModeDefaults('howto')).toEqual({
+      layout_family: 'process-flow',
+      motion_profile: 'guided-step',
+      background_color: '#07111f',
+    });
+    expect(resolveVideoModeDefaults('promo')).toEqual({
+      layout_family: 'promo-spot',
+      motion_profile: 'energetic',
+      background_color: '#08101e',
+    });
+    expect(resolveDefaultVideoBackgroundColor()).toBe('#07111f');
+  });
+
+  it('applies tenant design profiles to storyboard design system vars', () => {
+    const designDir = path.join(tenantFixtureRoot, 'design');
+    safeMkdir(path.join(designDir, 'assets'), { recursive: true });
+    safeWriteFile(
+      path.join(designDir, 'tenant-override.json'),
+      JSON.stringify(
+        {
+          tenant_id: 'video-tenant-fixture',
+          brand_name: 'Video Tenant',
+          matchers: ['video tenant'],
+          design_system_id: 'video-tenant-fixture',
+          branding: {
+            brand_name: 'Video Tenant',
+            logo_url: 'knowledge/confidential/video-tenant-fixture/design/assets/logo.png',
+          },
+          theme_pack_path: 'knowledge/confidential/video-tenant-fixture/design/theme.json',
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      path.join(designDir, 'theme.json'),
+      JSON.stringify(
+        {
+          kind: 'web-theme-pack',
+          version: '1.0.0',
+          theme_id: 'video-tenant-fixture',
+          brand_name: 'Video Tenant',
+          tenant_slug: 'video-tenant-fixture',
+          design_system_id: 'video-tenant-fixture',
+          theme: {
+            name: 'Video Tenant',
+            colors: {
+              primary: '#112233',
+              secondary: '#334455',
+              accent: '#D97706',
+              background: '#EEF2FF',
+              text: '#111827',
+            },
+            fonts: {
+              heading: 'Aptos Display, sans-serif',
+              body: 'Aptos, sans-serif',
+            },
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const storyboard = compileVideoContentBriefToStoryboard({
+      kind: 'video-content-brief',
+      version: '1.0.0',
+      audience: 'operators',
+      objective: 'present tenant branded video content',
+      distribution_channel: 'docs-demo',
+      content_type: 'howto',
+      presentation_mode: 'howto',
+      promise: 'tenant branded output',
+      desired_takeaway: 'tenant palette is applied',
+      constraints: ['keep it governed'],
+      proof_points: ['tenant profile', 'theme pack'],
+      design_profile: {
+        root_dir: tenantRoot,
+        customer_id: 'video-tenant-fixture',
+        brand_name: 'Video Tenant',
+        design_system_id: 'video-tenant-fixture',
+      },
+      design_system_ref: {
+        system_id: 'video-tenant-fixture',
+      },
+    });
+
+    expect(storyboard.design_system_ref?.brand_name).toBe('Video Tenant');
+    expect(storyboard.design_system_ref?.background_color).toBe('#EEF2FF');
+    expect(storyboard.design_system_ref?.logo_path).toBe(
+      path.join(tenantFixtureRoot, 'design/assets/logo.png')
+    );
+    expect(storyboard.design_system_ref?.css_vars?.['--kb-bg-main']).toBe('#EEF2FF');
+    expect(storyboard.design_system_ref?.css_vars?.['--kb-accent']).toBe('#D97706');
+  });
+
+  it('keeps tenant A and tenant B design profiles isolated', () => {
+    const tenantAPath = path.join(tenantRoot, 'knowledge/confidential/tenant-a/design');
+    const tenantBPath = path.join(tenantRoot, 'knowledge/confidential/tenant-b/design');
+    safeMkdir(path.join(tenantAPath, 'assets'), { recursive: true });
+    safeMkdir(path.join(tenantBPath, 'assets'), { recursive: true });
+    safeWriteFile(
+      path.join(tenantAPath, 'tenant-override.json'),
+      JSON.stringify(
+        {
+          tenant_id: 'tenant-a',
+          brand_name: 'Tenant A',
+          matchers: ['tenant a'],
+          design_system_id: 'tenant-a',
+          branding: {
+            brand_name: 'Tenant A',
+            logo_url: 'knowledge/confidential/tenant-a/design/assets/logo.png',
+          },
+          theme_pack_path: 'knowledge/confidential/tenant-a/design/theme.json',
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      path.join(tenantAPath, 'theme.json'),
+      JSON.stringify(
+        {
+          kind: 'web-theme-pack',
+          version: '1.0.0',
+          theme_id: 'tenant-a',
+          brand_name: 'Tenant A',
+          tenant_slug: 'tenant-a',
+          design_system_id: 'tenant-a',
+          theme: {
+            name: 'Tenant A',
+            colors: {
+              primary: '#101010',
+              secondary: '#202020',
+              accent: '#0EA5E9',
+              background: '#F0F9FF',
+              text: '#0F172A',
+            },
+            fonts: {
+              heading: 'Tenant A Display',
+              body: 'Tenant A Body',
+            },
+          },
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      path.join(tenantBPath, 'tenant-override.json'),
+      JSON.stringify(
+        {
+          tenant_id: 'tenant-b',
+          brand_name: 'Tenant B',
+          matchers: ['tenant b'],
+          design_system_id: 'tenant-b',
+          branding: {
+            brand_name: 'Tenant B',
+            logo_url: 'knowledge/confidential/tenant-b/design/assets/logo.png',
+          },
+          theme_pack_path: 'knowledge/confidential/tenant-b/design/theme.json',
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      path.join(tenantBPath, 'theme.json'),
+      JSON.stringify(
+        {
+          kind: 'web-theme-pack',
+          version: '1.0.0',
+          theme_id: 'tenant-b',
+          brand_name: 'Tenant B',
+          tenant_slug: 'tenant-b',
+          design_system_id: 'tenant-b',
+          theme: {
+            name: 'Tenant B',
+            colors: {
+              primary: '#222244',
+              secondary: '#444466',
+              accent: '#D97706',
+              background: '#FFF7ED',
+              text: '#1F2937',
+            },
+            fonts: {
+              heading: 'Tenant B Display',
+              body: 'Tenant B Body',
+            },
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const tenantBStoryboard = compileVideoContentBriefToStoryboard({
+      kind: 'video-content-brief',
+      version: '1.0.0',
+      audience: 'operators',
+      objective: 'present tenant branded video content',
+      distribution_channel: 'docs-demo',
+      content_type: 'howto',
+      presentation_mode: 'howto',
+      promise: 'tenant branded output',
+      desired_takeaway: 'tenant palette is applied',
+      constraints: ['keep it governed'],
+      proof_points: ['tenant profile', 'theme pack'],
+      design_profile: {
+        root_dir: tenantRoot,
+        customer_id: 'tenant-b',
+        brand_name: 'Tenant B',
+        design_system_id: 'tenant-b',
+      },
+      design_system_ref: {
+        system_id: 'tenant-b',
+      },
+    });
+
+    expect(tenantBStoryboard.design_system_ref?.brand_name).toBe('Tenant B');
+    expect(tenantBStoryboard.design_system_ref?.background_color).toBe('#FFF7ED');
+    expect(tenantBStoryboard.design_system_ref?.css_vars?.['--kb-bg-main']).toBe('#FFF7ED');
+    expect(tenantBStoryboard.design_system_ref?.css_vars?.['--kb-text-primary']).toBe('#1F2937');
+  });
+
   it('compiles vtuber briefs into stage-oriented beats with live presentation hints', () => {
     const storyboard = compileVideoContentBriefToStoryboard({
       kind: 'video-content-brief',
@@ -122,9 +364,18 @@ describe('video content brief contract', () => {
   it('keeps schema contracts aligned with design-system video fields', () => {
     const root = process.cwd();
     const ajv = new Ajv({ allErrors: true });
-    const contentBriefSchema = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/video-content-brief.schema.json'));
-    const storyboardSchema = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/video-storyboard.schema.json'));
-    const narratedBriefSchema = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/narrated-video-brief.schema.json'));
+    const contentBriefSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/video-content-brief.schema.json')
+    );
+    const storyboardSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/video-storyboard.schema.json')
+    );
+    const narratedBriefSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/narrated-video-brief.schema.json')
+    );
 
     const contentBrief = {
       kind: 'video-content-brief',

@@ -192,6 +192,21 @@ function getTaskModelHint(
   });
 }
 
+function isFastTierTaskModelHint(taskModelHint?: TaskModelHint): boolean {
+  return taskModelHint?.execution_tier === 'fast' || taskModelHint?.tier === 'small';
+}
+
+function buildFastTierPromptAddendum(taskModelHint?: TaskModelHint): string[] {
+  if (!isFastTierTaskModelHint(taskModelHint)) return [];
+  return [
+    'Fast-tier enforcement:',
+    '- Restate each acceptance criterion explicitly in the response.',
+    '- Provide a non-empty verification_done list that maps to those criteria.',
+    '- Include at least one artifact path when files changed or an artifact is expected.',
+    '- Keep the result minimal, but do not omit required schema fields.',
+  ];
+}
+
 function isIndependentReviewRequired(item: WorkItem): boolean {
   const metadata = (item.metadata || {}) as Record<string, unknown>;
   return metadata.risk === 'approval_required' || metadata.risk === 'high_stakes';
@@ -278,6 +293,7 @@ function buildIndependentReviewerPrompt(input: {
     acceptanceCriteria.length > 0
       ? `Acceptance criteria:\n- ${acceptanceCriteria.join('\n- ')}`
       : '',
+    ...buildFastTierPromptAddendum(input.taskModelHint).map((line) => `Reviewer note: ${line}`),
     '',
     'Mission context:',
     input.contextPackSummary,
@@ -590,6 +606,7 @@ async function reflectTicketOutcome(input: {
   reviewerPath?: string;
   reviewerExcerpt?: string;
   executionMode: 'agent' | 'subagent';
+  taskModelHint?: TaskModelHint;
 }): Promise<{
   ticketState: 'done' | 'review' | 'blocked';
   reflectionPath: string;
@@ -608,6 +625,14 @@ async function reflectTicketOutcome(input: {
     responseText: input.responseText,
     responseExcerpt: input.responseExcerpt,
   });
+  const fastTierVerificationSatisfied =
+    !isFastTierTaskModelHint(input.taskModelHint) ||
+    ((input.taskResult?.verification_done?.length || 0) > 0 &&
+      ((input.taskResult?.artifacts?.length || 0) > 0 ||
+        (input.taskResult?.needs?.length || 0) > 0));
+  if (!fastTierVerificationSatisfied) {
+    notes.push('fast-tier verification incomplete');
+  }
   if (!acceptanceCheck.satisfied) {
     notes.push(`acceptance criteria not met: ${acceptanceCheck.missing.join('; ')}`);
   }
@@ -627,11 +652,12 @@ async function reflectTicketOutcome(input: {
     };
   }
 
-  const effectiveFinalStatus = acceptanceCheck.satisfied
-    ? input.finalStatus
-    : input.responseText.trim()
-      ? 'review'
-      : 'blocked';
+  const effectiveFinalStatus =
+    acceptanceCheck.satisfied && fastTierVerificationSatisfied
+      ? input.finalStatus
+      : input.responseText.trim()
+        ? 'review'
+        : 'blocked';
   const ticketState = deriveTicketState(effectiveFinalStatus, notes);
   const reflectionPath = ticketReplyPath(input.missionPath, taskId);
   const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(
@@ -1066,6 +1092,7 @@ function buildWorkItemPromptBody(input: {
     acceptanceCriteria.length > 0
       ? `Acceptance criteria:\n- ${acceptanceCriteria.join('\n- ')}`
       : '',
+    ...buildFastTierPromptAddendum(input.taskModelHint),
     '',
     'Return exactly one ```task_result``` block and nothing else structured.',
     'Task result schema: {"summary":"3 sentences max","artifacts":[{"path":"...","kind":"..."}],"verification_done":["..."],"gaps":["..."],"needs":["..."]}',
@@ -1724,6 +1751,7 @@ export async function dispatchMissionWorkItems(
       clarificationPacket,
       clarificationPacketPath,
       executionMode: response.executionMode,
+      taskModelHint,
     });
     record.reflection_status = reflection.ticketState;
     if (reflection.reflectionPath) {

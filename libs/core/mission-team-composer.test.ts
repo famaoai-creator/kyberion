@@ -20,9 +20,9 @@ describe('mission-team-composer classification integration', () => {
     expect(owner?.status).toBe('assigned');
     expect(owner?.model_hint).toEqual(
       expect.objectContaining({
-        tier: 'large',
-        effort: 'high',
-        model_id: 'openai:gpt-5.5',
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
       })
     );
     expect(owner?.delegation_contract?.ownership_scope).toContain('end-to-end mission objective');

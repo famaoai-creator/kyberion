@@ -36,6 +36,26 @@ describe('check_script_integrity', () => {
     ]);
   });
 
+  it('flags TypeScript execution scripts without build output', () => {
+    const packageJsonPath = writeJson('package.json', {
+      scripts: {
+        broken: 'node --import ./scripts/ts-loader.mjs scripts/demos/demo_imessage_flow.ts',
+      },
+    });
+
+    const violations = checkScriptIntegrity({
+      packageJsonPath,
+      pipelineRoots: [],
+      pathExists: (repoRelativePath) =>
+        repoRelativePath === 'scripts/ts-loader.mjs' ||
+        repoRelativePath === 'scripts/demos/demo_imessage_flow.ts',
+    });
+
+    expect(violations).toEqual([
+      'package.json scripts.broken: scripts/demos/demo_imessage_flow.ts has no build output dist/scripts/demos/demo_imessage_flow.js',
+    ]);
+  });
+
   it('flags missing repo-local paths inside pipeline definitions', () => {
     writeJson('pipelines/broken.json', {
       steps: [

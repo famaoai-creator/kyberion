@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import {
   selectAgentForTeamRole,
@@ -84,10 +84,6 @@ export interface ResolveMissionTeamOptions {
   tier?: 'personal' | 'confidential' | 'public';
   assignedPersona?: string;
   organizationProfile?: OrganizationProfile | null;
-}
-
-function loadJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
 }
 
 function buildTeamGovernance(

@@ -63,6 +63,7 @@ export interface AnthropicReasoningBackendOptions {
   client?: Anthropic;
   model?: string;
   maxTokens?: number;
+  effort?: 'low' | 'medium' | 'high';
 }
 
 const HypothesisSketchSchema = z.object({
@@ -306,16 +307,33 @@ const SimulationResultSchema = z.object({
   ),
 });
 
+function buildThinkingConfig(
+  effort?: AnthropicReasoningBackendOptions['effort']
+): { type: 'adaptive' } | { type: 'enabled'; budget_tokens: number } {
+  switch (effort) {
+    case 'low':
+      return { type: 'enabled', budget_tokens: 1024 };
+    case 'medium':
+      return { type: 'enabled', budget_tokens: 2048 };
+    case 'high':
+      return { type: 'enabled', budget_tokens: 4096 };
+    default:
+      return { type: 'adaptive' };
+  }
+}
+
 export class AnthropicReasoningBackend implements ReasoningBackend {
   readonly name = 'anthropic';
   private readonly client: Anthropic;
   private readonly model: string;
   private readonly maxTokens: number;
+  private readonly effort?: AnthropicReasoningBackendOptions['effort'];
 
   constructor(options: AnthropicReasoningBackendOptions = {}) {
     this.client = options.client ?? new Anthropic();
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.effort = options.effort;
   }
 
   /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
@@ -332,6 +350,10 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     return llmSemaphore.run(
       () => this.client.messages.create(params) as Promise<Anthropic.Message>
     );
+  }
+
+  private thinkingConfig(effort?: AnthropicReasoningBackendOptions['effort']) {
+    return buildThinkingConfig(effort ?? this.effort);
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -357,7 +379,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: {
         format: zodOutputFormat(z.object({ hypotheses: z.array(HypothesisSketchSchema) })),
@@ -389,7 +411,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(CritiqueResultSchema) },
     });
@@ -421,7 +443,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(SynthesizedPersonaSchema) },
     });
@@ -449,7 +471,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: {
         format: zodOutputFormat(z.object({ branches: z.array(ForkedBranchSchema) })),
@@ -478,7 +500,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(SimulationResultSchema) },
     });
@@ -527,7 +549,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(ExtractedRequirementsSchema) },
     });
@@ -569,7 +591,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(ExtractedDesignSpecSchema) },
     });
@@ -603,7 +625,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(ExtractedTestPlanSchema) },
     });
@@ -643,7 +665,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(DecomposedTaskPlanSchema) },
     });
@@ -651,11 +673,15 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     return result.parsed_output!;
   }
 
-  async delegateTask(instruction: string, context?: string): Promise<string> {
+  async delegateTask(
+    instruction: string,
+    context?: string,
+    options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
+  ): Promise<string> {
     const response = await this.callCreate({
       model: this.model,
       max_tokens: this.maxTokens,
-      thinking: { type: 'adaptive' },
+      thinking: this.thinkingConfig(options?.effort),
       messages: [
         {
           role: 'user',
@@ -667,8 +693,11 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     return parts.map((b) => b.text).join('\n');
   }
 
-  async prompt(prompt: string): Promise<string> {
-    return this.delegateTask(prompt);
+  async prompt(
+    prompt: string,
+    options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
+  ): Promise<string> {
+    return this.delegateTask(prompt, undefined, options);
   }
 
   async generateWithTools(

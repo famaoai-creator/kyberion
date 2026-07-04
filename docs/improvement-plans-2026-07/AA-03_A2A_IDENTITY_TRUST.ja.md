@@ -48,3 +48,10 @@
 - enforce への切替は**通信を止め得る破壊的変更**。warn での観測期間(検証失敗ゼロの確認)を挟み、切替コミットは単独・即 revert 可能にする。
 - 永続化した共有秘密は「同一ホスト内の全プロセスが読める」前提のアイデンティティであり、ホスト間・プロセス分離の攻撃には無力(それは E4 の公開鍵の仕事)。この限界を Task 4 の運用文書に明記し、過大な保証を謳わない。
 - 鍵ファイルは tier-guard の保護対象パスに置き、バックアップ・ログへの混入(値の出力)をしない。
+
+## 実装メモ
+
+### Task 3 slice — 2026-07-04
+
+- `agent-registry` を trust score の参照元として明示し、`agent-lifecycle` の spawn gate と `agent-runtime-supervisor-client` の supervisor-backed handle が 5 固定の初期値ではなく trust engine の現在値を見るようにした。
+- `libs/core/agent-lifecycle.model-routing.test.ts` に trust score の参照テストを追加した。

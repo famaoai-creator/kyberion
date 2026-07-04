@@ -8,18 +8,13 @@ import {
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './presence-actuator-helpers.js';
+import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
-  const binding = resolveServiceBinding('slack', 'secret-guard');
-  void binding;
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-
-  const inputPath = pathResolver.rootResolve(argv.input as string);
-  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'presence-actuator',
+    handleAction,
+  });
 };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';

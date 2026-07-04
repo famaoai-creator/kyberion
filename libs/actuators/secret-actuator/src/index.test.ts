@@ -6,7 +6,7 @@ import { compileSchemaFromPath, pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<any>) => fn()),
+  retry: vi.fn(async (fn: () => Promise<any>) => fn()),
   ledgerRecord: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
   fetchSecret: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   return {
     ...(actual as any),
     safeExec: mocks.safeExec,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     logger: mocks.logger,
     ledger: { record: mocks.ledgerRecord },
     fetchSecret: mocks.fetchSecret,
@@ -112,7 +112,11 @@ describe('secret-actuator: governed mutation', () => {
     // Mission controller should NOT be called
     expect(mocks.safeExec).not.toHaveBeenCalledWith(
       'node',
-      expect.arrayContaining(['--import', 'scripts/ts-loader.mjs', expect.stringContaining('mission_controller.ts')])
+      expect.arrayContaining([
+        '--import',
+        'scripts/ts-loader.mjs',
+        expect.stringContaining('mission_controller.ts'),
+      ])
     );
 
     // Verify ledger record uses the existing mission ID

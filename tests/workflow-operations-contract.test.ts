@@ -65,6 +65,16 @@ describe('Workflow operations contract', () => {
     expect(crossOs).not.toContain('|| true');
   });
 
+  it('keeps the CI failure investigation template wired to GitHub Actions run listing', () => {
+    const template = read('knowledge/product/pipeline-templates/cicd-failure-investigation.json');
+    expect(template).toContain('CI Failure Investigation');
+    expect(template).toContain('service:preset');
+    expect(template).toContain('actions_list_runs');
+    expect(template).toContain('reasoning:analyze');
+    expect(template).toContain('cicd_failure_investigation');
+    expect(template).toContain('cicd-failure-investigation.md');
+  });
+
   it('keeps the stale workflow enabled for issues and pull requests', () => {
     const stale = read('.github/workflows/stale.yml');
     const triage = read('docs/developer/ISSUE_TRIAGE.md');

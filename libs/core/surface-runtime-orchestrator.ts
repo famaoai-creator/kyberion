@@ -19,7 +19,7 @@ import {
   formatClarificationPacketConcise,
 } from './intent-contract.js';
 import { logger } from './core.js';
-import { validateSurfaceUxContract } from './surface-ux-contract.js';
+import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
   resolveFallbackLocationCoordinates,
   resolveFallbackLocationSummary,
@@ -41,6 +41,7 @@ import type { TaskSession } from './task-session.js';
 import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
 import { truncateTextWithCount } from './text-truncation.js';
+import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
@@ -126,6 +127,74 @@ interface SurfaceRuntimeRouteHandler {
   handle: (context: SurfaceRuntimeRouteContext) => Promise<SurfaceConversationResult>;
 }
 
+function appendCompletionClosure(text: string, completionSummary: string[]): string {
+  const closure = completionSummary.filter((line) => String(line || '').trim().length > 0);
+  if (closure.length === 0) return text;
+  return [text, '', ...closure].join('\n');
+}
+
+function toCompletionSummaryRecord(action: ReturnType<typeof buildCompletionNextAction>): {
+  satisfied: boolean;
+  delivered: string[];
+  gaps: string[];
+  next_step: string;
+  confidence: number;
+  evidence_refs: string[];
+} {
+  return {
+    satisfied: action.satisfied,
+    delivered: action.delivered,
+    gaps: action.gaps,
+    next_step: action.next_step,
+    confidence: action.confidence,
+    evidence_refs: action.evidence_refs,
+  };
+}
+
+function buildDirectReplyCompletionAction(params: {
+  request: string;
+  response: string;
+  sourceLabel: string;
+  satisfied: boolean;
+}) {
+  return buildCompletionNextAction({
+    goal: {
+      summary: params.request,
+      success_condition: params.request,
+    },
+    reconciliation: {
+      satisfied: params.satisfied,
+      delivered: params.response ? [params.response] : [],
+      gaps: params.satisfied ? [] : [`${params.sourceLabel} response was incomplete.`],
+      confidence: params.satisfied ? 0.88 : 0.52,
+      evidence_refs: [],
+    },
+  });
+}
+
+function buildTaskSessionCompletionAction(input: {
+  session: TaskSession;
+  output: string;
+  outputPath?: string;
+  satisfied: boolean;
+}) {
+  const preview =
+    summarizeUserFacingText(input.output) || input.session.artifact?.preview_text || '';
+  const evidenceRefs = [input.outputPath, input.session.artifact?.output_path]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  return buildCompletionNextAction({
+    goal: input.session.goal,
+    reconciliation: {
+      satisfied: input.satisfied,
+      delivered: [input.session.goal.summary, preview].filter(Boolean),
+      gaps: input.satisfied ? [] : ['Task session did not reach completion.'],
+      confidence: input.satisfied ? 0.92 : 0.55,
+      evidence_refs: evidenceRefs,
+    },
+  });
+}
+
 async function handleSurfaceQueryRoute(
   context: SurfaceRuntimeRouteContext,
   resolved: ReturnType<typeof resolveSurfaceIntent>
@@ -143,19 +212,28 @@ async function handleSurfaceQueryRoute(
 
   if (resolved.intentId === 'schedule-read-agenda') {
     const answer = await readScheduleAgenda(queryText);
+    const completionAction = buildDirectReplyCompletionAction({
+      request: queryText,
+      response: answer,
+      sourceLabel: 'calendar agenda',
+      satisfied: Boolean(answer.trim()),
+    });
     if (resolved.intentId) {
       recordLearningOutcomeSafely({
         intent_id: resolved.intentId,
         execution_shape: resolved.shape || 'direct_reply',
         contract_ref: { kind: 'direct_reply', ref: 'calendar-actuator:list_events' },
         success: true,
+        completion_summary: toCompletionSummaryRecord(completionAction),
         context_fingerprint: {
           execution_shape: resolved.shape,
           surface: context.input.surface || 'unknown',
         },
       });
     }
-    return emptySurfaceResult(answer);
+    return emptySurfaceResult(
+      appendCompletionClosure(answer, formatCompletionNextAction(completionAction))
+    );
   }
 
   if (queryType === 'knowledge_search') {
@@ -167,19 +245,28 @@ async function handleSurfaceQueryRoute(
       providerLabel,
       results,
     });
+    const completionAction = buildDirectReplyCompletionAction({
+      request: queryText,
+      response: text,
+      sourceLabel: providerLabel,
+      satisfied: results.length > 0,
+    });
     if (resolved.intentId) {
       recordLearningOutcomeSafely({
         intent_id: resolved.intentId,
         execution_shape: resolved.shape || 'direct_reply',
         contract_ref: { kind: 'direct_reply', ref: 'knowledge-query' },
         success: true,
+        completion_summary: toCompletionSummaryRecord(completionAction),
         context_fingerprint: {
           execution_shape: resolved.shape,
           surface: context.input.surface || 'unknown',
         },
       });
     }
-    return emptySurfaceResult(text);
+    return emptySurfaceResult(
+      appendCompletionClosure(text, formatCompletionNextAction(completionAction))
+    );
   }
 
   let answer = '';
@@ -205,12 +292,23 @@ async function handleSurfaceQueryRoute(
     answer = `Unsupported live query type for: ${queryText}`;
   }
 
+  const surfacedAnswer = answer.startsWith('Provider:')
+    ? answer.replace(/^Provider:\s*[^\n]+\n/u, '').trim()
+    : answer;
+  const completionAction = buildDirectReplyCompletionAction({
+    request: queryText,
+    response: surfacedAnswer,
+    sourceLabel: queryType,
+    satisfied: Boolean(surfacedAnswer.trim()),
+  });
+
   if (resolved.intentId) {
     recordLearningOutcomeSafely({
       intent_id: resolved.intentId,
       execution_shape: resolved.shape || 'direct_reply',
       contract_ref: { kind: 'direct_reply', ref: `live-query:${queryType}` },
       success: true,
+      completion_summary: toCompletionSummaryRecord(completionAction),
       context_fingerprint: {
         execution_shape: resolved.shape,
         surface: context.input.surface || 'unknown',
@@ -219,7 +317,7 @@ async function handleSurfaceQueryRoute(
   }
 
   return emptySurfaceResult(
-    answer.startsWith('Provider:') ? answer.replace(/^Provider:\s*[^\n]+\n/u, '').trim() : answer
+    appendCompletionClosure(surfacedAnswer, formatCompletionNextAction(completionAction))
   );
 }
 
@@ -354,12 +452,19 @@ async function handleTaskSessionRoute(
         session,
         queryText,
       });
+      const completionAction = buildTaskSessionCompletionAction({
+        session: result.session,
+        output: result.output,
+        outputPath: result.outputPath,
+        satisfied: true,
+      });
       if (intent.intentId) {
         recordLearningOutcomeSafely({
           intent_id: intent.intentId,
           execution_shape: result.session.work_loop?.resolution.execution_shape || 'task_session',
           contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
           success: true,
+          completion_summary: toCompletionSummaryRecord(completionAction),
           context_fingerprint: {
             execution_shape: result.session.work_loop?.resolution.execution_shape,
             surface: context.input.surface || 'unknown',
@@ -376,6 +481,7 @@ async function handleTaskSessionRoute(
             '(no summary available)',
           outputPath: result.outputPath,
           intentId: intent.intentId,
+          completionSummary: formatCompletionNextAction(completionAction),
         })
       );
     } catch (error: any) {
@@ -587,11 +693,18 @@ async function handleTaskSessionRoute(
         { mkdir: true, encoding: 'utf8' }
       );
 
+      const completionAction = buildTaskSessionCompletionAction({
+        session: updated || session,
+        output: summary,
+        outputPath: pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+        satisfied: true,
+      });
       recordLearningOutcomeSafely({
         intent_id: 'fetch-external-data',
         execution_shape: 'task_session',
         contract_ref: { kind: 'task_session_policy', ref: 'fetch-external-data' },
         success: true,
+        completion_summary: toCompletionSummaryRecord(completionAction),
         context_fingerprint: {
           domain: dataTopic,
           surface: context.input.surface || 'unknown',
@@ -605,6 +718,7 @@ async function handleTaskSessionRoute(
           status: 'completed',
           summary,
           intentId: intent.intentId,
+          completionSummary: formatCompletionNextAction(completionAction),
         })
       );
     } catch (error: any) {
@@ -788,20 +902,26 @@ async function handleTaskSessionRoute(
         { mkdir: true, encoding: 'utf8' }
       );
 
+      const completionAction = buildTaskSessionCompletionAction({
+        session: updated || session,
+        output: output,
+        outputPath: `${pathResolver.sharedTmp(`service-operations/${session.session_id}.txt`)}`,
+        satisfied: true,
+      });
       if (intent.intentId) {
         recordLearningOutcomeSafely({
           intent_id: intent.intentId,
           execution_shape: 'task_session',
           contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
           success: true,
+          completion_summary: toCompletionSummaryRecord(completionAction),
           context_fingerprint: {
             execution_shape: 'task_session',
             surface: context.input.surface || 'unknown',
           },
         });
       }
-
-      const completionSummary =
+      const summaryText =
         sessionIntentId === 'enable-voice-input'
           ? '音声入力を有効化しました。'
           : `オペレーション [${sessionIntentId}] が正常に完了しました。`;
@@ -810,8 +930,9 @@ async function handleTaskSessionRoute(
         buildTaskSessionReply({
           session: updated || session,
           status: 'completed',
-          summary: completionSummary,
+          summary: summaryText,
           intentId: intent.intentId,
+          completionSummary: formatCompletionNextAction(completionAction),
         })
       );
     } catch (error: any) {
@@ -1938,6 +2059,18 @@ export async function runSurfaceMessageConversation(
     if (typeof text === 'string' && text.trim()) {
       const verdict = validateSurfaceUxContract({ text });
       if (!verdict.valid) {
+        const repairedText = repairSurfaceUxContractText(text);
+        if (repairedText !== text) {
+          const repairedVerdict = validateSurfaceUxContract({ text: repairedText });
+          if (repairedVerdict.valid) {
+            (result as { text?: string }).text = repairedText;
+            (result as { uxContract?: unknown }).uxContract = repairedVerdict;
+            logger.info(
+              `[UX_CONTRACT] surface response repaired before delivery: ${verdict.violations.join('; ')}`
+            );
+            return result;
+          }
+        }
         logger.warn(
           `[UX_CONTRACT] surface response violates contract: ${verdict.violations.join('; ')}`
         );

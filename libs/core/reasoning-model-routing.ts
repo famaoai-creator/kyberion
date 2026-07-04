@@ -32,6 +32,7 @@ export interface ModelRegistryEntry {
   family: string;
   status: ModelStatus;
   tier: TaskModelTier;
+  execution_tier?: 'fast' | 'standard' | 'deep';
   cost_band?: 'low' | 'medium' | 'high' | 'very_high';
   latency_band?: 'low' | 'medium' | 'high';
   reasoning_confidence?: 'low' | 'medium' | 'high';
@@ -59,6 +60,7 @@ export interface ReasoningModelRoute {
 
 export interface TaskModelHint {
   tier: TaskModelTier;
+  execution_tier?: 'fast' | 'standard' | 'deep';
   effort: TaskModelEffort;
   model_id: string;
   route_reason: string;
@@ -263,6 +265,17 @@ function tierToEffort(tier: TaskModelTier): TaskModelEffort {
   }
 }
 
+function tierToExecutionTier(tier: TaskModelTier): 'fast' | 'standard' | 'deep' {
+  switch (tier) {
+    case 'small':
+      return 'fast';
+    case 'standard':
+      return 'standard';
+    case 'large':
+      return 'deep';
+  }
+}
+
 function tierReason(input: TaskModelHintInput, tier: TaskModelTier): string {
   const parts = [
     `phase_kind=${input.phase_kind}`,
@@ -370,6 +383,7 @@ export function resolveTaskModelHint(
     const model = findTaskModelForTier(registry, tier);
     return {
       tier,
+      execution_tier: tierToExecutionTier(tier),
       effort: tierToEffort(tier),
       model_id: model.model_id,
       route_reason: tierReason(input, tier),
@@ -382,6 +396,7 @@ export function resolveTaskModelHint(
     findTaskModelForTier(registry, routed.choice.tier);
   return {
     tier: routed.choice.tier,
+    execution_tier: tierToExecutionTier(routed.choice.tier),
     effort: routed.choice.effort,
     model_id: model.model_id,
     route_reason: routed.route_reason,

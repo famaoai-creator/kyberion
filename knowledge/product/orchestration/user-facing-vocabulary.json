@@ -55,6 +55,94 @@
         "en": "Command the mirror...",
         "ja": "mirror に指示してください..."
       },
+      "progress_working": {
+        "en": "Working",
+        "ja": "処理中"
+      },
+      "progress_completed": {
+        "en": "Completed",
+        "ja": "完了"
+      },
+      "progress_failed": {
+        "en": "Failed",
+        "ja": "失敗"
+      },
+      "error_title": {
+        "en": "Something went wrong",
+        "ja": "問題が発生しました"
+      },
+      "error_trace_label": {
+        "en": "Trace",
+        "ja": "trace"
+      },
+      "error_connection_body": {
+        "en": "The service or network is unavailable.",
+        "ja": "サービスまたはネットワークに接続できません。"
+      },
+      "error_rate_limit_body": {
+        "en": "The provider is temporarily rate-limiting requests.",
+        "ja": "プロバイダが一時的にリクエストを制限しています。"
+      },
+      "error_missing_dependency_body": {
+        "en": "A runtime dependency is missing.",
+        "ja": "実行に必要な依存が不足しています。"
+      },
+      "error_missing_secret_body": {
+        "en": "A required credential or secret is missing.",
+        "ja": "必要な credential か secret が見つかりません。"
+      },
+      "error_invalid_input_body": {
+        "en": "The request shape is invalid.",
+        "ja": "入力形式が不正です。"
+      },
+      "error_resource_unavailable_body": {
+        "en": "The requested resource is busy or unavailable.",
+        "ja": "要求したリソースが使用中か利用できません。"
+      },
+      "error_timeout_body": {
+        "en": "The operation took too long.",
+        "ja": "処理が時間内に完了しませんでした。"
+      },
+      "error_governance_block_body": {
+        "en": "The action needs approval or a policy change.",
+        "ja": "承認またはポリシー変更が必要です。"
+      },
+      "error_permission_denied_body": {
+        "en": "You do not have permission to complete this action.",
+        "ja": "この操作を完了する権限がありません。"
+      },
+      "error_mission_not_found_body": {
+        "en": "The mission reference could not be resolved.",
+        "ja": "mission 参照を解決できませんでした。"
+      },
+      "error_unknown_body": {
+        "en": "The request could not be completed.",
+        "ja": "依頼を完了できませんでした。"
+      },
+      "error_next_step_retry": {
+        "en": "Try the request again.",
+        "ja": "もう一度やり直してください。"
+      },
+      "error_next_step_doctor": {
+        "en": "Check the runtime health and prerequisites.",
+        "ja": "実行環境と健全性を確認してください。"
+      },
+      "error_next_step_repair": {
+        "en": "Repair the blocked policy or approval and retry.",
+        "ja": "ブロックされたポリシーや承認を修復して再実行してください。"
+      },
+      "error_next_step_connect": {
+        "en": "Reconnect the service or network and retry.",
+        "ja": "接続を回復して再実行してください。"
+      },
+      "error_next_step_input": {
+        "en": "Fix the input shape and rerun the same action.",
+        "ja": "入力形式を修正して同じ操作を再実行してください。"
+      },
+      "error_next_step_secret": {
+        "en": "Update the required secret or credential and retry.",
+        "ja": "必要な secret / credential を更新して再実行してください。"
+      },
       "pipeline_crystallization_loop": {
         "en": "Pipeline Crystallization Loop",
         "ja": "パイプライン結晶化ループ"
@@ -394,6 +482,98 @@
       "readiness_runtime": {
         "en": "missing runtime prerequisites",
         "ja": "実行環境が不足"
+      },
+      "question_headline": {
+        "en": "More context is required before execution",
+        "ja": "実行前に追加の確認が必要です"
+      },
+      "question_summary": {
+        "en": "The request needs clarification before Kyberion can proceed safely.",
+        "ja": "実行を続ける前に入力内容の確認が必要です。"
+      },
+      "question_unresolved": {
+        "en": "The request still has unresolved inputs.",
+        "ja": "未解決の入力があります。"
+      },
+      "question_clear": {
+        "en": "The request can proceed without clarification.",
+        "ja": "この依頼は追加確認なしで進められます。"
+      },
+      "question_provide": {
+        "en": "Please provide {input}.",
+        "ja": "{input} を指定してください。"
+      },
+      "question_confirm": {
+        "en": "Please confirm {input}.",
+        "ja": "{input} を確認してください。"
+      },
+      "question_reason": {
+        "en": "The request cannot be executed safely without this input.",
+        "ja": "この入力がないと安全に実行できません。"
+      },
+      "question_goal_prompt": {
+        "en": "What should Kyberion do, and what outcome should count as success?",
+        "ja": "Kyberion は何を実行し、何を成功とみなせばよいですか?"
+      },
+      "connection_connected": {
+        "en": "connected",
+        "ja": "接続済み"
+      },
+      "connection_connecting": {
+        "en": "connecting",
+        "ja": "接続中"
+      },
+      "connection_degraded": {
+        "en": "degraded",
+        "ja": "接続品質が低下"
+      },
+      "connection_disconnected": {
+        "en": "disconnected",
+        "ja": "未接続"
+      },
+      "provider_available": {
+        "en": "available",
+        "ja": "利用可能"
+      },
+      "provider_busy": {
+        "en": "busy",
+        "ja": "処理中"
+      },
+      "provider_fallback": {
+        "en": "fallback",
+        "ja": "代替"
+      },
+      "provider_error": {
+        "en": "error",
+        "ja": "エラー"
+      },
+      "mission_planned": {
+        "en": "planned",
+        "ja": "予定"
+      },
+      "mission_active": {
+        "en": "active",
+        "ja": "進行中"
+      },
+      "mission_blocked": {
+        "en": "blocked",
+        "ja": "停止中"
+      },
+      "mission_completed": {
+        "en": "completed",
+        "ja": "完了"
+      },
+      "mission_failed": {
+        "en": "failed",
+        "ja": "失敗"
+      },
+      "mission_review": {
+        "en": "review",
+        "ja": "レビュー"
+      },
+      "mission_recovered": {
+        "en": "recovered",
+        "ja": "復旧"
       },
       "cli_readiness": {
         "en": "Readiness",

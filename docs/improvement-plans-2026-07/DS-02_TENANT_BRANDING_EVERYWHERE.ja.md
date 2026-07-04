@@ -50,3 +50,27 @@
 
 - **tier 隔離が最大のリスク**。ブランド値(色・ロゴ)は confidential 情報であり、公開 UI・public 成果物・スクリーンショット付き PR に混入させない。Task 2/4 の分離テストを省略しない。PR 添付のスクリーンショットはダミーテナント(`client-a`/`demo-org`)で撮る。
 - chronos のテナント切替は UX 上の混乱源になり得る。適用範囲を「テナント文脈が明示されている画面」に限定し、常にバナーで現在の文脈を表示する。
+
+## 実装メモ
+
+### Task 1 slice — 2026-07-04
+
+- `libs/core/tenant-design-resolver.ts` を追加し、confidential tenant override / theme pack / layout catalog / logo path の解決を共通化した。
+- `libs/actuators/media-actuator/src/index.ts` の tenant override 解決は新 resolver 経由に差し替えた。
+- `libs/core/tenant-design-resolver.test.ts` で tenant あり / default fallback を固定した。
+- 検証:
+  - `pnpm exec vitest run libs/core/tenant-design-resolver.test.ts`
+  - `pnpm --filter @actuator/media test`
+  - `pnpm run validate`
+
+### Task 3 slice — 2026-07-04
+
+- `video-content-brief` に `design_profile` を追加し、tenant/customer 指定から `resolveTenantDesign` → theme pack → video storyboard の `css_vars` へ流す経路を追加した。
+- `libs/core/video-design-system.ts` を追加し、video の既定トークン生成を `libs/core` へ集約した。
+- `libs/core/video-content-brief-contract.test.ts` で tenant palette が storyboard に反映されることを固定した。
+
+### Task 2 slice — 2026-07-04
+
+- chronos-mirror-v2 に `app/api/tenant-design` を追加し、URL の tenant 文脈から request-scoped に css_vars を取得できるようにした。
+- `presence/displays/chronos-mirror-v2/src/app/page.tsx` で tenant css_vars をローカル state に合成し、global theme は維持しつつ tenant 文脈の画面だけ反映するようにした。
+- `presence/displays/chronos-mirror-v2/src/app/api/tenant-design/route.test.ts` で tenant あり / default の応答を固定した。

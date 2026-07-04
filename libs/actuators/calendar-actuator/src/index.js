@@ -1,86 +1,105 @@
-import { logger, safeExec, safeReadFile, createStandardYargs, pathResolver, TraceContext, persistTrace, withRetry, classifyError, formatClassification, compileSchemaFromPath, } from '@agent/core';
+import {
+  logger,
+  safeExec,
+  safeReadFile,
+  createStandardYargs,
+  pathResolver,
+  TraceContext,
+  persistTrace,
+  retry,
+  classifyError,
+  formatClassification,
+  compileSchemaFromPath,
+} from '@agent/core';
 import AjvModule from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import * as path from 'node:path';
 const AjvCtor = AjvModule.default ?? AjvModule;
 const addFormats = addFormatsModule.default ?? addFormatsModule;
-const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/calendar-actuator/manifest.json');
+const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/calendar-actuator/manifest.json'
+);
 const DEFAULT_CALENDAR_RETRY = {
-    maxRetries: 2,
-    initialDelayMs: 500,
-    maxDelayMs: 5000,
-    factor: 2,
-    jitter: true,
+  maxRetries: 2,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  factor: 2,
+  jitter: true,
 };
 let cachedValidator = null;
 let cachedRecoveryPolicy = null;
 function getValidator() {
-    if (cachedValidator)
-        return cachedValidator;
-    const ajv = new AjvCtor({ allErrors: true });
-    addFormats(ajv);
-    const schemaPath = path.resolve(pathResolver.rootDir(), 'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json');
-    cachedValidator = compileSchemaFromPath(ajv, schemaPath);
-    return cachedValidator;
+  if (cachedValidator) return cachedValidator;
+  const ajv = new AjvCtor({ allErrors: true });
+  addFormats(ajv);
+  const schemaPath = path.resolve(
+    pathResolver.rootDir(),
+    'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json'
+  );
+  cachedValidator = compileSchemaFromPath(ajv, schemaPath);
+  return cachedValidator;
 }
 function validateAction(input) {
-    const validate = getValidator();
-    if (!validate(input)) {
-        const errors = (validate.errors || [])
-            .map(e => `${e.instancePath || '/'} ${e.message ?? 'invalid'}`)
-            .join('; ');
-        throw new Error(`calendar-actuator: invalid input: ${errors}`);
-    }
-    return input;
+  const validate = getValidator();
+  if (!validate(input)) {
+    const errors = (validate.errors || [])
+      .map((e) => `${e.instancePath || '/'} ${e.message ?? 'invalid'}`)
+      .join('; ');
+    throw new Error(`calendar-actuator: invalid input: ${errors}`);
+  }
+  return input;
 }
 function parseISODate(value, label) {
-    if (!value)
-        return null;
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) {
-        throw new Error(`calendar-actuator: invalid ${label}: "${value}"`);
-    }
-    return d;
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`calendar-actuator: invalid ${label}: "${value}"`);
+  }
+  return d;
 }
 function isPlainObject(value) {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 function loadRecoveryPolicy() {
-    if (cachedRecoveryPolicy)
-        return cachedRecoveryPolicy;
-    try {
-        const manifest = JSON.parse(safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }));
-        const policy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-        cachedRecoveryPolicy = policy;
-        return policy;
-    }
-    catch (_) {
-        cachedRecoveryPolicy = {};
-        return cachedRecoveryPolicy;
-    }
+  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
+  try {
+    const manifest = JSON.parse(safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }));
+    const policy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+    cachedRecoveryPolicy = policy;
+    return policy;
+  } catch (_) {
+    cachedRecoveryPolicy = {};
+    return cachedRecoveryPolicy;
+  }
 }
 function buildRetryOptions(override) {
-    const recoveryPolicy = loadRecoveryPolicy();
-    const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-    const retryableCategories = new Set(Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : []);
-    const resolved = {
-        ...DEFAULT_CALENDAR_RETRY,
-        ...manifestRetry,
-        ...(override || {}),
-    };
-    return {
-        ...resolved,
-        shouldRetry: (error) => {
-            const classification = classifyError(error);
-            if (retryableCategories.size > 0) {
-                return retryableCategories.has(classification.category);
-            }
-            return classification.category === 'network'
-                || classification.category === 'rate_limit'
-                || classification.category === 'timeout'
-                || classification.category === 'resource_unavailable';
-        },
-    };
+  const recoveryPolicy = loadRecoveryPolicy();
+  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
+  const retryableCategories = new Set(
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
+  );
+  const resolved = {
+    ...DEFAULT_CALENDAR_RETRY,
+    ...manifestRetry,
+    ...(override || {}),
+  };
+  return {
+    ...resolved,
+    shouldRetry: (error) => {
+      const classification = classifyError(error);
+      if (retryableCategories.size > 0) {
+        return retryableCategories.has(classification.category);
+      }
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
+    },
+  };
 }
 /**
  * Run a JXA script that reads its parameters from a JSON literal embedded in
@@ -93,43 +112,50 @@ function buildRetryOptions(override) {
  * literal and execute arbitrary JXA.
  */
 async function runJxa(scriptBody, params) {
-    const paramsLiteral = JSON.stringify(JSON.stringify(params));
-    const script = `
+  const paramsLiteral = JSON.stringify(JSON.stringify(params));
+  const script = `
     (function() {
       const PARAMS = JSON.parse(${paramsLiteral});
       ${scriptBody}
     })();
   `;
-    const output = await withRetry(async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]), buildRetryOptions());
-    const trimmed = String(output).trim();
-    if (!trimmed)
-        return undefined;
-    try {
-        return JSON.parse(trimmed);
-    }
-    catch (err) {
-        throw new Error(`calendar-actuator: failed to parse osascript output: ${err.message}\n${trimmed.slice(0, 300)}`);
-    }
+  const output = await retry(
+    async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]),
+    buildRetryOptions()
+  );
+  const trimmed = String(output).trim();
+  if (!trimmed) return undefined;
+  try {
+    return JSON.parse(trimmed);
+  } catch (err) {
+    throw new Error(
+      `calendar-actuator: failed to parse osascript output: ${err.message}\n${trimmed.slice(0, 300)}`
+    );
+  }
 }
 export async function listCalendars() {
-    return runJxa(`
+  return runJxa(
+    `
       const app = Application("Calendar");
       return JSON.stringify(app.calendars().map(function (cal) { return { name: cal.name() }; }));
-    `, {});
+    `,
+    {}
+  );
 }
 export async function listEvents(params) {
-    const startInput = parseISODate(params.start_date, 'start_date');
-    const endInput = parseISODate(params.end_date, 'end_date');
-    const start = startInput ?? new Date();
-    if (!startInput)
-        start.setHours(0, 0, 0, 0);
-    const end = endInput ?? new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    if (!endInput)
-        end.setHours(23, 59, 59, 999);
-    if (end.getTime() <= start.getTime()) {
-        throw new Error(`calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`);
-    }
-    return runJxa(`
+  const startInput = parseISODate(params.start_date, 'start_date');
+  const endInput = parseISODate(params.end_date, 'end_date');
+  const start = startInput ?? new Date();
+  if (!startInput) start.setHours(0, 0, 0, 0);
+  const end = endInput ?? new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  if (!endInput) end.setHours(23, 59, 59, 999);
+  if (end.getTime() <= start.getTime()) {
+    throw new Error(
+      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
+    );
+  }
+  return runJxa(
+    `
       const app = Application("Calendar");
       const targets = PARAMS.calendar_names && PARAMS.calendar_names.length ? PARAMS.calendar_names : null;
       const startLimit = new Date(PARAMS.start_iso);
@@ -159,23 +185,30 @@ export async function listEvents(params) {
         }
       });
       return JSON.stringify(results);
-    `, {
-        calendar_names: params.calendar_names ?? null,
-        start_iso: start.toISOString(),
-        end_iso: end.toISOString(),
-    });
+    `,
+    {
+      calendar_names: params.calendar_names ?? null,
+      start_iso: start.toISOString(),
+      end_iso: end.toISOString(),
+    }
+  );
 }
 export async function createEvent(params) {
-    if (!params.title || !params.start_date || !params.calendar_names?.[0]) {
-        throw new Error('calendar-actuator: create_event requires title, start_date, and calendar_names[0]');
-    }
-    const start = parseISODate(params.start_date, 'start_date');
-    const end = parseISODate(params.end_date, 'end_date') ??
-        new Date(start.getTime() + 30 * 60 * 1000);
-    if (end.getTime() <= start.getTime()) {
-        throw new Error(`calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`);
-    }
-    return runJxa(`
+  if (!params.title || !params.start_date || !params.calendar_names?.[0]) {
+    throw new Error(
+      'calendar-actuator: create_event requires title, start_date, and calendar_names[0]'
+    );
+  }
+  const start = parseISODate(params.start_date, 'start_date');
+  const end =
+    parseISODate(params.end_date, 'end_date') ?? new Date(start.getTime() + 30 * 60 * 1000);
+  if (end.getTime() <= start.getTime()) {
+    throw new Error(
+      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
+    );
+  }
+  return runJxa(
+    `
       const app = Application("Calendar");
       const cal = app.calendars.byName(PARAMS.calendar_name);
       if (!cal.exists()) {
@@ -190,75 +223,74 @@ export async function createEvent(params) {
       });
       cal.events.push(event);
       return JSON.stringify({ status: "success", title: PARAMS.title });
-    `, {
-        calendar_name: params.calendar_names[0],
-        title: params.title,
-        start_iso: start.toISOString(),
-        end_iso: end.toISOString(),
-        location: params.location ?? '',
-        description: params.description ?? '',
-    });
+    `,
+    {
+      calendar_name: params.calendar_names[0],
+      title: params.title,
+      start_iso: start.toISOString(),
+      end_iso: end.toISOString(),
+      location: params.location ?? '',
+      description: params.description ?? '',
+    }
+  );
 }
 export async function handleAction(action) {
-    const valid = validateAction(action);
-    const traceCtx = new TraceContext(`calendar-actuator:${valid.op}`, {
-        actuator: 'calendar-actuator',
+  const valid = validateAction(action);
+  const traceCtx = new TraceContext(`calendar-actuator:${valid.op}`, {
+    actuator: 'calendar-actuator',
+  });
+  traceCtx.addEvent('action.received', { op: valid.op });
+  let result;
+  try {
+    switch (valid.op) {
+      case 'list_calendars':
+        result = await listCalendars();
+        break;
+      case 'list_events':
+        result = await listEvents(valid.params || {});
+        break;
+      case 'create_event':
+        result = await createEvent(valid.params || {});
+        break;
+      default: {
+        const _exhaustive = valid.op;
+        throw new Error(`Unsupported operation: ${String(_exhaustive)}`);
+      }
+    }
+    traceCtx.addEvent('action.completed', {
+      op: valid.op,
+      records: Array.isArray(result) ? result.length : 1,
     });
-    traceCtx.addEvent('action.received', { op: valid.op });
-    let result;
+    return result;
+  } catch (err) {
+    const classified = classifyError(err);
+    traceCtx.addEvent('action.failed', {
+      op: valid.op,
+      category: classified.category,
+    });
+    throw err;
+  } finally {
     try {
-        switch (valid.op) {
-            case 'list_calendars':
-                result = await listCalendars();
-                break;
-            case 'list_events':
-                result = await listEvents(valid.params || {});
-                break;
-            case 'create_event':
-                result = await createEvent(valid.params || {});
-                break;
-            default: {
-                const _exhaustive = valid.op;
-                throw new Error(`Unsupported operation: ${String(_exhaustive)}`);
-            }
-        }
-        traceCtx.addEvent('action.completed', {
-            op: valid.op,
-            records: Array.isArray(result) ? result.length : 1,
-        });
-        return result;
+      persistTrace(traceCtx.finalize());
+    } catch (_) {
+      /* persistence best-effort */
     }
-    catch (err) {
-        const classified = classifyError(err);
-        traceCtx.addEvent('action.failed', {
-            op: valid.op,
-            category: classified.category,
-        });
-        throw err;
-    }
-    finally {
-        try {
-            persistTrace(traceCtx.finalize());
-        }
-        catch (_) {
-            /* persistence best-effort */
-        }
-    }
+  }
 }
 const main = async () => {
-    const argv = await createStandardYargs()
-        .option('input', { alias: 'i', type: 'string', demandOption: true })
-        .parseSync();
-    const inputPath = pathResolver.rootResolve(argv.input);
-    const inputContent = JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }));
-    const result = await handleAction(inputContent);
-    console.log(JSON.stringify(result, null, 2));
+  const argv = await createStandardYargs()
+    .option('input', { alias: 'i', type: 'string', demandOption: true })
+    .parseSync();
+  const inputPath = pathResolver.rootResolve(argv.input);
+  const inputContent = JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }));
+  const result = await handleAction(inputContent);
+  console.log(JSON.stringify(result, null, 2));
 };
 const isDirectRun = process.env.NODE_ENV !== 'test';
 if (isDirectRun) {
-    main().catch(err => {
-        logger.error(formatClassification(classifyError(err)));
-        process.exit(1);
-    });
+  main().catch((err) => {
+    logger.error(formatClassification(classifyError(err)));
+    process.exit(1);
+  });
 }
 //# sourceMappingURL=index.js.map

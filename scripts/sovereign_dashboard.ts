@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import {
+  resolveActiveProfileRoot,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   listSurfaceOutboxMessages,
   discoverProviders,
   loadSurfaceManifest,
-  logger,
   pathResolver,
   safeExistsSync,
   safeReaddir,
@@ -19,12 +19,18 @@ import { readJsonFile, readTextFile } from './refactor/cli-input.js';
  */
 
 const ROOT_DIR = pathResolver.rootDir();
+const PACKAGE_JSON_PATH = pathResolver.rootResolve('package.json');
 
 type DashboardFocus = 'all' | 'onboarding' | 'capabilities' | 'skills';
 
 function getDashboardFocus(): DashboardFocus {
   const focusIndex = process.argv.indexOf('--focus');
-  const focusValue = focusIndex >= 0 ? String(process.argv[focusIndex + 1] || '').trim().toLowerCase() : '';
+  const focusValue =
+    focusIndex >= 0
+      ? String(process.argv[focusIndex + 1] || '')
+          .trim()
+          .toLowerCase()
+      : '';
   if (focusValue === 'capabilities') return 'capabilities';
   if (focusValue === 'skills') return 'skills';
   return focusValue === 'onboarding' ? 'onboarding' : 'all';
@@ -34,10 +40,93 @@ function clearScreen() {
   process.stdout.write('\x1Bc');
 }
 
+function getDashboardVersion(): string {
+  const packageJson = readJsonIfExists<{ version?: string }>(PACKAGE_JSON_PATH);
+  return packageJson?.version || 'unknown';
+}
+
+type DashboardDoctorFinding = { severity: 'critical' | 'warning'; agentId: string; reason: string };
+
+function collectRuntimeDoctorFindings(): DashboardDoctorFinding[] {
+  const missions = new Set<string>();
+  const missionDirs = [
+    pathResolver.active('missions/public'),
+    pathResolver.active('missions/confidential'),
+    pathResolver.knowledge('personal/missions'),
+  ];
+  for (const dir of missionDirs) {
+    if (!safeExistsSync(dir)) continue;
+    for (const item of safeReaddir(dir)) {
+      const statePath = path.join(dir, item, 'mission-state.json');
+      if (!safeExistsSync(statePath)) continue;
+      const state = readJsonFile<any>(statePath);
+      if (state.status === 'active' && typeof state.mission_id === 'string') {
+        missions.add(state.mission_id);
+      }
+    }
+  }
+
+  const runtimeSnapshots = new Map(
+    listAgentRuntimeSnapshots().map((snapshot) => [snapshot.agent.agentId, snapshot])
+  );
+  const findings: DashboardDoctorFinding[] = [];
+  for (const lease of listAgentRuntimeLeaseSummaries()) {
+    const runtime = runtimeSnapshots.get(lease.agent_id);
+    if (!runtime) continue;
+    if (lease.owner_type === 'mission' && !missions.has(lease.owner_id)) {
+      findings.push({
+        severity: 'critical' as const,
+        agentId: lease.agent_id,
+        reason: 'orphaned mission lease',
+      });
+      continue;
+    }
+    if (runtime.agent.status === 'error') {
+      findings.push({
+        severity: 'warning' as const,
+        agentId: lease.agent_id,
+        reason: 'runtime in error state',
+      });
+      continue;
+    }
+    const executionMode =
+      typeof lease.metadata?.execution_mode === 'string'
+        ? lease.metadata.execution_mode
+        : undefined;
+    const channel =
+      typeof lease.metadata?.channel === 'string' ? lease.metadata.channel : undefined;
+    if (
+      executionMode === 'conversation' &&
+      channel === 'slack' &&
+      runtime.runtime?.idleForMs &&
+      runtime.runtime.idleForMs > 5 * 60 * 1000
+    ) {
+      findings.push({
+        severity: 'warning' as const,
+        agentId: lease.agent_id,
+        reason: 'stale slack conversation lease',
+      });
+    }
+  }
+  return findings.slice(0, 6);
+}
+
+function getDashboardHealthStatus(): 'OPERATIONAL' | 'DEGRADED' {
+  return collectRuntimeDoctorFindings().length > 0 ? 'DEGRADED' : 'OPERATIONAL';
+}
+
 function drawHeader() {
-  console.log(chalk.bold.cyan(' 🌌 KYBERION SOVEREIGN ECOSYSTEM | CEO DASHBOARD v1.0 '));
+  const identity = readJsonIfExists<{ name?: string }>(
+    path.join(resolveActiveProfileRoot(), 'my-identity.json')
+  );
+  const status = getDashboardHealthStatus();
+  console.log(
+    chalk.bold.cyan(` 🌌 KYBERION SOVEREIGN ECOSYSTEM | CEO DASHBOARD v${getDashboardVersion()} `)
+  );
   console.log(chalk.dim(' --------------------------------------------------- '));
-  console.log(` Status: ${chalk.green('OPERATIONAL')} | User: ${chalk.bold('famao')} | Time: ${new Date().toLocaleTimeString()}\n`);
+  console.log(
+    ` Status: ${status === 'OPERATIONAL' ? chalk.green(status) : chalk.yellow(status)} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${new Date().toLocaleTimeString()}\n`
+  );
 }
 
 function readJsonIfExists<T>(logicalPath: string): T | null {
@@ -83,8 +172,10 @@ function listJsonFiles(dir: string): string[] {
 }
 
 function readConnectionReview() {
-  const connectionDir = pathResolver.knowledge('personal/connections');
-  const readinessPath = pathResolver.knowledge('product/governance/service-connection-readiness.json');
+  const connectionDir = path.join(resolveActiveProfileRoot(), 'connections');
+  const readinessPath = pathResolver.knowledge(
+    'product/governance/service-connection-readiness.json'
+  );
   const readiness = readJsonIfExists<{
     required_services?: Record<string, { required_keys_any?: string[] }>;
   }>(readinessPath);
@@ -94,9 +185,12 @@ function readConnectionReview() {
     const serviceId = path.basename(file, '.json');
     const record = readJsonIfExists<Record<string, unknown>>(file);
     const requirements = readiness?.required_services?.[serviceId]?.required_keys_any || [];
-    const hasRequiredKey = requirements.length === 0
-      ? Boolean(record)
-      : requirements.some((key) => Boolean(record && Object.prototype.hasOwnProperty.call(record, key)));
+    const hasRequiredKey =
+      requirements.length === 0
+        ? Boolean(record)
+        : requirements.some((key) =>
+            Boolean(record && Object.prototype.hasOwnProperty.call(record, key))
+          );
     const status = !record ? 'pending' : hasRequiredKey ? 'ready' : 'blocked';
     return {
       serviceId,
@@ -126,8 +220,10 @@ function drawTenantContext() {
 
   const onboardingState = readJsonIfExists<{
     identity?: { name?: string };
-    tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }> };
-  }>(pathResolver.knowledge('personal/onboarding/onboarding-state.json'));
+    tenants?: {
+      entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }>;
+    };
+  }>(path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json'));
   const tenants = onboardingState?.tenants?.entries || [];
 
   if (tenants.length === 0) {
@@ -137,11 +233,22 @@ function drawTenantContext() {
   }
 
   const activeTenant = tenants[0];
-  console.log(`  ${chalk.gray('•')} Active: ${chalk.cyan(activeTenant.tenant_slug)} ${chalk.dim(activeTenant.display_name || '')}`);
+  console.log(
+    `  ${chalk.gray('•')} Active: ${chalk.cyan(activeTenant.tenant_slug)} ${chalk.dim(activeTenant.display_name || '')}`
+  );
   console.log(`  ${chalk.gray('•')} Role: ${chalk.white(activeTenant.assigned_role || 'unknown')}`);
-  console.log(`  ${chalk.gray('•')} Owner: ${chalk.white(onboardingState?.identity?.name || 'Sovereign')}`);
+  console.log(
+    `  ${chalk.gray('•')} Owner: ${chalk.white(onboardingState?.identity?.name || 'Sovereign')}`
+  );
   if (tenants.length > 1) {
-    console.log(`  ${chalk.gray('•')} Other tenants: ${chalk.dim(tenants.slice(1).map((tenant) => tenant.tenant_slug).join(', '))}`);
+    console.log(
+      `  ${chalk.gray('•')} Other tenants: ${chalk.dim(
+        tenants
+          .slice(1)
+          .map((tenant) => tenant.tenant_slug)
+          .join(', ')
+      )}`
+    );
   }
   console.log('');
 }
@@ -152,29 +259,40 @@ function drawConnectionReview() {
   const review = readConnectionReview();
   const services = review.services;
   const ready = services.filter((entry) => entry.status === 'ready');
-  const blocked = services.filter((entry) => entry.status === 'blocked' || entry.status === 'missing');
+  const blocked = services.filter(
+    (entry) => entry.status === 'blocked' || entry.status === 'missing'
+  );
   const pending = services.filter((entry) => entry.status === 'pending');
 
-  console.log(`  ${chalk.gray('•')} Ready: ${ready.length > 0 ? chalk.green(ready.length) : chalk.dim(0)}`);
-  console.log(`  ${chalk.gray('•')} Blocked: ${blocked.length > 0 ? chalk.yellow(blocked.length) : chalk.dim(0)}`);
-  console.log(`  ${chalk.gray('•')} Pending: ${pending.length > 0 ? chalk.yellow(pending.length) : chalk.dim(0)}`);
+  console.log(
+    `  ${chalk.gray('•')} Ready: ${ready.length > 0 ? chalk.green(ready.length) : chalk.dim(0)}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Blocked: ${blocked.length > 0 ? chalk.yellow(blocked.length) : chalk.dim(0)}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Pending: ${pending.length > 0 ? chalk.yellow(pending.length) : chalk.dim(0)}`
+  );
 
-  const recommended = blocked.length > 0
-    ? `review ${blocked[0].serviceId}`
-    : pending.length > 0
-      ? `capture ${pending[0].serviceId}`
-      : 'all required connection drafts are available';
+  const recommended =
+    blocked.length > 0
+      ? `review ${blocked[0].serviceId}`
+      : pending.length > 0
+        ? `capture ${pending[0].serviceId}`
+        : 'all required connection drafts are available';
   console.log(`  ${chalk.gray('•')} Review cue: ${chalk.white(recommended)}`);
 
   for (const entry of services.slice(0, 5)) {
-    const label = entry.status === 'ready'
-      ? chalk.green('READY')
-      : entry.status === 'blocked'
-        ? chalk.yellow('BLOCKED')
-        : entry.status === 'missing'
-          ? chalk.red('MISSING')
-          : chalk.dim('PENDING');
-    const requirements = entry.requirements.length > 0 ? chalk.dim(` needs=${entry.requirements.join('|')}`) : '';
+    const label =
+      entry.status === 'ready'
+        ? chalk.green('READY')
+        : entry.status === 'blocked'
+          ? chalk.yellow('BLOCKED')
+          : entry.status === 'missing'
+            ? chalk.red('MISSING')
+            : chalk.dim('PENDING');
+    const requirements =
+      entry.requirements.length > 0 ? chalk.dim(` needs=${entry.requirements.join('|')}`) : '';
     console.log(`  ${chalk.gray('•')} ${entry.serviceId.padEnd(16)} [${label}]${requirements}`);
   }
   console.log('');
@@ -187,49 +305,58 @@ function drawStarterMissionSuggestion() {
     status?: string;
     tutorial?: { mode?: string };
     tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string }> };
-  }>(pathResolver.knowledge('personal/onboarding/onboarding-state.json'));
+  }>(path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json'));
 
   const connectionReview = readConnectionReview();
-  const readyServices = connectionReview.services.filter((entry) => entry.status === 'ready').map((entry) => entry.serviceId);
-  const blockedServices = connectionReview.services.filter((entry) => entry.status === 'blocked' || entry.status === 'missing').map((entry) => entry.serviceId);
+  const readyServices = connectionReview.services
+    .filter((entry) => entry.status === 'ready')
+    .map((entry) => entry.serviceId);
+  const blockedServices = connectionReview.services
+    .filter((entry) => entry.status === 'blocked' || entry.status === 'missing')
+    .map((entry) => entry.serviceId);
   const tenantEntries = onboardingState?.tenants?.entries || [];
   const tutorialMode = onboardingState?.tutorial?.mode || 'skipped';
 
-  const suggestion = !onboardingState || onboardingState.status !== 'complete'
-    ? {
-        intentId: 'launch-first-run-onboarding',
-        title: 'Run onboarding to finish setup',
-        why: 'Onboarding is not complete yet.',
-      }
-    : blockedServices.length > 0
+  const suggestion =
+    !onboardingState || onboardingState.status !== 'complete'
       ? {
-          intentId: 'verify-environment-readiness',
-          title: 'Verify blocked service readiness',
-          why: `Blocked services remain: ${blockedServices.join(', ')}.`,
+          intentId: 'launch-first-run-onboarding',
+          title: 'Run onboarding to finish setup',
+          why: 'Onboarding is not complete yet.',
         }
-      : tenantEntries.length === 0
+      : blockedServices.length > 0
         ? {
-            intentId: 'configure-organization-toolchain',
-            title: 'Register the first tenant toolchain',
-            why: 'No tenant is registered yet, so the next useful step is organization setup.',
+            intentId: 'verify-environment-readiness',
+            title: 'Verify blocked service readiness',
+            why: `Blocked services remain: ${blockedServices.join(', ')}.`,
           }
-        : tutorialMode === 'skipped'
+        : tenantEntries.length === 0
           ? {
-              intentId: 'register-presentation-preference-profile',
-              title: 'Capture a reusable preference profile',
-              why: 'Tenant and service setup are available; a lightweight preference capture gives the first durable win.',
+              intentId: 'configure-organization-toolchain',
+              title: 'Register the first tenant toolchain',
+              why: 'No tenant is registered yet, so the next useful step is organization setup.',
             }
-          : {
-              intentId: 'register-presentation-preference-profile',
-              title: 'Refine presentation defaults',
-              why: 'The environment is ready for reusable preference capture.',
-            };
+          : tutorialMode === 'skipped'
+            ? {
+                intentId: 'register-presentation-preference-profile',
+                title: 'Capture a reusable preference profile',
+                why: 'Tenant and service setup are available; a lightweight preference capture gives the first durable win.',
+              }
+            : {
+                intentId: 'register-presentation-preference-profile',
+                title: 'Refine presentation defaults',
+                why: 'The environment is ready for reusable preference capture.',
+              };
 
   console.log(`  ${chalk.gray('•')} Intent: ${chalk.cyan(suggestion.intentId)}`);
   console.log(`  ${chalk.gray('•')} Suggestion: ${chalk.white(suggestion.title)}`);
   console.log(`  ${chalk.gray('•')} Why: ${chalk.dim(suggestion.why)}`);
-  console.log(`  ${chalk.gray('•')} Ready services: ${readyServices.length > 0 ? chalk.green(readyServices.join(', ')) : chalk.dim('none')}`);
-  console.log(`  ${chalk.gray('•')} Next action: ${chalk.white(`create a mission from ${suggestion.intentId} in the current tenant context`)}`);
+  console.log(
+    `  ${chalk.gray('•')} Ready services: ${readyServices.length > 0 ? chalk.green(readyServices.join(', ')) : chalk.dim('none')}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Next action: ${chalk.white(`create a mission from ${suggestion.intentId} in the current tenant context`)}`
+  );
   console.log('');
 }
 
@@ -248,22 +375,39 @@ function drawCapabilityLandscape() {
   }
 
   const installedProviders = discovery.filter((provider) => provider.installed);
-  const activeProviders = snapshot.providers.filter((provider) => provider.installed && provider.healthy);
+  const activeProviders = snapshot.providers.filter(
+    (provider) => provider.installed && provider.healthy
+  );
   const missingProviders = snapshot.missing_providers;
   const previewCapabilities = snapshot.capabilities.slice(0, 5);
 
   console.log(`  ${chalk.gray('•')} Generated: ${chalk.white(snapshot.generated_at)}`);
-  console.log(`  ${chalk.gray('•')} Registered: ${chalk.cyan(snapshot.registered_capabilities)} capabilities`);
-  console.log(`  ${chalk.gray('•')} Available: ${chalk.green(snapshot.available_capabilities)} capabilities`);
-  console.log(`  ${chalk.gray('•')} Providers: ${activeProviders.length > 0 ? chalk.green(activeProviders.length) : chalk.dim(0)} healthy / ${installedProviders.length} installed`);
-  console.log(`  ${chalk.gray('•')} Available providers: ${snapshot.available_providers.length > 0 ? chalk.green(snapshot.available_providers.join(', ')) : chalk.dim('none')}`);
-  console.log(`  ${chalk.gray('•')} Missing providers: ${missingProviders.length > 0 ? chalk.yellow(missingProviders.join(', ')) : chalk.dim('none')}`);
+  console.log(
+    `  ${chalk.gray('•')} Registered: ${chalk.cyan(snapshot.registered_capabilities)} capabilities`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Available: ${chalk.green(snapshot.available_capabilities)} capabilities`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Providers: ${activeProviders.length > 0 ? chalk.green(activeProviders.length) : chalk.dim(0)} healthy / ${installedProviders.length} installed`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Available providers: ${snapshot.available_providers.length > 0 ? chalk.green(snapshot.available_providers.join(', ')) : chalk.dim('none')}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Missing providers: ${missingProviders.length > 0 ? chalk.yellow(missingProviders.join(', ')) : chalk.dim('none')}`
+  );
 
   if (previewCapabilities.length > 0) {
     console.log(chalk.dim('  Top capabilities:'));
     for (const capability of previewCapabilities) {
-      const status = capability.discovery_status === 'available' ? chalk.green('available') : chalk.yellow('missing');
-      console.log(`    ${chalk.gray('•')} ${capability.capability_id.padEnd(38)} ${chalk.dim(capability.provider)} ${status}`);
+      const status =
+        capability.discovery_status === 'available'
+          ? chalk.green('available')
+          : chalk.yellow('missing');
+      console.log(
+        `    ${chalk.gray('•')} ${capability.capability_id.padEnd(38)} ${chalk.dim(capability.provider)} ${status}`
+      );
     }
   }
   console.log('');
@@ -298,13 +442,19 @@ function drawSkillLandscape() {
 
   console.log(`  ${chalk.gray('•')} Version: ${chalk.white(skillIndex.v || 'unknown')}`);
   console.log(`  ${chalk.gray('•')} Last updated: ${chalk.white(skillIndex.u || 'unknown')}`);
-  console.log(`  ${chalk.gray('•')} Skills: ${implemented.length > 0 ? chalk.green(implemented.length) : chalk.dim(0)} implemented / ${skillIndex.s.length}`);
-  console.log(`  ${chalk.gray('•')} Catalog: ${chalk.cyan(pathResolver.knowledge('product/orchestration/global_skill_index.json'))}`);
+  console.log(
+    `  ${chalk.gray('•')} Skills: ${implemented.length > 0 ? chalk.green(implemented.length) : chalk.dim(0)} implemented / ${skillIndex.s.length}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Catalog: ${chalk.cyan(pathResolver.knowledge('product/orchestration/global_skill_index.json'))}`
+  );
 
   if (preview.length > 0) {
     console.log(chalk.dim('  Top skills:'));
     for (const skill of preview) {
-      console.log(`    ${chalk.gray('•')} ${skill.n.padEnd(28)} ${chalk.dim(skill.version || 'unknown')} ${chalk.white(skill.d.slice(0, 56))}`);
+      console.log(
+        `    ${chalk.gray('•')} ${skill.n.padEnd(28)} ${chalk.dim(skill.version || 'unknown')} ${chalk.white(skill.d.slice(0, 56))}`
+      );
     }
   }
   console.log('');
@@ -313,19 +463,32 @@ function drawSkillLandscape() {
 function drawOnboardingHome() {
   console.log(chalk.bold.green(' 🏠 ONBOARDING HOME'));
 
-  const onboardingStatePath = pathResolver.knowledge('personal/onboarding/onboarding-state.json');
+  const onboardingStatePath = path.join(
+    resolveActiveProfileRoot(),
+    'onboarding/onboarding-state.json'
+  );
   const onboardingState = readJsonIfExists<{
     status?: string;
     current_phase?: string;
     completed_phases?: string[];
-    identity?: { name?: string; agent_id?: string; language?: string; interaction_style?: string; primary_domain?: string };
-    services?: { candidates?: Array<{ service_id: string; status?: string; connection_kind?: string }> };
-    tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }> };
+    identity?: {
+      name?: string;
+      agent_id?: string;
+      language?: string;
+      interaction_style?: string;
+      primary_domain?: string;
+    };
+    services?: {
+      candidates?: Array<{ service_id: string; status?: string; connection_kind?: string }>;
+    };
+    tenants?: {
+      entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }>;
+    };
     tutorial?: { mode?: string; summary?: string };
   }>(onboardingStatePath);
 
-  const connectionDir = pathResolver.knowledge('personal/connections');
-  const tenantDir = pathResolver.knowledge('personal/tenants');
+  const connectionDir = path.join(resolveActiveProfileRoot(), 'connections');
+  const tenantDir = path.join(resolveActiveProfileRoot(), 'tenants');
   const connectionFiles = listJsonFiles(connectionDir);
   const tenantFiles = listJsonFiles(tenantDir);
   const readiness = readJsonIfExists<{
@@ -345,9 +508,12 @@ function drawOnboardingHome() {
   for (const [serviceId, policy] of requiredServices) {
     const record = serviceMap.get(serviceId);
     const requiredKeys = policy.required_keys_any || [];
-    const hasRequiredKey = requiredKeys.length === 0
-      ? Boolean(record)
-      : requiredKeys.some((key) => Boolean(record && Object.prototype.hasOwnProperty.call(record, key)));
+    const hasRequiredKey =
+      requiredKeys.length === 0
+        ? Boolean(record)
+        : requiredKeys.some((key) =>
+            Boolean(record && Object.prototype.hasOwnProperty.call(record, key))
+          );
     if (hasRequiredKey) readyServices.push(serviceId);
     else blockedServices.push(serviceId);
   }
@@ -358,11 +524,21 @@ function drawOnboardingHome() {
   const tenantEntries = onboardingState?.tenants?.entries || [];
   const tutorial = onboardingState?.tutorial;
 
-  console.log(`  ${chalk.gray('•')} State: ${onboardingComplete ? chalk.green('complete') : chalk.yellow('draft')} ${chalk.dim(`phase=${phaseLabel}`)}`);
-  console.log(`  ${chalk.gray('•')} Identity: ${chalk.cyan(identity?.name || 'Sovereign')} ${chalk.dim(`/${identity?.agent_id || 'KYBERION-PRIME'}`)}`);
-  console.log(`  ${chalk.gray('•')} Services: ${readyServices.length > 0 ? chalk.green(`${readyServices.length} ready`) : chalk.dim('0 ready')} / ${blockedServices.length > 0 ? chalk.yellow(`${blockedServices.length} blocked`) : chalk.dim('0 blocked')}`);
-  console.log(`  ${chalk.gray('•')} Tenants: ${tenantFiles.length > 0 ? chalk.green(tenantFiles.length) : chalk.dim(0)} registered`);
-  console.log(`  ${chalk.gray('•')} Tutorial: ${tutorial?.mode ? chalk.cyan(tutorial.mode) : chalk.dim('not started')}`);
+  console.log(
+    `  ${chalk.gray('•')} State: ${onboardingComplete ? chalk.green('complete') : chalk.yellow('draft')} ${chalk.dim(`phase=${phaseLabel}`)}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Identity: ${chalk.cyan(identity?.name || 'Sovereign')} ${chalk.dim(`/${identity?.agent_id || 'KYBERION-PRIME'}`)}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Services: ${readyServices.length > 0 ? chalk.green(`${readyServices.length} ready`) : chalk.dim('0 ready')} / ${blockedServices.length > 0 ? chalk.yellow(`${blockedServices.length} blocked`) : chalk.dim('0 blocked')}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Tenants: ${tenantFiles.length > 0 ? chalk.green(tenantFiles.length) : chalk.dim(0)} registered`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Tutorial: ${tutorial?.mode ? chalk.cyan(tutorial.mode) : chalk.dim('not started')}`
+  );
 
   const recommendedNextAction = !onboardingComplete
     ? 'Run `pnpm onboard` (customer/{slug}/ preferred when KYBERION_CUSTOMER is set) and resume the current phase.'
@@ -391,7 +567,7 @@ function drawMissions() {
   const missionDirs = [
     pathResolver.active('missions/public'),
     pathResolver.active('missions/confidential'),
-    pathResolver.knowledge('personal/missions')
+    pathResolver.knowledge('personal/missions'),
   ];
 
   console.log(chalk.bold.yellow(' 📋 ACTIVE MISSIONS'));
@@ -409,10 +585,12 @@ function drawMissions() {
           const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
           const nextTasksPath = path.join(missionPath, 'NEXT_TASKS.json');
           const nextTaskCount = safeExistsSync(nextTasksPath)
-            ? (readJsonFile<any[]>(nextTasksPath)?.length || 0)
+            ? readJsonFile<any[]>(nextTasksPath)?.length || 0
             : 0;
           const planning = planReady ? chalk.green('PLAN READY') : chalk.yellow('PLANNING');
-          console.log(`  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`);
+          console.log(
+            `  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`
+          );
           count++;
         }
       }
@@ -423,7 +601,9 @@ function drawMissions() {
 }
 
 function drawMissionOrchestration() {
-  const eventsPath = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
+  const eventsPath = pathResolver.shared(
+    'observability/mission-control/orchestration-events.jsonl'
+  );
   const slackMissionsPath = pathResolver.shared('observability/channels/slack/missions.jsonl');
 
   console.log(chalk.bold.cyan(' 🧭 MISSION ORCHESTRATION'));
@@ -457,7 +637,9 @@ function drawMissionOrchestration() {
   const latest = events.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
   for (const event of latest) {
     const ts = event.ts.replace('T', ' ').slice(5, 16);
-    console.log(`  ${chalk.gray('•')} ${chalk.dim(ts)} ${chalk.white(event.decision.padEnd(30))} ${chalk.cyan((event.mission || 'system').slice(0, 32))}`);
+    console.log(
+      `  ${chalk.gray('•')} ${chalk.dim(ts)} ${chalk.white(event.decision.padEnd(30))} ${chalk.cyan((event.mission || 'system').slice(0, 32))}`
+    );
     if (event.why) {
       console.log(`    ${chalk.dim(event.why.slice(0, 96))}`);
     }
@@ -497,63 +679,16 @@ function drawOwnerSummaries() {
   }
 
   for (const summary of summaries) {
-    console.log(`  ${chalk.gray('•')} ${chalk.cyan(String(summary.mission_id || 'unknown').slice(0, 32))} ${chalk.dim(`accepted=${summary.accepted_count || 0} reviewed=${summary.reviewed_count || 0} completed=${summary.completed_count || 0} requested=${summary.requested_count || 0}`)}`);
+    console.log(
+      `  ${chalk.gray('•')} ${chalk.cyan(String(summary.mission_id || 'unknown').slice(0, 32))} ${chalk.dim(`accepted=${summary.accepted_count || 0} reviewed=${summary.reviewed_count || 0} completed=${summary.completed_count || 0} requested=${summary.requested_count || 0}`)}`
+    );
   }
   console.log('');
 }
 
 function drawRuntimeLeaseDoctor() {
   console.log(chalk.bold.red(' 🩺 RUNTIME LEASE DOCTOR'));
-
-  const missions = new Set<string>();
-  const missionDirs = [
-    pathResolver.active('missions/public'),
-    pathResolver.active('missions/confidential'),
-    pathResolver.knowledge('personal/missions'),
-  ];
-  for (const dir of missionDirs) {
-    if (!safeExistsSync(dir)) continue;
-    for (const item of safeReaddir(dir)) {
-      const statePath = path.join(dir, item, 'mission-state.json');
-      if (!safeExistsSync(statePath)) continue;
-      const state = readJsonFile<any>(statePath);
-      if (state.status === 'active' && typeof state.mission_id === 'string') {
-        missions.add(state.mission_id);
-      }
-    }
-  }
-
-  const runtimeSnapshots = new Map(
-    listAgentRuntimeSnapshots().map((snapshot) => [snapshot.agent.agentId, snapshot]),
-  );
-  const findings = listAgentRuntimeLeaseSummaries().flatMap((lease) => {
-    const runtime = runtimeSnapshots.get(lease.agent_id);
-    if (!runtime) return [];
-    if (lease.owner_type === 'mission' && !missions.has(lease.owner_id)) {
-      return [{
-        severity: 'critical',
-        agentId: lease.agent_id,
-        reason: 'orphaned mission lease',
-      }];
-    }
-    if (runtime.agent.status === 'error') {
-      return [{
-        severity: 'warning',
-        agentId: lease.agent_id,
-        reason: 'runtime in error state',
-      }];
-    }
-    const executionMode = typeof lease.metadata?.execution_mode === 'string' ? lease.metadata.execution_mode : undefined;
-    const channel = typeof lease.metadata?.channel === 'string' ? lease.metadata.channel : undefined;
-    if (executionMode === 'conversation' && channel === 'slack' && runtime.runtime?.idleForMs && runtime.runtime.idleForMs > 5 * 60 * 1000) {
-      return [{
-        severity: 'warning',
-        agentId: lease.agent_id,
-        reason: 'stale slack conversation lease',
-      }];
-    }
-    return [];
-  }).slice(0, 6);
+  const findings = collectRuntimeDoctorFindings();
 
   if (findings.length === 0) {
     console.log(chalk.dim('  (No runtime doctor findings)'));
@@ -562,8 +697,11 @@ function drawRuntimeLeaseDoctor() {
   }
 
   for (const finding of findings) {
-    const severity = finding.severity === 'critical' ? chalk.red('CRITICAL') : chalk.yellow('WARNING');
-    console.log(`  ${chalk.gray('•')} ${finding.agentId.padEnd(24)} [${severity}] ${chalk.dim(finding.reason)}`);
+    const severity =
+      finding.severity === 'critical' ? chalk.red('CRITICAL') : chalk.yellow('WARNING');
+    console.log(
+      `  ${chalk.gray('•')} ${finding.agentId.padEnd(24)} [${severity}] ${chalk.dim(finding.reason)}`
+    );
   }
   console.log('');
 }
@@ -572,13 +710,21 @@ function drawSlackOutbox() {
   console.log(chalk.bold.green(' 📬 SURFACE OUTBOX'));
   const slackMessages = listSurfaceOutboxMessages('slack');
   const chronosMessages = listSurfaceOutboxMessages('chronos');
-  console.log(`  Slack pending:   ${slackMessages.length > 0 ? chalk.bold.yellow(slackMessages.length) : chalk.dim(0)}`);
-  console.log(`  Chronos pending: ${chronosMessages.length > 0 ? chalk.bold.yellow(chronosMessages.length) : chalk.dim(0)}`);
+  console.log(
+    `  Slack pending:   ${slackMessages.length > 0 ? chalk.bold.yellow(slackMessages.length) : chalk.dim(0)}`
+  );
+  console.log(
+    `  Chronos pending: ${chronosMessages.length > 0 ? chalk.bold.yellow(chronosMessages.length) : chalk.dim(0)}`
+  );
   for (const message of slackMessages.slice(0, 4)) {
-    console.log(`  ${chalk.gray('•')} ${chalk.cyan(`slack/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`);
+    console.log(
+      `  ${chalk.gray('•')} ${chalk.cyan(`slack/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`
+    );
   }
   for (const message of chronosMessages.slice(0, 2)) {
-    console.log(`  ${chalk.gray('•')} ${chalk.cyan(`chronos/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`);
+    console.log(
+      `  ${chalk.gray('•')} ${chalk.cyan(`chronos/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`
+    );
   }
   console.log('');
 }
@@ -586,9 +732,9 @@ function drawSlackOutbox() {
 function drawA2ATraffic() {
   const inbox = pathResolver.rootResolve('active/shared/runtime/a2a/inbox');
   const outbox = pathResolver.rootResolve('active/shared/runtime/a2a/outbox');
-  
+
   console.log(chalk.bold.magenta(' 📡 A2A TRAFFIC'));
-  
+
   const inCount = safeExistsSync(inbox) ? safeReaddir(inbox).length : 0;
   const outCount = safeExistsSync(outbox) ? safeReaddir(outbox).length : 0;
 
@@ -617,7 +763,9 @@ function drawRuntimeSurfaces() {
     const record = state.surfaces?.[surface.id];
     const status = record?.pid ? chalk.green('RUNNING') : chalk.dim('STOPPED');
     const pid = record?.pid ? chalk.gray(` pid=${record.pid}`) : '';
-    console.log(`  ${chalk.gray('•')} ${surface.id.padEnd(20)} [${status}] ${chalk.dim(surface.kind)}${pid}`);
+    console.log(
+      `  ${chalk.gray('•')} ${surface.id.padEnd(20)} [${status}] ${chalk.dim(surface.kind)}${pid}`
+    );
   }
   console.log('');
 }
@@ -628,7 +776,7 @@ function drawTrustBoard() {
   if (safeExistsSync(ledgerPath)) {
     const raw = readJsonFile<any>(ledgerPath);
     const ledger = raw?.agents ?? raw ?? {};
-    Object.keys(ledger).forEach(a => {
+    Object.keys(ledger).forEach((a) => {
       const score = ledger[a].current_score / 100;
       const bar = '█'.repeat(Math.floor(score)) + '░'.repeat(10 - Math.floor(score));
       console.log(`  ${a.padEnd(15)} [${chalk.cyan(bar)}] ${score.toFixed(1)}`);
@@ -660,7 +808,11 @@ function render() {
     return;
   }
   if (focus === 'onboarding') {
-    console.log(chalk.dim(' Focused view: onboarding setup, connection review, tenant context, starter mission.'));
+    console.log(
+      chalk.dim(
+        ' Focused view: onboarding setup, connection review, tenant context, starter mission.'
+      )
+    );
     console.log(chalk.dim(' Press Ctrl+C to exit.'));
     return;
   }

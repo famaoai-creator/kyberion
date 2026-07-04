@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateSurfaceUxContract } from './surface-ux-contract.js';
+import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 
 describe('surface-ux-contract', () => {
   it('accepts user-facing summaries with request/plan/state/result signals', () => {
@@ -58,6 +58,16 @@ describe('surface-ux-contract', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.violations.some((item) => item.includes('internal-only vocabulary'))).toBe(true);
+  });
+
+  it('repairs internal vocabulary leakage before delivery when it can be localized safely', () => {
+    const repaired = repairSurfaceUxContractText(
+      'Plan: ADF と actuator を使って mission_class と workflow_id と execution_shape を決定します。Result: 完了後に返します。'
+    );
+    expect(repaired).not.toContain('ADF');
+    expect(repaired).not.toContain('actuator');
+    expect(repaired).not.toContain('mission_class');
+    expect(validateSurfaceUxContract({ text: repaired }).valid).toBe(true);
   });
 
   it('requires consequence and action when approval is required', () => {

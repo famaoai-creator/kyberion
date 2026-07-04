@@ -2,7 +2,7 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { DEFAULT_SPECIALIST_ID } from './specialist-ids.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
 import { loadStandardIntentCatalog, type StandardIntentDefinition } from './intent-resolution.js';
@@ -14,15 +14,14 @@ import {
   projectExecutionShapeToWorkflowShape,
   type WorkflowExecutionShape,
 } from './execution-shape.js';
-import {
-  resolveWorkScopeDecision,
-  type WorkScopeDecision,
-} from './work-scope-decision.js';
+import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
-const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge('product/orchestration/specialist-catalog.json');
+const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
+  'product/orchestration/specialist-catalog.json'
+);
 const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('product/orchestration/specialists');
 
 export interface OutcomeDefinition {
@@ -266,10 +265,6 @@ function normalizeKnowledgeTier(value?: string): 'personal' | 'confidential' | '
   return value === 'personal' || value === 'public' ? value : 'confidential';
 }
 
-function loadJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
-}
-
 function loadSpecialistCatalogFromPath(filePath: string): SpecialistCatalogFile {
   return loadJson<SpecialistCatalogFile>(filePath);
 }
@@ -280,7 +275,9 @@ function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile 
     throw new Error(`Specialist catalog directory not found: ${dir}`);
   }
 
-  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
     throw new Error(`Specialist catalog directory is empty: ${dir}`);
   }
@@ -316,11 +313,11 @@ function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile 
 }
 
 export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
-  const parsed = loadJson<OutcomeCatalogFile>(pathResolver.knowledge('product/governance/outcome-catalog.json'));
-  const entries = parsed.outcomes || {};
-  return Object.fromEntries(
-    Object.entries(entries).map(([id, value]) => [id, { id, ...value }]),
+  const parsed = loadJson<OutcomeCatalogFile>(
+    pathResolver.knowledge('product/governance/outcome-catalog.json')
   );
+  const entries = parsed.outcomes || {};
+  return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
 }
 
 export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
@@ -328,26 +325,38 @@ export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
     ? loadSpecialistCatalogDirectory(DEFAULT_SPECIALIST_CATALOG_DIR)
     : loadSpecialistCatalogFromPath(DEFAULT_SPECIALIST_CATALOG_PATH);
   const entries = parsed.specialists || {};
-  return Object.fromEntries(
-    Object.entries(entries).map(([id, value]) => [id, { id, ...value }]),
-  );
+  return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
 }
 
-function loadExecutionBoundaryProfiles(): Record<string, OrganizationWorkLoopSummary['execution_boundary']> {
-  const parsed = loadJson<BoundaryProfileFile>(pathResolver.knowledge('product/governance/execution-boundary-profiles.json'));
+function loadExecutionBoundaryProfiles(): Record<
+  string,
+  OrganizationWorkLoopSummary['execution_boundary']
+> {
+  const parsed = loadJson<BoundaryProfileFile>(
+    pathResolver.knowledge('product/governance/execution-boundary-profiles.json')
+  );
   return parsed.profiles || {};
 }
 
-function loadRuntimeDesignProfiles(): Record<string, OrganizationWorkLoopSummary['runtime_design']> {
-  const parsed = loadJson<RuntimeDesignProfileFile>(pathResolver.knowledge('product/governance/runtime-design-profiles.json'));
+function loadRuntimeDesignProfiles(): Record<
+  string,
+  OrganizationWorkLoopSummary['runtime_design']
+> {
+  const parsed = loadJson<RuntimeDesignProfileFile>(
+    pathResolver.knowledge('product/governance/runtime-design-profiles.json')
+  );
   return parsed.profiles || {};
 }
 
 function loadWorkPolicy(): WorkPolicyFile {
-  const value = loadJson<WorkPolicyFile>(pathResolver.knowledge('product/governance/work-policy.json'));
+  const value = loadJson<WorkPolicyFile>(
+    pathResolver.knowledge('product/governance/work-policy.json')
+  );
   const validate = ensureWorkPolicyValidator();
   if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid work-policy: ${errors}`);
   }
   return value;
@@ -367,7 +376,11 @@ function loadWorkDesignRules(): WorkDesignRulesFile {
 
 function findIntentDefinition(intentId?: string) {
   if (!intentId) return null;
-  return loadStandardIntentCatalog().find((intent: StandardIntentDefinition) => intent?.id === intentId) || null;
+  return (
+    loadStandardIntentCatalog().find(
+      (intent: StandardIntentDefinition) => intent?.id === intentId
+    ) || null
+  );
 }
 
 function matchesRoutingValue(value: string | undefined, expected: string[] | undefined): boolean {
@@ -377,8 +390,14 @@ function matchesRoutingValue(value: string | undefined, expected: string[] | und
 }
 
 function ruleMatches(
-  input: { intentId?: string; taskType?: string; queryType?: string; shape?: string; catalogShape?: string },
-  match?: RoutingMatch,
+  input: {
+    intentId?: string;
+    taskType?: string;
+    queryType?: string;
+    shape?: string;
+    catalogShape?: string;
+  },
+  match?: RoutingMatch
 ): boolean {
   if (!match) return false;
   const wildcardMatches = (value: string | undefined, expected: string[] | undefined): boolean => {
@@ -436,8 +455,11 @@ function buildExecutionBoundary(input: {
 }): OrganizationWorkLoopSummary['execution_boundary'] {
   const routing = loadWorkDesignProfileRouting();
   const profiles = loadExecutionBoundaryProfiles();
-  const matched = (routing.execution_boundary_rules || []).find((rule) => ruleMatches(input, rule.match));
-  const defaultProfileId = routing.defaults?.execution_boundary_profile_id || 'default_governed_execution';
+  const matched = (routing.execution_boundary_rules || []).find((rule) =>
+    ruleMatches(input, rule.match)
+  );
+  const defaultProfileId =
+    routing.defaults?.execution_boundary_profile_id || 'default_governed_execution';
   return profiles[matched?.profile_id || defaultProfileId] || profiles.default_governed_execution;
 }
 
@@ -449,7 +471,9 @@ function buildRuntimeDesign(input: {
 }): OrganizationWorkLoopSummary['runtime_design'] {
   const routing = loadWorkDesignProfileRouting();
   const profiles = loadRuntimeDesignProfiles();
-  const matched = (routing.runtime_design_rules || []).find((rule) => ruleMatches(input, rule.match));
+  const matched = (routing.runtime_design_rules || []).find((rule) =>
+    ruleMatches(input, rule.match)
+  );
   const defaultProfileId = routing.defaults?.runtime_design_profile_id || 'single_actor_delivery';
   return profiles[matched?.profile_id || defaultProfileId] || profiles.single_actor_delivery;
 }
@@ -462,11 +486,16 @@ function inferExecutionShape(input: {
   const intentDefinition = findIntentDefinition(input.intentId);
   const catalogShape = intentDefinition?.resolution?.shape;
   const normalizedInputShape = projectExecutionShapeToWorkflowShape(
-    normalizeExecutionShape(input.shape || catalogShape),
+    normalizeExecutionShape(input.shape || catalogShape)
   );
   const rules = loadWorkDesignRules();
-  const matchedRule = (rules.execution_shape_rules || []).find((rule) =>
-    Boolean(rule.shape) && ruleMatches({ ...input, shape: normalizedInputShape, catalogShape: normalizedInputShape }, rule.match),
+  const matchedRule = (rules.execution_shape_rules || []).find(
+    (rule) =>
+      Boolean(rule.shape) &&
+      ruleMatches(
+        { ...input, shape: normalizedInputShape, catalogShape: normalizedInputShape },
+        rule.match
+      )
   );
   return matchedRule?.shape || normalizedInputShape || 'direct_reply';
 }
@@ -477,7 +506,9 @@ function inferIntentLabel(input: {
   queryType?: string;
 }): string {
   const rules = loadWorkDesignRules();
-  const matchedRule = (rules.intent_label_rules || []).find((rule) => ruleMatches(input, rule.match));
+  const matchedRule = (rules.intent_label_rules || []).find((rule) =>
+    ruleMatches(input, rule.match)
+  );
   if (!matchedRule) return 'general_request';
   if (matchedRule.label) return matchedRule.label;
   if (matchedRule.label_from) return input[matchedRule.label_from] || 'general_request';
@@ -491,7 +522,10 @@ function specialistIdForIntent(input: {
   shape?: string;
 }): string {
   const intentDefinition = findIntentDefinition(input.intentId);
-  if (typeof intentDefinition?.specialist_id === 'string' && intentDefinition.specialist_id.trim()) {
+  if (
+    typeof intentDefinition?.specialist_id === 'string' &&
+    intentDefinition.specialist_id.trim()
+  ) {
     return intentDefinition.specialist_id;
   }
   const policy = loadSpecialistRoutingPolicy();
@@ -511,9 +545,12 @@ export function resolveWorkDesign(input: {
   const outcomes = loadOutcomeCatalog();
   const intentDefinition = findIntentDefinition(input.intentId);
   const primary = specialists[specialistIdForIntent(input)] || null;
-  const requestedOutcomeIds = (input.outcomeIds && input.outcomeIds.length)
-    ? input.outcomeIds
-    : (Array.isArray(intentDefinition?.outcome_ids) ? intentDefinition.outcome_ids : []);
+  const requestedOutcomeIds =
+    input.outcomeIds && input.outcomeIds.length
+      ? input.outcomeIds
+      : Array.isArray(intentDefinition?.outcome_ids)
+        ? intentDefinition.outcome_ids
+        : [];
   const tier = normalizeKnowledgeTier(input.tier);
   const resolvedOutcomes = requestedOutcomeIds
     .map((id) => outcomes[id])
@@ -522,9 +559,18 @@ export function resolveWorkDesign(input: {
     .filter((candidate) => candidate.status === 'promoted')
     .filter((candidate) => normalizeKnowledgeTier(candidate.tier) === tier)
     .filter((candidate) => {
-      if (primary?.id && candidate.specialist_id && candidate.specialist_id === primary.id) return true;
+      if (primary?.id && candidate.specialist_id && candidate.specialist_id === primary.id)
+        return true;
       if (input.taskType && candidate.metadata?.task_type === input.taskType) return true;
-      if (requestedOutcomeIds.length && requestedOutcomeIds.some((id) => candidate.summary.includes(id) || candidate.evidence_refs?.some((ref) => ref.includes(id)))) return true;
+      if (
+        requestedOutcomeIds.length &&
+        requestedOutcomeIds.some(
+          (id) =>
+            candidate.summary.includes(id) ||
+            candidate.evidence_refs?.some((ref) => ref.includes(id))
+        )
+      )
+        return true;
       return false;
     })
     .slice(0, 4)
@@ -647,7 +693,9 @@ export function buildOrganizationWorkLoopSummary(input: {
     resolution: {
       execution_shape: executionShape,
       selected_execution_shape: executionShape,
-      recommended_execution_shape: projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape),
+      recommended_execution_shape: projectExecutionShapeToWorkflowShape(
+        workScopeDecision.execution_shape
+      ),
       mismatch_reason:
         projectExecutionShapeToWorkflowShape(workScopeDecision.execution_shape) === executionShape
           ? undefined

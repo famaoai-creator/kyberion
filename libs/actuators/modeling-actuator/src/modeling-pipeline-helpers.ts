@@ -10,7 +10,7 @@ import {
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
-  withRetry,
+  retry,
   classifyError,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -21,7 +21,9 @@ import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
 
-const MODEL_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/modeling-actuator/manifest.json');
+const MODEL_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/modeling-actuator/manifest.json'
+);
 const DEFAULT_MODEL_RETRY = {
   maxRetries: 2,
   initialDelayMs: 150,
@@ -51,7 +53,7 @@ export function buildRetryOptions() {
   const policy = loadRecoveryPolicy();
   const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_MODEL_RETRY;
   const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
   );
   return {
     ...DEFAULT_MODEL_RETRY,
@@ -60,7 +62,8 @@ export function buildRetryOptions() {
       const classification = classifyError(error);
       return retryableCategories.size > 0
         ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+        : classification.category === 'resource_unavailable' ||
+            classification.category === 'timeout';
     },
   };
 }
@@ -69,7 +72,9 @@ const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ajv = new AjvCtor({ allErrors: true });
 addFormats(ajv);
-const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge('product/orchestration/browser-execution-presets.json');
+const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge(
+  'product/orchestration/browser-execution-presets.json'
+);
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -88,7 +93,12 @@ export interface ModelingAction {
   };
 }
 
-export async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+export async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: any = {},
+  options: any = {},
+  state: any = { stepCount: 0, startTime: Date.now() }
+) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
@@ -96,9 +106,14 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = await withRetry(
-      async () => JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string),
-      buildRetryOptions(),
+    const saved = await retry(
+      async () =>
+        JSON.parse(
+          safeReadFile(path.resolve(rootDir, initialCtx.context_path), {
+            encoding: 'utf8',
+          }) as string
+        ),
+      buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
   }
@@ -108,8 +123,10 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
   const results = [];
   for (const step of steps) {
     state.stepCount++;
-    if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
+    if (state.stepCount > MAX_STEPS)
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
+    if (Date.now() - state.startTime > TIMEOUT)
+      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
 
     try {
       logger.info(`  [MODEL_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
@@ -118,9 +135,15 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
         ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
       } else {
         switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-          case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
+          case 'capture':
+            ctx = await opCapture(step.op, step.params, ctx, resolve);
+            break;
+          case 'transform':
+            ctx = await opTransform(step.op, step.params, ctx, resolve);
+            break;
+          case 'apply':
+            await opApply(step.op, step.params, ctx, resolve);
+            break;
         }
       }
       results.push({ op: step.op, status: 'success' });
@@ -132,19 +155,28 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
   }
 
   if (initialCtx.context_path) {
-    await withRetry(
-      async () => {
-        safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
-        return undefined;
-      },
-      buildRetryOptions(),
-    );
+    await retry(async () => {
+      safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+      return undefined;
+    }, buildRetryOptions());
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any) {
+async function opControl(
+  op: string,
+  params: any,
+  ctx: any,
+  options: any,
+  state: any,
+  resolve: (value: any) => any
+) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -166,7 +198,8 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       }
       return ctx;
 
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -176,36 +209,46 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: await withRetry(
-          async () => JSON.parse(safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) as string),
-          buildRetryOptions(),
+        [params.export_as || 'last_capture_data']: await retry(
+          async () =>
+            JSON.parse(
+              safeReadFile(path.resolve(rootDir, resolve(params.path)), {
+                encoding: 'utf8',
+              }) as string
+            ),
+          buildRetryOptions()
         ),
       };
     case 'read_file':
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await withRetry(
-          async () => safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
-          buildRetryOptions(),
+        [params.export_as || 'last_capture']: await retry(
+          async () =>
+            safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+          buildRetryOptions()
         ),
       };
     case 'glob_files':
       return {
         ...ctx,
-        [params.export_as || 'file_list']: await withRetry(
-          async () => getAllFiles(path.resolve(rootDir, resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(rootDir, f)),
-          buildRetryOptions(),
+        [params.export_as || 'file_list']: await retry(
+          async () =>
+            getAllFiles(path.resolve(rootDir, resolve(params.dir)))
+              .filter((f) => !params.ext || f.endsWith(params.ext))
+              .map((f) => path.relative(rootDir, f)),
+          buildRetryOptions()
         ),
       };
     case 'shell':
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await withRetry(
+        [params.export_as || 'last_capture']: await retry(
           async () => execSync(resolve(params.cmd), { encoding: 'utf8' }).trim(),
-          buildRetryOptions(),
+          buildRetryOptions()
         ),
       };
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -214,14 +257,20 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
     case 'ajv_validate':
       const validate = ajv.compile(ctx[params.schema_from || 'last_schema_data']);
       const valid = validate(ctx[params.data_from || 'last_capture_data']);
-      return { ...ctx, [params.export_as || 'is_valid']: valid, [params.errors_as || 'validation_errors']: validate.errors };
+      return {
+        ...ctx,
+        [params.export_as || 'is_valid']: valid,
+        [params.errors_as || 'validation_errors']: validate.errors,
+      };
     case 'json_query':
       const res = getPathValue(ctx[params.from || 'last_capture_data'], params.path);
       return { ...ctx, [params.export_as]: res };
     case 'mermaid_gen':
       const items = ctx[params.from || 'skills_list'] || [];
       let mermaid = 'graph TD\n';
-      items.forEach((item: any) => { mermaid += `  ${item.n.replace(/-/g, '_')}["${item.n}"]\n`; });
+      items.forEach((item: any) => {
+        mermaid += `  ${item.n.replace(/-/g, '_')}["${item.n}"]\n`;
+      });
       return { ...ctx, [params.export_as || 'last_transform']: mermaid };
     case 'web_profile_to_ui_flow_adf': {
       const profile = ctx[params.from || 'last_capture_data'];
@@ -231,8 +280,12 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       const base = String(profile.base_url || '');
       const loginRoute = String(profile.login_route || '/login');
       const logoutRoute = String(profile.logout_route || '/logout');
-      const guardedRoutes = Array.isArray(profile.guarded_routes) ? profile.guarded_routes.map(String) : [];
-      const debugRoute = String(profile.debug_routes?.session_export || '/__kyberion/session-export');
+      const guardedRoutes = Array.isArray(profile.guarded_routes)
+        ? profile.guarded_routes.map(String)
+        : [];
+      const debugRoute = String(
+        profile.debug_routes?.session_export || '/__kyberion/session-export'
+      );
       const states = [
         {
           id: 'login',
@@ -264,7 +317,11 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         {
           id: 'login_success',
           from: 'login',
-          to: states.find((state: any) => state.id !== 'login' && state.kind === 'route' && state.guard === 'authenticated')?.id || 'login',
+          to:
+            states.find(
+              (state: any) =>
+                state.id !== 'login' && state.kind === 'route' && state.guard === 'authenticated'
+            )?.id || 'login',
           action: 'submit_login',
           expected: 'authenticated route is reachable',
         },
@@ -278,14 +335,22 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         })),
         {
           id: 'logout_transition',
-          from: states.find((state: any) => state.id !== 'login' && state.kind === 'route' && state.guard === 'authenticated')?.id || 'login',
+          from:
+            states.find(
+              (state: any) =>
+                state.id !== 'login' && state.kind === 'route' && state.guard === 'authenticated'
+            )?.id || 'login',
           to: 'logout',
           action: 'trigger_logout',
           expected: 'session cleared and login route shown',
         },
         {
           id: 'session_export_transition',
-          from: states.find((state: any) => state.id !== 'login' && state.kind === 'route' && state.guard === 'authenticated')?.id || 'login',
+          from:
+            states.find(
+              (state: any) =>
+                state.id !== 'login' && state.kind === 'route' && state.guard === 'authenticated'
+            )?.id || 'login',
           to: 'session_export',
           action: 'open_debug_session_export',
           guard: 'debug_only',
@@ -317,7 +382,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         steps: [
           `Open state ${transition.from}`,
           `Perform action ${transition.action}`,
-          transition.guard ? `Satisfy guard ${transition.guard} when needed` : 'No additional guard required',
+          transition.guard
+            ? `Satisfy guard ${transition.guard} when needed`
+            : 'No additional guard required',
         ],
         expected: [
           `Transition reaches ${transition.to}`,
@@ -348,15 +415,25 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         throw new Error('test_inventory_to_browser_pipeline requires a web app profile object');
       }
       const presetCatalog = await loadBrowserExecutionPresetCatalog();
-      const presetName = String(profile.execution_preset || params.preset || presetCatalog.default_preset || 'standard-web-auth');
+      const presetName = String(
+        profile.execution_preset ||
+          params.preset ||
+          presetCatalog.default_preset ||
+          'standard-web-auth'
+      );
       const executionPreset = presetCatalog.presets?.[presetName] || {};
 
       const baseUrl = String(profile.base_url || '');
       const loginRoute = String(profile.login_route || '/login');
       const logoutRoute = String(profile.logout_route || '/logout');
       const loginSelectors = profile.selectors?.login || {};
-      const guardedStates = (flow.states || []).filter((state: any) => state.kind === 'route' && state.guard === 'authenticated');
-      const sessionExportState = (flow.states || []).find((state: any) => state.kind === 'debug' && String(state.path || '').includes('session-export'));
+      const guardedStates = (flow.states || []).filter(
+        (state: any) => state.kind === 'route' && state.guard === 'authenticated'
+      );
+      const sessionExportState = (flow.states || []).find(
+        (state: any) =>
+          state.kind === 'debug' && String(state.path || '').includes('session-export')
+      );
       const steps: any[] = [
         {
           type: 'capture',
@@ -400,7 +477,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
               export_as: 'post_login_snapshot',
               max_elements: 80,
             },
-          },
+          }
         );
       }
 
@@ -421,7 +498,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
               export_as: `${state.id}_snapshot`,
               max_elements: 80,
             },
-          },
+          }
         );
       });
 
@@ -446,12 +523,15 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
             type: 'capture',
             op: 'export_session_handoff',
             params: {
-              path: params.handoff_output_path || executionPreset.handoff_output_path || 'active/shared/tmp/browser/generated-web-session-handoff.json',
+              path:
+                params.handoff_output_path ||
+                executionPreset.handoff_output_path ||
+                'active/shared/tmp/browser/generated-web-session-handoff.json',
               browser_session_id: String(profile.app_id || 'generated-web-session'),
               prefer_persistent_context: true,
               export_as: 'generated_session_handoff',
             },
-          },
+          }
         );
       }
 
@@ -471,7 +551,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
             export_as: 'post_logout_snapshot',
             max_elements: 80,
           },
-        },
+        }
       );
 
       return {
@@ -492,32 +572,45 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
     }
     case 'terraform_to_architecture_adf': {
       const rootDir = pathResolver.rootDir();
-      const terraformRoot = path.resolve(rootDir, resolve(params.dir || params.path || ctx[params.from || 'terraform_root']));
+      const terraformRoot = path.resolve(
+        rootDir,
+        resolve(params.dir || params.path || ctx[params.from || 'terraform_root'])
+      );
       const title = resolve(params.title) || path.basename(terraformRoot);
       return {
         ...ctx,
-        [params.export_as || 'architecture_adf']: terraformToArchitectureAdf(terraformRoot, { title }),
+        [params.export_as || 'architecture_adf']: terraformToArchitectureAdf(terraformRoot, {
+          title,
+        }),
       };
     }
     case 'terraform_to_topology_ir': {
       const rootDir = pathResolver.rootDir();
-      const terraformRoot = path.resolve(rootDir, resolve(params.dir || params.path || ctx[params.from || 'terraform_root']));
+      const terraformRoot = path.resolve(
+        rootDir,
+        resolve(params.dir || params.path || ctx[params.from || 'terraform_root'])
+      );
       const title = resolve(params.title) || path.basename(terraformRoot);
       return {
         ...ctx,
         [params.export_as || 'topology_ir']: terraformToTopologyIr(terraformRoot, { title }),
       };
     }
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
-async function loadBrowserExecutionPresetCatalog(): Promise<{ default_preset?: string; presets: Record<string, any> }> {
+async function loadBrowserExecutionPresetCatalog(): Promise<{
+  default_preset?: string;
+  presets: Record<string, any>;
+}> {
   if (safeExistsSync(BROWSER_EXECUTION_PRESETS_PATH)) {
     try {
-      const parsed = await withRetry(
-        async () => JSON.parse(safeReadFile(BROWSER_EXECUTION_PRESETS_PATH, { encoding: 'utf8' }) as string),
-        buildRetryOptions(),
+      const parsed = await retry(
+        async () =>
+          JSON.parse(safeReadFile(BROWSER_EXECUTION_PRESETS_PATH, { encoding: 'utf8' }) as string),
+        buildRetryOptions()
       );
       if (parsed && typeof parsed === 'object' && parsed.presets) return parsed;
     } catch (_) {}
@@ -543,14 +636,19 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const spec = resolveWriteArtifactSpec(params, ctx, resolve);
       const outPath = path.resolve(rootDir, spec.path);
       const content = spec.content;
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
-      await withRetry(
-        async () => {
-          safeWriteFile(outPath, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
-          return undefined;
-        },
-        buildRetryOptions(),
-      );
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
+      await retry(async () => {
+        safeWriteFile(
+          outPath,
+          typeof content === 'string'
+            ? content
+            : content === undefined
+              ? ''
+              : JSON.stringify(content, null, 2)
+        );
+        return undefined;
+      }, buildRetryOptions());
       break;
     case 'log':
       logger.info(`[MODELING_LOG] ${resolve(params.message || 'Action completed')}`);
@@ -559,11 +657,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 }
 
 export async function performReconcile(input: ModelingAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/modeling-strategy.json');
+  const strategyPath = pathResolver.rootResolve(
+    input.strategy_path || 'knowledge/product/governance/modeling-strategy.json'
+  );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await withRetry(
+  const config = await retry(
     async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
-    buildRetryOptions(),
+    buildRetryOptions()
   );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);

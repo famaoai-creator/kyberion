@@ -44,6 +44,13 @@
 
 - 分配ごとに `context_chars / pruned / rollup_used / result_schema_ok` を trace に記録し、reconciliation サマリに「平均コンテキストサイズ・needs 発生率」を 1 行追加する。
 
+## 実装メモ
+
+### Task 4 slice — 2026-07-04
+
+- `dispatchMissionNextTasks` の各 task result から context サイズと needs 件数を集計し、`MISSION_FOLLOWUP_DISPATCHED` に平均値と rate を記録するようにした。
+- `mission_controller record-task` 経路で `LATEST_TASK.json` に owner 向けの一行サマリが残るようにした。
+
 ## リスクと注意
 
 - パックの 6,000 字予算はタスクによっては不足する。予算は process template(MO-01)側でクラス別に上書き可能にする(research 系は広め等)。ただし上限撤廃はしない — 足りない分は `needs` 経路で取りに来させるのが原則。

@@ -284,6 +284,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
     expect(result.text).toContain('- mission authority');
     expect(result.text).toContain("If you'd like, I can narrow this down further.");
+    expect(result.text).toContain('Completion: Completion confirmed');
     expect(mocks.queryKnowledge).toHaveBeenCalledWith(
       expect.anything(),
       'mission authority',
@@ -655,6 +656,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(result.text).toContain('写真を取得しました。');
     expect(result.text).toContain('使用カメラ: FaceTime HD Camera');
     expect(result.text).toContain('保存先: /tmp/capture.jpg');
+    expect(result.text).toContain('Completion: Completion confirmed');
     expect(mocks.executeCapturePhotoTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session: expect.objectContaining({

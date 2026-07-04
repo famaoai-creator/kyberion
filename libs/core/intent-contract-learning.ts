@@ -6,14 +6,25 @@ import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
-const MEMORY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-contract-memory.schema.json');
-const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-contract-selection-policy.schema.json');
+const MEMORY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/intent-contract-memory.schema.json'
+);
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/intent-contract-selection-policy.schema.json'
+);
 const MEMORY_SEED_PATH = pathResolver.knowledge('product/governance/intent-contract-memory.json');
 const MEMORY_RUNTIME_PATH = pathResolver.shared('runtime/intent-contract-memory.json');
-const POLICY_PATH = pathResolver.knowledge('product/governance/intent-contract-selection-policy.json');
+const POLICY_PATH = pathResolver.knowledge(
+  'product/governance/intent-contract-selection-policy.json'
+);
 const ONTOLOGY_PATH = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
 
-type ContractKind = 'pipeline' | 'schema' | 'task_session_policy' | 'mission_command' | 'direct_reply';
+type ContractKind =
+  | 'pipeline'
+  | 'schema'
+  | 'task_session_policy'
+  | 'mission_command'
+  | 'direct_reply';
 
 export interface IntentContractMemoryEntry {
   intent_id: string;
@@ -33,6 +44,14 @@ export interface IntentContractMemoryEntry {
   sample_count: number;
   last_seen: string;
   last_error?: string;
+  completion_summary?: {
+    satisfied: boolean;
+    delivered: string[];
+    gaps: string[];
+    next_step: string;
+    confidence: number;
+    evidence_refs: string[];
+  };
 }
 
 interface IntentContractMemoryFile {
@@ -99,14 +118,18 @@ function loadMemoryFile(filePath: string): IntentContractMemoryFile | null {
   return validateIntentContractMemory(parseJson<IntentContractMemoryFile>(filePath));
 }
 
-function memoryEntryKey(entry: Pick<IntentContractMemoryEntry, 'intent_id' | 'contract_ref'>): string {
+function memoryEntryKey(
+  entry: Pick<IntentContractMemoryEntry, 'intent_id' | 'contract_ref'>
+): string {
   return `${entry.intent_id}::${entry.contract_ref.kind}::${entry.contract_ref.ref}`;
 }
 
 function validateIntentContractMemory(memory: IntentContractMemoryFile): IntentContractMemoryFile {
   const validate = ensureMemoryValidator();
   if (!validate(memory)) {
-    const errors = (validate.errors || []).map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid intent-contract-memory: ${errors}`);
   }
   return memory;
@@ -139,7 +162,10 @@ export function loadIntentContractMemoryStore(): IntentContractMemoryFile {
     // Runtime memory overrides seed memory for the same intent-contract pair.
     mergedByKey.set(memoryEntryKey(entry), entry);
   }
-  return { version: runtime.version || seed.version || '1.0.0', entries: Array.from(mergedByKey.values()) };
+  return {
+    version: runtime.version || seed.version || '1.0.0',
+    entries: Array.from(mergedByKey.values()),
+  };
 }
 
 export function loadIntentContractMemorySnapshot(): IntentContractMemoryFile {
@@ -163,7 +189,9 @@ export function loadIntentContractSelectionPolicy(): IntentContractSelectionPoli
   const parsed = parseJson<IntentContractSelectionPolicy>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid intent-contract-selection-policy: ${errors}`);
   }
   return parsed;
@@ -232,7 +260,14 @@ export function selectContractCandidates(intentId: string, maxCandidates = 3): C
 
   const defaults = defaultContractForIntent(intentId);
   const merged: ContractCandidate[] = [...remembered];
-  if (defaults && !merged.some((item) => item.contract_ref.kind === defaults.contract_ref.kind && item.contract_ref.ref === defaults.contract_ref.ref)) {
+  if (
+    defaults &&
+    !merged.some(
+      (item) =>
+        item.contract_ref.kind === defaults.contract_ref.kind &&
+        item.contract_ref.ref === defaults.contract_ref.ref
+    )
+  ) {
     merged.push(defaults);
   }
   return merged.slice(0, Math.max(1, maxCandidates));
@@ -245,12 +280,14 @@ export function recordIntentContractOutcome(input: {
   success: boolean;
   error?: string;
   context_fingerprint?: IntentContractMemoryEntry['context_fingerprint'];
+  completion_summary?: IntentContractMemoryEntry['completion_summary'];
 }): IntentContractMemoryEntry {
   const memory = loadIntentContractMemoryStore();
-  const idx = memory.entries.findIndex((entry) =>
-    entry.intent_id === input.intent_id &&
-    entry.contract_ref.kind === input.contract_ref.kind &&
-    entry.contract_ref.ref === input.contract_ref.ref,
+  const idx = memory.entries.findIndex(
+    (entry) =>
+      entry.intent_id === input.intent_id &&
+      entry.contract_ref.kind === input.contract_ref.kind &&
+      entry.contract_ref.ref === input.contract_ref.ref
   );
 
   if (idx < 0) {
@@ -263,6 +300,7 @@ export function recordIntentContractOutcome(input: {
       sample_count: 1,
       last_seen: new Date().toISOString(),
       ...(input.error ? { last_error: input.error } : {}),
+      ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
     };
     memory.entries.push(created);
     saveIntentContractMemory(memory);
@@ -280,6 +318,7 @@ export function recordIntentContractOutcome(input: {
     success_rate: Number(nextRate.toFixed(4)),
     last_seen: new Date().toISOString(),
     last_error: input.success ? undefined : input.error || prev.last_error,
+    ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
   };
   memory.entries[idx] = updated;
   saveIntentContractMemory(memory);

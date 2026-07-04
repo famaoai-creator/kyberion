@@ -48,3 +48,9 @@
 
 - 語彙置換の自動修正は過剰置換(本文中の偶然の一致)に注意。**構造化フィールド(readiness 等)のみ置換対象**とし、自由文はバリデーション警告のみに留める。
 - ステータス語の表示変更は運用者の目視習慣を変える。変更一覧(旧語 → 新語)を PR/パッチ説明に表で添付する。
+
+## 実装メモ
+
+- `libs/core/ux-vocabulary.ts` を追加し、`renderStatus()` で readiness / mission などの表示語彙を `user-facing-vocabulary.json` から引くようにした。
+- `scripts/cli.ts` の operator packet と `scripts/mission_controller.ts` の mission status 表示を共有レンダラ経由に寄せた。
+- `repairSurfaceUxContractText()` を追加し、`runSurfaceMessageConversation` は違反時に配信前修復を試みるようにした。

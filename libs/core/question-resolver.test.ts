@@ -64,6 +64,26 @@ describe('question-resolver', () => {
     );
   });
 
+  it('renders clarification text in English by default', () => {
+    const packet = resolveQuestionInteractionPacket({
+      text: 'Prepare the meeting',
+      requiredInputs: ['meeting_url'],
+      executionShape: 'task_session',
+      confidence: 0.3,
+      locale: 'en',
+      maxQuestions: 1,
+    });
+
+    expect(packet?.headline).toBe('More context is required before execution');
+    expect(packet?.summary).toBe(
+      'The request needs clarification before Kyberion can proceed safely.'
+    );
+    expect(packet?.questions?.[0]?.question).toBe('Please confirm meeting url.');
+    expect(packet?.questions?.[0]?.reason).toBe(
+      'Missing inputs remain above the clarification threshold (1 > 1).'
+    );
+  });
+
   it('tracks omitted clarification questions when maxQuestions truncates the packet', () => {
     const result = resolveQuestionResolution({
       text: '会議の準備をして',

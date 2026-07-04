@@ -1,14 +1,6 @@
 {
   "v": "1.0.0",
-  "t": 1,
-  "u": "2026-07-03T11:29:27.349Z",
-  "components": [
-    {
-      "name": "daemon-actuator",
-      "path": "libs/actuators/daemon-actuator",
-      "status": "legacy-review",
-      "package_based": false,
-      "rationale": "Launchd-era runtime management overlaps with surface-runtime and managed process supervision."
-    }
-  ]
+  "t": 0,
+  "u": "2026-07-04T06:05:38.956Z",
+  "components": []
 }
