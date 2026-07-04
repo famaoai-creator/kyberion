@@ -106,7 +106,7 @@ function globToRegex(glob: string): RegExp {
   return new RegExp(`^(?:${parts.join('|')})$`);
 }
 
-function walk(root: string, current: string, collected: string[]): void {
+function walk(root: string, current: string, collected: string[], structuralViolations: Violation[]): void {
   let entries: string[];
   try {
     entries = safeReaddir(path.join(root, current));
@@ -114,11 +114,35 @@ function walk(root: string, current: string, collected: string[]): void {
     return;
   }
   for (const entry of entries) {
+    const rel = current ? `${current}/${entry}` : entry;
+    const fullPath = path.join(root, rel);
+    
+    // Check structural constraints for knowledge tier (KM-04)
+    if (rel.startsWith('knowledge/')) {
+      if (entry === '.git' && rel !== '.git') {
+        structuralViolations.push({
+          file: rel,
+          line: 0,
+          pattern: 'nested-git',
+          matched: entry,
+          rationale: 'Nested .git repositories are not allowed in knowledge/',
+        });
+      }
+      if (entry.startsWith('MSN-TEST-')) {
+        structuralViolations.push({
+          file: rel,
+          line: 0,
+          pattern: 'test-mission-pollution',
+          matched: entry,
+          rationale: 'Test missions (MSN-TEST-*) must not be written to the knowledge/ store',
+        });
+      }
+    }
+
     if (entry.startsWith('.') || entry === 'node_modules' || entry === 'dist') {
       continue;
     }
-    const rel = current ? `${current}/${entry}` : entry;
-    const fullPath = path.join(root, rel);
+    
     let stat;
     try {
       stat = safeLstat(fullPath);
@@ -126,7 +150,7 @@ function walk(root: string, current: string, collected: string[]): void {
       continue;
     }
     if (stat.isDirectory()) {
-      walk(root, rel, collected);
+      walk(root, rel, collected, structuralViolations);
     } else if (stat.isFile()) {
       collected.push(rel);
     }
@@ -141,7 +165,8 @@ export async function scan(): Promise<Violation[]> {
   const skipRegexes = (policy.skip_paths ?? []).map(globToRegex);
 
   const allFiles: string[] = [];
-  walk(root, '', allFiles);
+  const violations: Violation[] = [];
+  walk(root, '', allFiles, violations);
 
   const files = allFiles.filter(
     (rel) =>
@@ -149,7 +174,6 @@ export async function scan(): Promise<Violation[]> {
   );
 
   const allowlist = buildAllowlist(policy);
-  const violations: Violation[] = [];
 
   for (const rel of files) {
     const absolute = path.join(root, rel);

@@ -96,4 +96,18 @@ describe('surface-response-blocks', () => {
       expect.stringContaining('approval block parse failed'),
     ]);
   });
+
+  it('rejects malformed task result blocks', () => {
+    const raw = [
+      '```task_result',
+      '{"summary":"","artifacts":[],"verification_done":[],"gaps":[],"needs":[]}',
+      '```',
+      '',
+      'done',
+    ].join('\n');
+
+    const parsed = extractSurfaceBlocks(raw);
+    expect(parsed.taskResults).toHaveLength(0);
+    expect(parsed.taskResultErrors[0]).toContain('task_result validation failed');
+  });
 });

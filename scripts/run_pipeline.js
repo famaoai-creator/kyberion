@@ -369,6 +369,7 @@ function normalizePipelineOp(op) {
   if (op === 'while' || op === 'loop_until') return 'core:while';
   if (op === 'retry_until_quality') return 'core:retry_until_quality';
   if (op === 'parallel_foreach') return 'core:parallel_foreach';
+  if (op === 'accumulate') return 'core:accumulate';
   return `system:${op}`;
 }
 function resolveLogMessage(params, ctx) {
@@ -743,6 +744,81 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
               ctx = { ...ctx, ...perItemContexts[perItemContexts.length - 1] };
             }
           }
+        } else if (domain === 'core' && action === 'accumulate') {
+          const items = resolveVars(params.items, ctx);
+          const subSteps = params.do;
+          if (!Array.isArray(items)) {
+            throw new Error('core:accumulate requires "items" to be an array');
+          }
+          if (!Array.isArray(subSteps)) {
+            throw new Error('core:accumulate requires "do" pipeline steps');
+          }
+          const itemName = params.as || 'item';
+          const collectKey = String(params.collect_as || params.export_as || 'result');
+          const exportKey = resolveExportKey(step, 'last_accumulate');
+          const originalItemValue = ctx[itemName];
+          const originalSharedCtx = { ...ctx };
+          const targetCount = coercePositiveInt(params.target_count ?? params.targetCount, items.length);
+          const maxIterations = coercePositiveInt(
+            params.max_iterations ?? params.maxIterations,
+            items.length
+          );
+          const dryStreakLimit = coercePositiveInt(
+            params.dry_streak_limit ?? params.dryStreakLimit,
+            2
+          );
+          const seen = new Set();
+          const collected = [];
+          let dryStreak = 0;
+          let loopCount = 0;
+          for (const [index, item] of items.entries()) {
+            if (loopCount >= maxIterations) break;
+            if (collected.length >= targetCount) break;
+            const loopCtx = { ...originalSharedCtx, [itemName]: item };
+            const nested = await runSteps(subSteps, loopCtx, opts);
+            if (nested.status === 'failed') {
+              throw new Error(
+                `accumulate item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
+              );
+            }
+            const candidateValue =
+              nested.context[collectKey] ?? nested.context ?? item;
+            const fingerprint = (() => {
+              try {
+                return JSON.stringify(candidateValue);
+              } catch {
+                return String(candidateValue);
+              }
+            })();
+            loopCount += 1;
+            if (!seen.has(fingerprint)) {
+              seen.add(fingerprint);
+              collected.push({
+                index,
+                item,
+                value: candidateValue,
+                context: nested.context,
+                results: nested.results,
+              });
+              dryStreak = 0;
+            } else {
+              dryStreak += 1;
+            }
+            results.push(...nested.results);
+            if (dryStreak >= dryStreakLimit) break;
+          }
+          ctx = {
+            ...ctx,
+            [exportKey]: {
+              collected,
+              iterations: loopCount,
+              dry_streak: dryStreak,
+              target_count: targetCount,
+              final_context: ctx,
+            },
+          };
+          if (originalItemValue === void 0) delete ctx[itemName];
+          else ctx[itemName] = originalItemValue;
         } else if (domain === 'core' && action === 'include') {
           const fragmentRef = String(resolveVars(params.fragment || '', ctx));
           if (!fragmentRef) throw new Error('core:include requires "fragment" param');

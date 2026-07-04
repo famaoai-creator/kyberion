@@ -8,6 +8,7 @@ import {
   safeReaddir,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
+import { generateIndex } from './generate_knowledge_index.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -300,6 +301,13 @@ function main() {
     validateCatalog(check, violations);
   }
   validateCapabilitiesGuideDrift(violations);
+
+  const indexUpToDate = generateIndex(true);
+  if (!indexUpToDate) {
+    violations.push(
+      'knowledge: _index.md or _manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
+    );
+  }
 
   if (violations.length > 0) {
     console.error('[check:catalogs] violations detected:');

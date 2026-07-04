@@ -142,7 +142,7 @@ export interface MissionControllerRoutingContext {
     jsonOutput?: boolean
   ) => Awaitable<void>;
   showOrganizationDiscovery: (jsonOutput?: boolean, summaryOnly?: boolean) => Awaitable<void>;
-  showMissionStatus: (id: string) => void;
+  showMissionStatus: (id: string, follow?: boolean) => void;
   showReasoningBackendStatus: () => void;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
   showMissionTeam: (id: string, refresh?: boolean, organizationId?: string) => Awaitable<void>;
@@ -527,7 +527,7 @@ export async function runMissionControllerAction(
       );
       break;
     case 'status':
-      context.showMissionStatus(arg1!);
+      context.showMissionStatus(arg1!, context.argv.includes('--follow'));
       context.showReasoningBackendStatus();
       break;
     case 'sync-project-ledger':

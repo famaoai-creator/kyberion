@@ -7,7 +7,7 @@ import * as pathResolver from './path-resolver.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
 import { auditChain } from './audit-chain.js';
-import { killSwitch } from './kill-switch.js';
+import { recordGovernanceAction } from './kill-switch.js';
 import { logger } from './core.js';
 
 /**
@@ -187,9 +187,10 @@ export function safeWriteFile(
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
-        killSwitch.logAction(
+        recordGovernanceAction(
           process.env.KYBERION_PERSONA || 'unknown',
-          `file_write:${resolved}:denied`,
+          'file_write',
+          `${resolved}:denied`,
           true
         );
         auditChain.record({
@@ -429,6 +430,18 @@ export function safeFsyncFile(filePath: string): void {
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * Safely set file permissions (mode) for a given path.
+ * Used primarily for secret/key files to enforce restrictive modes (e.g., 0o600).
+ * Only allowed within write-permitted paths.
+ */
+export function safeChmodSync(filePath: string, mode: number): void {
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  fs.chmodSync(resolved, mode);
 }
 
 /**

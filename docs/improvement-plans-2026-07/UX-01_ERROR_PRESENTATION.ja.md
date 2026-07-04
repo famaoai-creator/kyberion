@@ -67,3 +67,10 @@
 ## 実装メモ
 
 - 2026-07-04: `libs/core/error-classifier.ts` に `buildUserFacingError()` を追加し、`knowledge/product/orchestration/user-facing-vocabulary.json` へエラー語彙を追加した。Chronos の `FocusedOperatorView` / `MissionIntelligence` / `SovereignChat` は、内部例外を直接描画せず、ブラウザ安全な封筒表現に差し替えた。
+- 2026-07-04 (Task 3/4 完了): `libs/core/bridge-error-reply.ts` を新設(`buildBridgeErrorReplyText` / `buildBridgeEmptyReplyText` / `postBridgeError`(会話単位 1 分 1 回のレート制限内蔵)/ `chunkBridgeMessage`(コードフェンス境界を保つ分割))。語彙に `empty_reply_body` / `empty_reply_next_step` を追加。
+  - **slack**: 会話ハンドラ catch でスレッドへ封筒テキスト投稿、`empty_reply` 時に定型文投稿。
+  - **telegram**: 会話失敗時にチャットへ封筒テキスト送信(receipt は `ok:false, reason:'conversation_failed'`)、空返答時に定型文送信。
+  - **discord**: 2,000 文字制限対策の 1,900 文字チャンク分割(長い返信が無言で消える問題を解消)、catch で封筒テキスト reply、空返答時に定型文。
+  - **imessage**: メッセージ単位の try/catch 化(1件の失敗が同一 poll の後続を巻き込まない)、封筒テキスト送信、空返答定型文。
+  - **voice-hub (Task 4)**: 返答生成失敗時に「うまく処理できませんでした。もう一度お願いします」(en/ja 自動判定)を**発話**する。単発試行 + `.catch` で通知自体の失敗は再帰しない。TTS 主経路失敗時の `say` フォールバックは既存挙動を維持。
+  - unit test 10 件(`bridge-error-reply.test.ts`): err.message 非漏洩 / locale / レート制限 / 投稿失敗の黙認 / チャンク分割・フェンス保全。

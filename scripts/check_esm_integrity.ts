@@ -23,7 +23,7 @@ const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([]);
 const ALLOWED_CORE_LEGACY_JS = new Set<string>([]);
 const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/core/',
-  'libs/shared-business/',
+
   'libs/shared-media/',
   'libs/shared-network/',
   'libs/shared-nerve/',

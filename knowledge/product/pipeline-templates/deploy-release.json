@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "deploy-release",
   "version": "2.0.0",
-  "description": "SDLC deploy phase: trigger the registered DeploymentAdapter to promote a release to a named environment. Always gated through the approval gate (config:update rule). Stub adapter dry-runs; ShellDeploymentAdapter (KYBERION_DEPLOY_COMMAND) runs a real CI/CD trigger.",
+  "description": "SDLC deploy phase: trigger the registered DeploymentAdapter to promote a release to a named environment. Always gated through the approval gate (config:update rule). Stub adapter dry-runs; ShellDeploymentAdapter runs a real CI/CD trigger if configured at knowledge/personal/deployments/<project>.json.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",

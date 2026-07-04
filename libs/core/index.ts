@@ -584,6 +584,8 @@ export {
   rotateLogs,
   scanDataVault,
   runJanitor,
+  runJanitorIfStale,
+  readJanitorLastRunMs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
 } from './storage-janitor.js';
@@ -1058,6 +1060,7 @@ export type {
 export {
   getReasoningBackend,
   delegateBestOf,
+  delegateStructured,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1365,6 +1368,20 @@ export type {
   SynthesizedPersona,
 } from './reasoning-backend.js';
 export {
+  A2ATaskContractSchema,
+  PlanningPacketSchema,
+  PlanningReviewVerdictSchema,
+  ProcedureRankingCandidateSchema,
+  ProcedureRankingSchema,
+  TaskResultSchema,
+  structuredOutputSchemas,
+  type ProcedureRankingCandidate,
+  type ProcedureRankingResult,
+  type PlanningReviewVerdictResult,
+  type StructuredOutputSchemaName,
+  type StructuredOutputSchemaRef,
+} from './structured-output-contracts.js';
+export {
   getVoiceBridge,
   registerVoiceBridge,
   resetVoiceBridge,
@@ -1514,6 +1531,14 @@ export * from './trust-engine.js';
 export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
+export {
+  buildBridgeErrorReplyText,
+  buildBridgeEmptyReplyText,
+  shouldPostBridgeError,
+  resetBridgeErrorRateLimiter,
+  postBridgeError,
+  chunkBridgeMessage,
+} from './bridge-error-reply.js';
 export {
   recordConfigFallback,
   listFallbacks,
