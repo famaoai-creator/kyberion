@@ -199,19 +199,23 @@ const NATIVE_TTS: Dependency = {
   fallbackMode: 'voice output falls back to text-only',
 };
 
-const NODE22: Dependency = {
+// NOTE: the dependency id stays `node22` because it is a stable contract
+// key referenced by actuator-dependency-bundles.json (including personal
+// overlays); the enforced floor follows package.json engines (>=24).
+const NODE24: Dependency = {
   id: 'node22',
-  name: 'Node.js 22+',
+  name: 'Node.js 24+',
   level: 'must',
   check: async () => {
     const r = checkBinary('node');
     if (!r.ok) return { ok: false, detail: 'node not in PATH' };
     const version = r.version?.replace('v', '') ?? '';
     const major = parseInt(version.split('.')[0] ?? '0', 10);
-    if (major < 22) return { ok: false, version, detail: 'Node.js 22+ required' };
+    if (major < 24)
+      return { ok: false, version, detail: 'Node.js 24+ required (package.json engines)' };
     return { ok: true, version };
   },
-  installCommand: 'nvm install 22 && nvm use 22',
+  installCommand: 'nvm install 24 && nvm use 24',
   fallbackMode: 'Kyberion will not build',
 };
 
@@ -227,7 +231,7 @@ const PNPM: Dependency = {
 };
 
 const DEPENDENCY_BY_ID: Record<string, Dependency> = {
-  node22: NODE22,
+  node22: NODE24,
   pnpm: PNPM,
   python3: PYTHON3,
   'playwright-browser': PLAYWRIGHT_BROWSER,

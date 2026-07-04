@@ -218,8 +218,8 @@
       "id": "build.node-version",
       "category": "missing_dependency",
       "label": "Node.js version incompatible",
-      "remediation": "This project requires Node 22+. Run `node --version` to check, then install the required version via `nvm install 22` or the version manager of your choice.",
-      "patterns": ["engine.*node|node.*version.*required|requires node.*22|EBADENGINE"]
+      "remediation": "This project requires Node 24+ (package.json engines). Run `node --version` to check, then install the required version via `nvm install 24 && nvm use 24` or the version manager of your choice.",
+      "patterns": ["engine.*node|node.*version.*required|requires node.*2[24]|EBADENGINE"]
     },
     {
       "id": "build.pnpm-workspace",

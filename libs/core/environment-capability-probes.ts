@@ -10,22 +10,19 @@
  *   reasoning-backend.any-real   — at least one non-stub backend usable
  *   audit-chain.integrity        — audit-chain hashes verify
  *   repo-build.receipt           — libs/core/dist/ is fresh enough
+ *   node-version.floor           — running Node satisfies package.json engines
+ *   playwright.chromium-browser  — a Playwright browser cache is present
  *
  * Importing this module triggers `installCoreEnvironmentProbes()` for
  * its side effect; tests that reset the probe registry can re-arm by
  * calling that exported function again.
  */
 
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeExec,
-} from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
 import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
 import {
@@ -37,6 +34,8 @@ export function installCoreEnvironmentProbes(): void {
   registerEnvironmentCapabilityProbe('reasoning-backend.any-real', probeReasoningBackend);
   registerEnvironmentCapabilityProbe('audit-chain.integrity', probeAuditChain);
   registerEnvironmentCapabilityProbe('repo-build.receipt', probeRepoBuild);
+  registerEnvironmentCapabilityProbe('node-version.floor', probeNodeVersionFloor);
+  registerEnvironmentCapabilityProbe('playwright.chromium-browser', probePlaywrightChromium);
 }
 
 /* ------------------------------------------------------------------ *
@@ -136,6 +135,105 @@ async function probeRepoBuild(): Promise<{ available: boolean; reason?: string }
     logger.warn(`[env-probes] repo-build.receipt probe error: ${err?.message ?? err}`);
     return { available: true };
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Node version floor (package.json engines)                           *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Parse the minimum Node version out of an engines-style range like
+ * `>=24.0.0`. Returns null when no `>=` floor is declared.
+ */
+export function parseEnginesNodeFloor(range: string): [number, number, number] | null {
+  const match = /(?:>=|\^)\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(range);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)];
+}
+
+/** True when `current` (e.g. `v24.1.0` or `24.1.0`) >= `floor`. */
+export function nodeVersionSatisfiesFloor(
+  current: string,
+  floor: readonly [number, number, number]
+): boolean {
+  const parts = current.replace(/^v/, '').split('.');
+  const cur: [number, number, number] = [
+    Number(parts[0] ?? 0) || 0,
+    Number(parts[1] ?? 0) || 0,
+    Number(parts[2] ?? 0) || 0,
+  ];
+  for (let i = 0; i < 3; i += 1) {
+    if (cur[i] > floor[i]) return true;
+    if (cur[i] < floor[i]) return false;
+  }
+  return true;
+}
+
+function readRootEnginesNodeRange(): string | null {
+  try {
+    const pkgPath = pathResolver.rootResolve('package.json');
+    if (!safeExistsSync(pkgPath)) return null;
+    const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+    const range = pkg?.engines?.node;
+    return typeof range === 'string' && range.trim() !== '' ? range : null;
+  } catch {
+    return null;
+  }
+}
+
+async function probeNodeVersionFloor(): Promise<{ available: boolean; reason?: string }> {
+  const range = readRootEnginesNodeRange();
+  if (!range) return { available: true };
+  const floor = parseEnginesNodeFloor(range);
+  if (!floor) return { available: true };
+  if (nodeVersionSatisfiesFloor(process.versions.node, floor)) {
+    return { available: true };
+  }
+  const major = floor[0];
+  const current = `v${process.versions.node}`;
+  return {
+    available: false,
+    reason:
+      `Node ${current} does not satisfy package.json engines "${range}". ` +
+      `Fix: \`nvm install ${major} && nvm use ${major}\` (or \`mise install node@${major}\`), then rerun. ` +
+      `/ 実行中の Node ${current} は engines "${range}" を満たしていません。` +
+      `\`nvm install ${major} && nvm use ${major}\`(または \`mise install node@${major}\`)でアップグレードしてから再実行してください。`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Playwright browser cache                                            *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where Playwright keeps downloaded browsers on this host. Mirrors the
+ * playwright-core registry defaults; `PLAYWRIGHT_BROWSERS_PATH` wins,
+ * and the special value `0` means "inside node_modules".
+ */
+export function playwrightBrowsersDir(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env.PLAYWRIGHT_BROWSERS_PATH;
+  if (override && override !== '0') return override;
+  if (override === '0') {
+    return pathResolver.rootResolve('node_modules/playwright-core/.local-browsers');
+  }
+  const home = os.homedir();
+  if (process.platform === 'darwin') return path.join(home, 'Library', 'Caches', 'ms-playwright');
+  if (process.platform === 'win32') {
+    return path.join(env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'), 'ms-playwright');
+  }
+  return path.join(env.XDG_CACHE_HOME ?? path.join(home, '.cache'), 'ms-playwright');
+}
+
+async function probePlaywrightChromium(): Promise<{ available: boolean; reason?: string }> {
+  const dir = playwrightBrowsersDir();
+  if (safeExistsSync(dir)) return { available: true };
+  return {
+    available: false,
+    reason:
+      `no Playwright browser cache at ${dir} — browser features (first-win screenshot, browser:goto) ` +
+      `will silently fall back to text. Fix: \`pnpm exec playwright install chromium\`. ` +
+      `/ Playwright ブラウザ未導入です。\`pnpm exec playwright install chromium\` を実行してください。`,
+  };
 }
 
 /* ------------------------------------------------------------------ *

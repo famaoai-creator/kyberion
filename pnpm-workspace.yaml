@@ -6,11 +6,11 @@ packages:
   - 'presence/displays/*'
   - 'presence/bridge/*'
 allowBuilds:
-  '@anthropic-ai/claude-code': set this to true or false
+  '@anthropic-ai/claude-code': true
   '@scarf/scarf': false
   esbuild: true
   node-pty: true
-  onnxruntime-node: set this to true or false
+  onnxruntime-node: true
   protobufjs: true
   puppeteer: true
   sharp: true
