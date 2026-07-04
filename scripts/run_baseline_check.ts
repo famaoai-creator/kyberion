@@ -10,7 +10,10 @@ import {
   logger,
   withExecutionContext,
   loadServiceEndpointsCatalog,
+  killSwitch,
+  readJanitorLastRunMs,
 } from '@agent/core';
+import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
@@ -29,6 +32,8 @@ type ReadinessRule = {
 
 const BASELINE_CACHE_TTL_MS = 60 * 60 * 1000;
 const BASELINE_CACHE_DIR = 'runtime/baseline-check-cache';
+const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
+const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
 let baselineConfigDegraded = false;
 
 type CachedEnvelope<T> = {
@@ -41,6 +46,12 @@ type CachedSnapshot<T> = {
   value: T;
   cached: boolean;
   age_ms?: number;
+};
+
+export type BaselineMaintenanceState = {
+  submitted: boolean;
+  pending: boolean;
+  reason: string | null;
 };
 
 function cachePath(name: string): string {
@@ -204,7 +215,123 @@ function getCachedCoworkHealth() {
   return { value, cached: false } satisfies CachedSnapshot<ReturnType<typeof runCoworkHealthCheck>>;
 }
 
+function readJanitorLastSubmissionMs(): number | null {
+  const markerPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    const raw = safeReadFile(markerPath, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw) as { submitted_at?: string };
+    const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
+    return Number.isFinite(submittedAt) ? submittedAt : null;
+  } catch {
+    return null;
+  }
+}
+
+function markJanitorSubmission(): void {
+  safeWriteFile(
+    pathResolver.shared(JANITOR_SUBMIT_MARKER),
+    JSON.stringify(
+      {
+        submitted_at: new Date().toISOString(),
+        pipeline_id: 'storage-janitor',
+        dry_run: true,
+      },
+      null,
+      2
+    )
+  );
+}
+
+function maybeSubmitJanitorMaintenanceJob(): {
+  submitted: boolean;
+  pending: boolean;
+  reason: string | null;
+} {
+  const lastCompletedMs = readJanitorLastRunMs();
+  if (lastCompletedMs !== null && Date.now() - lastCompletedMs < JANITOR_MAINTENANCE_TTL_MS) {
+    return { submitted: false, pending: false, reason: null };
+  }
+
+  const lastSubmittedMs = readJanitorLastSubmissionMs();
+  if (lastSubmittedMs !== null && Date.now() - lastSubmittedMs < JANITOR_MAINTENANCE_TTL_MS) {
+    return {
+      submitted: false,
+      pending: true,
+      reason: 'storage janitor job is already pending',
+    };
+  }
+
+  spawnManagedProcess({
+    resourceId: `baseline-check:storage-janitor:${Date.now().toString(36)}`,
+    kind: 'service',
+    ownerId: 'baseline-check',
+    ownerType: 'baseline-check-maintenance',
+    command: 'node',
+    args: [
+      'dist/scripts/run_pipeline.js',
+      '--input',
+      'pipelines/storage-janitor.json',
+      '--context',
+      JSON.stringify({ dry_run: true }),
+    ],
+    spawnOptions: {
+      cwd: pathResolver.rootDir(),
+      env: process.env,
+      detached: true,
+      stdio: 'ignore',
+    },
+    shutdownPolicy: 'detached',
+    metadata: {
+      pipelineId: 'storage-janitor',
+      dryRun: true,
+      source: 'baseline-check',
+    },
+  });
+
+  markJanitorSubmission();
+  return {
+    submitted: true,
+    pending: true,
+    reason: 'storage janitor dry-run job submitted',
+  };
+}
+
+export function deriveBaselineStatus(
+  result: { success: boolean; failedLayer?: string | null },
+  janitorMaintenance: BaselineMaintenanceState
+): 'all_clear' | 'needs_onboarding' | 'needs_recovery' | 'needs_attention' {
+  if (!result.success) {
+    if (result.failedLayer === 'L3') return 'needs_onboarding';
+    if (['L0', 'L1', 'L2'].includes(result.failedLayer || '')) return 'needs_recovery';
+    return 'needs_attention';
+  }
+  if (janitorMaintenance.pending) return 'needs_attention';
+  return 'all_clear';
+}
+
 async function main() {
+  killSwitch.startMonitor();
+
+  // KM-01 fallback: without a resident chronos daemon the scheduled janitor
+  // never fires, so session start submits a detached dry-run maintenance job
+  // when the last completed run is stale. Failure-tolerant — maintenance must
+  // never block the baseline check.
+  let janitorMaintenance = { submitted: false, pending: false, reason: null as string | null };
+  try {
+    janitorMaintenance = maybeSubmitJanitorMaintenanceJob();
+    if (janitorMaintenance.submitted) {
+      logger.info(
+        `[BASELINE] storage janitor maintenance job submitted: ${janitorMaintenance.reason || 'storage janitor dry-run job submitted'}`
+      );
+    } else if (janitorMaintenance.pending) {
+      logger.info(
+        `[BASELINE] storage janitor maintenance pending: ${janitorMaintenance.reason || 'storage janitor job is already pending'}`
+      );
+    }
+  } catch (err: any) {
+    logger.warn(`[BASELINE] storage janitor fallback failed: ${err?.message ?? String(err)}`);
+  }
   const statePath = pathResolver.rootResolve('active/shared/runtime/state/pfc-state.json');
   const sentinel = new SovereignSentinel(statePath);
   const tenantDriftSnapshot = getCachedTenantDrift();
@@ -267,16 +394,7 @@ async function main() {
   const state = sentinel.getState();
 
   // Determine High-Level Status
-  let status = 'all_clear';
-  if (!result.success) {
-    if (result.failedLayer === 'L3') {
-      status = 'needs_onboarding';
-    } else if (['L0', 'L1', 'L2'].includes(result.failedLayer!)) {
-      status = 'needs_recovery';
-    } else {
-      status = 'needs_attention';
-    }
-  }
+  const status = deriveBaselineStatus(result, janitorMaintenance);
 
   // Format Output
   const report = {
@@ -293,6 +411,14 @@ async function main() {
       cowork_health: {
         cached: coworkHealthSnapshot.cached,
         age_ms: coworkHealthSnapshot.age_ms ?? null,
+      },
+    },
+    maintenance: {
+      janitor: {
+        required: janitorMaintenance.pending || janitorMaintenance.submitted,
+        submitted: janitorMaintenance.submitted,
+        pending: janitorMaintenance.pending,
+        reason: janitorMaintenance.reason,
       },
     },
   };

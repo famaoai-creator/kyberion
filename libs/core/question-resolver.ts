@@ -15,6 +15,7 @@ import { getPresentationBriefQuestions } from './presentation-preference-profile
 import { slugify } from './text-utils.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
+import { logger } from './core.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -542,6 +543,12 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
       note: rule?.rationale || 'Clarification pattern observed through governed intake.',
     },
   };
+
+  if (omittedQuestionCount > 0) {
+    logger.info(
+      `[question-resolver] omitted ${omittedQuestionCount} clarification question(s) for intent=${input.intentId || 'default'}`
+    );
+  }
 
   return result;
 }

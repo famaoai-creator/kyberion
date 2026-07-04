@@ -1,5 +1,7 @@
 # Procedure: Theme and Design System Reference
 
+> **Note:** For the canonical design tokens (colors and fonts) and how they are generated across all surfaces including `themes.json`, see [DESIGN_SYSTEM.md](../../../../docs/developer/design/DESIGN_SYSTEM.md).
+
 ## Goal
 
 Give operators one place to understand what Kyberion currently defines as a theme, what is only a higher-level design system, and how extracted PPTX design fits into that picture.

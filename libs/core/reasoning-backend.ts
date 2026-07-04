@@ -16,8 +16,24 @@
  */
 
 import { logger } from './core.js';
+import type {
+  A2ATaskContract,
+  PlanningPacket,
+  TaskResultBlock,
+} from './channel-surface-types.js';
 import { slugify } from './text-utils.js';
 import { parseStructuredJson } from './structured-reasoning.js';
+import {
+  resolveStructuredOutputSchema,
+  type ProcedureRankingResult,
+  type StructuredOutputSchemaRef,
+} from './structured-output-contracts.js';
+import {
+  listDemotedProviders,
+  reportProviderHealthy,
+  getProviderHealthDemotionTtlMs,
+  reportProviderTemporarilyUnhealthy,
+} from './provider-health-registry.js';
 import { z } from 'zod';
 
 export type PersonaLabel = string;
@@ -352,23 +368,23 @@ export interface BestOfDelegationOptions extends StructuredDelegationOptions {
 export interface ReasoningBackend {
   name: string;
   /** Divergence — produce independent hypotheses per persona. */
-  divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]>;
+  divergePersonas(input: DivergeHypothesisInput, options?: ReasoningCallOptions): Promise<HypothesisSketch[]>;
   /** Cross-critique — each persona critiques the others' hypotheses. */
-  crossCritique(input: CritiqueInput): Promise<CritiqueResult>;
+  crossCritique(input: CritiqueInput, options?: ReasoningCallOptions): Promise<CritiqueResult>;
   /** Persona synthesis — derive a counterparty persona from a relationship node. */
-  synthesizePersona(input: PersonaSynthesisInput): Promise<SynthesizedPersona>;
+  synthesizePersona(input: PersonaSynthesisInput, options?: ReasoningCallOptions): Promise<SynthesizedPersona>;
   /** Fork — propose N short-horizon branches from surviving hypotheses. */
-  forkBranches(input: BranchForkInput): Promise<ForkedBranch[]>;
+  forkBranches(input: BranchForkInput, options?: ReasoningCallOptions): Promise<ForkedBranch[]>;
   /** Simulate — run short-horizon simulations of branches. */
-  simulateBranches(input: SimulationInput): Promise<SimulationResult>;
+  simulateBranches(input: SimulationInput, options?: ReasoningCallOptions): Promise<SimulationResult>;
   /** Extract structured requirements from raw elicitation-source text. */
-  extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements>;
+  extractRequirements(input: ExtractRequirementsInput, options?: ReasoningCallOptions): Promise<ExtractedRequirements>;
   /** Derive an architectural design spec from a requirements draft. */
-  extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec>;
+  extractDesignSpec(input: ExtractDesignSpecInput, options?: ReasoningCallOptions): Promise<ExtractedDesignSpec>;
   /** Derive a test plan (test-case-adf-compatible cases) from requirements + optional design. */
-  extractTestPlan(input: ExtractTestPlanInput): Promise<ExtractedTestPlan>;
+  extractTestPlan(input: ExtractTestPlanInput, options?: ReasoningCallOptions): Promise<ExtractedTestPlan>;
   /** Decompose requirements + design into an ordered implementation task plan. */
-  decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan>;
+  decomposeIntoTasks(input: DecomposeIntoTasksInput, options?: ReasoningCallOptions): Promise<DecomposedTaskPlan>;
   /** Delegate a complex, multi-step task to an autonomous sub-agent. */
   delegateTask(
     instruction: string,
@@ -381,14 +397,211 @@ export interface ReasoningBackend {
   generateWithTools?(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult>;
 }
 
-export async function delegateStructured<T>(
+export interface ReasoningBackendCandidate {
+  backend: ReasoningBackend;
+  provider?: string;
+  label?: string;
+}
+
+function summarizeError(error: unknown): string {
+  if (error instanceof Error) return error.message || error.name;
+  return String(error);
+}
+
+function normalizeProviderName(value?: string): string | null {
+  const provider = String(value || '').trim().toLowerCase();
+  return provider || null;
+}
+
+function candidateLabel(candidate: ReasoningBackendCandidate): string {
+  return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
+}
+
+export class FailoverReasoningBackend implements ReasoningBackend {
+  readonly name: string;
+  private readonly candidates: ReasoningBackendCandidate[];
+
+  constructor(candidates: ReasoningBackendCandidate[]) {
+    this.candidates = candidates.filter((candidate) => Boolean(candidate.backend));
+    this.name = this.candidates[0]?.backend.name || 'failover';
+  }
+
+  private async runWithFailover<T>(
+    operation: string,
+    invoke: (backend: ReasoningBackend) => Promise<T>
+  ): Promise<T> {
+    const skippedProviders = new Set(listDemotedProviders());
+    const errors: string[] = [];
+
+    for (const candidate of this.candidates) {
+      const provider = normalizeProviderName(candidate.provider);
+      if (provider && skippedProviders.has(provider)) continue;
+      try {
+        const result = await invoke(candidate.backend);
+        if (provider) reportProviderHealthy(provider);
+        return result;
+      } catch (error) {
+        const message = summarizeError(error);
+        errors.push(`${candidateLabel(candidate)}: ${message}`);
+        logger.warn(
+          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
+        );
+        if (provider) {
+          reportProviderTemporarilyUnhealthy(provider, {
+            reason: `${operation}:${message}`,
+          });
+        }
+      }
+    }
+
+    throw new Error(
+      `[reasoning-backend:failover] ${operation} failed across ${errors.length} candidate(s): ${errors.join(' | ')}`
+    );
+  }
+
+  divergePersonas(
+    input: DivergeHypothesisInput,
+    options?: ReasoningCallOptions
+  ): Promise<HypothesisSketch[]> {
+    return this.runWithFailover('divergePersonas', (backend) => backend.divergePersonas(input, options));
+  }
+
+  crossCritique(input: CritiqueInput, options?: ReasoningCallOptions): Promise<CritiqueResult> {
+    return this.runWithFailover('crossCritique', (backend) => backend.crossCritique(input, options));
+  }
+
+  synthesizePersona(
+    input: PersonaSynthesisInput,
+    options?: ReasoningCallOptions
+  ): Promise<SynthesizedPersona> {
+    return this.runWithFailover('synthesizePersona', (backend) => backend.synthesizePersona(input, options));
+  }
+
+  forkBranches(input: BranchForkInput, options?: ReasoningCallOptions): Promise<ForkedBranch[]> {
+    return this.runWithFailover('forkBranches', (backend) => backend.forkBranches(input, options));
+  }
+
+  simulateBranches(input: SimulationInput, options?: ReasoningCallOptions): Promise<SimulationResult> {
+    return this.runWithFailover('simulateBranches', (backend) => backend.simulateBranches(input, options));
+  }
+
+  extractRequirements(
+    input: ExtractRequirementsInput,
+    options?: ReasoningCallOptions
+  ): Promise<ExtractedRequirements> {
+    return this.runWithFailover('extractRequirements', (backend) => backend.extractRequirements(input, options));
+  }
+
+  extractDesignSpec(
+    input: ExtractDesignSpecInput,
+    options?: ReasoningCallOptions
+  ): Promise<ExtractedDesignSpec> {
+    return this.runWithFailover('extractDesignSpec', (backend) => backend.extractDesignSpec(input, options));
+  }
+
+  extractTestPlan(
+    input: ExtractTestPlanInput,
+    options?: ReasoningCallOptions
+  ): Promise<ExtractedTestPlan> {
+    return this.runWithFailover('extractTestPlan', (backend) => backend.extractTestPlan(input, options));
+  }
+
+  decomposeIntoTasks(
+    input: DecomposeIntoTasksInput,
+    options?: ReasoningCallOptions
+  ): Promise<DecomposedTaskPlan> {
+    return this.runWithFailover('decomposeIntoTasks', (backend) => backend.decomposeIntoTasks(input, options));
+  }
+
+  delegateTask(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    return this.runWithFailover('delegateTask', (backend) => backend.delegateTask(instruction, context, options));
+  }
+
+  prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
+    return this.runWithFailover('prompt', (backend) => backend.prompt(prompt, options));
+  }
+
+  async generateWithTools(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult> {
+    const skippedProviders = new Set(listDemotedProviders());
+    const errors: string[] = [];
+
+    for (const candidate of this.candidates) {
+      const provider = normalizeProviderName(candidate.provider);
+      if (provider && skippedProviders.has(provider)) continue;
+      if (!candidate.backend.generateWithTools) continue;
+      try {
+        const result = await candidate.backend.generateWithTools(prompt, tools);
+        if (provider) reportProviderHealthy(provider);
+        return result;
+      } catch (error) {
+        const message = summarizeError(error);
+        errors.push(`${candidateLabel(candidate)}: ${message}`);
+        logger.warn(
+          `[reasoning-backend:failover] generateWithTools failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
+        );
+        if (provider) {
+          reportProviderTemporarilyUnhealthy(provider, {
+            reason: `generateWithTools:${message}`,
+          });
+        }
+      }
+    }
+
+    throw new Error(
+      `[reasoning-backend:failover] generateWithTools failed across ${errors.length} candidate(s): ${errors.join(' | ')}`
+    );
+  }
+}
+
+export function buildFailoverReasoningBackend(
+  candidates: ReasoningBackendCandidate[]
+): ReasoningBackend {
+  return new FailoverReasoningBackend(candidates);
+}
+
+export function delegateStructured(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: 'planning_packet',
+  options?: StructuredDelegationOptions
+): Promise<PlanningPacket>;
+export function delegateStructured(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: 'task_result',
+  options?: StructuredDelegationOptions
+): Promise<TaskResultBlock>;
+export function delegateStructured(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: 'a2a_task_contract',
+  options?: StructuredDelegationOptions
+): Promise<A2ATaskContract>;
+export function delegateStructured(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: 'procedure_ranking',
+  options?: StructuredDelegationOptions
+): Promise<ProcedureRankingResult>;
+export function delegateStructured<T>(
   backend: Pick<ReasoningBackend, 'delegateTask'>,
   instruction: string,
   schema: z.ZodType<T>,
+  options?: StructuredDelegationOptions
+): Promise<T>;
+export async function delegateStructured<T>(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: StructuredOutputSchemaRef<T>,
   options: StructuredDelegationOptions = {}
 ): Promise<T> {
-  const maxRetries = Math.max(0, options.maxRetries ?? 1);
-  const schemaJson = z.toJSONSchema(schema) as Record<string, unknown>;
+  const maxRetries = Math.max(0, options.maxRetries ?? 2);
+  const resolvedSchema = resolveStructuredOutputSchema(schema);
+  const schemaJson = z.toJSONSchema(resolvedSchema) as Record<string, unknown>;
   if ('$schema' in schemaJson) delete schemaJson['$schema'];
 
   const buildPrompt = (attempt: number, priorError?: string): string =>
@@ -411,7 +624,7 @@ export async function delegateStructured<T>(
     const raw = await backend.delegateTask(buildPrompt(attempt, lastError), options.context);
     try {
       const parsed = parseStructuredJson(raw, 'delegateStructured');
-      const validated = schema.safeParse(parsed);
+      const validated = resolvedSchema.safeParse(parsed);
       if (validated.success) return validated.data;
       lastError = validated.error.message;
     } catch (error) {

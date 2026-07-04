@@ -9,9 +9,14 @@ module.exports = {
         background: "var(--background)",
         foreground: "var(--foreground)",
         kyberion: {
-          gold: "#D4AF37",
-          dark: "#0F0F0F",
-          accent: "#1A1A1A",
+          bg_main: "var(--kb-bg-main)",
+          panel_bg: "var(--kb-panel-bg)",
+          primary: "var(--kb-primary)",
+          secondary: "var(--kb-secondary)",
+          accent: "var(--kb-accent)",
+          warning: "var(--kb-warning)",
+          text_primary: "var(--kb-text-primary)",
+          text_secondary: "var(--kb-text-secondary)",
         }
       },
     },

@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { enforceApprovalGate } from './approval-gate.js';
-import { killSwitch } from './kill-switch.js';
+import { recordGovernanceAction } from './kill-switch.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import {
   type BrowserExtensionLease,
@@ -137,14 +137,14 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
   const { procedure, recording, session, agentId, channel, correlationId } = input;
 
   if (!recording) {
-    killSwitch.logAction(agentId, 'procedure_dispatch_missing_recording', true);
+    recordGovernanceAction(agentId, 'procedure_dispatcher', 'missing_recording', true);
     return {
       status: 'blocked',
       errors: ['extension_session executor requires a recording'],
     };
   }
   if (!session) {
-    killSwitch.logAction(agentId, 'procedure_dispatch_missing_session', true);
+    recordGovernanceAction(agentId, 'procedure_dispatcher', 'missing_session', true);
     return {
       status: 'blocked',
       errors: ['extension_session executor requires a session'],
@@ -158,7 +158,7 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
     for (const segment of segments) {
       const allowed = procedure.target.origins.some((o) => matchesAllowedOrigin(o, segment.origin));
       if (!allowed) {
-        killSwitch.logAction(agentId, `procedure_origin_blocked:${procedure.procedure_id}`, true);
+        recordGovernanceAction(agentId, 'procedure_dispatcher', `origin_blocked:${procedure.procedure_id}`, true);
         return {
           status: 'blocked',
           errors: [
@@ -187,7 +187,7 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
       `[procedure-dispatcher] approval required for "${procedure.procedure_id}" ` +
         `— request_id=${approval.requestId ?? 'n/a'}`
     );
-    killSwitch.logAction(agentId, `procedure_approval_required:${procedure.procedure_id}`, true);
+    recordGovernanceAction(agentId, 'procedure_dispatcher', `approval_required:${procedure.procedure_id}`, true);
     return {
       status: 'approval_required',
       approvalRequestId: approval.requestId,
@@ -253,11 +253,11 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   const { procedure, serviceRecording, agentId, channel, correlationId } = input;
 
   if (!serviceRecording) {
-    killSwitch.logAction(agentId, 'procedure_service_missing_recording', true);
+    recordGovernanceAction(agentId, 'procedure_dispatcher', 'service_missing_recording', true);
     return { status: 'blocked', errors: ['service:preset executor requires a serviceRecording'] };
   }
   if (serviceRecording.review?.status !== 'approved') {
-    killSwitch.logAction(agentId, 'procedure_service_unapproved_recording', true);
+    recordGovernanceAction(agentId, 'procedure_dispatcher', 'service_unapproved_recording', true);
     return {
       status: 'blocked',
       errors: ['service execution requires an approved recording review'],
@@ -269,7 +269,7 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   if (allowedServices.length > 0) {
     for (const step of serviceRecording.steps) {
       if (!allowedServices.includes(step.service_id)) {
-        killSwitch.logAction(agentId, `procedure_service_blocked:${procedure.procedure_id}`, true);
+        recordGovernanceAction(agentId, 'procedure_dispatcher', `service_blocked:${procedure.procedure_id}`, true);
         return {
           status: 'blocked',
           errors: [
@@ -305,9 +305,10 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
       logger.info(
         `[procedure-dispatcher] service approval required for "${procedure.procedure_id}" — request_id=${approval.requestId ?? 'n/a'}`
       );
-      killSwitch.logAction(
+      recordGovernanceAction(
         agentId,
-        `procedure_service_approval_required:${procedure.procedure_id}`,
+        'procedure_dispatcher',
+        `service_approval_required:${procedure.procedure_id}`,
         true
       );
       return { status: 'approval_required', approvalRequestId: approval.requestId, errors: [] };

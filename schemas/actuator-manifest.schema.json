@@ -2,12 +2,24 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Actuator Capability Manifest",
   "type": "object",
-  "required": ["actuator_id", "version", "capabilities"],
+  "required": [
+    "actuator_id",
+    "version",
+    "capabilities"
+  ],
   "properties": {
-    "actuator_id": { "type": "string" },
-    "version": { "type": "string" },
-    "description": { "type": "string" },
-    "contract_schema": { "type": "string" },
+    "actuator_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "contract_schema": {
+      "type": "string"
+    },
     "resilience_tier": {
       "type": "string",
       "description": "High-level resilience posture for the actuator, e.g. adaptive_retry."
@@ -16,20 +28,34 @@
       "type": "object",
       "description": "Retry and fallback contract used when the actuator encounters transient failure.",
       "properties": {
-        "fallback_strategy": { "type": "string" },
+        "fallback_strategy": {
+          "type": "string"
+        },
         "retry": {
           "type": "object",
           "properties": {
-            "maxRetries": { "type": "number" },
-            "initialDelayMs": { "type": "number" },
-            "maxDelayMs": { "type": "number" },
-            "factor": { "type": "number" },
-            "jitter": { "type": "boolean" }
+            "maxRetries": {
+              "type": "number"
+            },
+            "initialDelayMs": {
+              "type": "number"
+            },
+            "maxDelayMs": {
+              "type": "number"
+            },
+            "factor": {
+              "type": "number"
+            },
+            "jitter": {
+              "type": "boolean"
+            }
           }
         },
         "retryable_categories": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -37,41 +63,106 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["op", "platforms"],
+        "required": [
+          "op",
+          "platforms"
+        ],
         "properties": {
-          "op": { "type": "string" },
-          "schema_ref": { "type": "string" },
+          "op": {
+            "type": "string"
+          },
+          "schema_ref": {
+            "type": "string"
+          },
           "platforms": {
             "type": "array",
-            "items": { "type": "string", "enum": ["darwin", "linux", "win32"] }
+            "items": {
+              "type": "string",
+              "enum": [
+                "darwin",
+                "linux",
+                "win32"
+              ]
+            }
           },
           "requirements": {
             "type": "object",
             "properties": {
-              "bin": { "type": "array", "items": { "type": "string" } },
-              "lib": { "type": "array", "items": { "type": "string" } },
-              "env": { "type": "array", "items": { "type": "string" } }
+              "bin": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "lib": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           },
           "prerequisites": {
             "type": "object",
             "description": "Runtime prerequisites used by capability probes to decide whether this op is usable on the current host.",
             "properties": {
-              "binaries": { "type": "array", "items": { "type": "string" } },
+              "binaries": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "platforms": {
                 "type": "array",
-                "items": { "type": "string", "enum": ["darwin", "linux", "win32"] }
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "darwin",
+                    "linux",
+                    "win32"
+                  ]
+                }
               },
-              "env": { "type": "array", "items": { "type": "string" } },
-              "services": { "type": "array", "items": { "type": "string" } },
+              "env": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "services": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "install": {
                 "oneOf": [
-                  { "type": "array", "items": { "type": "string" } },
-                  { "type": "object", "additionalProperties": { "type": "string" } }
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
                 ]
               }
             },
             "additionalProperties": false
+          },
+          "implemented": {
+            "type": "boolean",
+            "description": "Set false when the op is declared but not implemented yet (AC-01/AC-06). Probes report available:false with reason not_implemented."
           }
         }
       }

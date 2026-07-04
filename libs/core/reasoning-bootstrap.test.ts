@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getIntentExtractor, resetIntentExtractor } from './intent-extractor.js';
 import { getReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
 import {
@@ -9,6 +9,35 @@ import {
   resetReasoningBootstrap,
 } from './reasoning-bootstrap.js';
 import { getVoiceBridge, resetVoiceBridge } from './voice-bridge.js';
+
+const mockProviders = vi.hoisted(() => {
+  const defaultProviders = [
+    { provider: 'codex', installed: true, healthy: true },
+    { provider: 'gemini', installed: false, healthy: false },
+    { provider: 'agy', installed: false, healthy: false },
+  ];
+
+  let providers = defaultProviders;
+
+  return {
+    defaultProviders,
+    setProviders: (nextProviders: typeof defaultProviders) => {
+      providers = nextProviders;
+    },
+    discoverProviders: vi.fn(() => providers),
+    resolveProviderDecision: vi.fn(() => {
+      throw new Error('broker disabled in test');
+    }),
+  };
+});
+
+vi.mock('./provider-discovery.js', () => ({
+  discoverProviders: mockProviders.discoverProviders,
+}));
+
+vi.mock('./capability-broker.js', () => ({
+  resolveProviderDecision: mockProviders.resolveProviderDecision,
+}));
 
 describe('reasoning-bootstrap', () => {
   // Isolate resolution from the harness host env: when this suite runs *inside* a
@@ -38,6 +67,7 @@ describe('reasoning-bootstrap', () => {
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.KYBERION_OPENROUTER_MODEL;
     delete process.env.KYBERION_OPENROUTER_URL;
+    mockProviders.setProviders(mockProviders.defaultProviders);
   });
 
   it('installs codex-cli adapters when requested explicitly', () => {
@@ -121,6 +151,22 @@ describe('reasoning-bootstrap', () => {
     expect(getIntentExtractor().name).toBe('codex-cli');
     expect(getVoiceBridge().name).toBe('codex-cli-text');
   }, 60000);
+
+  it('auto-selects and installs codex-cli when codex is the only healthy CLI provider', () => {
+    mockProviders.setProviders([
+      { provider: 'codex', installed: true, healthy: true },
+      { provider: 'gemini', installed: false, healthy: false },
+      { provider: 'agy', installed: false, healthy: false },
+    ]);
+
+    const installed = installReasoningBackends({ refreshProviders: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('codex-cli');
+    expect(getReasoningBackend().name).toBe('codex-cli');
+    expect(getIntentExtractor().name).toBe('codex-cli');
+    expect(getVoiceBridge().name).toBe('codex-cli-text');
+  });
 
   it('normalizes gemini-api to the CLI-backed gemini mode', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');

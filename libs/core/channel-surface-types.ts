@@ -188,6 +188,7 @@ export interface A2ATaskContext {
   thread?: string;
   slack_channel?: string;
   correlation_id?: string;
+  user_language?: string;
   task_model_hint?: Record<string, unknown>;
   model_hint?: Record<string, unknown>;
 }
@@ -196,6 +197,7 @@ export interface A2ATaskContract {
   intent: string;
   text: string;
   context: A2ATaskContext;
+  task_model_hint?: Record<string, unknown>;
   objective?: string;
   acceptance_criteria?: string[];
   expected_outputs?: string[];

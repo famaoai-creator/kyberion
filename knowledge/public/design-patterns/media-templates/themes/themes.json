@@ -5,13 +5,13 @@
       "colors": {
         "primary": "#0f172a",
         "secondary": "#334155",
-        "accent": "#38bdf8",
+        "accent": "#0066cc",
         "background": "#ffffff",
-        "text": "#1e293b"
+        "text": "#0f172a"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
-        "body": "System-ui, sans-serif"
+        "heading": "Inter, 'Noto Sans JP', sans-serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
       },
       "assets": {
         "logo_url": "/assets/logos/kyberion-logo.png"
@@ -20,15 +20,15 @@
     "kyberion-sovereign": {
       "name": "Kyberion Sovereign",
       "colors": {
-        "primary": "#111827",
-        "secondary": "#374151",
-        "accent": "#c0841a",
-        "background": "#f8fafc",
-        "text": "#111827"
+        "primary": "#0A192F",
+        "secondary": "#31415B",
+        "accent": "#00F2FF",
+        "background": "#020617",
+        "text": "#F8FAFC"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
-        "body": "System-ui, sans-serif"
+        "heading": "Inter, 'Noto Sans JP', sans-serif",
+        "body": "Inter, 'Noto Sans JP', sans-serif"
       }
     },
     "executive-neutral": {

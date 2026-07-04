@@ -63,7 +63,7 @@ A few seconds. Useful when you've changed types but don't yet need a built dist/
 
 ```bash
 pnpm --filter @agent/core build       # rebuild only @agent/core
-pnpm --filter @agent/shared-business build
+pnpm --filter @agent/shared-media build
 ```
 
 vs. the full `pnpm build` which rebuilds everything (~ 30 s).

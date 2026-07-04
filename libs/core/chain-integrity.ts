@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import * as path from 'node:path';
 import {
   safeCreateExclusiveFileSync,
+  safeChmodSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -54,6 +55,8 @@ export function resolveAuditChainKey(options: { createIfMissing?: boolean } = {}
   const generated = randomBytes(32).toString('hex');
   try {
     safeCreateExclusiveFileSync(keyPath, `${generated}\n`);
+    // Restrict access to owner-only (read+write) — key must not be world-readable.
+    safeChmodSync(keyPath, 0o600);
   } catch {
     if (safeExistsSync(keyPath)) {
       const existing = String(safeReadFile(keyPath, { encoding: 'utf8' })).trim();

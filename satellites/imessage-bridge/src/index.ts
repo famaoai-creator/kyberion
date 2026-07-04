@@ -1,15 +1,17 @@
 import express from 'express';
-import { 
-  createStandardYargs, 
-  logger, 
-  pathResolver, 
+import {
+  createStandardYargs,
+  logger,
+  pathResolver,
   safeReadFile,
-  describeIMessageBridgeHealth, 
-  sendIMessage, 
+  describeIMessageBridgeHealth,
+  sendIMessage,
   getRecentIMessages,
   getIMessageHistory,
   runSurfaceMessageConversation,
-  type IMessageSendRequest 
+  buildBridgeEmptyReplyText,
+  postBridgeError,
+  type IMessageSendRequest,
 } from '@agent/core';
 
 interface BridgeInput {
@@ -65,26 +67,44 @@ async function pollIMessages() {
       logger.info(`📥 [iMessageBridge] Message from ${msg.sender}: ${msg.text}`);
       const threadContext = buildThreadContext(msg);
 
-      const conversation = await runSurfaceMessageConversation({
-        surface: 'imessage',
-        text: msg.text,
-        channel: msg.chatId,
-        threadTs: msg.id,
-        correlationId: `imsg-${msg.id}`,
-        receivedAt: msg.date,
-        actorId: msg.sender,
-        senderAgentId: 'kyberion:imessage-bridge',
-        agentId: IMESSAGE_SURFACE_AGENT_ID,
-        threadContext: threadContext || undefined,
-        delegationSummaryInstruction: 
-          'Produce a concise iMessage reply in the user language. Do not use A2A blocks.'
-      } as any);
+      try {
+        const conversation = await runSurfaceMessageConversation({
+          surface: 'imessage',
+          text: msg.text,
+          channel: msg.chatId,
+          threadTs: msg.id,
+          correlationId: `imsg-${msg.id}`,
+          receivedAt: msg.date,
+          actorId: msg.sender,
+          senderAgentId: 'kyberion:imessage-bridge',
+          agentId: IMESSAGE_SURFACE_AGENT_ID,
+          threadContext: threadContext || undefined,
+          delegationSummaryInstruction:
+            'Produce a concise iMessage reply in the user language. Do not use A2A blocks.'
+        } as any);
 
-      if (conversation.text) {
-        logger.info(`📤 [iMessageBridge] Replying to ${msg.sender}: ${conversation.text}`);
-        await sendIMessage({
-          recipient: msg.sender,
-          text: conversation.text
+        if (conversation.text) {
+          logger.info(`📤 [iMessageBridge] Replying to ${msg.sender}: ${conversation.text}`);
+          await sendIMessage({
+            recipient: msg.sender,
+            text: conversation.text
+          });
+        } else {
+          // UX-01: an empty agent reply must not read as silence.
+          await sendIMessage({
+            recipient: msg.sender,
+            text: buildBridgeEmptyReplyText({ locale: 'ja' }),
+          });
+        }
+      } catch (err: any) {
+        logger.error(`❌ [iMessageBridge] Conversation failed for ${msg.sender}: ${err.message}`);
+        // UX-01: surface a vocabulary-based error to the user (rate-limited per chat).
+        await postBridgeError({
+          conversationKey: `imessage:${msg.chatId}`,
+          err,
+          surface: 'imessage',
+          locale: 'ja',
+          post: async (errorText) => sendIMessage({ recipient: msg.sender, text: errorText }),
         });
       }
     }

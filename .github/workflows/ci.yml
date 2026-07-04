@@ -118,7 +118,6 @@ jobs:
           - test-suite: scripts
             command: pnpm run test:scripts
           - test-suite: integration
-            experimental: true
             command: pnpm run test:integration
     steps:
       - uses: actions/checkout@v4
