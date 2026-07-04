@@ -33,6 +33,14 @@
           "type": "string",
           "enum": ["approved", "candidate", "deprecated", "blocked"]
         },
+        "tier": {
+          "type": "string",
+          "enum": ["small", "standard", "large"]
+        },
+        "execution_tier": {
+          "type": "string",
+          "enum": ["fast", "standard", "deep"]
+        },
         "role_fit": {
           "type": "object",
           "additionalProperties": false,
@@ -67,7 +75,9 @@
         "provider",
         "family",
         "status",
+        "tier",
         "role_fit",
+        "execution_tier",
         "cost_band",
         "latency_band",
         "structured_output_confidence",

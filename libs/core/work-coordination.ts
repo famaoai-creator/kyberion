@@ -1,9 +1,24 @@
 import * as crypto from 'node:crypto';
+import { slugify } from './text-utils.js';
 
 import { withExecutionContext } from './authority.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 
-export type WorkItemStatus = 'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived';
+export type WorkItemStatus =
+  | 'backlog'
+  | 'ready'
+  | 'in_progress'
+  | 'blocked'
+  | 'review'
+  | 'done'
+  | 'archived';
 export type WorkItemPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type WorkItemSource = 'local' | 'github' | 'jira' | 'peer';
 export type WorkBoardType = 'project' | 'personal' | 'peer' | 'review' | 'external';
@@ -267,7 +282,7 @@ export class WorkCoordinationError extends Error {
       | 'idempotency_conflict'
       | 'board_conflict',
     message: string,
-    public readonly details: WorkCoordinationErrorDetails = {},
+    public readonly details: WorkCoordinationErrorDetails = {}
   ) {
     super(message);
     this.name = 'WorkCoordinationError';
@@ -301,17 +316,11 @@ function randomId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-function slugify(value: string): string {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || `board-${crypto.randomUUID().slice(0, 8)}`;
-}
-
 function coordinationNamespace(): string {
-  return coordinationNamespaceOverride || String(process.env.KYBERION_WORK_COORDINATION_NAMESPACE || '').trim();
+  return (
+    coordinationNamespaceOverride ||
+    String(process.env.KYBERION_WORK_COORDINATION_NAMESPACE || '').trim()
+  );
 }
 
 function runtimeRoot(): string {
@@ -464,7 +473,7 @@ function finalizeWorkItemAttempt(
     failureReason?: string;
     traceId?: string;
     metadata?: Record<string, unknown>;
-  } = {},
+  } = {}
 ): { attempts: WorkItemAttempt[]; currentAttemptId?: string; attempt: WorkItemAttempt | null } {
   const attempts = [...(current.attempts || [])];
   const now = nowIso();
@@ -497,7 +506,7 @@ function appendWorkItemAttemptEvent(
   note: string,
   actorPeerId?: string,
   actorUserId?: string,
-  expectedVersion?: number,
+  expectedVersion?: number
 ): void {
   appendEvent({
     eventType,
@@ -549,7 +558,9 @@ function createEvent(payload: AppendCoordinationEventInput): CoordinationEvent {
     ...(payload.actorUserId ? { actor_user_id: payload.actorUserId } : {}),
     ...(payload.commandId ? { command_id: payload.commandId } : {}),
     ...(payload.idempotencyKey ? { idempotency_key: payload.idempotencyKey } : {}),
-    ...(typeof payload.expectedVersion === 'number' ? { expected_version: payload.expectedVersion } : {}),
+    ...(typeof payload.expectedVersion === 'number'
+      ? { expected_version: payload.expectedVersion }
+      : {}),
     ...(payload.status ? { status: payload.status } : {}),
     ...(payload.note ? { note: payload.note } : {}),
     ...(payload.payload ? { payload: payload.payload } : {}),
@@ -598,11 +609,23 @@ function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkIt
   const query = filter.text ? filter.text.trim().toLowerCase() : '';
 
   return items.filter((item) => {
-    if ((filter.projectId || (filter as any).project_id) && item.project_id !== (filter.projectId || (filter as any).project_id)) return false;
+    if (
+      (filter.projectId || (filter as any).project_id) &&
+      item.project_id !== (filter.projectId || (filter as any).project_id)
+    )
+      return false;
     if (sources.length > 0 && !sources.includes(item.source)) return false;
     if (statuses.length > 0 && !statuses.includes(item.status)) return false;
-    if ((filter.assigneePeerId || (filter as any).assignee_peer_id) && item.assignee_peer_id !== (filter.assigneePeerId || (filter as any).assignee_peer_id)) return false;
-    if ((filter.assigneeUserId || (filter as any).assignee_user_id) && item.assignee_user_id !== (filter.assigneeUserId || (filter as any).assignee_user_id)) return false;
+    if (
+      (filter.assigneePeerId || (filter as any).assignee_peer_id) &&
+      item.assignee_peer_id !== (filter.assigneePeerId || (filter as any).assignee_peer_id)
+    )
+      return false;
+    if (
+      (filter.assigneeUserId || (filter as any).assignee_user_id) &&
+      item.assignee_user_id !== (filter.assigneeUserId || (filter as any).assignee_user_id)
+    )
+      return false;
     if (labelSet.size > 0) {
       const itemLabels = new Set(item.labels || []);
       for (const label of labelSet) {
@@ -610,7 +633,9 @@ function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkIt
       }
     }
     if (query) {
-      const haystack = [item.title, item.description, item.source_ref, item.project_id].join(' ').toLowerCase();
+      const haystack = [item.title, item.description, item.source_ref, item.project_id]
+        .join(' ')
+        .toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;
@@ -621,7 +646,10 @@ function sortItems(items: WorkItem[], sortBy: WorkBoard['sort_by'] = 'updated_at
   return [...items].sort((a, b) => {
     switch (sortBy) {
       case 'priority':
-        return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || b.updated_at.localeCompare(a.updated_at);
+        return (
+          PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
+          b.updated_at.localeCompare(a.updated_at)
+        );
       case 'created_at':
         return b.created_at.localeCompare(a.created_at);
       case 'status':
@@ -699,7 +727,7 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
 function updateItemSnapshot(
   current: WorkItem,
   patch: Partial<WorkItem>,
-  options: { clearLease?: boolean } = {},
+  options: { clearLease?: boolean } = {}
 ): WorkItem {
   const now = nowIso();
   const activeLease = options.clearLease ? null : activeLeaseForItem(current.item_id);
@@ -717,23 +745,27 @@ function updateItemSnapshot(
           claimed_by_user_id: undefined,
           current_attempt_id: undefined,
         }
-        : activeLease
+      : activeLease
         ? {
-          lease_id: activeLease.lease_id,
-          claimed_at: current.claimed_at || activeLease.created_at,
-          claimed_by_peer_id: activeLease.holder_peer_id,
-          ...(activeLease.holder_user_id ? { claimed_by_user_id: activeLease.holder_user_id } : {}),
-          released_at: undefined,
-        }
+            lease_id: activeLease.lease_id,
+            claimed_at: current.claimed_at || activeLease.created_at,
+            claimed_by_peer_id: activeLease.holder_peer_id,
+            ...(activeLease.holder_user_id
+              ? { claimed_by_user_id: activeLease.holder_user_id }
+              : {}),
+            released_at: undefined,
+          }
         : {
-          lease_id: undefined,
-          claimed_at: undefined,
-          released_at: undefined,
-          claimed_by_peer_id: undefined,
-          claimed_by_user_id: undefined,
-        }),
+            lease_id: undefined,
+            claimed_at: undefined,
+            released_at: undefined,
+            claimed_by_peer_id: undefined,
+            claimed_by_user_id: undefined,
+          }),
     ...(patch.attempts ? { attempts: patch.attempts.map((attempt) => ({ ...attempt })) } : {}),
-    ...(patch.current_attempt_id !== undefined ? { current_attempt_id: patch.current_attempt_id } : {}),
+    ...(patch.current_attempt_id !== undefined
+      ? { current_attempt_id: patch.current_attempt_id }
+      : {}),
   };
   appendItemSnapshot(next);
   return next;
@@ -748,16 +780,23 @@ export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
 
   const nextStatus = input.status || current.status;
   const shouldClearLease = isTerminalStatus(nextStatus);
-  const attemptStatus: Exclude<WorkItemAttemptStatus, 'running'> = nextStatus === 'blocked'
-    ? 'blocked'
-    : nextStatus === 'done' || nextStatus === 'archived'
-    ? 'completed'
-    : 'released';
+  const attemptStatus: Exclude<WorkItemAttemptStatus, 'running'> =
+    nextStatus === 'blocked'
+      ? 'blocked'
+      : nextStatus === 'done' || nextStatus === 'archived'
+        ? 'completed'
+        : 'released';
   const finalizedAttempt = shouldClearLease
     ? finalizeWorkItemAttempt(current, attemptStatus, {
         summary: typeof input.metadata?.summary === 'string' ? input.metadata.summary : undefined,
-        blockedReason: typeof input.metadata?.blocked_reason === 'string' ? input.metadata.blocked_reason : undefined,
-        failureReason: typeof input.metadata?.failure_reason === 'string' ? input.metadata.failure_reason : undefined,
+        blockedReason:
+          typeof input.metadata?.blocked_reason === 'string'
+            ? input.metadata.blocked_reason
+            : undefined,
+        failureReason:
+          typeof input.metadata?.failure_reason === 'string'
+            ? input.metadata.failure_reason
+            : undefined,
         traceId: typeof input.metadata?.trace_id === 'string' ? input.metadata.trace_id : undefined,
         metadata: input.metadata,
       })
@@ -776,10 +815,13 @@ export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
       ...(input.dependencies ? { dependencies: [...input.dependencies] } : {}),
       ...(input.metadata ? { metadata: input.metadata } : {}),
       ...(finalizedAttempt
-        ? { attempts: finalizedAttempt.attempts, current_attempt_id: finalizedAttempt.currentAttemptId }
+        ? {
+            attempts: finalizedAttempt.attempts,
+            current_attempt_id: finalizedAttempt.currentAttemptId,
+          }
         : {}),
     },
-    { clearLease: shouldClearLease },
+    { clearLease: shouldClearLease }
   );
 
   if (shouldClearLease) {
@@ -806,7 +848,7 @@ export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
       `attempt closed because status=${next.status}`,
       input.assigneePeerId,
       input.assigneeUserId,
-      input.expectedVersion,
+      input.expectedVersion
     );
   }
 
@@ -817,7 +859,9 @@ export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
     status: next.status,
     note: `updated ${next.item_id}`,
     payload: {
-      changed_fields: Object.keys(input).filter((key) => key !== 'itemId' && key !== 'expectedVersion'),
+      changed_fields: Object.keys(input).filter(
+        (key) => key !== 'itemId' && key !== 'expectedVersion'
+      ),
     },
   });
   return next;
@@ -841,7 +885,9 @@ export function createBoard(input: CreateBoardInput): WorkBoard {
   const now = nowIso();
   const catalog = materializeBoardCatalog();
   const board: WorkBoard = {
-    board_id: input.boardId || slugify(name),
+    board_id:
+      input.boardId ||
+      slugify(name, { maxLength: 80, fallback: `board-${crypto.randomUUID().slice(0, 8)}` }),
     name,
     type: input.type,
     ...(input.description ? { description: input.description } : {}),
@@ -894,7 +940,9 @@ export function appendCoordinationEvent(input: AppendCoordinationEventInput): Co
   return event;
 }
 
-export function listCoordinationEvents(filter: Partial<CoordinationEvent> = {}): CoordinationEvent[] {
+export function listCoordinationEvents(
+  filter: Partial<CoordinationEvent> = {}
+): CoordinationEvent[] {
   const events = readJsonl<CoordinationEvent>(eventsPath());
   return events.filter((event) => {
     if (filter.event_id && event.event_id !== filter.event_id) return false;
@@ -913,7 +961,7 @@ function appendLeaseEvent(
   note: string,
   actorPeerId?: string,
   actorUserId?: string,
-  expectedVersion?: number,
+  expectedVersion?: number
 ): void {
   appendEvent({
     eventType,
@@ -946,10 +994,14 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
     return { item: current, lease: existingLease };
   }
   if (existingLease) {
-    throw new WorkCoordinationError('lease_conflict', `item is already leased: ${current.item_id}`, {
-      item_id: current.item_id,
-      lease_id: existingLease.lease_id,
-    });
+    throw new WorkCoordinationError(
+      'lease_conflict',
+      `item is already leased: ${current.item_id}`,
+      {
+        item_id: current.item_id,
+        lease_id: existingLease.lease_id,
+      }
+    );
   }
 
   const now = nowIso();
@@ -964,7 +1016,9 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
     created_at: now,
     renewed_at: now,
     ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
-    ...(typeof input.expectedVersion === 'number' ? { expected_version: input.expectedVersion } : {}),
+    ...(typeof input.expectedVersion === 'number'
+      ? { expected_version: input.expectedVersion }
+      : {}),
   };
   appendLeaseSnapshot(lease);
 
@@ -990,8 +1044,24 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
     attempts: [...(current.attempts || []), attempt],
   });
 
-  appendLeaseEvent('item_claimed', current.item_id, lease, `claimed by ${input.actorPeerId}`, input.actorPeerId, input.actorUserId, input.expectedVersion);
-  appendWorkItemAttemptEvent('item_attempt_started', current.item_id, attempt, `attempt started by ${input.actorPeerId}`, input.actorPeerId, input.actorUserId, input.expectedVersion);
+  appendLeaseEvent(
+    'item_claimed',
+    current.item_id,
+    lease,
+    `claimed by ${input.actorPeerId}`,
+    input.actorPeerId,
+    input.actorUserId,
+    input.expectedVersion
+  );
+  appendWorkItemAttemptEvent(
+    'item_attempt_started',
+    current.item_id,
+    attempt,
+    `attempt started by ${input.actorPeerId}`,
+    input.actorPeerId,
+    input.actorUserId,
+    input.expectedVersion
+  );
   return { item: next, lease };
 }
 
@@ -1016,11 +1086,15 @@ export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; 
     });
   }
   if (activeLease.holder_peer_id !== input.actorPeerId) {
-    throw new WorkCoordinationError('lease_conflict', `lease owner mismatch for ${current.item_id}`, {
-      item_id: current.item_id,
-      holder_peer_id: activeLease.holder_peer_id,
-      actor_peer_id: input.actorPeerId,
-    });
+    throw new WorkCoordinationError(
+      'lease_conflict',
+      `lease owner mismatch for ${current.item_id}`,
+      {
+        item_id: current.item_id,
+        holder_peer_id: activeLease.holder_peer_id,
+        actor_peer_id: input.actorPeerId,
+      }
+    );
   }
 
   const now = nowIso();
@@ -1052,8 +1126,24 @@ export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; 
     attempts: finalAttempt.attempts,
   });
 
-  appendLeaseEvent('item_released', current.item_id, released, `released by ${input.actorPeerId}`, input.actorPeerId, input.actorUserId, input.expectedVersion);
-  appendWorkItemAttemptEvent('item_attempt_released', current.item_id, finalAttempt.attempt, `attempt released by ${input.actorPeerId}`, input.actorPeerId, input.actorUserId, input.expectedVersion);
+  appendLeaseEvent(
+    'item_released',
+    current.item_id,
+    released,
+    `released by ${input.actorPeerId}`,
+    input.actorPeerId,
+    input.actorUserId,
+    input.expectedVersion
+  );
+  appendWorkItemAttemptEvent(
+    'item_attempt_released',
+    current.item_id,
+    finalAttempt.attempt,
+    `attempt released by ${input.actorPeerId}`,
+    input.actorPeerId,
+    input.actorUserId,
+    input.expectedVersion
+  );
   return { item: next, lease: released };
 }
 
@@ -1094,7 +1184,11 @@ export function expireWorkItemLeases(now: string = nowIso()): WorkLease[] {
   return expired;
 }
 
-export function handoffWorkItem(input: HandoffWorkItemInput): { item: WorkItem; fromLease: WorkLease; toLease: WorkLease } {
+export function handoffWorkItem(input: HandoffWorkItemInput): {
+  item: WorkItem;
+  fromLease: WorkLease;
+  toLease: WorkLease;
+} {
   const released = releaseWorkItem({
     itemId: input.itemId,
     leaseId: input.fromLeaseId,
@@ -1144,7 +1238,9 @@ export function importExternalWorkItem(input: {
   dependencies?: string[];
   metadata?: Record<string, unknown>;
 }): WorkItem {
-  const existing = listWorkItems({ source: input.source }).find((item) => item.source_ref === input.sourceRef);
+  const existing = listWorkItems({ source: input.source }).find(
+    (item) => item.source_ref === input.sourceRef
+  );
   if (existing) {
     return updateWorkItem({
       itemId: existing.item_id,
@@ -1188,13 +1284,22 @@ export function normalizeWorkItemLabels(labels: string[] | undefined): string[] 
   return [...new Set((labels || []).map((label) => label.trim()).filter(Boolean))];
 }
 
-export function createDefaultWorkBoard(boardId: string, name: string, filters: WorkBoardFilter, type: WorkBoardType = 'project'): WorkBoard {
+export function createDefaultWorkBoard(
+  boardId: string,
+  name: string,
+  filters: WorkBoardFilter,
+  type: WorkBoardType = 'project'
+): WorkBoard {
   return createBoard({ boardId, name, type, filters, sortBy: 'priority' });
 }
 
 export function describeWorkCoordinationStore(): Record<string, unknown> {
   const items = listWorkItems();
-  const activeAttempts = items.reduce((count, item) => count + (item.attempts || []).filter((attempt) => attempt.status === 'running').length, 0);
+  const activeAttempts = items.reduce(
+    (count, item) =>
+      count + (item.attempts || []).filter((attempt) => attempt.status === 'running').length,
+    0
+  );
   return {
     items_path: itemsPath(),
     leases_path: leasesPath(),
@@ -1202,13 +1307,17 @@ export function describeWorkCoordinationStore(): Record<string, unknown> {
     events_path: eventsPath(),
     item_count: items.length,
     board_count: listBoards().length,
-    active_lease_count: currentLeaseRecords().filter((lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()).length,
+    active_lease_count: currentLeaseRecords().filter(
+      (lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()
+    ).length,
     active_attempt_count: activeAttempts,
   };
 }
 
 export function listActiveWorkLeases(): WorkLease[] {
-  return currentLeaseRecords().filter((lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now());
+  return currentLeaseRecords().filter(
+    (lease) => lease.status === 'active' && new Date(lease.expires_at).getTime() > Date.now()
+  );
 }
 
 export function ensureDefaultWorkCoordinationCatalog(): void {

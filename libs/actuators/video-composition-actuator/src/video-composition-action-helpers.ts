@@ -1,7 +1,4 @@
-import {
-  spawn,
-  type ChildProcessWithoutNullStreams,
-} from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import {
   compileNarratedVideoBriefToCompositionADF,
   compileVideoCompositionADF,
@@ -19,7 +16,7 @@ import {
   safeReadFile,
   safeStat,
   safeWriteFile,
-  withRetry,
+  retry,
   writeVideoCompositionBundle,
 } from '@agent/core';
 import * as path from 'node:path';
@@ -47,32 +44,49 @@ import {
 
 type VideoCompositionAction =
   | VideoCompositionADF
-  | { action: 'prepare_video_composition'; params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string } }
-  | { action: 'compile_narrated_video_brief'; params: { narrated_video_brief: Record<string, unknown> } }
-  | { action: 'compile_video_content_brief'; params: { video_content_brief: Record<string, unknown> } }
   | {
-    action: 'create_narrated_video_from_content_brief';
-    params: {
-      video_content_brief: Record<string, unknown>;
-      narration_artifact_ref: string;
-      job_id?: string;
-      bundle_dir?: string;
-      output?: Record<string, unknown>;
-    };
-  }
+      action: 'prepare_video_composition';
+      params: { video_composition_adf: VideoCompositionADF; job_id?: string; bundle_dir?: string };
+    }
   | {
-    action: 'create_narrated_intro_movie';
-    params: {
-      narrated_video_brief: Record<string, unknown>;
-      job_id?: string;
-      bundle_dir?: string;
-    };
-  }
+      action: 'compile_narrated_video_brief';
+      params: { narrated_video_brief: Record<string, unknown> };
+    }
+  | {
+      action: 'compile_video_content_brief';
+      params: { video_content_brief: Record<string, unknown> };
+    }
+  | {
+      action: 'create_narrated_video_from_content_brief';
+      params: {
+        video_content_brief: Record<string, unknown>;
+        narration_artifact_ref: string;
+        job_id?: string;
+        bundle_dir?: string;
+        output?: Record<string, unknown>;
+      };
+    }
+  | {
+      action: 'create_narrated_intro_movie';
+      params: {
+        narrated_video_brief: Record<string, unknown>;
+        job_id?: string;
+        bundle_dir?: string;
+      };
+    }
   | { action: 'list_video_composition_templates'; params: Record<string, unknown> }
   | { action: 'get_video_composition_job_status'; params: { job_id: string } }
   | { action: 'await_video_composition_job'; params: { job_id: string; timeout_ms?: number } }
   | { action: 'cancel_video_composition_job'; params: { job_id: string; reason?: string } }
-  | { action: 'verify_rendered_video_artifact'; params: { path: string; require_audio?: boolean; require_video?: boolean; export_as?: string } }
+  | {
+      action: 'verify_rendered_video_artifact';
+      params: {
+        path: string;
+        require_audio?: boolean;
+        require_video?: boolean;
+        export_as?: string;
+      };
+    }
   | { action: 'get_video_composition_queue'; params?: Record<string, unknown> }
   | Record<string, any>;
 
@@ -108,9 +122,14 @@ interface VideoCompositionJobTicket {
   diagnostics?: VideoCompositionJobDiagnostics | null;
 }
 
-const DETACHED_WORKER_SCRIPT = pathResolver.rootResolve('dist/libs/actuators/video-composition-actuator/src/index.js');
+const DETACHED_WORKER_SCRIPT = pathResolver.rootResolve(
+  'dist/libs/actuators/video-composition-actuator/src/index.js'
+);
 
-function writeVideoCompositionJobTicket(ticketPath: string, ticket: VideoCompositionJobTicket): void {
+function writeVideoCompositionJobTicket(
+  ticketPath: string,
+  ticket: VideoCompositionJobTicket
+): void {
   safeMkdir(path.dirname(ticketPath), { recursive: true });
   safeWriteFile(ticketPath, JSON.stringify(ticket, null, 2));
 }
@@ -118,13 +137,17 @@ function writeVideoCompositionJobTicket(ticketPath: string, ticket: VideoComposi
 function readVideoCompositionJobTicket(ticketPath: string): VideoCompositionJobTicket | null {
   if (!safeExistsSync(ticketPath)) return null;
   try {
-    return JSON.parse(String(safeReadFile(ticketPath, { encoding: 'utf8' }))) as VideoCompositionJobTicket;
+    return JSON.parse(
+      String(safeReadFile(ticketPath, { encoding: 'utf8' }))
+    ) as VideoCompositionJobTicket;
   } catch {
     return null;
   }
 }
 
-function spawnDetachedVideoCompositionWorker(inputPath: string): ChildProcessWithoutNullStreams | null {
+function spawnDetachedVideoCompositionWorker(
+  inputPath: string
+): ChildProcessWithoutNullStreams | null {
   if (!safeExistsSync(DETACHED_WORKER_SCRIPT)) {
     return null;
   }
@@ -158,7 +181,9 @@ async function listVideoCompositionTemplates() {
   };
 }
 
-async function compileNarratedVideoBrief(params: { narrated_video_brief?: Record<string, unknown> }) {
+async function compileNarratedVideoBrief(params: {
+  narrated_video_brief?: Record<string, unknown>;
+}) {
   if (!params.narrated_video_brief) {
     throw new Error('compile_narrated_video_brief requires params.narrated_video_brief');
   }
@@ -193,7 +218,9 @@ async function createNarratedVideoFromContentBrief(params: {
     throw new Error('create_narrated_video_from_content_brief requires params.video_content_brief');
   }
   if (!params.narration_artifact_ref) {
-    throw new Error('create_narrated_video_from_content_brief requires params.narration_artifact_ref');
+    throw new Error(
+      'create_narrated_video_from_content_brief requires params.narration_artifact_ref'
+    );
   }
   const contentBrief = params.video_content_brief as any;
   const storyboard = compileVideoContentBriefToStoryboard(contentBrief);
@@ -210,9 +237,9 @@ async function createNarratedVideoFromContentBrief(params: {
       fps: params.output?.fps || contentBrief.design_system_ref?.fps,
     },
     output: {
-      format: params.output?.format as any || 'mp4',
+      format: (params.output?.format as any) || 'mp4',
       target_path: params.output?.target_path as string | undefined,
-      bundle_dir: params.output?.bundle_dir as string | undefined || params.bundle_dir,
+      bundle_dir: (params.output?.bundle_dir as string | undefined) || params.bundle_dir,
       await_completion: params.output?.await_completion as boolean | undefined,
       detached_background: params.output?.detached_background as boolean | undefined,
     },
@@ -253,7 +280,7 @@ async function createNarratedIntroMovie(params: {
       await renderNarratedFallbackVideo(
         repairedPlan,
         execution.rendered_output_path,
-        new Error('backend render returned an invalid artifact'),
+        new Error('backend render returned an invalid artifact')
       );
     }
   }
@@ -274,25 +301,32 @@ async function verifyRenderedVideoArtifact(params: {
   const rootDir = pathResolver.rootDir();
   const artifactPath = pathResolver.rootResolve(String(params.path || '').trim());
   if (!artifactPath || !safeExistsSync(artifactPath)) {
-    throw new Error(`verify_rendered_video_artifact requires an existing path: ${String(params.path || '')}`);
+    throw new Error(
+      `verify_rendered_video_artifact requires an existing path: ${String(params.path || '')}`
+    );
   }
 
   const requireAudio = params.require_audio !== false;
   const requireVideo = params.require_video !== false;
-  const probeStream = (selector: string) => safeExec('ffprobe', [
-    '-v',
-    'error',
-    '-select_streams',
-    selector,
-    '-show_entries',
-    'stream=index',
-    '-of',
-    'csv=p=0',
-    artifactPath,
-  ], {
-    cwd: rootDir,
-    timeoutMs: 30_000,
-  }).trim();
+  const probeStream = (selector: string) =>
+    safeExec(
+      'ffprobe',
+      [
+        '-v',
+        'error',
+        '-select_streams',
+        selector,
+        '-show_entries',
+        'stream=index',
+        '-of',
+        'csv=p=0',
+        artifactPath,
+      ],
+      {
+        cwd: rootDir,
+        timeoutMs: 30_000,
+      }
+    ).trim();
 
   let audioProbe = '';
   let videoProbe = '';
@@ -371,7 +405,9 @@ async function getVideoCompositionJobStatus(params: { job_id?: string; job_ticke
   if (!jobId) throw new Error('get_video_composition_job_status requires params.job_id');
   const packet = runtime.getPacket(jobId);
   if (!packet) {
-    const ticketPath = params.job_ticket_path ? pathResolver.rootResolve(String(params.job_ticket_path)) : null;
+    const ticketPath = params.job_ticket_path
+      ? pathResolver.rootResolve(String(params.job_ticket_path))
+      : null;
     const ticket = ticketPath ? readVideoCompositionJobTicket(ticketPath) : null;
     if (ticket) {
       return {
@@ -400,11 +436,17 @@ async function getVideoCompositionJobStatus(params: { job_id?: string; job_ticke
   };
 }
 
-async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: number; job_ticket_path?: string }) {
+async function awaitVideoCompositionJob(params: {
+  job_id?: string;
+  timeout_ms?: number;
+  job_ticket_path?: string;
+}) {
   const jobId = String(params.job_id || '');
   if (!jobId) throw new Error('await_video_composition_job requires params.job_id');
   const timeoutMs = normalizeAwaitTimeoutMs(params.timeout_ms);
-  const ticketPath = params.job_ticket_path ? pathResolver.rootResolve(String(params.job_ticket_path)) : null;
+  const ticketPath = params.job_ticket_path
+    ? pathResolver.rootResolve(String(params.job_ticket_path))
+    : null;
 
   if (ticketPath) {
     const startedAt = Date.now();
@@ -466,7 +508,8 @@ async function awaitVideoCompositionJob(params: { job_id?: string; timeout_ms?: 
 async function cancelVideoCompositionJob(params: { job_id?: string; reason?: string }) {
   const jobId = String(params.job_id || '');
   if (!jobId) throw new Error('cancel_video_composition_job requires params.job_id');
-  const reason = params.reason && String(params.reason).trim() ? String(params.reason).trim() : undefined;
+  const reason =
+    params.reason && String(params.reason).trim() ? String(params.reason).trim() : undefined;
   if (reason) {
     upsertJobDiagnostics(jobId, {
       cancellation_reason: reason,
@@ -506,10 +549,11 @@ async function prepareVideoComposition(params: {
   const bundlePreview = compileVideoCompositionADF(adf, { bundleDir: params.bundle_dir });
   const jobTicketPath = path.join(bundlePreview.bundle_dir, 'job-state.json');
   const runMode = String(process.env.KYBERION_VIDEO_RENDER_RUN_MODE || 'foreground');
-  const detachedBackground = adf.output?.detached_background === true
-    && awaitCompletion === false
-    && policy.render.enable_backend_rendering
-    && runMode !== 'in-process';
+  const detachedBackground =
+    adf.output?.detached_background === true &&
+    awaitCompletion === false &&
+    policy.render.enable_backend_rendering &&
+    runMode !== 'in-process';
   upsertJobDiagnostics(jobId, { created_at: new Date().toISOString() });
   writeVideoCompositionJobTicket(jobTicketPath, {
     job_id: jobId,
@@ -546,7 +590,9 @@ async function prepareVideoComposition(params: {
     safeWriteFile(requestPath, JSON.stringify(requestPayload, null, 2));
     const child = spawnDetachedVideoCompositionWorker(requestPath);
     if (!child) {
-      logger.warn(`[VIDEO_COMPOSITION] Detached worker unavailable, falling back to in-process queue for ${jobId}`);
+      logger.warn(
+        `[VIDEO_COMPOSITION] Detached worker unavailable, falling back to in-process queue for ${jobId}`
+      );
     } else {
       return {
         status: 'queued',
@@ -574,23 +620,38 @@ async function prepareVideoComposition(params: {
         const totalSteps = policy.render.enable_backend_rendering ? 5 : 4;
         api.report({
           status: 'validating_contract',
-          progress: { current: 1, total: totalSteps, percent: (1 / totalSteps) * 100, unit: 'steps' },
+          progress: {
+            current: 1,
+            total: totalSteps,
+            percent: (1 / totalSteps) * 100,
+            unit: 'steps',
+          },
           message: 'validated video composition contract',
         });
         api.report({
           status: 'resolving_templates',
-          progress: { current: 2, total: totalSteps, percent: (2 / totalSteps) * 100, unit: 'steps' },
+          progress: {
+            current: 2,
+            total: totalSteps,
+            percent: (2 / totalSteps) * 100,
+            unit: 'steps',
+          },
           message: `resolved ${adf.scenes.length} scene template(s)`,
         });
         api.report({
           status: 'assembling_bundle',
-          progress: { current: 3, total: totalSteps, percent: (3 / totalSteps) * 100, unit: 'steps' },
+          progress: {
+            current: 3,
+            total: totalSteps,
+            percent: (3 / totalSteps) * 100,
+            unit: 'steps',
+          },
           message: 'assembling deterministic composition bundle',
         });
 
-        const plan = await withRetry(
+        const plan = await retry(
           async () => writeVideoCompositionBundle(adf, { bundleDir: bundlePreview.bundle_dir }),
-          buildRetryOptions(DEFAULT_VIDEO_RETRY),
+          buildRetryOptions(DEFAULT_VIDEO_RETRY)
         );
         let artifactRefs = [...plan.artifact_refs];
         let backendOutputPath: string | undefined;
@@ -610,68 +671,78 @@ async function prepareVideoComposition(params: {
         });
 
         if (policy.render.enable_backend_rendering) {
-        if (api.isCancelled()) throw new Error('video composition job cancelled');
-        api.report({
-          status: 'rendering',
-          progress: { current: 4, total: totalSteps, percent: (4 / totalSteps) * 100, unit: 'steps' },
-          message: `rendering composed video via backend ${policy.render.backend}`,
-          artifact_refs: artifactRefs,
-        });
+          if (api.isCancelled()) throw new Error('video composition job cancelled');
+          api.report({
+            status: 'rendering',
+            progress: {
+              current: 4,
+              total: totalSteps,
+              percent: (4 / totalSteps) * 100,
+              unit: 'steps',
+            },
+            message: `rendering composed video via backend ${policy.render.backend}`,
+            artifact_refs: artifactRefs,
+          });
 
-        let backendResult: any;
-        try {
-          backendResult = await withRetry(
-            async () =>
-              renderVideoCompositionBundleAsync(plan, policy, {
-                isCancelled: api.isCancelled,
-              }),
-            buildRetryOptions(DEFAULT_VIDEO_RETRY),
-          );
-        } catch (error: any) {
-          const backendState = extractBackendTerminationState(error);
-          if (backendState) {
-            upsertJobDiagnostics(jobId, backendState);
+          let backendResult: any;
+          try {
+            backendResult = await retry(
+              async () =>
+                renderVideoCompositionBundleAsync(plan, policy, {
+                  isCancelled: api.isCancelled,
+                }),
+              buildRetryOptions(DEFAULT_VIDEO_RETRY)
+            );
+          } catch (error: any) {
+            const backendState = extractBackendTerminationState(error);
+            if (backendState) {
+              upsertJobDiagnostics(jobId, backendState);
+            }
+            if (api.isCancelled() || backendState?.backend_cancelled) {
+              api.report({
+                status: 'cancelled',
+                progress: {
+                  current: 4,
+                  total: totalSteps,
+                  percent: (4 / totalSteps) * 100,
+                  unit: 'steps',
+                },
+                message: formatCancellationMessage(jobId),
+                artifact_refs: artifactRefs,
+              });
+              throw new Error('video composition job cancelled');
+            }
+            throw error;
           }
-          if (api.isCancelled() || backendState?.backend_cancelled) {
-            api.report({
-              status: 'cancelled',
-              progress: { current: 4, total: totalSteps, percent: (4 / totalSteps) * 100, unit: 'steps' },
-              message: formatCancellationMessage(jobId),
-              artifact_refs: artifactRefs,
-            });
-            throw new Error('video composition job cancelled');
+          if (backendResult.output_path) {
+            backendOutputPath = backendResult.output_path;
+            artifactRefs = [...artifactRefs, backendOutputPath];
           }
-          throw error;
-        }
-        if (backendResult.output_path) {
-          backendOutputPath = backendResult.output_path;
-          artifactRefs = [...artifactRefs, backendOutputPath];
-        }
-        writeVideoCompositionJobTicket(jobTicketPath, {
-          job_id: jobId,
-          status: 'completed',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          bundle_dir: plan.bundle_dir,
-          output_format: adf.output.format,
-          output_target_path: adf.output.target_path,
-          await_completion: awaitCompletion,
-          backend_rendering_enabled: policy.render.enable_backend_rendering,
-          backend_render_backend: policy.render.backend,
-          artifact_refs: artifactRefs,
-          rendered_output_path: backendOutputPath,
-          diagnostics: jobDiagnostics.get(jobId) || null,
-        });
+          writeVideoCompositionJobTicket(jobTicketPath, {
+            job_id: jobId,
+            status: 'completed',
+            created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            bundle_dir: plan.bundle_dir,
+            output_format: adf.output.format,
+            output_target_path: adf.output.target_path,
+            await_completion: awaitCompletion,
+            backend_rendering_enabled: policy.render.enable_backend_rendering,
+            backend_render_backend: policy.render.backend,
+            artifact_refs: artifactRefs,
+            rendered_output_path: backendOutputPath,
+            diagnostics: jobDiagnostics.get(jobId) || null,
+          });
 
-        if (api.isCancelled()) throw new Error('video composition job cancelled');
-        api.report({
-          status: 'encoding',
-          progress: { current: 5, total: totalSteps, percent: 100, unit: 'steps' },
-          message: backendResult.executed
-            ? 'backend render completed'
-            : (backendResult.reason || 'backend skipped'),
-          artifact_refs: artifactRefs,
-        });
+          if (api.isCancelled()) throw new Error('video composition job cancelled');
+          api.report({
+            status: 'encoding',
+            progress: { current: 5, total: totalSteps, percent: 100, unit: 'steps' },
+            message: backendResult.executed
+              ? 'backend render completed'
+              : backendResult.reason || 'backend skipped',
+            artifact_refs: artifactRefs,
+          });
         } else {
           api.report({
             status: 'rendering',
@@ -751,7 +822,9 @@ async function prepareVideoComposition(params: {
       backend_render_backend: policy.render.backend,
     };
   }
-  const renderedOutputPath = (finalPacket.artifact_refs || []).find((ref: string) => ref.endsWith(`.${adf.output.format}`));
+  const renderedOutputPath = (finalPacket.artifact_refs || []).find((ref: string) =>
+    ref.endsWith(`.${adf.output.format}`)
+  );
   const backendRendered = Boolean(policy.render.enable_backend_rendering && renderedOutputPath);
   return {
     status: finalPacket.status === 'completed' ? 'succeeded' : finalPacket.status,
@@ -808,7 +881,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   if (action === 'get_video_composition_queue') {
     return getVideoCompositionQueue();
   }
-  throw new Error(`Unsupported video composition action: ${String((input as any)?.action || (input as any)?.kind)}`);
+  throw new Error(
+    `Unsupported video composition action: ${String((input as any)?.action || (input as any)?.kind)}`
+  );
 }
 
 export async function handleAction(input: VideoCompositionAction) {
@@ -827,7 +902,7 @@ export async function handleAction(input: VideoCompositionAction) {
 export async function dispatchDecisionOp(
   op: string,
   params: Record<string, unknown>,
-  ctx: Record<string, unknown>,
+  ctx: Record<string, unknown>
 ): Promise<{ handled: boolean; ctx: Record<string, unknown> }> {
   const resolvedParams = deepResolve(params, ctx);
   const payload = { action: op, ...(resolvedParams || {}) };

@@ -3,10 +3,8 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  executePipeline,
-  type PipelineStep,
-} from './orchestrator-helpers.js';
+import { executePipeline, type PipelineStep } from './orchestrator-helpers.js';
+import { runActuatorCli } from '@agent/core';
 
 /**
  * Orchestrator-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -36,7 +34,9 @@ async function handleAction(input: OrchestratorAction) {
 }
 
 async function performReconcile(input: OrchestratorAction) {
-  const strategyPath = pathResolver.rootResolve(input.strategy_path || 'knowledge/product/governance/orchestration-strategy.json');
+  const strategyPath = pathResolver.rootResolve(
+    input.strategy_path || 'knowledge/product/governance/orchestration-strategy.json'
+  );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
   for (const strategy of config.strategies) {
@@ -46,10 +46,10 @@ async function performReconcile(input: OrchestratorAction) {
 }
 
 const main = async () => {
-  const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'orchestrator-actuator',
+    handleAction,
+  });
 };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';

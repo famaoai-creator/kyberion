@@ -19,6 +19,17 @@ How to iterate fast on Kyberion locally. Phase C'-7 of `docs/PRODUCTIZATION_ROAD
 - `libs/core/*.js`, `*.d.ts`, and source maps under `libs/core/` are generated artifacts and should not be edited by hand.
 - Imports inside `libs/core` use `./foo.js` specifiers because the repo compiles to ESM-compatible Node output, while TypeScript resolves those specifiers back to the `.ts` source during development.
 
+## Script execution modes
+
+- `dist/` is the production path. When a script has a `dist/scripts/*.js` target, prefer that path in published commands.
+- `node --import ./scripts/ts-loader.mjs scripts/*.ts` is the development path for TypeScript-only execution. Use it for local iteration, but keep the matching `dist/scripts/*.js` output present.
+- `pnpm exec tsx scripts/*.ts` is reserved for emergency fallback only. If a script needs it, it should also warn and fail clearly when `dist/` is stale or missing.
+- `pnpm build` now starts with `pnpm run clean`, so stale `dist/` and `.tsbuildinfo` files do not keep dead commands alive.
+- When adding a new `scripts/*.ts` entry, confirm both execution modes work:
+  1. `node --import ./scripts/ts-loader.mjs scripts/your_script.ts`
+  2. `node dist/scripts/your_script.js`
+  3. `pnpm run check:script-integrity`
+
 ### Run a single test
 
 ```bash
@@ -67,17 +78,17 @@ vs. full `pnpm lint` which scans everything.
 
 ## When to use which
 
-| Situation | Use |
-|---|---|
-| Changing a function in `libs/core/foo.ts` and its test | `pnpm vitest watch libs/core/foo.test.ts` |
-| Adding types only | `pnpm typecheck` |
-| Adding a new actuator | `pnpm --filter @actuators/your-actuator build` then a smoke run |
-| Touching pipelines | `pnpm pipeline --input pipelines/your-pipeline.json` (with `KYBERION_REASONING_BACKEND=stub`) |
-| Touching schemas | `pnpm tsx scripts/check_contract_schemas.ts` |
-| Touching actuator manifest / contract | `pnpm tsx scripts/check_contract_semver.ts` |
-| Touching docs | `pnpm tsx scripts/check_doc_examples.ts` (when example blocks tagged `bash check`) |
-| Before committing | `pnpm validate` (full run, ~ 1 min) |
-| Before opening a PR | `pnpm ci` (validate + full test) |
+| Situation                                              | Use                                                                                           |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Changing a function in `libs/core/foo.ts` and its test | `pnpm vitest watch libs/core/foo.test.ts`                                                     |
+| Adding types only                                      | `pnpm typecheck`                                                                              |
+| Adding a new actuator                                  | `pnpm --filter @actuators/your-actuator build` then a smoke run                               |
+| Touching pipelines                                     | `pnpm pipeline --input pipelines/your-pipeline.json` (with `KYBERION_REASONING_BACKEND=stub`) |
+| Touching schemas                                       | `pnpm tsx scripts/check_contract_schemas.ts`                                                  |
+| Touching actuator manifest / contract                  | `pnpm tsx scripts/check_contract_semver.ts`                                                   |
+| Touching docs                                          | `pnpm tsx scripts/check_doc_examples.ts` (when example blocks tagged `bash check`)            |
+| Before committing                                      | `pnpm validate` (full run, ~ 1 min)                                                           |
+| Before opening a PR                                    | `pnpm ci` (validate + full test)                                                              |
 
 ## Useful environment overrides
 
@@ -88,6 +99,10 @@ export KYBERION_REASONING_BACKEND=stub
 # Override active customer
 export KYBERION_CUSTOMER=demo-customer
 # Customer-specific identity, connections, and onboarding artifacts resolve under customer/{slug}/ when set
+
+# Override the local ComfyUI export folder used by media generation examples
+export KYBERION_COMFY_OUTPUT_DIR=active/shared/tmp/comfy/output
+# The default fallback is already under active/shared/tmp/comfy/output; set this only when ComfyUI writes elsewhere
 
 # Bypass tier-guard for tests (use cautiously)
 export KYBERION_PERSONA=ecosystem_architect
@@ -136,12 +151,12 @@ KYBERION_LOG_LEVEL=debug pnpm pipeline --input pipelines/baseline-check.json
 
 ## Common slow-down causes
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `pnpm build` takes > 60 s | Full TS rebuild | Use `pnpm --filter` for incremental |
-| `pnpm vitest run` is slow | Cold module imports (workspace size) | Use `pnpm vitest watch` to keep modules cached |
-| Doctor times out on `pnpm doctor` | Provider discovery scanning all CLIs | `KYBERION_REASONING_BACKEND=stub pnpm doctor` to skip |
-| Path-scope policy errors in tests | Missing persona env | `export KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller` |
+| Symptom                           | Cause                                | Fix                                                                           |
+| --------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `pnpm build` takes > 60 s         | Full TS rebuild                      | Use `pnpm --filter` for incremental                                           |
+| `pnpm vitest run` is slow         | Cold module imports (workspace size) | Use `pnpm vitest watch` to keep modules cached                                |
+| Doctor times out on `pnpm doctor` | Provider discovery scanning all CLIs | `KYBERION_REASONING_BACKEND=stub pnpm doctor` to skip                         |
+| Path-scope policy errors in tests | Missing persona env                  | `export KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller` |
 
 ## What's coming (Phase C'-7 follow-up)
 

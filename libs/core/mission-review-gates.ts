@@ -2,9 +2,15 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
-import type { MissionClass, MissionDeliveryShape, MissionRiskProfile, MissionStage } from './mission-classification.js';
+import type {
+  MissionClass,
+  MissionDeliveryShape,
+  MissionRiskProfile,
+  MissionStage,
+} from './mission-classification.js';
 import type { ArtifactBundle } from './artifact-bundle.js';
 import { checkArtifactBundleFulfillment } from './artifact-bundle.js';
+import { evaluateDeliverableQuality, type DeliverableKind } from './deliverable-quality.js';
 
 export type MissionReviewMode = 'lean' | 'standard' | 'strict';
 export type ReviewGateVerdict = 'ready' | 'concerns' | 'blocked';
@@ -68,8 +74,12 @@ type ReviewGateRegistry = {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const REGISTRY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-review-gate-registry.schema.json');
-const REGISTRY_PATH = pathResolver.knowledge('product/governance/mission-review-gate-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-review-gate-registry.schema.json'
+);
+const REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/mission-review-gate-registry.json'
+);
 const RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/review-gate-result.schema.json');
 
 let registryValidateFn: ValidateFunction | null = null;
@@ -88,7 +98,13 @@ function ensureResultValidator(): ValidateFunction {
 }
 
 function normalizeArray(values?: string[]): string[] {
-  return (values || []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+  return (values || [])
+    .map((value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+    )
+    .filter(Boolean);
 }
 
 function matchesValue(actual: string, expected?: string[]): boolean {
@@ -97,13 +113,16 @@ function matchesValue(actual: string, expected?: string[]): boolean {
   return normalized.includes(actual.toLowerCase());
 }
 
-function matchRule(input: {
-  missionClass: string;
-  deliveryShape: string;
-  riskProfile: string;
-  workflowPattern: string;
-  stage: string;
-}, match?: RuleMatch): boolean {
+function matchRule(
+  input: {
+    missionClass: string;
+    deliveryShape: string;
+    riskProfile: string;
+    workflowPattern: string;
+    stage: string;
+  },
+  match?: RuleMatch
+): boolean {
   if (!match) return false;
   return (
     matchesValue(input.missionClass, match.mission_classes) &&
@@ -115,16 +134,22 @@ function matchRule(input: {
 }
 
 function loadRegistry(): ReviewGateRegistry {
-  const parsed = JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string) as ReviewGateRegistry;
+  const parsed = JSON.parse(
+    safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string
+  ) as ReviewGateRegistry;
   const validate = ensureRegistryValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid mission-review-gate-registry: ${errors}`);
   }
   return parsed;
 }
 
-export function resolveMissionReviewDesign(input: MissionReviewSelectionInput): MissionReviewDesign {
+export function resolveMissionReviewDesign(
+  input: MissionReviewSelectionInput
+): MissionReviewDesign {
   const registry = loadRegistry();
   const normalized = {
     missionClass: input.missionClass.toLowerCase(),
@@ -142,7 +167,9 @@ export function resolveMissionReviewDesign(input: MissionReviewSelectionInput): 
 
   return {
     review_mode: reviewMode,
-    required_gate_ids: applicableGates.filter((gate) => gate.required_in_modes.includes(reviewMode)).map((gate) => gate.gate_id),
+    required_gate_ids: applicableGates
+      .filter((gate) => gate.required_in_modes.includes(reviewMode))
+      .map((gate) => gate.gate_id),
     all_gate_ids: applicableGates.map((gate) => gate.gate_id),
     rationale: modeRule
       ? `Review mode ${reviewMode} selected by rule ${modeRule.id}.`
@@ -167,7 +194,9 @@ export function summarizeReviewGateVerdicts(input: {
   };
   const validate = ensureResultValidator();
   if (!validate(summary)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid review gate summary: ${errors}`);
   }
   return summary;
@@ -177,22 +206,40 @@ export function summarizeReviewGateVerdicts(input: {
  * Converts a mission's ArtifactBundle into a ReviewGateResult for the ARTIFACT_BUNDLE gate.
  * Use this helper when a mission produces a bundle of artifacts that should be approved before finish.
  */
-export function evaluateArtifactBundleGate(bundle: ArtifactBundle | null | undefined): ReviewGateResult {
+export function evaluateArtifactBundleGate(
+  bundle: ArtifactBundle | null | undefined
+): ReviewGateResult {
   if (!bundle) {
-    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'No artifact bundle registered for this mission.' };
+    return {
+      gate_id: 'ARTIFACT_BUNDLE',
+      verdict: 'concerns',
+      reason: 'No artifact bundle registered for this mission.',
+    };
   }
   if (bundle.status === 'assembling') {
-    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'Bundle is still assembling — not all artifacts collected yet.' };
+    return {
+      gate_id: 'ARTIFACT_BUNDLE',
+      verdict: 'concerns',
+      reason: 'Bundle is still assembling — not all artifacts collected yet.',
+    };
   }
   if (bundle.status === 'pending_review') {
-    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'Artifact bundle is awaiting review approval.' };
+    return {
+      gate_id: 'ARTIFACT_BUNDLE',
+      verdict: 'concerns',
+      reason: 'Artifact bundle is awaiting review approval.',
+    };
   }
   if (bundle.status === 'rejected') {
     const note = bundle.approval.note ? `: ${bundle.approval.note}` : '.';
     return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'blocked', reason: `Bundle was rejected${note}` };
   }
   if (bundle.status === 'superseded') {
-    return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'concerns', reason: 'Bundle has been superseded — a new bundle must be created.' };
+    return {
+      gate_id: 'ARTIFACT_BUNDLE',
+      verdict: 'concerns',
+      reason: 'Bundle has been superseded — a new bundle must be created.',
+    };
   }
   const report = checkArtifactBundleFulfillment(bundle);
   if (!report.fulfilled) {
@@ -203,4 +250,17 @@ export function evaluateArtifactBundleGate(bundle: ArtifactBundle | null | undef
     };
   }
   return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'ready' };
+}
+
+export function evaluateDeliverableQualityGate(
+  kind: DeliverableKind | string,
+  artifact: unknown
+): ReviewGateResult {
+  const report = evaluateDeliverableQuality(kind, artifact);
+  return {
+    gate_id: 'DELIVERABLE_QUALITY',
+    verdict:
+      report.severity === 'poor' ? 'blocked' : report.severity === 'warn' ? 'concerns' : 'ready',
+    reason: report.reason,
+  };
 }

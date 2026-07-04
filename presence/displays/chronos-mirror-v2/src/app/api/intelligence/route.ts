@@ -65,6 +65,7 @@ import {
   normalizeSurfaceDefinition,
   pathResolver,
   promoteMemoryCandidateToKnowledge,
+  promotePersonalMemoryCandidates,
   probeSurfaceHealth,
   restartAgentRuntime,
   safeExec,
@@ -435,12 +436,18 @@ function collectWorkCoordinationSummary(): WorkCoordinationSummary {
       attempt_count: attempts.length,
       ...(item.current_attempt_id ? { current_attempt_id: item.current_attempt_id } : {}),
       ...(currentAttempt?.status ? { current_attempt_status: currentAttempt.status } : {}),
-      ...(currentAttempt?.started_at ? { current_attempt_started_at: currentAttempt.started_at } : {}),
+      ...(currentAttempt?.started_at
+        ? { current_attempt_started_at: currentAttempt.started_at }
+        : {}),
       ...(currentAttempt?.summary ? { current_attempt_summary: currentAttempt.summary } : {}),
       ...(currentAttempt?.blocked_reason ? { blocked_reason: currentAttempt.blocked_reason } : {}),
       ...(currentAttempt?.failure_reason ? { failure_reason: currentAttempt.failure_reason } : {}),
-      ...(currentAttempt?.actor_peer_id ? { claimed_by_peer_id: currentAttempt.actor_peer_id } : {}),
-      ...(currentAttempt?.actor_user_id ? { claimed_by_user_id: currentAttempt.actor_user_id } : {}),
+      ...(currentAttempt?.actor_peer_id
+        ? { claimed_by_peer_id: currentAttempt.actor_peer_id }
+        : {}),
+      ...(currentAttempt?.actor_user_id
+        ? { claimed_by_user_id: currentAttempt.actor_user_id }
+        : {}),
     };
   });
 
@@ -1532,16 +1539,28 @@ export async function GET(req: NextRequest) {
       controlActionCatalog,
       controlActionAvailability,
       controlActions,
-      controlActionDetails: safeCollect('collectControlActionDetails', {}, collectControlActionDetails),
+      controlActionDetails: safeCollect(
+        'collectControlActionDetails',
+        {},
+        collectControlActionDetails
+      ),
       ownerSummaries: safeCollect('collectOwnerSummaries', [], collectOwnerSummaries),
       browserSessions: safeCollect('collectBrowserSessions', [], collectBrowserSessions),
-      browserConversationSessions: safeCollect('collectBrowserConversationSessions', [], collectBrowserConversationSessions),
+      browserConversationSessions: safeCollect(
+        'collectBrowserConversationSessions',
+        [],
+        collectBrowserConversationSessions
+      ),
       computerSessions: safeCollect('collectComputerSessions', [], collectComputerSessions),
       surfaceOutbox: {
         slack: listSurfaceOutboxMessages('slack').length,
         chronos: listSurfaceOutboxMessages('chronos').length,
       },
-      recentSurfaceOutbox: safeCollect('collectRecentSurfaceOutbox', [], collectRecentSurfaceOutbox),
+      recentSurfaceOutbox: safeCollect(
+        'collectRecentSurfaceOutbox',
+        [],
+        collectRecentSurfaceOutbox
+      ),
       runtime: {
         total: runtime.length,
         ready: runtime.filter((entry) => entry.agent.status === 'ready').length,
@@ -1697,12 +1716,14 @@ export async function POST(req: NextRequest) {
 
       const promoted: string[] = [];
       const failed: Array<{ candidate_id: string; reason: string }> = [];
+      const supersedes = typeof body?.supersedes === 'string' ? body.supersedes : '';
       for (const candidate of approved) {
         try {
-          promoteMemoryCandidateToKnowledge({
+          await promoteMemoryCandidateToKnowledge({
             candidateId: candidate.candidate_id,
             executionRole: 'chronos_gateway',
             ratificationNote: 'Promoted from Chronos control action memory_promote_pending.',
+            supersedes,
           });
           promoted.push(candidate.candidate_id);
         } catch (err: any) {
@@ -1712,6 +1733,12 @@ export async function POST(req: NextRequest) {
           });
         }
       }
+
+      const personalAutopromote = await promotePersonalMemoryCandidates({
+        executionRole: 'chronos_gateway',
+        ratificationNote: 'Autopromoted from Chronos control action memory_promote_pending.',
+        dryRun: false,
+      });
 
       emitMissionOrchestrationObservation({
         event_id: `CA-MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -1729,6 +1756,7 @@ export async function POST(req: NextRequest) {
         action,
         promoted_count: promoted.length,
         failed_count: failed.length,
+        autopromote: personalAutopromote,
         promoted,
         failed,
         ts: new Date().toISOString(),

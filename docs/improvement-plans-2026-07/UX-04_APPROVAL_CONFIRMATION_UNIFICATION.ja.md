@@ -62,3 +62,7 @@
 
 - 確認ステップの追加は操作回数を増やす。**read-only 操作や低リスク操作には付けない**(risky 分類のみ)。
 - 旧 CLI 形式を使う自動化(パイプラインや docs のサンプル)が無いか、Task 2 で `grep -rn "chronos approve" docs/ pipelines/ knowledge/product/` を実行して確認・追従する。
+
+## 実装メモ
+
+- 2026-07-04: `presence/displays/chronos-mirror-v2/src/components/MissionIntelligence.tsx` に risky action confirmation modal を追加し、runtime lease 修復・outbox clear・mission seed promote・mission/surface risky actions を確認経由に切り替えた。`buildDangerousActionPrompt()` を純関数として切り出し、ヘルパーテストで文言を固定した。

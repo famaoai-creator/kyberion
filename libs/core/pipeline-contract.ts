@@ -24,14 +24,22 @@ export interface StepHook {
   cmd?: string;
 }
 
+export interface PipelineStepBudget {
+  cost_cap_tokens?: number;
+  max_prompt_chars?: number;
+  max_response_chars?: number;
+  max_combined_chars?: number;
+  approval_required?: boolean;
+}
+
 export type FlowRole = 'source' | 'transform' | 'sink' | 'gate';
 
 /** Maps legacy type values to Typed Flow roles. */
 export const ROLE_FROM_TYPE: Record<string, FlowRole> = {
-  capture:   'source',
+  capture: 'source',
   transform: 'transform',
-  apply:     'sink',
-  control:   'gate',
+  apply: 'sink',
+  control: 'gate',
 };
 
 export interface FlowChannel {
@@ -44,6 +52,8 @@ export interface PipelineAdfStep {
   op: string;
   params: Record<string, unknown>;
   id?: string;
+  effort?: 'low' | 'medium' | 'high';
+  budget?: PipelineStepBudget;
   /** Typed Flow node role. Preferred over `type`. */
   role?: FlowRole;
   /** Legacy role alias. Prefer `role`. capture→source, transform→transform, apply→sink, control→gate. */

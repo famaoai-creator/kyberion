@@ -1,6 +1,16 @@
-import { logger, safeReadFile, executeServicePreset, pathResolver, classifyError, withRetry, ocrImage as coreOcrImage } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  executeServicePreset,
+  pathResolver,
+  classifyError,
+  retry,
+  ocrImage as coreOcrImage,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runActuatorCli } from '@agent/core';
 
 /**
  * Vision-Actuator v1.3.0 [LEGACY COMPATIBILITY FACADE]
@@ -17,7 +27,9 @@ const LEGACY_MEDIA_GENERATION_ACTIONS = new Set([
   'run_workflow',
 ]);
 
-const VISION_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/vision-actuator/manifest.json');
+const VISION_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/vision-actuator/manifest.json'
+);
 const DEFAULT_VISION_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -48,7 +60,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_VISION_RETRY,
@@ -62,10 +76,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -81,10 +97,13 @@ async function inspectImage(params: any) {
     bytes: buffer.length,
     extension: ext,
     mime_guess:
-      ext === '.png' ? 'image/png' :
-      ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
-      ext === '.webp' ? 'image/webp' :
-      'application/octet-stream',
+      ext === '.png'
+        ? 'image/png'
+        : ext === '.jpg' || ext === '.jpeg'
+          ? 'image/jpeg'
+          : ext === '.webp'
+            ? 'image/webp'
+            : 'application/octet-stream',
   };
 }
 
@@ -116,10 +135,17 @@ async function handleSingleAction(input: any) {
   if (action === 'inspect_image') return inspectImage(params);
   if (action === 'ocr_image') return ocrImage(params);
   if (!LEGACY_MEDIA_GENERATION_ACTIONS.has(action)) {
-    throw new Error(`Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`);
+    throw new Error(
+      `Vision actuator is being narrowed to perception workflows. Unsupported legacy action: ${action}`
+    );
   }
-  logger.warn(`🎨 [VISION:LEGACY] "${action}" is a legacy route. Prefer media-generation-actuator.`);
-  return await withRetry(async () => executeServicePreset('media-generation', action, params), buildRetryOptions());
+  logger.warn(
+    `🎨 [VISION:LEGACY] "${action}" is a legacy route. Prefer media-generation-actuator.`
+  );
+  return await retry(
+    async () => executeServicePreset('media-generation', action, params),
+    buildRetryOptions()
+  );
 }
 
 export async function handleAction(input: any) {
@@ -134,23 +160,17 @@ export async function handleAction(input: any) {
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-
-  const inputData = JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string);
-  const result = await handleAction(inputData);
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'vision-actuator',
+    handleAction,
+  });
 };
 
-const isMain = process.argv[1] && (
-  process.argv[1].endsWith('vision-actuator/src/index.ts') || 
-  process.argv[1].endsWith('vision-actuator/dist/index.js') ||
-  process.argv[1].endsWith('vision-actuator/src/index.js')
-);
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
 
-if (isMain) {
-  main().catch(err => {
+if (entrypoint && modulePath === entrypoint) {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

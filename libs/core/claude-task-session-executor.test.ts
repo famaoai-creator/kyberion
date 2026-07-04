@@ -75,7 +75,13 @@ describe('claude-task-session-executor', () => {
 
     expect(runApprovedClaudeDocumentTask).toHaveBeenCalledTimes(1);
     expect(runApprovedClaudeBrowserTask).not.toHaveBeenCalled();
-    expect(updateTaskSession).toHaveBeenCalledWith('TSK-1', expect.objectContaining({ status: 'completed' }));
+    expect(updateTaskSession).toHaveBeenCalledWith(
+      'TSK-1',
+      expect.objectContaining({
+        status: 'completed',
+        artifact: expect.objectContaining({ omitted_count: 0 }),
+      })
+    );
     expect(recordTaskSessionHistory).toHaveBeenCalled();
     expect(result.kind).toBe('document');
     expect(result.output).toBe('document output');

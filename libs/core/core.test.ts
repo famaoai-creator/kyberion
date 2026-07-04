@@ -31,9 +31,12 @@ vi.mock('node:readline', () => ({
 describe('core library bundle', () => {
   beforeEach(() => {
     process.argv = [...originalArgv];
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-04T00:00:00.000Z'));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     process.argv = [...originalArgv];
   });
 
@@ -153,7 +156,7 @@ describe('core library bundle', () => {
       const cache = new Cache(10, 1000);
       cache.set('short', 1, 10);
       cache.set('long', 2, 500);
-      await new Promise((r) => setTimeout(r, 25));
+      vi.setSystemTime(new Date('2026-07-04T00:00:00.025Z'));
       expect(cache.get('short')).toBeUndefined();
       expect(cache.get('long')).toBe(2);
     });

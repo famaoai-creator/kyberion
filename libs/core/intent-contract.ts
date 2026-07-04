@@ -358,14 +358,15 @@ function parseJsonObject<T>(text: string): T | null {
   }
 }
 
-function summarizeRelevantIntents(
+export function summarizeRelevantIntents(
   text: string,
   packet?: ReturnType<typeof resolveIntentResolutionPacket>
-): string {
+): { text: string; omitted_count: number } {
   const policy = loadIntentPolicy();
   const intents = loadStandardIntentCatalog();
+  const resolvedPacket = packet || resolveIntentResolutionPacket(text);
   const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
-  const scored = (packet || resolveIntentResolutionPacket(text)).candidates
+  const scored = resolvedPacket.candidates
     .slice(0, policy.compiler.relevant_intent_limit)
     .map((candidate) => catalogById.get(candidate.intent_id))
     .filter((intent): intent is NonNullable<typeof intent> => Boolean(intent))
@@ -380,7 +381,14 @@ function summarizeRelevantIntents(
       trigger_keywords: intent.trigger_keywords,
     }));
 
-  return JSON.stringify(scored, null, 2);
+  const omittedCount = Math.max(0, resolvedPacket.candidates.length - scored.length);
+  if (omittedCount > 0) {
+    logger.info(
+      `[intent-contract] omitted ${omittedCount} relevant intent candidate(s) for input preview; limit=${policy.compiler.relevant_intent_limit}`
+    );
+  }
+
+  return { text: JSON.stringify(scored, null, 2), omitted_count: omittedCount };
 }
 
 function summarizeRelevantCapabilityBundlesByIntentIds(intentIds: string[]): string {
@@ -802,7 +810,7 @@ function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
     '- Keep the brief human-readable and minimal.',
     '',
     'Relevant governed intents:',
-    summarizeRelevantIntents(input.text, packet),
+    summarizeRelevantIntents(input.text, packet).text,
     '',
     'Request context:',
     JSON.stringify(
@@ -913,7 +921,7 @@ function buildIntentContractPrompt(
     ),
     '',
     'Relevant governed intents:',
-    summarizeRelevantIntents(input.text, packet),
+    summarizeRelevantIntents(input.text, packet).text,
     '',
     'Relevant capability bundles:',
     summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
@@ -976,7 +984,7 @@ function buildWorkLoopPrompt(
     JSON.stringify(input.runtimeContext || {}, null, 2),
     '',
     'Relevant governed intents:',
-    summarizeRelevantIntents(input.text, packet),
+    summarizeRelevantIntents(input.text, packet).text,
     '',
     'Relevant capability bundles:',
     summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
@@ -1089,7 +1097,8 @@ function buildFallbackWorkLoop(
 function buildClarificationPacket(
   contract: IntentContract,
   workLoop: OrganizationWorkLoopSummary,
-  executionBrief?: ActuatorExecutionBrief
+  executionBrief?: ActuatorExecutionBrief,
+  locale?: string
 ): OperatorInteractionPacket | undefined {
   if (!contract.clarification_needed) return undefined;
   return resolveQuestionInteractionPacket(
@@ -1097,6 +1106,7 @@ function buildClarificationPacket(
       text: contract.source_text,
       intentId: contract.intent_id,
       executionShape: contract.resolution.execution_shape as any,
+      locale,
       requiredInputs: contract.required_inputs,
       confidence: contract.confidence,
       executionBrief,
@@ -1502,7 +1512,8 @@ export async function compileUserIntentFlow(
         clarificationPacket: buildClarificationPacket(
           intentContract,
           workLoop,
-          finalExecutionBrief
+          finalExecutionBrief,
+          input.locale
         ),
         source,
       },
@@ -1539,7 +1550,12 @@ export async function compileUserIntentFlow(
     routingDecision,
     reasoningDecision,
     shadowModelRoute,
-    clarificationPacket: buildClarificationPacket(intentContract, workLoop, finalExecutionBrief),
+    clarificationPacket: buildClarificationPacket(
+      intentContract,
+      workLoop,
+      finalExecutionBrief,
+      input.locale
+    ),
     source,
   };
 }

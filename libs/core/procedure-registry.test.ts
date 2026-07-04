@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  PROCEDURE_RESOLUTION_THRESHOLDS,
-  type ProcedureEntry,
-} from './procedure-types.js';
+import { PROCEDURE_RESOLUTION_THRESHOLDS, type ProcedureEntry } from './procedure-types.js';
 import {
   invalidateProcedureCache,
   loadProcedures,
@@ -10,7 +7,12 @@ import {
   resolveProcedure,
 } from './procedure-registry.js';
 import * as secureIo from './secure-io.js';
-import { resetReasoningBackend, registerReasoningBackend, stubReasoningBackend, type ReasoningBackend } from './reasoning-backend.js';
+import {
+  resetReasoningBackend,
+  registerReasoningBackend,
+  stubReasoningBackend,
+  type ReasoningBackend,
+} from './reasoning-backend.js';
 
 const BROWSER_ENTRY: ProcedureEntry = {
   procedure_id: 'attendance.approve.kingoftime',
@@ -45,7 +47,7 @@ const DEPRECATED_ENTRY: ProcedureEntry = {
 
 function stubCatalog(entries: ProcedureEntry[] = [BROWSER_ENTRY, SERVICE_ENTRY, DEPRECATED_ENTRY]) {
   vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(
-    JSON.stringify({ schema_version: 'procedures.v1', procedures: entries }),
+    JSON.stringify({ schema_version: 'procedures.v1', procedures: entries })
   );
 }
 
@@ -74,12 +76,12 @@ describe('procedure-registry', () => {
     });
 
     it('caches on second call without forceRefresh', () => {
-      const spy = vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(
-        JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }),
-      );
-      loadProcedures(true);   // force refresh — reads file
-      loadProcedures();       // uses cache
-      loadProcedures();       // uses cache again
+      const spy = vi
+        .spyOn(secureIo, 'safeReadFile')
+        .mockReturnValue(JSON.stringify({ schema_version: 'procedures.v1', procedures: [] }));
+      loadProcedures(true); // force refresh — reads file
+      loadProcedures(); // uses cache
+      loadProcedures(); // uses cache again
       expect(spy).toHaveBeenCalledTimes(1);
     });
 
@@ -92,7 +94,10 @@ describe('procedure-registry', () => {
     });
 
     it('drops structurally-invalid entries', () => {
-      stubCatalog([BROWSER_ENTRY, { procedure_id: '', intent_phrases: [] } as unknown as ProcedureEntry]);
+      stubCatalog([
+        BROWSER_ENTRY,
+        { procedure_id: '', intent_phrases: [] } as unknown as ProcedureEntry,
+      ]);
       expect(loadProcedures(true)).toHaveLength(1);
     });
   });
@@ -103,7 +108,7 @@ describe('procedure-registry', () => {
   describe('resolveAllowlistedRecordingRef', () => {
     it('accepts a path inside the recordings store', () => {
       expect(
-        resolveAllowlistedRecordingRef('active/shared/runtime/recordings/foo.json'),
+        resolveAllowlistedRecordingRef('active/shared/runtime/recordings/foo.json')
       ).not.toBeNull();
     });
 
@@ -114,12 +119,14 @@ describe('procedure-registry', () => {
 
     it('rejects traversal escapes out of the store', () => {
       expect(
-        resolveAllowlistedRecordingRef('active/shared/runtime/recordings/../../../../etc/passwd'),
+        resolveAllowlistedRecordingRef('active/shared/runtime/recordings/../../../../etc/passwd')
       ).toBeNull();
     });
 
     it('rejects paths outside the store (e.g. knowledge/)', () => {
-      expect(resolveAllowlistedRecordingRef('knowledge/product/orchestration/procedures.json')).toBeNull();
+      expect(
+        resolveAllowlistedRecordingRef('knowledge/product/orchestration/procedures.json')
+      ).toBeNull();
     });
   });
 
@@ -157,7 +164,9 @@ describe('procedure-registry', () => {
       const result = await resolveProcedure('勤怠の承認');
       expect(result.outcome).toBe('matched');
       expect(result.best?.procedure_id).toBe('attendance.approve.kingoftime');
-      expect(result.best?.confidence).toBeGreaterThanOrEqual(PROCEDURE_RESOLUTION_THRESHOLDS.autoExecute);
+      expect(result.best?.confidence).toBeGreaterThanOrEqual(
+        PROCEDURE_RESOLUTION_THRESHOLDS.autoExecute
+      );
       expect(result.recommendedPattern).toBe('B');
     });
 
@@ -173,7 +182,7 @@ describe('procedure-registry', () => {
       const withOrigin = await resolveProcedure('勤怠の承認', { origin: 'https://s2.kingtime.jp' });
       const withoutOrigin = await resolveProcedure('勤怠の承認');
       expect(withOrigin.best?.confidence).toBeGreaterThanOrEqual(
-        withoutOrigin.best?.confidence ?? 0,
+        withoutOrigin.best?.confidence ?? 0
       );
     });
 
@@ -229,9 +238,15 @@ describe('procedure-registry', () => {
 
     it('calls delegateTask when Stage 1 is ambiguous and backend is real', async () => {
       const delegateFn = vi.fn().mockResolvedValue(
-        JSON.stringify([
-          { procedure_id: 'attendance.approve.kingoftime', confidence: 0.9, reason: 'best match' },
-        ]),
+        JSON.stringify({
+          candidates: [
+            {
+              procedure_id: 'attendance.approve.kingoftime',
+              confidence: 0.9,
+              reason: 'best match',
+            },
+          ],
+        })
       );
       const fakeBackend: ReasoningBackend = {
         ...stubReasoningBackend,
@@ -247,8 +262,24 @@ describe('procedure-registry', () => {
       expect(result.best?.procedure_id).toBe('attendance.approve.kingoftime');
     });
 
-    it('returns unmatched when LLM explicitly returns empty array', async () => {
-      const delegateFn = vi.fn().mockResolvedValue('[]');
+    it('falls back to Stage 1 when structured delegation returns invalid JSON', async () => {
+      const delegateFn = vi.fn().mockResolvedValue('not-json');
+      const fakeBackend: ReasoningBackend = {
+        ...stubReasoningBackend,
+        name: 'fake',
+        delegateTask: delegateFn,
+      };
+      registerReasoningBackend(fakeBackend);
+      twoIdenticalPhraseEntries();
+
+      const result = await resolveProcedure('勤怠の承認');
+      expect(delegateFn).toHaveBeenCalled();
+      expect(result.outcome).toBe('ambiguous');
+      expect(result.candidates).toHaveLength(2);
+    });
+
+    it('returns unmatched when structured LLM output has no candidates', async () => {
+      const delegateFn = vi.fn().mockResolvedValue(JSON.stringify({ candidates: [] }));
       const fakeBackend: ReasoningBackend = {
         ...stubReasoningBackend,
         name: 'fake',

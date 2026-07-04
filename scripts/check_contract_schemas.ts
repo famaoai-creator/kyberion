@@ -54,12 +54,16 @@ function readSurfaceManifestPayloads(): unknown[] {
 }
 
 function readSurfaceProviderCatalogPayloads(): unknown[] {
-  const dir = pathResolver.rootResolve('knowledge/product/governance/surface-provider-manifest-catalogs');
+  const dir = pathResolver.rootResolve(
+    'knowledge/product/governance/surface-provider-manifest-catalogs'
+  );
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/governance/surface-provider-manifest-catalogs/${entry}`));
+    .map((entry) =>
+      readGovernanceJson(`knowledge/product/governance/surface-provider-manifest-catalogs/${entry}`)
+    );
 }
 
 function readServiceEndpointPayloads(): unknown[] {
@@ -68,7 +72,9 @@ function readServiceEndpointPayloads(): unknown[] {
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
-    .map((entry) => readGovernanceJson(`knowledge/product/orchestration/service-endpoints/${entry}`));
+    .map((entry) =>
+      readGovernanceJson(`knowledge/product/orchestration/service-endpoints/${entry}`)
+    );
 }
 
 function readServicePresetPayloads(): unknown[] {
@@ -133,11 +139,15 @@ type ContractCheck = {
 };
 
 function createChecks(): ContractCheck[] {
-  const workPolicy = readJsonFile(pathResolver.rootResolve('knowledge/product/governance/work-policy.json'));
+  const workPolicy = readJsonFile(
+    pathResolver.rootResolve('knowledge/product/governance/work-policy.json')
+  );
   const surfaceProviderManifests = readJsonFile(
     pathResolver.rootResolve('knowledge/product/governance/surface-provider-manifests.json')
   );
-  const surfacePolicy = readJsonFile(pathResolver.rootResolve('knowledge/product/governance/surface-policy.json'));
+  const surfacePolicy = readJsonFile(
+    pathResolver.rootResolve('knowledge/product/governance/surface-policy.json')
+  );
 
   const promotedPattern = buildPromotedMemoryRecord(
     createDistillCandidateRecord({
@@ -215,13 +225,16 @@ function createChecks(): ContractCheck[] {
               adapter: {
                 recorder: 'chrome-extension',
                 executor: 'extension_session',
-                recording_ref: 'active/shared/runtime/recordings/attendance-approve-kingoftime.json',
+                recording_ref:
+                  'active/shared/runtime/recordings/attendance-approve-kingoftime.json',
               },
               target: { name: 'King of Time', origins: ['https://s2.kingtime.jp'] },
               intent_phrases: ['勤怠の承認', 'approve attendance'],
               execution_substrate: 'extension',
               pipeline_ref: 'pipelines/browser/attendance-approve-kingoftime.json',
-              required_inputs: [{ name: 'target_period', label: '対象期間', type: 'string', optional: true }],
+              required_inputs: [
+                { name: 'target_period', label: '対象期間', type: 'string', optional: true },
+              ],
               required_secrets: [{ name: 'kingoftime_login', scope: 'confidential/{project}' }],
               risk_class: 'high',
               golden_scenario_ref: 'knowledge/product/golden/attendance-approve-kingoftime.v1.json',
@@ -243,7 +256,10 @@ function createChecks(): ContractCheck[] {
         },
       ],
       invalidPayloads: [
-        { schema_version: 'procedures.v1', procedures: [{ procedure_id: 'x', substrate: 'quantum' }] },
+        {
+          schema_version: 'procedures.v1',
+          procedures: [{ procedure_id: 'x', substrate: 'quantum' }],
+        },
         {
           schema_version: 'procedures.v1',
           procedures: [
@@ -322,14 +338,38 @@ function createChecks(): ContractCheck[] {
           created_at: '2026-06-24T00:00:00.000Z',
           target: { name: 'Deal Intake', services: ['jira', 'slack'] },
           steps: [
-            { step_id: 's1', service_id: 'jira', action: 'create_issue', summary: '起票', risk_class: 'high', params: { summary: '{{input.title}}' }, produces: 'issue_key' },
-            { step_id: 's2', service_id: 'slack', action: 'post_message', summary: '通知', risk_class: 'high', params: { text: '{{channel.issue_key}}' }, consumes: ['issue_key'] },
+            {
+              step_id: 's1',
+              service_id: 'jira',
+              action: 'create_issue',
+              summary: '起票',
+              risk_class: 'high',
+              params: { summary: '{{input.title}}' },
+              produces: 'issue_key',
+            },
+            {
+              step_id: 's2',
+              service_id: 'slack',
+              action: 'post_message',
+              summary: '通知',
+              risk_class: 'high',
+              params: { text: '{{channel.issue_key}}' },
+              consumes: ['issue_key'],
+            },
           ],
           risk_summary: { requires_manual_review: true, approval_required_count: 2 },
         },
       ],
       invalidPayloads: [
-        { schema_version: 'service-recording.v1', recording_id: 'x', source: 'service-capture', created_at: '2026-06-24T00:00:00.000Z', target: { name: 'X', services: [] }, steps: [], risk_summary: { requires_manual_review: true, approval_required_count: 0 } },
+        {
+          schema_version: 'service-recording.v1',
+          recording_id: 'x',
+          source: 'service-capture',
+          created_at: '2026-06-24T00:00:00.000Z',
+          target: { name: 'X', services: [] },
+          steps: [],
+          risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+        },
       ],
     },
     {
@@ -343,12 +383,22 @@ function createChecks(): ContractCheck[] {
           source: 'desktop-capture',
           created_at: '2026-06-24T00:00:00.000Z',
           target: { name: 'Excel', platform: 'darwin' },
-          steps: [{ step_id: 'd1', op: 'click_element', summary: 'OKをクリック', risk_class: 'low' }],
+          steps: [
+            { step_id: 'd1', op: 'click_element', summary: 'OKをクリック', risk_class: 'low' },
+          ],
           risk_summary: { requires_manual_review: true, approval_required_count: 0 },
         },
       ],
       invalidPayloads: [
-        { schema_version: 'desktop-recording.v1', recording_id: 'x', source: 'desktop-capture', created_at: '2026-06-24T00:00:00.000Z', target: { name: 'X', platform: 'solaris' }, steps: [], risk_summary: { requires_manual_review: true, approval_required_count: 0 } },
+        {
+          schema_version: 'desktop-recording.v1',
+          recording_id: 'x',
+          source: 'desktop-capture',
+          created_at: '2026-06-24T00:00:00.000Z',
+          target: { name: 'X', platform: 'solaris' },
+          steps: [],
+          risk_summary: { requires_manual_review: true, approval_required_count: 0 },
+        },
       ],
     },
     {
@@ -362,11 +412,25 @@ function createChecks(): ContractCheck[] {
           source: 'media-distill',
           created_at: '2026-06-24T00:00:00.000Z',
           target: { name: 'Explainer Video', medium: 'video' },
-          stages: [{ stage_id: 'm1', actuator: 'video-composition-actuator', summary: 'compose', produces: 'render' }],
+          stages: [
+            {
+              stage_id: 'm1',
+              actuator: 'video-composition-actuator',
+              summary: 'compose',
+              produces: 'render',
+            },
+          ],
         },
       ],
       invalidPayloads: [
-        { schema_version: 'media-recipe.v1', recipe_id: 'x', source: 'media-distill', created_at: '2026-06-24T00:00:00.000Z', target: { name: 'X', medium: 'hologram' }, stages: [] },
+        {
+          schema_version: 'media-recipe.v1',
+          recipe_id: 'x',
+          source: 'media-distill',
+          created_at: '2026-06-24T00:00:00.000Z',
+          target: { name: 'X', medium: 'hologram' },
+          stages: [],
+        },
       ],
     },
     {
@@ -383,7 +447,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'reasoning-level-policy',
       schemaPath: 'knowledge/product/schemas/reasoning-level-policy.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/product/governance/reasoning-level-policy.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/reasoning-level-policy.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -398,7 +464,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'production-evidence-register',
       schemaPath: 'knowledge/product/schemas/production-evidence-register.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/product/governance/production-evidence-register.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/production-evidence-register.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -613,8 +681,14 @@ function createChecks(): ContractCheck[] {
           ],
         },
         (() => {
-          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
-            items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
+          const payload = readGovernanceJson(
+            'knowledge/product/governance/production-evidence-register.json'
+          ) as {
+            items: Array<
+              Record<string, unknown> & {
+                ref_requirements: Array<Record<string, unknown> & { id: string }>;
+              }
+            >;
           };
           payload.items[0] = {
             ...payload.items[0],
@@ -625,8 +699,14 @@ function createChecks(): ContractCheck[] {
           return payload;
         })(),
         (() => {
-          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
-            items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
+          const payload = readGovernanceJson(
+            'knowledge/product/governance/production-evidence-register.json'
+          ) as {
+            items: Array<
+              Record<string, unknown> & {
+                ref_requirements: Array<Record<string, unknown> & { id: string }>;
+              }
+            >;
           };
           payload.items[1] = {
             ...payload.items[1],
@@ -642,8 +722,14 @@ function createChecks(): ContractCheck[] {
           return payload;
         })(),
         (() => {
-          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
-            items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
+          const payload = readGovernanceJson(
+            'knowledge/product/governance/production-evidence-register.json'
+          ) as {
+            items: Array<
+              Record<string, unknown> & {
+                ref_requirements: Array<Record<string, unknown> & { id: string }>;
+              }
+            >;
           };
           payload.items[1] = {
             ...payload.items[1],
@@ -659,8 +745,14 @@ function createChecks(): ContractCheck[] {
           return payload;
         })(),
         (() => {
-          const payload = readGovernanceJson('knowledge/product/governance/production-evidence-register.json') as {
-            items: Array<Record<string, unknown> & { ref_requirements: Array<Record<string, unknown> & { id: string }> }>;
+          const payload = readGovernanceJson(
+            'knowledge/product/governance/production-evidence-register.json'
+          ) as {
+            items: Array<
+              Record<string, unknown> & {
+                ref_requirements: Array<Record<string, unknown> & { id: string }>;
+              }
+            >;
           };
           payload.items[2] = {
             ...payload.items[2],
@@ -820,7 +912,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'voice-engine-registry',
       schemaPath: 'knowledge/product/schemas/voice-engine-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/product/governance/voice-engine-registry.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/voice-engine-registry.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -840,7 +934,9 @@ function createChecks(): ContractCheck[] {
     {
       id: 'tool-runtime-registry',
       schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
-      validPayloads: [readGovernanceJson('knowledge/product/governance/tool-runtime-registry.json')],
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/tool-runtime-registry.json'),
+      ],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -2045,89 +2141,207 @@ function createChecks(): ContractCheck[] {
     {
       id: 'mesh-peer-registration',
       schemaPath: 'knowledge/product/schemas/mesh-peer-registration.schema.json',
-      validPayloads: [{
-        kind: 'mesh-peer-registration', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
-        endpoint_ref: 'mesh://peer-a1.local', key_ref: 'vault://mesh/peer-a1/key',
-        status: 'enrolled', registered_at: '2026-06-24T00:00:00.000Z',
-        allowed_request_kinds: ['review.request'],
-      }],
-      invalidPayloads: [{
-        kind: 'mesh-peer-registration', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
-        endpoint_ref: 'mesh://peer-a1.local', status: 'enrolled', registered_at: '2026-06-24T00:00:00.000Z',
-      }],
+      validPayloads: [
+        {
+          kind: 'mesh-peer-registration',
+          peer_id: 'peer-a1',
+          tenant_id: 'tenant-acme',
+          endpoint_ref: 'mesh://peer-a1.local',
+          key_ref: 'vault://mesh/peer-a1/key',
+          status: 'enrolled',
+          registered_at: '2026-06-24T00:00:00.000Z',
+          allowed_request_kinds: ['review.request'],
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'mesh-peer-registration',
+          peer_id: 'peer-a1',
+          tenant_id: 'tenant-acme',
+          endpoint_ref: 'mesh://peer-a1.local',
+          status: 'enrolled',
+          registered_at: '2026-06-24T00:00:00.000Z',
+        },
+      ],
     },
     {
       id: 'mesh-peer-presence',
       schemaPath: 'knowledge/product/schemas/mesh-peer-presence.schema.json',
-      validPayloads: [{
-        kind: 'mesh-peer-presence', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
-        heartbeat_at: '2026-06-24T00:00:00.000Z', expires_at: '2026-06-24T00:05:00.000Z', health: 'healthy',
-        capacity: { accepting_new_work: true, available_slots: 1, max_inflight: 2 }, receive_modes: ['request'],
-      }],
-      invalidPayloads: [{
-        kind: 'mesh-peer-presence', peer_id: 'peer-a1', tenant_id: 'tenant-acme',
-        heartbeat_at: '2026-06-24T00:00:00.000Z', health: 'healthy',
-      }],
+      validPayloads: [
+        {
+          kind: 'mesh-peer-presence',
+          peer_id: 'peer-a1',
+          tenant_id: 'tenant-acme',
+          heartbeat_at: '2026-06-24T00:00:00.000Z',
+          expires_at: '2026-06-24T00:05:00.000Z',
+          health: 'healthy',
+          capacity: { accepting_new_work: true, available_slots: 1, max_inflight: 2 },
+          receive_modes: ['request'],
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'mesh-peer-presence',
+          peer_id: 'peer-a1',
+          tenant_id: 'tenant-acme',
+          heartbeat_at: '2026-06-24T00:00:00.000Z',
+          health: 'healthy',
+        },
+      ],
     },
     {
       id: 'mesh-capability-advertisement',
       schemaPath: 'knowledge/product/schemas/mesh-capability-advertisement.schema.json',
-      validPayloads: [{
-        kind: 'mesh-capability-advertisement', capability_id: 'document.review', version: '1', peer_id: 'peer-a1',
-        tenant_id: 'tenant-acme', roles: ['reviewer'], request_kinds: ['review.request'], visibility: 'tenant',
-        approval_policy: { requires_explicit_acceptance: true, requires_local_validation: true, requires_policy_check: true },
-        advertised_at: '2026-06-24T00:00:00.000Z',
-      }],
-      invalidPayloads: [{
-        kind: 'mesh-capability-advertisement', capability_id: 'document.review', version: '1', peer_id: 'peer-a1',
-        tenant_id: 'tenant-acme', roles: ['reviewer'], request_kinds: ['mission.start'], visibility: 'tenant',
-        approval_policy: { requires_explicit_acceptance: true }, advertised_at: '2026-06-24T00:00:00.000Z',
-      }],
+      validPayloads: [
+        {
+          kind: 'mesh-capability-advertisement',
+          capability_id: 'document.review',
+          version: '1',
+          peer_id: 'peer-a1',
+          tenant_id: 'tenant-acme',
+          roles: ['reviewer'],
+          request_kinds: ['review.request'],
+          visibility: 'tenant',
+          approval_policy: {
+            requires_explicit_acceptance: true,
+            requires_local_validation: true,
+            requires_policy_check: true,
+          },
+          advertised_at: '2026-06-24T00:00:00.000Z',
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'mesh-capability-advertisement',
+          capability_id: 'document.review',
+          version: '1',
+          peer_id: 'peer-a1',
+          tenant_id: 'tenant-acme',
+          roles: ['reviewer'],
+          request_kinds: ['mission.start'],
+          visibility: 'tenant',
+          approval_policy: { requires_explicit_acceptance: true },
+          advertised_at: '2026-06-24T00:00:00.000Z',
+        },
+      ],
     },
     {
       id: 'mesh-request',
       schemaPath: 'knowledge/product/schemas/mesh-request.schema.json',
-      validPayloads: [{
-        kind: 'mesh-request', request_id: 'meshreq-1', tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
-        sender_peer_id: 'peer-sender', created_at: '2026-06-24T00:00:00.000Z', ttl_ms: 60000, idempotency_key: 'idem-1',
-        correlation_id: 'corr-1', request_kind: 'review.request', target: { selector: { kind: 'peer', peer_id: 'peer-a1' } },
-        payload: { classification: 'confidential', reference: { artifact_ref: 'artifact://tenant-acme/brief', integrity_hash: 'sha256:abc', storage_class: 'artifact_store' } },
-      }],
-      invalidPayloads: [{
-        kind: 'mesh-request', request_id: 'meshreq-1', tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
-        sender_peer_id: 'peer-sender', created_at: '2026-06-24T00:00:00.000Z', ttl_ms: 60000, idempotency_key: 'idem-1',
-        correlation_id: 'corr-1', request_kind: 'mission.start', target: { selector: { kind: 'broadcast' } },
-        payload: { classification: 'personal', reference: { artifact_ref: 'artifact://tenant-acme/brief', integrity_hash: 'sha256:abc', storage_class: 'artifact_store' } },
-      }],
+      validPayloads: [
+        {
+          kind: 'mesh-request',
+          request_id: 'meshreq-1',
+          tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
+          sender_peer_id: 'peer-sender',
+          created_at: '2026-06-24T00:00:00.000Z',
+          ttl_ms: 60000,
+          idempotency_key: 'idem-1',
+          correlation_id: 'corr-1',
+          request_kind: 'review.request',
+          target: { selector: { kind: 'peer', peer_id: 'peer-a1' } },
+          payload: {
+            classification: 'confidential',
+            reference: {
+              artifact_ref: 'artifact://tenant-acme/brief',
+              integrity_hash: 'sha256:abc',
+              storage_class: 'artifact_store',
+            },
+          },
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'mesh-request',
+          request_id: 'meshreq-1',
+          tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
+          sender_peer_id: 'peer-sender',
+          created_at: '2026-06-24T00:00:00.000Z',
+          ttl_ms: 60000,
+          idempotency_key: 'idem-1',
+          correlation_id: 'corr-1',
+          request_kind: 'mission.start',
+          target: { selector: { kind: 'broadcast' } },
+          payload: {
+            classification: 'personal',
+            reference: {
+              artifact_ref: 'artifact://tenant-acme/brief',
+              integrity_hash: 'sha256:abc',
+              storage_class: 'artifact_store',
+            },
+          },
+        },
+      ],
     },
     {
       id: 'mesh-delivery-record',
       schemaPath: 'knowledge/product/schemas/mesh-delivery-record.schema.json',
-      validPayloads: [{
-        kind: 'mesh-delivery-record', delivery_id: 'delivery-1', message_id: 'msg-1', request_id: 'meshreq-1',
-        tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' }, request_kind: 'review.request',
-        target: { selector: { kind: 'peer', peer_id: 'peer-a1' } },
-        payload: { classification: 'public', reference: { artifact_ref: 'artifact://tenant-acme/brief', integrity_hash: 'sha256:abc', storage_class: 'artifact_store' } },
-        attempt_count: 0, status: 'queued', route: { selector: { kind: 'peer', peer_id: 'peer-a1' }, decision: 'direct', policy_version: '1.0.0' },
-        created_at: '2026-06-24T00:00:00.000Z',
-      }],
-      invalidPayloads: [{
-        kind: 'mesh-delivery-record', delivery_id: 'delivery-1', message_id: 'msg-1', request_id: 'meshreq-1',
-        tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' }, request_kind: 'review.request', attempt_count: 0, status: 'queued',
-      }],
+      validPayloads: [
+        {
+          kind: 'mesh-delivery-record',
+          delivery_id: 'delivery-1',
+          message_id: 'msg-1',
+          request_id: 'meshreq-1',
+          tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
+          request_kind: 'review.request',
+          target: { selector: { kind: 'peer', peer_id: 'peer-a1' } },
+          payload: {
+            classification: 'public',
+            reference: {
+              artifact_ref: 'artifact://tenant-acme/brief',
+              integrity_hash: 'sha256:abc',
+              storage_class: 'artifact_store',
+            },
+          },
+          attempt_count: 0,
+          status: 'queued',
+          route: {
+            selector: { kind: 'peer', peer_id: 'peer-a1' },
+            decision: 'direct',
+            policy_version: '1.0.0',
+          },
+          created_at: '2026-06-24T00:00:00.000Z',
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'mesh-delivery-record',
+          delivery_id: 'delivery-1',
+          message_id: 'msg-1',
+          request_id: 'meshreq-1',
+          tenant_scope: { tenant_id: 'tenant-acme', scope: 'same_tenant' },
+          request_kind: 'review.request',
+          attempt_count: 0,
+          status: 'queued',
+        },
+      ],
     },
     {
       id: 'mesh-topic-subscription',
       schemaPath: 'knowledge/product/schemas/mesh-topic-subscription.schema.json',
-      validPayloads: [{
-        kind: 'mesh-topic-subscription', subscription_id: 'sub-1', tenant_id: 'tenant-acme', topic: 'release.review', peer_id: 'peer-a1',
-        filters: { request_kinds: ['notification.publish'], payload_classifications: ['public'] },
-        expires_at: '2026-06-24T01:00:00.000Z', policy_version: '1.0.0',
-      }],
-      invalidPayloads: [{
-        kind: 'mesh-topic-subscription', subscription_id: 'sub-1', tenant_id: 'tenant-acme', topic: 'release.review', peer_id: 'peer-a1',
-        filters: { request_kinds: ['mission.start'], payload_classifications: ['personal'] }, policy_version: '1.0.0',
-      }],
+      validPayloads: [
+        {
+          kind: 'mesh-topic-subscription',
+          subscription_id: 'sub-1',
+          tenant_id: 'tenant-acme',
+          topic: 'release.review',
+          peer_id: 'peer-a1',
+          filters: { request_kinds: ['notification.publish'], payload_classifications: ['public'] },
+          expires_at: '2026-06-24T01:00:00.000Z',
+          policy_version: '1.0.0',
+        },
+      ],
+      invalidPayloads: [
+        {
+          kind: 'mesh-topic-subscription',
+          subscription_id: 'sub-1',
+          tenant_id: 'tenant-acme',
+          topic: 'release.review',
+          peer_id: 'peer-a1',
+          filters: { request_kinds: ['mission.start'], payload_classifications: ['personal'] },
+          policy_version: '1.0.0',
+        },
+      ],
     },
     {
       id: 'bridge-request',
@@ -2250,7 +2464,8 @@ function createChecks(): ContractCheck[] {
           context_pack_id: 'CPK-MSN-CONTEXT-PACK-001-IMPLEMENTER-ABC12345',
           version: '1',
           generated_at: new Date('2026-06-05T00:00:00.000Z').toISOString(),
-          summary: 'mission=MSN-CONTEXT-PACK-001 / role=implementer / recipient=agent / project=PRJ-CONTEXT-PACK-001 / work_item=WIT-CONTEXT-PACK-001',
+          summary:
+            'mission=MSN-CONTEXT-PACK-001 / role=implementer / recipient=agent / project=PRJ-CONTEXT-PACK-001 / work_item=WIT-CONTEXT-PACK-001',
           scope: {
             tier: 'public',
             mission_id: 'MSN-CONTEXT-PACK-001',
@@ -2311,7 +2526,8 @@ function createChecks(): ContractCheck[] {
           work_item: {
             item_id: 'WIT-CONTEXT-PACK-001',
             title: 'Implement context pack injection',
-            description: 'Build the scoped mission context pack and use it in the work item dispatch prompt.',
+            description:
+              'Build the scoped mission context pack and use it in the work item dispatch prompt.',
             status: 'ready',
             priority: 'high',
             source: 'local',
@@ -2349,7 +2565,12 @@ function createChecks(): ContractCheck[] {
           generated_at: new Date('2026-06-05T00:00:00.000Z').toISOString(),
           summary: 'missing scope',
           recipient: { kind: 'agent' },
-          mission: { mission_id: 'MSN-CTX', tier: 'public', status: 'active', assigned_persona: 'worker' },
+          mission: {
+            mission_id: 'MSN-CTX',
+            tier: 'public',
+            status: 'active',
+            assigned_persona: 'worker',
+          },
           sources: [],
           redactions: [],
           delivery: { mode: 'prompt', summary: 'invalid' },
@@ -3025,7 +3246,9 @@ function createChecks(): ContractCheck[] {
       id: 'presentation-preference-profile',
       schemaPath: 'knowledge/product/schemas/presentation-preference-profile.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/product/schemas/presentation-preference-profile.example.json'),
+        readGovernanceJson(
+          'knowledge/product/schemas/presentation-preference-profile.example.json'
+        ),
       ],
       invalidPayloads: [
         {
@@ -3355,7 +3578,12 @@ function createChecks(): ContractCheck[] {
               summary: '会社名を入力（値は保存しない）',
               risk: 'low',
               captured_at: '2026-06-23T00:00:01.000Z',
-              target: { ref: '@e1', role: 'textbox', name: 'Company name', snapshot_hash: 'b'.repeat(64) },
+              target: {
+                ref: '@e1',
+                role: 'textbox',
+                name: 'Company name',
+                snapshot_hash: 'b'.repeat(64),
+              },
               variable: { name: 'company_name', classification: 'user_input' },
             },
           ],
@@ -3374,14 +3602,16 @@ function createChecks(): ContractCheck[] {
           created_at: '2026-06-23T00:00:00.000Z',
           tab: { origin: 'https://example.com', origin_hash: 'a'.repeat(64), title: 'Example' },
           extension: { version: '0.1.0' },
-          actions: [{
-            action_id: 'step-1',
-            op: 'fill_ref',
-            summary: '入力',
-            risk: 'low',
-            captured_at: '2026-06-23T00:00:01.000Z',
-            value: 'must-not-be-recorded',
-          }],
+          actions: [
+            {
+              action_id: 'step-1',
+              op: 'fill_ref',
+              summary: '入力',
+              risk: 'low',
+              captured_at: '2026-06-23T00:00:01.000Z',
+              value: 'must-not-be-recorded',
+            },
+          ],
           risk_summary: {
             requires_manual_review: true,
             sensitive_input_omitted: 0,
@@ -3482,9 +3712,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'service-presets',
       schemaPath: 'knowledge/product/schemas/service-presets.schema.json',
-      validPayloads: [
-        ...readServicePresetPayloads(),
-      ],
+      validPayloads: [...readServicePresetPayloads()],
       invalidPayloads: [
         {
           service_id: 'slack',
@@ -3630,9 +3858,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'media-tone-style-map',
       schemaPath: 'knowledge/product/schemas/media-tone-style-map.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/media-tone-style-map.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/media-tone-style-map.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3643,9 +3869,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'media-drawio-policy',
       schemaPath: 'knowledge/product/schemas/media-drawio-policy.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/media-drawio-policy.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/media-drawio-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3817,7 +4041,9 @@ function createChecks(): ContractCheck[] {
       id: 'provider-cli-capability-report-policy',
       schemaPath: 'knowledge/product/schemas/provider-cli-capability-report-policy.schema.json',
       validPayloads: [
-        readGovernanceJson('knowledge/product/governance/provider-cli-capability-report-policy.json'),
+        readGovernanceJson(
+          'knowledge/product/governance/provider-cli-capability-report-policy.json'
+        ),
       ],
       invalidPayloads: [
         {
@@ -3868,9 +4094,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'changelog-policy',
       schemaPath: 'knowledge/product/schemas/changelog-policy.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/changelog-policy.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/changelog-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3894,9 +4118,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'legacy-media-ops',
       schemaPath: 'knowledge/product/schemas/legacy-media-ops.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/legacy-media-ops.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/legacy-media-ops.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3920,9 +4142,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'media-aws-icon-rules',
       schemaPath: 'knowledge/product/schemas/media-aws-icon-rules.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/media-aws-icon-rules.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/media-aws-icon-rules.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3933,9 +4153,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'media-semantic-map',
       schemaPath: 'knowledge/product/schemas/media-semantic-map.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/media-semantic-map.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/media-semantic-map.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3946,9 +4164,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'media-style-policy',
       schemaPath: 'knowledge/product/schemas/media-style-policy.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/media-style-policy.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/media-style-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -3972,9 +4188,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'tracker-sheet-policy',
       schemaPath: 'knowledge/product/schemas/tracker-sheet-policy.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/tracker-sheet-policy.json'),
-      ],
+      validPayloads: [readGovernanceJson('knowledge/product/governance/tracker-sheet-policy.json')],
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -4020,7 +4234,12 @@ function createChecks(): ContractCheck[] {
               description: 'Creates decks, reports, and structured workbook artifacts.',
               conversation_agent: 'presence-surface-agent',
               team_roles: ['planner', 'implementer', 'reviewer'],
-              capabilities: ['presentation_deck', 'report_document', 'workbook_wbs', 'artifact_generation'],
+              capabilities: [
+                'presentation_deck',
+                'report_document',
+                'workbook_wbs',
+                'artifact_generation',
+              ],
             },
           },
         },
@@ -4514,6 +4733,9 @@ function createChecks(): ContractCheck[] {
         {
           intent: 'request_mission_work',
           text: '進捗をまとめて',
+          objective: 'team_status_summary',
+          acceptance_criteria: ['summarize the mission', 'list open questions'],
+          expected_outputs: ['summary', 'open questions'],
           context: {
             mission_id: 'MSN-schema-1',
             team_role: 'mission-controller',

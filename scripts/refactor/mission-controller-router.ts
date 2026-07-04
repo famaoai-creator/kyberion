@@ -30,7 +30,7 @@ export interface MissionControllerRoutingContext {
   validateMissionStartCreateInput: (
     actionName: 'create' | 'start',
     missionId?: string,
-    argv?: string[],
+    argv?: string[]
   ) => {
     tier?: 'personal' | 'confidential' | 'public';
     tenantId?: string;
@@ -55,7 +55,7 @@ export interface MissionControllerRoutingContext {
     persona?: string,
     relationships?: any,
     tenantSlug?: string,
-    organizationId?: string,
+    organizationId?: string
   ) => Awaitable<void>;
   startMission: (
     id: string,
@@ -66,12 +66,12 @@ export interface MissionControllerRoutingContext {
     visionRef?: string,
     relationships?: any,
     tenantSlug?: string,
-    organizationId?: string,
+    organizationId?: string
   ) => Awaitable<void>;
   recordRoutingDecisionInMissionState: (
     missionId: string,
     routingDecision: Record<string, unknown> | null,
-    event: 'CREATE' | 'START',
+    event: 'CREATE' | 'START'
   ) => Awaitable<void>;
   grantMissionAccess: (missionId: string, serviceId: string, ttl?: number) => Awaitable<void>;
   grantMissionSudo: (missionId: string, on?: boolean, ttl?: number) => Awaitable<void>;
@@ -87,17 +87,19 @@ export interface MissionControllerRoutingContext {
       liveTargets?: Array<'workitem' | 'github' | 'jira'>;
       github?: { owner?: string; repo?: string };
       jira?: { domain?: string; projectKey?: string };
-    },
+    }
   ) => Awaitable<void>;
   dispatchMissionWorkItems: (
     id: string,
     options?: {
       mode?: 'auto' | 'agent' | 'subagent';
       limit?: number;
-      statuses?: Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>;
+      statuses?: Array<
+        'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'
+      >;
       sources?: Array<'local' | 'github' | 'jira' | 'peer'>;
       finalStatus?: 'review' | 'done';
-    },
+    }
   ) => Awaitable<void>;
   sealMission: (id: string) => Awaitable<unknown>;
   enqueueMission: (id: string, tier: string, priority: number, deps: string[]) => Awaitable<void>;
@@ -110,11 +112,13 @@ export interface MissionControllerRoutingContext {
     candidateId: string,
     executionRole?: 'mission_controller' | 'chronos_gateway',
     note?: string,
+    supersedes?: string
   ) => void;
   promotePendingMemoryCandidates: (input: {
     executionRole?: 'mission_controller' | 'chronos_gateway';
     dryRun?: boolean;
     note?: string;
+    supersedes?: string;
   }) => void;
   finishMission: (id: string, seal?: boolean) => Awaitable<void>;
   resumeMission: (id?: string) => Awaitable<void>;
@@ -126,23 +130,35 @@ export interface MissionControllerRoutingContext {
     evidence?: string[],
     teamRole?: string,
     actorId?: string,
-    actorType?: 'agent' | 'human' | 'service',
+    actorType?: 'agent' | 'human' | 'service'
   ) => Awaitable<void>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   listMissions: (filterStatus?: string) => void;
   listOrganizationCatalogs: (organizationId?: string, jsonOutput?: boolean) => Awaitable<void>;
   listOrganizationProfiles: (organizationId?: string) => Awaitable<void>;
-  showOrganizationProfile: (organizationId?: string, summaryOnly?: boolean, jsonOutput?: boolean) => Awaitable<void>;
+  showOrganizationProfile: (
+    organizationId?: string,
+    summaryOnly?: boolean,
+    jsonOutput?: boolean
+  ) => Awaitable<void>;
   showOrganizationDiscovery: (jsonOutput?: boolean, summaryOnly?: boolean) => Awaitable<void>;
   showMissionStatus: (id: string) => void;
   showReasoningBackendStatus: () => void;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
   showMissionTeam: (id: string, refresh?: boolean, organizationId?: string) => Awaitable<void>;
   staffMissionTeam: (id: string, organizationId?: string) => Awaitable<void>;
-  prewarmMissionTeam: (id: string, teamRolesArg?: string, organizationId?: string) => Awaitable<void>;
+  prewarmMissionTeam: (
+    id: string,
+    teamRolesArg?: string,
+    organizationId?: string
+  ) => Awaitable<void>;
   classifyMission: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   selectMissionWorkflow: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
-  reviewWorkerOutput: (id: string, result?: 'verified' | 'rejected', note?: string) => Awaitable<void>;
+  reviewWorkerOutput: (
+    id: string,
+    result?: 'verified' | 'rejected',
+    note?: string
+  ) => Awaitable<void>;
   handoffMission: (id: string, nextPersona: string, note?: string) => Awaitable<void>;
   gatePass: (missionId: string, gateId: string, note?: string) => Awaitable<void>;
   gateFail: (missionId: string, gateId: string, note?: string) => Awaitable<void>;
@@ -153,7 +169,7 @@ function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return { raw };
   }
@@ -169,7 +185,7 @@ function parseIntentConfidence(value?: string): number {
 }
 
 function summarizeIntentTrackGate(
-  gate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null,
+  gate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null
 ): Record<string, unknown> | null {
   if (!gate) return null;
   if (gate.status === 'escalation_required') return gate;
@@ -199,8 +215,11 @@ function summarizeIntentTrackGate(
 async function applyIntentTrackGate(
   context: MissionControllerRoutingContext,
   input: MissionStartCreateInput,
-  missionId: string | undefined,
-): Promise<{ input: MissionStartCreateInput; intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null }> {
+  missionId: string | undefined
+): Promise<{
+  input: MissionStartCreateInput;
+  intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null;
+}> {
   const intentId = context.getOptionValue('--intent-id', context.argv);
   if (!intentId) return { input, intentTrackGate: null };
 
@@ -210,7 +229,7 @@ async function applyIntentTrackGate(
   }
   if (!input.relationships?.project?.project_id || !input.relationships.project.project_path) {
     throw new Error(
-      '--intent-id requires --project-id and --project-path so the generated track remains linked to a governed project',
+      '--intent-id requires --project-id and --project-path so the generated track remains linked to a governed project'
     );
   }
 
@@ -228,7 +247,7 @@ async function applyIntentTrackGate(
   if (result.status === 'escalation_required') {
     if (context.hasDryRun) return { input, intentTrackGate: result };
     throw new Error(
-      `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`,
+      `Intent-to-track gate requires confirmation: ${result.intent_id} confidence ${result.confidence} is below ${result.min_confidence_to_autostart}`
     );
   }
 
@@ -245,7 +264,7 @@ async function applyIntentTrackGate(
 }
 
 function persistIntentTrackGate(
-  intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null,
+  intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null
 ): void {
   if (intentTrackGate?.status !== 'ready_to_provision') return;
   saveProjectTrackRecord(intentTrackGate.track_record);
@@ -255,21 +274,15 @@ function syncRoutingDecisionSummary(
   context: MissionControllerRoutingContext,
   missionId: string,
   routingDecision: Record<string, unknown> | null,
-  event: 'CREATE' | 'START',
+  event: 'CREATE' | 'START'
 ): Awaitable<void> {
   return context.recordRoutingDecisionInMissionState(missionId, routingDecision, event);
 }
 
-export async function runMissionControllerAction(context: MissionControllerRoutingContext): Promise<void> {
-  const {
-    action,
-    arg1,
-    arg2,
-    arg3,
-    arg4,
-    hasDryRun,
-    getOptionValue: getValue,
-  } = context;
+export async function runMissionControllerAction(
+  context: MissionControllerRoutingContext
+): Promise<void> {
+  const { action, arg1, arg2, arg3, arg4, hasDryRun, getOptionValue: getValue } = context;
 
   switch (action) {
     case 'create': {
@@ -289,21 +302,24 @@ export async function runMissionControllerAction(context: MissionControllerRouti
               intentTrackGate: summarizeIntentTrackGate(intentTrack.intentTrackGate),
             },
             null,
-            2,
-          ),
+            2
+          )
         );
         break;
       }
       await context.createMission(
         arg1!,
-        (createInput?.tier || positionalTier || 'confidential') as 'personal' | 'confidential' | 'public',
+        (createInput?.tier || positionalTier || 'confidential') as
+          | 'personal'
+          | 'confidential'
+          | 'public',
         createInput?.tenantId,
         createInput?.missionType,
         createInput?.visionRef,
         createInput?.persona,
         createInput?.relationships,
         createInput?.tenantSlug,
-        createInput?.organizationId,
+        createInput?.organizationId
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
@@ -337,8 +353,8 @@ export async function runMissionControllerAction(context: MissionControllerRouti
               intentTrackGate: summarizeIntentTrackGate(intentTrack.intentTrackGate),
             },
             null,
-            2,
-          ),
+            2
+          )
         );
         break;
       }
@@ -351,7 +367,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
         input?.visionRef,
         input?.relationships,
         input?.tenantSlug,
-        input?.organizationId,
+        input?.organizationId
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
@@ -377,7 +393,11 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       break;
     case 'checkpoint':
       if (getValue('--mission-id', context.argv) || getValue('--mission', context.argv)) {
-        await context.createCheckpoint(arg1 || 'manual', arg2 || 'progress update', getValue('--mission-id', context.argv) || getValue('--mission', context.argv));
+        await context.createCheckpoint(
+          arg1 || 'manual',
+          arg2 || 'progress update',
+          getValue('--mission-id', context.argv) || getValue('--mission', context.argv)
+        );
       } else if (arg3) {
         await context.createCheckpoint(arg2 || 'manual', arg3 || 'progress update', arg1);
       } else {
@@ -391,7 +411,11 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       await context.importMission(arg1!, arg2!);
       break;
     case 'verify':
-      await context.verifyMission(arg1!, (arg2 as 'verified' | 'rejected') || 'verified', arg3 || '');
+      await context.verifyMission(
+        arg1!,
+        (arg2 as 'verified' | 'rejected') || 'verified',
+        arg3 || ''
+      );
       break;
     case 'distill':
       await context.distillMission(arg1!);
@@ -406,7 +430,12 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       await context.sealMission(arg1!);
       break;
     case 'enqueue':
-      await context.enqueueMission(arg1!, arg2!, parseInt(arg3 || '5'), arg4 ? arg4.split(',') : []);
+      await context.enqueueMission(
+        arg1!,
+        arg2!,
+        parseInt(arg3 || '5'),
+        arg4 ? arg4.split(',') : []
+      );
       break;
     case 'dispatch':
       await context.dispatchNextMission();
@@ -415,7 +444,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       context.acceptRubricOverride(
         arg1!,
         getValue('--reason', context.argv),
-        getValue('--severity', context.argv),
+        getValue('--severity', context.argv)
       );
       break;
     case 'memory-queue':
@@ -428,18 +457,22 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       context.rejectMemoryCandidate(arg1!, getValue('--note', context.argv));
       break;
     case 'memory-promote':
-      context.promoteMemoryCandidate(
+      await context.promoteMemoryCandidate(
         arg1!,
-        (getValue('--execution-role', context.argv) as 'mission_controller' | 'chronos_gateway') || 'mission_controller',
+        (getValue('--execution-role', context.argv) as 'mission_controller' | 'chronos_gateway') ||
+          'mission_controller',
         getValue('--note', context.argv),
+        getValue('--supersedes', context.argv)
       );
       break;
     case 'memory-promote-pending':
-      context.promotePendingMemoryCandidates({
+      await context.promotePendingMemoryCandidates({
         executionRole:
-          (getValue('--execution-role', context.argv) as 'mission_controller' | 'chronos_gateway') ||
-          'mission_controller',
+          (getValue('--execution-role', context.argv) as
+            | 'mission_controller'
+            | 'chronos_gateway') || 'mission_controller',
         note: getValue('--note', context.argv),
+        supersedes: getValue('--supersedes', context.argv),
         dryRun: context.argv.includes('--dry-run'),
       });
       break;
@@ -460,7 +493,7 @@ export async function runMissionControllerAction(context: MissionControllerRouti
         parseCsvOption('--evidence', context.argv),
         getValue('--team-role', context.argv),
         getValue('--actor-id', context.argv),
-        getValue('--actor-type', context.argv) as any,
+        getValue('--actor-type', context.argv) as any
       );
       break;
     case 'purge':
@@ -472,23 +505,25 @@ export async function runMissionControllerAction(context: MissionControllerRouti
     case 'organization-catalogs':
       await context.listOrganizationCatalogs(
         getValue('--organization-id', context.argv) || getValue('--org', context.argv),
-        context.argv.includes('--json'),
+        context.argv.includes('--json')
       );
       break;
     case 'organization-profiles':
-      await context.listOrganizationProfiles(getValue('--organization-id', context.argv) || getValue('--org', context.argv));
+      await context.listOrganizationProfiles(
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
       break;
     case 'organization-profile':
       await context.showOrganizationProfile(
         getValue('--organization-id', context.argv) || getValue('--org', context.argv),
         context.argv.includes('--summary') || context.argv.includes('--compact'),
-        context.argv.includes('--json'),
+        context.argv.includes('--json')
       );
       break;
     case 'organization-discovery':
       await context.showOrganizationDiscovery(
         context.argv.includes('--json'),
-        context.argv.includes('--summary') || context.argv.includes('--compact'),
+        context.argv.includes('--summary') || context.argv.includes('--compact')
       );
       break;
     case 'status':
@@ -499,13 +534,24 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       await context.syncProjectLedger(arg1!);
       break;
     case 'team':
-      await context.showMissionTeam(arg1!, context.hasRefresh, getValue('--organization-id', context.argv) || getValue('--org', context.argv));
+      await context.showMissionTeam(
+        arg1!,
+        context.hasRefresh,
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
       break;
     case 'staff':
-      await context.staffMissionTeam(arg1!, getValue('--organization-id', context.argv) || getValue('--org', context.argv));
+      await context.staffMissionTeam(
+        arg1!,
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
       break;
     case 'prewarm':
-      await context.prewarmMissionTeam(arg1!, arg2, getValue('--organization-id', context.argv) || getValue('--org', context.argv));
+      await context.prewarmMissionTeam(
+        arg1!,
+        arg2,
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
       break;
     case 'classify':
       await context.classifyMission(arg1!, arg2, arg3);
@@ -514,7 +560,11 @@ export async function runMissionControllerAction(context: MissionControllerRouti
       await context.selectMissionWorkflow(arg1!, arg2, arg3);
       break;
     case 'review-worker-output':
-      await context.reviewWorkerOutput(arg1!, (arg2 as 'verified' | 'rejected') || 'verified', arg3);
+      await context.reviewWorkerOutput(
+        arg1!,
+        (arg2 as 'verified' | 'rejected') || 'verified',
+        arg3
+      );
       break;
     case 'handoff':
       await context.handoffMission(arg1!, arg2!, arg3);
