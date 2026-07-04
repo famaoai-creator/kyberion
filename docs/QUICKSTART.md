@@ -20,19 +20,22 @@ Actuator -> ADF -> internal runtime detail
 
 ## 1. Setup
 
+> **Canonical cold-start source: [docs/INITIALIZATION.md](./INITIALIZATION.md).** The block below is a summary; when in doubt (ordering, prerequisites, troubleshooting), follow INITIALIZATION.md.
+
 Prerequisites:
 
-- Node.js `22+`
+- Node.js `24+` (matches `package.json` engines and `.nvmrc`)
 - `pnpm`
 
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
-pnpm prereq:check
+pnpm prereq:check     # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm exec playwright install chromium   # recommended: needed for the browser first-win
 pnpm build
-pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
 pnpm surfaces:reconcile
+pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
 ```
 
 ## 2. First Win Smoke

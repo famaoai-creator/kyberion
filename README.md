@@ -26,6 +26,7 @@
 Kyberion turns intent into governed execution. You ask `今週の進捗レポートを作って` or `この PDF をパワポにして`, and it picks the right actuators, runs the work, asks only when something is genuinely ambiguous, and returns the result plus an artifact plus a trace that next runs can learn from.
 
 **For people new to the repo**
+
 - If you want to try it quickly, start with [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).
 - If you want to understand what it does, read [`docs/WHY.md`](./docs/WHY.md) and [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md).
 - If you want to extend it, jump to [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) and [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md).
@@ -36,16 +37,22 @@ Kyberion turns intent into governed execution. You ask `今週の進捗レポー
 
 ## Quick Start
 
+> **Canonical cold-start source: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).** The commands below are a summary; if anything conflicts, INITIALIZATION.md wins.
+
 Kyberion's first visible result comes in three short paths:
 
 - 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 
+Requires Node.js 24+ (`.nvmrc` / `package.json` engines) and pnpm.
+
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
+pnpm prereq:check                       # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm exec playwright install chromium   # recommended: the browser smoke needs it
 pnpm build
 pnpm onboard
 pnpm doctor
@@ -66,7 +73,7 @@ To understand the structure in 15 minutes, read [`docs/QUICKSTART.md`](./docs/QU
 
 If you do not know which surface to use next, `pnpm setup:report --persona first-time-user` now acts as the entry guide. It tells you whether to start with Chronos, the voice path, or a messaging surface, and whether auth/setup is still blocking that route.
 
-For the full setup, see [`docs/QUICKSTART.md`](./docs/QUICKSTART.md). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
+For the full canonical setup, see [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md) (structure map: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
 ---
 
@@ -109,18 +116,18 @@ The strategic positioning is **OSS-first, with paid implementation support / FDE
 
 ## Documentation Map
 
-| If you want to | Read |
-|---|---|
-| Understand why this exists | [`docs/WHY.md`](./docs/WHY.md) / [`.ja.md`](./docs/WHY.ja.md) |
-| Try it in 5 minutes | [`docs/QUICKSTART.md`](./docs/QUICKSTART.md) |
-| Deploy it for a customer | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md) |
-| Browse what it can automate | [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md) |
-| Understand the architecture | [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md) |
-| Author a new actuator / pipeline | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) |
-| Customize for a customer | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |
-| Contribute | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
-| Understand the data flow / privacy | [`docs/PRIVACY.md`](./docs/PRIVACY.md) / [`.ja.md`](./docs/PRIVACY.ja.md) |
-| Report a security issue | [`SECURITY.md`](./SECURITY.md) |
+| If you want to                     | Read                                                                                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Understand why this exists         | [`docs/WHY.md`](./docs/WHY.md) / [`.ja.md`](./docs/WHY.ja.md)                                                                                  |
+| Try it in 5 minutes                | [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)                                                                                                   |
+| Deploy it for a customer           | [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md)                                                                                 |
+| Browse what it can automate        | [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md)                                                                                       |
+| Understand the architecture        | [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md)                       |
+| Author a new actuator / pipeline   | [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md)                                                                   |
+| Customize for a customer           | [`docs/developer/CUSTOMER_AGGREGATION.md`](./docs/developer/CUSTOMER_AGGREGATION.md) / [`.ja.md`](./docs/developer/CUSTOMER_AGGREGATION.ja.md) |
+| Contribute                         | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                                         |
+| Understand the data flow / privacy | [`docs/PRIVACY.md`](./docs/PRIVACY.md) / [`.ja.md`](./docs/PRIVACY.ja.md)                                                                      |
+| Report a security issue            | [`SECURITY.md`](./SECURITY.md)                                                                                                                 |
 
 Three audiences, three folders:
 
@@ -132,13 +139,13 @@ Three audiences, three folders:
 
 ## How It Compares
 
-| You've used | What Kyberion adds |
-|---|---|
-| **ChatGPT / Claude.ai** | Stateful missions, governed execution, a catalog of actuators (browser, file, voice, …), audit chain, reusable memory across runs. |
-| **Cursor** | Code is one actuator among many. The unit of work is a long-running mission with persistent state, not a single chat. |
-| **Computer Use / browser agents** | Mission-scoped state, tier-isolated knowledge, customer aggregation. The browser is one tool, not the substrate. |
-| **Zapier / n8n / RPA** | Replaces brittle rule chains with intent-driven plans. Plans survive site changes via Trace-fed reusable hints. |
-| **AI Ops / agent SaaS** | OSS, self-hostable, customer-data-stays-local. No central server. FDE-ready for implementation engagements. |
+| You've used                       | What Kyberion adds                                                                                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **ChatGPT / Claude.ai**           | Stateful missions, governed execution, a catalog of actuators (browser, file, voice, …), audit chain, reusable memory across runs. |
+| **Cursor**                        | Code is one actuator among many. The unit of work is a long-running mission with persistent state, not a single chat.              |
+| **Computer Use / browser agents** | Mission-scoped state, tier-isolated knowledge, customer aggregation. The browser is one tool, not the substrate.                   |
+| **Zapier / n8n / RPA**            | Replaces brittle rule chains with intent-driven plans. Plans survive site changes via Trace-fed reusable hints.                    |
+| **AI Ops / agent SaaS**           | OSS, self-hostable, customer-data-stays-local. No central server. FDE-ready for implementation engagements.                        |
 
 ---
 
