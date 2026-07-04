@@ -1,13 +1,13 @@
 import path from 'node:path';
+import { z } from 'zod';
 import { logger } from './core.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
-import { getReasoningBackend } from './reasoning-backend.js';
+import { delegateStructured, getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
 import {
   PROCEDURE_RESOLUTION_THRESHOLDS,
   type ProcedureCatalog,
-  type ProcedureCandidate,
   type ProcedureEntry,
   type ProcedureResolution,
 } from './procedure-types.js';
@@ -21,6 +21,16 @@ const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
  * an arbitrary file in the repo.
  */
 const RECORDINGS_STORE = pathResolver.shared('runtime/recordings');
+
+const procedureCandidateSchema = z.object({
+  procedure_id: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  reason: z.string().min(1),
+});
+
+const procedureRankingSchema = z.object({
+  candidates: z.array(procedureCandidateSchema),
+});
 
 let catalogCache: ProcedureEntry[] | null = null;
 
@@ -61,7 +71,9 @@ export function loadProcedures(forceRefresh = false): ProcedureEntry[] {
         continue;
       }
       if (seen.has(entry.procedure_id)) {
-        logger.warn(`[procedure-registry] duplicate procedure_id "${entry.procedure_id}" — keeping first`);
+        logger.warn(
+          `[procedure-registry] duplicate procedure_id "${entry.procedure_id}" — keeping first`
+        );
         continue;
       }
       seen.add(entry.procedure_id);
@@ -103,10 +115,7 @@ export function resolveAllowlistedRecordingRef(recordingRef: string | undefined)
 function normalize(s: string): string {
   return s
     .toLowerCase()
-    .replace(
-      /[\s　、。・，！？「」【】（）()『』]+/g,
-      ' ',
-    )
+    .replace(/[\s　、。・，！？「」【】（）()『』]+/g, ' ')
     .trim();
 }
 
@@ -134,7 +143,7 @@ function scoreEntry(
   entry: ProcedureEntry,
   intent: string,
   origin?: string,
-  substrate?: string,
+  substrate?: string
 ): number {
   if (substrate && entry.substrate !== substrate) return 0;
 
@@ -178,7 +187,7 @@ export interface ResolveOptions {
  */
 export async function resolveProcedure(
   intent: string,
-  opts: ResolveOptions = {},
+  opts: ResolveOptions = {}
 ): Promise<ProcedureResolution> {
   const { autoExecute, learn } = PROCEDURE_RESOLUTION_THRESHOLDS;
   const procedures = loadProcedures().filter((p) => p.status === 'active');
@@ -221,46 +230,45 @@ export async function resolveProcedure(
       .slice(0, 5)
       .map(
         (x) =>
-          `- id="${x.entry.procedure_id}" phrases=${JSON.stringify(x.entry.intent_phrases)} score=${x.score.toFixed(2)}`,
+          `- id="${x.entry.procedure_id}" phrases=${JSON.stringify(x.entry.intent_phrases)} score=${x.score.toFixed(2)}`
       )
       .join('\n');
 
-    const prompt =
-      `You are ranking intent-to-procedure candidates. User intent: "${intent}"\n` +
-      `Candidates:\n${candidateLines}\n\n` +
-      `Return a JSON array (no other text) of { "procedure_id": string, "confidence": number, "reason": string }, ` +
-      `sorted by confidence descending. confidence range: 0..1. ` +
-      `Assign >= ${autoExecute} only when the intent clearly matches. Return [] if none match.`;
-
     try {
-      const raw = await backend.delegateTask(prompt, `intent-resolution: "${intent}"`);
-      const start = raw.indexOf('[');
-      const end = raw.lastIndexOf(']');
-      if (start !== -1 && end > start) {
-        const llmCandidates = JSON.parse(raw.slice(start, end + 1)) as ProcedureCandidate[];
-        if (Array.isArray(llmCandidates)) {
-          // LLM explicitly returned no matches → override Stage 1
-          if (llmCandidates.length === 0) {
-            return { outcome: 'unmatched', candidates: [], recommendedPattern: 'A' };
-          }
-          const llmTop = llmCandidates[0];
-          if (llmTop.confidence >= autoExecute) {
-            return {
-              outcome: 'matched',
-              best: { procedure_id: llmTop.procedure_id, confidence: llmTop.confidence },
-              candidates: llmCandidates,
-              recommendedPattern: 'B',
-            };
-          }
-          if (llmTop.confidence >= learn) {
-            return { outcome: 'ambiguous', candidates: llmCandidates, recommendedPattern: 'A' };
-          }
-          return { outcome: 'unmatched', candidates: [], recommendedPattern: 'A' };
-        }
+      const { candidates: llmCandidates } = await delegateStructured(
+        backend,
+        [
+          `You are ranking intent-to-procedure candidates. User intent: "${intent}"`,
+          `Candidates:`,
+          candidateLines,
+          '',
+          `Return a JSON object with a "candidates" array of { "procedure_id": string, "confidence": number, "reason": string },`,
+          `sorted by confidence descending. confidence range: 0..1.`,
+          `Assign >= ${autoExecute} only when the intent clearly matches. Return {"candidates": []} if none match.`,
+        ].join('\n'),
+        procedureRankingSchema,
+        { context: `intent-resolution: "${intent}"` }
+      );
+      // LLM explicitly returned no matches → override Stage 1
+      if (llmCandidates.length === 0) {
+        return { outcome: 'unmatched', candidates: [], recommendedPattern: 'A' };
       }
+      const llmTop = llmCandidates[0];
+      if (llmTop.confidence >= autoExecute) {
+        return {
+          outcome: 'matched',
+          best: { procedure_id: llmTop.procedure_id, confidence: llmTop.confidence },
+          candidates: llmCandidates,
+          recommendedPattern: 'B',
+        };
+      }
+      if (llmTop.confidence >= learn) {
+        return { outcome: 'ambiguous', candidates: llmCandidates, recommendedPattern: 'A' };
+      }
+      return { outcome: 'unmatched', candidates: [], recommendedPattern: 'A' };
     } catch (err) {
       logger.warn(
-        `[procedure-registry] LLM re-ranking failed: ${String(err)} — falling back to Stage 1`,
+        `[procedure-registry] LLM re-ranking failed: ${String(err)} — falling back to Stage 1`
       );
     }
   }

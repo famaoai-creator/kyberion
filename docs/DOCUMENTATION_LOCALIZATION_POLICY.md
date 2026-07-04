@@ -14,24 +14,20 @@ However, localized variants should be treated as `derived operator aids`, not as
 
 ## Recommended Structure
 
-Use this pattern:
+Use colocated language variants when a document has a localized counterpart:
 
 ```text
 docs/
   <canonical-doc>.md
-  i18n/
-    ja/
-      <canonical-doc>.md
+  <canonical-doc>.ja.md
 ```
 
-For knowledge documents:
+For knowledge documents, prefer the same colocated pattern:
 
 ```text
 knowledge/public/
-  ...
-  i18n/
-    ja/
-      ...
+  <document>.md
+  <document>.ja.md
 ```
 
 ## What Should Usually Stay Canonical
@@ -61,7 +57,7 @@ These are good candidates for localization:
 UI- and operator-facing wording should not be localized by scattering translated strings across surfaces.
 Instead, surfaces should prefer governed catalogs such as:
 
-- [`knowledge/product/orchestration/user-facing-vocabulary.json`](/Users/famao/kyberion/knowledge/product/orchestration/user-facing-vocabulary.json)
+- [`knowledge/product/orchestration/user-facing-vocabulary.json`](../knowledge/product/orchestration/user-facing-vocabulary.json)
 
 This rule applies mainly to `fixed labels`, `section headers`, and short status words.
 It does not require every free-form explanation or clarification sentence to be pre-translated.

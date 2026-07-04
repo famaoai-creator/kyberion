@@ -1,0 +1,17 @@
+{
+  "name": "@actuator/voice",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Governed local voice generation actuator with native playback and artifact fallback",
+  "main": "../../../dist/libs/actuators/voice-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/voice-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run src/"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1"
+  }
+}

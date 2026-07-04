@@ -1,5 +1,10 @@
 import type { VideoStoryboard } from './video-content-brief-contract.js';
-import type { VideoCompositionADF, VideoCompositionAssetRef, VideoCompositionSceneRole } from './video-composition-contract.js';
+import type {
+  VideoCompositionADF,
+  VideoCompositionAssetRef,
+  VideoCompositionSceneRole,
+} from './video-composition-contract.js';
+import { resolveDefaultVideoBackgroundColor } from './video-design-system.js';
 
 export interface NarratedVideoBrief {
   kind: 'narrated-video-brief';
@@ -41,13 +46,18 @@ export interface NarratedVideoBrief {
   };
 }
 
-export function compileNarratedVideoBriefToCompositionADF(brief: NarratedVideoBrief): VideoCompositionADF {
+export function compileNarratedVideoBriefToCompositionADF(
+  brief: NarratedVideoBrief
+): VideoCompositionADF {
   const storyboard = brief.storyboard;
-  const totalDuration = clampDuration(brief.timing?.duration_sec || (storyboard ? sumStoryboardDuration(storyboard) : 9));
+  const totalDuration = clampDuration(
+    brief.timing?.duration_sec || (storyboard ? sumStoryboardDuration(storyboard) : 9)
+  );
   const fps = clampFps(brief.timing?.fps || 30);
-  const background = brief.design_system.theme_tokens?.background_color
-    || storyboard?.design_system_ref?.background_color
-    || '#07111f';
+  const background =
+    brief.design_system.theme_tokens?.background_color ||
+    storyboard?.design_system_ref?.background_color ||
+    resolveDefaultVideoBackgroundColor();
   const format = brief.output?.format || 'mp4';
   const title = brief.title || `${brief.design_system.brand_name} Intro`;
   const compositionFormat = storyboard?.format || resolveDefaultCompositionFormat();
@@ -84,11 +94,27 @@ export function compileNarratedVideoBriefToCompositionADF(brief: NarratedVideoBr
   };
 }
 
-function buildStoryboardScenes(brief: NarratedVideoBrief, storyboard: VideoStoryboard): VideoCompositionADF['scenes'] {
+function buildStoryboardScenes(
+  brief: NarratedVideoBrief,
+  storyboard: VideoStoryboard
+): VideoCompositionADF['scenes'] {
   return storyboard.beats.map((beat, index) => {
     const role = normalizeSceneRole(beat.role || beat.semantic);
-    const templateId = selectTemplateId(storyboard.presentation_mode, role, beat.semantic, index, storyboard.beats.length);
-    const layoutVariant = resolveSceneLayoutVariant(storyboard.presentation_mode, role, beat.semantic, index, storyboard.beats.length, beat.layout_variant);
+    const templateId = selectTemplateId(
+      storyboard.presentation_mode,
+      role,
+      beat.semantic,
+      index,
+      storyboard.beats.length
+    );
+    const layoutVariant = resolveSceneLayoutVariant(
+      storyboard.presentation_mode,
+      role,
+      beat.semantic,
+      index,
+      storyboard.beats.length,
+      beat.layout_variant
+    );
     return {
       scene_id: beat.beat_id,
       role,
@@ -106,7 +132,7 @@ function buildStoryboardSceneContent(
   storyboard: VideoStoryboard,
   beat: VideoStoryboard['beats'][number],
   index: number,
-  layoutVariant: string,
+  layoutVariant: string
 ): Record<string, unknown> {
   const presentationMode = storyboard.presentation_mode || 'howto';
   const content: Record<string, unknown> = {
@@ -121,10 +147,12 @@ function buildStoryboardSceneContent(
     beat_index: index + 1,
     presentation_mode: presentationMode,
     layout_variant: layoutVariant,
-    layout_family: typeof beat.design_token_hints?.layout_family === 'string'
-      ? beat.design_token_hints.layout_family
-      : undefined,
-    design_system_vars: storyboard.design_system_ref?.css_vars || brief.design_system.theme_tokens?.css_vars || {},
+    layout_family:
+      typeof beat.design_token_hints?.layout_family === 'string'
+        ? beat.design_token_hints.layout_family
+        : undefined,
+    design_system_vars:
+      storyboard.design_system_ref?.css_vars || brief.design_system.theme_tokens?.css_vars || {},
   };
   if (beat.semantic === 'process' || beat.semantic === 'steps' || beat.semantic === 'demo') {
     content.visual_steps = deriveProcessSteps(storyboard);
@@ -140,7 +168,12 @@ function buildStoryboardSceneContent(
       brief.storyboard?.promise || brief.script.feature,
       brief.storyboard?.desired_takeaway || brief.script.cta,
     ].filter(Boolean);
-    content.social_proof = brief.storyboard?.promise ? [brief.storyboard.promise, ...(brief.storyboard.desired_takeaway ? [brief.storyboard.desired_takeaway] : [])] : [];
+    content.social_proof = brief.storyboard?.promise
+      ? [
+          brief.storyboard.promise,
+          ...(brief.storyboard.desired_takeaway ? [brief.storyboard.desired_takeaway] : []),
+        ]
+      : [];
   }
   if (presentationMode === 'vtuber') {
     content.stage_notes = [
@@ -162,7 +195,7 @@ function buildStoryboardSceneContent(
 function buildStoryboardAssetRefs(
   brief: NarratedVideoBrief,
   beat: VideoStoryboard['beats'][number],
-  role: VideoCompositionSceneRole,
+  role: VideoCompositionSceneRole
 ): VideoCompositionAssetRef[] {
   const assets: VideoCompositionAssetRef[] = [];
   const hero = brief.design_system.assets?.hero_path;
@@ -170,8 +203,18 @@ function buildStoryboardAssetRefs(
   const isVtuber = brief.storyboard?.presentation_mode === 'vtuber';
 
   if (hero) {
-    const isVtuberStage = isVtuber && beat.role !== 'cta' && beat.role !== 'outro' && beat.semantic !== 'cta' && beat.semantic !== 'validation';
-    if (role === 'feature' || beat.semantic === 'demo' || beat.semantic === 'process' || isVtuberStage) {
+    const isVtuberStage =
+      isVtuber &&
+      beat.role !== 'cta' &&
+      beat.role !== 'outro' &&
+      beat.semantic !== 'cta' &&
+      beat.semantic !== 'validation';
+    if (
+      role === 'feature' ||
+      beat.semantic === 'demo' ||
+      beat.semantic === 'process' ||
+      isVtuberStage
+    ) {
       assets.push({
         asset_id: `${beat.beat_id}-hero`,
         path: hero,
@@ -196,7 +239,10 @@ function buildStoryboardAssetRefs(
   return assets;
 }
 
-function buildLegacyScenes(brief: NarratedVideoBrief, totalDuration: number): VideoCompositionADF['scenes'] {
+function buildLegacyScenes(
+  brief: NarratedVideoBrief,
+  totalDuration: number
+): VideoCompositionADF['scenes'] {
   const hookDuration = roundTo2(totalDuration * 0.33);
   const featureDuration = roundTo2(totalDuration * 0.45);
   const outroDuration = roundTo2(Math.max(0.1, totalDuration - hookDuration - featureDuration));
@@ -255,7 +301,14 @@ function deriveProcessSteps(storyboard: VideoStoryboard): Array<{ step: string; 
 }
 
 function normalizeSceneRole(role?: string): VideoCompositionSceneRole {
-  if (role === 'hook' || role === 'feature' || role === 'proof' || role === 'cta' || role === 'outro' || role === 'generic') {
+  if (
+    role === 'hook' ||
+    role === 'feature' ||
+    role === 'proof' ||
+    role === 'cta' ||
+    role === 'outro' ||
+    role === 'generic'
+  ) {
     return role;
   }
   if (role === 'validation') return 'cta';
@@ -268,10 +321,15 @@ function selectTemplateId(
   role: VideoCompositionSceneRole,
   semantic?: string,
   index?: number,
-  total?: number,
+  total?: number
 ): string {
   if (presentationMode === 'promo') {
-    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+    if (
+      role === 'outro' ||
+      semantic === 'cta' ||
+      semantic === 'validation' ||
+      (typeof index === 'number' && typeof total === 'number' && index === total - 1)
+    ) {
       return 'logo-outro';
     }
     if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') {
@@ -289,7 +347,12 @@ function selectTemplateId(
     return 'promo-spot';
   }
   if (presentationMode === 'vtuber') {
-    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+    if (
+      role === 'outro' ||
+      semantic === 'cta' ||
+      semantic === 'validation' ||
+      (typeof index === 'number' && typeof total === 'number' && index === total - 1)
+    ) {
       return 'logo-outro';
     }
     return 'vtuber-stage';
@@ -297,16 +360,32 @@ function selectTemplateId(
   if (semantic === 'process' || semantic === 'steps' || semantic === 'demo') {
     return 'howto-guide';
   }
-  if (role === 'outro' || semantic === 'validation' || semantic === 'cta' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+  if (
+    role === 'outro' ||
+    semantic === 'validation' ||
+    semantic === 'cta' ||
+    (typeof index === 'number' && typeof total === 'number' && index === total - 1)
+  ) {
     return 'logo-outro';
   }
-  if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact' || semantic === 'process' || semantic === 'steps' || semantic === 'demo' || role === 'feature') {
+  if (
+    semantic === 'proof' ||
+    semantic === 'evidence' ||
+    semantic === 'artifact' ||
+    semantic === 'process' ||
+    semantic === 'steps' ||
+    semantic === 'demo' ||
+    role === 'feature'
+  ) {
     return 'split-highlight';
   }
   return 'basic-title-card';
 }
 
-function buildSceneAssets(brief: NarratedVideoBrief, scene: 'hook' | 'feature' | 'outro'): VideoCompositionAssetRef[] {
+function buildSceneAssets(
+  brief: NarratedVideoBrief,
+  scene: 'hook' | 'feature' | 'outro'
+): VideoCompositionAssetRef[] {
   const assets: VideoCompositionAssetRef[] = [];
   if (brief.design_system.assets?.hero_path && scene !== 'outro') {
     assets.push({
@@ -331,30 +410,46 @@ function resolveSceneLayoutVariant(
   semantic?: string,
   index?: number,
   total?: number,
-  fallback?: string,
+  fallback?: string
 ): string {
   if (typeof fallback === 'string' && fallback.trim()) {
     return fallback;
   }
   if (presentationMode === 'vtuber') {
     if (role === 'hook' || semantic === 'hook') return 'focus-center';
-    if (semantic === 'demo' || semantic === 'process' || semantic === 'steps') return 'fullscreen-demo';
-    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+    if (semantic === 'demo' || semantic === 'process' || semantic === 'steps')
+      return 'fullscreen-demo';
+    if (
+      role === 'outro' ||
+      semantic === 'cta' ||
+      semantic === 'validation' ||
+      (typeof index === 'number' && typeof total === 'number' && index === total - 1)
+    ) {
       return 'split-right';
     }
     return 'split-left';
   }
   if (presentationMode === 'promo') {
-    if (role === 'outro' || semantic === 'cta' || semantic === 'validation' || (typeof index === 'number' && typeof total === 'number' && index === total - 1)) {
+    if (
+      role === 'outro' ||
+      semantic === 'cta' ||
+      semantic === 'validation' ||
+      (typeof index === 'number' && typeof total === 'number' && index === total - 1)
+    ) {
       return 'split-right';
     }
-    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact') return 'fullscreen-demo';
+    if (semantic === 'proof' || semantic === 'evidence' || semantic === 'artifact')
+      return 'fullscreen-demo';
     return 'split-left';
   }
   return fallback || 'split-left';
 }
 
-function resolveDefaultCompositionFormat(): { width: number; height: number; aspect_ratio: string } {
+function resolveDefaultCompositionFormat(): {
+  width: number;
+  height: number;
+  aspect_ratio: string;
+} {
   return {
     width: 1920,
     height: 1080,

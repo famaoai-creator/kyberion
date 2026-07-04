@@ -231,6 +231,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         'Do not actually execute anything — produce a reasoned simulation narrative per branch.',
       userPrompt: [
         `Goal: ${input.goal}`,
+        `Max steps per branch: ${input.maxStepsPerBranch ?? 10}`,
         '',
         'Branches to simulate:',
         JSON.stringify(input.branches, null, 2),

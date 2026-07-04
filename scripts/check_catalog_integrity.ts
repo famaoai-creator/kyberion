@@ -281,8 +281,8 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
     );
   }
   if (
-    !guide.includes(
-      '| Actuator | Description | Version | Ops | Prerequisites | Contract Schema | Path |'
+    !/\|\s*Actuator\s*\|\s*Description\s*\|\s*Version\s*\|\s*Ops\s*\|\s*Prerequisites\s*\|\s*Contract Schema\s*\|\s*Path\s*\|/u.test(
+      guide
     )
   ) {
     violations.push('capabilities-guide: generated table must include Prerequisites column');

@@ -8,6 +8,7 @@ import {
   loadModelRegistry,
   resetReasoningModelRoutingCache,
   resolveReasoningModelRoute,
+  resolveTaskModelHint,
   resolveRuntimeModelId,
 } from './reasoning-model-routing.js';
 
@@ -85,6 +86,7 @@ describe('reasoning-model-routing', () => {
           provider: 'openai',
           family: 'gpt-5',
           status: 'approved' as const,
+          tier: 'large' as const,
           role_fit: {
             intent_compiler: 'primary' as const,
             surface_agent: 'primary' as const,
@@ -116,6 +118,7 @@ describe('reasoning-model-routing', () => {
     expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.5-flash');
     expect(resolveRuntimeModelId('openai-vision', {})).toBe('gpt-5.5');
     expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.5');
+    expect(resolveRuntimeModelId('copilot-default', {})).toBe('claude-sonnet-4-6');
 
     expect(
       resolveRuntimeModelId('anthropic-default', {
@@ -127,5 +130,127 @@ describe('reasoning-model-routing', () => {
         KYBERION_GEMINI_MODEL: 'gemini-custom',
       })
     ).toBe('gemini-custom');
+  });
+
+  it('derives task-level tier and effort hints deterministically', () => {
+    const registry = loadModelRegistry();
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'plan',
+          estimated_scope: 'S',
+          risk: 'medium',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        tier: 'standard',
+        execution_tier: 'standard',
+        effort: 'medium',
+        model_id: 'openai:gpt-5.5',
+      })
+    );
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'mechanical',
+          estimated_scope: 'S',
+          risk: 'low',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        tier: 'small',
+        execution_tier: 'fast',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+      })
+    );
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'implement',
+          estimated_scope: 'M',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        tier: 'standard',
+        execution_tier: 'standard',
+        effort: 'medium',
+        model_id: 'openai:gpt-5.5',
+      })
+    );
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'review',
+          estimated_scope: 'M',
+          risk: 'approval_required',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        tier: 'large',
+        execution_tier: 'deep',
+        effort: 'high',
+        model_id: 'openai:gpt-5.5',
+      })
+    );
+  });
+
+  it('falls back to the next eligible model when the small lane is unavailable', () => {
+    const registry = {
+      version: '1.0.0',
+      default_model_id: 'openai:gpt-5.5',
+      models: [
+        {
+          model_id: 'openai:gpt-5.5',
+          provider: 'openai',
+          family: 'gpt-5',
+          status: 'approved' as const,
+          tier: 'large' as const,
+          role_fit: {
+            intent_compiler: 'primary' as const,
+            surface_agent: 'primary' as const,
+            analysis: 'primary' as const,
+            coding: 'primary' as const,
+          },
+          cost_band: 'high' as const,
+          latency_band: 'medium' as const,
+          structured_output_confidence: 'high' as const,
+          tool_use_confidence: 'high' as const,
+          multilingual_confidence: 'high' as const,
+          reasoning_confidence: 'high' as const,
+          capability_tags: [],
+        },
+      ],
+    };
+
+    expect(
+      resolveTaskModelHint(
+        {
+          phase_kind: 'mechanical',
+          estimated_scope: 'XS',
+          risk: 'low',
+        },
+        { registry }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        tier: 'small',
+        execution_tier: 'fast',
+        effort: 'low',
+        model_id: 'openai:gpt-5.5',
+      })
+    );
   });
 });

@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 
+const REPO_ROOT = process.cwd();
+
 const mocks = vi.hoisted(() => {
+  const repoRoot = process.cwd();
   const pageHandlers = new Map<string, Record<string, Function>>();
   function createPage(
     label: string,
@@ -13,7 +16,7 @@ const mocks = vi.hoisted(() => {
     pageHandlers.set(label, handlers);
     let currentUrl = initialUrl;
     let currentTitle = initialTitle;
-    const videoPath = `${process.cwd()}/evidence/browser/videos/${label}.webm`;
+    const videoPath = `${repoRoot}/evidence/browser/videos/${label}.webm`;
     return {
       goto: vi.fn(async (url: string) => {
         currentUrl = url;
@@ -78,7 +81,7 @@ const mocks = vi.hoisted(() => {
     fileStore.delete(filePath);
   });
   const safeExec = vi.fn(() => '');
-  const withRetry = vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn());
+  const retry = vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn());
 
   const context = {
     pages: vi.fn(() => [page]),
@@ -145,8 +148,9 @@ const mocks = vi.hoisted(() => {
     safeWriteFile,
     safeRmSync,
     safeExec,
-    withRetry,
+    retry,
     fileStore,
+    repoRoot,
   };
 });
 
@@ -160,7 +164,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
     safeExec: mocks.safeExec,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
   };
 });
 
@@ -190,12 +194,16 @@ describe('browser-actuator v3 contract', () => {
       session_id: 'browser-test',
       steps: [
         { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
-        { type: 'apply', op: 'click_ref', params: { ref: '@e1', retry: { maxRetries: 4, initialDelayMs: 250 } } },
+        {
+          type: 'apply',
+          op: 'click_ref',
+          params: { ref: '@e1', retry: { maxRetries: 4, initialDelayMs: 250 } },
+        },
       ],
       options: { headless: true },
     });
 
-    expect(mocks.withRetry).toHaveBeenCalledWith(
+    expect(mocks.retry).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
         maxRetries: 4,
@@ -204,7 +212,7 @@ describe('browser-actuator v3 contract', () => {
         factor: 2,
         jitter: true,
         shouldRetry: expect.any(Function),
-      }),
+      })
     );
   });
 
@@ -345,7 +353,7 @@ describe('browser-actuator v3 contract', () => {
 
   it('records action trails and exports playwright/adf artifacts', async () => {
     const { handleAction } = await import('./index');
-    const outDir = path.join(process.cwd(), 'active/shared/tmp/browser');
+    const outDir = path.join(REPO_ROOT, 'active/shared/tmp/browser');
     safeMkdir(outDir, { recursive: true });
     const specPath = path.join(outDir, 'browser-test-playwright.spec.ts');
     const adfPath = path.join(outDir, 'browser-test-pipeline.json');
@@ -447,7 +455,7 @@ describe('browser-actuator v3 contract', () => {
       options: {
         headless: true,
         record_video: true,
-        video_artifact_dir: 'active/shared/tmp/browser-videos/browser-video',
+        video_artifact_dir: path.join(REPO_ROOT, 'active/shared/tmp/browser-videos/browser-video'),
       },
     });
 
@@ -455,22 +463,25 @@ describe('browser-actuator v3 contract', () => {
       expect.any(String),
       expect.objectContaining({
         recordVideo: {
-          dir: path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video'),
+          dir: path.join(REPO_ROOT, 'active/shared/tmp/browser-videos/browser-video'),
         },
       })
     );
     expect(result.context.video_output_dir).toBe(
-      path.resolve(process.cwd(), 'active/shared/tmp/browser-videos/browser-video')
+      path.join(REPO_ROOT, 'active/shared/tmp/browser-videos/browser-video')
     );
     expect(result.context.video_recording_pending).toBe(false);
     expect(result.context.recorded_videos).toEqual([
-      path.join(process.cwd(), 'evidence/browser/videos', 'tab-1.webm'),
+      path.join(REPO_ROOT, 'evidence/browser/videos/tab-1.webm'),
     ]);
   });
 
   it('marks video recording as pending for leased sessions kept alive after the test flow', async () => {
     const { handleAction } = await import('./index');
-    const videoOutputDir = 'active/shared/tmp/browser-videos/browser-video-lease';
+    const videoOutputDir = path.join(
+      REPO_ROOT,
+      'active/shared/tmp/browser-videos/browser-video-lease'
+    );
 
     const result = await handleAction({
       action: 'pipeline',
@@ -486,7 +497,7 @@ describe('browser-actuator v3 contract', () => {
 
     expect(result.context.video_recording_pending).toBe(true);
     expect(result.context.recorded_videos).toEqual([]);
-    expect(result.context.video_output_dir).toBe(path.resolve(process.cwd(), videoOutputDir));
+    expect(result.context.video_output_dir).toBe(videoOutputDir);
   });
 
   it('configures a virtual passkey authenticator and inspects stored credentials', async () => {
@@ -712,7 +723,7 @@ describe('browser-actuator v3 contract', () => {
 
   it('pauses for operator continuation using a continue file in non-tty mode', async () => {
     const { handleAction } = await import('./index');
-    const outDir = path.join(process.cwd(), 'active/shared/tmp/browser');
+    const outDir = path.join(REPO_ROOT, 'active/shared/tmp/browser');
     safeMkdir(outDir, { recursive: true });
     const continueFile = path.join(outDir, 'browser-operator.continue');
     if (safeExistsSync(continueFile)) safeRmSync(continueFile, { force: true });
@@ -780,14 +791,14 @@ describe('browser-actuator v3 contract', () => {
       options: {
         headless: true,
         browser_channel: 'chrome',
-        user_data_dir: 'active/shared/tmp/browser/chrome-profile',
+        user_data_dir: path.join(REPO_ROOT, 'active/shared/tmp/browser/chrome-profile'),
         profile_directory: 'Profile 1',
         launch_args: ['--disable-features=Translate'],
       },
     });
 
     expect(mocks.launchPersistentContext).toHaveBeenLastCalledWith(
-      path.resolve(process.cwd(), 'active/shared/tmp/browser/chrome-profile'),
+      path.join(REPO_ROOT, 'active/shared/tmp/browser/chrome-profile'),
       expect.objectContaining({
         channel: 'chrome',
         args: [
@@ -856,7 +867,7 @@ describe('browser-actuator v3 contract', () => {
       expect(mocks.safeExec).toHaveBeenCalledWith(
         'ps',
         ['-axo', 'pid=,command='],
-        expect.objectContaining({ timeoutMs: 2000, maxOutputMB: 2 }),
+        expect.objectContaining({ timeoutMs: 2000, maxOutputMB: 2 })
       );
       expect(mocks.connectOverCDP).toHaveBeenCalledWith('http://127.0.0.1:9555');
       expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
@@ -871,8 +882,8 @@ describe('browser-actuator v3 contract', () => {
   it('prefers a freshly discovered Chrome CDP endpoint over stale persisted metadata', async () => {
     const { handleAction, closeBrowserSession } = await import('./index');
     const sessionId = 'browser-stale-cdp';
-    const metadataPath = path.resolve(
-      process.cwd(),
+    const metadataPath = path.join(
+      REPO_ROOT,
       'active/shared/runtime/browser/sessions',
       `${sessionId}.json`
     );
@@ -882,7 +893,7 @@ describe('browser-actuator v3 contract', () => {
       JSON.stringify(
         {
           session_id: sessionId,
-          user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
+          user_data_dir: path.join(REPO_ROOT, 'active/shared/runtime/browser', sessionId),
           lease_status: 'inactive',
           retained: false,
           cdp_url: 'http://127.0.0.1:9334',
@@ -939,8 +950,8 @@ describe('browser-actuator v3 contract', () => {
     const { handleAction, resetBrowserRuntimeLeasesForTest } = await import('./index');
     const sessionId = 'browser-cdp-reconnect';
     await resetBrowserRuntimeLeasesForTest();
-    const metadataPath = path.resolve(
-      process.cwd(),
+    const metadataPath = path.join(
+      REPO_ROOT,
       'active/shared/runtime/browser/sessions',
       `${sessionId}.json`
     );
@@ -950,7 +961,7 @@ describe('browser-actuator v3 contract', () => {
       JSON.stringify(
         {
           session_id: sessionId,
-          user_data_dir: path.resolve(process.cwd(), 'active/shared/runtime/browser', sessionId),
+          user_data_dir: path.join(REPO_ROOT, 'active/shared/runtime/browser', sessionId),
           active_tab_id: 'tab-1',
           tab_count: 1,
           tabs: [{ tab_id: 'tab-1', url: 'https://example.com', title: 'Test Page', active: true }],
@@ -973,6 +984,8 @@ describe('browser-actuator v3 contract', () => {
       steps: [{ type: 'capture', op: 'tabs', params: { export_as: 'tabs' } }],
       options: {
         headless: true,
+        connect_over_cdp: true,
+        cdp_port: 9334,
         lease_ms: 60_000,
       },
     });
@@ -1064,43 +1077,52 @@ describe('browser-actuator v3 contract', () => {
     const { handleAction } = await import('./index');
     const result = await handleAction({
       action: 'pipeline',
-      steps: [{
-        type: 'apply',
-        op: 'extension_session',
-        params: {
-          recording: {
-            schema_version: 'browser-recording.v1',
-            recording_id: 'REC-1',
-            source: 'chrome-extension',
-            created_at: '2026-06-23T00:00:00.000Z',
-            tab: { origin: 'https://example.com', origin_hash: 'a'.repeat(64), title: 'Example' },
-            extension: { version: '0.1.0' },
-            actions: [{
-              action_id: 'step-1',
-              op: 'click_ref',
-              summary: 'Continue を選択',
-              risk: 'low',
-              captured_at: '2026-06-23T00:00:01.000Z',
-              target: { ref: '@e1', role: 'button', name: 'Continue', snapshot_hash: 'b'.repeat(64) },
-            }],
-            risk_summary: {
-              requires_manual_review: true,
-              sensitive_input_omitted: 0,
-              approval_required_count: 0,
+      steps: [
+        {
+          type: 'apply',
+          op: 'extension_session',
+          params: {
+            recording: {
+              schema_version: 'browser-recording.v1',
+              recording_id: 'REC-1',
+              source: 'chrome-extension',
+              created_at: '2026-06-23T00:00:00.000Z',
+              tab: { origin: 'https://example.com', origin_hash: 'a'.repeat(64), title: 'Example' },
+              extension: { version: '0.1.0' },
+              actions: [
+                {
+                  action_id: 'step-1',
+                  op: 'click_ref',
+                  summary: 'Continue を選択',
+                  risk: 'low',
+                  captured_at: '2026-06-23T00:00:01.000Z',
+                  target: {
+                    ref: '@e1',
+                    role: 'button',
+                    name: 'Continue',
+                    snapshot_hash: 'b'.repeat(64),
+                  },
+                },
+              ],
+              risk_summary: {
+                requires_manual_review: true,
+                sensitive_input_omitted: 0,
+                approval_required_count: 0,
+              },
+            },
+            session: {
+              kind: 'browser-extension-session.v1',
+              mission_id: 'MSN-1',
+              pipeline_id: 'browser-candidate-1',
+              tab_id: '42',
+              origin: 'https://example.com',
+              mode: 'record',
+              recording_id: 'REC-1',
+              requested_operations: ['click_ref'],
             },
           },
-          session: {
-            kind: 'browser-extension-session.v1',
-            mission_id: 'MSN-1',
-            pipeline_id: 'browser-candidate-1',
-            tab_id: '42',
-            origin: 'https://example.com',
-            mode: 'record',
-            recording_id: 'REC-1',
-            requested_operations: ['click_ref'],
-          },
         },
-      }],
+      ],
     });
 
     expect(result.status).toBe('success');

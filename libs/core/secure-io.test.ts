@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { 
-  validateFileSize, 
+import {
+  validateFileSize,
   buildSafeExecEnv,
-  safeReadFile, 
-  safeWriteFile, 
-  sanitizePath, 
-  validateUrl 
+  ensureDir,
+  loadJson,
+  safeReadFile,
+  safeWriteFile,
+  sanitizePath,
+  validateUrl,
 } from './secure-io.js';
 
 describe('secure-io core', () => {
@@ -67,8 +69,24 @@ describe('secure-io core', () => {
       expect(fs.readFileSync(testFile, 'utf8')).toBe('updated');
 
       const files = fs.readdirSync(tmpDir);
-      const tempFiles = files.filter(f => f.includes('atomic.txt.tmp'));
+      const tempFiles = files.filter((f) => f.includes('atomic.txt.tmp'));
       expect(tempFiles.length).toBe(0);
+    });
+  });
+
+  describe('loadJson', () => {
+    it('should read and parse JSON content', () => {
+      const testFile = path.join(tmpDir, 'payload.json');
+      fs.writeFileSync(testFile, JSON.stringify({ hello: 'world' }));
+      expect(loadJson<{ hello: string }>(testFile)).toEqual({ hello: 'world' });
+    });
+  });
+
+  describe('ensureDir', () => {
+    it('should create directories recursively', () => {
+      const dir = path.join(tmpDir, 'nested', 'dir');
+      ensureDir(dir);
+      expect(fs.existsSync(dir)).toBe(true);
     });
   });
 

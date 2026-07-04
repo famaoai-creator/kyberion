@@ -1,41 +1,32 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+
+vi.mock('./secure-io.js', async () => {
+  const fsModule = await import('node:fs');
+  return {
+    safeExistsSync: fsModule.existsSync,
+    safeReadFile: (filePath: string, options?: { encoding?: BufferEncoding | null }) =>
+      fsModule.readFileSync(filePath, options?.encoding ?? 'utf8'),
+    safeReaddir: fsModule.readdirSync,
+    safeWriteFile: fsModule.writeFileSync,
+    safeAppendFileSync: fsModule.appendFileSync,
+    safeMkdir: fsModule.mkdirSync,
+    rawExistsSync: fsModule.existsSync,
+    rawReadTextFile: (filePath: string) => fsModule.readFileSync(filePath, 'utf8'),
+  };
+});
+
+vi.mock('./audit-chain.js', () => ({
+  auditChain: {
+    record: vi.fn(),
+  },
+}));
 
 const ROOT = pathResolver.rootDir();
-
-async function waitForAuditEntry(
-  predicate: (entry: any) => boolean,
-  timeoutMs = 1000,
-): Promise<any | null> {
-  const auditPath = path.join(
-    ROOT,
-    'active/shared/logs/audit',
-    `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
-  );
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    if (safeExistsSync(auditPath)) {
-      const lines = (safeReadFile(auditPath, { encoding: 'utf8' }) as string)
-        .split('\n')
-        .filter(Boolean);
-      for (const line of lines) {
-        try {
-          const entry = JSON.parse(line);
-          if (predicate(entry)) return entry;
-        } catch {
-          /* ignore malformed historical lines */
-        }
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  return null;
-}
 
 describe('tier-guard tenant scope (IP-1)', () => {
   let savedTenant: string | undefined;
@@ -110,7 +101,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     const target = path.join(
       ROOT,
-      'active/missions/confidential/other-tenant/MSN-FOO/evidence/leak.json',
+      'active/missions/confidential/other-tenant/MSN-FOO/evidence/leak.json'
     );
     const result = validateWritePermission(target);
     if (!result.allowed) {
@@ -145,22 +136,26 @@ describe('tier-guard tenant scope (IP-1)', () => {
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/pipeline-step.json');
     const productVoiceProfileTarget = path.join(
       ROOT,
-      'knowledge/product/governance/voice-profiles/test-profile.json',
+      'knowledge/product/governance/voice-profiles/test-profile.json'
     );
     const personalVoiceProfileOverlay = path.join(
       ROOT,
-      'knowledge/personal/voice/profile-registry.json',
+      'knowledge/personal/voice/profile-registry.json'
     );
     const unrelatedPersonalTarget = path.join(ROOT, 'knowledge/personal/other/private.json');
 
-    withExecutionContext('run_pipeline', () => {
-      expect(validateReadPermission(personalVoiceProfileOverlay).allowed).toBe(true);
-      expect(validateReadPermission(unrelatedPersonalTarget).allowed).toBe(false);
-      expect(validateWritePermission(traceTarget).allowed).toBe(true);
-      expect(validateWritePermission(tmpTarget).allowed).toBe(true);
-      expect(validateWritePermission(personalVoiceProfileOverlay).allowed).toBe(true);
-      expect(validateWritePermission(productVoiceProfileTarget).allowed).toBe(false);
-    }, 'unknown');
+    withExecutionContext(
+      'run_pipeline',
+      () => {
+        expect(validateReadPermission(personalVoiceProfileOverlay).allowed).toBe(true);
+        expect(validateReadPermission(unrelatedPersonalTarget).allowed).toBe(false);
+        expect(validateWritePermission(traceTarget).allowed).toBe(true);
+        expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+        expect(validateWritePermission(personalVoiceProfileOverlay).allowed).toBe(true);
+        expect(validateWritePermission(productVoiceProfileTarget).allowed).toBe(false);
+      },
+      'unknown'
+    );
   });
 
   it('allows run_super_pipeline to write temporary dispatch artifacts', () => {
@@ -168,10 +163,14 @@ describe('tier-guard tenant scope (IP-1)', () => {
     const traceTarget = path.join(ROOT, 'customer/story-demo/logs/traces/traces-2026-05-08.jsonl');
     const tmpTarget = path.join(ROOT, 'active/shared/tmp/super-pipeline.json');
 
-    withExecutionContext('run_super_pipeline', () => {
-      expect(validateWritePermission(traceTarget).allowed).toBe(true);
-      expect(validateWritePermission(tmpTarget).allowed).toBe(true);
-    }, 'unknown');
+    withExecutionContext(
+      'run_super_pipeline',
+      () => {
+        expect(validateWritePermission(traceTarget).allowed).toBe(true);
+        expect(validateWritePermission(tmpTarget).allowed).toBe(true);
+      },
+      'unknown'
+    );
   });
 
   it('legacy non-slug confidential paths are not tenant-scoped', () => {
@@ -180,7 +179,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     const target = path.join(
       ROOT,
-      'active/missions/confidential/MSN-LEGACY-MISSION/evidence/note.md',
+      'active/missions/confidential/MSN-LEGACY-MISSION/evidence/note.md'
     );
     const result = validateWritePermission(target);
     if (!result.allowed) {
@@ -209,7 +208,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
         status: 'active',
         member_tenants: ['acme-corp', 'beta-co'],
         shared_prefixes: ['knowledge/confidential/shared/unit-shared/'],
-      }),
+      })
     );
 
     const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
@@ -232,7 +231,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
         status: 'active',
         member_tenants: ['acme-corp', 'beta-co'],
         shared_prefixes: ['knowledge/confidential/shared/unit-shared/'],
-      }),
+      })
     );
 
     const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
@@ -254,7 +253,7 @@ describe('tier-guard tenant scope (IP-1)', () => {
         status: 'active',
         member_tenants: ['acme-corp'],
         shared_prefixes: ['knowledge/public/shared/unit-shared/'],
-      }),
+      })
     );
 
     const target = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
@@ -297,8 +296,8 @@ describe('tier-guard brokered missions (C8)', () => {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
   });
 
@@ -314,7 +313,11 @@ describe('tier-guard brokered missions (C8)', () => {
     const path = await import('node:path');
     const ROOT = pathResolver.rootDir();
     const dir = path.join(ROOT, 'active/missions/public', FIX_MISSION);
-    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   });
 
   it('broker mission: allows access to tenants in source_tenants list', () => {
@@ -343,14 +346,17 @@ describe('tier-guard brokered missions (C8)', () => {
       expect(result.reason).not.toMatch(/tenant\.scope_violation/);
     }
 
-    const entry = await waitForAuditEntry(
-      (candidate) =>
-        candidate.action === 'tenant.broker_access' &&
-        candidate.operation === 'knowledge/confidential/acme-corp/audit-marker.md' &&
-        candidate.metadata?.target_tenant === 'acme-corp',
+    const { auditChain } = await import('./audit-chain.js');
+    expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'tenant.broker_access',
+        operation: 'knowledge/confidential/acme-corp/audit-marker.md',
+        metadata: expect.objectContaining({
+          target_tenant: 'acme-corp',
+          broker_tenants: ['acme-corp', 'beta-co'],
+        }),
+      })
     );
-    expect(entry).not.toBeNull();
-    expect(entry?.metadata?.broker_tenants).toEqual(['acme-corp', 'beta-co']);
   });
 
   it('broker mission: still denies tenants outside source_tenants list', () => {
@@ -395,8 +401,8 @@ describe('tier-guard brokered missions (C8)', () => {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;

@@ -9,16 +9,19 @@ import {
   pathResolver,
   resolveVars,
   assertValidMobileAppProfile,
-  withRetry,
+  retry,
   classifyError,
+  sleep,
 } from '@agent/core';
 import type { MobileAppProfile } from '@agent/core';
 import * as path from 'node:path';
 
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
-  'product/orchestration/android-ui-defaults.json',
+  'product/orchestration/android-ui-defaults.json'
 );
-const ANDROID_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/android-actuator/manifest.json');
+const ANDROID_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/android-actuator/manifest.json'
+);
 const DEFAULT_ANDROID_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -70,7 +73,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(ANDROID_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(ANDROID_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
   } catch {
     cachedRecoveryPolicy = {};
@@ -82,7 +87,7 @@ export function buildRetryOptions() {
   const policy = loadRecoveryPolicy();
   const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_ANDROID_RETRY;
   const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
   );
   return {
     ...DEFAULT_ANDROID_RETRY,
@@ -91,9 +96,9 @@ export function buildRetryOptions() {
       const classification = classifyError(error);
       return retryableCategories.size > 0
         ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable'
-          || classification.category === 'timeout'
-          || classification.category === 'network';
+        : classification.category === 'resource_unavailable' ||
+            classification.category === 'timeout' ||
+            classification.category === 'network';
     },
   };
 }
@@ -108,13 +113,13 @@ export async function handleAction(input: AndroidAction) {
 export async function executePipeline(
   steps: PipelineStep[],
   options: AndroidAction['options'] = {},
-  initialCtx: Record<string, any> = {},
+  initialCtx: Record<string, any> = {}
 ) {
   const rootDir = pathResolver.rootDir();
   const artifactsDir = path.resolve(
     rootDir,
     options?.artifacts_dir ||
-      pathResolver.sharedTmp(`actuators/android-actuator/session_${Date.now()}`),
+      pathResolver.sharedTmp(`actuators/android-actuator/session_${Date.now()}`)
   );
   if (!safeExistsSync(artifactsDir)) safeMkdir(artifactsDir, { recursive: true });
 
@@ -174,21 +179,21 @@ async function opCapture(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  options?: AndroidAction['options'],
+  options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_text_file': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const content = await withRetry(
+      const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
-        buildRetryOptions(),
+        buildRetryOptions()
       );
       return { ...ctx, [params.export_as || 'last_text']: content };
     }
     case 'read_json': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const parsed = await withRetry(async () => {
+      const parsed = await retry(async () => {
         const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
         return JSON.parse(content);
       }, buildRetryOptions());
@@ -198,7 +203,7 @@ async function opCapture(
       return { ...ctx, [params.export_as || 'last_json']: parsed };
     }
     case 'adb_health_check': {
-      const health = await withRetry(async () => collectAdbHealth(ctx, options), buildRetryOptions());
+      const health = await retry(async () => collectAdbHealth(ctx, options), buildRetryOptions());
       return {
         ...ctx,
         [params.export_as || 'adb_health']: health,
@@ -209,9 +214,9 @@ async function opCapture(
     case 'capture_foreground_activity': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      const output = await withRetry(
+      const output = await retry(
         async () => runAdb(['shell', 'dumpsys', 'activity', 'activities'], serial, options),
-        buildRetryOptions(),
+        buildRetryOptions()
       );
       const resumedLine = output
         .split('\n')
@@ -229,23 +234,26 @@ async function opCapture(
       const serial = resolveSerial(ctx, options, params);
       const profile = resolveAppProfile(params, ctx);
       const devicePath = String(
-        resolve(params.device_path || profile?.webview?.runtime_export?.android_device_path || ''),
+        resolve(params.device_path || profile?.webview?.runtime_export?.android_device_path || '')
       ).trim();
       if (!devicePath) {
         throw new Error(
-          'capture_runtime_session_handoff requires params.device_path or app_profile.webview.runtime_export.android_device_path',
+          'capture_runtime_session_handoff requires params.device_path or app_profile.webview.runtime_export.android_device_path'
         );
       }
       const outPath = path.resolve(
         rootDir,
         resolve(
           params.path ||
-            path.join(ctx.artifacts_dir, `android-runtime-session-handoff-${Date.now()}.json`),
-        ),
+            path.join(ctx.artifacts_dir, `android-runtime-session-handoff-${Date.now()}.json`)
+        )
       );
       ensureParentDir(outPath);
-      await withRetry(async () => runAdb(['pull', devicePath, outPath], serial, options), buildRetryOptions());
-      const parsed = await withRetry(async () => {
+      await retry(
+        async () => runAdb(['pull', devicePath, outPath], serial, options),
+        buildRetryOptions()
+      );
+      const parsed = await retry(async () => {
         const content = safeReadFile(outPath, { encoding: 'utf8' }) as string;
         return JSON.parse(content);
       }, buildRetryOptions());
@@ -259,18 +267,27 @@ async function opCapture(
       ensureAdbAvailable(ctx, options);
       const outPath = path.resolve(
         rootDir,
-        resolve(params.path || path.join(ctx.artifacts_dir, `ui-tree-${Date.now()}.xml`)),
+        resolve(params.path || path.join(ctx.artifacts_dir, `ui-tree-${Date.now()}.xml`))
       );
       ensureParentDir(outPath);
       const remotePath = `/sdcard/kyberion-ui-${Date.now()}.xml`;
       const serial = resolveSerial(ctx, options, params);
-      await withRetry(async () => runAdb(['shell', 'uiautomator', 'dump', remotePath], serial, options), buildRetryOptions());
-      await withRetry(async () => runAdb(['pull', remotePath, outPath], serial, options), buildRetryOptions());
-      await withRetry(async () => {
+      await retry(
+        async () => runAdb(['shell', 'uiautomator', 'dump', remotePath], serial, options),
+        buildRetryOptions()
+      );
+      await retry(
+        async () => runAdb(['pull', remotePath, outPath], serial, options),
+        buildRetryOptions()
+      );
+      await retry(async () => {
         safeCleanupRemote(serial, remotePath, options);
         return undefined;
       }, buildRetryOptions());
-      const xml = await withRetry(async () => safeReadFile(outPath, { encoding: 'utf8' }) as string, buildRetryOptions());
+      const xml = await retry(
+        async () => safeReadFile(outPath, { encoding: 'utf8' }) as string,
+        buildRetryOptions()
+      );
       return {
         ...ctx,
         [params.export_as || 'last_ui_tree']: xml,
@@ -291,10 +308,7 @@ async function opCapture(
       const serial = resolveSerial(ctx, options, params);
       if (serial) cliArgs.push('--serial', serial);
       if (params.pretty !== false) cliArgs.push('--pretty');
-      const raw = await withRetry(
-        async () => runAndroidCli(cliArgs, options),
-        buildRetryOptions(),
-      );
+      const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let layout: unknown;
       try {
         layout = JSON.parse(raw);
@@ -314,15 +328,17 @@ async function opCapture(
     }
     case 'android_cli_screen_resolve': {
       ensureAndroidCliAvailable(options);
-      const screenshotPath = String(resolve(params.screenshot_path || ctx.last_screenshot_path || ''));
+      const screenshotPath = String(
+        resolve(params.screenshot_path || ctx.last_screenshot_path || '')
+      );
       const label = String(resolve(params.string || params.label || ''));
-      if (!screenshotPath) throw new Error('android_cli_screen_resolve requires params.screenshot_path or ctx.last_screenshot_path');
+      if (!screenshotPath)
+        throw new Error(
+          'android_cli_screen_resolve requires params.screenshot_path or ctx.last_screenshot_path'
+        );
       if (!label) throw new Error('android_cli_screen_resolve requires params.string');
       const cliArgs = ['screen', 'resolve', `--screenshot=${screenshotPath}`, `--string=${label}`];
-      const raw = await withRetry(
-        async () => runAndroidCli(cliArgs, options),
-        buildRetryOptions(),
-      );
+      const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let resolved: unknown;
       try {
         resolved = JSON.parse(raw);
@@ -341,10 +357,7 @@ async function opCapture(
       if (serial) cliArgs.push('--serial', serial);
       const apkPath = resolve(params.apk_path || '');
       if (apkPath) cliArgs.push(String(apkPath));
-      const raw = await withRetry(
-        async () => runAndroidCli(cliArgs, options),
-        buildRetryOptions(),
-      );
+      const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let description: unknown;
       try {
         description = JSON.parse(raw);
@@ -362,10 +375,7 @@ async function opCapture(
       if (!query) throw new Error('android_cli_docs_search requires params.query');
       const cliArgs = ['docs', 'search', query];
       if (params.limit) cliArgs.push('--limit', String(resolve(params.limit)));
-      const raw = await withRetry(
-        async () => runAndroidCli(cliArgs, options),
-        buildRetryOptions(),
-      );
+      const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let results: unknown;
       try {
         results = JSON.parse(raw);
@@ -387,7 +397,7 @@ async function opTransform(
   op: string,
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ) {
   switch (op) {
     case 'set': {
@@ -402,7 +412,7 @@ async function opTransform(
         node_count: nodes.length,
         clickable_count: nodes.filter((node) => node.clickable).length,
         editable_count: nodes.filter(
-          (node) => node.className.includes('EditText') || node.resourceId.includes('input'),
+          (node) => node.className.includes('EditText') || node.resourceId.includes('input')
         ).length,
         texts: nodes
           .map((node) => node.text)
@@ -431,7 +441,7 @@ async function opApply(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  options?: AndroidAction['options'],
+  options?: AndroidAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
@@ -460,7 +470,7 @@ async function opApply(
       runAdb(
         ['shell', 'input', 'tap', String(resolve(params.x)), String(resolve(params.y))],
         serial,
-        options,
+        options
       );
       return ctx;
     }
@@ -485,7 +495,7 @@ async function opApply(
       runAdb(
         ['shell', 'input', 'tap', String(target.center.x), String(target.center.y)],
         serial,
-        options,
+        options
       );
       return { ...ctx, [params.export_as || 'last_tap_target']: tapResult };
     }
@@ -514,10 +524,10 @@ async function opApply(
       runAdb(
         ['shell', 'input', 'tap', String(target.center.x), String(target.center.y)],
         serial,
-        options,
+        options
       );
       const preDelayMs = Number(resolve(params.pre_input_delay_ms || 250));
-      if (preDelayMs > 0) sleep(preDelayMs);
+      if (preDelayMs > 0) await sleep(preDelayMs);
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(text)], serial, options);
       return { ...ctx, [params.export_as || 'last_input_target']: inputResult };
     }
@@ -533,9 +543,9 @@ async function opApply(
       runAdb(
         ['shell', 'input', 'tap', String(formPlan.email_field.x), String(formPlan.email_field.y)],
         serial,
-        options,
+        options
       );
-      sleep(Number(resolve(params.pre_input_delay_ms || 200)));
+      await sleep(Number(resolve(params.pre_input_delay_ms || 200)));
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(formPlan.email)], serial, options);
       runAdb(
         [
@@ -546,9 +556,9 @@ async function opApply(
           String(formPlan.password_field.y),
         ],
         serial,
-        options,
+        options
       );
-      sleep(Number(resolve(params.pre_input_delay_ms || 200)));
+      await sleep(Number(resolve(params.pre_input_delay_ms || 200)));
       runAdb(['shell', 'input', 'text', normalizeAdbInputText(formPlan.password)], serial, options);
       if (params.submit !== false) {
         runAdb(
@@ -560,7 +570,7 @@ async function opApply(
             String(formPlan.submit_button.y),
           ],
           serial,
-          options,
+          options
         );
       }
       return { ...ctx, [params.export_as || 'last_login_form_plan']: formPlan };
@@ -580,7 +590,7 @@ async function opApply(
           String(resolve(params.duration_ms || 250)),
         ],
         serial,
-        options,
+        options
       );
       return ctx;
     }
@@ -596,7 +606,7 @@ async function opApply(
       const serial = resolveSerial(ctx, options, params);
       const outPath = path.resolve(
         rootDir,
-        resolve(params.path || path.join(ctx.artifacts_dir, `screen-${Date.now()}.png`)),
+        resolve(params.path || path.join(ctx.artifacts_dir, `screen-${Date.now()}.png`))
       );
       ensureParentDir(outPath);
       const remotePath = `/sdcard/kyberion-screen-${Date.now()}.png`;
@@ -609,14 +619,14 @@ async function opApply(
       ensureAndroidCliAvailable(options);
       const outPath = path.resolve(
         rootDir,
-        resolve(params.path || path.join(ctx.artifacts_dir, `cli-screen-${Date.now()}.png`)),
+        resolve(params.path || path.join(ctx.artifacts_dir, `cli-screen-${Date.now()}.png`))
       );
       ensureParentDir(outPath);
       const cliArgs = ['screen', 'capture', '--output', outPath];
       const serial = resolveSerial(ctx, options, params);
       if (serial) cliArgs.push('--serial', serial);
       if (params.annotate) cliArgs.push('--annotate');
-      await withRetry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
+      await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       return {
         ...ctx,
         last_screenshot_path: outPath,
@@ -642,7 +652,7 @@ async function opApply(
         const found = nodes.some(
           (node) =>
             node.text.toLowerCase().includes(target) ||
-            node.contentDesc.toLowerCase().includes(target),
+            node.contentDesc.toLowerCase().includes(target)
         );
         if (found) {
           return {
@@ -652,7 +662,7 @@ async function opApply(
             wait_for_ui_text_value: resolve(params.text),
           };
         }
-        sleep(intervalMs);
+        await sleep(intervalMs);
       }
 
       throw new Error(`Timed out waiting for UI text: ${resolve(params.text)}`);
@@ -676,7 +686,7 @@ async function opApply(
             wait_for_ui_node_found: true,
           };
         }
-        sleep(intervalMs);
+        await sleep(intervalMs);
       }
 
       throw new Error(`Timed out waiting for UI node: ${describeUiSelector(params, resolve)}`);
@@ -724,7 +734,7 @@ async function opApply(
       runAdb(
         ['shell', 'input', 'tap', String(target.center.x), String(target.center.y)],
         serial,
-        options,
+        options
       );
       return { ...ctx, [params.export_as || 'last_passkey_plan']: passkeyPlan };
     }
@@ -733,8 +743,8 @@ async function opApply(
       const outPath = path.resolve(
         rootDir,
         resolve(
-          params.path || path.join(ctx.artifacts_dir, `android-session-handoff-${Date.now()}.json`),
-        ),
+          params.path || path.join(ctx.artifacts_dir, `android-session-handoff-${Date.now()}.json`)
+        )
       );
       ensureParentDir(outPath);
       safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
@@ -791,10 +801,10 @@ function ensureAdbAvailable(ctx: Record<string, any>, options?: AndroidAction['o
 function resolveSerial(
   ctx: Record<string, any>,
   options: AndroidAction['options'] | undefined,
-  params: any,
+  params: any
 ): string {
   return String(
-    resolvePrimitive(params?.serial) || options?.serial || ctx.android_serial || '',
+    resolvePrimitive(params?.serial) || options?.serial || ctx.android_serial || ''
   ).trim();
 }
 
@@ -829,7 +839,11 @@ function runAndroidCli(args: string[], options?: AndroidAction['options']): stri
   return safeExec('android', args, { timeoutMs: options?.timeout_ms || 30000 }).trim();
 }
 
-function collectAndroidCliHealth(options?: AndroidAction['options']): { available: boolean; version?: string; error?: string } {
+function collectAndroidCliHealth(options?: AndroidAction['options']): {
+  available: boolean;
+  version?: string;
+  error?: string;
+} {
   try {
     const version = safeExec('android', ['--version'], {
       timeoutMs: options?.timeout_ms || 10000,
@@ -885,7 +899,7 @@ function resolveKey(key: string, ctx: Record<string, any>): any {
 function resolveUiTreeSource(
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): string {
   if (params.from) {
     const value = ctx[String(params.from)];
@@ -902,7 +916,7 @@ function resolveUiTreeSource(
   }
 
   throw new Error(
-    'summarize_ui_tree/find_ui_nodes requires params.from, params.source, or ctx.last_ui_tree',
+    'summarize_ui_tree/find_ui_nodes requires params.from, params.source, or ctx.last_ui_tree'
   );
 }
 
@@ -930,7 +944,7 @@ function parseUiTreeNodes(xml: string): AndroidUiNode[] {
 function resolveTapTarget(
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): AndroidTapTarget {
   let candidates: AndroidUiNode[] = [];
 
@@ -985,7 +999,7 @@ function selectorParamsFromInput(params: any): any {
 function buildLoginFormPlan(
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): {
   email: string;
   password: string;
@@ -1018,7 +1032,7 @@ function buildLoginFormPlan(
       package_name: params.email_selector_package_name || profile?.package_name,
     },
     ctx,
-    resolve,
+    resolve
   );
   const passwordTarget = resolveTapTarget(
     {
@@ -1038,7 +1052,7 @@ function buildLoginFormPlan(
       package_name: params.password_selector_package_name || profile?.package_name,
     },
     ctx,
-    resolve,
+    resolve
   );
   const submitTarget = resolveTapTarget(
     {
@@ -1058,7 +1072,7 @@ function buildLoginFormPlan(
       package_name: params.submit_selector_package_name || profile?.package_name,
     },
     ctx,
-    resolve,
+    resolve
   );
 
   return {
@@ -1104,7 +1118,7 @@ function buildSessionHandoffArtifact(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  platform: 'android' | 'ios',
+  platform: 'android' | 'ios'
 ) {
   const profile = resolveAppProfile(params, ctx);
   const targetUrl = String(
@@ -1112,12 +1126,12 @@ function buildSessionHandoffArtifact(
       params.target_url ||
         profile?.webview?.session_handoff?.target_url ||
         profile?.webview?.entry_url ||
-        '',
-    ),
+        ''
+    )
   ).trim();
   if (!targetUrl)
     throw new Error(
-      'emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url',
+      'emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url'
     );
 
   const localStorage =
@@ -1135,8 +1149,8 @@ function buildSessionHandoffArtifact(
       resolve(
         params.browser_session_id ||
           profile?.webview?.session_handoff?.browser_session_id ||
-          `${platform}-webview`,
-      ),
+          `${platform}-webview`
+      )
     ),
     prefer_persistent_context:
       params.prefer_persistent_context ??
@@ -1193,7 +1207,7 @@ function resolveAppProfile(params: any, ctx: Record<string, any>): MobileAppProf
 function matchUiNodes(
   nodes: AndroidUiNode[],
   params: any,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ): AndroidUiNode[] {
   const text = String(resolve(params.text || ''))
     .trim()
@@ -1264,11 +1278,4 @@ function decodeXml(input: string): string {
 
 function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function sleep(ms: number): void {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    // busy wait is acceptable here for a small actuator MVP
-  }
 }

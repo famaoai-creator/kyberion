@@ -2,13 +2,11 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
-import { findRelevantDistilledKnowledge, type DistilledKnowledgeEntry } from './distill-knowledge-injector.js';
+  findRelevantDistilledKnowledge,
+  type DistilledKnowledgeEntry,
+} from './distill-knowledge-injector.js';
 import {
   findReusableArtifactOwnershipRecord,
   listArtifactOwnershipRecordsForProject,
@@ -20,35 +18,42 @@ import {
   projectOperationalStatePath,
   type ProjectOperationalState,
 } from './project-operational-state-registry.js';
-import {
-  loadProjectTrackRecord,
-  type ProjectTrackRecord,
-} from './project-track-registry.js';
+import { loadProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
 import {
   getMissionTeamPlanPath,
   loadMissionTeamPlan,
   resolveMissionTeamPlan,
   type MissionTeamAssignment,
 } from './mission-team-plan-composer.js';
-import {
-  getWorkItem,
-  type WorkItem,
-} from './work-coordination.js';
-import {
-  loadTaskSession,
-  validateTaskSession,
-  type TaskSession,
-} from './task-session.js';
+import { getWorkItem, type WorkItem } from './work-coordination.js';
+import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
+import { slugify } from './text-utils.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const MISSION_STATE_SCHEMA_PATH = pathResolver.rootResolve('schemas/mission-state.schema.json');
-const MISSION_CONTEXT_PACK_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-context-pack.schema.json');
+const MISSION_CONTEXT_PACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-context-pack.schema.json'
+);
 
 type MissionTier = 'personal' | 'confidential' | 'public';
-type MissionStatus = 'planned' | 'active' | 'validating' | 'distilling' | 'completed' | 'paused' | 'failed' | 'archived';
-type MissionContextRecipientKind = 'agent' | 'subagent' | 'reviewer' | 'operator' | 'planner' | 'tester';
+type MissionStatus =
+  | 'planned'
+  | 'active'
+  | 'validating'
+  | 'distilling'
+  | 'completed'
+  | 'paused'
+  | 'failed'
+  | 'archived';
+type MissionContextRecipientKind =
+  | 'agent'
+  | 'subagent'
+  | 'reviewer'
+  | 'operator'
+  | 'planner'
+  | 'tester';
 type MissionContextDeliveryMode = 'prompt' | 'artifact';
 
 export interface MissionStateSummary {
@@ -171,6 +176,14 @@ export interface MissionContextPackArtifactHint {
   reuse_reason: string;
 }
 
+export interface MissionContextPackTaskGuidance {
+  model_tier: 'fast' | 'standard' | 'deep';
+  acceptance_criteria: string[];
+  output_contract: string;
+  verification: string[];
+  seed?: string[];
+}
+
 export interface MissionContextPackPruningSummary {
   budget_chars: number;
   estimated_chars: number;
@@ -277,6 +290,7 @@ export interface MissionContextPack {
   work_item?: MissionContextPackWorkItemSummary;
   knowledge_hints?: MissionContextPackKnowledgeHint[];
   artifact_hints?: MissionContextPackArtifactHint[];
+  task_guidance?: MissionContextPackTaskGuidance;
   sources: MissionContextPackSource[];
   redactions: string[];
   pruning?: MissionContextPackPruningSummary;
@@ -346,7 +360,9 @@ function validationErrors(validate: ValidateFunction): string[] {
 }
 
 function summarizeText(value: unknown, max = 180): string | undefined {
-  const text = String(value || '').trim().replace(/\s+/g, ' ');
+  const text = String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
   if (!text) return undefined;
   return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
 }
@@ -357,6 +373,184 @@ function estimatedChars(value: unknown): number {
   } catch {
     return String(value || '').length;
   }
+}
+
+function mapTaskModelTier(
+  tier?: MissionTeamAssignment['model_hint']['tier']
+): 'fast' | 'standard' | 'deep' | undefined {
+  if (!tier) return undefined;
+  switch (tier) {
+    case 'small':
+      return 'fast';
+    case 'standard':
+      return 'standard';
+    case 'large':
+      return 'deep';
+  }
+}
+
+function buildTaskGuidance(input: {
+  missionState: MissionStateSummary;
+  missionPath?: string;
+  taskSession?: TaskSession | null;
+  workItem?: WorkItem | null;
+  missionTeamAssignment?: MissionTeamAssignment | null;
+  artifactHints?: MissionContextPackArtifactHint[];
+}): MissionContextPackTaskGuidance | undefined {
+  const modelTier = mapTaskModelTier(input.missionTeamAssignment?.model_hint?.tier);
+  if (modelTier !== 'fast') return undefined;
+
+  const successCriteria = [
+    ...(input.missionState.outcome_contract?.success_criteria || []),
+    ...(input.taskSession?.outcome_contract?.success_criteria || []),
+  ]
+    .map((entry) => String(entry).trim())
+    .filter(Boolean);
+
+  const workItemMetadata =
+    input.workItem?.metadata && typeof input.workItem.metadata === 'object'
+      ? (input.workItem.metadata as Record<string, unknown>)
+      : null;
+  const workItemCriteria = Array.isArray(workItemMetadata?.acceptance_criteria)
+    ? workItemMetadata.acceptance_criteria.map((entry) => String(entry).trim()).filter(Boolean)
+    : [];
+
+  const acceptanceCriteria = Array.from(
+    new Set(
+      [
+        ...successCriteria,
+        input.workItem?.title ? `Deliver the work item outcome: ${input.workItem.title}` : '',
+        input.workItem?.description
+          ? `Preserve the work item scope: ${summarizeText(input.workItem.description, 160) || input.workItem.description}`
+          : '',
+        input.taskSession?.goal?.success_condition
+          ? `Satisfy task session success condition: ${input.taskSession.goal.success_condition}`
+          : '',
+        ...workItemCriteria,
+      ].filter(Boolean)
+    )
+  );
+
+  const seed: string[] = [];
+  if (workItemMetadata) {
+    if (typeof workItemMetadata.target_path === 'string' && workItemMetadata.target_path.trim()) {
+      seed.push(`Target path: ${workItemMetadata.target_path}`);
+    }
+    if (typeof workItemMetadata.deliverable === 'string' && workItemMetadata.deliverable.trim()) {
+      seed.push(`Deliverable: ${workItemMetadata.deliverable}`);
+    }
+  }
+  for (const artifactHint of (input.artifactHints || []).slice(0, 2)) {
+    seed.push(`Reference artifact: ${artifactHint.artifact_id} (${artifactHint.kind})`);
+    if (artifactHint.path) seed.push(`Artifact path: ${artifactHint.path}`);
+    if (artifactHint.evidence_refs?.length) {
+      seed.push(`Evidence refs: ${artifactHint.evidence_refs.join(', ')}`);
+    }
+  }
+
+  if (input.missionPath) {
+    const dispatchManifestPath = path.join(
+      input.missionPath,
+      'evidence',
+      'workitem-dispatch-manifest.json'
+    );
+    if (safeExistsSync(dispatchManifestPath)) {
+      try {
+        const parsed = JSON.parse(
+          safeReadFile(dispatchManifestPath, { encoding: 'utf8' }) as string
+        ) as { records?: Array<Record<string, unknown>> };
+        const currentItemId = input.workItem?.item_id;
+        const currentTeamRole = String(
+          input.workItem?.metadata && typeof input.workItem.metadata === 'object'
+            ? (input.workItem.metadata as Record<string, unknown>).team_role || ''
+            : ''
+        ).trim();
+        const priorResponses = (parsed.records || [])
+          .filter((record) => {
+            const itemId = String(record.item_id || '').trim();
+            if (!itemId || itemId === currentItemId) return false;
+            if (!String(record.response_path || '').trim()) return false;
+            const status = String(record.status || '')
+              .trim()
+              .toLowerCase();
+            if (status && !['updated', 'done'].includes(status)) return false;
+            const recordTeamRole = String(record.team_role || '').trim();
+            if (currentTeamRole && recordTeamRole && recordTeamRole !== currentTeamRole)
+              return false;
+            return true;
+          })
+          .sort((left, right) =>
+            String(
+              right.reflected_at || right.written_at || right.response_path || ''
+            ).localeCompare(
+              String(left.reflected_at || left.written_at || left.response_path || '')
+            )
+          )
+          .slice(0, 2);
+
+        for (const record of priorResponses) {
+          const responsePath = String(record.response_path || '').trim();
+          const reflectionPath = String(record.reflection_path || '').trim();
+          const responseExcerpt = String(record.response_excerpt || '').trim();
+          const recordTitle = String(record.title || '').trim();
+          seed.push(`Prior work item response: ${responsePath}`);
+          if (reflectionPath) seed.push(`Prior reflection: ${reflectionPath}`);
+          if (recordTitle) seed.push(`Prior work item: ${recordTitle}`);
+          if (responseExcerpt)
+            seed.push(
+              `Prior response excerpt: ${summarizeText(responseExcerpt, 160) || responseExcerpt}`
+            );
+          if (responsePath && safeExistsSync(responsePath)) {
+            try {
+              const responsePayload = JSON.parse(
+                safeReadFile(responsePath, { encoding: 'utf8' }) as string
+              ) as {
+                task_result?: {
+                  artifacts?: Array<{ path?: string; kind?: string }>;
+                  summary?: string;
+                };
+              };
+              const artifacts = Array.isArray(responsePayload.task_result?.artifacts)
+                ? responsePayload.task_result.artifacts
+                : [];
+              for (const artifact of artifacts.slice(0, 3)) {
+                const artifactPath = String(artifact.path || '').trim();
+                if (artifactPath) {
+                  seed.push(
+                    `Prior artifact: ${artifactPath}${artifact.kind ? ` (${artifact.kind})` : ''}`
+                  );
+                }
+              }
+              const summary = String(responsePayload.task_result?.summary || '').trim();
+              if (summary) {
+                seed.push(`Prior task summary: ${summarizeText(summary, 180) || summary}`);
+              }
+            } catch {
+              // Best-effort seed enrichment only.
+            }
+          }
+        }
+      } catch {
+        // Best-effort seed enrichment only.
+      }
+    }
+  }
+
+  return {
+    model_tier: modelTier,
+    acceptance_criteria:
+      acceptanceCriteria.length > 0
+        ? acceptanceCriteria
+        : ['Complete the assigned work item with no scope expansion.'],
+    output_contract:
+      'Return a schema-forced result. Prefer structured JSON if an output schema is available; do not answer with free-form prose when a schema or artifact contract exists.',
+    verification: [
+      'Run the narrowest applicable validation or test before claiming completion.',
+      'If the output does not satisfy the required schema or artifact contract, repair it before reporting success.',
+      'Treat unresolved gaps as blockers instead of assuming the missing facts.',
+    ],
+    ...(seed.length > 0 ? { seed } : {}),
+  };
 }
 
 function truncateText(value: string | undefined, max: number): string | undefined {
@@ -376,14 +570,25 @@ function buildRollupSummary(pack: MissionContextPack, prunedSections: string[]):
     `- Scope: tier=${pack.scope.tier}${pack.scope.tenant_slug ? `; tenant=${pack.scope.tenant_slug}` : ''}${pack.scope.project_id ? `; project=${pack.scope.project_id}` : ''}${pack.scope.track_id ? `; track=${pack.scope.track_id}` : ''}${pack.scope.work_item_id ? `; work_item=${pack.scope.work_item_id}` : ''}`,
     `- Pruned sections: ${prunedSections.length > 0 ? prunedSections.join(', ') : 'none'}`,
   ];
-  if (pack.project?.summary) lines.push(`- Project summary: ${summarizeText(pack.project.summary, 220) || pack.project.summary}`);
-  if (pack.track?.summary) lines.push(`- Track summary: ${summarizeText(pack.track.summary, 220) || pack.track.summary}`);
-  if (pack.task_session?.goal?.summary) lines.push(`- Task goal: ${summarizeText(pack.task_session.goal.summary, 180) || pack.task_session.goal.summary}`);
+  if (pack.project?.summary)
+    lines.push(
+      `- Project summary: ${summarizeText(pack.project.summary, 220) || pack.project.summary}`
+    );
+  if (pack.track?.summary)
+    lines.push(`- Track summary: ${summarizeText(pack.track.summary, 220) || pack.track.summary}`);
+  if (pack.task_session?.goal?.summary)
+    lines.push(
+      `- Task goal: ${summarizeText(pack.task_session.goal.summary, 180) || pack.task_session.goal.summary}`
+    );
   if (pack.work_item?.title) lines.push(`- Work item: ${pack.work_item.title}`);
   return lines.join('\n');
 }
 
-function writeMissionContextRollup(missionPath: string | undefined, pack: MissionContextPack, rollupSummary: string): string | undefined {
+function writeMissionContextRollup(
+  missionPath: string | undefined,
+  pack: MissionContextPack,
+  rollupSummary: string
+): string | undefined {
   if (!missionPath) return undefined;
   const targetDir = path.join(missionPath, 'coordination', 'context-rollups');
   if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
@@ -392,7 +597,11 @@ function writeMissionContextRollup(missionPath: string | undefined, pack: Missio
   return filePath;
 }
 
-function pruneMissionContextPack(pack: MissionContextPack, budgetChars?: number, missionPath?: string): MissionContextPack {
+function pruneMissionContextPack(
+  pack: MissionContextPack,
+  budgetChars?: number,
+  missionPath?: string
+): MissionContextPack {
   const budget = typeof budgetChars === 'number' && budgetChars > 0 ? budgetChars : 6000;
   const working = clonePack(pack);
   const originalEstimate = estimatedChars(working);
@@ -446,7 +655,9 @@ function pruneMissionContextPack(pack: MissionContextPack, budgetChars?: number,
         ...working.task_session,
         goal: {
           ...working.task_session.goal,
-          summary: truncateText(working.task_session.goal.summary, 180) || working.task_session.goal.summary,
+          summary:
+            truncateText(working.task_session.goal.summary, 180) ||
+            working.task_session.goal.summary,
         },
       }
     : working.task_session;
@@ -454,7 +665,8 @@ function pruneMissionContextPack(pack: MissionContextPack, budgetChars?: number,
   working.work_item = working.work_item
     ? {
         ...working.work_item,
-        description: truncateText(working.work_item.description, 220) || working.work_item.description,
+        description:
+          truncateText(working.work_item.description, 220) || working.work_item.description,
         labels: working.work_item.labels.slice(0, 8),
         dependencies: working.work_item.dependencies.slice(0, 5),
       }
@@ -489,19 +701,26 @@ function normalizeTier(tier: unknown, fallback: MissionTier = 'public'): Mission
   return tier === 'personal' || tier === 'confidential' || tier === 'public' ? tier : fallback;
 }
 
-function slugifySegment(value: string, fallback = 'shared'): string {
-  return String(value || '')
-    .trim()
-    .replace(/[\\/]+/g, '-')
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || fallback;
-}
-
-function buildContextPackId(input: { missionId: string; teamRole?: string; recipientKind?: MissionContextRecipientKind; workItemId?: string }): string {
-  const parts = ['CPK', slugifySegment(input.missionId.toUpperCase(), 'MISSION')];
-  if (input.teamRole) parts.push(slugifySegment(input.teamRole, 'role'));
-  else if (input.recipientKind) parts.push(slugifySegment(input.recipientKind, 'recipient'));
-  if (input.workItemId) parts.push(slugifySegment(input.workItemId, 'item'));
+function buildContextPackId(input: {
+  missionId: string;
+  teamRole?: string;
+  recipientKind?: MissionContextRecipientKind;
+  workItemId?: string;
+}): string {
+  const parts = [
+    'CPK',
+    slugify(input.missionId.toUpperCase(), { separator: '-', fallback: 'MISSION' }).toUpperCase(),
+  ];
+  if (input.teamRole) {
+    parts.push(slugify(input.teamRole, { separator: '-', fallback: 'role' }).toUpperCase());
+  } else if (input.recipientKind) {
+    parts.push(
+      slugify(input.recipientKind, { separator: '-', fallback: 'recipient' }).toUpperCase()
+    );
+  }
+  if (input.workItemId) {
+    parts.push(slugify(input.workItemId, { separator: '-', fallback: 'item' }).toUpperCase());
+  }
   parts.push(randomUUID().slice(0, 8).toUpperCase());
   return parts.join('-');
 }
@@ -515,7 +734,9 @@ function loadMissionState(missionId: string, tier: MissionTier): MissionStateSum
   const filePath = missionStatePath(missionId, tier);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as MissionStateSummary;
+    const parsed = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as MissionStateSummary;
     return ensureMissionStateValidator()(parsed) ? parsed : null;
   } catch {
     return null;
@@ -574,7 +795,9 @@ function missionSources(input: {
     {
       kind: 'mission_state',
       ref: `mission:${input.missionId}`,
-      path: input.missionPath ? path.join(input.missionPath, 'mission-state.json') : missionStatePath(input.missionId, input.missionTier),
+      path: input.missionPath
+        ? path.join(input.missionPath, 'mission-state.json')
+        : missionStatePath(input.missionId, input.missionTier),
       summary: `Mission state for ${input.missionId}`,
       captured_at: new Date().toISOString(),
     },
@@ -645,7 +868,9 @@ function missionSources(input: {
   return sources;
 }
 
-function missionAssignmentSummary(assignment: MissionTeamAssignment | null | undefined): MissionContextPackRecipient {
+function missionAssignmentSummary(
+  assignment: MissionTeamAssignment | null | undefined
+): MissionContextPackRecipient {
   if (!assignment) {
     return {
       kind: 'subagent',
@@ -684,7 +909,9 @@ function loadProjectStateIfPossible(input: {
     input.projectId,
     input.missionState.relationships?.project?.project_id,
     input.workItem?.project_id,
-  ].map((entry) => String(entry || '').trim()).filter(Boolean);
+  ]
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
   const projectId = candidates[0];
   if (!projectId) return null;
   const queryTier = normalizeTier(input.missionState.tier, input.tier);
@@ -701,9 +928,9 @@ function loadTrackStateIfPossible(input: {
 }): ProjectTrackRecord | null {
   const candidate = String(
     input.trackId ||
-    input.missionState.relationships?.track?.track_id ||
-    input.projectState?.active_track_ids?.[0] ||
-    ''
+      input.missionState.relationships?.track?.track_id ||
+      input.projectState?.active_track_ids?.[0] ||
+      ''
   ).trim();
   if (!candidate) return null;
   return loadProjectTrackRecord(candidate);
@@ -732,13 +959,21 @@ async function loadKnowledgeHintsIfPossible(input: {
     .join(' ');
   if (!topic) return [];
 
-  const tags = new Set<string>([
-    input.missionState.tier,
-    input.missionState.mission_type || '',
-    input.teamRole || '',
-    input.projectState?.project_id || '',
-    input.trackRecord?.track_type || '',
-  ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
+  const tags = new Set<string>(
+    [
+      input.missionState.tier,
+      input.missionState.mission_type || '',
+      input.teamRole || '',
+      input.projectState?.project_id || '',
+      input.trackRecord?.track_type || '',
+    ]
+      .map((value) =>
+        String(value || '')
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean)
+  );
 
   const relevant = await findRelevantDistilledKnowledge({
     topic,
@@ -768,31 +1003,89 @@ function loadArtifactHintsIfPossible(input: {
 }): MissionContextPackArtifactHint[] {
   const projectId = String(
     input.projectState?.project_id ||
-    input.missionState.relationships?.project?.project_id ||
-    input.workItem?.project_id ||
-    ''
+      input.missionState.relationships?.project?.project_id ||
+      input.workItem?.project_id ||
+      ''
   ).trim();
   if (!projectId) return [];
 
-  const preferredKinds = new Set<string>([
-    input.missionState.outcome_contract?.deliverable_kind,
-    ...(input.trackRecord?.required_artifacts || []),
-    input.taskSession?.artifact?.kind,
-  ].map((value) => String(value || '').trim()).filter(Boolean));
+  const getQualityScore = (record: ArtifactOwnershipRecord): number => {
+    const metadata = record.metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return 0;
+    const score =
+      metadata.quality_score ??
+      metadata.qualityScore ??
+      metadata.reuse_score ??
+      metadata.reuseScore;
+    if (typeof score === 'number' && Number.isFinite(score)) return score;
+    if (typeof score === 'string' && score.trim()) {
+      const parsed = Number(score);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    const verdict =
+      metadata.quality_verdict ??
+      metadata.qualityVerdict ??
+      metadata.review_gate_verdict ??
+      metadata.reviewGateVerdict;
+    if (typeof verdict === 'string') {
+      const normalized = verdict.toLowerCase();
+      if (
+        normalized === 'promoted' ||
+        normalized === 'ready' ||
+        normalized === 'approved' ||
+        normalized === 'ok'
+      )
+        return 100;
+      if (normalized === 'warn' || normalized === 'concerns') return 50;
+      if (normalized === 'blocked' || normalized === 'poor') return 0;
+    }
+    return 0;
+  };
+
+  const getQualityRank = (record: ArtifactOwnershipRecord): number => {
+    const score = getQualityScore(record);
+    if (score > 0) return score;
+    const promoted =
+      record.metadata?.promoted === true ||
+      record.metadata?.promoted_at ||
+      record.metadata?.final_gate_verdict;
+    return promoted ? 1 : 0;
+  };
+
+  const preferredKinds = new Set<string>(
+    [
+      input.missionState.outcome_contract?.deliverable_kind,
+      ...(input.trackRecord?.required_artifacts || []),
+      input.taskSession?.artifact?.kind,
+    ]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  );
 
   const reuseCandidates = Array.from(preferredKinds)
     .map((kind) => findReusableArtifactOwnershipRecord({ projectId, kind }))
     .filter((record): record is ArtifactOwnershipRecord => Boolean(record));
 
-  const allProjectRecords = listArtifactOwnershipRecordsForProject(projectId, { includeTmp: false });
+  const allProjectRecords = listArtifactOwnershipRecordsForProject(projectId, {
+    includeTmp: false,
+  });
   const projectRecords = preferredKinds.size
     ? allProjectRecords.filter((record) => preferredKinds.has(record.kind))
     : allProjectRecords;
   const fallbackRecords = projectRecords.length > 0 ? projectRecords : allProjectRecords;
 
   const candidates = [...reuseCandidates, ...fallbackRecords]
-    .filter((record, index, all) => all.findIndex((candidate) => candidate.artifact_id === record.artifact_id) === index)
-    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .filter(
+      (record, index, all) =>
+        all.findIndex((candidate) => candidate.artifact_id === record.artifact_id) === index
+    )
+    .sort((a, b) => {
+      const qualityCompare = getQualityRank(b) - getQualityRank(a);
+      if (qualityCompare !== 0) return qualityCompare;
+      const createdAtCompare = String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      if (createdAtCompare !== 0) return createdAtCompare;
+      return String(b.artifact_id || '').localeCompare(String(a.artifact_id || ''));
+    })
     .slice(0, 3);
 
   return candidates.map((record) => ({
@@ -815,20 +1108,42 @@ function loadArtifactHintsIfPossible(input: {
 export function buildMissionContextPack(input: BuildMissionContextPackInput): MissionContextPack {
   const missionStateValidate = ensureMissionStateValidator();
   if (!missionStateValidate(input.missionState)) {
-    throw new Error(`Invalid mission state for context pack: ${validationErrors(missionStateValidate).join('; ')}`);
+    throw new Error(
+      `Invalid mission state for context pack: ${validationErrors(missionStateValidate).join('; ')}`
+    );
   }
 
   const missionTier = normalizeTier(input.missionState.tier);
-  const missionPath = input.missionPath || findMissionPath(input.missionState.mission_id) || pathResolver.missionDir(input.missionState.mission_id, missionTier);
-  const projectId = input.projectState?.project_id
-    || input.missionState.relationships?.project?.project_id
-    || input.workItem?.project_id;
-  const trackId = input.trackRecord?.track_id
-    || input.missionState.relationships?.track?.track_id
-    || input.projectState?.active_track_ids?.[0];
+  const missionPath =
+    input.missionPath ||
+    findMissionPath(input.missionState.mission_id) ||
+    pathResolver.missionDir(input.missionState.mission_id, missionTier);
+  const projectId =
+    input.projectState?.project_id ||
+    input.missionState.relationships?.project?.project_id ||
+    input.workItem?.project_id;
+  const trackId =
+    input.trackRecord?.track_id ||
+    input.missionState.relationships?.track?.track_id ||
+    input.projectState?.active_track_ids?.[0];
   const taskSessionId = input.taskSession?.session_id || undefined;
   const workItemId = input.workItem?.item_id || undefined;
   const assignment = input.missionTeamAssignment || null;
+  const artifactHints = loadArtifactHintsIfPossible({
+    missionState: input.missionState,
+    projectState: input.projectState,
+    trackRecord: input.trackRecord,
+    taskSession: input.taskSession,
+    workItem: input.workItem,
+  });
+  const taskGuidance = buildTaskGuidance({
+    missionState: input.missionState,
+    missionPath,
+    taskSession: input.taskSession,
+    workItem: input.workItem,
+    missionTeamAssignment: assignment,
+    artifactHints,
+  });
   const recipient = input.recipientKind
     ? {
         ...missionAssignmentSummary(assignment),
@@ -855,12 +1170,22 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(input.missionState.tenant_id ? { tenant_id: input.missionState.tenant_id } : {}),
     ...(input.missionState.tenant_slug ? { tenant_slug: input.missionState.tenant_slug } : {}),
     ...(input.missionState.vision_ref ? { vision_ref: input.missionState.vision_ref } : {}),
-    ...(input.missionState.execution_mode ? { execution_mode: input.missionState.execution_mode } : {}),
-    ...(typeof input.missionState.priority === 'number' ? { priority: input.missionState.priority } : {}),
-    ...(typeof input.missionState.confidence_score === 'number' ? { confidence_score: input.missionState.confidence_score } : {}),
-    ...(input.missionState.relationships ? { relationships: input.missionState.relationships } : {}),
+    ...(input.missionState.execution_mode
+      ? { execution_mode: input.missionState.execution_mode }
+      : {}),
+    ...(typeof input.missionState.priority === 'number'
+      ? { priority: input.missionState.priority }
+      : {}),
+    ...(typeof input.missionState.confidence_score === 'number'
+      ? { confidence_score: input.missionState.confidence_score }
+      : {}),
+    ...(input.missionState.relationships
+      ? { relationships: input.missionState.relationships }
+      : {}),
     ...(input.missionState.context ? { context: input.missionState.context } : {}),
-    ...(input.missionState.outcome_contract ? { outcome_contract: input.missionState.outcome_contract } : {}),
+    ...(input.missionState.outcome_contract
+      ? { outcome_contract: input.missionState.outcome_contract }
+      : {}),
   };
 
   const project = input.projectState
@@ -871,15 +1196,33 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
         status: input.projectState.status,
         tier: input.projectState.tier,
         ...(input.projectState.tenant_slug ? { tenant_slug: input.projectState.tenant_slug } : {}),
-        ...(input.projectState.project_path ? { project_path: input.projectState.project_path } : {}),
-        ...(input.projectState.current_phase ? { current_phase: input.projectState.current_phase } : {}),
-        ...(input.projectState.active_track_ids ? { active_track_ids: [...input.projectState.active_track_ids] } : {}),
-        ...(input.projectState.active_mission_ids ? { active_mission_ids: [...input.projectState.active_mission_ids] } : {}),
-        ...(input.projectState.active_task_session_ids ? { active_task_session_ids: [...input.projectState.active_task_session_ids] } : {}),
-        ...(input.projectState.source_refs ? { source_refs: [...input.projectState.source_refs] } : {}),
-        ...(input.projectState.distill_targets ? { distill_targets: [...input.projectState.distill_targets] } : {}),
-        ...(input.projectState.knowledge_refs ? { knowledge_refs: [...input.projectState.knowledge_refs] } : {}),
-        ...(input.projectState.last_distilled_at ? { last_distilled_at: input.projectState.last_distilled_at } : {}),
+        ...(input.projectState.project_path
+          ? { project_path: input.projectState.project_path }
+          : {}),
+        ...(input.projectState.current_phase
+          ? { current_phase: input.projectState.current_phase }
+          : {}),
+        ...(input.projectState.active_track_ids
+          ? { active_track_ids: [...input.projectState.active_track_ids] }
+          : {}),
+        ...(input.projectState.active_mission_ids
+          ? { active_mission_ids: [...input.projectState.active_mission_ids] }
+          : {}),
+        ...(input.projectState.active_task_session_ids
+          ? { active_task_session_ids: [...input.projectState.active_task_session_ids] }
+          : {}),
+        ...(input.projectState.source_refs
+          ? { source_refs: [...input.projectState.source_refs] }
+          : {}),
+        ...(input.projectState.distill_targets
+          ? { distill_targets: [...input.projectState.distill_targets] }
+          : {}),
+        ...(input.projectState.knowledge_refs
+          ? { knowledge_refs: [...input.projectState.knowledge_refs] }
+          : {}),
+        ...(input.projectState.last_distilled_at
+          ? { last_distilled_at: input.projectState.last_distilled_at }
+          : {}),
       }
     : undefined;
 
@@ -893,12 +1236,20 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
         track_type: input.trackRecord.track_type,
         lifecycle_model: input.trackRecord.lifecycle_model,
         tier: input.trackRecord.tier,
-        ...(input.trackRecord.primary_locale ? { primary_locale: input.trackRecord.primary_locale } : {}),
+        ...(input.trackRecord.primary_locale
+          ? { primary_locale: input.trackRecord.primary_locale }
+          : {}),
         ...(input.trackRecord.release_id ? { release_id: input.trackRecord.release_id } : {}),
         ...(input.trackRecord.change_scope ? { change_scope: input.trackRecord.change_scope } : {}),
-        ...(input.trackRecord.gate_profile_id ? { gate_profile_id: input.trackRecord.gate_profile_id } : {}),
-        ...(input.trackRecord.active_missions ? { active_missions: [...input.trackRecord.active_missions] } : {}),
-        ...(input.trackRecord.required_artifacts ? { required_artifacts: [...input.trackRecord.required_artifacts] } : {}),
+        ...(input.trackRecord.gate_profile_id
+          ? { gate_profile_id: input.trackRecord.gate_profile_id }
+          : {}),
+        ...(input.trackRecord.active_missions
+          ? { active_missions: [...input.trackRecord.active_missions] }
+          : {}),
+        ...(input.trackRecord.required_artifacts
+          ? { required_artifacts: [...input.trackRecord.required_artifacts] }
+          : {}),
       }
     : undefined;
 
@@ -913,11 +1264,15 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
           summary: input.taskSession.goal.summary,
           success_condition: input.taskSession.goal.success_condition,
         },
-        ...(input.taskSession.project_context ? { project_context: input.taskSession.project_context } : {}),
+        ...(input.taskSession.project_context
+          ? { project_context: input.taskSession.project_context }
+          : {}),
         ...(input.taskSession.requirements ? { requirements: input.taskSession.requirements } : {}),
         ...(input.taskSession.artifact ? { artifact: input.taskSession.artifact } : {}),
         ...(input.taskSession.control ? { control: input.taskSession.control } : {}),
-        ...(input.taskSession.outcome_contract ? { outcome_contract: input.taskSession.outcome_contract } : {}),
+        ...(input.taskSession.outcome_contract
+          ? { outcome_contract: input.taskSession.outcome_contract }
+          : {}),
         updated_at: input.taskSession.updated_at,
       }
     : undefined;
@@ -932,8 +1287,12 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
         source: input.workItem.source,
         source_ref: input.workItem.source_ref,
         project_id: input.workItem.project_id,
-        ...(input.workItem.assignee_peer_id ? { assignee_peer_id: input.workItem.assignee_peer_id } : {}),
-        ...(input.workItem.assignee_user_id ? { assignee_user_id: input.workItem.assignee_user_id } : {}),
+        ...(input.workItem.assignee_peer_id
+          ? { assignee_peer_id: input.workItem.assignee_peer_id }
+          : {}),
+        ...(input.workItem.assignee_user_id
+          ? { assignee_user_id: input.workItem.assignee_user_id }
+          : {}),
         labels: [...input.workItem.labels],
         dependencies: [...input.workItem.dependencies],
         ...(input.workItem.metadata ? { metadata: { ...input.workItem.metadata } } : {}),
@@ -958,14 +1317,6 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     missionTeamAssignment: assignment,
     knowledgeHints: input.knowledgeHints,
   });
-  const artifactHints = loadArtifactHintsIfPossible({
-    missionState: input.missionState,
-    projectState: input.projectState,
-    trackRecord: input.trackRecord,
-    taskSession: input.taskSession,
-    workItem: input.workItem,
-  });
-
   const summary = missionContextSummary({
     missionId: input.missionState.mission_id,
     teamRole: input.teamRole,
@@ -978,12 +1329,14 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   });
 
   const pack: MissionContextPack = {
-    context_pack_id: input.contextPackId || buildContextPackId({
-      missionId: input.missionState.mission_id,
-      teamRole: input.teamRole,
-      recipientKind: recipient.kind,
-      workItemId,
-    }),
+    context_pack_id:
+      input.contextPackId ||
+      buildContextPackId({
+        missionId: input.missionState.mission_id,
+        teamRole: input.teamRole,
+        recipientKind: recipient.kind,
+        workItemId,
+      }),
     version: '1',
     generated_at: new Date().toISOString(),
     summary,
@@ -994,13 +1347,18 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(track ? { track } : {}),
     ...(taskSession ? { task_session: taskSession } : {}),
     ...(workItem ? { work_item: workItem } : {}),
-    ...(input.knowledgeHints && input.knowledgeHints.length > 0 ? { knowledge_hints: input.knowledgeHints } : {}),
+    ...(input.knowledgeHints && input.knowledgeHints.length > 0
+      ? { knowledge_hints: input.knowledgeHints }
+      : {}),
     ...(artifactHints.length > 0 ? { artifact_hints: artifactHints } : {}),
+    ...(taskGuidance ? { task_guidance: taskGuidance } : {}),
     sources,
     redactions: defaultRedactions(),
     delivery: {
       mode: 'prompt',
-      summary: 'Role-scoped mission context pack. Full Kyberion knowledge and unrelated operational state are intentionally omitted.',
+      summary: taskGuidance
+        ? 'Role-scoped mission context pack with fast-lane guidance. Full Kyberion knowledge and unrelated operational state are intentionally omitted.'
+        : 'Role-scoped mission context pack. Full Kyberion knowledge and unrelated operational state are intentionally omitted.',
     },
   };
 
@@ -1013,50 +1371,61 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   return prunedPack;
 }
 
-export async function resolveMissionContextPack(input: ResolveMissionContextPackInput): Promise<MissionContextPack | null> {
+export async function resolveMissionContextPack(
+  input: ResolveMissionContextPackInput
+): Promise<MissionContextPack | null> {
   const tier = normalizeTier(input.tier, 'public');
   const missionState = input.missionState || loadMissionState(input.missionId, tier);
   if (!missionState) return null;
 
   const workItem = input.workItem || (input.workItemId ? getWorkItem(input.workItemId) : null);
   const workItemMetadata = (workItem?.metadata || {}) as Record<string, unknown>;
-  const derivedTaskSessionId = typeof workItemMetadata.task_session_id === 'string'
-    ? workItemMetadata.task_session_id
-    : undefined;
-  const taskSession = input.taskSession || loadTaskSessionIfPossible(input.taskSessionId || derivedTaskSessionId);
-  const projectState = input.projectState || loadProjectStateIfPossible({
-    projectId: input.projectId,
-    missionState,
-    workItem,
-    tier,
-    tenantSlug: input.tenantSlug,
-  });
-  const trackRecord = input.trackRecord || loadTrackStateIfPossible({
-    trackId: input.trackId,
-    projectState,
-    missionState,
-  });
+  const derivedTaskSessionId =
+    typeof workItemMetadata.task_session_id === 'string'
+      ? workItemMetadata.task_session_id
+      : undefined;
+  const taskSession =
+    input.taskSession || loadTaskSessionIfPossible(input.taskSessionId || derivedTaskSessionId);
+  const projectState =
+    input.projectState ||
+    loadProjectStateIfPossible({
+      projectId: input.projectId,
+      missionState,
+      workItem,
+      tier,
+      tenantSlug: input.tenantSlug,
+    });
+  const trackRecord =
+    input.trackRecord ||
+    loadTrackStateIfPossible({
+      trackId: input.trackId,
+      projectState,
+      missionState,
+    });
   const missionTeamPlan = input.teamRole
-    ? (loadMissionTeamPlan(input.missionId) || resolveMissionTeamPlan({
+    ? loadMissionTeamPlan(input.missionId) ||
+      resolveMissionTeamPlan({
         missionId: input.missionId,
         missionType: missionState.mission_type,
         tier,
         assignedPersona: missionState.assigned_persona,
-      }))
+      })
     : null;
-  const missionTeamAssignment = input.teamRole && missionTeamPlan
-    ? missionTeamPlan.assignments.find((entry) => entry.team_role === input.teamRole) || null
-    : null;
-  const knowledgeHints = input.includeKnowledgeHints === false
-    ? []
-    : await loadKnowledgeHintsIfPossible({
-        missionState,
-        projectState,
-        trackRecord,
-        teamRole: input.teamRole,
-        workItem,
-        taskSession,
-      });
+  const missionTeamAssignment =
+    input.teamRole && missionTeamPlan
+      ? missionTeamPlan.assignments.find((entry) => entry.team_role === input.teamRole) || null
+      : null;
+  const knowledgeHints =
+    input.includeKnowledgeHints === false
+      ? []
+      : await loadKnowledgeHintsIfPossible({
+          missionState,
+          projectState,
+          trackRecord,
+          teamRole: input.teamRole,
+          workItem,
+          taskSession,
+        });
 
   return buildMissionContextPack({
     missionState,
@@ -1076,11 +1445,12 @@ export async function resolveMissionContextPack(input: ResolveMissionContextPack
 }
 
 export function saveMissionContextPack(missionPath: string, pack: MissionContextPack): string {
-  const missionDir = missionPath && safeExistsSync(missionPath)
-    ? missionPath
-    : path.isAbsolute(missionPath)
+  const missionDir =
+    missionPath && safeExistsSync(missionPath)
       ? missionPath
-      : pathResolver.rootResolve(missionPath);
+      : path.isAbsolute(missionPath)
+        ? missionPath
+        : pathResolver.rootResolve(missionPath);
   const targetDir = path.join(missionDir, 'coordination', 'context-packs');
   if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
   const filePath = path.join(targetDir, `${pack.context_pack_id}.json`);
@@ -1090,7 +1460,9 @@ export function saveMissionContextPack(missionPath: string, pack: MissionContext
   };
   const validate = ensureMissionContextPackValidator();
   if (!validate(payload)) {
-    throw new Error(`Invalid mission context pack payload: ${validationErrors(validate).join('; ')}`);
+    throw new Error(
+      `Invalid mission context pack payload: ${validationErrors(validate).join('; ')}`
+    );
   }
   safeWriteFile(filePath, JSON.stringify(payload, null, 2));
   return filePath;
@@ -1108,28 +1480,42 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
   if (pack.project) {
     lines.push(
       `- Project: ${pack.project.project_id} | ${pack.project.name} | ${pack.project.status}${pack.project.current_phase ? ` | phase=${pack.project.current_phase}` : ''}`,
-      `  - Summary: ${summarizeText(pack.project.summary, 320) || pack.project.summary}`,
+      `  - Summary: ${summarizeText(pack.project.summary, 320) || pack.project.summary}`
     );
   }
 
   if (pack.track) {
     lines.push(
       `- Track: ${pack.track.track_id} | ${pack.track.name} | ${pack.track.status} | ${pack.track.track_type}/${pack.track.lifecycle_model}`,
-      `  - Summary: ${summarizeText(pack.track.summary, 280) || pack.track.summary}`,
+      `  - Summary: ${summarizeText(pack.track.summary, 280) || pack.track.summary}`
     );
   }
 
   if (pack.task_session) {
     lines.push(
       `- Task session: ${pack.task_session.session_id} | ${pack.task_session.task_type} | ${pack.task_session.status} | ${pack.task_session.mode}`,
-      `  - Goal: ${summarizeText(pack.task_session.goal.summary, 240) || pack.task_session.goal.summary}`,
+      `  - Goal: ${summarizeText(pack.task_session.goal.summary, 240) || pack.task_session.goal.summary}`
     );
   }
 
   if (pack.work_item) {
     lines.push(
       `- Work item: ${pack.work_item.item_id} | ${pack.work_item.status} | ${pack.work_item.title}`,
-      `  - Description: ${summarizeText(pack.work_item.description, 280) || pack.work_item.description}`,
+      `  - Description: ${summarizeText(pack.work_item.description, 280) || pack.work_item.description}`
+    );
+  }
+
+  if (pack.task_guidance) {
+    lines.push(
+      `- Fast-lane guidance: model_tier=${pack.task_guidance.model_tier}`,
+      `  - Acceptance criteria:`,
+      ...pack.task_guidance.acceptance_criteria.map((criterion) => `    - ${criterion}`),
+      `  - Output contract: ${pack.task_guidance.output_contract}`,
+      `  - Verification:`,
+      ...pack.task_guidance.verification.map((step) => `    - ${step}`),
+      ...(pack.task_guidance.seed?.length
+        ? [`  - Seed:`, ...pack.task_guidance.seed.map((entry) => `    - ${entry}`)]
+        : [])
     );
   }
 
@@ -1138,7 +1524,7 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
       `- Context pruning: budget=${pack.pruning.budget_chars}; estimated=${pack.pruning.estimated_chars}`,
       `  - Kept: ${pack.pruning.kept_sections.join(', ')}`,
       `  - Pruned: ${pack.pruning.pruned_sections.length > 0 ? pack.pruning.pruned_sections.join(', ') : 'none'}`,
-      ...(pack.pruning.rollup_path ? [`  - Rollup: ${pack.pruning.rollup_path}`] : []),
+      ...(pack.pruning.rollup_path ? [`  - Rollup: ${pack.pruning.rollup_path}`] : [])
     );
   }
 
@@ -1157,7 +1543,9 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
       lines.push(`    ${hint.reuse_reason}`);
       if (hint.path) lines.push(`    path: ${hint.path}`);
       if (hint.project_id || hint.mission_id || hint.task_session_id) {
-        lines.push(`    lineage: ${[hint.project_id ? `project=${hint.project_id}` : '', hint.mission_id ? `mission=${hint.mission_id}` : '', hint.task_session_id ? `task_session=${hint.task_session_id}` : ''].filter(Boolean).join(', ')}`);
+        lines.push(
+          `    lineage: ${[hint.project_id ? `project=${hint.project_id}` : '', hint.mission_id ? `mission=${hint.mission_id}` : '', hint.task_session_id ? `task_session=${hint.task_session_id}` : ''].filter(Boolean).join(', ')}`
+        );
       }
     }
   }
@@ -1168,11 +1556,16 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
       `[${source.kind}] ${source.ref}`,
       source.path ? `(${source.path})` : '',
       source.summary ? `- ${summarizeText(source.summary, 200) || source.summary}` : '',
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
     lines.push(`  - ${descriptor}`);
   }
 
   lines.push(`- Redactions: ${pack.redactions.length > 0 ? pack.redactions.join('; ') : 'none'}`);
-  lines.push('', 'Use only the facts in this pack and the task instructions that follow. If a necessary fact is missing, report the gap instead of assuming the full knowledge base.');
+  lines.push(
+    '',
+    'Use only the facts in this pack and the task instructions that follow. If a necessary fact is missing, report the gap instead of assuming the full knowledge base.'
+  );
   return lines.join('\n');
 }

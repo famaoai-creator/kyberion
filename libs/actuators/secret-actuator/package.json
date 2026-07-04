@@ -1,5 +1,5 @@
 {
-  "name": "@agent/secret-actuator",
+  "name": "@actuator/secret",
   "version": "1.0.0",
   "type": "module",
   "description": "OS Native Secret Actuator for Kyberion Ecosystem",

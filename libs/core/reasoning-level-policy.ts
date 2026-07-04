@@ -17,6 +17,10 @@ export type ReasoningLevel =
   | 'REACTION_FAST'
   | 'REFLEX_DETERMINISTIC';
 
+export type TaskModelPhaseKind = 'plan' | 'implement' | 'review' | 'mechanical';
+export type TaskModelTier = 'small' | 'standard' | 'large';
+export type TaskModelEffort = 'low' | 'medium' | 'high';
+
 export interface ReasoningLevelDecision {
   level: ReasoningLevel;
   rule_id: string;
@@ -42,6 +46,45 @@ export interface ReasoningLevelPolicy {
   cache_ttl_hours?: number;
   rules: ReasoningLevelPolicyRule[];
   shadow_model_map?: Partial<Record<ReasoningLevel, string>>;
+  task_model_routing?: {
+    default: {
+      tier: TaskModelTier;
+      effort: TaskModelEffort;
+      model_id: string;
+    };
+    phases: Partial<
+      Record<
+        TaskModelPhaseKind,
+        {
+          default: {
+            tier: TaskModelTier;
+            effort: TaskModelEffort;
+            model_id: string;
+          };
+          scope?: Partial<
+            Record<
+              'S' | 'M' | 'L',
+              {
+                tier: TaskModelTier;
+                effort: TaskModelEffort;
+                model_id: string;
+              }
+            >
+          >;
+          risk?: Partial<
+            Record<
+              'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes',
+              {
+                tier: TaskModelTier;
+                effort: TaskModelEffort;
+                model_id: string;
+              }
+            >
+          >;
+        }
+      >
+    >;
+  };
 }
 
 let validateFn: ValidateFunction | null = null;
@@ -60,10 +103,15 @@ function errorsFrom(validate: ValidateFunction): string[] {
   );
 }
 
-export function validateReasoningLevelPolicy(value: unknown, label = POLICY_PATH): ReasoningLevelPolicy {
+export function validateReasoningLevelPolicy(
+  value: unknown,
+  label = POLICY_PATH
+): ReasoningLevelPolicy {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid reasoning level policy at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid reasoning level policy at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as ReasoningLevelPolicy;
 }
@@ -90,7 +138,9 @@ function getSelectedIntent(input: {
   return input.selectedIntent;
 }
 
-function getSelectedShape(intent?: StandardIntentDefinition): 'direct_reply' | 'task_session' | undefined {
+function getSelectedShape(
+  intent?: StandardIntentDefinition
+): 'direct_reply' | 'task_session' | undefined {
   const shape = intent?.resolution?.shape || intent?.execution_shape;
   return shape === 'direct_reply' || shape === 'task_session' ? shape : undefined;
 }
@@ -103,7 +153,7 @@ function buildDecision(
   level: ReasoningLevel,
   rule_id: string,
   reasons: string[],
-  policy: ReasoningLevelPolicy,
+  policy: ReasoningLevelPolicy
 ): ReasoningLevelDecision {
   return {
     level,
@@ -120,7 +170,7 @@ export function resolveReasoningLevelDecision(
     resolutionPacket: IntentResolutionPacket;
     selectedIntent?: StandardIntentDefinition;
   },
-  policy: ReasoningLevelPolicy = loadReasoningLevelPolicy(),
+  policy: ReasoningLevelPolicy = loadReasoningLevelPolicy()
 ): ReasoningLevelDecision {
   const selectedIntent = getSelectedIntent(input);
   const selectedConfidence = input.resolutionPacket.selected_confidence;
@@ -135,7 +185,7 @@ export function resolveReasoningLevelDecision(
             'REFLEX_DETERMINISTIC',
             rule.id,
             ['simple greeting predicate matched'],
-            policy,
+            policy
           );
         }
         break;
@@ -145,18 +195,13 @@ export function resolveReasoningLevelDecision(
             'COGNITIVE_EXPLORATORY',
             rule.id,
             [`selected intent risk_profile=${selectedRisk}`],
-            policy,
+            policy
           );
         }
         break;
       case 'ambiguous-exploratory':
         if (!selectedIntent) {
-          return buildDecision(
-            'COGNITIVE_EXPLORATORY',
-            rule.id,
-            ['no selected intent'],
-            policy,
-          );
+          return buildDecision('COGNITIVE_EXPLORATORY', rule.id, ['no selected intent'], policy);
         }
         if (
           typeof selectedConfidence !== 'number' ||
@@ -168,7 +213,7 @@ export function resolveReasoningLevelDecision(
             [
               `selected confidence ${typeof selectedConfidence === 'number' ? selectedConfidence : 'n/a'} < ${policy.thresholds.low_confidence}`,
             ],
-            policy,
+            policy
           );
         }
         break;
@@ -188,7 +233,7 @@ export function resolveReasoningLevelDecision(
               `selected risk_profile=${selectedRisk}`,
               `selected shape=${selectedShape}`,
             ],
-            policy,
+            policy
           );
         }
         break;
@@ -197,7 +242,7 @@ export function resolveReasoningLevelDecision(
           'COGNITIVE_STANDARD',
           rule.id,
           ['no higher-priority rule matched'],
-          policy,
+          policy
         );
     }
   }
@@ -206,7 +251,7 @@ export function resolveReasoningLevelDecision(
     'COGNITIVE_STANDARD',
     'default-standard',
     ['policy did not contain a matching rule; defaulted to standard reasoning'],
-    policy,
+    policy
   );
 }
 

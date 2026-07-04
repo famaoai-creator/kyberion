@@ -7,6 +7,8 @@
       "provider": "openai",
       "family": "gpt-5",
       "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
       "role_fit": {
         "intent_compiler": "primary",
         "surface_agent": "primary",
@@ -27,6 +29,8 @@
       "provider": "openai",
       "family": "gpt-5",
       "status": "candidate",
+      "tier": "small",
+      "execution_tier": "fast",
       "role_fit": {
         "intent_compiler": "secondary",
         "surface_agent": "primary",
@@ -47,6 +51,8 @@
       "provider": "anthropic",
       "family": "claude-sonnet",
       "status": "candidate",
+      "tier": "large",
+      "execution_tier": "deep",
       "role_fit": {
         "intent_compiler": "secondary",
         "surface_agent": "secondary",

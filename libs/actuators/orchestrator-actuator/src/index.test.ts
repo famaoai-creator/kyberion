@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   safeSymlinkSync: vi.fn(),
   resolveVars: vi.fn((value: string) => value),
   evaluateCondition: vi.fn(),
-  withRetry: vi.fn(async (fn: any) => fn()),
+  retry: vi.fn(async (fn: any) => fn()),
   derivePipelineStatus: vi.fn(() => 'succeeded'),
 }));
 
@@ -27,7 +28,7 @@ vi.mock('@agent/core', async () => {
     safeSymlinkSync: mocks.safeSymlinkSync,
     resolveVars: mocks.resolveVars,
     evaluateCondition: mocks.evaluateCondition,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     derivePipelineStatus: mocks.derivePipelineStatus,
   };
 });
@@ -37,6 +38,8 @@ vi.mock('@agent/core/fs-utils', () => ({
 }));
 
 describe('orchestrator-actuator', () => {
+  const ROOT = pathResolver.rootDir();
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.safeExistsSync.mockReturnValue(true);
@@ -145,11 +148,10 @@ describe('orchestrator-actuator', () => {
   });
 
   it('loads existing context and persists merged context to context_path', async () => {
-    const root = process.cwd();
     const contextPath = 'active/shared/tmp/orchestrator-tests/context.json';
     const inputPath = 'active/shared/tmp/orchestrator-tests/input.json';
-    const resolvedContextPath = `${root}/${contextPath}`;
-    const resolvedInputPath = `${root}/${inputPath}`;
+    const resolvedContextPath = `${ROOT}/${contextPath}`;
+    const resolvedInputPath = `${ROOT}/${inputPath}`;
 
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath === resolvedContextPath) return JSON.stringify({ existing: 'yes' });

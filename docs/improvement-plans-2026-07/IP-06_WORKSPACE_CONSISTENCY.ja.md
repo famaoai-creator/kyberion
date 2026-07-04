@@ -31,7 +31,7 @@
 1. 既存の標準形(例: `libs/actuators/process-actuator/package.json`)を雛形に、`media-generation-actuator` / `video-composition-actuator` / `vision-actuator` / `voice-actuator` へ package.json を追加する(name は `@actuator/<name>`、`main` は他と同じ `../../../dist/...` 規約、`test` script 付き)。
 2. 各パッケージの import 文から実依存(`@agent/core` 以外の外部依存)を洗い出し、dependencies に明記する。ルート package.json に巻き上げられていた依存に暗黙依存していた場合はここで顕在化するので、パッケージ側に宣言する。
 3. `pnpm install` → `pnpm build` → `pnpm --filter '@actuator/*' test`(テストの無いものは後述)で確認。
-4. `voice-actuator` 直下の野良スクリプト `mms-jp-test.py`, `ms-voice-test.py`, `singing-test.py`, `voice-bridge.py` と `vision-actuator/override.txt`(0バイト)は IP-14 の対象なので触らない。
+4. `voice-actuator` 直下の野良スクリプト `mms-jp-test.py`, `ms-voice-test.py`, `singing-test.py` と `vision-actuator/override.txt`(0バイト)は IP-14 の対象なので触らない。`voice-bridge.py` は voice preset 参照があるので残す。
 
 ### Task 3: scope 統一 — `claude-sonnet-4`
 
@@ -53,3 +53,9 @@
 
 - Task 2 で依存をパッケージ側に宣言すると pnpm の hoisting 変化で他パッケージの解決が変わる可能性がある。`pnpm build` 全体と smoke テストで確認する。
 - scope リネームは文字列参照(manifest.json の `package` フィールド、capability カタログ `knowledge/product/orchestration/global_actuator_index.json` 等)に漏れが出やすい。Task 3 の grep は `.md` を除く全拡張子で行い、`pnpm check:catalogs` を必ず実行する。
+
+## 実装メモ
+
+- `email-actuator` と `working-memory-actuator` の baseline テストは追加済みで、個別 `pnpm --filter ... test` と `pnpm run validate` で確認した。
+- `daemon-actuator` は `retired/actuators/daemon-actuator/` へ移動し、`scripts/sync_component_inventory.ts` を再実行してインベントリを再生成した。
+- 現時点の workspace 整合は、Task 1 と Task 5 の要求を満たした状態まで進んでいる。

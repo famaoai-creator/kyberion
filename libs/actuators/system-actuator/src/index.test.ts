@@ -87,7 +87,9 @@ const dragFrom = vi.fn();
 const runAppleScript = vi.fn((_script: string) => 'applescript-result');
 const getScreenSize = vi.fn(() => ({ width: 1920, height: 1080 }));
 const getWindowList = vi.fn((_app: string) => ['Window 1', 'Window 2']);
-const activateWindowByTitle = vi.fn((_app: string, _windowTitle: string, _matchPolicy?: string) => true);
+const activateWindowByTitle = vi.fn(
+  (_app: string, _windowTitle: string, _matchPolicy?: string) => true
+);
 const quitApplication = vi.fn();
 const systemNotify = vi.fn();
 const clipboardRead = vi.fn(() => 'clipboard text');
@@ -143,13 +145,31 @@ const createVirtualMediaDeviceControlBridge = vi.fn(() => ({
     selection: {
       inventory: {
         audio_inputs: [
-          { kind: 'audio-input', name: 'Built-in Microphone', platform: 'darwin', source: 'system_profiler', available: true },
+          {
+            kind: 'audio-input',
+            name: 'Built-in Microphone',
+            platform: 'darwin',
+            source: 'system_profiler',
+            available: true,
+          },
         ],
         audio_outputs: [
-          { kind: 'audio-output', name: 'Built-in Output', platform: 'darwin', source: 'system_profiler', available: true },
+          {
+            kind: 'audio-output',
+            name: 'Built-in Output',
+            platform: 'darwin',
+            source: 'system_profiler',
+            available: true,
+          },
         ],
         cameras: [
-          { kind: 'camera', name: 'FaceTime HD Camera', platform: 'darwin', source: 'system_profiler', available: true },
+          {
+            kind: 'camera',
+            name: 'FaceTime HD Camera',
+            platform: 'darwin',
+            source: 'system_profiler',
+            available: true,
+          },
         ],
         virtual_audio_devices: [],
         virtual_cameras: [],
@@ -219,13 +239,31 @@ const createVirtualDeviceInventoryBridge = vi.fn(() => ({
     available: true,
     inventory: {
       audio_inputs: [
-        { kind: 'audio-input', name: 'Built-in Microphone', platform: 'darwin', source: 'system_profiler', available: true },
+        {
+          kind: 'audio-input',
+          name: 'Built-in Microphone',
+          platform: 'darwin',
+          source: 'system_profiler',
+          available: true,
+        },
       ],
       audio_outputs: [
-        { kind: 'audio-output', name: 'Built-in Output', platform: 'darwin', source: 'system_profiler', available: true },
+        {
+          kind: 'audio-output',
+          name: 'Built-in Output',
+          platform: 'darwin',
+          source: 'system_profiler',
+          available: true,
+        },
       ],
       cameras: [
-        { kind: 'camera', name: 'FaceTime HD Camera', platform: 'darwin', source: 'system_profiler', available: true },
+        {
+          kind: 'camera',
+          name: 'FaceTime HD Camera',
+          platform: 'darwin',
+          source: 'system_profiler',
+          available: true,
+        },
       ],
       virtual_audio_devices: [],
       virtual_cameras: [],
@@ -256,7 +294,13 @@ const createVirtualCameraBridge = vi.fn(() => ({
       audio_inputs: [],
       audio_outputs: [],
       cameras: [
-        { kind: 'camera', name: 'FaceTime HD Camera', platform: 'darwin', source: 'system_profiler', available: true },
+        {
+          kind: 'camera',
+          name: 'FaceTime HD Camera',
+          platform: 'darwin',
+          source: 'system_profiler',
+          available: true,
+        },
       ],
       virtual_audio_devices: [],
       virtual_cameras: [],
@@ -264,16 +308,18 @@ const createVirtualCameraBridge = vi.fn(() => ({
     },
   })),
   pipeTo: vi.fn(async (bus: any, input?: any) => {
-    await bus.writeFrames((async function* () {
-      const frameCount = Math.max(1, Number(input?.max_frames || 2));
-      for (let index = 0; index < frameCount; index += 1) {
-        yield {
-          format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
-          payload: new Uint8Array([index + 1, index + 2, index + 3]),
-          ts_ms: index * 33,
-        };
-      }
-    })());
+    await bus.writeFrames(
+      (async function* () {
+        const frameCount = Math.max(1, Number(input?.max_frames || 2));
+        for (let index = 0; index < frameCount; index += 1) {
+          yield {
+            format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+            payload: new Uint8Array([index + 1, index + 2, index + 3]),
+            ts_ms: index * 33,
+          };
+        }
+      })()
+    );
   }),
 }));
 const createVirtualCameraInjectionBridge = vi.fn(() => ({
@@ -333,16 +379,18 @@ const createScreenCaptureBridge = vi.fn(() => ({
     subject_hint: input?.subject_hint,
   })),
   pipeTo: vi.fn(async (bus: any, input?: any) => {
-    await bus.writeFrames((async function* () {
-      const frameCount = Math.max(1, Number(input?.max_frames || 2));
-      for (let index = 0; index < frameCount; index += 1) {
-        yield {
-          format: { mime_type: 'image/png' as const, width: 1920, height: 1080 },
-          payload: new Uint8Array([index + 10, index + 11, index + 12]),
-          ts_ms: index * 250,
-        };
-      }
-    })());
+    await bus.writeFrames(
+      (async function* () {
+        const frameCount = Math.max(1, Number(input?.max_frames || 2));
+        for (let index = 0; index < frameCount; index += 1) {
+          yield {
+            format: { mime_type: 'image/png' as const, width: 1920, height: 1080 },
+            payload: new Uint8Array([index + 10, index + 11, index + 12]),
+            ts_ms: index * 250,
+          };
+        }
+      })()
+    );
   }),
 }));
 const createScreenRecordingBridge = vi.fn(() => ({
@@ -414,7 +462,11 @@ const listToolRuntimeInventory = vi.fn(() => ({
       requested_mode: 'trial',
       lifecycle_stage: 'trial',
       selected_action: 'run_trial',
-      selected_backend: { kind: 'uvx', command: 'uvx', args: ['--from', 'mflux', 'mflux-generate'] },
+      selected_backend: {
+        kind: 'uvx',
+        command: 'uvx',
+        args: ['--from', 'mflux', 'mflux-generate'],
+      },
       trial_backend: { kind: 'uvx', command: 'uvx', args: ['--from', 'mflux', 'mflux-generate'] },
       install_backend: { kind: 'uv', command: 'uv', args: ['tool', 'install', 'mflux'] },
       installed_backend: { kind: 'uv', command: 'uv', args: ['tool', 'run', 'mflux-generate'] },
@@ -444,7 +496,10 @@ const listServiceRuntimeInventory = vi.fn(() => ({
       lifecycle_stage: 'trial',
       selected_action: 'probe',
       selected_probe: { kind: 'http', method: 'GET', path: 'system_stats' },
-      selected_plan: { kind: 'service_preset', preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json' },
+      selected_plan: {
+        kind: 'service_preset',
+        preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
+      },
       available: true,
       installed: true,
       requires_install: false,
@@ -469,25 +524,31 @@ const writeVideoFrameBusToMp4 = vi.fn(async (bus: any, outputPath: string) => {
   };
 });
 const pipeMp4ToVideoFrameBus = vi.fn(async (_inputPath: string, bus: any) => {
-  await bus.writeFrames((async function* () {
-    yield {
-      format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
-      payload: new Uint8Array([9, 8, 7]),
-      ts_ms: 0,
-    };
-    yield {
-      format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
-      payload: new Uint8Array([6, 5, 4]),
-      ts_ms: 33,
-    };
-  })());
+  await bus.writeFrames(
+    (async function* () {
+      yield {
+        format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+        payload: new Uint8Array([9, 8, 7]),
+        ts_ms: 0,
+      };
+      yield {
+        format: { mime_type: 'image/jpeg' as const, width: 640, height: 480 },
+        payload: new Uint8Array([6, 5, 4]),
+        ts_ms: 33,
+      };
+    })()
+  );
 });
 const StubVideoFrameBus = vi.fn(function StubVideoFrameBus(this: any) {
   const queue: Array<any> = [];
   let closed = false;
   let resolver: ((frame: any | null) => void) | null = null;
   this.bus_id = 'stub';
-  this.probe = vi.fn(async () => ({ bus_id: 'stub', available: true, buffered_frames: queue.length }));
+  this.probe = vi.fn(async () => ({
+    bus_id: 'stub',
+    available: true,
+    buffered_frames: queue.length,
+  }));
   this.frameStream = vi.fn(async function* () {
     while (!closed || queue.length > 0) {
       if (queue.length > 0) {
@@ -533,12 +594,14 @@ const createVirtualAudioOutputPlaybackBridge = vi.fn(() => ({
   playOnOutputs: vi.fn(async (targets?: string[]) => ({
     bridge_id: 'virtual-audio-output-playback-bridge',
     platform: 'darwin',
-    outputs: (targets && targets.length > 0 ? targets : ['Built-in Output', 'HDMI']).map((device_name) => ({
-      device_name,
-      status: 'played',
-      tone_path: '/tmp/kyberion-tone.wav',
-      selected_backend: 'swift-output-switch' as const,
-    })),
+    outputs: (targets && targets.length > 0 ? targets : ['Built-in Output', 'HDMI']).map(
+      (device_name) => ({
+        device_name,
+        status: 'played',
+        tone_path: '/tmp/kyberion-tone.wav',
+        selected_backend: 'swift-output-switch' as const,
+      })
+    ),
   })),
 }));
 const createVirtualAudioInputRecordingBridge = vi.fn(() => ({
@@ -552,7 +615,10 @@ const createVirtualAudioInputRecordingBridge = vi.fn(() => ({
   recordOnInputs: vi.fn(async (targets?: string[]) => ({
     bridge_id: 'virtual-audio-input-recording-bridge',
     platform: 'darwin',
-    recordings: (targets && targets.length > 0 ? targets : ['Built-in Microphone', 'External Mic']).map((device_name) => ({
+    recordings: (targets && targets.length > 0
+      ? targets
+      : ['Built-in Microphone', 'External Mic']
+    ).map((device_name) => ({
       device_name,
       status: 'recorded',
       recorded_path: `/tmp/${device_name.replace(/\s+/g, '_').toLowerCase()}.wav`,
@@ -595,7 +661,7 @@ const emitComputerSurfacePatch = vi.fn();
 const createApprovalRequest = vi.fn(() => ({ id: 'approval-123', status: 'pending' }));
 const loadApprovalRequest = vi.fn(() => null);
 const classifyError = vi.fn(() => ({ category: 'timeout' }));
-const withRetry = vi.fn(async (fn: any) => fn());
+const retry = vi.fn(async (fn: any) => fn());
 const pathResolver = {
   rootDir: vi.fn(() => '/tmp/kyberion'),
   rootResolve: vi.fn((p: string) => `/tmp/kyberion/${String(p).replace(/^\/+/, '')}`),
@@ -603,16 +669,18 @@ const pathResolver = {
   knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
   active: vi.fn((p = '') => `/tmp/kyberion/active/${String(p).replace(/^\/+/, '')}`),
   vault: vi.fn((p = '') => `/tmp/kyberion/.vault/${String(p).replace(/^\/+/, '')}`),
-  resolve: vi.fn((p = '') => (String(p).startsWith('/') ? String(p) : `/tmp/kyberion/${String(p)}`)),
+  resolve: vi.fn((p = '') =>
+    String(p).startsWith('/') ? String(p) : `/tmp/kyberion/${String(p)}`
+  ),
   toRepoRelative: vi.fn((p = '') =>
-    String(p).startsWith('/tmp/kyberion/') ? String(p).slice('/tmp/kyberion/'.length) : String(p),
+    String(p).startsWith('/tmp/kyberion/') ? String(p).slice('/tmp/kyberion/'.length) : String(p)
   ),
   normalizeStoredPath: vi.fn((p = '') =>
     String(p).startsWith('/tmp/kyberion/')
       ? { path: String(p).slice('/tmp/kyberion/'.length), foreign: false }
       : String(p).startsWith('/')
         ? { path: String(p), foreign: true }
-        : { path: String(p), foreign: false },
+        : { path: String(p), foreign: false }
   ),
 };
 
@@ -629,7 +697,7 @@ vi.mock('@agent/core', () => ({
   resolveWriteArtifactSpec,
   safeExec,
   classifyError,
-  withRetry,
+  retry,
   emitComputerSurfacePatch,
   activateApplication,
   detectFocusedInput,
@@ -1097,7 +1165,10 @@ describe('system-actuator computer_interaction adapter', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 176']);
+    expect(core.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "System Events" to key code 176',
+    ]);
     restorePlatform();
   });
 
@@ -1473,10 +1544,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(core.safeMkdir).toHaveBeenCalledWith(
-        expect.stringContaining('screenshots'),
-        { recursive: true },
-      );
+      expect(core.safeMkdir).toHaveBeenCalledWith(expect.stringContaining('screenshots'), {
+        recursive: true,
+      });
       expect(typeof result.context.shot).toBe('string');
     });
 
@@ -1487,7 +1557,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'screenshot', params: { path: 'active/shared/tmp/snap.png', export_as: 'snap' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'screenshot',
+            params: { path: 'active/shared/tmp/snap.png', export_as: 'snap' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1506,7 +1582,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       expect(result.status).toBe('succeeded');
       const screenFactory = vi.mocked(createScreenCaptureBridge).mock.results.at(-1)?.value;
-      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({ display_index: 0 }));
+      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(
+        expect.objectContaining({ display_index: 0 })
+      );
       expect(createScreenDisplayInventoryBridge).toHaveBeenCalled();
     });
 
@@ -1517,12 +1595,20 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'shot', display_name: 'DELL U2720Q' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'screenshot',
+            params: { export_as: 'shot', display_name: 'DELL U2720Q' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
       const screenFactory = vi.mocked(createScreenCaptureBridge).mock.results.at(-1)?.value;
-      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({ display_index: 1 }));
+      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(
+        expect.objectContaining({ display_index: 1 })
+      );
       expect(createScreenDisplayInventoryBridge).toHaveBeenCalled();
     });
 
@@ -1533,13 +1619,21 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'screenshot', params: { export_as: 'shot', application: 'Finder' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'screenshot',
+            params: { export_as: 'shot', application: 'Finder' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
       expect(activateApplication).toHaveBeenCalledWith('Finder');
       const screenFactory = vi.mocked(createScreenCaptureBridge).mock.results.at(-1)?.value;
-      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({ capture_mode: 'focused_window' }));
+      expect(screenFactory?.captureScreenshot).toHaveBeenCalledWith(
+        expect.objectContaining({ capture_mode: 'focused_window' })
+      );
       expect(result.context.screenshot_application).toBe('Finder');
     });
 
@@ -1550,11 +1644,18 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{
-          type: 'capture',
-          op: 'screenshot',
-          params: { export_as: 'shot', application: 'Finder', window_title: 'Downloads', window_match_policy: 'contains' },
-        }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'screenshot',
+            params: {
+              export_as: 'shot',
+              application: 'Finder',
+              window_title: 'Downloads',
+              window_match_policy: 'contains',
+            },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1570,7 +1671,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'test_screen_stream', params: { export_as: 'screen_stream_test', max_frames: 2 } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'test_screen_stream',
+            params: { export_as: 'screen_stream_test', max_frames: 2 },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1584,7 +1691,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'test_screen_stream', params: { export_as: 'screen_stream_test', max_frames: 2, display_name: 'DELL U2720Q' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'test_screen_stream',
+            params: { export_as: 'screen_stream_test', max_frames: 2, display_name: 'DELL U2720Q' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1600,7 +1713,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'test_screen_mp4_roundtrip', params: { export_as: 'screen_roundtrip', max_frames: 2 } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'test_screen_mp4_roundtrip',
+            params: { export_as: 'screen_roundtrip', max_frames: 2 },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1653,7 +1772,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'resolve', path: 'knowledge/x.md', export_as: 'p' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'resolve_path',
+            params: { mode: 'resolve', path: 'knowledge/x.md', export_as: 'p' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1665,7 +1790,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'to_relative', path: '/tmp/kyberion/scripts/run.ts', export_as: 'p' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'resolve_path',
+            params: { mode: 'to_relative', path: '/tmp/kyberion/scripts/run.ts', export_as: 'p' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1677,7 +1808,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'normalize', path: '/opt/elsewhere/data.json', export_as: 'p' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'resolve_path',
+            params: { mode: 'normalize', path: '/opt/elsewhere/data.json', export_as: 'p' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1690,8 +1827,16 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       const result = await handleAction({
         action: 'pipeline',
         steps: [
-          { type: 'capture', op: 'resolve_path', params: { mode: 'shared', path: 'tmp/run.json', export_as: 'shared_p' } },
-          { type: 'capture', op: 'resolve_path', params: { mode: 'tmp', path: 'run.json', export_as: 'tmp_p' } },
+          {
+            type: 'capture',
+            op: 'resolve_path',
+            params: { mode: 'shared', path: 'tmp/run.json', export_as: 'shared_p' },
+          },
+          {
+            type: 'capture',
+            op: 'resolve_path',
+            params: { mode: 'tmp', path: 'run.json', export_as: 'tmp_p' },
+          },
         ],
       } as any);
 
@@ -1705,7 +1850,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'resolve_path', params: { mode: 'bogus', path: 'x', export_as: 'p' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'resolve_path',
+            params: { mode: 'bogus', path: 'x', export_as: 'p' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('failed');
@@ -1720,7 +1871,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect((result.context.inputs as any).keyboards.map((d: any) => d.name)).toContain('MINILA-R Convertible');
+      expect((result.context.inputs as any).keyboards.map((d: any) => d.name)).toContain(
+        'MINILA-R Convertible'
+      );
       expect((result.context.inputs as any).mice.map((d: any) => d.name)).toContain('ERGO M575SP');
       expect(createVirtualInputDeviceInventoryBridge).toHaveBeenCalled();
     });
@@ -1734,7 +1887,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect((result.context.displays as any).inventory.displays.map((d: any) => d.name)).toContain('DELL U2720Q');
+      expect((result.context.displays as any).inventory.displays.map((d: any) => d.name)).toContain(
+        'DELL U2720Q'
+      );
       expect((result.context.displays as any).primary_display.name).toBe('Built-in Retina Display');
       expect((result.context.displays as any).display_count).toBe(2);
       expect(createScreenDisplayInventoryBridge).toHaveBeenCalled();
@@ -1749,7 +1904,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect((result.context.media as any).audio.selected_devices.input).toBe('Built-in Microphone');
+      expect((result.context.media as any).audio.selected_devices.input).toBe(
+        'Built-in Microphone'
+      );
       expect((result.context.media as any).audio.selected_devices.output).toBe('Built-in Output');
       expect((result.context.media as any).camera.selected_camera).toBe('FaceTime HD Camera');
       expect((result.context.media as any).supported_actions).toBeTruthy();
@@ -1761,12 +1918,16 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'list_tool_runtimes', params: { export_as: 'tool_runtimes' } }],
+        steps: [
+          { type: 'capture', op: 'list_tool_runtimes', params: { export_as: 'tool_runtimes' } },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
       expect((result.context.tool_runtimes as any).default_tool_id).toBe('mflux');
-      expect((result.context.tool_runtimes as any).tools.map((tool: any) => tool.tool_id)).toContain('mflux');
+      expect(
+        (result.context.tool_runtimes as any).tools.map((tool: any) => tool.tool_id)
+      ).toContain('mflux');
       expect((result.context.tool_runtimes as any).tools[0].lifecycle_stage).toBe('trial');
       expect(listToolRuntimeInventory).toHaveBeenCalledWith('trial');
     });
@@ -1776,12 +1937,20 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'list_service_runtimes', params: { export_as: 'service_runtimes' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'list_service_runtimes',
+            params: { export_as: 'service_runtimes' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
       expect((result.context.service_runtimes as any).default_service_id).toBe('comfyui');
-      expect((result.context.service_runtimes as any).services.map((service: any) => service.service_id)).toContain('comfyui');
+      expect(
+        (result.context.service_runtimes as any).services.map((service: any) => service.service_id)
+      ).toContain('comfyui');
       expect((result.context.service_runtimes as any).services[0].lifecycle_stage).toBe('trial');
       expect(listServiceRuntimeInventory).toHaveBeenCalledWith('trial');
     });
@@ -1791,98 +1960,141 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'control_media_devices', params: { action: 'add', scope: 'audio', export_as: 'control' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'control_media_devices',
+            params: { action: 'add', scope: 'audio', export_as: 'control' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
       expect((result.context.control as any).status).toBe('blocked');
       expect((result.context.control as any).host_plan.notes).toContain('host setup required');
-    expect(createVirtualMediaDeviceControlBridge).toHaveBeenCalled();
-  });
+      expect(createVirtualMediaDeviceControlBridge).toHaveBeenCalled();
+    });
 
-  it('test_audio_outputs: returns per-output playback results', async () => {
-    const { handleAction } = await import('./index');
+    it('test_audio_outputs: returns per-output playback results', async () => {
+      const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [{ type: 'capture', op: 'test_audio_outputs', params: { export_as: 'audio_test' } }],
-    } as any);
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'test_audio_outputs', params: { export_as: 'audio_test' } }],
+      } as any);
 
-    expect(result.status).toBe('succeeded');
-    expect((result.context.audio_test as any).outputs.map((entry: any) => entry.device_name)).toContain('Built-in Output');
-    expect(createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
-  });
+      expect(result.status).toBe('succeeded');
+      expect(
+        (result.context.audio_test as any).outputs.map((entry: any) => entry.device_name)
+      ).toContain('Built-in Output');
+      expect(createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
+    });
 
-  it('test_audio_inputs: returns per-input recording results', async () => {
-    const { handleAction } = await import('./index');
+    it('test_audio_inputs: returns per-input recording results', async () => {
+      const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [{ type: 'capture', op: 'test_audio_inputs', params: { export_as: 'audio_input_test' } }],
-    } as any);
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          { type: 'capture', op: 'test_audio_inputs', params: { export_as: 'audio_input_test' } },
+        ],
+      } as any);
 
-    expect(result.status).toBe('succeeded');
-    expect((result.context.audio_input_test as any).recordings.map((entry: any) => entry.device_name)).toContain('Built-in Microphone');
-    expect(createVirtualAudioInputRecordingBridge).toHaveBeenCalled();
-  });
+      expect(result.status).toBe('succeeded');
+      expect(
+        (result.context.audio_input_test as any).recordings.map((entry: any) => entry.device_name)
+      ).toContain('Built-in Microphone');
+      expect(createVirtualAudioInputRecordingBridge).toHaveBeenCalled();
+    });
 
-  it('test_camera_stream: returns camera frames through a video bus', async () => {
-    const { handleAction } = await import('./index');
+    it('test_camera_stream: returns camera frames through a video bus', async () => {
+      const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [{ type: 'capture', op: 'test_camera_stream', params: { export_as: 'camera_stream_test', frame_count: 2, frame_interval_ms: 0 } }],
-    } as any);
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'test_camera_stream',
+            params: { export_as: 'camera_stream_test', frame_count: 2, frame_interval_ms: 0 },
+          },
+        ],
+      } as any);
 
-    expect(result.status).toBe('succeeded');
-    expect((result.context.camera_stream_test as any).bridge_id).toBe('virtual-camera-bridge');
-    expect((result.context.camera_stream_test as any).backend).toBe('stub');
-    expect((result.context.camera_stream_test as any).selected_camera).toBe('FaceTime HD Camera');
-    expect((result.context.camera_stream_test as any).frame_count).toBe(2);
-    expect((result.context.camera_stream_test as any).frames).toHaveLength(2);
-    expect(createVirtualCameraBridge).toHaveBeenCalled();
-    expect(StubVideoFrameBus).toHaveBeenCalled();
-  });
+      expect(result.status).toBe('succeeded');
+      expect((result.context.camera_stream_test as any).bridge_id).toBe('virtual-camera-bridge');
+      expect((result.context.camera_stream_test as any).backend).toBe('stub');
+      expect((result.context.camera_stream_test as any).selected_camera).toBe('FaceTime HD Camera');
+      expect((result.context.camera_stream_test as any).frame_count).toBe(2);
+      expect((result.context.camera_stream_test as any).frames).toHaveLength(2);
+      expect(createVirtualCameraBridge).toHaveBeenCalled();
+      expect(StubVideoFrameBus).toHaveBeenCalled();
+    });
 
-  it('test_camera_mp4_roundtrip: exports and re-imports camera frames through mp4', async () => {
-    const { handleAction } = await import('./index');
+    it('test_camera_mp4_roundtrip: exports and re-imports camera frames through mp4', async () => {
+      const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [{ type: 'capture', op: 'test_camera_mp4_roundtrip', params: { export_as: 'camera_mp4_roundtrip', frame_count: 2, frame_interval_ms: 0 } }],
-    } as any);
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'test_camera_mp4_roundtrip',
+            params: { export_as: 'camera_mp4_roundtrip', frame_count: 2, frame_interval_ms: 0 },
+          },
+        ],
+      } as any);
 
-    expect(result.status).toBe('succeeded');
-    expect((result.context.camera_mp4_roundtrip as any).bridge_id).toBe('virtual-camera-bridge');
-    expect((result.context.camera_mp4_roundtrip as any).exported_frame_count).toBe(2);
-    expect((result.context.camera_mp4_roundtrip as any).imported_frame_count).toBe(2);
-    expect((result.context.camera_mp4_roundtrip as any).exported_mp4_path).toContain('.mp4');
-    expect(writeVideoFrameBusToMp4).toHaveBeenCalled();
-    expect(pipeMp4ToVideoFrameBus).toHaveBeenCalled();
-  });
+      expect(result.status).toBe('succeeded');
+      expect((result.context.camera_mp4_roundtrip as any).bridge_id).toBe('virtual-camera-bridge');
+      expect((result.context.camera_mp4_roundtrip as any).exported_frame_count).toBe(2);
+      expect((result.context.camera_mp4_roundtrip as any).imported_frame_count).toBe(2);
+      expect((result.context.camera_mp4_roundtrip as any).exported_mp4_path).toContain('.mp4');
+      expect(writeVideoFrameBusToMp4).toHaveBeenCalled();
+      expect(pipeMp4ToVideoFrameBus).toHaveBeenCalled();
+    });
 
-  it('test_camera_injection: injects an mp4 through the camera injection bridge', async () => {
-    const { handleAction } = await import('./index');
+    it('test_camera_injection: injects an mp4 through the camera injection bridge', async () => {
+      const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [{ type: 'capture', op: 'test_camera_injection', params: { export_as: 'camera_injection_test', input_mp4_path: 'active/shared/tmp/in.mp4' } }],
-    } as any);
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'test_camera_injection',
+            params: {
+              export_as: 'camera_injection_test',
+              input_mp4_path: 'active/shared/tmp/in.mp4',
+            },
+          },
+        ],
+      } as any);
 
-    expect(result.status).toBe('succeeded');
-    expect((result.context.camera_injection_test as any).bridge_id).toBe('virtual-camera-injection-bridge');
-    expect((result.context.camera_injection_test as any).status).toBe('succeeded');
-    expect((result.context.camera_injection_test as any).mode).toBe('replay');
-    expect((result.context.camera_injection_test as any).source_path).toContain('active/shared/tmp/in.mp4');
-    expect(createVirtualCameraInjectionBridge).toHaveBeenCalled();
-  });
+      expect(result.status).toBe('succeeded');
+      expect((result.context.camera_injection_test as any).bridge_id).toBe(
+        'virtual-camera-injection-bridge'
+      );
+      expect((result.context.camera_injection_test as any).status).toBe('succeeded');
+      expect((result.context.camera_injection_test as any).mode).toBe('replay');
+      expect((result.context.camera_injection_test as any).source_path).toContain(
+        'active/shared/tmp/in.mp4'
+      );
+      expect(createVirtualCameraInjectionBridge).toHaveBeenCalled();
+    });
 
     it('window_list: returns windows for the given application', async () => {
       const { handleAction } = await import('./index');
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'window_list', params: { application: 'Finder', export_as: 'wins' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'window_list',
+            params: { application: 'Finder', export_as: 'wins' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1920,7 +2132,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'capture', op: 'chrome_tab_list', params: { application: 'Brave Browser', export_as: 'tabs' } }],
+        steps: [
+          {
+            type: 'capture',
+            op: 'chrome_tab_list',
+            params: { application: 'Brave Browser', export_as: 'tabs' },
+          },
+        ],
       } as any);
 
       expect(listChromeTabs).toHaveBeenCalledWith('Brave Browser');
@@ -1933,7 +2151,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'apply', op: 'scroll', params: { x: 100, y: 200, direction: 'down', amount: 5 } }],
+        steps: [
+          { type: 'apply', op: 'scroll', params: { x: 100, y: 200, direction: 'down', amount: 5 } },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1945,7 +2165,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'apply', op: 'drag', params: { from_x: 10, from_y: 20, to_x: 300, to_y: 400 } }],
+        steps: [
+          { type: 'apply', op: 'drag', params: { from_x: 10, from_y: 20, to_x: 300, to_y: 400 } },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -1957,7 +2179,13 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'apply', op: 'system_notify', params: { title: 'Hi', message: 'Done', subtitle: 'detail' } }],
+        steps: [
+          {
+            type: 'apply',
+            op: 'system_notify',
+            params: { title: 'Hi', message: 'Done', subtitle: 'detail' },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
@@ -2018,11 +2246,17 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{ type: 'apply', op: 'open_file', params: { path: 'active/shared/tmp/report.html' } }],
+        steps: [
+          { type: 'apply', op: 'open_file', params: { path: 'active/shared/tmp/report.html' } },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(core.safeExec).toHaveBeenCalledWith('open', [expect.stringContaining('report.html')], expect.any(Object));
+      expect(core.safeExec).toHaveBeenCalledWith(
+        'open',
+        [expect.stringContaining('report.html')],
+        expect.any(Object)
+      );
       restorePlatform();
     });
 
@@ -2033,15 +2267,20 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       const result = await handleAction({
         action: 'pipeline',
-        steps: [{
-          type: 'apply',
-          op: 'voice_input_toggle',
-          params: { dictation_keycode: 176 },
-        }],
+        steps: [
+          {
+            type: 'apply',
+            op: 'voice_input_toggle',
+            params: { dictation_keycode: 176 },
+          },
+        ],
       } as any);
 
       expect(result.status).toBe('succeeded');
-      expect(core.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 176']);
+      expect(core.safeExec).toHaveBeenCalledWith('osascript', [
+        '-e',
+        'tell application "System Events" to key code 176',
+      ]);
       restorePlatform();
     });
   });

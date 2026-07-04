@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import { createDistillCandidateRecord } from './distill-candidate-registry.js';
 import {
@@ -13,24 +13,66 @@ import {
   resolvePromotedReportTemplateSections,
 } from './promoted-report-template-policy.js';
 import { safeReadFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { buildOrganizationWorkLoopSummary } from './work-design.js';
+import { safeWriteFile } from './secure-io.js';
 
 // Files written during a single test run; cleaned up in afterEach so the
 // committed knowledge/public/common/.../generated/ directory does not
 // accumulate fixture-shaped records on every CI run.
 const writtenPaths: string[] = [];
+const archivedPaths: string[] = [];
 function rememberWrite(absMdPath: string): void {
   writtenPaths.push(absMdPath);
   writtenPaths.push(absMdPath.replace(/\.md$/, '.json'));
 }
 
+function rememberArchive(absPath: string): void {
+  archivedPaths.push(absPath);
+}
+
 describe('promoted-memory', () => {
+  const hintsPath = pathResolver.knowledge('product/governance/HINTS.md');
+  let originalHintsRaw: string | null = null;
+
+  beforeAll(() => {
+    if (fs.existsSync(hintsPath)) {
+      originalHintsRaw = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    }
+  });
+
   afterEach(() => {
     for (const p of writtenPaths) {
-      try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) { /* best-effort */ }
+      try {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch (_) {
+        /* best-effort */
+      }
     }
     writtenPaths.length = 0;
+    for (const p of archivedPaths) {
+      try {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch (_) {
+        /* best-effort */
+      }
+    }
+    archivedPaths.length = 0;
+  });
+
+  afterAll(() => {
+    if (originalHintsRaw !== null) {
+      withExecutionContext('ecosystem_architect', () => {
+        safeWriteFile(hintsPath, originalHintsRaw);
+      });
+      return;
+    }
+    if (fs.existsSync(hintsPath)) {
+      withExecutionContext('ecosystem_architect', () => {
+        fs.unlinkSync(hintsPath);
+      });
+    }
   });
 
   it('builds a tier-aware promoted memory record', () => {
@@ -138,8 +180,157 @@ describe('promoted-memory', () => {
     expect(markdown).toContain('A reusable presentation artifact.');
   });
 
+  it('records supersede relationships in frontmatter and backfills the prior record', () => {
+    const previousCandidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'public',
+      track_id: 'TRK-DEMO-SUPERSEDE-OLD',
+      title: 'Legacy presentation pattern',
+      summary: 'Earlier pattern that should be superseded by the revised version.',
+      status: 'promoted',
+      target_kind: 'pattern',
+      evidence_refs: ['artifact:ART-OLD'],
+      metadata: {
+        applicability: ['presentation delivery'],
+        reusable_steps: ['Review the prior deck'],
+        expected_outcome: 'A reusable legacy presentation artifact.',
+      },
+    });
+    const previous = savePromotedMemoryRecord(previousCandidate, {
+      executionRole: 'chronos_gateway',
+    });
+    rememberWrite(pathResolver.resolve(previous.logicalPath));
+
+    const nextCandidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'public',
+      track_id: 'TRK-DEMO-SUPERSEDE-NEW',
+      title: 'Revised presentation pattern',
+      summary: 'Updated pattern that supersedes the older guidance.',
+      status: 'promoted',
+      target_kind: 'pattern',
+      evidence_refs: ['artifact:ART-NEW'],
+      metadata: {
+        applicability: ['presentation delivery'],
+        reusable_steps: ['Review the latest deck'],
+        expected_outcome: 'A reusable revised presentation artifact.',
+        supersedes: previous.logicalPath,
+      },
+    });
+    const next = savePromotedMemoryRecord(nextCandidate, { executionRole: 'chronos_gateway' });
+    rememberWrite(pathResolver.resolve(next.logicalPath));
+
+    const nextMarkdown = safeReadFile(pathResolver.resolve(next.logicalPath), {
+      encoding: 'utf8',
+    }) as string;
+    const previousMarkdown = safeReadFile(pathResolver.resolve(previous.logicalPath), {
+      encoding: 'utf8',
+    }) as string;
+    expect(nextMarkdown).toContain(`supersedes: ${previous.logicalPath}`);
+    expect(previousMarkdown).toContain(`superseded_by: ${nextCandidate.candidate_id}`);
+  });
+
+  it('appends promoted knowledge hints into governance HINTS.md', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'personal',
+      track_id: 'TRK-DEMO-HINTS',
+      track_name: 'Hints demo',
+      title: 'Browser hint for repeatable navigation',
+      summary: 'Use the browser bridge when a workflow depends on deterministic site navigation.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['active/shared/tmp/hints-source.md'],
+      metadata: {
+        hint_scope: 'browser navigation',
+        hint_triggers: ['repeatable web workflow'],
+        recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+      },
+    });
+
+    const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
+    rememberWrite(pathResolver.resolve(saved.logicalPath));
+
+    const hints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    expect(hints).toContain(
+      'Use the browser bridge when a workflow depends on deterministic site navigation.'
+    );
+    expect(hints).toContain('source_ref:');
+    expect(hints).toContain('active/shared/tmp/hints-source.md');
+  });
+
+  it('rotates older hint sections into archive when the live file exceeds the cap', () => {
+    const makeSection = (index: number) =>
+      [
+        `## LIVE-${String(index + 1).padStart(2, '0')} (2026-07-03)`,
+        '',
+        `Live hint ${index + 1}`,
+        '',
+        `source_ref: source-${index + 1}`,
+        `evidence_refs:`,
+        `- evidence-${index + 1}`,
+        '',
+      ].join('\n');
+
+    const fixture = [
+      '# Operational Hints',
+      '',
+      '> **Generated by** `pipelines/fragments/memory-distillation.json` (via `volatile-gc` → `memory-promotion-queue`).',
+      '> Do not edit manually — content is overwritten by the distillation pipeline.',
+      '> **Purpose**: Condensed operational learnings from recent missions and volatile working-memory faces,',
+      '> surfaced here so Recovery and Alignment phases can read relevant hints without full knowledge search.',
+      '',
+      '<!-- Distillation pipeline will append structured hint blocks below this line -->',
+      '',
+      Array.from({ length: 50 }, (_, index) => makeSection(index)).join('\n'),
+      '',
+    ].join('\n');
+
+    withExecutionContext('ecosystem_architect', () => {
+      safeWriteFile(hintsPath, fixture);
+    });
+
+    const candidate = createDistillCandidateRecord({
+      source_type: 'task_session',
+      tier: 'personal',
+      track_id: 'TRK-DEMO-HINTS-ARCHIVE',
+      track_name: 'Hints archive demo',
+      title: 'Browser hint for archived rotation',
+      summary: 'Use the browser bridge when a workflow depends on deterministic site navigation.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['active/shared/tmp/hints-source.md'],
+      metadata: {
+        hint_scope: 'browser navigation',
+        hint_triggers: ['repeatable web workflow'],
+        recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+      },
+    });
+
+    const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
+    rememberWrite(pathResolver.resolve(saved.logicalPath));
+
+    const archivePath = pathResolver.knowledge(
+      `product/hints/archive/${saved.record.created_at.replace(/[:.]/gu, '-')}-${saved.record.record_id}.md`
+    );
+    rememberArchive(archivePath);
+
+    const hints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    const liveSections = hints.match(/^## /gm) || [];
+    expect(liveSections).toHaveLength(50);
+    expect(hints).toContain('## LIVE-02 (2026-07-03)');
+    expect(hints).not.toContain('## LIVE-01 (2026-07-03)');
+
+    const archived = safeReadFile(archivePath, { encoding: 'utf8' }) as string;
+    expect(archived).toContain('# Archived Operational Hints');
+    expect(archived).toContain('archived_sections: 1');
+    expect(archived).toContain('## LIVE-01 (2026-07-03)');
+  });
+
   describe('value threshold (isMeaningfulPromotionCandidate)', () => {
-    function withFixture(overrides: Partial<Parameters<typeof createDistillCandidateRecord>[0]> = {}) {
+    function withFixture(
+      overrides: Partial<Parameters<typeof createDistillCandidateRecord>[0]> = {}
+    ) {
       return createDistillCandidateRecord({
         source_type: 'task_session',
         tier: 'public',

@@ -1,18 +1,30 @@
 import { randomUUID } from 'node:crypto';
 
-import { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE, type KnowledgeHintIndex, type KnowledgeScope } from './src/knowledge-index.js';
+import {
+  buildScopedIndex,
+  queryKnowledgeHybrid,
+  DEFAULT_SCOPE,
+  type KnowledgeHintIndex,
+  type KnowledgeScope,
+} from './src/knowledge-index.js';
 import { secureFetch } from './network.js';
 import { safeExec } from './secure-io.js';
 import { resolveFallbackLocationSummary } from './location-fallback.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import { recordSchedulePreference, resolveDefaultScheduleSource } from './contextual-intent-memory.js';
+import {
+  recordSchedulePreference,
+  resolveDefaultScheduleSource,
+} from './contextual-intent-memory.js';
 import { recordContextualIntentLearning } from './contextual-intent-learning.js';
 import type { UserIntentFlow } from './intent-contract.js';
 import type { ContractCandidate } from './intent-contract-learning.js';
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
 import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
-import type { SurfaceConversationResult, SurfaceDelegationResult } from './channel-surface-types.js';
+import type {
+  SurfaceConversationResult,
+  SurfaceDelegationResult,
+} from './channel-surface-types.js';
 import { resolveSurfaceIntent } from './router-contract.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
@@ -68,7 +80,9 @@ export function extractFollowUpRequests(input: string): string[] {
     /[？?]$/u,
   ];
 
-  return segments.filter((segment) => requestPatterns.some((pattern) => pattern.test(segment))).slice(0, 3);
+  return segments
+    .filter((segment) => requestPatterns.some((pattern) => pattern.test(segment)))
+    .slice(0, 3);
 }
 
 export function buildDelegationSummaryInstruction(): string {
@@ -89,8 +103,8 @@ export function buildDelegationSummaryContext(params: {
 }): string {
   const followUpRequests = params.delegationResults.flatMap((result) =>
     extractFollowUpRequests(String(result.response || '')).map(
-      (request) => `${result.receiver || 'unknown'}: ${request}`,
-    ),
+      (request) => `${result.receiver || 'unknown'}: ${request}`
+    )
   );
   const lines = [
     `Original request: ${summarizeUserFacingText(params.originalQuery, 600) || '(empty)'}`,
@@ -99,12 +113,17 @@ export function buildDelegationSummaryContext(params: {
     ...params.delegationResults
       .filter((result) => !result.error)
       .map((result) => {
-        const response = summarizeUserFacingText(String(result.response || ''), 800) || '(no response)';
+        const response =
+          summarizeUserFacingText(String(result.response || ''), 800) || '(no response)';
         return `- ${result.receiver || 'unknown'}: ${response}`;
       }),
   ];
   if (followUpRequests.length > 0) {
-    lines.push('', 'Follow-up requests from delegated work:', ...followUpRequests.map((request) => `- ${request}`));
+    lines.push(
+      '',
+      'Follow-up requests from delegated work:',
+      ...followUpRequests.map((request) => `- ${request}`)
+    );
   }
   return lines.join('\n');
 }
@@ -119,6 +138,7 @@ function buildTaskSessionReply(params: {
   missingInputs?: string[];
   handoffIntentId?: string;
   kind?: string;
+  completionSummary?: string[];
   serviceOptions?: Array<
     | string
     | {
@@ -147,7 +167,11 @@ function buildTaskSessionReply(params: {
   } else if (params.status === 'pending') {
     lines.push(isScheduleCoordination ? '予定の確認を進めます。' : '確認を進めます。');
   } else {
-    lines.push(isScheduleCoordination ? '予定の確認がうまく進みませんでした。' : 'うまく進められませんでした。');
+    lines.push(
+      isScheduleCoordination
+        ? '予定の確認がうまく進みませんでした。'
+        : 'うまく進められませんでした。'
+    );
   }
 
   if (params.summary) {
@@ -167,25 +191,31 @@ function buildTaskSessionReply(params: {
         return map[input] || input.replace(/_/g, ' ');
       })
       .join('、');
-    lines.push(isScheduleCoordination ? `確認したい点があります: ${readableMissing}` : `必要な情報があります: ${readableMissing}`);
+    lines.push(
+      isScheduleCoordination
+        ? `確認したい点があります: ${readableMissing}`
+        : `必要な情報があります: ${readableMissing}`
+    );
   }
 
   const serviceOptions = params.serviceOptions || [];
   if (params.intentId === 'stop-service' && serviceOptions.length > 0) {
     lines.push('停止するサービス候補:');
     serviceOptions.forEach((choice, index) => {
-      const serviceName = typeof choice === 'string'
-        ? choice
-        : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
-      const serviceId = typeof choice === 'string'
-        ? undefined
-        : choice.service_id && choice.service_id !== serviceName
-          ? choice.service_id
-          : undefined;
-      const description = typeof choice === 'string'
-        ? undefined
-        : choice.description;
-      lines.push(`  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`);
+      const serviceName =
+        typeof choice === 'string'
+          ? choice
+          : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
+      const serviceId =
+        typeof choice === 'string'
+          ? undefined
+          : choice.service_id && choice.service_id !== serviceName
+            ? choice.service_id
+            : undefined;
+      const description = typeof choice === 'string' ? undefined : choice.description;
+      lines.push(
+        `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
+      );
     });
     lines.push('停止したいサービス名を指定してください。');
   }
@@ -193,18 +223,20 @@ function buildTaskSessionReply(params: {
   if (params.intentId === 'start-service' && serviceOptions.length > 0) {
     lines.push('起動するサービス候補:');
     serviceOptions.forEach((choice, index) => {
-      const serviceName = typeof choice === 'string'
-        ? choice
-        : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
-      const serviceId = typeof choice === 'string'
-        ? undefined
-        : choice.service_id && choice.service_id !== serviceName
-          ? choice.service_id
-          : undefined;
-      const description = typeof choice === 'string'
-        ? undefined
-        : choice.description;
-      lines.push(`  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`);
+      const serviceName =
+        typeof choice === 'string'
+          ? choice
+          : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
+      const serviceId =
+        typeof choice === 'string'
+          ? undefined
+          : choice.service_id && choice.service_id !== serviceName
+            ? choice.service_id
+            : undefined;
+      const description = typeof choice === 'string' ? undefined : choice.description;
+      lines.push(
+        `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
+      );
     });
     lines.push('起動したいサービス名を指定してください。');
   }
@@ -215,6 +247,10 @@ function buildTaskSessionReply(params: {
         ? '必要なら会議調整まで引き継げます。'
         : '必要なら次の担当に引き継げます。'
     );
+  }
+
+  if (params.completionSummary && params.completionSummary.length > 0) {
+    lines.push(...params.completionSummary);
   }
 
   if (params.error) {

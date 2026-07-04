@@ -166,6 +166,8 @@ describe('mission_controller argument parsing', () => {
       'chronos_gateway',
       '--note',
       'operator approved',
+      '--supersedes',
+      'knowledge/public/common/wisdom/generated/OLD.md',
     ]);
 
     expect(positionalArgs).toEqual(['memory-promote', 'MEM-123']);
@@ -180,6 +182,8 @@ describe('mission_controller argument parsing', () => {
       'mission_controller',
       '--note',
       'batch approval',
+      '--supersedes',
+      'knowledge/public/common/patterns/generated/OLD.md',
       '--dry-run',
     ]);
 
@@ -420,6 +424,9 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('organization-profiles --json --summary');
     expect(help).toContain('organization-profile --json --summary');
     expect(help).toContain('organization-catalogs --json --selected-only --summary');
+    expect(help).toContain(
+      'resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)'
+    );
   });
 
   it('treats --json as a boolean flag for organization profile inventory', () => {

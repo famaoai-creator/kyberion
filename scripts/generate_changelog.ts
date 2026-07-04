@@ -209,4 +209,9 @@ function main(): void {
   }
 }
 
-main();
+const isDirect = process.argv[1] && /generate_changelog\.(ts|js)$/.test(process.argv[1]);
+if (isDirect) {
+  main();
+}
+
+export { parseCommit, classify, renderSection };

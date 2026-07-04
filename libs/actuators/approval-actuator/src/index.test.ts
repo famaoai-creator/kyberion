@@ -45,7 +45,7 @@ const mocks = vi.hoisted(() => ({
   loadApprovalRequest: vi.fn(),
   listApprovalRequests: vi.fn(),
   safeReadFile: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
@@ -53,7 +53,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
     pathResolver: {
       ...actual.pathResolver,
@@ -149,7 +149,7 @@ describe('approval-actuator handleAction', () => {
     });
 
     expect(mocks.loadApprovalRequest).toHaveBeenCalledWith('terminal', 'req-1');
-    expect(mocks.withRetry).toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalled();
     expect(result.status).toBe('ok');
     expect(result.request).toEqual(mockRequest);
   });
@@ -168,6 +168,6 @@ describe('approval-actuator handleAction', () => {
 
     expect(result.status).toBe('ok');
     expect(result.requests).toHaveLength(2);
-    expect(mocks.withRetry).toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalled();
   });
 });

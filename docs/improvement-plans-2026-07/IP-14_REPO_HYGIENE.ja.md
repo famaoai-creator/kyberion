@@ -53,7 +53,7 @@ A〜E がそれぞれ解消され、`pnpm build && pnpm lint && pnpm test:unit &
 
 ### Task 3: 野良ファイル(D)— `claude-haiku`
 
-1. voice-actuator の `.py` 4 本: 参照 grep(scripts/pipelines/manifest/docs)でゼロを確認して削除。参照があれば `scripts/demos/` へ移動して参照を更新。
+1. voice-actuator の `.py` 4 本: 参照 grep(scripts/pipelines/manifest/docs)でゼロを確認して削除。`voice-bridge.py` は `voice.json` の preset と service-engine テストから参照があるため残す。
 2. `vision-actuator/override.txt` を削除。
 3. `tools/chronos-mirror/`: `grep -rn "tools/chronos-mirror"` で参照ゼロを確認して削除(参照があれば sonnet に差し戻し)。
 
@@ -62,6 +62,13 @@ A〜E がそれぞれ解消され、`pnpm build && pnpm lint && pnpm test:unit &
 1. `docs/DOC_INVENTORY.md`: 冒頭に「2026-05-07 時点のスナップショット(歴史的記録)」の注記を追加する(全面更新はしない。棚卸しは別途)。
 2. `docs/DOCUMENTATION_LOCALIZATION_POLICY.md`: (a) `docs/i18n/ja/` 推奨の節を実慣行(`.ja.md` 併置)に合わせて改訂、(b) `/Users/famao/...` 絶対パスをリポジトリ相対リンクに修正。ポリシーの中身(English-first 原則、語彙カタログ)は変えない。
 3. リンク切れ確認: 変更した 2 文書内の相対リンクを手繰って実在確認する。
+
+## 実装メモ
+
+- `media-generation-actuator` の既定 ComfyUI 出力先を `active/shared/tmp/comfy/output` に寄せ、`KYBERION_COMFY_OUTPUT_DIR` で上書きできるようにした。
+- `libs/actuators/media-generation-actuator/src/index.js` を含むソースツリー内の生成物を削除し、`.gitignore` に同アクチュエータの in-place build 出力を追加した。
+- 例示スクリプトの出力先を `active/shared/tmp/` 配下へ寄せた。
+- 参照ゼロだった `libs/actuators/voice-actuator/mms-jp-test.py` / `ms-voice-test.py` / `singing-test.py`、`libs/actuators/vision-actuator/override.txt`、`tools/chronos-mirror/public/history.json` を削除した。`voice-bridge.py` は `voice.json` の preset と service-engine テストから参照されるため残している。
 
 ## リスクと注意
 

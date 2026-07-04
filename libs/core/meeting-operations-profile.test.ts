@@ -59,11 +59,18 @@ const profile: MeetingOperationsProfile = {
 
 describe('meeting-operations-profile', () => {
   it('selects brief questions and role sets by purpose', () => {
-    expect(getMeetingBriefQuestions(profile, 'planning')).toEqual([
-      'What is being decided?',
-      'Who can make the final call?',
-    ]);
+    const questions = getMeetingBriefQuestions(profile, 'planning');
+    expect(questions.questions).toEqual(['What is being decided?', 'Who can make the final call?']);
+    expect(questions.omitted_count).toBe(0);
     expect(selectMeetingRoleSet(profile, 'status_update')?.primary_role).toBe('scribe');
+  });
+
+  it('reports omitted brief questions when capped', () => {
+    const questions = getMeetingBriefQuestions(profile, 'planning', 1);
+    expect(questions).toEqual({
+      questions: ['What is being decided?'],
+      omitted_count: 1,
+    });
   });
 
   it('builds a meeting brief with a role and exit boundary', () => {
@@ -85,8 +92,12 @@ describe('meeting-operations-profile', () => {
     expect(brief.exit_conditions).toContain('Agenda is complete');
     expect(brief.environment?.transport_mode).toBe('transcribe_first');
     expect(brief.environment?.items.find((item) => item.kind === 'audio')?.state).toBe('required');
-    expect(brief.environment?.items.find((item) => item.kind === 'camera')?.state).toBe('recommended');
-    expect(brief.environment?.questions).toContain('Will this meeting be video-on, or should Kyberion stay audio-only?');
+    expect(brief.environment?.items.find((item) => item.kind === 'camera')?.state).toBe(
+      'recommended'
+    );
+    expect(brief.environment?.questions).toContain(
+      'Will this meeting be video-on, or should Kyberion stay audio-only?'
+    );
   });
 
   it('marks speaking prerequisites when the profile allows live speech', () => {
@@ -112,6 +123,8 @@ describe('meeting-operations-profile', () => {
 
     expect(brief.environment?.transport_mode).toBe('realtime_voice');
     expect(brief.environment?.items.find((item) => item.kind === 'tts')?.state).toBe('required');
-    expect(brief.environment?.items.find((item) => item.kind === 'voice_consent')?.state).toBe('required');
+    expect(brief.environment?.items.find((item) => item.kind === 'voice_consent')?.state).toBe(
+      'required'
+    );
   });
 });

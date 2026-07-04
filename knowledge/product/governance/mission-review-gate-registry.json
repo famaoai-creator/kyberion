@@ -88,6 +88,11 @@
       "gate_id": "ARTIFACT_BUNDLE",
       "description": "Verify the mission's artifact bundle is assembled, approved, and fulfills all required artifact kinds declared by the Track and OutcomeContract.",
       "required_in_modes": ["standard", "strict"]
+    },
+    {
+      "gate_id": "DELIVERABLE_QUALITY",
+      "description": "Evaluate the produced deliverable against kind-specific quality checks and block low-quality artifacts before delivery.",
+      "required_in_modes": ["standard", "strict"]
     }
   ],
   "mode_rules": [

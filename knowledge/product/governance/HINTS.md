@@ -6,3 +6,30 @@
 > surfaced here so Recovery and Alignment phases can read relevant hints without full knowledge search.
 
 <!-- Distillation pipeline will append structured hint blocks below this line -->
+
+## DSC-MR576RXB-23D50F67 (2026-07-03)
+
+Use the browser bridge when a workflow depends on deterministic site navigation.
+
+source_ref: DSC-MR576RXB-23D50F67
+evidence_refs:
+
+- active/shared/tmp/hints-source.md
+
+## DSC-MR57697W-B1EDDABC (2026-07-03)
+
+Use the browser bridge when a workflow depends on deterministic site navigation.
+
+source_ref: DSC-MR57697W-B1EDDABC
+evidence_refs:
+
+- active/shared/tmp/hints-source.md
+
+## DSC-MR575TJG-DBBEC2D5 (2026-07-03)
+
+Use the browser bridge when a workflow depends on deterministic site navigation.
+
+source_ref: DSC-MR575TJG-DBBEC2D5
+evidence_refs:
+
+- active/shared/tmp/hints-source.md

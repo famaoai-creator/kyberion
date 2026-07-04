@@ -14,6 +14,7 @@ export interface ArtifactOwnershipRecord {
   external_ref?: string;
   created_at: string;
   evidence_refs: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface ArtifactOwnershipQuery {
@@ -21,13 +22,17 @@ export interface ArtifactOwnershipQuery {
   missionId?: string;
   taskSessionId?: string;
   kind?: string;
-  storageClass?: ArtifactOwnershipRecord['storage_class'] | ArtifactOwnershipRecord['storage_class'][];
+  storageClass?:
+    | ArtifactOwnershipRecord['storage_class']
+    | ArtifactOwnershipRecord['storage_class'][];
   includeTmp?: boolean;
 }
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve('schemas/artifact-record.schema.json');
+const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve(
+  'schemas/artifact-record.schema.json'
+);
 const ARTIFACT_REGISTRY_PATH = pathResolver.shared('runtime/artifacts/registry.jsonl');
 
 let artifactOwnershipValidateFn: ValidateFunction | null = null;
@@ -50,9 +55,13 @@ function parseJsonl(raw: string): ArtifactOwnershipRecord[] {
     .map((line) => JSON.parse(line) as ArtifactOwnershipRecord);
 }
 
-function normalizeStorageClasses(storageClass?: ArtifactOwnershipQuery['storageClass']): ArtifactOwnershipRecord['storage_class'][] {
+function normalizeStorageClasses(
+  storageClass?: ArtifactOwnershipQuery['storageClass']
+): ArtifactOwnershipRecord['storage_class'][] {
   if (!storageClass) return [];
-  return (Array.isArray(storageClass) ? storageClass : [storageClass]).map((value) => String(value).trim() as ArtifactOwnershipRecord['storage_class']).filter(Boolean);
+  return (Array.isArray(storageClass) ? storageClass : [storageClass])
+    .map((value) => String(value).trim() as ArtifactOwnershipRecord['storage_class'])
+    .filter(Boolean);
 }
 
 function matchesQuery(record: ArtifactOwnershipRecord, query: ArtifactOwnershipQuery): boolean {
@@ -66,36 +75,49 @@ function matchesQuery(record: ArtifactOwnershipRecord, query: ArtifactOwnershipQ
   return true;
 }
 
-function compareArtifactOwnershipRecords(a: ArtifactOwnershipRecord, b: ArtifactOwnershipRecord): number {
+function compareArtifactOwnershipRecords(
+  a: ArtifactOwnershipRecord,
+  b: ArtifactOwnershipRecord
+): number {
   const createdAtCompare = String(b.created_at || '').localeCompare(String(a.created_at || ''));
   if (createdAtCompare !== 0) return createdAtCompare;
   return String(b.artifact_id || '').localeCompare(String(a.artifact_id || ''));
 }
 
-export function createArtifactOwnershipRecord(input: Omit<ArtifactOwnershipRecord, 'created_at' | 'evidence_refs'> & {
-  created_at?: string;
-  evidence_refs?: string[];
-}): ArtifactOwnershipRecord {
+export function createArtifactOwnershipRecord(
+  input: Omit<ArtifactOwnershipRecord, 'created_at' | 'evidence_refs'> & {
+    created_at?: string;
+    evidence_refs?: string[];
+  }
+): ArtifactOwnershipRecord {
   return {
     ...input,
     created_at: input.created_at || new Date().toISOString(),
     evidence_refs: (input.evidence_refs || []).map((value) => String(value).trim()).filter(Boolean),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 }
 
-export function validateArtifactOwnershipRecord(record: ArtifactOwnershipRecord): { valid: boolean; errors: string[] } {
+export function validateArtifactOwnershipRecord(record: ArtifactOwnershipRecord): {
+  valid: boolean;
+  errors: string[];
+} {
   const validate = ensureValidator();
   const valid = validate(record);
-  const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+  const errors = (validate.errors || []).map(
+    (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  );
   return { valid: Boolean(valid), errors };
 }
 
 export function appendArtifactOwnershipRecord(
   record: ArtifactOwnershipRecord,
-  options: { for_delivery?: boolean } = {},
+  options: { for_delivery?: boolean } = {}
 ): string {
   if (!hasOwnership(record)) {
-    throw new Error('Artifact ownership record requires at least one owner: project_id, mission_id, or task_session_id.');
+    throw new Error(
+      'Artifact ownership record requires at least one owner: project_id, mission_id, or task_session_id.'
+    );
   }
   if (options.for_delivery && record.storage_class === 'tmp') {
     throw new Error('tmp storage_class cannot be registered as a delivery artifact.');
@@ -117,21 +139,31 @@ export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   return parseJsonl(raw);
 }
 
-export function listArtifactOwnershipRecordsByQuery(query: ArtifactOwnershipQuery = {}): ArtifactOwnershipRecord[] {
+export function listArtifactOwnershipRecordsByQuery(
+  query: ArtifactOwnershipQuery = {}
+): ArtifactOwnershipRecord[] {
   return listArtifactOwnershipRecords()
     .filter((record) => matchesQuery(record, query))
     .sort(compareArtifactOwnershipRecords);
 }
 
-export function listArtifactOwnershipRecordsForProject(projectId: string, query: Omit<ArtifactOwnershipQuery, 'projectId'> = {}): ArtifactOwnershipRecord[] {
+export function listArtifactOwnershipRecordsForProject(
+  projectId: string,
+  query: Omit<ArtifactOwnershipQuery, 'projectId'> = {}
+): ArtifactOwnershipRecord[] {
   return listArtifactOwnershipRecordsByQuery({ ...query, projectId });
 }
 
-export function listArtifactOwnershipRecordsForMission(missionId: string, query: Omit<ArtifactOwnershipQuery, 'missionId'> = {}): ArtifactOwnershipRecord[] {
+export function listArtifactOwnershipRecordsForMission(
+  missionId: string,
+  query: Omit<ArtifactOwnershipQuery, 'missionId'> = {}
+): ArtifactOwnershipRecord[] {
   return listArtifactOwnershipRecordsByQuery({ ...query, missionId });
 }
 
-export function findReusableArtifactOwnershipRecord(query: ArtifactOwnershipQuery & { projectId?: string }): ArtifactOwnershipRecord | null {
+export function findReusableArtifactOwnershipRecord(
+  query: ArtifactOwnershipQuery & { projectId?: string }
+): ArtifactOwnershipRecord | null {
   const records = listArtifactOwnershipRecordsByQuery({
     ...query,
     includeTmp: query.includeTmp ?? false,

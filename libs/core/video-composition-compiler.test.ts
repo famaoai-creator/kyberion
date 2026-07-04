@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
-import { compileVideoCompositionADF, writeVideoCompositionBundle } from './video-composition-compiler.js';
+import {
+  compileVideoCompositionADF,
+  writeVideoCompositionBundle,
+} from './video-composition-compiler.js';
 import type { VideoCompositionADF } from './video-composition-contract.js';
 
 describe('video composition compiler', () => {
@@ -58,7 +61,32 @@ describe('video composition compiler', () => {
     expect(written.bundle_dir).toBe(bundleDir);
     expect(safeExistsSync(`${bundleDir}/index.html`)).toBe(true);
     expect(safeExistsSync(`${bundleDir}/render-plan.json`)).toBe(true);
-    expect(safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain('Explain the product clearly');
+    expect(safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain(
+      'Explain the product clearly'
+    );
+  });
+
+  it('slugifies the composition id from the intent when present', () => {
+    const plan = compileVideoCompositionADF({
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Product Explainer',
+      title: 'Product Explainer',
+      composition: {
+        duration_sec: 4,
+        fps: 24,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [],
+      output: {
+        format: 'mp4',
+        bundle_dir: pathResolver.sharedTmp('video-composition-bundle-tests/slugified-id'),
+      },
+    });
+
+    expect(plan.composition_id).toBe('product-explainer');
   });
 
   it('carries narration references into the render plan', () => {
@@ -166,7 +194,9 @@ describe('video composition compiler', () => {
     };
 
     writeVideoCompositionBundle(adf);
-    const html = safeReadFile(`${bundleDir}/compositions/feature.html`, { encoding: 'utf8' }) as string;
+    const html = safeReadFile(`${bundleDir}/compositions/feature.html`, {
+      encoding: 'utf8',
+    }) as string;
     expect(html).toContain('Brief intake');
     expect(html).toContain('Render package');
   });
@@ -209,7 +239,9 @@ describe('video composition compiler', () => {
     };
 
     writeVideoCompositionBundle(adf);
-    const html = safeReadFile(`${bundleDir}/compositions/process.html`, { encoding: 'utf8' }) as string;
+    const html = safeReadFile(`${bundleDir}/compositions/process.html`, {
+      encoding: 'utf8',
+    }) as string;
     expect(html).toContain('Ordered steps');
     expect(html).toContain('Brief intake');
     expect(html).toContain('Render package');
@@ -288,8 +320,12 @@ describe('video composition compiler', () => {
       },
     });
 
-    expect(safeReadFile(`${promoDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain('Promo spot');
-    expect(safeReadFile(`${vtuberDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain('LIVE');
+    expect(safeReadFile(`${promoDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain(
+      'Promo spot'
+    );
+    expect(safeReadFile(`${vtuberDir}/compositions/hook.html`, { encoding: 'utf8' })).toContain(
+      'LIVE'
+    );
   });
 
   it('sanitizes unsafe scene ids before writing bundle artifacts and runtime keys', () => {
@@ -326,14 +362,18 @@ describe('video composition compiler', () => {
 
     writeVideoCompositionBundle(adf);
     expect(safeExistsSync(`${bundleDir}/compositions/foo-bar-script.html`)).toBe(true);
-    const html = safeReadFile(`${bundleDir}/compositions/foo-bar-script.html`, { encoding: 'utf8' }) as string;
+    const html = safeReadFile(`${bundleDir}/compositions/foo-bar-script.html`, {
+      encoding: 'utf8',
+    }) as string;
     expect(html).toContain('window.__timelines["foo-bar-script"]');
     expect(html).not.toContain('foo/../bar<script>');
   });
 
   it('stages avatar_assets declared in scene content for vtuber rendering', () => {
     const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/avatar-assets');
-    const avatarPath = pathResolver.sharedTmp('video-composition-bundle-tests/assets/avatar-smile.png');
+    const avatarPath = pathResolver.sharedTmp(
+      'video-composition-bundle-tests/assets/avatar-smile.png'
+    );
     safeWriteFile(avatarPath, 'avatar-bytes');
 
     const adf: VideoCompositionADF = {
@@ -372,7 +412,9 @@ describe('video composition compiler', () => {
     };
 
     writeVideoCompositionBundle(adf);
-    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' }) as string;
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
     expect(html).toContain('../assets/avatar-smile.png');
     expect(safeExistsSync(`${bundleDir}/assets/avatar-smile.png`)).toBe(true);
   });

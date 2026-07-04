@@ -11,15 +11,15 @@ export interface PreviewStep {
   id?: string;
   type: string;
   op: string;
-  description: string;        // human-readable description of what this step does
-  resolvedParams: Record<string, any>;  // params with variables resolved where possible
-  warnings: string[];         // e.g. "ref path does not exist", "unresolved variable {{x}}"
-  children?: PreviewStep[];   // for ref sub-pipelines
+  description: string; // human-readable description of what this step does
+  resolvedParams: Record<string, any>; // params with variables resolved where possible
+  warnings: string[]; // e.g. "ref path does not exist", "unresolved variable {{x}}"
+  children?: PreviewStep[]; // for ref sub-pipelines
 }
 
 export interface PipelinePreview {
   valid: boolean;
-  totalSteps: number;         // including sub-pipeline steps
+  totalSteps: number; // including sub-pipeline steps
   warnings: string[];
   errors: string[];
   steps: PreviewStep[];
@@ -86,6 +86,29 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
     resolvedParams: {},
     warnings: [],
   };
+  const policyParts: string[] = [];
+  if (step.effort) policyParts.push(`effort=${step.effort}`);
+  if (step.budget && typeof step.budget === 'object') {
+    const budget = step.budget as Record<string, unknown>;
+    if (typeof budget.cost_cap_tokens === 'number') {
+      policyParts.push(`cost cap ${budget.cost_cap_tokens} tokens`);
+    }
+    if (typeof budget.max_prompt_chars === 'number') {
+      policyParts.push(`prompt <= ${budget.max_prompt_chars} chars`);
+    }
+    if (typeof budget.max_response_chars === 'number') {
+      policyParts.push(`response <= ${budget.max_response_chars} chars`);
+    }
+    if (typeof budget.max_combined_chars === 'number') {
+      policyParts.push(`combined <= ${budget.max_combined_chars} chars`);
+    }
+    if (budget.approval_required === true) {
+      policyParts.push('approval required on overrun');
+    }
+  }
+  if (policyParts.length > 0) {
+    ps.description += ` (${policyParts.join(', ')})`;
+  }
 
   // Check for unresolved template variables
   const paramStr = JSON.stringify(step.params || {});
@@ -140,20 +163,26 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
     }
   }
 
-  // Control flow children: while
-  if (step.op === 'while' && step.params?.pipeline) {
-    const children = step.params.pipeline.map((s: any, j: number) =>
-      previewStep(s, j, ctx)
-    );
+  // Control flow children: while / loop-until / retry-until-quality
+  if (
+    (step.op === 'while' || step.op === 'loop_until' || step.op === 'retry_until_quality') &&
+    step.params?.pipeline
+  ) {
+    const children = step.params.pipeline.map((s: any, j: number) => previewStep(s, j, ctx));
     ps.children = children;
     ps.description += ` (loop body: ${children.length} steps, max ${step.params.max_iterations || '\u221e'} iterations)`;
   }
 
+  // Control flow children: parallel foreach
+  if (step.op === 'parallel_foreach' && step.params?.do) {
+    const children = step.params.do.map((s: any, j: number) => previewStep(s, j, ctx));
+    ps.children = children;
+    ps.description += ` (parallel body: ${children.length} steps, concurrency ${step.params.concurrency || step.params.parallelism || 2})`;
+  }
+
   // Control flow children: if
   if (step.op === 'if' && step.params?.then) {
-    const thenChildren = step.params.then.map((s: any, j: number) =>
-      previewStep(s, j, ctx)
-    );
+    const thenChildren = step.params.then.map((s: any, j: number) => previewStep(s, j, ctx));
     const elseChildren = Array.isArray(step.params?.else)
       ? step.params.else.map((s: any, j: number) => previewStep(s, j, ctx))
       : [];
@@ -190,6 +219,12 @@ function describeStep(step: any): string {
       return `Condition: ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
     case 'while':
       return `Loop while ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
+    case 'loop_until':
+      return `Loop until ${step.params?.condition?.from || '?'} ${step.params?.condition?.operator || '?'} ${step.params?.condition?.value || '?'}`;
+    case 'retry_until_quality':
+      return `Retry until quality ${step.params?.condition?.from || step.params?.quality_condition?.from || '?'} ${step.params?.condition?.operator || step.params?.quality_condition?.operator || '?'} ${step.params?.condition?.value || step.params?.quality_condition?.value || '?'}`;
+    case 'parallel_foreach':
+      return `Parallel foreach over ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s)`;
     case 'pptx_extract':
       return `Extract PPTX design from ${step.params?.path || '?'} (raw-preserving)`;
     case 'xlsx_extract':

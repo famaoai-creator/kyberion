@@ -6,7 +6,7 @@ vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
     ...actual,
-    withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+    retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
     safeReadFile: vi.fn().mockReturnValue('{}'),
     safeWriteFile: vi.fn(),
     safeMkdir: vi.fn(),
@@ -35,7 +35,8 @@ vi.mock('@agent/core/fs-utils', () => ({
 describe('code-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    const { safeReadFile, safeExistsSync, safeReaddir, safeLstat, safeExec } = await import('@agent/core');
+    const { safeReadFile, safeExistsSync, safeReaddir, safeLstat, safeExec } =
+      await import('@agent/core');
     vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
       if (String(filePath).includes('manifest.json')) {
         return JSON.stringify({ recovery_policy: {} });
@@ -174,7 +175,7 @@ describe('code-actuator', () => {
       it('discover_skills で governed skill index を読み込む', async () => {
         const { safeExistsSync, safeReadFile } = await import('@agent/core');
         vi.mocked(safeExistsSync).mockImplementation((filePath: string) =>
-          String(filePath).includes('global_skill_index.json'),
+          String(filePath).includes('global_skill_index.json')
         );
         vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
           if (String(filePath).includes('global_skill_index.json')) {
@@ -356,7 +357,11 @@ describe('code-actuator', () => {
               params: { message: `step ${i}` },
             }));
 
-            const result = await handleAction({ action: 'pipeline', steps, options: { max_steps: maxSteps } });
+            const result = await handleAction({
+              action: 'pipeline',
+              steps,
+              options: { max_steps: maxSteps },
+            });
             expect(result.status).toBe('error');
             expect(result.message).toContain('[SAFETY_LIMIT]');
           }),

@@ -18,11 +18,11 @@ This is the contract between Kyberion core and:
 
 ## 1. Stability Tiers
 
-| Tier | Meaning | Versioning |
-|---|---|---|
-| **Stable (v1+)** | Public surface. Breaking changes require a major version bump and a migration path. | semver |
-| **Beta** | Intentionally exposed but expected to change. Breaking changes allowed in minors with a release note. | semver |
-| **Internal** | No stability guarantee. May change in any release. Direct usage discouraged. | none |
+| Tier             | Meaning                                                                                               | Versioning |
+| ---------------- | ----------------------------------------------------------------------------------------------------- | ---------- |
+| **Stable (v1+)** | Public surface. Breaking changes require a major version bump and a migration path.                   | semver     |
+| **Beta**         | Intentionally exposed but expected to change. Breaking changes allowed in minors with a release note. | semver     |
+| **Internal**     | No stability guarantee. May change in any release. Direct usage discouraged.                          | none       |
 
 ## 2. Surfaces
 
@@ -43,6 +43,7 @@ The contract between Kyberion's pipeline engine and an actuator.
 - The wording of human-readable `description` fields.
 - The set of capability `requirements.bin/lib/env` (additive only is non-breaking).
 - Internal support helpers like `libs/actuators/meeting-browser-driver/` are implementation details of `meeting-actuator`, not a public extension point.
+- Shared utility functions such as `slugify`, `retry`, `chunk`, `sleep`, `loadJson`, and `ensureDir` should be imported from `@agent/core` rather than redefined locally.
 
 ### 2.2 ADF Pipeline Format — **Stable (v1)**
 
@@ -147,15 +148,15 @@ The set of `pnpm <command>` scripts in `package.json`.
 
 For each stable surface:
 
-| Change | Bump |
-|---|---|
-| Remove a feature, field, op, or behavior contract | **major** |
-| Add a required field, narrow accepted values | **major** |
-| Add an optional feature, field, op | **minor** |
-| Add a new actuator | **minor** (of the actuator); core stays the same |
-| Doc-only / comment-only / refactor with no observable change | **patch** |
-| Performance improvement with no observable change | **patch** |
-| Beta → Stable promotion | **minor** of the surface, document in CHANGELOG |
+| Change                                                       | Bump                                             |
+| ------------------------------------------------------------ | ------------------------------------------------ |
+| Remove a feature, field, op, or behavior contract            | **major**                                        |
+| Add a required field, narrow accepted values                 | **major**                                        |
+| Add an optional feature, field, op                           | **minor**                                        |
+| Add a new actuator                                           | **minor** (of the actuator); core stays the same |
+| Doc-only / comment-only / refactor with no observable change | **patch**                                        |
+| Performance improvement with no observable change            | **patch**                                        |
+| Beta → Stable promotion                                      | **minor** of the surface, document in CHANGELOG  |
 
 Each actuator carries its own semver in `manifest.json`. The repo as a whole carries `package.json` `version`. Repo version follows the tightest bump across all stable surfaces.
 
@@ -185,14 +186,14 @@ The stable extension point for meeting participation is the actuator / CLI contr
 
 For FDE / customer engagements:
 
-| Need | Use this | Avoid |
-|---|---|---|
-| Customer-specific identity / vision | `customer/{slug}/identity.json`, `vision.md` | Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset |
-| Customer-specific connections | `customer/{slug}/connections/` | Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset |
-| Customer-specific policy override | `customer/{slug}/policy/` | Editing `knowledge/product/governance/` |
-| Customer-specific mission templates | `customer/{slug}/mission-seeds/` | Modifying core `pipelines/` |
-| Customer-specific actuator | A new actuator under `libs/actuators/` with its own version | Patching an existing actuator's behavior |
-| Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one | Forking the core actuator |
+| Need                                      | Use this                                                    | Avoid                                                                       |
+| ----------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Customer-specific identity / vision       | `customer/{slug}/identity.json`, `vision.md`                | Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset             |
+| Customer-specific connections             | `customer/{slug}/connections/`                              | Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset |
+| Customer-specific policy override         | `customer/{slug}/policy/`                                   | Editing `knowledge/product/governance/`                                     |
+| Customer-specific mission templates       | `customer/{slug}/mission-seeds/`                            | Modifying core `pipelines/`                                                 |
+| Customer-specific actuator                | A new actuator under `libs/actuators/` with its own version | Patching an existing actuator's behavior                                    |
+| Customer-specific actuator behavior tweak | A wrapper actuator that calls the core one                  | Forking the core actuator                                                   |
 
 If you find yourself wanting to modify something that isn't listed in §2 as Stable, that's a signal to either:
 

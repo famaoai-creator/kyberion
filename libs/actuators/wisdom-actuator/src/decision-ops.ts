@@ -45,9 +45,11 @@ import {
   type ActionItemProvenance,
   type MeetingFacilitatorPolicy,
   type PresentationPreferenceProfile,
+  delegateBestOf,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
+import { z } from 'zod';
 
 /**
  * Decision-support operations for Kyberion.
@@ -142,9 +144,7 @@ export interface ExtractRequirementsOpInput {
   prior_draft_ref?: string;
 }
 
-export async function extractRequirementsOp(
-  input: ExtractRequirementsOpInput
-): Promise<{
+export async function extractRequirementsOp(input: ExtractRequirementsOpInput): Promise<{
   mission_id: string;
   version: string;
   draft_path: string;
@@ -1076,42 +1076,65 @@ export async function simulateAll(input: {
   manifest_path?: string;
   goal: string;
   output_dir: string;
+  max_steps_per_branch?: number;
 }): Promise<{
   written_to: string;
   quality_written_to: string;
   quality_severity: 'ok' | 'warn' | 'poor';
+  quality_retry_count: number;
+  max_steps_per_branch: number;
   reasoning_mode: 'placeholder' | 'model';
 }> {
   const backend = getReasoningBackend();
+  const baseMaxSteps = Math.max(1, input.max_steps_per_branch ?? 10);
   const manifest =
     input.manifest_path && safeExistsSync(pathResolver.rootResolve(input.manifest_path))
       ? readJSON<any>(input.manifest_path)
       : { branches: [] };
-  const { branches: simulated } = await backend.simulateBranches({
-    branches: manifest.branches ?? [],
-    goal: input.goal,
-  });
-  const reasoningMode = deriveReasoningMode(backend.name);
-  const summary = {
-    goal: input.goal,
-    branches: simulated,
-    generated_by: backend.name,
-    timestamp: nowIso(),
-    reasoning_mode: reasoningMode,
-  };
   const outDir = input.output_dir.replace(/\/$/, '');
   const outPath = `${outDir}/simulation-summary.json`;
-  writeJSON(outPath, summary);
-
-  const quality = evaluateSimulationQuality(summary);
   const qualityPath = `${outDir}/simulation-quality.json`;
-  writeJSON(qualityPath, quality);
+
+  const runSimulation = async (maxStepsPerBranch: number) => {
+    const { branches: simulated } = await backend.simulateBranches({
+      branches: manifest.branches ?? [],
+      goal: input.goal,
+      maxStepsPerBranch,
+    });
+    const reasoningMode = deriveReasoningMode(backend.name);
+    const summary = {
+      goal: input.goal,
+      branches: simulated,
+      generated_by: backend.name,
+      timestamp: nowIso(),
+      reasoning_mode: reasoningMode,
+      max_steps_per_branch: maxStepsPerBranch,
+    };
+    const quality = evaluateSimulationQuality(summary);
+    return { summary, quality, reasoningMode, maxStepsPerBranch };
+  };
+
+  let retryCount = 0;
+  let finalRun = await runSimulation(baseMaxSteps);
+  if (finalRun.quality.severity === 'poor') {
+    retryCount = 1;
+    const retrySteps = Math.max(baseMaxSteps + 2, Math.ceil(baseMaxSteps * 1.5));
+    logger.info(
+      `[simulateAll] quality severity poor; retrying with maxStepsPerBranch=${retrySteps}`
+    );
+    finalRun = await runSimulation(retrySteps);
+  }
+
+  writeJSON(outPath, finalRun.summary);
+  writeJSON(qualityPath, finalRun.quality);
 
   return {
     written_to: outPath,
     quality_written_to: qualityPath,
-    quality_severity: quality.severity,
-    reasoning_mode: reasoningMode,
+    quality_severity: finalRun.quality.severity,
+    quality_retry_count: retryCount,
+    max_steps_per_branch: finalRun.maxStepsPerBranch,
+    reasoning_mode: finalRun.reasoningMode,
   };
 }
 
@@ -1400,19 +1423,34 @@ export async function generateFacilitationScriptOp(input: {
     'Recent transcript chunk:',
     input.recent_transcript_chunk ?? '(silence so far)',
   ].join('\n');
-  const raw = await backend.delegateTask(prompt, 'meeting-facilitation');
+  const facilitationSchema = z.object({
+    speech_text: z.string(),
+    next_action: z.enum(['continue_listen', 'transition_topic', 'wrap_up', 'pause']),
+  });
   try {
-    const parsed = extractFirstJsonBlock(raw) as any;
-    const speech = typeof parsed.speech_text === 'string' ? parsed.speech_text : '';
-    const next =
-      parsed.next_action &&
-      ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
-        ? parsed.next_action
-        : 'continue_listen';
-    return { speech_text: speech, next_action: next };
+    const result = await delegateBestOf(backend, prompt, facilitationSchema, {
+      context: 'meeting-facilitation',
+      candidateCount: 2,
+      judgeInstructions:
+        'Prefer the candidate that is concise, natural in the requested language, and most likely to help the meeting advance without adding unsupported facts.',
+    });
+    return result.winner;
   } catch (err: any) {
-    logger.warn(`[generate_facilitation_script] parse failed: ${err?.message ?? err}`);
-    return { speech_text: '', next_action: 'continue_listen' };
+    logger.warn(`[generate_facilitation_script] best-of failed: ${err?.message ?? err}`);
+    const raw = await backend.delegateTask(prompt, 'meeting-facilitation');
+    try {
+      const parsed = extractFirstJsonBlock(raw) as any;
+      const speech = typeof parsed.speech_text === 'string' ? parsed.speech_text : '';
+      const next =
+        parsed.next_action &&
+        ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
+          ? parsed.next_action
+          : 'continue_listen';
+      return { speech_text: speech, next_action: next };
+    } catch (parseErr: any) {
+      logger.warn(`[generate_facilitation_script] parse failed: ${parseErr?.message ?? parseErr}`);
+      return { speech_text: '', next_action: 'continue_listen' };
+    }
   }
 }
 
@@ -1793,6 +1831,7 @@ export async function simulateAllEnsemble(input: {
   individual_runs_dir: string;
   convergence_severity: 'ok' | 'warn' | 'poor';
   divergent_outcomes_warning: boolean;
+  retry_count: number;
 }> {
   if (!Number.isInteger(input.runs) || input.runs < 2) {
     throw new Error('[simulateAllEnsemble] runs must be an integer >= 2');
@@ -1801,28 +1840,42 @@ export async function simulateAllEnsemble(input: {
   const runsDir = `${outDir}/ensemble-runs`;
   safeMkdir(pathResolver.rootResolve(runsDir), { recursive: true });
 
-  const runs: any[] = [];
-  for (let i = 0; i < input.runs; i++) {
-    const runOutDir = `${runsDir}/run-${i + 1}`;
-    safeMkdir(pathResolver.rootResolve(runOutDir), { recursive: true });
-    const result = await simulateAll({
-      ...(input.manifest_path ? { manifest_path: input.manifest_path } : {}),
-      goal: input.goal,
-      output_dir: runOutDir,
+  const executeEnsemble = async (runsCount: number) => {
+    const runs: any[] = [];
+    for (let i = 0; i < runsCount; i++) {
+      const runOutDir = `${runsDir}/run-${i + 1}`;
+      safeMkdir(pathResolver.rootResolve(runOutDir), { recursive: true });
+      const result = await simulateAll({
+        ...(input.manifest_path ? { manifest_path: input.manifest_path } : {}),
+        goal: input.goal,
+        output_dir: runOutDir,
+      });
+      const summaryPath = result.written_to;
+      runs.push({
+        run_index: i + 1,
+        summary_path: summaryPath,
+        quality_severity: result.quality_severity,
+        summary: readJSON<any>(summaryPath),
+      });
+    }
+    const convergence = evaluateEnsembleConvergence({
+      runs: runs.map((r) => r.summary),
+      threshold: input.convergence_threshold ?? 0.6,
     });
-    const summaryPath = result.written_to;
-    runs.push({
-      run_index: i + 1,
-      summary_path: summaryPath,
-      quality_severity: result.quality_severity,
-      summary: readJSON<any>(summaryPath),
-    });
+    return { runs, convergence };
+  };
+
+  let retryCount = 0;
+  let ensembleRun = await executeEnsemble(input.runs);
+  if (ensembleRun.convergence.severity === 'poor') {
+    retryCount = 1;
+    const retryRuns = Math.max(input.runs + 2, Math.ceil(input.runs * 1.5));
+    logger.info(`[simulateAllEnsemble] convergence poor; retrying with runs=${retryRuns}`);
+    ensembleRun = await executeEnsemble(retryRuns);
   }
 
-  const convergence = evaluateEnsembleConvergence({
-    runs: runs.map((r) => r.summary),
-    threshold: input.convergence_threshold ?? 0.6,
-  });
+  const runs = ensembleRun.runs;
+  const convergence = ensembleRun.convergence;
 
   const ensemble = {
     goal: input.goal,
@@ -1834,6 +1887,7 @@ export async function simulateAllEnsemble(input: {
     })),
     convergence,
     timestamp: nowIso(),
+    retry_count: retryCount,
   };
   const ensemblePath = `${outDir}/simulation-ensemble.json`;
   writeJSON(ensemblePath, ensemble);
@@ -1843,6 +1897,7 @@ export async function simulateAllEnsemble(input: {
     individual_runs_dir: runsDir,
     convergence_severity: convergence.severity,
     divergent_outcomes_warning: convergence.divergent_outcomes_warning,
+    retry_count: retryCount,
   };
 }
 
@@ -2588,6 +2643,7 @@ export async function dispatchDecisionOp(
         manifest_path: resolved('manifest_path'),
         goal: resolved('goal'),
         output_dir: resolved('output_dir'),
+        max_steps_per_branch: params.max_steps_per_branch || 10,
       });
       return { handled: true, ctx: assign(result) };
     }

@@ -4,9 +4,24 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
-import { buildProjectBootstrapWorkItems, listProjectRecords, loadProjectRecord, resolveProjectRecordForText, saveProjectRecord } from './project-registry.js';
-import { listServiceBindingRecords, loadServiceBindingRecord, saveServiceBindingRecord } from './service-binding-registry.js';
-import { attachArtifactRecordToTaskSession, createArtifactRecord, loadArtifactRecord, saveArtifactRecord } from './artifact-record.js';
+import {
+  buildProjectBootstrapWorkItems,
+  listProjectRecords,
+  loadProjectRecord,
+  resolveProjectRecordForText,
+  saveProjectRecord,
+} from './project-registry.js';
+import {
+  listServiceBindingRecords,
+  loadServiceBindingRecord,
+  saveServiceBindingRecord,
+} from './service-binding-registry.js';
+import {
+  attachArtifactRecordToTaskSession,
+  createArtifactRecord,
+  loadArtifactRecord,
+  saveArtifactRecord,
+} from './artifact-record.js';
 import { createTaskSession, saveTaskSession } from './task-session.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -51,7 +66,9 @@ describe('project and artifact registries', () => {
     expect(loadProjectRecord('PRJ-TEST-WEB')?.kickoff_task_session_id).toBe('TSK-TEST-KICKOFF');
     expect(loadProjectRecord('PRJ-TEST-WEB')?.default_track_id).toBe('TRK-TEST-REL1');
     expect(listProjectRecords().some((item) => item.project_id === 'PRJ-TEST-WEB')).toBe(true);
-    expect(resolveProjectRecordForText({ utterance: 'Test Web Service の試験計画を作って' })?.project_id).toBe('PRJ-TEST-WEB');
+    expect(
+      resolveProjectRecordForText({ utterance: 'Test Web Service の試験計画を作って' })?.project_id
+    ).toBe('PRJ-TEST-WEB');
   });
 
   it('persists service binding records', () => {
@@ -67,7 +84,9 @@ describe('project and artifact registries', () => {
       auth_mode: 'secret-guard',
     });
     expect(loadServiceBindingRecord('BIND-TEST-GITHUB')?.service_type).toBe('github');
-    expect(listServiceBindingRecords().some((item) => item.binding_id === 'BIND-TEST-GITHUB')).toBe(true);
+    expect(listServiceBindingRecords().some((item) => item.binding_id === 'BIND-TEST-GITHUB')).toBe(
+      true
+    );
   });
 
   it('persists artifact ownership and attaches it to a task session', () => {
@@ -100,7 +119,9 @@ describe('project and artifact registries', () => {
     attachArtifactRecordToTaskSession('TSK-TEST-ARTIFACT', artifact);
     expect(loadArtifactRecord('ART-TEST-DECK')?.project_id).toBe('PRJ-TEST-WEB');
     expect(loadArtifactRecord('ART-TEST-DECK')?.track_id).toBe('TRK-TEST-REL1');
-    expect(loadArtifactRecord('ART-TEST-DECK')?.work_loop?.resolution.execution_shape).toBe('task_session');
+    expect(loadArtifactRecord('ART-TEST-DECK')?.work_loop?.resolution.execution_shape).toBe(
+      'task_session'
+    );
   });
 
   it('builds bootstrap work items for project creation flows', () => {
@@ -110,6 +131,7 @@ describe('project and artifact registries', () => {
       utterance: '新しい Webサービスを作って',
     });
     expect(items.length).toBeGreaterThanOrEqual(3);
+    expect(items[0]?.work_id).toBe('WRK-TEST-WEB-FRAME');
     expect(items[0]?.kind).toBe('task_session');
     expect(items[0]?.specialist_id).toBe('project-lead');
     expect(items.some((item) => item.title.toLowerCase().includes('architecture'))).toBe(true);
@@ -134,7 +156,10 @@ describe('project and artifact registries', () => {
 
   it('emits project records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/project-record.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/project-record.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const project = {
       project_id: 'PRJ-TEST-SCHEMA',

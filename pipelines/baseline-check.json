@@ -8,9 +8,10 @@
     {
       "id": "run-sentinel",
       "role": "sink",
-      "op": "system:shell",
+      "op": "system:exec",
       "params": {
-        "cmd": "node dist/scripts/run_baseline_check.js"
+        "command": "node",
+        "args": ["dist/scripts/run_baseline_check.js"]
       }
     }
   ]

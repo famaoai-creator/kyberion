@@ -11,7 +11,7 @@ import {
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
-  withRetry,
+  retry,
   classifyError,
   derivePipelineStatus,
   getReasoningBackend,
@@ -58,7 +58,9 @@ import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { dispatchDecisionOp } from './decision-ops.js';
 
-const WISDOM_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json');
+const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/wisdom-actuator/manifest.json'
+);
 const KNOWLEDGE_PACKAGE_AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const KNOWLEDGE_TIER_PATTERN = /^(personal|confidential|public)$/;
 const DEFAULT_WISDOM_RETRY = {
@@ -90,7 +92,7 @@ function buildRetryOptions() {
   const policy = loadRecoveryPolicy();
   const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_WISDOM_RETRY;
   const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
   );
   return {
     ...DEFAULT_WISDOM_RETRY,
@@ -107,7 +109,9 @@ function buildRetryOptions() {
 }
 
 function normalizeKnowledgeTier(value: unknown): 'personal' | 'confidential' | 'public' {
-  const tier = String(value || 'confidential').trim().toLowerCase();
+  const tier = String(value || 'confidential')
+    .trim()
+    .toLowerCase();
   if (!KNOWLEDGE_TIER_PATTERN.test(tier)) {
     throw new Error(`Invalid knowledge import tier: ${value}`);
   }
@@ -146,17 +150,30 @@ export async function handleAction(input: WisdomAction) {
   return await executePipeline(input.steps || [], input.context || {}, input.options);
 }
 
-export async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+export async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: any = {},
+  options: any = {},
+  state: any = { stepCount: 0, startTime: Date.now() }
+) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
   let ctx = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
 
-  if (initialCtx.context_path && safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))) {
-    const saved = await withRetry(
-      async () => JSON.parse(safeReadFile(pathResolver.rootResolve(initialCtx.context_path), { encoding: 'utf8' }) as string),
-      buildRetryOptions(),
+  if (
+    initialCtx.context_path &&
+    safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))
+  ) {
+    const saved = await retry(
+      async () =>
+        JSON.parse(
+          safeReadFile(pathResolver.rootResolve(initialCtx.context_path), {
+            encoding: 'utf8',
+          }) as string
+        ),
+      buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
   }
@@ -164,8 +181,10 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
   const results = [];
   for (const step of steps) {
     state.stepCount++;
-    if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
+    if (state.stepCount > MAX_STEPS)
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
+    if (Date.now() - state.startTime > TIMEOUT)
+      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
 
     try {
       logger.info(`  [WISDOM_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
@@ -174,9 +193,15 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
         ctx = await opControl(step.op, step.params, ctx, options, state);
       } else {
         switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx); break;
-          case 'apply': await opApply(step.op, step.params, ctx); break;
+          case 'capture':
+            ctx = await opCapture(step.op, step.params, ctx);
+            break;
+          case 'transform':
+            ctx = await opTransform(step.op, step.params, ctx);
+            break;
+          case 'apply':
+            await opApply(step.op, step.params, ctx);
+            break;
         }
       }
       results.push({ op: step.op, status: 'success' });
@@ -188,16 +213,21 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
   }
 
   if (initialCtx.context_path) {
-    await withRetry(
-      async () => {
-        safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
-        return undefined;
-      },
-      buildRetryOptions(),
-    );
+    await retry(async () => {
+      safeWriteFile(
+        pathResolver.rootResolve(initialCtx.context_path),
+        JSON.stringify(ctx, null, 2)
+      );
+      return undefined;
+    }, buildRetryOptions());
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
 }
 
 async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
@@ -222,7 +252,8 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       }
       return ctx;
 
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -232,18 +263,36 @@ async function opCapture(op: string, params: any, ctx: any) {
       const cmd = resolveVars(params.cmd, ctx);
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await withRetry(
+        [params.export_as || 'last_capture']: await retry(
           async () => safeExec(cmd).trim(),
-          buildRetryOptions(),
+          buildRetryOptions()
         ),
       };
     case 'read_file':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(pathResolver.rootResolve(resolveVars(params.path, ctx)), { encoding: 'utf8' }) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: safeReadFile(
+          pathResolver.rootResolve(resolveVars(params.path, ctx)),
+          { encoding: 'utf8' }
+        ),
+      };
     case 'read_json':
-      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(pathResolver.rootResolve(resolveVars(params.path, ctx)), { encoding: 'utf8' }) as string) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture_data']: JSON.parse(
+          safeReadFile(pathResolver.rootResolve(resolveVars(params.path, ctx)), {
+            encoding: 'utf8',
+          }) as string
+        ),
+      };
     case 'glob_files':
       const searchDir = pathResolver.rootResolve(resolveVars(params.dir, ctx));
-      return { ...ctx, [params.export_as || 'file_list']: getAllFiles(searchDir).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(pathResolver.rootDir(), f)) };
+      return {
+        ...ctx,
+        [params.export_as || 'file_list']: getAllFiles(searchDir)
+          .filter((f) => !params.ext || f.endsWith(params.ext))
+          .map((f) => path.relative(pathResolver.rootDir(), f)),
+      };
     case 'knowledge_search':
       const query = resolveVars(params.query, ctx).toLowerCase();
       const manifestPath = pathResolver.knowledge('_manifest.json');
@@ -263,15 +312,20 @@ async function opCapture(op: string, params: any, ctx: any) {
         ctx._knowledgeIndex = await buildScopedIndex(scope);
         ctx._knowledgeIndexScopeKey = scopeKey;
       }
-      const hints = await queryKnowledgeHybrid(ctx._knowledgeIndex, resolveVars(params.topic, ctx), {
-        actuator: params.actuator,
-        op: params.op,
-        maxResults: params.max_results || 5,
-      });
+      const hints = await queryKnowledgeHybrid(
+        ctx._knowledgeIndex,
+        resolveVars(params.topic, ctx),
+        {
+          actuator: params.actuator,
+          op: params.op,
+          maxResults: params.max_results || 5,
+        }
+      );
       ctx = { ...ctx, [params.export_as || 'last_hints']: hints };
       return ctx;
     }
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -288,7 +342,13 @@ async function opTransform(op: string, params: any, ctx: any) {
     }
     case 'regex_replace': {
       const input = String(ctx[params.from || 'last_capture'] || '');
-      return { ...ctx, [params.export_as || 'last_transform']: input.replace(new RegExp(params.pattern, 'g'), resolveVars(params.template, ctx)) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_transform']: input.replace(
+          new RegExp(params.pattern, 'g'),
+          resolveVars(params.template, ctx)
+        ),
+      };
     }
     case 'yaml_update': {
       const content = String(ctx[params.from || 'last_capture'] || '');
@@ -297,7 +357,13 @@ async function opTransform(op: string, params: any, ctx: any) {
       const fm = yaml.load(fmMatch[1]) as any;
       fm[params.field] = resolveVars(params.value, ctx);
       const newFm = yaml.dump(fm, { lineWidth: -1 }).trim();
-      return { ...ctx, [params.export_as || 'last_transform']: content.replace(/^---\n[\s\S]*?\n---/m, `---\n${newFm}\n---`) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_transform']: content.replace(
+          /^---\n[\s\S]*?\n---/m,
+          `---\n${newFm}\n---`
+        ),
+      };
     }
     case 'json_query': {
       const data = ctx[params.from || 'last_capture_data'];
@@ -335,11 +401,18 @@ async function opApply(op: string, params: any, ctx: any) {
               : `${JSON.stringify(content, null, 2)}\n`;
         safeAppendFileSync(out, payload, 'utf8');
       } else {
-        safeWriteFile(out, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
+        safeWriteFile(
+          out,
+          typeof content === 'string'
+            ? content
+            : content === undefined
+              ? ''
+              : JSON.stringify(content, null, 2)
+        );
       }
       break;
     case 'knowledge_inject':
-      await withRetry(async () => {
+      await retry(async () => {
         const kPath = resolveVars(params.knowledge_path, ctx);
         const missionId = resolveVars(params.mission_id, ctx);
         const missionPath = (pathResolver as any).findMissionPath(missionId);
@@ -358,13 +431,20 @@ async function opApply(op: string, params: any, ctx: any) {
         }
       }, buildRetryOptions());
       break;
-    case 'log': logger.info(`[WISDOM_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`); break;
+    case 'log':
+      logger.info(`[WISDOM_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
+      break;
     case 'knowledge_export':
-      await withRetry(async () => {
+      await retry(async () => {
         const sourceFile = pathResolver.knowledge(resolveVars(params.path, ctx));
-        if (!safeExistsSync(sourceFile)) throw new Error(`Knowledge source not found: ${sourceFile}`);
+        if (!safeExistsSync(sourceFile))
+          throw new Error(`Knowledge source not found: ${sourceFile}`);
 
-        const agentId = JSON.parse(safeReadFile(pathResolver.knowledge('personal/agent-identity.json'), { encoding: 'utf8' }) as string).agent_id;
+        const agentId = JSON.parse(
+          safeReadFile(pathResolver.knowledge('personal/agent-identity.json'), {
+            encoding: 'utf8',
+          }) as string
+        ).agent_id;
         const rawData = safeReadFile(sourceFile, { encoding: 'utf8' }) as string;
         const { createHash } = await import('node:crypto');
         const hash = createHash('sha256').update(rawData).digest('hex');
@@ -385,7 +465,11 @@ async function opApply(op: string, params: any, ctx: any) {
         };
 
         const outPath = pathResolver.rootResolve(
-          resolveVars(params.output_path || pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`), ctx),
+          resolveVars(
+            params.output_path ||
+              pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`),
+            ctx
+          )
         );
         safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
         logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
@@ -393,7 +477,7 @@ async function opApply(op: string, params: any, ctx: any) {
       break;
 
     case 'knowledge_import':
-      await withRetry(async () => {
+      await retry(async () => {
         const pkgPath = pathResolver.rootResolve(resolveVars(params.package_path, ctx));
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
@@ -402,7 +486,9 @@ async function opApply(op: string, params: any, ctx: any) {
         const actualHash = vHash('sha256').update(pkg.content.raw_data).digest('hex');
 
         if (actualHash !== pkg.metadata.hash) {
-          throw new Error(`CRITICAL: Knowledge Package integrity check failed. Expected: ${pkg.metadata.hash}, Got: ${actualHash}`);
+          throw new Error(
+            `CRITICAL: Knowledge Package integrity check failed. Expected: ${pkg.metadata.hash}, Got: ${actualHash}`
+          );
         }
 
         const targetTier = normalizeKnowledgeTier(params.tier);
@@ -428,11 +514,13 @@ async function opApply(op: string, params: any, ctx: any) {
 }
 
 export async function performReconcile(input: WisdomAction) {
-  const strategyPath = pathResolver.knowledge(input.strategy_path || 'governance/wisdom-reconcile-strategy.json');
+  const strategyPath = pathResolver.knowledge(
+    input.strategy_path || 'governance/wisdom-reconcile-strategy.json'
+  );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await withRetry(
+  const config = await retry(
     async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
-    buildRetryOptions(),
+    buildRetryOptions()
   );
   for (const strategy of config.strategies) {
     if (strategy.for_each) {

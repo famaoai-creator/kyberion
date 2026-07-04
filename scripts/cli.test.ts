@@ -7,6 +7,7 @@ import {
   extractBranchArg,
   main,
   normalizeActuators,
+  formatOperatorPacketLines,
   searchActuators,
   stripNpmSeparatorArg,
 } from './cli.js';
@@ -14,7 +15,14 @@ import {
 describe('Kyberion CLI helpers', () => {
   it('normalizes compact actuator index entries', () => {
     const actuators = normalizeActuators({
-      s: [{ n: 'file-actuator', path: 'libs/actuators/file-actuator', d: 'File operations', s: 'implemented' }],
+      s: [
+        {
+          n: 'file-actuator',
+          path: 'libs/actuators/file-actuator',
+          d: 'File operations',
+          s: 'implemented',
+        },
+      ],
     });
 
     expect(actuators).toEqual([
@@ -30,13 +38,27 @@ describe('Kyberion CLI helpers', () => {
   it('searches name, description, and path', () => {
     const actuators = normalizeActuators({
       s: [
-        { n: 'browser-actuator', path: 'libs/actuators/browser-actuator', d: 'Playwright web automation', s: 'implemented' },
-        { n: 'service-actuator', path: 'libs/actuators/service-actuator', d: 'External SaaS connectors', s: 'implemented' },
+        {
+          n: 'browser-actuator',
+          path: 'libs/actuators/browser-actuator',
+          d: 'Playwright web automation',
+          s: 'implemented',
+        },
+        {
+          n: 'service-actuator',
+          path: 'libs/actuators/service-actuator',
+          d: 'External SaaS connectors',
+          s: 'implemented',
+        },
       ],
     });
 
-    expect(searchActuators(actuators, 'playwright').map(actuator => actuator.name)).toEqual(['browser-actuator']);
-    expect(searchActuators(actuators, 'service-actuator').map(actuator => actuator.name)).toEqual(['service-actuator']);
+    expect(searchActuators(actuators, 'playwright').map((actuator) => actuator.name)).toEqual([
+      'browser-actuator',
+    ]);
+    expect(searchActuators(actuators, 'service-actuator').map((actuator) => actuator.name)).toEqual(
+      ['service-actuator']
+    );
   });
 
   it('extracts and removes the branch option from forwarded args', () => {
@@ -57,6 +79,7 @@ describe('Kyberion CLI helpers', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('prints shared mobile app profile summary', async () => {
@@ -67,7 +90,9 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('Mobile app profiles');
     expect(output).toContain('example-mobile-login-passkey');
-    expect(output).toContain('knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
+    expect(output).toContain(
+      'knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json'
+    );
   });
 
   it('prints a specific shared mobile app profile', async () => {
@@ -78,7 +103,9 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('example-mobile-login-passkey (android)');
     expect(output).toContain('Example Mobile Login + Passkey');
-    expect(output).toContain('Path: knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json');
+    expect(output).toContain(
+      'Path: knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json'
+    );
   });
 
   it('prints shared web app profile summary', async () => {
@@ -89,7 +116,9 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('Web app profiles');
     expect(output).toContain('example-web-login-guarded');
-    expect(output).toContain('knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json');
+    expect(output).toContain(
+      'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json'
+    );
   });
 
   it('prints a specific shared web app profile', async () => {
@@ -100,7 +129,22 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('example-web-login-guarded (browser)');
     expect(output).toContain('Example Web Login + Guarded Routes');
-    expect(output).toContain('Path: knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json');
+    expect(output).toContain(
+      'Path: knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json'
+    );
+  });
+
+  it('renders operator packet readiness through the shared vocabulary catalog', () => {
+    vi.stubEnv('KYBERION_UI_LOCALE', 'ja');
+    const lines = formatOperatorPacketLines({
+      kind: 'operator-interaction-packet',
+      interaction_type: 'status-summary',
+      headline: 'Status',
+      summary: 'Summary',
+      readiness: 'needs_clarification',
+    });
+
+    expect(lines.join('\n')).toContain('実行準備度: 追加確認が必要');
   });
 
   it('includes the email workflow command in help output', async () => {
@@ -114,6 +158,7 @@ describe('Kyberion CLI helpers', () => {
     expect(output).toContain('npm run cli -- email draft');
     expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
     expect(output).toContain('npm run cli -- calendar status');
+    expect(output).toContain('intent [--clarify] "<utterance>"');
   });
 
   it('includes the inbox archive example in email help output', async () => {
@@ -137,18 +182,36 @@ describe('Kyberion CLI helpers', () => {
   });
 
   it('allows only approved packet commands', () => {
-    expect(() => assertApprovedNextActionCommand('node dist/scripts/mission_controller.js status MSN-1')).not.toThrow();
-    expect(() => assertApprovedNextActionCommand('bash -lc "echo hacked"')).toThrow('Only node-based packet commands are allowed');
-    expect(() => assertApprovedNextActionCommand('node -e "console.log(1)"')).toThrow('approved dist/scripts entrypoint');
-    expect(() => assertApprovedNextActionCommand('node dist/scripts/archive_missions.js')).toThrow('not approved');
+    expect(() =>
+      assertApprovedNextActionCommand('node dist/scripts/mission_controller.js status MSN-1')
+    ).not.toThrow();
+    expect(() => assertApprovedNextActionCommand('bash -lc "echo hacked"')).toThrow(
+      'Only node-based packet commands are allowed'
+    );
+    expect(() => assertApprovedNextActionCommand('node -e "console.log(1)"')).toThrow(
+      'approved dist/scripts entrypoint'
+    );
+    expect(() => assertApprovedNextActionCommand('node dist/scripts/archive_missions.js')).toThrow(
+      'not approved'
+    );
   });
 
   it('allows only approved packet and pipeline paths', () => {
-    expect(() => assertPacketPathAllowed(`${process.cwd()}/active/shared/tmp/orchestrator/test-packet.json`)).not.toThrow();
-    expect(() => assertPacketPathAllowed(`${process.cwd()}/tmp/evil.json`)).toThrow('Packet path must stay within');
-    expect(() => assertApprovedPipelinePath('pipelines/web-session-handoff-runner.json')).not.toThrow();
-    expect(() => assertApprovedPipelinePath('active/shared/tmp/orchestrator/status-packet.json')).not.toThrow();
-    expect(() => assertApprovedPipelinePath('../secrets.json')).toThrow('Pipeline path is not approved');
+    expect(() =>
+      assertPacketPathAllowed(`${process.cwd()}/active/shared/tmp/orchestrator/test-packet.json`)
+    ).not.toThrow();
+    expect(() => assertPacketPathAllowed(`${process.cwd()}/tmp/evil.json`)).toThrow(
+      'Packet path must stay within'
+    );
+    expect(() =>
+      assertApprovedPipelinePath('pipelines/web-session-handoff-runner.json')
+    ).not.toThrow();
+    expect(() =>
+      assertApprovedPipelinePath('active/shared/tmp/orchestrator/status-packet.json')
+    ).not.toThrow();
+    expect(() => assertApprovedPipelinePath('../secrets.json')).toThrow(
+      'Pipeline path is not approved'
+    );
   });
 });
 
@@ -168,7 +231,7 @@ describe('next action outcome classification', () => {
       'node -e "console.log(\'ok\')"',
       false,
       undefined,
-      'ok',
+      'ok'
     );
 
     expect(outcome.recommended_next_action_type).toBe('execute_now');
@@ -189,7 +252,7 @@ describe('next action outcome classification', () => {
       'node dist/scripts/mission_controller.js status MSN-TEST',
       false,
       undefined,
-      'Mission: MSN-TEST',
+      'Mission: MSN-TEST'
     );
 
     expect(outcome.recommended_next_action_type).toBe('inspect');
@@ -209,7 +272,7 @@ describe('next action outcome classification', () => {
       'node dist/scripts/cli.js packet',
       true,
       'Missing packet path.',
-      'ERROR Missing packet path.',
+      'ERROR Missing packet path.'
     );
 
     expect(outcome.recommended_next_action_type).toBe('clarify');
@@ -232,7 +295,7 @@ describe('next action outcome classification', () => {
       'node -e "console.log(\'mission_controller.js start\')"',
       false,
       undefined,
-      'mission_controller.js start is recommended',
+      'mission_controller.js start is recommended'
     );
 
     expect(outcome.recommended_next_action_type).toBe('start_mission');
@@ -252,7 +315,7 @@ describe('next action outcome classification', () => {
       'node -e "console.log(\'mission_controller.js resume\')"',
       false,
       undefined,
-      'mission_controller.js resume is recommended',
+      'mission_controller.js resume is recommended'
     );
 
     expect(outcome.recommended_next_action_type).toBe('resume_mission');

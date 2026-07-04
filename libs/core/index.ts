@@ -17,6 +17,7 @@ export * from './error-codes.js';
 export * as secureIo from './secure-io.js';
 export {
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeAppendFileSync,
   safeCopyFileSync,
@@ -25,6 +26,7 @@ export {
   safeRmSync,
   safeUnlinkSync,
   safeMkdir,
+  ensureDir,
   safeExistsSync,
   safeExec,
   safeExecResult,
@@ -49,10 +51,15 @@ export * as customerResolver from './customer-resolver.js';
 // Error Classification (Phase A-7)
 export {
   classifyError,
+  buildUserFacingError,
   formatClassification,
   getRuleIds as getErrorClassifierRuleIds,
 } from './error-classifier.js';
-export type { ErrorCategory, ErrorClassification } from './error-classifier.js';
+export type {
+  ErrorCategory,
+  ErrorClassification,
+  UserFacingErrorEnvelope,
+} from './error-classifier.js';
 
 // Native OS TTS (Phase A-5, voice tier 0)
 export {
@@ -90,11 +97,14 @@ export {
   resolve,
   rootResolve,
 } from './path-resolver.js';
+export { resolveTenantDesign } from './tenant-design-resolver.js';
 
 // Utils
 export * from './fs-utils.js';
 export * from './cli-utils.js';
+export * from './async-utils.js';
 export * from './ledger.js';
+export * from './text-utils.js';
 export * from './src/logic-utils.js';
 export * from './src/lock-utils.js';
 export * from './src/retry-utils.js';
@@ -112,19 +122,32 @@ export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
+export * from './deliverable-quality.js';
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';
 export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
 export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
 export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
-export { buildNextAction, buildNextActionFromError, formatNextAction } from './next-action.js';
+export {
+  buildNextAction,
+  buildNextActionFromError,
+  buildCompletionNextAction,
+  formatCompletionNextAction,
+  formatNextAction,
+} from './next-action.js';
 export type {
   BuildNextActionInput,
   ErrorNextActionContext,
+  CompletionGoal,
+  CompletionNextAction,
+  CompletionReconciliation,
   NextAction,
   NextActionType,
 } from './next-action.js';
+export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
+export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
+export { resolveActiveProfileRoot } from './profile-root.js';
 
 // Classification & Knowledge
 export * as classifier from './classifier.js';
@@ -1031,6 +1054,7 @@ export type {
 } from './sdlc-artifact-store.js';
 export {
   getReasoningBackend,
+  delegateBestOf,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1123,6 +1147,7 @@ export {
   resetReasoningLevelPolicyCache,
   validateReasoningLevelPolicy,
 } from './reasoning-level-policy.js';
+export { resolveRuntimeModelId, type RuntimeModelRole } from './runtime-model-defaults.js';
 export type {
   ReasoningLevel,
   ReasoningLevelDecision,
@@ -1131,12 +1156,17 @@ export type {
 export {
   loadModelRegistry,
   resolveReasoningModelRoute,
+  resolveTaskModelHint,
   resetReasoningModelRoutingCache,
 } from './reasoning-model-routing.js';
 export type {
   ModelRegistryEntry,
   ModelRegistryFile,
   ReasoningModelRoute,
+  TaskModelEffort,
+  TaskModelHint,
+  TaskModelHintInput,
+  TaskModelTier,
 } from './reasoning-model-routing.js';
 export {
   loadVoiceTaskProfileCatalog,
@@ -1384,6 +1414,8 @@ export * from './mission-team-orchestrator.js';
 export * from './agent-runtime-supervisor.js';
 export * from './agent-runtime-supervisor-client.js';
 export * from './mission-orchestration-events.js';
+export * from './mission-orchestration-journal.js';
+export * from './mission-task-recovery.js';
 export * from './mission-orchestration-worker.js';
 export * from './mission-task-events.js';
 export * from './worker-assignment-policy.js';

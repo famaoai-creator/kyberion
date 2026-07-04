@@ -7,11 +7,12 @@ import {
   pathResolver,
   classifyError,
   secureFetch,
-  withRetry,
+  retry,
   compileMusicGenerationADF,
   compileImageGenerationADF,
   compileVideoGenerationADF,
   resolveImageBackend,
+  sleep,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -32,10 +33,13 @@ export type PromptGenerationRequest = {
 
 const DEFAULT_COMFY_BASE_URL = process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188';
 // External, operator-configured ComfyUI output dir; KYBERION_COMFY_OUTPUT_DIR overrides this default.
-const DEFAULT_COMFY_OUTPUT_DIR = process.env.KYBERION_COMFY_OUTPUT_DIR || '/Users/famaoai/Documents/comfy/ComfyUI/output'; // governance-allow-abs-path
+const DEFAULT_COMFY_OUTPUT_DIR =
+  process.env.KYBERION_COMFY_OUTPUT_DIR || pathResolver.sharedTmp('comfy/output');
 const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'canceled']);
-const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-generation-actuator/manifest.json');
+const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/media-generation-actuator/manifest.json'
+);
 const DEFAULT_MEDIA_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -47,19 +51,16 @@ const DEFAULT_MEDIA_RETRY = {
 let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 function resolveGenerationBackend(action: string, params: any) {
-  const backendId = String(
-    params?.backend_id
-    || params?.image_adf?.engine?.backend_id
-    || params?.video_adf?.engine?.backend_id
-    || params?.music_adf?.engine?.backend_id
-    || 'media-generation.comfyui',
-  ).trim() || 'media-generation.comfyui';
+  const backendId =
+    String(
+      params?.backend_id ||
+        params?.image_adf?.engine?.backend_id ||
+        params?.video_adf?.engine?.backend_id ||
+        params?.music_adf?.engine?.backend_id ||
+        'media-generation.comfyui'
+    ).trim() || 'media-generation.comfyui';
   void action;
   return resolveImageBackend(backendId, process.platform);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function nowIso(): string {
@@ -73,7 +74,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(MEDIA_GENERATION_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(MEDIA_GENERATION_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy ?? {};
   } catch (_) {
@@ -85,7 +88,9 @@ function loadRecoveryPolicy(): Record<string, any> {
 function buildRetryOptions(override?: Record<string, any>) {
   const manifestRetry = isPlainObject(loadRecoveryPolicy().retry) ? loadRecoveryPolicy().retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(loadRecoveryPolicy().retryable_categories) ? loadRecoveryPolicy().retryable_categories.map(String) : [],
+    Array.isArray(loadRecoveryPolicy().retryable_categories)
+      ? loadRecoveryPolicy().retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_MEDIA_RETRY,
@@ -99,10 +104,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -182,9 +189,7 @@ function resolveImageArtifactFormat(sourcePath: string): string {
 
 function resolveImageProviderPreference(params: any): string[] | undefined {
   const explicitBackendId = String(
-    params?.backend_id
-    || params?.image_adf?.engine?.backend_id
-    || '',
+    params?.backend_id || params?.image_adf?.engine?.backend_id || ''
   ).trim();
   if (explicitBackendId) {
     const backendTokens = explicitBackendId.split('.').filter(Boolean);
@@ -200,29 +205,37 @@ function resolveImageProviderPreference(params: any): string[] | undefined {
 
 function preparePromptBasedGeneration(action: string, params: any): PromptGenerationRequest {
   const compiled =
-    action === 'generate_music' && params.music_adf ? compileMusicGenerationADF(params.music_adf) :
-    action === 'generate_image' && params.image_adf ? compileImageGenerationADF(params.image_adf) :
-    action === 'generate_video' && params.video_adf ? compileVideoGenerationADF(params.video_adf) :
-    null;
+    action === 'generate_music' && params.music_adf
+      ? compileMusicGenerationADF(params.music_adf)
+      : action === 'generate_image' && params.image_adf
+        ? compileImageGenerationADF(params.image_adf)
+        : action === 'generate_video' && params.video_adf
+          ? compileVideoGenerationADF(params.video_adf)
+          : null;
   const workflow = params.workflow || compiled?.workflow;
   const hasWorkflowPath = Boolean(params.workflow_path);
   if (!workflow && !hasWorkflowPath) {
-    const message = action === 'generate_music'
-      ? 'generate_music requires either params.workflow or params.music_adf'
-      : action === 'generate_image'
-        ? 'generate_image requires params.workflow, params.workflow_path, or params.image_adf'
-        : action === 'generate_video'
-          ? 'generate_video requires params.workflow, params.workflow_path, or params.video_adf'
-          : `${action} requires params.workflow or params.workflow_path`;
+    const message =
+      action === 'generate_music'
+        ? 'generate_music requires either params.workflow or params.music_adf'
+        : action === 'generate_image'
+          ? 'generate_image requires params.workflow, params.workflow_path, or params.image_adf'
+          : action === 'generate_video'
+            ? 'generate_video requires params.workflow, params.workflow_path, or params.video_adf'
+            : `${action} requires params.workflow or params.workflow_path`;
     throw new Error(message);
   }
   return { action, params, compiled, workflow };
 }
 
-async function waitForPromptCompletion(promptId: string, timeoutMs: number, pollIntervalMs: number): Promise<any> {
+async function waitForPromptCompletion(
+  promptId: string,
+  timeoutMs: number,
+  pollIntervalMs: number
+): Promise<any> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    const history = await withRetry(async () => {
+    const history = await retry(async () => {
       return await secureFetch({
         method: 'GET',
         url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
@@ -239,15 +252,32 @@ async function waitForPromptCompletion(promptId: string, timeoutMs: number, poll
   throw new Error(`Timed out waiting for Comfy prompt ${promptId}`);
 }
 
-async function collectGenerationResult(action: string, params: any, promptId: string, compiled?: any) {
-  const timeoutMs = Number(params.timeout_ms || params.music_adf?.output?.timeout_ms || 15 * 60 * 1000);
-  const pollIntervalMs = Number(params.poll_interval_ms || params.music_adf?.output?.poll_interval_ms || 5_000);
+async function collectGenerationResult(
+  action: string,
+  params: any,
+  promptId: string,
+  compiled?: any
+) {
+  const timeoutMs = Number(
+    params.timeout_ms || params.music_adf?.output?.timeout_ms || 15 * 60 * 1000
+  );
+  const pollIntervalMs = Number(
+    params.poll_interval_ms || params.music_adf?.output?.poll_interval_ms || 5_000
+  );
   const history = await waitForPromptCompletion(promptId, timeoutMs, pollIntervalMs);
   const artifacts = extractArtifacts(history);
   const primaryArtifact = artifacts[0];
   const backend = resolveGenerationBackend(action, params);
-  const requestedOutputPath = params.output_path || params.path;
-  const copiedPath = primaryArtifact ? maybeCopyArtifact(primaryArtifact.path, requestedOutputPath) : undefined;
+  const requestedOutputPath =
+    params.output_path ||
+    params.target_path ||
+    params.path ||
+    params.music_adf?.output?.target_path ||
+    params.image_adf?.output?.target_path ||
+    params.video_adf?.output?.target_path;
+  const copiedPath = primaryArtifact
+    ? maybeCopyArtifact(primaryArtifact.path, requestedOutputPath)
+    : undefined;
   return {
     action,
     prompt_id: promptId,

@@ -6,8 +6,8 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import {
   compileSchemaFromPath,
-  customerResolver,
   pathResolver,
+  resolveActiveProfileRoot,
   resolveOnboardingFlowPolicy,
   resolveOnboardingSummaryPolicy,
   safeExistsSync,
@@ -43,7 +43,7 @@ interface ApplyInput {
 }
 
 function profileRoot(): string {
-  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+  return resolveActiveProfileRoot();
 }
 
 function onboardingRoot(): string {
@@ -80,10 +80,14 @@ export function validateInput(input: ApplyInput) {
   if (!input?.identity) throw new Error('identity block is required');
   const { name, language, interaction_style, primary_domain, vision, agent_id } = input.identity;
   if (!name || !language || !interaction_style || !primary_domain || !vision || !agent_id) {
-    throw new Error('identity requires {name, language, interaction_style, primary_domain, vision, agent_id}');
+    throw new Error(
+      'identity requires {name, language, interaction_style, primary_domain, vision, agent_id}'
+    );
   }
   if (!['Senior Partner', 'Concierge', 'Minimalist'].includes(interaction_style)) {
-    throw new Error(`interaction_style must be one of Senior Partner | Concierge | Minimalist, got: ${interaction_style}`);
+    throw new Error(
+      `interaction_style must be one of Senior Partner | Concierge | Minimalist, got: ${interaction_style}`
+    );
   }
   for (const tenant of input.tenants || []) {
     if (!/^[a-z][a-z0-9-]{1,30}$/.test(tenant.tenant_slug)) {
@@ -117,30 +121,45 @@ export async function applyIdentity(input: ApplyInput, now: string) {
 
   const id = input.identity;
 
-  await writeJson(path.join(profileDir, 'my-identity.json'), {
-    name: id.name,
-    language: id.language,
-    interaction_style: id.interaction_style,
-    primary_domain: id.primary_domain,
-    created_at: now,
-    status: 'active',
-    version: '1.0.0',
-  }, 'onboarding-my-identity');
+  await writeJson(
+    path.join(profileDir, 'my-identity.json'),
+    {
+      name: id.name,
+      language: id.language,
+      interaction_style: id.interaction_style,
+      primary_domain: id.primary_domain,
+      created_at: now,
+      status: 'active',
+      version: '1.0.0',
+    },
+    'onboarding-my-identity'
+  );
 
-  await writeText(path.join(profileDir, 'my-vision.md'), `# Sovereign Vision\n\n${id.vision}\n`, 'onboarding-my-vision');
+  await writeText(
+    path.join(profileDir, 'my-vision.md'),
+    `# Sovereign Vision\n\n${id.vision}\n`,
+    'onboarding-my-vision'
+  );
 
-  await writeJson(path.join(profileDir, 'agent-identity.json'), {
-    agent_id: id.agent_id,
-    version: '1.0.0',
-    role: 'Ecosystem Architect / Senior Partner',
-    owner: id.name,
-    trust_tier: 'sovereign',
-    created_at: now,
-    description: `The primary autonomous entity of the Kyberion Ecosystem for ${id.name}.`,
-  }, 'onboarding-agent-identity');
+  await writeJson(
+    path.join(profileDir, 'agent-identity.json'),
+    {
+      agent_id: id.agent_id,
+      version: '1.0.0',
+      role: 'Ecosystem Architect / Senior Partner',
+      owner: id.name,
+      trust_tier: 'sovereign',
+      created_at: now,
+      description: `The primary autonomous entity of the Kyberion Ecosystem for ${id.name}.`,
+    },
+    'onboarding-agent-identity'
+  );
 }
 
-export async function applyTenants(input: ApplyInput, now: string): Promise<Array<Record<string, unknown>>> {
+export async function applyTenants(
+  input: ApplyInput,
+  now: string
+): Promise<Array<Record<string, unknown>>> {
   const tenants = input.tenants || [];
   const tenantDir = path.join(profileRoot(), 'tenants');
   ensureDir(tenantDir);
@@ -157,7 +176,11 @@ export async function applyTenants(input: ApplyInput, now: string): Promise<Arra
       isolation_policy: { strict_isolation: true, allow_cross_distillation: true },
       metadata: { onboarding_source: 'pnpm onboard:apply' },
     };
-    await writeJson(path.join(tenantDir, `${t.tenant_slug}.json`), profile, `onboarding-tenant-${t.tenant_slug}`);
+    await writeJson(
+      path.join(tenantDir, `${t.tenant_slug}.json`),
+      profile,
+      `onboarding-tenant-${t.tenant_slug}`
+    );
     entries.push({
       tenant_slug: t.tenant_slug,
       tenant_id: t.tenant_slug,
@@ -176,22 +199,31 @@ export async function applyTutorial(input: ApplyInput, now: string) {
   const flowPolicy = resolveOnboardingFlowPolicy();
   const summary = input.tutorial?.summary || flowPolicy.tutorial_default_summary;
   const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
-  await writeText(planPath, [
-    `# ${flowPolicy.tutorial_plan_title}`,
-    '',
-    `- Mode: ${mode}`,
-    `- Summary: ${summary}`,
-    '',
-    `## ${flowPolicy.tutorial_next_step_title}`,
-    mode === 'apply'
-      ? '- Review the plan and create a mission manually if the setup is ready.'
-      : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
-    '',
-  ].join('\n'), 'onboarding-tutorial-plan');
+  await writeText(
+    planPath,
+    [
+      `# ${flowPolicy.tutorial_plan_title}`,
+      '',
+      `- Mode: ${mode}`,
+      `- Summary: ${summary}`,
+      '',
+      `## ${flowPolicy.tutorial_next_step_title}`,
+      mode === 'apply'
+        ? '- Review the plan and create a mission manually if the setup is ready.'
+        : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
+      '',
+    ].join('\n'),
+    'onboarding-tutorial-plan'
+  );
   return { mode, summary, plan_path: planPath };
 }
 
-export function buildState(input: ApplyInput, now: string, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string; plan_path: string }) {
+export function buildState(
+  input: ApplyInput,
+  now: string,
+  tenantEntries: Array<Record<string, unknown>>,
+  tutorial: { mode: string; summary: string; plan_path: string }
+) {
   return {
     version: '1.0.0' as const,
     status: 'complete' as const,
@@ -206,7 +238,11 @@ export function buildState(input: ApplyInput, now: string, tenantEntries: Array<
   };
 }
 
-export function buildSummary(input: ApplyInput, tenantEntries: Array<Record<string, unknown>>, tutorial: { mode: string; summary: string }) {
+export function buildSummary(
+  input: ApplyInput,
+  tenantEntries: Array<Record<string, unknown>>,
+  tutorial: { mode: string; summary: string }
+) {
   const id = input.identity;
   const summaryPolicy = resolveOnboardingSummaryPolicy();
   const lines = [
@@ -240,10 +276,40 @@ export function buildSummary(input: ApplyInput, tenantEntries: Array<Record<stri
   return lines.join('\n');
 }
 
+export function buildApplySummary(
+  input: ApplyInput,
+  tenantEntries: Array<Record<string, unknown>>,
+  tutorial: { mode: string; summary: string },
+  paths: { statePath: string; summaryPath: string }
+): string {
+  const lines = [
+    'Onboarding applied successfully.',
+    `Identity: ${input.identity.name} (${input.identity.agent_id})`,
+    `Tenants: ${tenantEntries.length}`,
+    `Tutorial: ${tutorial.mode}`,
+    `State: ${paths.statePath}`,
+    `Summary: ${paths.summaryPath}`,
+    '',
+    'Next steps:',
+    '1. Run `pnpm vital` to verify the live ecosystem health.',
+    '2. Open Chronos to confirm the identity badge and tenant context.',
+    '3. Re-run `pnpm onboard:apply --json` if you need machine-readable output.',
+  ];
+  return lines.join('\n');
+}
+
 export async function main() {
   const argv = await yargs(hideBin(process.argv))
-    .option('identity', { type: 'string', describe: 'Path to identity JSON (or pipe JSON via stdin)' })
+    .option('identity', {
+      type: 'string',
+      describe: 'Path to identity JSON (or pipe JSON via stdin)',
+    })
     .option('dry-run', { type: 'boolean', default: false })
+    .option('json', {
+      type: 'boolean',
+      default: false,
+      describe: 'Emit machine-readable JSON output',
+    })
     .strict()
     .parse();
 
@@ -262,7 +328,7 @@ export async function main() {
   addFormats(ajv);
   const validateState = compileSchemaFromPath(
     ajv,
-    pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json'),
+    pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
   );
 
   const now = new Date().toISOString();
@@ -274,16 +340,30 @@ export async function main() {
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
   await writeJson(statePath(), state, 'onboarding-state');
-  await writeText(summaryPath(), buildSummary(input, tenantEntries, tutorial), 'onboarding-summary');
+  await writeText(
+    summaryPath(),
+    buildSummary(input, tenantEntries, tutorial),
+    'onboarding-summary'
+  );
 
-  console.log(JSON.stringify({
+  const result = {
     status: 'complete',
     identity_name: input.identity.name,
     agent_id: input.identity.agent_id,
     tenants: tenantEntries.length,
     state_path: statePath(),
     summary_path: summaryPath(),
-  }, null, 2));
+  };
+  if (argv.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log(
+    buildApplySummary(input, tenantEntries, tutorial, {
+      statePath: statePath(),
+      summaryPath: summaryPath(),
+    })
+  );
 }
 
 const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');

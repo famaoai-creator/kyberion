@@ -1,4 +1,23 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeLstat, derivePipelineStatus, resolveVars, evaluateCondition, resolveWriteArtifactSpec, pathResolver, loadCapabilityRegistry, scanProviderCapabilities, withRetry, classifyError, createActuatorTrace, finalizeActuatorTrace } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  safeReaddir,
+  safeLstat,
+  derivePipelineStatus,
+  resolveVars,
+  evaluateCondition,
+  resolveWriteArtifactSpec,
+  pathResolver,
+  loadCapabilityRegistry,
+  scanProviderCapabilities,
+  retry,
+  classifyError,
+  createActuatorTrace,
+  finalizeActuatorTrace,
+} from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
@@ -34,7 +53,7 @@ export function buildRetryOptions() {
   const policy = loadRecoveryPolicy();
   const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_CODE_RETRY;
   const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
   );
   return {
     ...DEFAULT_CODE_RETRY,
@@ -43,7 +62,8 @@ export function buildRetryOptions() {
       const classification = classifyError(error);
       return retryableCategories.size > 0
         ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+        : classification.category === 'resource_unavailable' ||
+            classification.category === 'timeout';
     },
   };
 }
@@ -58,13 +78,17 @@ const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
-    throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
+    throw new Error(
+      '[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.'
+    );
   }
 }
 
 function assertUnsafeJsAllowed() {
   if (!ALLOW_UNSAFE_JS) {
-    throw new Error('[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.');
+    throw new Error(
+      '[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.'
+    );
   }
 }
 
@@ -110,7 +134,13 @@ export async function handleAction(input: CodeAction) {
     stepCount: Array.isArray(input.steps) ? input.steps.length : 0,
   });
   try {
-    const result = await executePipeline(input.steps || [], input.context || {}, input.options, { stepCount: 0, startTime: Date.now() }, traceCtx);
+    const result = await executePipeline(
+      input.steps || [],
+      input.context || {},
+      input.options,
+      { stepCount: 0, startTime: Date.now() },
+      traceCtx
+    );
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
   } catch (err: any) {
@@ -123,17 +153,28 @@ export async function handleAction(input: CodeAction) {
   }
 }
 
-export async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }, traceCtx?: any) {
+export async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: any = {},
+  options: any = {},
+  state: any = { stepCount: 0, startTime: Date.now() },
+  traceCtx?: any
+) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
   let ctx = { ...initialCtx, root: rootDir };
-  
+
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = await withRetry(
-      async () => JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string),
-      buildRetryOptions(),
+    const saved = await retry(
+      async () =>
+        JSON.parse(
+          safeReadFile(path.resolve(rootDir, initialCtx.context_path), {
+            encoding: 'utf8',
+          }) as string
+        ),
+      buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
   }
@@ -143,20 +184,28 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
   const results = [];
   for (const step of steps) {
     state.stepCount++;
-    if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
+    if (state.stepCount > MAX_STEPS)
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
+    if (Date.now() - state.startTime > TIMEOUT)
+      throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
 
     try {
       traceCtx?.startSpan?.(`code:${step.type}:${step.op}`, { stepCount: state.stepCount });
       logger.info(`  [CODE_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-      
+
       if (step.type === 'control') {
         ctx = await opControl(step.op, step.params, ctx, options, state, resolve, traceCtx);
       } else {
         switch (step.type) {
-          case 'capture': ctx = await opCapture(step.op, step.params, ctx, resolve); break;
-          case 'transform': ctx = await opTransform(step.op, step.params, ctx, resolve); break;
-          case 'apply': await opApply(step.op, step.params, ctx, resolve); break;
+          case 'capture':
+            ctx = await opCapture(step.op, step.params, ctx, resolve);
+            break;
+          case 'transform':
+            ctx = await opTransform(step.op, step.params, ctx, resolve);
+            break;
+          case 'apply':
+            await opApply(step.op, step.params, ctx, resolve);
+            break;
         }
       }
       traceCtx?.endSpan?.('ok');
@@ -165,24 +214,34 @@ export async function executePipeline(steps: PipelineStep[], initialCtx: any = {
       traceCtx?.endSpan?.('error', err.message);
       logger.error(`  [CODE_PIPELINE] Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
-      break; 
+      break;
     }
   }
 
   if (initialCtx.context_path) {
-    await withRetry(
-      async () => {
-        safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
-        return undefined;
-      },
-      buildRetryOptions(),
-    );
+    await retry(async () => {
+      safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+      return undefined;
+    }, buildRetryOptions());
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any, traceCtx?: any) {
+async function opControl(
+  op: string,
+  params: any,
+  ctx: any,
+  options: any,
+  state: any,
+  resolve: (value: any) => any,
+  traceCtx?: any
+) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -204,7 +263,8 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       }
       return ctx;
 
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -214,45 +274,49 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'read_file':
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await withRetry(
-          async () => safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
-          buildRetryOptions(),
+        [params.export_as || 'last_capture']: await retry(
+          async () =>
+            safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
+          buildRetryOptions()
         ),
       };
     case 'glob_files':
       return {
         ...ctx,
-        [params.export_as || 'file_list']: await withRetry(
+        [params.export_as || 'file_list']: await retry(
           async () =>
             getAllFiles(path.resolve(rootDir, resolve(params.dir)))
-              .filter(f => !params.ext || f.endsWith(params.ext))
-              .map(f => path.relative(rootDir, f)),
-          buildRetryOptions(),
+              .filter((f) => !params.ext || f.endsWith(params.ext))
+              .map((f) => path.relative(rootDir, f)),
+          buildRetryOptions()
         ),
       };
     case 'shell':
       assertUnsafeShellAllowed();
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await withRetry(
-          async () => {
-            const result = spawnSync('/bin/sh', ['-c', resolve(params.cmd)], { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
-            if (result.error) throw result.error;
-            if (result.status !== 0) {
-              throw new Error(result.stderr || `Command failed with exit code ${result.status}`);
-            }
-            return String(result.stdout || '').trim();
-          },
-          buildRetryOptions(),
-        ),
+        [params.export_as || 'last_capture']: await retry(async () => {
+          const result = spawnSync('/bin/sh', ['-c', resolve(params.cmd)], {
+            encoding: 'utf8',
+            maxBuffer: 10 * 1024 * 1024,
+          });
+          if (result.error) throw result.error;
+          if (result.status !== 0) {
+            throw new Error(result.stderr || `Command failed with exit code ${result.status}`);
+          }
+          return String(result.stdout || '').trim();
+        }, buildRetryOptions()),
       };
     case 'discover_capabilities':
       const actuatorsRootDir = path.join(rootDir, 'libs/actuators');
       const capabilities: any[] = [];
       if (safeExistsSync(actuatorsRootDir)) {
-        const actuatorDirs = await withRetry(
-          async () => safeReaddir(actuatorsRootDir).filter(f => safeLstat(path.join(actuatorsRootDir, f)).isDirectory()),
-          buildRetryOptions(),
+        const actuatorDirs = await retry(
+          async () =>
+            safeReaddir(actuatorsRootDir).filter((f) =>
+              safeLstat(path.join(actuatorsRootDir, f)).isDirectory()
+            ),
+          buildRetryOptions()
         );
         for (const dir of actuatorDirs) {
           capabilities.push({
@@ -267,54 +331,61 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'semgrep_scan':
       return {
         ...ctx,
-        [params.export_as || 'semgrep_findings']: await withRetry(
-          async () => {
-            const target = path.resolve(rootDir, resolve(params.target_dir));
-            const config = String(resolve(params.config) || 'auto');
-            const args = ['--config', config, target, '--json'];
-            const result = spawnSync('semgrep', args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
-            if (result.error) {
-              throw result.error;
-            }
-            const stdout = String(result.stdout || '');
-            if (result.status !== 0 && !stdout) {
-              throw new Error(`[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`);
+        [params.export_as || 'semgrep_findings']: await retry(async () => {
+          const target = path.resolve(rootDir, resolve(params.target_dir));
+          const config = String(resolve(params.config) || 'auto');
+          const args = ['--config', config, target, '--json'];
+          const result = spawnSync('semgrep', args, {
+            encoding: 'utf8',
+            maxBuffer: 10 * 1024 * 1024,
+          });
+          if (result.error) {
+            throw result.error;
+          }
+          const stdout = String(result.stdout || '');
+          if (result.status !== 0 && !stdout) {
+            throw new Error(
+              `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
+            );
+          }
+          try {
+            return JSON.parse(stdout);
+          } catch {
+            if (result.status === 0) {
+              throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
             }
             try {
-              return JSON.parse(stdout);
+              return JSON.parse(String(result.stderr || ''));
             } catch {
-              if (result.status === 0) {
-                throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
-              }
-              try {
-                return JSON.parse(String(result.stderr || ''));
-              } catch {
-                throw new Error(`[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`);
-              }
+              throw new Error(
+                `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
+              );
             }
-          },
-          buildRetryOptions(),
-        ),
+          }
+        }, buildRetryOptions()),
       };
     case 'discover_skills':
       return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
 function discoverProviderCliCapabilities(): any[] {
   const registry = loadCapabilityRegistry();
-  return scanProviderCapabilities(registry, undefined, { includeUnavailable: false }).map((capability) => ({
-    name: capability.source.name,
-    path: `${capability.source.provider} ${capability.source.name}`.trim(),
-    category: capability.source.type,
-    provider: capability.source.provider,
-    capability_id: capability.capability_id,
-    status: capability.discovery_status === 'available' ? capability.status : 'blocked',
-    description: capability.notes || capability.capability_id,
-    evidence: capability.evidence || capability.provider_probe.evidence,
-    discovery_status: capability.discovery_status,
-  }));
+  return scanProviderCapabilities(registry, undefined, { includeUnavailable: false }).map(
+    (capability) => ({
+      name: capability.source.name,
+      path: `${capability.source.provider} ${capability.source.name}`.trim(),
+      category: capability.source.type,
+      provider: capability.source.provider,
+      capability_id: capability.capability_id,
+      status: capability.discovery_status === 'available' ? capability.status : 'blocked',
+      description: capability.notes || capability.capability_id,
+      evidence: capability.evidence || capability.provider_probe.evidence,
+      discovery_status: capability.discovery_status,
+    })
+  );
 }
 
 function discoverGovernedSkills(): any[] {
@@ -346,18 +417,29 @@ function discoverGovernedSkills(): any[] {
 async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   switch (op) {
     case 'regex_replace':
-      return { ...ctx, [params.export_as || 'last_transform']: String(ctx[params.from || 'last_capture'] || '').replace(new RegExp(params.pattern, 'g'), resolve(params.template)) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_transform']: String(
+          ctx[params.from || 'last_capture'] || ''
+        ).replace(new RegExp(params.pattern, 'g'), resolve(params.template)),
+      };
     case 'json_update':
       const json = JSON.parse(ctx[params.from || 'last_capture']);
-      params.updates.forEach((u: any) => { json[u.key] = resolve(u.value); });
-      return { ...ctx, [params.export_as || 'last_transform']: JSON.stringify(json, null, 2) + '\n' };
+      params.updates.forEach((u: any) => {
+        json[u.key] = resolve(u.value);
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'last_transform']: JSON.stringify(json, null, 2) + '\n',
+      };
     case 'run_js':
       assertUnsafeJsAllowed();
       const sandbox = { Buffer, process: { env: { ...process.env } }, console, ctx: { ...ctx } };
       vm.createContext(sandbox);
       await new vm.Script(resolve(params.code)).runInContext(sandbox);
       return { ...sandbox.ctx };
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -368,26 +450,33 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     case 'write_artifact':
       const spec = resolveWriteArtifactSpec(params, ctx, resolve);
       const out = path.resolve(rootDir, spec.path);
-      const content = typeof spec.content === 'string' ? spec.content : spec.content === undefined ? '' : JSON.stringify(spec.content, null, 2);
+      const content =
+        typeof spec.content === 'string'
+          ? spec.content
+          : spec.content === undefined
+            ? ''
+            : JSON.stringify(spec.content, null, 2);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      await withRetry(
-        async () => {
-          safeWriteFile(out, content);
-          return undefined;
-        },
-        buildRetryOptions(),
-      );
+      await retry(async () => {
+        safeWriteFile(out, content);
+        return undefined;
+      }, buildRetryOptions());
       break;
-    case 'log': logger.info(`[CODE_LOG] ${resolve(params.message || 'Action completed')}`); break;
+    case 'log':
+      logger.info(`[CODE_LOG] ${resolve(params.message || 'Action completed')}`);
+      break;
   }
 }
 
 async function performReconcile(input: CodeAction) {
-  const strategyPath = path.resolve(pathResolver.rootDir(), input.strategy_path || 'knowledge/product/governance/code-strategy.json');
+  const strategyPath = path.resolve(
+    pathResolver.rootDir(),
+    input.strategy_path || 'knowledge/product/governance/code-strategy.json'
+  );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await withRetry(
+  const config = await retry(
     async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
-    buildRetryOptions(),
+    buildRetryOptions()
   );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile, safeRmSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
-import { readValidatedPipelineAdf } from './adf-input.js';
+import { readValidatedPipelineAdf, readValidatedWorkflowAdf } from './adf-input.js';
 
 const tmpRoot = pathResolver.sharedTmp('adf-input-tests');
 
@@ -78,6 +78,56 @@ describe('readValidatedPipelineAdf', () => {
     expect(readValidatedPipelineAdf(filePath)).toEqual(
       expect.objectContaining({
         steps: expect.any(Array),
+      })
+    );
+  });
+
+  it('loads a workflow module input and validates it like JSON ADF', async () => {
+    safeMkdir(tmpRoot, { recursive: true });
+    const filePath = fixturePath('workflow-module.ts');
+    safeWriteFile(
+      filePath,
+      [
+        'export default {',
+        '  name: "workflow-module-test",',
+        '  steps: [',
+        '    {',
+        '      op: "demo:step",',
+        '      params: {},',
+        '      hooks: {',
+        '        before: [',
+        '          {',
+        '            type: "http",',
+        '            url: "https://github.com/health",',
+        '          },',
+        '        ],',
+        '      },',
+        '    },',
+        '  ],',
+        '};',
+      ].join('\n'),
+      { encoding: 'utf8' }
+    );
+
+    await expect(readValidatedWorkflowAdf(filePath)).resolves.toEqual(
+      expect.objectContaining({
+        name: 'workflow-module-test',
+        steps: expect.any(Array),
+      })
+    );
+  });
+
+  it('loads the checked-in workflow-as-code example module', async () => {
+    const examplePath = path.resolve(process.cwd(), 'scripts/demos/workflow-as-code-example.ts');
+
+    await expect(readValidatedWorkflowAdf(examplePath)).resolves.toEqual(
+      expect.objectContaining({
+        name: 'workflow-as-code-example',
+        action: 'pipeline',
+        steps: expect.arrayContaining([
+          expect.objectContaining({ op: 'system:log' }),
+          expect.objectContaining({ op: 'system:set' }),
+        ]),
       })
     );
   });

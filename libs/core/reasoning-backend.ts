@@ -16,6 +16,9 @@
  */
 
 import { logger } from './core.js';
+import { slugify } from './text-utils.js';
+import { parseStructuredJson } from './structured-reasoning.js';
+import { z } from 'zod';
 
 export type PersonaLabel = string;
 
@@ -40,11 +43,13 @@ export interface CritiqueInput {
 }
 
 export interface CritiqueResult {
-  hypotheses: Array<HypothesisSketch & {
-    survived: boolean;
-    rejection_reason?: string;
-    critiques?: Array<{ by: PersonaLabel; content: string }>;
-  }>;
+  hypotheses: Array<
+    HypothesisSketch & {
+      survived: boolean;
+      rejection_reason?: string;
+      critiques?: Array<{ by: PersonaLabel; content: string }>;
+    }
+  >;
 }
 
 export interface PersonaSynthesisInput {
@@ -76,6 +81,7 @@ export interface ForkedBranch {
 export interface SimulationInput {
   branches: ForkedBranch[];
   goal: string;
+  maxStepsPerBranch?: number;
 }
 
 export interface SimulationResult {
@@ -320,6 +326,29 @@ export interface GenerateWithToolsResult {
   toolCalls?: ToolCall[];
 }
 
+export interface ReasoningCallBudget {
+  cost_cap_tokens?: number;
+  max_prompt_chars?: number;
+  max_response_chars?: number;
+  max_combined_chars?: number;
+  approval_required?: boolean;
+}
+
+export interface ReasoningCallOptions {
+  effort?: 'low' | 'medium' | 'high';
+  budget?: ReasoningCallBudget;
+}
+
+export interface StructuredDelegationOptions {
+  context?: string;
+  maxRetries?: number;
+}
+
+export interface BestOfDelegationOptions extends StructuredDelegationOptions {
+  candidateCount?: number;
+  judgeInstructions?: string;
+}
+
 export interface ReasoningBackend {
   name: string;
   /** Divergence — produce independent hypotheses per persona. */
@@ -341,11 +370,118 @@ export interface ReasoningBackend {
   /** Decompose requirements + design into an ordered implementation task plan. */
   decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan>;
   /** Delegate a complex, multi-step task to an autonomous sub-agent. */
-  delegateTask(instruction: string, context?: string): Promise<string>;
+  delegateTask(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string>;
   /** Run a plain prompt against the active reasoning backend. */
-  prompt(prompt: string): Promise<string>;
+  prompt(prompt: string, options?: ReasoningCallOptions): Promise<string>;
   /** (Optional) Execute a prompt with tool access (Function Calling / Tool Use). */
   generateWithTools?(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult>;
+}
+
+export async function delegateStructured<T>(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: z.ZodType<T>,
+  options: StructuredDelegationOptions = {}
+): Promise<T> {
+  const maxRetries = Math.max(0, options.maxRetries ?? 1);
+  const schemaJson = z.toJSONSchema(schema) as Record<string, unknown>;
+  if ('$schema' in schemaJson) delete schemaJson['$schema'];
+
+  const buildPrompt = (attempt: number, priorError?: string): string =>
+    [
+      'Return a single JSON object that satisfies the schema below.',
+      'Do not wrap the JSON in markdown fences.',
+      'Do not add explanatory prose.',
+      attempt > 0 ? `Retry attempt ${attempt} after schema mismatch: ${priorError}` : '',
+      'Schema:',
+      JSON.stringify(schemaJson, null, 2),
+      '',
+      'Task:',
+      instruction,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+  let lastError = '';
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const raw = await backend.delegateTask(buildPrompt(attempt, lastError), options.context);
+    try {
+      const parsed = parseStructuredJson(raw, 'delegateStructured');
+      const validated = schema.safeParse(parsed);
+      if (validated.success) return validated.data;
+      lastError = validated.error.message;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  throw new Error(
+    `[reasoning-backend] structured delegation failed after ${maxRetries + 1} attempts: ${lastError}`
+  );
+}
+
+export async function delegateBestOf<T>(
+  backend: Pick<ReasoningBackend, 'delegateTask'>,
+  instruction: string,
+  schema: z.ZodType<T>,
+  options: BestOfDelegationOptions = {}
+): Promise<{ winner: T; candidates: T[]; judge: { winner_index: number; rationale: string } }> {
+  const candidateCount = Math.max(2, options.candidateCount ?? 3);
+  const candidateRuns = await Promise.all(
+    Array.from({ length: candidateCount }, async (_, index) =>
+      delegateStructured(
+        backend,
+        [
+          instruction,
+          '',
+          `Variant guidance: this is candidate ${index + 1}/${candidateCount}. Produce a distinct answer that still satisfies the schema.`,
+        ].join('\n'),
+        schema,
+        {
+          context: `${options.context ?? 'delegateBestOf'}:candidate=${index + 1}/${candidateCount}`,
+          maxRetries: options.maxRetries,
+        }
+      )
+    )
+  );
+
+  const judgeSchema = z.object({
+    winner_index: z
+      .number()
+      .int()
+      .min(0)
+      .max(candidateRuns.length - 1),
+    rationale: z.string().min(1),
+  });
+  const judge = await delegateStructured(
+    backend,
+    [
+      'Select the single best candidate from the JSON array below.',
+      options.judgeInstructions
+        ? `Rubric: ${options.judgeInstructions}`
+        : 'Rubric: prefer the most complete, useful, and schema-faithful candidate.',
+      '',
+      'Candidates:',
+      JSON.stringify(candidateRuns, null, 2),
+      '',
+      'Return a JSON object with { "winner_index": number, "rationale": string }.',
+    ].join('\n'),
+    judgeSchema,
+    {
+      context: `${options.context ?? 'delegateBestOf'}:judge`,
+      maxRetries: options.maxRetries,
+    }
+  );
+
+  return {
+    winner: candidateRuns[judge.winner_index],
+    candidates: candidateRuns,
+    judge,
+  };
 }
 
 let registered: ReasoningBackend | null = null;
@@ -365,24 +501,20 @@ export function resetReasoningBackend(): void {
   registered = null;
 }
 
-function slugify(value: string): string {
-  return value.replace(/\s+/gu, '_').slice(0, 48);
-}
-
 /** Deterministic, offline backend that emits structured placeholders. */
 export const stubReasoningBackend: ReasoningBackend = {
   name: 'stub',
 
   async divergePersonas(input) {
     logger.warn(
-      `[reasoning-backend:stub] divergePersonas — no real backend registered; topic="${input.topic}"`,
+      `[reasoning-backend:stub] divergePersonas — no real backend registered; topic="${input.topic}"`
     );
     const min = Math.max(1, input.minPerPersona ?? 1);
     const out: HypothesisSketch[] = [];
     for (const persona of input.personas) {
       for (let i = 0; i < min; i++) {
         out.push({
-          id: `H-${slugify(persona)}-${i + 1}`,
+          id: `H-${slugify(persona, { mode: 'whitespace', separator: '_', maxLength: 48 })}-${i + 1}`,
           proposed_by: persona,
           content: `[STUB] Hypothesis ${i + 1} from ${persona} on "${input.topic}"`,
           status: 'pending',
@@ -450,9 +582,13 @@ export const stubReasoningBackend: ReasoningBackend = {
 
   async extractRequirements(input) {
     logger.warn(
-      '[reasoning-backend:stub] extractRequirements — no real backend registered; emitting a single placeholder requirement',
+      '[reasoning-backend:stub] extractRequirements — no real backend registered; emitting a single placeholder requirement'
     );
-    const head = input.sourceText.split(/\r?\n/u).map((l) => l.trim()).filter(Boolean)[0] ?? '';
+    const head =
+      input.sourceText
+        .split(/\r?\n/u)
+        .map((l) => l.trim())
+        .filter(Boolean)[0] ?? '';
     const goalPreview = head.slice(0, 140);
     return {
       functional_requirements: [
@@ -479,7 +615,8 @@ export const stubReasoningBackend: ReasoningBackend = {
   async extractDesignSpec(_input) {
     logger.warn('[reasoning-backend:stub] extractDesignSpec — no real backend registered');
     return {
-      architecture_summary: '[STUB] Register a real backend to generate a real architecture summary.',
+      architecture_summary:
+        '[STUB] Register a real backend to generate a real architecture summary.',
       components: [
         {
           id: 'COMP-STUB1',
@@ -533,12 +670,16 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async delegateTask(instruction, context) {
-    logger.warn(`[reasoning-backend:stub] delegateTask — no real backend registered; instruction="${instruction}"`);
+    logger.warn(
+      `[reasoning-backend:stub] delegateTask — no real backend registered; instruction="${instruction}"`
+    );
     return `[STUB] Delegated task execution (stub). Context: ${context ?? 'none'}`;
   },
 
   async prompt(prompt) {
-    logger.warn(`[reasoning-backend:stub] prompt — no real backend registered; prompt="${prompt.slice(0, 80)}"`);
+    logger.warn(
+      `[reasoning-backend:stub] prompt — no real backend registered; prompt="${prompt.slice(0, 80)}"`
+    );
     return `[STUB] ${prompt}`;
   },
 };

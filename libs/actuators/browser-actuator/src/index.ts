@@ -1,4 +1,24 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExec, safeExistsSync, safeReaddir, safeRmSync, derivePipelineStatus, emitComputerSurfacePatch, TraceContext, persistTrace, pathResolver, resolveVars, evaluateCondition, getPathValue, withRetry, classifyError, buildBrowserExtensionPipelineCandidate, preflightBrowserExtensionSession } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExec,
+  safeExistsSync,
+  safeReaddir,
+  safeRmSync,
+  derivePipelineStatus,
+  emitComputerSurfacePatch,
+  TraceContext,
+  persistTrace,
+  pathResolver,
+  resolveVars,
+  evaluateCondition,
+  getPathValue,
+  classifyError,
+  buildBrowserExtensionPipelineCandidate,
+  preflightBrowserExtensionSession,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { createBrowserInteractionHelpers } from './browser-interaction-helpers.js';
@@ -7,6 +27,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { chromium, Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
+import { runActuatorCli } from '@agent/core';
 
 /**
  * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
@@ -177,13 +198,24 @@ interface BrowserRuntime {
   cdpSessions: WeakMap<Page, CDPSession>;
   activeTabId: string;
   consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
-  networkEvents: Array<{ tab_id: string; method: string; url: string; resourceType: string; ts: string }>;
+  networkEvents: Array<{
+    tab_id: string;
+    method: string;
+    url: string;
+    resourceType: string;
+    ts: string;
+  }>;
   webAuthn?: {
     authenticatorId?: string;
     enabled: boolean;
     options?: Record<string, any>;
     credentials: Array<Record<string, any>>;
-    events: Array<{ type: string; credential?: Record<string, any>; credentialId?: string; ts: string }>;
+    events: Array<{
+      type: string;
+      credential?: Record<string, any>;
+      credentialId?: string;
+      ts: string;
+    }>;
   };
 }
 
@@ -220,8 +252,12 @@ const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
-const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge('product/orchestration/browser-passkey-providers.json');
-const BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/browser-actuator/manifest.json');
+const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
+  'product/orchestration/browser-passkey-providers.json'
+);
+const BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/browser-actuator/manifest.json'
+);
 const DEFAULT_BROWSER_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -242,7 +278,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -255,15 +293,27 @@ function buildRetryOptions(stepParams: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
   const resolved = {
     ...DEFAULT_BROWSER_RETRY,
     ...manifestRetry,
     ...explicitRetry,
-    maxRetries: Number(stepParams.max_retries ?? explicitRetry.maxRetries ?? manifestRetry.maxRetries ?? DEFAULT_BROWSER_RETRY.maxRetries),
-    initialDelayMs: Number(stepParams.retry_delay_ms ?? explicitRetry.initialDelayMs ?? manifestRetry.initialDelayMs ?? DEFAULT_BROWSER_RETRY.initialDelayMs),
+    maxRetries: Number(
+      stepParams.max_retries ??
+        explicitRetry.maxRetries ??
+        manifestRetry.maxRetries ??
+        DEFAULT_BROWSER_RETRY.maxRetries
+    ),
+    initialDelayMs: Number(
+      stepParams.retry_delay_ms ??
+        explicitRetry.initialDelayMs ??
+        manifestRetry.initialDelayMs ??
+        DEFAULT_BROWSER_RETRY.initialDelayMs
+    ),
   };
 
   return {
@@ -274,13 +324,15 @@ function buildRetryOptions(stepParams: Record<string, any>) {
         return retryableCategories.has(classification.category);
       }
       const message = error.message?.toLowerCase?.() || '';
-      return classification.category === 'timeout'
-        || classification.category === 'network'
-        || classification.category === 'resource_unavailable'
-        || message.includes('selector')
-        || message.includes('not visible')
-        || message.includes('strict mode violation')
-        || message.includes('detached');
+      return (
+        classification.category === 'timeout' ||
+        classification.category === 'network' ||
+        classification.category === 'resource_unavailable' ||
+        message.includes('selector') ||
+        message.includes('not visible') ||
+        message.includes('strict mode violation') ||
+        message.includes('detached')
+      );
     },
   };
 }
@@ -293,15 +345,25 @@ async function handleAction(input: BrowserAction) {
     return await browserInteractionHelpers.handleComputerInteraction(input as any);
   }
   if (input.action !== 'pipeline') {
-    throw new Error(`Unsupported action: ${(input as any).action}. Browser-Actuator accepts pipeline and computer_interaction contracts.`);
+    throw new Error(
+      `Unsupported action: ${(input as any).action}. Browser-Actuator accepts pipeline and computer_interaction contracts.`
+    );
   }
   if (input.steps?.length === 1 && input.steps[0]?.op === 'extension_session') {
     return handleExtensionSessionPreflight(input.steps[0].params || {}, input.context || {});
   }
-  return await executeBrowserPipeline(input.steps || [], input.session_id || 'default', input.options || {}, input.context || {});
+  return await executeBrowserPipeline(
+    input.steps || [],
+    input.session_id || 'default',
+    input.options || {},
+    input.context || {}
+  );
 }
 
-function handleExtensionSessionPreflight(params: Record<string, unknown>, context: Record<string, unknown>) {
+function handleExtensionSessionPreflight(
+  params: Record<string, unknown>,
+  context: Record<string, unknown>
+) {
   const preflight = preflightBrowserExtensionSession({
     recording: params.recording,
     session: params.session,
@@ -328,7 +390,7 @@ function resolveRefSelector(ctx: any, ref: string): string {
 
 function renderPlaywrightSkeleton(
   trail: any[],
-  options: { assertions?: 'hint' | 'strict' } = {},
+  options: { assertions?: 'hint' | 'strict' } = {}
 ): string {
   return browserRuntimeHelpers.renderPlaywrightSkeleton(trail as any, options);
 }
@@ -363,7 +425,10 @@ function waitForOperatorContinue(options: {
   return browserRuntimeHelpers.waitForOperatorContinue(options);
 }
 
-async function buildSnapshot(page: Page, options: { sessionId: string; tabId: string; maxElements: number }): Promise<any> {
+async function buildSnapshot(
+  page: Page,
+  options: { sessionId: string; tabId: string; maxElements: number }
+): Promise<any> {
   return browserRuntimeHelpers.buildSnapshot(page, options);
 }
 
@@ -371,18 +436,17 @@ async function buildSnapshot(page: Page, options: { sessionId: string; tabId: st
  * CLI Runner
  */
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'browser-actuator',
+    handleAction,
+  });
 };
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
 
-if (isDirectRun) {
-  main().catch(err => {
+if (entrypoint && modulePath === entrypoint) {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

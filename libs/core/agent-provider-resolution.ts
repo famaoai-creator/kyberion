@@ -1,7 +1,5 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
-import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
+import { loadProviderConfig } from './provider-config.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export interface ResolveAgentProviderOptions {
@@ -17,40 +15,6 @@ export interface ResolvedAgentProviderTarget {
   modelId: string;
   strategy: 'preferred' | 'fallback' | 'unresolved';
   availableProviders: string[];
-}
-
-interface ProviderConfigFile {
-  default_priority: string[];
-  default_models: Record<string, string>;
-}
-
-let _cachedProviderConfig: ProviderConfigFile | null = null;
-
-function loadProviderConfig(): ProviderConfigFile {
-  if (_cachedProviderConfig) return _cachedProviderConfig;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/provider-config.json');
-    _cachedProviderConfig = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ProviderConfigFile;
-  } catch (err) {
-    const defaults: ProviderConfigFile = {
-      default_priority: ['gemini', 'claude', 'codex', 'copilot'],
-      default_models: {
-        gemini: resolveRuntimeModelId('gemini-default'),
-        claude: resolveRuntimeModelId('anthropic-fast'),
-        codex: resolveRuntimeModelId('codex-default'),
-        copilot: resolveRuntimeModelId('copilot-default'),
-      },
-    };
-    recordConfigFallback({
-      knowledgePath: 'product/governance/provider-config.json',
-      error: err,
-      defaults,
-    });
-    _cachedProviderConfig = defaults;
-  }
-  return _cachedProviderConfig;
 }
 
 function normalizeSet(values?: string[]): Set<string> {

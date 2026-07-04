@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
-  safeExistsSync: vi.fn((target: string) => String(target).includes('espeak-ng') || String(target).endsWith('.aiff') || String(target).endsWith('.wav')),
+  safeExistsSync: vi.fn(
+    (target: string) =>
+      String(target).includes('espeak-ng') ||
+      String(target).endsWith('.aiff') ||
+      String(target).endsWith('.wav')
+  ),
   safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
   safeExecResult: vi.fn(() => ({
@@ -118,7 +123,7 @@ const mocks = vi.hoisted(() => ({
     voice: 'Kyoko',
     rate: 170,
   })),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   resolveManagedToolPythonBin: vi.fn(() => null),
   logger: {
     warn: vi.fn(),
@@ -128,7 +133,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     getVoiceEngineRecord: mocks.getVoiceEngineRecord,
@@ -141,7 +146,7 @@ vi.mock('@agent/core', async () => {
     safeReadFile: mocks.safeReadFile,
     safeStat: mocks.safeStat,
     getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
   };
 });
@@ -186,7 +191,9 @@ describe('voice runtime helpers', () => {
     expect(artifactPath).toBe(outputPath);
     expect(mocks.safeExec.mock.calls.some(([command]) => command === 'say')).toBe(true);
     expect(mocks.safeExecResult).toHaveBeenCalled();
-    expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('configured engine local_say failed'));
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('configured engine local_say failed')
+    );
   });
 
   it('does not fall back to non-clone engines when learned voice is required', async () => {
@@ -199,25 +206,27 @@ describe('voice runtime helpers', () => {
       error: null,
     });
 
-    await expect(renderNativeArtifact('学習済み音声だけを使います。', {
-      requestId: 'strict-clone-test',
-      voice: 'Kyoko',
-      rate: 170,
-      language: 'ja',
-      format: 'wav',
-      engineId: 'mlx_audio_qwen3',
-      supportsFormats: ['wav'],
-      outputPath: '/tmp/strict-clone-test.wav',
-      requireVoiceClone: true,
-      profile: {
-        profile_id: 'my-voice-v2',
-        sample_refs: ['/tmp/ref.wav'],
-      },
-    })).rejects.toThrow('mlx_audio_tts_bridge.py failed');
+    await expect(
+      renderNativeArtifact('学習済み音声だけを使います。', {
+        requestId: 'strict-clone-test',
+        voice: 'Kyoko',
+        rate: 170,
+        language: 'ja',
+        format: 'wav',
+        engineId: 'mlx_audio_qwen3',
+        supportsFormats: ['wav'],
+        outputPath: '/tmp/strict-clone-test.wav',
+        requireVoiceClone: true,
+        profile: {
+          profile_id: 'my-voice-v2',
+          sample_refs: ['/tmp/ref.wav'],
+        },
+      })
+    ).rejects.toThrow('mlx_audio_tts_bridge.py failed');
 
     expect(mocks.safeExec).not.toHaveBeenCalledWith(
       'say',
-      expect.arrayContaining(['学習済み音声だけを使います。']),
+      expect.arrayContaining(['学習済み音声だけを使います。'])
     );
   });
 });

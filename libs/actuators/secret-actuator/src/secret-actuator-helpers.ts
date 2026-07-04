@@ -1,4 +1,19 @@
-import { logger, safeReadFile, safeWriteFile, safeExec, ledger, classifyError, withRetry, safeExistsSync, safeMkdir, fetchSecret, storeSecret, removeSecret, listSecrets as coreListSecrets, pathResolver } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeExec,
+  ledger,
+  classifyError,
+  retry,
+  safeExistsSync,
+  safeMkdir,
+  fetchSecret,
+  storeSecret,
+  removeSecret,
+  listSecrets as coreListSecrets,
+  pathResolver,
+} from '@agent/core';
 import * as path from 'node:path';
 
 /**
@@ -6,7 +21,9 @@ import * as path from 'node:path';
  * Integrates with OS Native Secret Managers (macOS Keychain, etc.)
  */
 
-const SECRET_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/secret-actuator/manifest.json');
+const SECRET_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/secret-actuator/manifest.json'
+);
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
 
 const DEFAULT_SECRET_RETRY = {
@@ -42,7 +59,9 @@ interface SecretAction {
 function loadRegistry(): KeychainRegistry {
   if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
   try {
-    return JSON.parse(safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string) as KeychainRegistry;
+    return JSON.parse(
+      safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string
+    ) as KeychainRegistry;
   } catch {
     return { entries: [] };
   }
@@ -56,7 +75,9 @@ function saveRegistry(registry: KeychainRegistry): void {
 
 function registryAdd(service: string, account: string): void {
   const registry = loadRegistry();
-  const existing = registry.entries.findIndex(e => e.service === service && e.account === account);
+  const existing = registry.entries.findIndex(
+    (e) => e.service === service && e.account === account
+  );
   const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
   if (existing >= 0) {
     registry.entries[existing] = entry;
@@ -68,7 +89,9 @@ function registryAdd(service: string, account: string): void {
 
 function registryRemove(service: string, account: string): void {
   const registry = loadRegistry();
-  registry.entries = registry.entries.filter(e => !(e.service === service && e.account === account));
+  registry.entries = registry.entries.filter(
+    (e) => !(e.service === service && e.account === account)
+  );
   saveRegistry(registry);
 }
 
@@ -92,7 +115,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_SECRET_RETRY,
@@ -106,10 +131,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -125,10 +152,31 @@ async function withGovernedMutation(
   const missionId = existingMissionId || `MSN-SEC-${Date.now().toString(36).toUpperCase()}`;
 
   if (isEphemeral) {
-    logger.info(`🛡️ [SECRET-GUARD] No active mission found. Auto-wrapping mutation in ephemeral mission: ${missionId}`);
+    logger.info(
+      `🛡️ [SECRET-GUARD] No active mission found. Auto-wrapping mutation in ephemeral mission: ${missionId}`
+    );
     try {
-      safeExec('node', ['--import', 'scripts/ts-loader.mjs', 'scripts/mission_controller.ts', 'create', missionId, 'personal', 'kyberion', 'governance', '"Ephemeral Secret Mutation"', 'Unknown', '--is-ephemeral']);
-      safeExec('node', ['--import', 'scripts/ts-loader.mjs', 'scripts/mission_controller.ts', 'start', missionId, 'personal']);
+      safeExec('node', [
+        '--import',
+        'scripts/ts-loader.mjs',
+        'scripts/mission_controller.ts',
+        'create',
+        missionId,
+        'personal',
+        'kyberion',
+        'governance',
+        '"Ephemeral Secret Mutation"',
+        'Unknown',
+        '--is-ephemeral',
+      ]);
+      safeExec('node', [
+        '--import',
+        'scripts/ts-loader.mjs',
+        'scripts/mission_controller.ts',
+        'start',
+        missionId,
+        'personal',
+      ]);
     } catch (err) {
       logger.warn(`Failed to create ephemeral mission: ${err}`);
     }
@@ -144,7 +192,7 @@ async function withGovernedMutation(
         service_id: params.service,
         config_target: 'os-keychain',
         action: actionType,
-        changed_keys: [params.account]
+        changed_keys: [params.account],
       });
       result.mission_id = missionId;
     }
@@ -154,7 +202,13 @@ async function withGovernedMutation(
   } finally {
     if (isEphemeral) {
       try {
-        safeExec('node', ['--import', 'scripts/ts-loader.mjs', 'scripts/mission_controller.ts', 'finish', missionId]);
+        safeExec('node', [
+          '--import',
+          'scripts/ts-loader.mjs',
+          'scripts/mission_controller.ts',
+          'finish',
+          missionId,
+        ]);
       } catch (err) {
         logger.warn(`Failed to finish ephemeral mission: ${err}`);
       }
@@ -166,20 +220,29 @@ export async function handleAction(input: SecretAction) {
   const platform = process.platform;
 
   switch (input.action) {
-    case 'get': return await getSecret(input.params, platform);
+    case 'get':
+      return await getSecret(input.params, platform);
     case 'set':
-      return await withGovernedMutation('set', input.params, platform, () => setSecret(input.params, platform));
+      return await withGovernedMutation('set', input.params, platform, () =>
+        setSecret(input.params, platform)
+      );
     case 'delete':
-      return await withGovernedMutation('delete', input.params, platform, () => deleteSecret(input.params, platform));
+      return await withGovernedMutation('delete', input.params, platform, () =>
+        deleteSecret(input.params, platform)
+      );
     case 'list':
       return listSecrets(input.params);
-    default: throw new Error(`Unsupported secret action: ${(input as any).action}`);
+    default:
+      throw new Error(`Unsupported secret action: ${(input as any).action}`);
   }
 }
 
 async function getSecret(params: any, platform: string) {
   try {
-    const value = await withRetry(async () => fetchSecret(params.service, params.account), buildRetryOptions());
+    const value = await retry(
+      async () => fetchSecret(params.service, params.account),
+      buildRetryOptions()
+    );
     if (value === null) {
       return { status: 'failed', error: 'Secret not found.' };
     }
@@ -194,7 +257,10 @@ async function setSecret(params: any, platform: string) {
   if (!params.account) throw new Error('Account is required for "set" action.');
 
   try {
-    await withRetry(async () => storeSecret(params.service, params.account, params.value), buildRetryOptions());
+    await retry(
+      async () => storeSecret(params.service, params.account, params.value),
+      buildRetryOptions()
+    );
     registryAdd(params.service, params.account);
     return { status: 'success', message: 'Secret stored.' };
   } catch (err: any) {
@@ -206,7 +272,7 @@ async function deleteSecret(params: any, platform: string) {
   if (!params.account) throw new Error('Account is required for "delete" action.');
 
   try {
-    await withRetry(async () => removeSecret(params.service, params.account), buildRetryOptions());
+    await retry(async () => removeSecret(params.service, params.account), buildRetryOptions());
     registryRemove(params.service, params.account);
     return { status: 'success', message: 'Secret deleted.' };
   } catch (err: any) {

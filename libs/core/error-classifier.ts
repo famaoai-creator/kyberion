@@ -2,21 +2,22 @@ import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnclassifiedError } from './unclassified-error-registry.js';
+import { renderVocabularyText } from './ux-vocabulary.js';
 
 export type ErrorCategory =
-  | 'auth'                     // missing / invalid credentials
-  | 'permission_denied'        // tier-guard, path-scope, OS perms
-  | 'network'                  // DNS, TCP, TLS, HTTP timeouts
-  | 'rate_limit'               // 429, provider quota
-  | 'missing_dependency'       // binary or package not installed
-  | 'missing_secret'           // expected env var / keychain entry not found
-  | 'invalid_input'            // malformed JSON / schema violation / bad ADF
-  | 'resource_unavailable'     // port in use, file locked, disk full
-  | 'timeout'                  // operation exceeded its window
-  | 'governance_block'         // approval required, policy violation
-  | 'tier_violation'           // tier-guard refused
-  | 'mission_not_found'        // mission id resolution failed
-  | 'unknown';                 // fallback
+  | 'auth' // missing / invalid credentials
+  | 'permission_denied' // tier-guard, path-scope, OS perms
+  | 'network' // DNS, TCP, TLS, HTTP timeouts
+  | 'rate_limit' // 429, provider quota
+  | 'missing_dependency' // binary or package not installed
+  | 'missing_secret' // expected env var / keychain entry not found
+  | 'invalid_input' // malformed JSON / schema violation / bad ADF
+  | 'resource_unavailable' // port in use, file locked, disk full
+  | 'timeout' // operation exceeded its window
+  | 'governance_block' // approval required, policy violation
+  | 'tier_violation' // tier-guard refused
+  | 'mission_not_found' // mission id resolution failed
+  | 'unknown'; // fallback
 
 export interface ErrorClassification {
   category: ErrorCategory;
@@ -30,6 +31,13 @@ export interface ErrorClassification {
   ruleId: string;
   /** (Optional) A hint for an autonomous agent on how to repair this error. */
   repairAction?: string;
+}
+
+export interface UserFacingErrorEnvelope {
+  title: string;
+  body: string;
+  nextAction: string;
+  traceLine?: string;
 }
 
 interface ClassifierRule {
@@ -66,10 +74,10 @@ interface ErrorClassifierRulesFile {
 }
 
 function buildTestFn(entry: RuleFileEntry): (m: string, code?: string | number) => boolean {
-  const regexps = entry.patterns.map(p => new RegExp(p, 'i'));
+  const regexps = entry.patterns.map((p) => new RegExp(p, 'i'));
   const codes = new Set(entry.codes || []);
   return (m, code) =>
-    regexps.some(re => re.test(m)) ||
+    regexps.some((re) => re.test(m)) ||
     (codes.size > 0 && code !== undefined && codes.has(String(code)));
 }
 
@@ -80,8 +88,10 @@ function loadClassifierRules(): ClassifierRule[] {
   if (_cachedRules) return _cachedRules;
   try {
     const filePath = pathResolver.knowledge('product/governance/error-classifier-rules.json');
-    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ErrorClassifierRulesFile;
-    _cachedRules = data.rules.map(entry => ({
+    const data = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as ErrorClassifierRulesFile;
+    _cachedRules = data.rules.map((entry) => ({
       id: entry.id,
       category: entry.category,
       label: entry.label,
@@ -90,7 +100,11 @@ function loadClassifierRules(): ClassifierRule[] {
       repairAction: entry.repairAction,
     }));
   } catch (err) {
-    recordConfigFallback({ knowledgePath: 'product/governance/error-classifier-rules.json', error: err, defaults: { rules: [], policy_violation_patterns: [] } });
+    recordConfigFallback({
+      knowledgePath: 'product/governance/error-classifier-rules.json',
+      error: err,
+      defaults: { rules: [], policy_violation_patterns: [] },
+    });
     _cachedRules = [];
   }
   return _cachedRules;
@@ -100,8 +114,10 @@ function loadPolicyViolationPatterns(): typeof POLICY_VIOLATION_PATTERNS {
   if (_cachedPolicyPatterns) return _cachedPolicyPatterns;
   try {
     const filePath = pathResolver.knowledge('product/governance/error-classifier-rules.json');
-    const data = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as ErrorClassifierRulesFile;
-    _cachedPolicyPatterns = data.policy_violation_patterns.map(entry => ({
+    const data = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as ErrorClassifierRulesFile;
+    _cachedPolicyPatterns = data.policy_violation_patterns.map((entry) => ({
       pattern: new RegExp(entry.pattern, 'i'),
       violationType: entry.violation_type,
       explanation: entry.explanation,
@@ -110,7 +126,11 @@ function loadPolicyViolationPatterns(): typeof POLICY_VIOLATION_PATTERNS {
       repairSteps: entry.repair_steps,
     }));
   } catch (err) {
-    recordConfigFallback({ knowledgePath: 'product/governance/error-classifier-rules.json', error: err, defaults: { rules: [], policy_violation_patterns: [] } });
+    recordConfigFallback({
+      knowledgePath: 'product/governance/error-classifier-rules.json',
+      error: err,
+      defaults: { rules: [], policy_violation_patterns: [] },
+    });
     _cachedPolicyPatterns = [];
   }
   return _cachedPolicyPatterns;
@@ -151,6 +171,38 @@ type PolicyViolationPattern = {
 
 // Alias for loadPolicyViolationPatterns return type (resolved at runtime from JSON)
 const POLICY_VIOLATION_PATTERNS: PolicyViolationPattern[] = [];
+
+const USER_FACING_ERROR_BODY_KEYS: Record<ErrorCategory, string> = {
+  auth: 'error_auth_body',
+  permission_denied: 'error_permission_denied_body',
+  network: 'error_connection_body',
+  rate_limit: 'error_rate_limit_body',
+  missing_dependency: 'error_missing_dependency_body',
+  missing_secret: 'error_missing_secret_body',
+  invalid_input: 'error_invalid_input_body',
+  resource_unavailable: 'error_resource_unavailable_body',
+  timeout: 'error_timeout_body',
+  governance_block: 'error_governance_block_body',
+  tier_violation: 'error_permission_denied_body',
+  mission_not_found: 'error_mission_not_found_body',
+  unknown: 'error_unknown_body',
+};
+
+const USER_FACING_ERROR_NEXT_ACTION_KEYS: Record<ErrorCategory, string> = {
+  auth: 'error_next_step_secret',
+  permission_denied: 'error_next_step_repair',
+  network: 'error_next_step_connect',
+  rate_limit: 'error_next_step_retry',
+  missing_dependency: 'error_next_step_doctor',
+  missing_secret: 'error_next_step_secret',
+  invalid_input: 'error_next_step_input',
+  resource_unavailable: 'error_next_step_retry',
+  timeout: 'error_next_step_retry',
+  governance_block: 'error_next_step_repair',
+  tier_violation: 'error_next_step_repair',
+  mission_not_found: 'error_next_step_retry',
+  unknown: 'error_next_step_retry',
+};
 
 /**
  * Produce a structured diagnosis for a POLICY_VIOLATION error string.
@@ -197,8 +249,7 @@ export function classifyError(err: unknown): ErrorClassification {
   } else if (err && typeof err === 'object') {
     const obj = err as { message?: unknown; code?: unknown };
     message = String(obj.message ?? '');
-    code =
-      typeof obj.code === 'string' || typeof obj.code === 'number' ? obj.code : undefined;
+    code = typeof obj.code === 'string' || typeof obj.code === 'number' ? obj.code : undefined;
   } else {
     message = String(err);
   }
@@ -233,6 +284,30 @@ export function classifyError(err: unknown): ErrorClassification {
   };
 }
 
+export function buildUserFacingError(
+  err: unknown,
+  opts: { locale?: string; surface?: string; traceId?: string } = {}
+): UserFacingErrorEnvelope {
+  const classification = classifyError(err);
+  const title = renderVocabularyText('error_title', opts.locale);
+  const bodyKey =
+    USER_FACING_ERROR_BODY_KEYS[classification.category] || USER_FACING_ERROR_BODY_KEYS.unknown;
+  const nextActionKey =
+    USER_FACING_ERROR_NEXT_ACTION_KEYS[classification.category] ||
+    USER_FACING_ERROR_NEXT_ACTION_KEYS.unknown;
+  const traceLine = opts.traceId
+    ? `${renderVocabularyText('error_trace_label', opts.locale)} ${opts.traceId}`
+    : undefined;
+
+  const surfacePrefix = opts.surface ? `${opts.surface}: ` : '';
+  return {
+    title,
+    body: `${surfacePrefix}${renderVocabularyText(bodyKey, opts.locale)}`,
+    nextAction: renderVocabularyText(nextActionKey, opts.locale),
+    traceLine,
+  };
+}
+
 /** Format a classification for display in CLI / logs. */
 export function formatClassification(c: ErrorClassification): string {
   return `[${c.category}] ${c.label}\n  → ${c.remediation}\n  detail: ${c.detail}`;
@@ -240,5 +315,5 @@ export function formatClassification(c: ErrorClassification): string {
 
 /** Returns the rule list for testing / documentation. */
 export function getRuleIds(): string[] {
-  return loadClassifierRules().map(r => r.id);
+  return loadClassifierRules().map((r) => r.id);
 }

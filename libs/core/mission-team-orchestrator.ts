@@ -28,7 +28,9 @@ function isReady(agentId: string): boolean {
   return record?.status === 'ready' || record?.status === 'busy';
 }
 
-export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeamRuntimeOptions): Promise<MissionTeamRuntimePlan> {
+export async function ensureMissionTeamRuntime(
+  input: string | EnsureMissionTeamRuntimeOptions
+): Promise<MissionTeamRuntimePlan> {
   const missionId = typeof input === 'string' ? input : input.missionId;
   const teamRoles = typeof input === 'string' ? undefined : input.teamRoles;
   const requestedRoles = teamRoles ? new Set(teamRoles) : null;
@@ -85,6 +87,7 @@ export async function ensureMissionTeamRuntime(input: string | EnsureMissionTeam
         capabilities: assignment.required_capabilities,
         runtimeMetadata: {
           skip_provider_resolution: true,
+          task_model_hint: assignment.model_hint,
         },
         missionId: missionId.toUpperCase(),
         requestedBy: 'mission_team_orchestrator',

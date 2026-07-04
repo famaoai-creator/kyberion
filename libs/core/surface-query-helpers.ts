@@ -1,15 +1,28 @@
-import { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE, type KnowledgeHintIndex, type KnowledgeScope } from './src/knowledge-index.js';
+import {
+  buildScopedIndex,
+  queryKnowledgeHybrid,
+  DEFAULT_SCOPE,
+  type KnowledgeHintIndex,
+  type KnowledgeScope,
+} from './src/knowledge-index.js';
 import { secureFetch } from './network.js';
 import { resolveFallbackLocationSummary } from './location-fallback.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import { recordSchedulePreference, resolveDefaultScheduleSource } from './contextual-intent-memory.js';
+import {
+  recordSchedulePreference,
+  resolveDefaultScheduleSource,
+} from './contextual-intent-memory.js';
 import { recordContextualIntentLearning } from './contextual-intent-learning.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { resolveSurfaceIntent } from './router-contract.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { safeExec } from './secure-io.js';
-import type { SurfaceConversationResult, SurfaceDelegationResult } from './channel-surface-types.js';
+import { logger } from './core.js';
+import type {
+  SurfaceConversationResult,
+  SurfaceDelegationResult,
+} from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
 
 function getScheduleDateRange(
@@ -32,9 +45,17 @@ function getScheduleDateRange(
       return { start: tomorrow, end: new Date(tomorrow.getTime() + dayMs - 1), label: 'tomorrow' };
     }
     case 'this_week':
-      return { start: thisWeekStart, end: new Date(thisWeekStart.getTime() + 7 * dayMs - 1), label: 'this_week' };
+      return {
+        start: thisWeekStart,
+        end: new Date(thisWeekStart.getTime() + 7 * dayMs - 1),
+        label: 'this_week',
+      };
     case 'next_week':
-      return { start: nextWeekStart, end: new Date(nextWeekStart.getTime() + 7 * dayMs - 1), label: 'next_week' };
+      return {
+        start: nextWeekStart,
+        end: new Date(nextWeekStart.getTime() + 7 * dayMs - 1),
+        label: 'next_week',
+      };
     case 'this_month': {
       const monthStart = new Date(start.getFullYear(), start.getMonth(), 1);
       const monthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -50,28 +71,40 @@ function getScheduleDateRange(
   }
 }
 
-function formatCalendarAgendaReply(params: {
+export function formatCalendarAgendaReply(params: {
   sourceLabel: string;
   sourceName?: string;
   rangeLabel: string;
   events: Array<{ title: string; start: string; end: string; calendar?: string }>;
   assumption?: string;
-}): string {
-  const header = params.sourceName ? `${params.sourceLabel} / ${params.sourceName}` : params.sourceLabel;
+}): { text: string; omitted_count: number } {
+  const header = params.sourceName
+    ? `${params.sourceLabel} / ${params.sourceName}`
+    : params.sourceLabel;
   if (params.events.length === 0) {
-    return [
-      params.assumption ? `${params.assumption}` : '',
-      `Provider: ${header}`,
-      `${params.rangeLabel} の予定は見つかりませんでした。`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    return {
+      text: [
+        params.assumption ? `${params.assumption}` : '',
+        `Provider: ${header}`,
+        `${params.rangeLabel} の予定は見つかりませんでした。`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      omitted_count: 0,
+    };
+  }
+  const visibleEvents = params.events.slice(0, 10);
+  const omittedCount = Math.max(0, params.events.length - visibleEvents.length);
+  if (omittedCount > 0) {
+    logger.info(
+      `[surface-query-helpers] omitted ${omittedCount} agenda event(s) for ${header} ${params.rangeLabel}`
+    );
   }
   const lines = [
     ...(params.assumption ? [params.assumption] : []),
     `Provider: ${header}`,
     `${params.rangeLabel} の予定:`,
-    ...params.events.slice(0, 10).map((event) => {
+    ...visibleEvents.map((event) => {
       const start = new Date(event.start);
       const end = new Date(event.end);
       const time = `${start.toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
@@ -79,7 +112,10 @@ function formatCalendarAgendaReply(params: {
       return `- ${time} ${event.title}${calendar}`;
     }),
   ];
-  return lines.join('\n');
+  return {
+    text: lines.join('\n'),
+    omitted_count: omittedCount,
+  };
 }
 
 function parseCalendarDate(value: string | undefined, label: string): Date | null {
@@ -95,7 +131,16 @@ async function listCalendarEvents(params: {
   calendar_names?: string[];
   start_date: string;
   end_date: string;
-}): Promise<Array<{ title: string; start: string; end: string; calendar: string; location: string; description: string }>> {
+}): Promise<
+  Array<{
+    title: string;
+    start: string;
+    end: string;
+    calendar: string;
+    location: string;
+    description: string;
+  }>
+> {
   const startInput = parseCalendarDate(params.start_date, 'start_date');
   const endInput = parseCalendarDate(params.end_date, 'end_date');
   const start = startInput ?? new Date();
@@ -103,7 +148,9 @@ async function listCalendarEvents(params: {
   const end = endInput ?? new Date(start.getTime() + 24 * 60 * 60 * 1000);
   if (!endInput) end.setHours(23, 59, 59, 999);
   if (end.getTime() <= start.getTime()) {
-    throw new Error(`calendar query: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`);
+    throw new Error(
+      `calendar query: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
+    );
   }
 
   const payload = {
@@ -159,15 +206,12 @@ async function readScheduleAgenda(queryText: string): Promise<string> {
     text: queryText,
     executionShape: 'direct_reply',
     requiredInputs:
-      frame.missing.length > 0
-        ? frame.missing
-        : frame.date_range
-          ? []
-          : ['date_range'],
+      frame.missing.length > 0 ? frame.missing : frame.date_range ? [] : ['date_range'],
     confidence: frame.confidence,
     contextualFrame: frame,
   });
-  const scheduleSource = frame.source_binding.selected || resolveDefaultScheduleSource().source || 'browser_calendar';
+  const scheduleSource =
+    frame.source_binding.selected || resolveDefaultScheduleSource().source || 'browser_calendar';
   const calendarName = resolveDefaultScheduleSource().calendarName;
   const range = getScheduleDateRange(frame.date_range?.value);
   const assumption = [
@@ -183,16 +227,6 @@ async function readScheduleAgenda(queryText: string): Promise<string> {
       start_date: range.start.toISOString(),
       end_date: range.end.toISOString(),
     });
-    recordContextualIntentLearning({
-      utterance: queryText,
-      intentId: 'schedule-read-agenda',
-      frame,
-      clarificationNeeded: clarificationDecision.shouldClarify,
-      confirmed: true,
-      tier: 'personal',
-      responseShape: 'calendar_agenda_summary',
-      notes: `read-only agenda returned ${Array.isArray(events) ? events.length : 0} event(s)`,
-    });
     if (frame.source_binding.selected) {
       recordSchedulePreference({
         source: frame.source_binding.selected,
@@ -201,13 +235,24 @@ async function readScheduleAgenda(queryText: string): Promise<string> {
         confirmed: true,
       });
     }
-    return formatCalendarAgendaReply({
+    const agendaReply = formatCalendarAgendaReply({
       sourceLabel: scheduleSource,
       sourceName: calendarName,
       rangeLabel: range.label,
       events: Array.isArray(events) ? events : [],
       assumption,
     });
+    recordContextualIntentLearning({
+      utterance: queryText,
+      intentId: 'schedule-read-agenda',
+      frame,
+      clarificationNeeded: clarificationDecision.shouldClarify,
+      confirmed: true,
+      tier: 'personal',
+      responseShape: 'calendar_agenda_summary',
+      notes: `read-only agenda returned ${Array.isArray(events) ? events.length : 0} event(s); omitted_count=${agendaReply.omitted_count}`,
+    });
+    return agendaReply.text;
   } catch (error: any) {
     recordContextualIntentLearning({
       utterance: queryText,
@@ -251,7 +296,7 @@ function buildDelegatedSurfaceConversationResult(
 
 function attachRoutingDecision(
   result: SurfaceConversationResult,
-  routingDecision?: UserIntentFlow['routingDecision'],
+  routingDecision?: UserIntentFlow['routingDecision']
 ): SurfaceConversationResult {
   return routingDecision ? { ...result, routingDecision } : result;
 }
@@ -312,8 +357,13 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
-function extractDuckDuckGoResults(html: string, limit = 3): Array<{ title: string; url: string; snippet?: string }> {
-  const anchors = [...html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
+function extractDuckDuckGoResults(
+  html: string,
+  limit = 3
+): Array<{ title: string; url: string; snippet?: string }> {
+  const anchors = [
+    ...html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g),
+  ];
   const results: Array<{ title: string; url: string; snippet?: string }> = [];
 
   for (let i = 0; i < anchors.length && results.length < limit; i++) {
@@ -343,7 +393,10 @@ function extractDuckDuckGoResults(html: string, limit = 3): Array<{ title: strin
 
 function extractLocationHint(queryText: string): string | null {
   const stripped = queryText
-    .replace(/(今日|今|現在|明日|この|その|あの)?(の)?(天気|weather|forecast|気温|降水確率|雨|晴れ|天候)/gi, ' ')
+    .replace(
+      /(今日|今|現在|明日|この|その|あの)?(の)?(天気|weather|forecast|気温|降水確率|雨|晴れ|天候)/gi,
+      ' '
+    )
     .replace(/(を)?(教えて|知りたい|見せて|検索して|調べて|お願いします|please)/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -440,7 +493,9 @@ async function runWebSearch(queryText: string): Promise<string> {
 let knowledgeIndexPromise: Promise<KnowledgeHintIndex> | null = null;
 let _lastScope: KnowledgeScope | null = null;
 
-async function loadKnowledgeHintIndex(scope: KnowledgeScope = DEFAULT_SCOPE): Promise<KnowledgeHintIndex> {
+async function loadKnowledgeHintIndex(
+  scope: KnowledgeScope = DEFAULT_SCOPE
+): Promise<KnowledgeHintIndex> {
   const scopeKey = JSON.stringify(scope);
   if (!knowledgeIndexPromise || JSON.stringify(_lastScope) !== scopeKey) {
     _lastScope = scope;
@@ -453,7 +508,8 @@ function structuredSurfaceQueryText(context: {
   input: { surfaceText?: string; query?: string; threadContext?: string };
   structuredQuery?: string;
 }): string {
-  const baseText = context.input.surfaceText || context.input.query || context.structuredQuery || '';
+  const baseText =
+    context.input.surfaceText || context.input.query || context.structuredQuery || '';
   const contextualText = context.input.threadContext
     ? `${context.input.threadContext}\n\nCurrent incoming message:\n${baseText}`
     : baseText;
@@ -480,7 +536,6 @@ export {
   extractDuckDuckGoResults,
   extractLocationHint,
   fetchWeatherSummary,
-  formatCalendarAgendaReply,
   formatExecutionReceipt,
   getScheduleDateRange,
   loadKnowledgeHintIndex,

@@ -7,7 +7,6 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import {
   compileSchemaFromPath,
-  customerResolver,
   findMissionPath,
   logger,
   missionDir as resolveMissionDir,
@@ -18,6 +17,7 @@ import {
   safeReaddir,
   safeWriteFile,
   withLock,
+  resolveActiveProfileRoot,
 } from '@agent/core';
 import { hasAuthority, detectTier } from '@agent/core/governance';
 import { readJsonFile } from './cli-input.js';
@@ -26,13 +26,15 @@ const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const missionStateAjv = new AjvCtor({ allErrors: true });
 const missionStateValidate = compileSchemaFromPath(
   missionStateAjv,
-  pathResolver.rootResolve('schemas/mission-state.schema.json'),
+  pathResolver.rootResolve('schemas/mission-state.schema.json')
 );
 
 function assertMissionStateSchema(state: MissionState): void {
   if (missionStateValidate(state)) return;
   const errors = Array.isArray(missionStateValidate.errors)
-    ? missionStateValidate.errors.map((entry: any) => `${entry.instancePath || '/'} ${entry.message || 'invalid'}`).join('; ')
+    ? missionStateValidate.errors
+        .map((entry: any) => `${entry.instancePath || '/'} ${entry.message || 'invalid'}`)
+        .join('; ')
     : 'unknown schema error';
   throw new Error(`[MISSION_STATE_SCHEMA] Invalid mission state: ${errors}`);
 }
@@ -51,24 +53,31 @@ export function normalizeRelationships(
 
   if (overlays.project) {
     relationships.project = {
-      relationship_type: overlays.project.relationship_type || relationships.project?.relationship_type || 'independent',
+      relationship_type:
+        overlays.project.relationship_type ||
+        relationships.project?.relationship_type ||
+        'independent',
       project_id: overlays.project.project_id || relationships.project?.project_id,
       project_path: overlays.project.project_path || relationships.project?.project_path,
-      affected_artifacts: overlays.project.affected_artifacts || relationships.project?.affected_artifacts || [],
+      affected_artifacts:
+        overlays.project.affected_artifacts || relationships.project?.affected_artifacts || [],
       gate_impact: overlays.project.gate_impact || relationships.project?.gate_impact || 'none',
-      traceability_refs: overlays.project.traceability_refs || relationships.project?.traceability_refs || [],
+      traceability_refs:
+        overlays.project.traceability_refs || relationships.project?.traceability_refs || [],
       note: overlays.project.note || relationships.project?.note,
     };
   }
 
   if (overlays.track) {
     relationships.track = {
-      relationship_type: overlays.track.relationship_type || relationships.track?.relationship_type || 'belongs_to',
+      relationship_type:
+        overlays.track.relationship_type || relationships.track?.relationship_type || 'belongs_to',
       track_id: overlays.track.track_id || relationships.track?.track_id,
       track_name: overlays.track.track_name || relationships.track?.track_name,
       track_type: overlays.track.track_type || relationships.track?.track_type,
       lifecycle_model: overlays.track.lifecycle_model || relationships.track?.lifecycle_model,
-      traceability_refs: overlays.track.traceability_refs || relationships.track?.traceability_refs || [],
+      traceability_refs:
+        overlays.track.traceability_refs || relationships.track?.traceability_refs || [],
       note: overlays.track.note || relationships.track?.note,
     };
   }
@@ -87,33 +96,40 @@ export function readFocusedMissionId(missionFocusPath: string): string | null {
 }
 
 export function writeFocusedMissionId(missionFocusPath: string, missionId: string): void {
-  safeWriteFile(missionFocusPath, JSON.stringify({
-    mission_id: missionId.toUpperCase(),
-    ts: new Date().toISOString(),
-  }, null, 2));
+  safeWriteFile(
+    missionFocusPath,
+    JSON.stringify(
+      {
+        mission_id: missionId.toUpperCase(),
+        ts: new Date().toISOString(),
+      },
+      null,
+      2
+    )
+  );
 }
 
 export function checkPrerequisites(): void {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
 
-  const profileRoot = customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+  const profileRoot = resolveActiveProfileRoot();
   const requiredFiles = ['my-identity.json', 'my-vision.md', 'agent-identity.json'].map((name) =>
-    path.join(profileRoot, name),
+    path.join(profileRoot, name)
   );
   const missingFiles = requiredFiles.filter((filePath) => !safeExistsSync(filePath));
   if (missingFiles.length > 0) {
     throw new Error(
       `CRITICAL: Sovereign profile incomplete. Missing: ${missingFiles.map((filePath) => path.basename(filePath)).join(', ')}. ` +
-      'Please run "pnpm onboard" (or complete customer onboarding) before creating missions.',
+        'Please run "pnpm onboard" (or complete customer onboarding) before creating missions.'
     );
   }
 
   const tiers = [
     'knowledge/personal/missions',
     'active/missions/confidential',
-    'active/missions/public'
+    'active/missions/public',
   ];
-  tiers.forEach(tier => {
+  tiers.forEach((tier) => {
     const fullPath = pathResolver.rootResolve(tier);
     if (!safeExistsSync(fullPath)) {
       logger.warn(`Creating missing tier directory: ${tier}`);
@@ -133,9 +149,9 @@ export function calculateRequiredTier(
   requestedTier?: string
 ): 'personal' | 'confidential' | 'public' {
   const tierWeight: Record<string, number> = {
-    'public': 1,
-    'confidential': 3,
-    'personal': 4
+    public: 1,
+    confidential: 3,
+    personal: 4,
   };
 
   let maxWeight = requestedTier ? tierWeight[requestedTier] || 1 : 1;
@@ -159,7 +175,9 @@ export function loadState(id: string): MissionState | null {
   if (!safeExistsSync(statePath)) return null;
   try {
     return readJsonFile<MissionState>(statePath);
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 export async function saveState(
@@ -203,10 +221,9 @@ export function getActiveMissionSearchDirs(): string[] {
     try {
       const config = readJsonFile<{ directories?: Record<string, string> }>(configPath);
       const dirs = config.directories || {};
-      return ACTIVE_TIERS
-        .map(tier => dirs[tier])
+      return ACTIVE_TIERS.map((tier) => dirs[tier])
         .filter((d): d is string => !!d)
-        .map(d => pathResolver.rootResolve(d));
+        .map((d) => pathResolver.rootResolve(d));
     } catch (_) {}
   }
   return [pathResolver.active('missions')];
@@ -232,7 +249,9 @@ export function listMissionsInSearchDirs(): Array<{ missionId: string; missionPa
 }
 
 export function listActiveMissions(): Array<{ missionId: string; missionPath: string }> {
-  return listMissionsInSearchDirs().filter(({ missionId }) => loadState(missionId)?.status === 'active');
+  return listMissionsInSearchDirs().filter(
+    ({ missionId }) => loadState(missionId)?.status === 'active'
+  );
 }
 
 export function readJsonFileSafe(filePath: string): any | null {

@@ -7,6 +7,7 @@ import {
   resolveAgentSelectionHints,
 } from './agent-manifest.js';
 import { auditChain } from './audit-chain.js';
+import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
 import { killSwitch } from './kill-switch.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
@@ -25,6 +26,7 @@ import {
   shutdownAgentRuntimeViaDaemon,
   toSupervisorEnsurePayload,
 } from './agent-runtime-supervisor-client.js';
+import { type TaskModelHint } from './reasoning-model-routing.js';
 
 /**
  * A2A-to-ACP Bridge v1.1 [SECURITY HARDENED]
@@ -45,6 +47,7 @@ export interface A2AMessage {
     sender: string;
     receiver?: string;
     conversation_id?: string;
+    correlation_id?: string;
     performative: 'request' | 'propose' | 'inform' | 'accept' | 'reject' | 'query' | 'result';
     timestamp?: string;
     signature?: string;
@@ -113,6 +116,22 @@ class A2ABridgeImpl {
 
     // Parse receiver
     const { agentId, provider } = this.parseReceiver(receiver);
+    const correlationId = this.resolveCorrelationId(envelope);
+    const taskModelHint = this.extractTaskModelHint(envelope.payload);
+    const taskContractValidation = this.validateTaskContractPayload(envelope.payload);
+    if (!taskContractValidation.valid) {
+      auditChain.record({
+        agentId: envelope.header.sender,
+        action: 'a2a_task_contract_invalid',
+        operation: 'route',
+        result: 'denied',
+        reason: `Invalid A2A task contract on message ${envelope.header.msg_id}: ${taskContractValidation.errors.join('; ')}`,
+      });
+      killSwitch.logAction(envelope.header.sender, 'a2a_task_contract_invalid', true);
+      throw new Error(
+        `A2A task contract validation failed: ${taskContractValidation.errors.join('; ')}`
+      );
+    }
 
     // Security: Only spawn agents that have a manifest (whitelist)
     const runtimeContextKey = this.getRuntimeContextKey(envelope.payload);
@@ -147,6 +166,7 @@ class A2ABridgeImpl {
           typeof envelope.payload?.context?.thread === 'string'
             ? String(envelope.payload.context.thread)
             : undefined,
+        correlation_id: correlationId,
         performative: envelope.header.performative,
         intent:
           typeof envelope.payload?.intent === 'string'
@@ -166,17 +186,30 @@ class A2ABridgeImpl {
       action: 'a2a_route',
       operation: `delegate_to:${agentId}`,
       result: 'completed',
-      metadata: { receiver: agentId, performative: envelope.header.performative },
+      metadata: {
+        receiver: agentId,
+        performative: envelope.header.performative,
+        correlation_id: correlationId,
+      },
     });
     killSwitch.logAction(envelope.header.sender, `a2a_route:${agentId}`, false);
 
     // Ask the agent
     let responseText: string;
     try {
-      const result = await askAgentRuntimeViaDaemon({ agentId, prompt, requestedBy: 'a2a_bridge' });
+      const result = await askAgentRuntimeViaDaemon({
+        agentId,
+        prompt,
+        requestedBy: 'a2a_bridge',
+        correlationId,
+        ...(taskModelHint ? { taskModelHint } : {}),
+      });
       responseText = result.text;
     } catch (_) {
-      responseText = await askAgentRuntime(agentId, prompt, 'a2a_bridge');
+      responseText = await askAgentRuntime(agentId, prompt, 'a2a_bridge', {
+        correlationId,
+        ...(taskModelHint ? { taskModelHint } : {}),
+      });
     }
 
     // Build signed response envelope
@@ -188,6 +221,7 @@ class A2ABridgeImpl {
         sender: agentId,
         receiver: envelope.header.sender,
         conversation_id: envelope.header.conversation_id,
+        correlation_id: correlationId,
         performative: 'result',
         timestamp: new Date().toISOString(),
       },
@@ -298,6 +332,11 @@ class A2ABridgeImpl {
           typeof (payload as any)?.context?.thread === 'string'
             ? String((payload as any).context.thread)
             : undefined,
+        correlation_id:
+          typeof (payload as any)?.context?.correlation_id === 'string'
+            ? String((payload as any).context.correlation_id)
+            : undefined,
+        task_model_hint: this.extractTaskModelHint(payload),
         intent:
           typeof (payload as any)?.intent === 'string'
             ? String((payload as any).intent)
@@ -362,6 +401,57 @@ class A2ABridgeImpl {
     return typeof executionMode === 'string' ? executionMode : undefined;
   }
 
+  private extractTaskModelHint(payload: unknown): TaskModelHint | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const record = payload as Record<string, unknown>;
+    const candidate =
+      record.task_model_hint ||
+      record.model_hint ||
+      (record.context && typeof record.context === 'object'
+        ? (record.context as Record<string, unknown>).task_model_hint ||
+          (record.context as Record<string, unknown>).model_hint
+        : undefined);
+    if (!candidate || typeof candidate !== 'object') return undefined;
+
+    const hint = candidate as Record<string, unknown>;
+    const modelId = typeof hint.model_id === 'string' ? hint.model_id : undefined;
+    const tier = typeof hint.tier === 'string' ? hint.tier : undefined;
+    const effort = typeof hint.effort === 'string' ? hint.effort : undefined;
+    const routeReason = typeof hint.route_reason === 'string' ? hint.route_reason : undefined;
+    if (!modelId || !tier || !effort || !routeReason) return undefined;
+
+    return {
+      model_id: modelId,
+      tier: tier as TaskModelHint['tier'],
+      effort: effort as TaskModelHint['effort'],
+      route_reason: routeReason,
+    };
+  }
+
+  private validateTaskContractPayload(payload: unknown): { valid: boolean; errors: string[] } {
+    if (!isA2ATaskContractLike(payload)) {
+      return { valid: true, errors: [] };
+    }
+
+    const validation = validateA2ATaskContract(payload);
+    return {
+      valid: validation.valid,
+      errors: validation.errors,
+    };
+  }
+
+  private resolveCorrelationId(envelope: A2AMessage): string {
+    const headerCorrelationId = envelope.header.correlation_id;
+    if (typeof headerCorrelationId === 'string' && headerCorrelationId.trim()) {
+      return headerCorrelationId.trim();
+    }
+    const payloadCorrelationId = (envelope.payload as any)?.context?.correlation_id;
+    if (typeof payloadCorrelationId === 'string' && payloadCorrelationId.trim()) {
+      return payloadCorrelationId.trim();
+    }
+    return crypto.randomUUID();
+  }
+
   private resolveSpawnCwd(
     agentId: string,
     provider: string,
@@ -397,6 +487,23 @@ class A2ABridgeImpl {
     const record = payload as Record<string, unknown>;
     const text = typeof record.text === 'string' ? record.text.trim() : '';
     const intent = typeof record.intent === 'string' ? record.intent.trim() : '';
+    const objective = typeof record.objective === 'string' ? record.objective.trim() : '';
+    const rationale = typeof record.rationale === 'string' ? record.rationale.trim() : '';
+    const acceptanceCriteria = Array.isArray(record.acceptance_criteria)
+      ? record.acceptance_criteria
+          .filter((entry) => typeof entry === 'string' && entry.trim())
+          .map((entry) => entry.trim())
+      : [];
+    const expectedOutputs = Array.isArray(record.expected_outputs)
+      ? record.expected_outputs
+          .filter((entry) => typeof entry === 'string' && entry.trim())
+          .map((entry) => entry.trim())
+      : [];
+    const priorDecisions = Array.isArray(record.prior_decisions)
+      ? record.prior_decisions
+          .filter((entry) => typeof entry === 'string' && entry.trim())
+          .map((entry) => entry.trim())
+      : [];
     const context =
       record.context && typeof record.context === 'object' ? record.context : undefined;
 
@@ -406,7 +513,12 @@ class A2ABridgeImpl {
 
     const sections = [
       intent ? `Intent: ${intent}` : '',
+      objective ? `Objective: ${objective}` : '',
       context ? `Context:\n${JSON.stringify(context, null, 2)}` : '',
+      acceptanceCriteria.length ? `Acceptance criteria:\n- ${acceptanceCriteria.join('\n- ')}` : '',
+      expectedOutputs.length ? `Expected outputs:\n- ${expectedOutputs.join('\n- ')}` : '',
+      priorDecisions.length ? `Prior decisions:\n- ${priorDecisions.join('\n- ')}` : '',
+      rationale ? `Rationale: ${rationale}` : '',
       text ? `Request:\n${text}` : '',
     ].filter(Boolean);
 

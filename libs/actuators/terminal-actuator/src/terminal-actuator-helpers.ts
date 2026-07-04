@@ -1,4 +1,13 @@
-import { logger, ptyEngine, encodeTerminalInput, safeReadFile, emitComputerSurfacePatch, pathResolver, classifyError, withRetry } from '@agent/core';
+import {
+  logger,
+  ptyEngine,
+  encodeTerminalInput,
+  safeReadFile,
+  emitComputerSurfacePatch,
+  pathResolver,
+  classifyError,
+  retry,
+} from '@agent/core';
 import * as path from 'node:path';
 
 /**
@@ -6,7 +15,9 @@ import * as path from 'node:path';
  * Provides virtual terminal sessions via PTY engine with Symbolic Keys and Log Slicing.
  */
 
-const TERMINAL_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/terminal-actuator/manifest.json');
+const TERMINAL_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/terminal-actuator/manifest.json'
+);
 const DEFAULT_TERMINAL_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -82,7 +93,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(TERMINAL_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(TERMINAL_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -95,7 +108,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_TERMINAL_RETRY,
@@ -109,10 +124,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -135,7 +152,10 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
 
     case 'poll': {
       if (!params.sessionId) throw new Error('sessionId is required for poll action');
-      const result = await withRetry(async () => ptyEngine.poll(params.sessionId, params.offset, params.limit), buildRetryOptions());
+      const result = await retry(
+        async () => ptyEngine.poll(params.sessionId, params.offset, params.limit),
+        buildRetryOptions()
+      );
       let messages: any[] = [];
       if (params.threadId && params.persona) {
         messages = ptyEngine.popMessages(params.threadId, params.persona);
@@ -145,7 +165,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
         status: session?.status || 'unknown',
         ...result,
         messages,
-        exitCode: session?.exitCode
+        exitCode: session?.exitCode,
       };
     }
 
@@ -181,7 +201,7 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
     }
 
     case 'list': {
-      return await withRetry(async () => ({ sessions: ptyEngine.list() }), buildRetryOptions());
+      return await retry(async () => ({ sessions: ptyEngine.list() }), buildRetryOptions());
     }
 
     default:
@@ -189,7 +209,9 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
   }
 }
 
-async function handleComputerInteraction(input: ComputerInteractionAction): Promise<TerminalResult> {
+async function handleComputerInteraction(
+  input: ComputerInteractionAction
+): Promise<TerminalResult> {
   const action = input.action;
   const sessionId = input.target?.terminal_session_id || input.session_id;
 
@@ -215,7 +237,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
         return result;
       });
     case 'poll_terminal':
-      if (!sessionId) throw new Error('session_id or target.terminal_session_id is required for poll_terminal');
+      if (!sessionId)
+        throw new Error('session_id or target.terminal_session_id is required for poll_terminal');
       return await handleAction({
         action: 'poll',
         params: {
@@ -233,7 +256,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
         return result;
       });
     case 'write_terminal':
-      if (!sessionId) throw new Error('session_id or target.terminal_session_id is required for write_terminal');
+      if (!sessionId)
+        throw new Error('session_id or target.terminal_session_id is required for write_terminal');
       return await handleAction({
         action: 'write',
         params: {
@@ -252,7 +276,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
         return result;
       });
     case 'kill_terminal':
-      if (!sessionId) throw new Error('session_id or target.terminal_session_id is required for kill_terminal');
+      if (!sessionId)
+        throw new Error('session_id or target.terminal_session_id is required for kill_terminal');
       return await handleAction({
         action: 'kill',
         params: {
@@ -268,25 +293,29 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
         return result;
       });
     case 'list_terminal_sessions':
-      return await withRetry(async () => ({
-        status: 'listed',
-        sessions: ptyEngine.list().map((id) => {
-          const session = ptyEngine.get(id);
-          return {
-            sessionId: id,
-            status: session?.status || 'unknown',
-            exitCode: session?.exitCode,
-            pid: session?.adapter.pid,
-          };
+      return await retry(
+        async () => ({
+          status: 'listed',
+          sessions: ptyEngine.list().map((id) => {
+            const session = ptyEngine.get(id);
+            return {
+              sessionId: id,
+              status: session?.status || 'unknown',
+              exitCode: session?.exitCode,
+              pid: session?.adapter.pid,
+            };
+          }),
         }),
-      }), buildRetryOptions());
+        buildRetryOptions()
+      );
     case 'shell_command': {
       const shell = action.shell || (process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
-      const args = action.args && action.args.length > 0
-        ? action.args
-        : process.platform === 'win32'
-          ? ['-Command', action.text || '']
-          : ['-lc', action.text || ''];
+      const args =
+        action.args && action.args.length > 0
+          ? action.args
+          : process.platform === 'win32'
+            ? ['-Command', action.text || '']
+            : ['-lc', action.text || ''];
       return await handleAction({
         action: 'spawn',
         params: {
@@ -307,7 +336,8 @@ async function handleComputerInteraction(input: ComputerInteractionAction): Prom
       });
     }
     default:
-      throw new Error(`Unsupported computer interaction action for terminal-actuator: ${action.type}`);
+      throw new Error(
+        `Unsupported computer interaction action for terminal-actuator: ${action.type}`
+      );
   }
 }
-

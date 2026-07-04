@@ -42,6 +42,21 @@ CI/CD・デプロイは需要カタログ上の最大級の領域なのに、実
 
 - `system:terraform` 等の未知 op エラーに、AC-01 の分類エラー形式で「対応 op 一覧と代替(modeling の terraform 読取 / shell adapter)」を含める(エラーメッセージ改善のみ。terraform apply は実装**しない**)。
 
+## 実装メモ
+
+### Task 2 slice — 2026-07-04
+
+- `knowledge/product/orchestration/service-presets/github.json` に `actions_list_runs` / `actions_get_run` / `actions_dispatch_workflow` を追加した。
+- `libs/core/service-engine.test.ts` で workflow run 一覧・run 取得・dispatch の API 契約を固定した。
+- `libs/core/service-preset-registry.test.ts` で canonical preset に 3 op が載ることを確認した。
+- `knowledge/product/pipeline-templates/cicd-failure-investigation.json` を追加し、GitHub Actions run 一覧→reasoning→調査メモの導線を用意した。
+- `libs/core/deployment-adapter.test.ts` に、ShellDeploymentAdapter の config schema 逸脱が明示的に拒否される回帰テストを追加した。
+- `scripts/generate_changelog.ts` に export と直接実行ガードを入れ、`scripts/generate_changelog.test.ts` で Conventional Commits の分類と section 生成を契約化した。
+- 検証:
+  - `pnpm exec vitest run libs/core/service-preset-registry.test.ts libs/core/service-engine.test.ts tests/release-operations-contract.test.ts`
+  - `pnpm exec vitest run tests/workflow-operations-contract.test.ts`
+  - `pnpm exec tsc --noEmit --pretty false`
+
 ## リスクと注意
 
 - **デプロイは破壊的操作の最上位**。Task 1 の承認ゲートは省略不可。また adapter が実行するコマンドは設定ファイル由来なので、設定ファイル自体の書き込みが tier-guard の保護下にあること(personal tier)を確認する。

@@ -31,13 +31,19 @@ function cleanupSurfaceArtifacts(): void {
     for (const message of listSurfaceOutboxMessages(surface)) {
       clearSurfaceOutboxMessage(surface, message.message_id);
     }
-    safeRmSync(pathResolver.resolve(`active/shared/coordination/channels/${surface}/notifications`), { recursive: true, force: true });
+    safeRmSync(
+      pathResolver.resolve(`active/shared/coordination/channels/${surface}/notifications`),
+      { recursive: true, force: true }
+    );
   }
   process.env.MISSION_ROLE = 'slack_bridge';
   for (const message of listSurfaceOutboxMessages('slack')) {
     clearSurfaceOutboxMessage('slack', message.message_id);
   }
-  safeRmSync(pathResolver.resolve('active/shared/coordination/channels/slack/notifications'), { recursive: true, force: true });
+  safeRmSync(pathResolver.resolve('active/shared/coordination/channels/slack/notifications'), {
+    recursive: true,
+    force: true,
+  });
   if (previousRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = previousRole;
 }
@@ -60,12 +66,15 @@ describe('surface-interaction-model', () => {
 
     expect(receipt.mode).toBe('outbox');
     const outbox = listSurfaceOutboxMessages('slack');
-    expect(outbox.some((entry) =>
-      entry.channel === 'C123' &&
-      entry.thread_ts === '1710000000.100' &&
-      entry.text === 'acknowledged' &&
-      entry.correlation_id === 'corr-1'
-    )).toBe(true);
+    expect(
+      outbox.some(
+        (entry) =>
+          entry.channel === 'C123' &&
+          entry.thread_ts === '1710000000.100' &&
+          entry.text === 'acknowledged' &&
+          entry.correlation_id === 'corr-1'
+      )
+    ).toBe(true);
   });
 
   it('routes iMessage replies through notifications', () => {
@@ -80,12 +89,15 @@ describe('surface-interaction-model', () => {
 
     expect(receipt.mode).toBe('notification');
     expect(receipt.notification?.surface).toBe('imessage');
-    expect(listSurfaceNotifications('imessage').some((entry) =>
-      entry.channel === 'chat-42' &&
-      entry.thread_ts === 'thread-42' &&
-      entry.text === 'iMessage ack' &&
-      entry.source_agent_id === 'imessage-surface-agent'
-    )).toBe(true);
+    expect(
+      listSurfaceNotifications('imessage').some(
+        (entry) =>
+          entry.channel === 'chat-42' &&
+          entry.thread_ts === 'thread-42' &&
+          entry.text === 'iMessage ack' &&
+          entry.source_agent_id === 'imessage-surface-agent'
+      )
+    ).toBe(true);
   });
 
   it('routes Discord replies through the outbox', () => {
@@ -100,12 +112,15 @@ describe('surface-interaction-model', () => {
     const receipt = message.reply({ text: 'discord ack', source: 'surface' });
 
     expect(receipt.mode).toBe('outbox');
-    expect(listSurfaceOutboxMessages('discord').some((entry) =>
-      entry.channel === 'guild-1' &&
-      entry.thread_ts === 'thread-1' &&
-      entry.text === 'discord ack' &&
-      entry.correlation_id === 'corr-discord'
-    )).toBe(true);
+    expect(
+      listSurfaceOutboxMessages('discord').some(
+        (entry) =>
+          entry.channel === 'guild-1' &&
+          entry.thread_ts === 'thread-1' &&
+          entry.text === 'discord ack' &&
+          entry.correlation_id === 'corr-discord'
+      )
+    ).toBe(true);
   });
 
   it('builds normalized Telegram surface conversation input', () => {
@@ -269,20 +284,79 @@ describe('surface-interaction-model', () => {
       actorId: 'slack-surface-agent',
     });
 
-    const result = await slack.responding(
-      async () => 'done',
-      {
-        title: 'Slack Task',
-        startedText: 'processing started',
-        completedText: 'processing completed',
-        sourceAgentId: 'slack-surface-agent',
-        requestId: 'REQ-SLACK-1',
-      },
-    );
+    const result = await slack.responding(async () => 'done', {
+      title: 'Slack Task',
+      startedText: 'processing started',
+      completedText: 'processing completed',
+      sourceAgentId: 'slack-surface-agent',
+      requestId: 'REQ-SLACK-1',
+    });
 
     expect(result).toBe('done');
     const notifications = listSurfaceNotifications('slack');
-    expect(notifications.some((entry) => entry.status === 'info' && entry.request_id === 'REQ-SLACK-1')).toBe(true);
-    expect(notifications.some((entry) => entry.status === 'success' && entry.request_id === 'REQ-SLACK-1')).toBe(true);
+    expect(
+      notifications.some((entry) => entry.status === 'info' && entry.request_id === 'REQ-SLACK-1')
+    ).toBe(true);
+    expect(
+      notifications.some(
+        (entry) => entry.status === 'success' && entry.request_id === 'REQ-SLACK-1'
+      )
+    ).toBe(true);
+  });
+
+  it('emits default progress notifications unless explicitly suppressed', async () => {
+    const slack = createSurfaceSpace({
+      surface: 'slack',
+      channel: 'C998',
+      threadTs: '1710000000.998',
+      correlationId: 'corr-slack-default',
+      actorId: 'slack-surface-agent',
+    });
+
+    await slack.responding(async () => 'done', {
+      requestId: 'REQ-SLACK-2',
+    });
+
+    const defaultNotifications = listSurfaceNotifications('slack').filter(
+      (entry) => entry.request_id === 'REQ-SLACK-2'
+    );
+    expect(
+      defaultNotifications.some((entry) => entry.status === 'info' && entry.text === 'Working')
+    ).toBe(true);
+    expect(
+      defaultNotifications.some((entry) => entry.status === 'success' && entry.text === 'Completed')
+    ).toBe(true);
+
+    const japaneseSlack = createSurfaceSpace({
+      surface: 'slack',
+      channel: 'C997',
+      threadTs: '1710000000.997',
+      correlationId: 'corr-slack-ja',
+      actorId: 'slack-surface-agent',
+      locale: 'ja',
+    });
+
+    await japaneseSlack.responding(async () => 'done', {
+      requestId: 'REQ-SLACK-JA',
+    });
+
+    const japaneseNotifications = listSurfaceNotifications('slack').filter(
+      (entry) => entry.request_id === 'REQ-SLACK-JA'
+    );
+    expect(
+      japaneseNotifications.some((entry) => entry.status === 'info' && entry.text === '処理中')
+    ).toBe(true);
+    expect(
+      japaneseNotifications.some((entry) => entry.status === 'success' && entry.text === '完了')
+    ).toBe(true);
+
+    await slack.responding(async () => 'done', {
+      requestId: 'REQ-SLACK-3',
+      progress: false,
+    });
+    const suppressedNotifications = listSurfaceNotifications('slack').filter(
+      (entry) => entry.request_id === 'REQ-SLACK-3'
+    );
+    expect(suppressedNotifications.length).toBe(0);
   });
 });

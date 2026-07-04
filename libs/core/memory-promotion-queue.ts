@@ -1,5 +1,6 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
@@ -32,6 +33,9 @@ export interface MemoryCandidate {
   ratification_required: boolean;
   status: MemoryCandidateStatus;
   queued_at: string;
+  content_hash?: string;
+  occurrences?: number;
+  last_seen?: string;
   ratified_at?: string;
   ratification_note?: string;
   promoted_ref?: string;
@@ -53,6 +57,27 @@ function ensureValidator(): ValidateFunction {
 function normalizeEvidenceRefs(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function normalizeContent(value: string): string {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function computeContentHash(candidate: Pick<MemoryCandidate, 'summary'>): string {
+  return createHash('sha256').update(normalizeContent(candidate.summary)).digest('hex');
+}
+
+function resolveContentHash(candidate: Pick<MemoryCandidate, 'summary' | 'content_hash'>): string {
+  return String(candidate.content_hash || '').trim() || computeContentHash(candidate);
+}
+
+function normalizeOccurrenceCount(value: unknown): number {
+  const count = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
+  return Math.max(1, count);
 }
 
 function parseJsonl(raw: string): MemoryCandidate[] {
@@ -92,6 +117,7 @@ export function createMemoryPromotionCandidate(input: {
   status?: MemoryCandidateStatus;
   queuedAt?: string;
 }): MemoryCandidate {
+  const now = input.queuedAt || new Date().toISOString();
   return {
     candidate_id:
       input.candidateId ||
@@ -107,7 +133,10 @@ export function createMemoryPromotionCandidate(input: {
         ? input.ratificationRequired
         : input.sensitivityTier !== 'personal',
     status: input.status || 'queued',
-    queued_at: input.queuedAt || new Date().toISOString(),
+    queued_at: now,
+    content_hash: computeContentHash({ summary: String(input.summary || '').trim() }),
+    occurrences: 1,
+    last_seen: now,
   };
 }
 
@@ -133,7 +162,61 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
     throw new Error(`Invalid memory promotion candidate: ${validation.errors.join('; ')}`);
   }
   ensureQueueDir();
-  safeAppendFileSync(QUEUE_PATH, `${JSON.stringify(candidate)}\n`);
+  const rows = listMemoryPromotionCandidates();
+  const contentHash = resolveContentHash(candidate);
+  const normalizedSourceRef = String(candidate.source_ref || '').trim();
+  const now = candidate.last_seen || candidate.queued_at || new Date().toISOString();
+  const existingIndex = rows.findIndex(
+    (row) =>
+      String(row.source_ref || '').trim() === normalizedSourceRef &&
+      resolveContentHash(row) === contentHash
+  );
+  if (existingIndex >= 0) {
+    const current = rows[existingIndex] as MemoryCandidate;
+    const nextOccurrences = normalizeOccurrenceCount(current.occurrences) + 1;
+    const mergedEvidenceRefs = Array.from(
+      new Set(
+        [...current.evidence_refs, ...candidate.evidence_refs]
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    );
+    const next: MemoryCandidate = {
+      ...current,
+      evidence_refs: mergedEvidenceRefs,
+      source_type: current.source_type,
+      source_ref: current.source_ref,
+      proposed_memory_kind: current.proposed_memory_kind,
+      summary: current.summary,
+      sensitivity_tier: current.sensitivity_tier,
+      ratification_required: current.ratification_required,
+      status: current.status,
+      queued_at: current.queued_at || candidate.queued_at,
+      content_hash: contentHash,
+      occurrences: nextOccurrences,
+      last_seen: now,
+    };
+    const updatedValidation = validateMemoryPromotionCandidate(next);
+    if (!updatedValidation.valid) {
+      throw new Error(
+        `Invalid memory promotion candidate update: ${updatedValidation.errors.join('; ')}`
+      );
+    }
+    rows[existingIndex] = next;
+    safeWriteFile(QUEUE_PATH, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    return QUEUE_PATH;
+  }
+  const nextCandidate: MemoryCandidate = {
+    ...candidate,
+    content_hash: contentHash,
+    occurrences: normalizeOccurrenceCount(candidate.occurrences),
+    last_seen: now,
+  };
+  const nextValidation = validateMemoryPromotionCandidate(nextCandidate);
+  if (!nextValidation.valid) {
+    throw new Error(`Invalid memory promotion candidate: ${nextValidation.errors.join('; ')}`);
+  }
+  safeAppendFileSync(QUEUE_PATH, `${JSON.stringify(nextCandidate)}\n`);
   return QUEUE_PATH;
 }
 

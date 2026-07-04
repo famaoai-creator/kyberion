@@ -13,9 +13,13 @@ import {
   ensureAgentRuntimeViaDaemon,
   toSupervisorEnsurePayload,
 } from './agent-runtime-supervisor-client.js';
-import { compileUserIntentFlow, formatClarificationPacket, formatClarificationPacketConcise } from './intent-contract.js';
+import {
+  compileUserIntentFlow,
+  formatClarificationPacket,
+  formatClarificationPacketConcise,
+} from './intent-contract.js';
 import { logger } from './core.js';
-import { validateSurfaceUxContract } from './surface-ux-contract.js';
+import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
   resolveFallbackLocationCoordinates,
   resolveFallbackLocationSummary,
@@ -26,10 +30,18 @@ import {
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
-import { classifyTaskSessionIntent, createTaskSession, saveTaskSession, updateTaskSession, getActiveTaskSession } from './task-session.js';
+import {
+  classifyTaskSessionIntent,
+  createTaskSession,
+  saveTaskSession,
+  updateTaskSession,
+  getActiveTaskSession,
+} from './task-session.js';
 import type { TaskSession } from './task-session.js';
 import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
+import { truncateTextWithCount } from './text-truncation.js';
+import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
@@ -39,7 +51,10 @@ import {
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import { recordSchedulePreference, resolveDefaultScheduleSource } from './contextual-intent-memory.js';
+import {
+  recordSchedulePreference,
+  resolveDefaultScheduleSource,
+} from './contextual-intent-memory.js';
 import { recordContextualIntentLearning } from './contextual-intent-learning.js';
 import {
   buildDelegationFallbackText,
@@ -112,6 +127,74 @@ interface SurfaceRuntimeRouteHandler {
   handle: (context: SurfaceRuntimeRouteContext) => Promise<SurfaceConversationResult>;
 }
 
+function appendCompletionClosure(text: string, completionSummary: string[]): string {
+  const closure = completionSummary.filter((line) => String(line || '').trim().length > 0);
+  if (closure.length === 0) return text;
+  return [text, '', ...closure].join('\n');
+}
+
+function toCompletionSummaryRecord(action: ReturnType<typeof buildCompletionNextAction>): {
+  satisfied: boolean;
+  delivered: string[];
+  gaps: string[];
+  next_step: string;
+  confidence: number;
+  evidence_refs: string[];
+} {
+  return {
+    satisfied: action.satisfied,
+    delivered: action.delivered,
+    gaps: action.gaps,
+    next_step: action.next_step,
+    confidence: action.confidence,
+    evidence_refs: action.evidence_refs,
+  };
+}
+
+function buildDirectReplyCompletionAction(params: {
+  request: string;
+  response: string;
+  sourceLabel: string;
+  satisfied: boolean;
+}) {
+  return buildCompletionNextAction({
+    goal: {
+      summary: params.request,
+      success_condition: params.request,
+    },
+    reconciliation: {
+      satisfied: params.satisfied,
+      delivered: params.response ? [params.response] : [],
+      gaps: params.satisfied ? [] : [`${params.sourceLabel} response was incomplete.`],
+      confidence: params.satisfied ? 0.88 : 0.52,
+      evidence_refs: [],
+    },
+  });
+}
+
+function buildTaskSessionCompletionAction(input: {
+  session: TaskSession;
+  output: string;
+  outputPath?: string;
+  satisfied: boolean;
+}) {
+  const preview =
+    summarizeUserFacingText(input.output) || input.session.artifact?.preview_text || '';
+  const evidenceRefs = [input.outputPath, input.session.artifact?.output_path]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  return buildCompletionNextAction({
+    goal: input.session.goal,
+    reconciliation: {
+      satisfied: input.satisfied,
+      delivered: [input.session.goal.summary, preview].filter(Boolean),
+      gaps: input.satisfied ? [] : ['Task session did not reach completion.'],
+      confidence: input.satisfied ? 0.92 : 0.55,
+      evidence_refs: evidenceRefs,
+    },
+  });
+}
+
 async function handleSurfaceQueryRoute(
   context: SurfaceRuntimeRouteContext,
   resolved: ReturnType<typeof resolveSurfaceIntent>
@@ -129,19 +212,28 @@ async function handleSurfaceQueryRoute(
 
   if (resolved.intentId === 'schedule-read-agenda') {
     const answer = await readScheduleAgenda(queryText);
+    const completionAction = buildDirectReplyCompletionAction({
+      request: queryText,
+      response: answer,
+      sourceLabel: 'calendar agenda',
+      satisfied: Boolean(answer.trim()),
+    });
     if (resolved.intentId) {
       recordLearningOutcomeSafely({
         intent_id: resolved.intentId,
         execution_shape: resolved.shape || 'direct_reply',
         contract_ref: { kind: 'direct_reply', ref: 'calendar-actuator:list_events' },
         success: true,
+        completion_summary: toCompletionSummaryRecord(completionAction),
         context_fingerprint: {
           execution_shape: resolved.shape,
           surface: context.input.surface || 'unknown',
         },
       });
     }
-    return emptySurfaceResult(answer);
+    return emptySurfaceResult(
+      appendCompletionClosure(answer, formatCompletionNextAction(completionAction))
+    );
   }
 
   if (queryType === 'knowledge_search') {
@@ -153,19 +245,28 @@ async function handleSurfaceQueryRoute(
       providerLabel,
       results,
     });
+    const completionAction = buildDirectReplyCompletionAction({
+      request: queryText,
+      response: text,
+      sourceLabel: providerLabel,
+      satisfied: results.length > 0,
+    });
     if (resolved.intentId) {
       recordLearningOutcomeSafely({
         intent_id: resolved.intentId,
         execution_shape: resolved.shape || 'direct_reply',
         contract_ref: { kind: 'direct_reply', ref: 'knowledge-query' },
         success: true,
+        completion_summary: toCompletionSummaryRecord(completionAction),
         context_fingerprint: {
           execution_shape: resolved.shape,
           surface: context.input.surface || 'unknown',
         },
       });
     }
-    return emptySurfaceResult(text);
+    return emptySurfaceResult(
+      appendCompletionClosure(text, formatCompletionNextAction(completionAction))
+    );
   }
 
   let answer = '';
@@ -191,12 +292,23 @@ async function handleSurfaceQueryRoute(
     answer = `Unsupported live query type for: ${queryText}`;
   }
 
+  const surfacedAnswer = answer.startsWith('Provider:')
+    ? answer.replace(/^Provider:\s*[^\n]+\n/u, '').trim()
+    : answer;
+  const completionAction = buildDirectReplyCompletionAction({
+    request: queryText,
+    response: surfacedAnswer,
+    sourceLabel: queryType,
+    satisfied: Boolean(surfacedAnswer.trim()),
+  });
+
   if (resolved.intentId) {
     recordLearningOutcomeSafely({
       intent_id: resolved.intentId,
       execution_shape: resolved.shape || 'direct_reply',
       contract_ref: { kind: 'direct_reply', ref: `live-query:${queryType}` },
       success: true,
+      completion_summary: toCompletionSummaryRecord(completionAction),
       context_fingerprint: {
         execution_shape: resolved.shape,
         surface: context.input.surface || 'unknown',
@@ -205,9 +317,7 @@ async function handleSurfaceQueryRoute(
   }
 
   return emptySurfaceResult(
-    answer.startsWith('Provider:')
-      ? answer.replace(/^Provider:\s*[^\n]+\n/u, '').trim()
-      : answer
+    appendCompletionClosure(surfacedAnswer, formatCompletionNextAction(completionAction))
   );
 }
 
@@ -221,7 +331,11 @@ async function handleTaskSessionRoute(
   let session = activeSession;
   let intent: any = null;
 
-  if (activeSession && activeSession.requirements?.missing && activeSession.requirements.missing.length > 0) {
+  if (
+    activeSession &&
+    activeSession.requirements?.missing &&
+    activeSession.requirements.missing.length > 0
+  ) {
     const missingList = activeSession.requirements.missing;
     const nextSlot = missingList[0];
 
@@ -233,8 +347,12 @@ async function handleTaskSessionRoute(
         const providerName = extractProviderFromUtterance(queryText);
         if (providerName) {
           const dataTopic = (activeSession.payload?.data_topic as string) ?? '';
-          const topicMatch = dataTopic.match(/(天気|weather|気温|温度|為替|レート|exchange\s*rate|ニュース|news|株価|stock)/i);
-          const locationMatch = dataTopic.match(/(秋葉原|渋谷|新宿|池袋|品川|横浜|大阪|名古屋|札幌|東京|[^\s]{2,5}(?:市|区|町|村|駅))/);
+          const topicMatch = dataTopic.match(
+            /(天気|weather|気温|温度|為替|レート|exchange\s*rate|ニュース|news|株価|stock)/i
+          );
+          const locationMatch = dataTopic.match(
+            /(秋葉原|渋谷|新宿|池袋|品川|横浜|大阪|名古屋|札幌|東京|[^\s]{2,5}(?:市|区|町|村|駅))/
+          );
           const topic = topicMatch?.[1] ?? '';
           const location = locationMatch?.[1] ?? '';
 
@@ -252,7 +370,11 @@ async function handleTaskSessionRoute(
       }
     }
 
-    const updatedPayload = { ...(activeSession.payload || {}), [nextSlot]: slotValue, ...extraPayload };
+    const updatedPayload = {
+      ...(activeSession.payload || {}),
+      [nextSlot]: slotValue,
+      ...extraPayload,
+    };
     const updatedMissing = missingList.slice(1);
     const updatedRequirements = { ...activeSession.requirements, missing: updatedMissing };
     const nextStatus = updatedMissing.length === 0 ? 'planning' : 'collecting_requirements';
@@ -276,7 +398,9 @@ async function handleTaskSessionRoute(
       );
     }
 
-    logger.info(`[SURFACE] Session ${activeSession.session_id} is now fully filled. Proceeding to execution.`);
+    logger.info(
+      `[SURFACE] Session ${activeSession.session_id} is now fully filled. Proceeding to execution.`
+    );
     session = updatedSession;
     intent = {
       intentId: (session!.payload?.intent_id as string) || '',
@@ -328,12 +452,19 @@ async function handleTaskSessionRoute(
         session,
         queryText,
       });
+      const completionAction = buildTaskSessionCompletionAction({
+        session: result.session,
+        output: result.output,
+        outputPath: result.outputPath,
+        satisfied: true,
+      });
       if (intent.intentId) {
         recordLearningOutcomeSafely({
           intent_id: intent.intentId,
           execution_shape: result.session.work_loop?.resolution.execution_shape || 'task_session',
           contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
           success: true,
+          completion_summary: toCompletionSummaryRecord(completionAction),
           context_fingerprint: {
             execution_shape: result.session.work_loop?.resolution.execution_shape,
             surface: context.input.surface || 'unknown',
@@ -344,14 +475,18 @@ async function handleTaskSessionRoute(
         buildTaskSessionReply({
           session: result.session,
           status: 'completed',
-          summary: summarizeUserFacingText(result.output) || result.session.artifact?.preview_text || '(no summary available)',
+          summary:
+            summarizeUserFacingText(result.output) ||
+            result.session.artifact?.preview_text ||
+            '(no summary available)',
           outputPath: result.outputPath,
           intentId: intent.intentId,
-        }),
+          completionSummary: formatCompletionNextAction(completionAction),
+        })
       );
     } catch (error: any) {
       logger.warn(
-        `[SURFACE] capture_photo task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`,
+        `[SURFACE] capture_photo task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`
       );
       if (intent.intentId) {
         recordLearningOutcomeSafely({
@@ -372,7 +507,7 @@ async function handleTaskSessionRoute(
           status: 'failed',
           error: error?.message || String(error),
           intentId: intent.intentId,
-        }),
+        })
       );
     }
   }
@@ -402,15 +537,18 @@ async function handleTaskSessionRoute(
         buildTaskSessionReply({
           session: result.session,
           status: 'completed',
-          summary: summarizeUserFacingText(result.output) || result.session.artifact?.preview_text || '(no summary available)',
+          summary:
+            summarizeUserFacingText(result.output) ||
+            result.session.artifact?.preview_text ||
+            '(no summary available)',
           outputPath: result.outputPath,
           intentId: intent.intentId,
           kind: result.kind,
-        }),
+        })
       );
     } catch (error: any) {
       logger.warn(
-        `[SURFACE] Claude task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`,
+        `[SURFACE] Claude task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`
       );
       if (intent.intentId) {
         recordLearningOutcomeSafely({
@@ -431,7 +569,7 @@ async function handleTaskSessionRoute(
           status: 'failed',
           error: error?.message || String(error),
           intentId: intent.intentId,
-        }),
+        })
       );
     }
   }
@@ -469,17 +607,18 @@ async function handleTaskSessionRoute(
         timeout: 15000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; Kyberion/2.0; +https://kyberion.ai)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'ja,en;q=0.5',
         },
       });
 
-      const rawHtml = typeof fetchResult === 'string'
-        ? fetchResult
-        : (fetchResult as any)?.body || (fetchResult as any)?.data || JSON.stringify(fetchResult);
+      const rawHtml =
+        typeof fetchResult === 'string'
+          ? fetchResult
+          : (fetchResult as any)?.body || (fetchResult as any)?.data || JSON.stringify(fetchResult);
 
       // 2. Strip HTML tags and extract readable text
-      const plainText = String(rawHtml)
+      const plainTextRaw = String(rawHtml)
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<[^>]+>/g, ' ')
@@ -489,8 +628,14 @@ async function handleTaskSessionRoute(
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
         .replace(/\s{2,}/g, ' ')
-        .trim()
-        .slice(0, 4000); // Limit context size
+        .trim();
+      const plainTextPreview = truncateTextWithCount(plainTextRaw, 4000);
+      const plainText = plainTextPreview.text;
+      if (plainTextPreview.omitted_count > 0) {
+        logger.info(
+          `[SURFACE] fetch-external-data truncated extracted page text by ${plainTextPreview.omitted_count} character(s) for ${sourceUrl}`
+        );
+      }
 
       if (!plainText || plainText.length < 20) {
         throw new Error(`取得したページからテキストを抽出できませんでした (URL: ${sourceUrl})`);
@@ -500,9 +645,13 @@ async function handleTaskSessionRoute(
       if (!knownServiceId) {
         try {
           registerService({ service_id: serviceIdHint, topic: dataTopic, url: sourceUrl });
-          logger.info(`[SURFACE] fetch-external-data: registered new service "${serviceIdHint}" for topic "${dataTopic}"`);
+          logger.info(
+            `[SURFACE] fetch-external-data: registered new service "${serviceIdHint}" for topic "${dataTopic}"`
+          );
         } catch (regErr: any) {
-          logger.warn(`[SURFACE] fetch-external-data: service registration failed: ${regErr?.message}`);
+          logger.warn(
+            `[SURFACE] fetch-external-data: service registration failed: ${regErr?.message}`
+          );
         }
       }
 
@@ -514,21 +663,26 @@ async function handleTaskSessionRoute(
       }
 
       // 5. Build the summary reply
+      const summaryPreview = truncateTextWithCount(plainText, 1500);
       const summary = [
         `**${dataTopic}** の情報を取得しました。`,
         ``,
-        plainText.slice(0, 1500),
-        plainText.length > 1500 ? `\n...(以降省略)` : '',
+        summaryPreview.text,
+        summaryPreview.omitted_count > 0
+          ? `\n...(以降 ${summaryPreview.omitted_count} 文字省略)`
+          : '',
         ``,
         `\`ソース: ${sourceUrl}\``,
       ].join('\n');
 
+      const preview = truncateTextWithCount(plainText, 500);
       const updated = updateTaskSession(session.session_id, {
         status: 'completed',
         artifact: {
           kind: 'external_data_fetch_result',
           output_path: pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
-          preview_text: plainText.slice(0, 500),
+          preview_text: preview.text,
+          omitted_count: preview.omitted_count,
           storage_class: 'tmp',
         },
       });
@@ -539,11 +693,18 @@ async function handleTaskSessionRoute(
         { mkdir: true, encoding: 'utf8' }
       );
 
+      const completionAction = buildTaskSessionCompletionAction({
+        session: updated || session,
+        output: summary,
+        outputPath: pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+        satisfied: true,
+      });
       recordLearningOutcomeSafely({
         intent_id: 'fetch-external-data',
         execution_shape: 'task_session',
         contract_ref: { kind: 'task_session_policy', ref: 'fetch-external-data' },
         success: true,
+        completion_summary: toCompletionSummaryRecord(completionAction),
         context_fingerprint: {
           domain: dataTopic,
           surface: context.input.surface || 'unknown',
@@ -557,6 +718,7 @@ async function handleTaskSessionRoute(
           status: 'completed',
           summary,
           intentId: intent.intentId,
+          completionSummary: formatCompletionNextAction(completionAction),
         })
       );
     } catch (error: any) {
@@ -616,7 +778,9 @@ async function handleTaskSessionRoute(
     try {
       let output = '';
       if (sessionIntentId === 'resolve-approval' || sessionIntentId === 'request-approval') {
-        const tempFile = pathResolver.sharedTmp(`approval-actuator-inputs/input-${session.session_id}.json`);
+        const tempFile = pathResolver.sharedTmp(
+          `approval-actuator-inputs/input-${session.session_id}.json`
+        );
         const actionInput = {
           action: sessionIntentId === 'resolve-approval' ? 'decide' : 'create',
           params: {
@@ -632,13 +796,17 @@ async function handleTaskSessionRoute(
               summary: queryText,
               severity: 'medium',
             },
-          }
+          },
         };
         safeWriteFile(tempFile, JSON.stringify(actionInput, null, 2), { mkdir: true });
 
-        const execRes = safeExec('node', ['dist/libs/actuators/approval-actuator/src/index.js', '--input', tempFile], {
-          cwd: pathResolver.rootDir(),
-        });
+        const execRes = safeExec(
+          'node',
+          ['dist/libs/actuators/approval-actuator/src/index.js', '--input', tempFile],
+          {
+            cwd: pathResolver.rootDir(),
+          }
+        );
 
         const resultJson = JSON.parse(execRes);
         output = `[Approval-Actuator] 承認アクション [${actionInput.action}] が正常に完了しました。\n結果: ${JSON.stringify(resultJson, null, 2)}`;
@@ -647,9 +815,13 @@ async function handleTaskSessionRoute(
         output = `[Messaging Bridge] ${platformId} とのメッセージ同期連携ブリッジを正常に起動・有効化しました。接続された認証トークンを確認し、チャンネル統合を完了しました。`;
       } else if (sessionIntentId === 'inspect-service') {
         const serviceName = session.payload?.service_name || 'voice-hub';
-        const supervisorOutput = safeExec('node', ['dist/scripts/agent_runtime_supervisor_status.js'], {
-          cwd: pathResolver.rootDir(),
-        });
+        const supervisorOutput = safeExec(
+          'node',
+          ['dist/scripts/agent_runtime_supervisor_status.js'],
+          {
+            cwd: pathResolver.rootDir(),
+          }
+        );
         output = `サービス [${serviceName}] のステータスを確認しました。\n\n${supervisorOutput}`;
       } else if (sessionIntentId === 'start-service') {
         const serviceName = String(session.payload?.service_name || '').trim();
@@ -685,7 +857,9 @@ async function handleTaskSessionRoute(
         output = `サービス [${serviceName}] を停止しました。\n\n${controlOutput}`;
       } else if (sessionIntentId === 'enable-voice-input') {
         const serviceName = session.payload?.service_name || 'voice-hub';
-        const tempFile = pathResolver.sharedTmp(`system-actuator-inputs/input-${session.session_id}.json`);
+        const tempFile = pathResolver.sharedTmp(
+          `system-actuator-inputs/input-${session.session_id}.json`
+        );
         const actionInput = {
           version: '0.1',
           kind: 'computer_interaction',
@@ -699,9 +873,13 @@ async function handleTaskSessionRoute(
           },
         };
         safeWriteFile(tempFile, JSON.stringify(actionInput, null, 2), { mkdir: true });
-        const execRes = safeExec('node', ['dist/libs/actuators/system-actuator/src/index.js', '--input', tempFile], {
-          cwd: pathResolver.rootDir(),
-        });
+        const execRes = safeExec(
+          'node',
+          ['dist/libs/actuators/system-actuator/src/index.js', '--input', tempFile],
+          {
+            cwd: pathResolver.rootDir(),
+          }
+        );
         const resultJson = JSON.parse(execRes);
         output = `[System-Actuator] 音声入力を有効化しました。対象: ${serviceName}\n結果: ${JSON.stringify(resultJson, null, 2)}`;
       } else {
@@ -713,7 +891,7 @@ async function handleTaskSessionRoute(
         artifact: {
           kind: `${sessionIntentId}_result`,
           output_path: pathResolver.sharedTmp(`service-operations/${session.session_id}.txt`),
-          preview_text: output.slice(0, 500),
+          ...truncateTextWithCount(output, 500),
           storage_class: 'tmp',
         },
       });
@@ -724,20 +902,26 @@ async function handleTaskSessionRoute(
         { mkdir: true, encoding: 'utf8' }
       );
 
+      const completionAction = buildTaskSessionCompletionAction({
+        session: updated || session,
+        output: output,
+        outputPath: `${pathResolver.sharedTmp(`service-operations/${session.session_id}.txt`)}`,
+        satisfied: true,
+      });
       if (intent.intentId) {
         recordLearningOutcomeSafely({
           intent_id: intent.intentId,
           execution_shape: 'task_session',
           contract_ref: { kind: 'task_session_policy', ref: intent.intentId },
           success: true,
+          completion_summary: toCompletionSummaryRecord(completionAction),
           context_fingerprint: {
             execution_shape: 'task_session',
             surface: context.input.surface || 'unknown',
           },
         });
       }
-
-      const completionSummary =
+      const summaryText =
         sessionIntentId === 'enable-voice-input'
           ? '音声入力を有効化しました。'
           : `オペレーション [${sessionIntentId}] が正常に完了しました。`;
@@ -746,14 +930,15 @@ async function handleTaskSessionRoute(
         buildTaskSessionReply({
           session: updated || session,
           status: 'completed',
-          summary: completionSummary,
+          summary: summaryText,
           intentId: intent.intentId,
+          completionSummary: formatCompletionNextAction(completionAction),
         })
       );
     } catch (error: any) {
       const sessionIntentId = (session.payload?.intent_id as string) || intent.intentId || '';
       logger.warn(
-        `[SURFACE] Service operation execution failed for ${session.session_id}: ${error?.message || String(error)}`,
+        `[SURFACE] Service operation execution failed for ${session.session_id}: ${error?.message || String(error)}`
       );
 
       const blocked = updateTaskSession(session.session_id, {
@@ -817,13 +1002,24 @@ async function handleTaskSessionRoute(
         ? `必要な確認点があります。`
         : '必要な情報はそろっています。',
       missingInputs: session.requirements?.missing || [],
-      serviceOptions: Array.isArray(session.payload?.startable_services) && sessionIntentId === 'start-service'
-        ? (session.payload?.startable_services as Array<string | { service_name?: string; service_id?: string; surface_id?: string; description?: string; kind?: string; startup_mode?: string }>)
-        : Array.isArray(session.payload?.active_services)
-          ? (session.payload?.active_services as string[])
-        : Array.isArray(session.payload?.service_choices)
-          ? (session.payload?.service_choices as string[])
-          : undefined,
+      serviceOptions:
+        Array.isArray(session.payload?.startable_services) && sessionIntentId === 'start-service'
+          ? (session.payload?.startable_services as Array<
+              | string
+              | {
+                  service_name?: string;
+                  service_id?: string;
+                  surface_id?: string;
+                  description?: string;
+                  kind?: string;
+                  startup_mode?: string;
+                }
+            >)
+          : Array.isArray(session.payload?.active_services)
+            ? (session.payload?.active_services as string[])
+            : Array.isArray(session.payload?.service_choices)
+              ? (session.payload?.service_choices as string[])
+              : undefined,
       handoffIntentId: handoffIntentId || undefined,
     })
   );
@@ -855,7 +1051,9 @@ function shouldPromoteToMission(context: SurfaceRuntimeRouteContext): boolean {
   return routeFamily === 'task_session' || routeFamily === 'pipeline';
 }
 
-function buildWorkScopeGovernancePayload(context: SurfaceRuntimeRouteContext): Record<string, unknown> | null {
+function buildWorkScopeGovernancePayload(
+  context: SurfaceRuntimeRouteContext
+): Record<string, unknown> | null {
   const workScopeDecision = getWorkScopeDecision(context);
   if (!workScopeDecision) return null;
   const routingDecision = context.compiledFlow?.routingDecision;
@@ -865,13 +1063,15 @@ function buildWorkScopeGovernancePayload(context: SurfaceRuntimeRouteContext): R
   };
 }
 
-function buildWorkScopeGovernanceReceipt(context: SurfaceRuntimeRouteContext): {
-  policy_version?: string;
-  promotion_required?: boolean;
-  matched_rule_ids?: string[];
-  mandatory_triggers?: string[];
-  accumulation_triggers?: string[];
-} | undefined {
+function buildWorkScopeGovernanceReceipt(context: SurfaceRuntimeRouteContext):
+  | {
+      policy_version?: string;
+      promotion_required?: boolean;
+      matched_rule_ids?: string[];
+      mandatory_triggers?: string[];
+      accumulation_triggers?: string[];
+    }
+  | undefined {
   const workScopeDecision = getWorkScopeDecision(context);
   if (!workScopeDecision) return undefined;
   return {
@@ -1123,7 +1323,13 @@ async function handleGovernedExecutionHint(
     try {
       output = safeExec(
         'node',
-        ['dist/scripts/mission_controller.js', 'create', missionId, 'public', ...routingDecisionArgs],
+        [
+          'dist/scripts/mission_controller.js',
+          'create',
+          missionId,
+          'public',
+          ...routingDecisionArgs,
+        ],
         {
           cwd: pathResolver.rootDir(),
         }
@@ -1203,9 +1409,13 @@ async function handleGovernedExecutionHint(
   const command = `node dist/scripts/mission_controller.js ${mapped.join(' ')}`;
   let output = '';
   try {
-    output = safeExec('node', ['dist/scripts/mission_controller.js', ...mapped, ...routingDecisionArgs], {
-      cwd: pathResolver.rootDir(),
-    });
+    output = safeExec(
+      'node',
+      ['dist/scripts/mission_controller.js', ...mapped, ...routingDecisionArgs],
+      {
+        cwd: pathResolver.rootDir(),
+      }
+    );
     if (intentId) {
       recordLearningOutcomeSafely({
         intent_id: intentId,
@@ -1565,8 +1775,8 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
       const resolved = resolvedSurfaceIntent(context);
       return Boolean(
         resolved.routeFamily === 'pipeline' ||
-          resolved.routeFamily === 'mission' ||
-          shouldPromoteToMission(context),
+        resolved.routeFamily === 'mission' ||
+        shouldPromoteToMission(context)
       );
     },
     handle: async (context) => {
@@ -1613,12 +1823,18 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
   },
   {
     matches: (context) => {
-      const surface = context.input.surface || surfaceChannelFromAgentId(context.input.agentId) || 'presence';
+      const surface =
+        context.input.surface || surfaceChannelFromAgentId(context.input.agentId) || 'presence';
       const activeSession = getActiveTaskSession(surface);
       const hasActiveSlotFilling = Boolean(
-        activeSession && activeSession.requirements?.missing && activeSession.requirements.missing.length > 0
+        activeSession &&
+        activeSession.requirements?.missing &&
+        activeSession.requirements.missing.length > 0
       );
-      return hasActiveSlotFilling || Boolean(classifyTaskSessionIntent(structuredSurfaceQueryText(context)));
+      return (
+        hasActiveSlotFilling ||
+        Boolean(classifyTaskSessionIntent(structuredSurfaceQueryText(context)))
+      );
     },
     handle: async (context) => {
       try {
@@ -1653,8 +1869,7 @@ export async function runSurfaceConversation(
   const routingText = input.threadContext
     ? `${input.threadContext}\n\nCurrent incoming message:\n${routedSurfaceInput.text}`
     : routedSurfaceInput.text;
-  const ruleBasedReceiver =
-    forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);
+  const ruleBasedReceiver = forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);
   const compiledFlow: UserIntentFlow | null = shouldCompileSurfaceIntent(
     input,
     routingText,
@@ -1672,16 +1887,19 @@ export async function runSurfaceConversation(
     : null;
 
   if (compiledFlow?.clarificationPacket) {
-    return attachRoutingDecision({
-      text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, { locale: 'ja' }),
-      a2uiMessages: [],
-      a2aMessages: [],
-      delegationResults: [],
-      approvalRequests: [],
-      routingProposals: [],
-      missionProposals: [],
-      planningPackets: [],
-    }, compiledFlow.routingDecision);
+    return attachRoutingDecision(
+      {
+        text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, { locale: 'ja' }),
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        routingProposals: [],
+        missionProposals: [],
+        planningPackets: [],
+      },
+      compiledFlow.routingDecision
+    );
   }
 
   const computedReceiver: SurfaceDelegationReceiver | undefined =
@@ -1698,7 +1916,9 @@ export async function runSurfaceConversation(
         'Governed execution brief:',
         JSON.stringify(compiledFlow.executionBrief, null, 2),
         compiledFlow.executionBrief?.workflow_steps?.length ? '' : undefined,
-        compiledFlow.executionBrief?.workflow_steps?.length ? 'Governed workflow steps:' : undefined,
+        compiledFlow.executionBrief?.workflow_steps?.length
+          ? 'Governed workflow steps:'
+          : undefined,
         compiledFlow.executionBrief?.workflow_steps?.length
           ? JSON.stringify(compiledFlow.executionBrief.workflow_steps, null, 2)
           : undefined,
@@ -1779,14 +1999,17 @@ export async function runSurfaceConversation(
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
-    return attachRoutingDecision({
-      ...firstBlocks,
-      delegationResults: finalDelegationResults,
-      approvalRequests: firstBlocks.approvalRequests,
-      routingProposals,
-      missionProposals: firstBlocks.missionProposals,
-      planningPackets: firstBlocks.planningPackets,
-    }, compiledFlow?.routingDecision);
+    return attachRoutingDecision(
+      {
+        ...firstBlocks,
+        delegationResults: finalDelegationResults,
+        approvalRequests: firstBlocks.approvalRequests,
+        routingProposals,
+        missionProposals: firstBlocks.missionProposals,
+        planningPackets: firstBlocks.planningPackets,
+      },
+      compiledFlow?.routingDecision
+    );
   }
 
   const summaryInstruction = input.delegationSummaryInstruction
@@ -1801,22 +2024,25 @@ export async function runSurfaceConversation(
   const followUpResponse = await handle.ask(summaryPrompt);
   const followUpBlocks = extractSurfaceBlocks(followUpResponse);
 
-  return attachRoutingDecision({
-    text: followUpBlocks.text,
-    a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
-    a2aMessages: firstBlocks.a2aMessages,
-    delegationResults: finalDelegationResults,
-    approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
-    routingProposals,
-    missionProposals: [
-      ...(firstBlocks.missionProposals || []),
-      ...(followUpBlocks.missionProposals || []),
-    ],
-    planningPackets: [
-      ...(firstBlocks.planningPackets || []),
-      ...(followUpBlocks.planningPackets || []),
-    ],
-  }, compiledFlow?.routingDecision);
+  return attachRoutingDecision(
+    {
+      text: followUpBlocks.text,
+      a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
+      a2aMessages: firstBlocks.a2aMessages,
+      delegationResults: finalDelegationResults,
+      approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
+      routingProposals,
+      missionProposals: [
+        ...(firstBlocks.missionProposals || []),
+        ...(followUpBlocks.missionProposals || []),
+      ],
+      planningPackets: [
+        ...(firstBlocks.planningPackets || []),
+        ...(followUpBlocks.planningPackets || []),
+      ],
+    },
+    compiledFlow?.routingDecision
+  );
 }
 
 export async function runSurfaceMessageConversation(
@@ -1833,7 +2059,21 @@ export async function runSurfaceMessageConversation(
     if (typeof text === 'string' && text.trim()) {
       const verdict = validateSurfaceUxContract({ text });
       if (!verdict.valid) {
-        logger.warn(`[UX_CONTRACT] surface response violates contract: ${verdict.violations.join('; ')}`);
+        const repairedText = repairSurfaceUxContractText(text);
+        if (repairedText !== text) {
+          const repairedVerdict = validateSurfaceUxContract({ text: repairedText });
+          if (repairedVerdict.valid) {
+            (result as { text?: string }).text = repairedText;
+            (result as { uxContract?: unknown }).uxContract = repairedVerdict;
+            logger.info(
+              `[UX_CONTRACT] surface response repaired before delivery: ${verdict.violations.join('; ')}`
+            );
+            return result;
+          }
+        }
+        logger.warn(
+          `[UX_CONTRACT] surface response violates contract: ${verdict.violations.join('; ')}`
+        );
       }
       (result as { uxContract?: unknown }).uxContract = verdict;
     }

@@ -17,7 +17,16 @@ import {
   Type,
   Ruler,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   composeWebDesignSystem,
   DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
@@ -307,6 +316,8 @@ export default function ChronosMirrorV2() {
     string | null
   >(null);
   const [focusedOperatorMissionId, setFocusedOperatorMissionId] = useState<string | null>(null);
+  const [tenantCssVars, setTenantCssVars] = useState<Record<string, string>>({});
+  const [tenantLabel, setTenantLabel] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     taxonomy: false,
     cycle: false,
@@ -466,565 +477,630 @@ export default function ChronosMirrorV2() {
   const webLayout = WEB_DESIGN_SYSTEM.layout;
 
   return (
-    <main
-      className="min-h-screen w-screen overflow-hidden bg-[var(--kb-bg-main)] text-white"
-      style={WEB_DESIGN_SYSTEM.css_vars as CSSProperties}
-    >
-      <div className="absolute inset-0 pointer-events-none opacity-60">
-        <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-cyan-500/10 blur-[160px]" />
-        <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-cyan-400/5 blur-[150px]" />
-        <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full bg-slate-500/5 blur-[160px]" />
-      </div>
-      <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.06]" />
-      <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(255,248,225,0.05)_0%,transparent_18%,transparent_82%,rgba(148,163,184,0.04)_100%)]" />
+    <Suspense fallback={null}>
+      <TenantDesignBridge
+        onResolve={(cssVars, label) => {
+          setTenantCssVars(cssVars);
+          setTenantLabel(label);
+        }}
+      />
+      <main
+        className="min-h-screen w-screen overflow-hidden bg-[var(--kb-bg-main)] text-white"
+        style={{ ...(WEB_DESIGN_SYSTEM.css_vars as CSSProperties), ...tenantCssVars }}
+      >
+        <div className="absolute inset-0 pointer-events-none opacity-60">
+          <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-cyan-500/10 blur-[160px]" />
+          <div className="absolute top-[18%] right-[12%] h-[20rem] w-[20rem] rounded-full bg-cyan-400/5 blur-[150px]" />
+          <div className="absolute bottom-[-12%] left-[32%] h-[26rem] w-[26rem] rounded-full bg-slate-500/5 blur-[160px]" />
+        </div>
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.06]" />
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(255,248,225,0.05)_0%,transparent_18%,transparent_82%,rgba(148,163,184,0.04)_100%)]" />
 
-      <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6 xl:h-screen xl:overflow-hidden">
-        <header className="px-1 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10">
-                <Shield className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold">
-                  Chronos Mirror
+        <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6 xl:h-screen xl:overflow-hidden">
+          <header className="px-1 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10">
+                  <Shield className="h-5 w-5 text-cyan-400" />
                 </div>
-                <h1 className="text-lg font-bold tracking-tight text-white/90">Control Plane</h1>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <IdentityBadge />
-              <button
-                onClick={() => setAgentPanelOpen(true)}
-                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400"
-              >
-                <Cpu size={12} />
-                <span>{uxText('chronos_agent_runtimes', 'Agent Runtimes', locale)}</span>
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr),minmax(0,0.85fr)]">
-          <div className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-white/42">
-              <span>{webTheme.name}</span>
-              <span className="text-white/20">·</span>
-              <span>{WEB_DESIGN_SYSTEM.design_system.pack_id}</span>
-              <span className="text-white/20">·</span>
-              <span>{webTheme.colors.accent}</span>
-            </div>
-            <div className="mt-4 max-w-3xl">
-              <h2 className="text-2xl font-semibold tracking-tight text-white/92 md:text-[2rem]">
-                Web site も PowerPoint と同じように、Theme と Structure を分けて組み立てる。
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200/68">
-                この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack`
-                でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。
-              </p>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {WEB_DESIGN_SYSTEM.section_order.map((sectionId) => (
-                <span
-                  key={sectionId}
-                  className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/68"
-                >
-                  {sectionId}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
-                <Palette size={12} />
-                Theme
-              </div>
-              <div className="mt-2 text-sm font-semibold text-white/90">{webTheme.name}</div>
-              <div className="mt-2 text-[11px] leading-6 text-cyan-50/72">
-                {WEB_DESIGN_SYSTEM.theme.web.snapshot_summary}
-              </div>
-            </div>
-            <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
-                <LayoutGrid size={12} />
-                Layout
-              </div>
-              <div className="mt-2 text-sm font-semibold text-white/90">
-                {webLayout.grid_columns}-column grid
-              </div>
-              <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
-                Container {webLayout.container_max_width}
-              </div>
-            </div>
-            <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
-                <Type size={12} />
-                Typography
-              </div>
-              <div className="mt-2 text-sm font-semibold text-white/90">
-                {webTheme.fonts.heading}
-              </div>
-              <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
-                Body {webTheme.fonts.body}
-              </div>
-            </div>
-            <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
-                <Ruler size={12} />
-                Surface
-              </div>
-              <div className="mt-2 text-sm font-semibold text-white/90">
-                {webLayout.panel_radius} / {webLayout.surface_radius}
-              </div>
-              <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
-                {webLayout.section_gap} section gap
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <FirstRunBanner />
-
-        <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
-          <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
-            <div className="flex flex-col gap-6">
-              <section
-                id="operator-quick-actions"
-                className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
-                      {uxText('chronos_quick_actions', 'Quick Actions', locale)}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-200/65">
-                      {uxText(
-                        'chronos_grouped_by_operator_intent',
-                        'These drive the active A2UI surface on the right.',
-                        locale
-                      )}
-                    </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold">
+                    Chronos Mirror
                   </div>
+                  <h1 className="text-lg font-bold tracking-tight text-white/90">Control Plane</h1>
                 </div>
-
-                <div className="space-y-5">
-                  {QUICK_ACTION_GROUPS.map((group) => {
-                    const Icon = group.icon;
-                    return (
-                      <div
-                        key={group.title}
-                        className="overflow-hidden rounded-2xl border border-white/8 bg-black/20"
-                      >
-                        <div className={`bg-gradient-to-r ${group.accent} px-3 py-3`}>
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/6">
-                              <Icon size={14} className={group.accentText} />
-                            </div>
-                            <div>
-                              <div
-                                className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${group.accentText}`}
-                              >
-                                {group.title}
-                              </div>
-                              <div className="mt-1 text-[11px] leading-5 text-slate-200/58">
-                                {group.hint}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-2 p-3">
-                          {group.actions.map((action) => (
-                            <button
-                              key={action.label}
-                              onClick={() => handleQuickAction(action.query)}
-                              className="flex items-center justify-between rounded-xl border border-white/8 bg-slate-950/55 px-3 py-2 text-left transition hover:border-white/18 hover:bg-slate-900/80"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="text-sm">{action.icon}</div>
-                                <div>
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/88">
-                                    {action.label}
-                                  </div>
-                                  <div className="text-[10px] uppercase tracking-[0.14em] text-slate-400/70">
-                                    {action.tone}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-[10px] uppercase tracking-[0.2em] text-white/38">
-                                Run
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+              </div>
+              {tenantLabel ? (
+                <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100/80">
+                  {tenantLabel}
                 </div>
-              </section>
+              ) : null}
 
-              <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
-                <div className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
-                  <div className="flex items-end justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <IdentityBadge />
+                <button
+                  onClick={() => setAgentPanelOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400"
+                >
+                  <Cpu size={12} />
+                  <span>{uxText('chronos_agent_runtimes', 'Agent Runtimes', locale)}</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr),minmax(0,0.85fr)]">
+            <div className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-white/42">
+                <span>{webTheme.name}</span>
+                <span className="text-white/20">·</span>
+                <span>{WEB_DESIGN_SYSTEM.design_system.pack_id}</span>
+                <span className="text-white/20">·</span>
+                <span>{webTheme.colors.accent}</span>
+              </div>
+              <div className="mt-4 max-w-3xl">
+                <h2 className="text-2xl font-semibold tracking-tight text-white/92 md:text-[2rem]">
+                  Web site も PowerPoint と同じように、Theme と Structure を分けて組み立てる。
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200/68">
+                  この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack`
+                  でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。
+                </p>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {WEB_DESIGN_SYSTEM.section_order.map((sectionId) => (
+                  <span
+                    key={sectionId}
+                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/68"
+                  >
+                    {sectionId}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                  <Palette size={12} />
+                  Theme
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white/90">{webTheme.name}</div>
+                <div className="mt-2 text-[11px] leading-6 text-cyan-50/72">
+                  {WEB_DESIGN_SYSTEM.theme.web.snapshot_summary}
+                </div>
+              </div>
+              <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                  <LayoutGrid size={12} />
+                  Layout
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white/90">
+                  {webLayout.grid_columns}-column grid
+                </div>
+                <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                  Container {webLayout.container_max_width}
+                </div>
+              </div>
+              <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                  <Type size={12} />
+                  Typography
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white/90">
+                  {webTheme.fonts.heading}
+                </div>
+                <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                  Body {webTheme.fonts.body}
+                </div>
+              </div>
+              <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                  <Ruler size={12} />
+                  Surface
+                </div>
+                <div className="mt-2 text-sm font-semibold text-white/90">
+                  {webLayout.panel_radius} / {webLayout.surface_radius}
+                </div>
+                <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                  {webLayout.section_gap} section gap
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <FirstRunBanner />
+
+          <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
+            <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
+              <div className="flex flex-col gap-6">
+                <section
+                  id="operator-quick-actions"
+                  className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4 md:p-5"
+                >
+                  <div className="mb-4 flex items-center justify-between">
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
-                        Scenarios
+                        {uxText('chronos_quick_actions', 'Quick Actions', locale)}
                       </div>
                       <div className="mt-1 text-sm text-slate-200/65">
-                        Pick the task. Jump once.
+                        {uxText(
+                          'chronos_grouped_by_operator_intent',
+                          'These drive the active A2UI surface on the right.',
+                          locale
+                        )}
                       </div>
                     </div>
-                    <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
-                      1-7
-                    </div>
                   </div>
-                  <div className="mt-4 grid gap-2">
-                    {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
-                      const active =
-                        (scenario.surface === 'mission-intelligence' &&
-                          missionIntelligenceFocus === scenario.targetId) ||
-                        (scenario.surface === 'focused-operator' &&
-                          focusedOperatorView === scenario.targetId);
+
+                  <div className="space-y-5">
+                    {QUICK_ACTION_GROUPS.map((group) => {
+                      const Icon = group.icon;
                       return (
-                        <button
-                          key={scenario.label}
-                          type="button"
-                          onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
-                          className={`rounded-2xl border px-3 py-3 text-left transition ${
-                            active
-                              ? 'border-cyan-400/30 bg-cyan-400/10'
-                              : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
-                          }`}
+                        <div
+                          key={group.title}
+                          className="overflow-hidden rounded-2xl border border-white/8 bg-black/20"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-black/25 text-[9px] uppercase tracking-[0.16em] text-white/60">
-                                  {index + 1}
+                          <div className={`bg-gradient-to-r ${group.accent} px-3 py-3`}>
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/6">
+                                <Icon size={14} className={group.accentText} />
+                              </div>
+                              <div>
+                                <div
+                                  className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${group.accentText}`}
+                                >
+                                  {group.title}
                                 </div>
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
-                                  {scenario.label}
+                                <div className="mt-1 text-[11px] leading-5 text-slate-200/58">
+                                  {group.hint}
                                 </div>
                               </div>
-                              <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
-                                {scenario.detail}
-                              </div>
-                            </div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/70">
-                              {scenario.actionLabel}
                             </div>
                           </div>
-                        </button>
+
+                          <div className="grid gap-2 p-3">
+                            {group.actions.map((action) => (
+                              <button
+                                key={action.label}
+                                onClick={() => handleQuickAction(action.query)}
+                                className="flex items-center justify-between rounded-xl border border-white/8 bg-slate-950/55 px-3 py-2 text-left transition hover:border-white/18 hover:bg-slate-900/80"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="text-sm">{action.icon}</div>
+                                  <div>
+                                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/88">
+                                      {action.label}
+                                    </div>
+                                    <div className="text-[10px] uppercase tracking-[0.14em] text-slate-400/70">
+                                      {action.tone}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] uppercase tracking-[0.2em] text-white/38">
+                                  Run
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
-                  <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] text-white/34 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                      Scenarios · 1-7
-                    </div>
-                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                      Thread · T / C
-                    </div>
-                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                      Sessions · 1-9 / J K
-                    </div>
-                    <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
-                      Traces · 1-9 / J K / R
-                    </div>
-                  </div>
-                </div>
+                </section>
 
-                {activeScenario ? (
-                  <section className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
-                    <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
-                      Current
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-white/90">
-                      {activeScenario.label}
-                    </div>
-                    <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
-                        Next
-                      </div>
-                      <div className="mt-1 text-[11px] leading-5 text-white/72">
-                        {activeScenario.nextStep}
-                      </div>
-                      <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
-                        Hotkey{' '}
-                        {OPERATOR_SCENARIO_PRESETS.findIndex(
-                          (scenario) => scenario.label === activeScenario.label
-                        ) + 1}
-                      </div>
-                    </div>
-                    {activeScenario.surface === 'mission-intelligence' ? (
-                      <button
-                        type="button"
-                        onClick={() => setMissionIntelligenceFocus(null)}
-                        className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
-                      >
-                        Clear
-                      </button>
-                    ) : null}
-                  </section>
-                ) : null}
-              </section>
-
-              <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
-                {STATUS_CARDS.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <button
-                      key={card.label}
-                      type="button"
-                      onClick={() => handleSectionJump(card.targetId)}
-                      className="kyberion-glass rounded-2xl border border-white/8 p-4 text-left transition hover:border-white/16 hover:bg-white/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-xl border ${card.accent}`}
-                        >
-                          <Icon size={15} />
+                <section className="grid gap-3 xl:grid-cols-[1.35fr,0.85fr]">
+                  <div className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.055),rgba(255,255,255,0.02))] p-4">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
+                          Scenarios
                         </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400/80">
-                            {card.label}
-                          </div>
-                          <div className="mt-1 text-base font-semibold text-white/90">
-                            {card.value}
-                          </div>
+                        <div className="mt-1 text-sm text-slate-200/65">
+                          Pick the task. Jump once.
                         </div>
                       </div>
-                      <p className="mt-3 text-[11px] leading-5 text-slate-200/58">{card.detail}</p>
-                      <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-white/35">
-                        {uxText('chronos_jump_to_section', 'Jump to section', locale)}
+                      <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
+                        1-7
                       </div>
-                    </button>
-                  );
-                })}
-              </section>
-
-              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
-                <button
-                  onClick={() => toggleSection('views')}
-                  className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
-                >
-                  <span>Operator Views</span>
-                  {expandedSections.views ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                </button>
-                {expandedSections.views && (
-                  <>
-                    <div className="mt-2 text-sm text-slate-200/68">
-                      Use this menu to switch the main console into a single focused operator view,
-                      including the runtime map.
                     </div>
                     <div className="mt-4 grid gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFocusedOperatorView(null)}
-                        className={`rounded-2xl border px-3 py-3 text-left transition ${
-                          focusedOperatorView === null
-                            ? 'border-cyan-400/30 bg-cyan-400/10'
-                            : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
-                        }`}
-                      >
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
-                          Full Console
+                      {OPERATOR_SCENARIO_PRESETS.map((scenario, index) => {
+                        const active =
+                          (scenario.surface === 'mission-intelligence' &&
+                            missionIntelligenceFocus === scenario.targetId) ||
+                          (scenario.surface === 'focused-operator' &&
+                            focusedOperatorView === scenario.targetId);
+                        return (
+                          <button
+                            key={scenario.label}
+                            type="button"
+                            onClick={() => handleScenarioOpen(scenario.targetId, scenario.surface)}
+                            className={`rounded-2xl border px-3 py-3 text-left transition ${
+                              active
+                                ? 'border-cyan-400/30 bg-cyan-400/10'
+                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-black/25 text-[9px] uppercase tracking-[0.16em] text-white/60">
+                                    {index + 1}
+                                  </div>
+                                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
+                                    {scenario.label}
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
+                                  {scenario.detail}
+                                </div>
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/70">
+                                {scenario.actionLabel}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 grid gap-2 text-[9px] uppercase tracking-[0.18em] text-white/34 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Scenarios · 1-7
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Thread · T / C
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Sessions · 1-9 / J K
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/18 px-3 py-2">
+                        Traces · 1-9 / J K / R
+                      </div>
+                    </div>
+                  </div>
+
+                  {activeScenario ? (
+                    <section className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+                      <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                        Current
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-white/90">
+                        {activeScenario.label}
+                      </div>
+                      <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+                          Next
                         </div>
-                        <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
-                          Show the complete control surface with all operator sections.
+                        <div className="mt-1 text-[11px] leading-5 text-white/72">
+                          {activeScenario.nextStep}
+                        </div>
+                        <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-white/30">
+                          Hotkey{' '}
+                          {OPERATOR_SCENARIO_PRESETS.findIndex(
+                            (scenario) => scenario.label === activeScenario.label
+                          ) + 1}
+                        </div>
+                      </div>
+                      {activeScenario.surface === 'mission-intelligence' ? (
+                        <button
+                          type="button"
+                          onClick={() => setMissionIntelligenceFocus(null)}
+                          className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
+                        >
+                          Clear
+                        </button>
+                      ) : null}
+                    </section>
+                  ) : null}
+                </section>
+
+                <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
+                  {STATUS_CARDS.map((card) => {
+                    const Icon = card.icon;
+                    return (
+                      <button
+                        key={card.label}
+                        type="button"
+                        onClick={() => handleSectionJump(card.targetId)}
+                        className="kyberion-glass rounded-2xl border border-white/8 p-4 text-left transition hover:border-white/16 hover:bg-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl border ${card.accent}`}
+                          >
+                            <Icon size={15} />
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400/80">
+                              {card.label}
+                            </div>
+                            <div className="mt-1 text-base font-semibold text-white/90">
+                              {card.value}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-3 text-[11px] leading-5 text-slate-200/58">
+                          {card.detail}
+                        </p>
+                        <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-white/35">
+                          {uxText('chronos_jump_to_section', 'Jump to section', locale)}
                         </div>
                       </button>
-                      {OPERATOR_VIEW_LINKS.map((view) => (
+                    );
+                  })}
+                </section>
+
+                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4">
+                  <button
+                    onClick={() => toggleSection('views')}
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                  >
+                    <span>Operator Views</span>
+                    {expandedSections.views ? (
+                      <ChevronDown size={12} />
+                    ) : (
+                      <ChevronRight size={12} />
+                    )}
+                  </button>
+                  {expandedSections.views && (
+                    <>
+                      <div className="mt-2 text-sm text-slate-200/68">
+                        Use this menu to switch the main console into a single focused operator
+                        view, including the runtime map.
+                      </div>
+                      <div className="mt-4 grid gap-2">
                         <button
-                          key={view.targetId}
                           type="button"
-                          onClick={() => handleOperatorViewOpen(view.targetId)}
+                          onClick={() => setFocusedOperatorView(null)}
                           className={`rounded-2xl border px-3 py-3 text-left transition ${
-                            focusedOperatorView === view.targetId
+                            focusedOperatorView === null
                               ? 'border-cyan-400/30 bg-cyan-400/10'
                               : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
                           }`}
                         >
                           <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
-                            {view.label}
+                            Full Console
                           </div>
                           <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
-                            {view.detail}
+                            Show the complete control surface with all operator sections.
                           </div>
                         </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </section>
-
-              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
-                <button
-                  onClick={() => toggleSection('taxonomy')}
-                  className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
-                >
-                  <span>Surface Taxonomy</span>
-                  {expandedSections.taxonomy ? (
-                    <ChevronDown size={12} />
-                  ) : (
-                    <ChevronRight size={12} />
+                        {OPERATOR_VIEW_LINKS.map((view) => (
+                          <button
+                            key={view.targetId}
+                            type="button"
+                            onClick={() => handleOperatorViewOpen(view.targetId)}
+                            className={`rounded-2xl border px-3 py-3 text-left transition ${
+                              focusedOperatorView === view.targetId
+                                ? 'border-cyan-400/30 bg-cyan-400/10'
+                                : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/52">
+                              {view.label}
+                            </div>
+                            <div className="mt-2 text-[11px] leading-5 text-slate-200/56">
+                              {view.detail}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
-                </button>
-                {expandedSections.taxonomy && (
-                  <>
-                    <div className="mt-2 text-sm text-slate-200/68">
-                      Every surface connects people and agent execution in a different mode. Chronos
-                      is the control surface, while A2UI provides drill-down work surfaces.
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      {SURFACE_ROLES.map((role) => (
-                        <div
-                          key={role.label}
-                          className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/44">
-                              {role.label}
-                            </div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/72">
-                              {role.value}
-                            </div>
-                          </div>
-                          <div className="mt-2 text-[11px] leading-5 text-slate-200/58">
-                            {role.detail}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </section>
+                </section>
 
-              <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
-                <button
-                  onClick={() => toggleSection('cycle')}
-                  className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
-                >
-                  <span>Mission Cycle</span>
-                  {expandedSections.cycle ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                </button>
-                {expandedSections.cycle && (
-                  <>
-                    <div className="mt-2 text-sm text-slate-200/68">
-                      Kyberion should always make this loop legible: a request becomes a mission,
-                      execution stays explainable, and the result remains inspectable and reusable.
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {MISSION_CYCLE.map((step, index) => (
-                        <div
-                          key={step.label}
-                          className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-[10px] font-semibold text-cyan-400">
-                              {index + 1}
+                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                  <button
+                    onClick={() => toggleSection('taxonomy')}
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                  >
+                    <span>Surface Taxonomy</span>
+                    {expandedSections.taxonomy ? (
+                      <ChevronDown size={12} />
+                    ) : (
+                      <ChevronRight size={12} />
+                    )}
+                  </button>
+                  {expandedSections.taxonomy && (
+                    <>
+                      <div className="mt-2 text-sm text-slate-200/68">
+                        Every surface connects people and agent execution in a different mode.
+                        Chronos is the control surface, while A2UI provides drill-down work
+                        surfaces.
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        {SURFACE_ROLES.map((role) => (
+                          <div
+                            key={role.label}
+                            className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-white/44">
+                                {role.label}
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/72">
+                                {role.value}
+                              </div>
                             </div>
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">
-                              {step.label}
+                            <div className="mt-2 text-[11px] leading-5 text-slate-200/58">
+                              {role.detail}
                             </div>
                           </div>
-                          <div className="mt-2 text-[11px] leading-5 text-slate-200/58">
-                            {step.detail}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </section>
-            </div>
-          </aside>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </section>
 
-          <section
-            ref={mainSurfaceRef}
-            className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
-          >
-            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.34em] text-stone-200/42">
-                  Active Surface
+                <section className="kyberion-glass rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.05),rgba(255,255,255,0.02))] p-4 opacity-60 hover:opacity-100 transition">
+                  <button
+                    onClick={() => toggleSection('cycle')}
+                    className="w-full flex items-center justify-between text-[10px] uppercase tracking-[0.28em] text-white/45 hover:text-white/80 transition"
+                  >
+                    <span>Mission Cycle</span>
+                    {expandedSections.cycle ? (
+                      <ChevronDown size={12} />
+                    ) : (
+                      <ChevronRight size={12} />
+                    )}
+                  </button>
+                  {expandedSections.cycle && (
+                    <>
+                      <div className="mt-2 text-sm text-slate-200/68">
+                        Kyberion should always make this loop legible: a request becomes a mission,
+                        execution stays explainable, and the result remains inspectable and
+                        reusable.
+                      </div>
+                      <div className="mt-4 grid gap-2">
+                        {MISSION_CYCLE.map((step, index) => (
+                          <div
+                            key={step.label}
+                            className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-[10px] font-semibold text-cyan-400">
+                                {index + 1}
+                              </div>
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">
+                                {step.label}
+                              </div>
+                            </div>
+                            <div className="mt-2 text-[11px] leading-5 text-slate-200/58">
+                              {step.detail}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </section>
+              </div>
+            </aside>
+
+            <section
+              ref={mainSurfaceRef}
+              className="kyberion-glass flex min-h-[60vh] min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(247,240,223,0.035),rgba(255,255,255,0.02))] xl:max-h-[calc(100vh-11rem)]"
+            >
+              <div className="flex items-center justify-between border-b border-white/8 px-5 py-4 md:px-6">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.34em] text-stone-200/42">
+                    Active Surface
+                  </div>
+                  <div className="mt-1 text-lg font-semibold tracking-tight text-white/92">
+                    {activeSurfaceTitle}
+                  </div>
                 </div>
-                <div className="mt-1 text-lg font-semibold tracking-tight text-white/92">
-                  {activeSurfaceTitle}
+                <div className="flex items-center gap-2 rounded-full border border-white/8 bg-black/25 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
+                  <PanelsTopLeft size={12} />
+                  <span>
+                    {surface
+                      ? 'a2ui drill-down'
+                      : focusedOperatorView
+                        ? 'focused operator view'
+                        : missionIntelligenceFocus
+                          ? 'focused mission console'
+                          : 'default operator view'}
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 rounded-full border border-white/8 bg-black/25 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-300/60">
-                <PanelsTopLeft size={12} />
-                <span>
-                  {surface
-                    ? 'a2ui drill-down'
-                    : focusedOperatorView
-                      ? 'focused operator view'
-                      : missionIntelligenceFocus
-                        ? 'focused mission console'
-                        : 'default operator view'}
-                </span>
-              </div>
-            </div>
 
-            <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-              {!surface ? (
-                focusedOperatorView ? (
-                  <FocusedOperatorView
-                    viewId={
-                      focusedOperatorView as
-                        | 'needs-attention'
-                        | 'mission-control-plane'
-                        | 'runtime-topology-map'
-                        | 'runtime-lease-doctor'
-                        | 'recent-surface-outbox'
-                        | 'secret-approval-queue'
-                        | 'owner-summaries'
-                        | 'trace-viewer'
-                    }
-                    onBack={() => {
-                      setFocusedOperatorView(null);
-                      setFocusedOperatorMissionId(null);
-                    }}
-                    onOpenView={(targetId, missionId) =>
-                      handleOperatorViewOpen(targetId, missionId || null)
-                    }
-                    focusedMissionId={focusedOperatorMissionId}
-                    onOpenMissionThread={(missionId) =>
-                      handleOperatorViewOpen('mission-control-plane', missionId)
-                    }
-                  />
-                ) : (
-                  <MissionIntelligence
-                    focusedView={missionIntelligenceFocus}
-                    onClearFocus={() => {
-                      setMissionIntelligenceFocus(null);
-                      setMissionIntelligenceFocusedMissionId(null);
-                    }}
-                    focusedMissionId={missionIntelligenceFocusedMissionId}
-                  />
-                )
-              ) : (
-                <div className="flex flex-col gap-6">
-                  {surface.components?.map((component: any, index: number) => (
-                    <A2UIRenderer
-                      key={component.id || index}
-                      type={component.type}
-                      props={component.props || {}}
+              <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+                {!surface ? (
+                  focusedOperatorView ? (
+                    <FocusedOperatorView
+                      viewId={
+                        focusedOperatorView as
+                          | 'needs-attention'
+                          | 'mission-control-plane'
+                          | 'runtime-topology-map'
+                          | 'runtime-lease-doctor'
+                          | 'recent-surface-outbox'
+                          | 'secret-approval-queue'
+                          | 'owner-summaries'
+                          | 'trace-viewer'
+                      }
+                      onBack={() => {
+                        setFocusedOperatorView(null);
+                        setFocusedOperatorMissionId(null);
+                      }}
+                      onOpenView={(targetId, missionId) =>
+                        handleOperatorViewOpen(targetId, missionId || null)
+                      }
+                      focusedMissionId={focusedOperatorMissionId}
+                      onOpenMissionThread={(missionId) =>
+                        handleOperatorViewOpen('mission-control-plane', missionId)
+                      }
                     />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
+                  ) : (
+                    <MissionIntelligence
+                      focusedView={missionIntelligenceFocus}
+                      onClearFocus={() => {
+                        setMissionIntelligenceFocus(null);
+                        setMissionIntelligenceFocusedMissionId(null);
+                      }}
+                      focusedMissionId={missionIntelligenceFocusedMissionId}
+                    />
+                  )
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    {surface.components?.map((component: any, index: number) => (
+                      <A2UIRenderer
+                        key={component.id || index}
+                        type={component.type}
+                        props={component.props || {}}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
 
-        <SovereignChat onA2UIMessage={handleA2UIMessage} onReady={handleReady} />
-        <AgentPanel isOpen={agentPanelOpen} onClose={() => setAgentPanelOpen(false)} />
-      </div>
-    </main>
+          <SovereignChat onA2UIMessage={handleA2UIMessage} onReady={handleReady} />
+          <AgentPanel isOpen={agentPanelOpen} onClose={() => setAgentPanelOpen(false)} />
+        </div>
+      </main>
+    </Suspense>
   );
+}
+
+function TenantDesignBridge({
+  onResolve,
+}: {
+  onResolve: (cssVars: Record<string, string>, label: string | null) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const customerId = searchParams.get('customerId') || searchParams.get('customer') || '';
+    const brandName = searchParams.get('brandName') || '';
+    const designSystemId = searchParams.get('designSystemId') || '';
+    if (!customerId && !brandName && !designSystemId) {
+      onResolve({}, null);
+      return;
+    }
+    const params = new URLSearchParams();
+    if (customerId) params.set('customerId', customerId);
+    if (brandName) params.set('brandName', brandName);
+    if (designSystemId) params.set('designSystemId', designSystemId);
+    const controller = new AbortController();
+    void fetch(`/api/tenant-design?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as {
+          source?: string;
+          brand_name?: string | null;
+          css_vars?: Record<string, string>;
+        };
+      })
+      .then((payload) => {
+        if (!payload) return;
+        onResolve(payload.css_vars || {}, payload.brand_name || payload.source || null);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [onResolve, searchParams]);
+
+  return null;
 }

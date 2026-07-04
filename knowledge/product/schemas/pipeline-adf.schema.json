@@ -42,12 +42,27 @@
             "enum": ["capture", "transform", "apply", "control"]
           },
           "op": { "type": "string", "minLength": 1 },
+          "effort": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "cost_cap_tokens": { "type": "number", "minimum": 1 },
+              "max_prompt_chars": { "type": "number", "minimum": 1 },
+              "max_response_chars": { "type": "number", "minimum": 1 },
+              "max_combined_chars": { "type": "number", "minimum": 1 },
+              "approval_required": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          },
           "params": { "type": "object" },
           "hooks": {
             "type": "object",
             "properties": {
               "before": { "$ref": "#/definitions/hookList" },
-              "after":  { "$ref": "#/definitions/hookList" }
+              "after": { "$ref": "#/definitions/hookList" }
             },
             "additionalProperties": false
           }
@@ -59,10 +74,10 @@
       "type": "object",
       "required": ["cron"],
       "properties": {
-        "id":       { "type": "string" },
-        "cron":     { "type": "string", "minLength": 9 },
+        "id": { "type": "string" },
+        "cron": { "type": "string", "minLength": 9 },
         "timezone": { "type": "string" },
-        "enabled":  { "type": "boolean" }
+        "enabled": { "type": "boolean" }
       },
       "additionalProperties": false
     }
@@ -74,16 +89,16 @@
         "type": "object",
         "required": ["type"],
         "properties": {
-          "type":      { "type": "string", "enum": ["actuator_op", "http", "command"] },
-          "label":     { "type": "string" },
+          "type": { "type": "string", "enum": ["actuator_op", "http", "command"] },
+          "label": { "type": "string" },
           "on_reject": { "type": "string", "enum": ["abort", "skip", "warn"] },
-          "op":        { "type": "string" },
-          "params":    { "type": "object" },
-          "url":       { "type": "string" },
-          "method":    { "type": "string", "enum": ["GET", "POST"] },
-          "body":      { "type": "object" },
-          "headers":   { "type": "object" },
-          "cmd":       { "type": "string" }
+          "op": { "type": "string" },
+          "params": { "type": "object" },
+          "url": { "type": "string" },
+          "method": { "type": "string", "enum": ["GET", "POST"] },
+          "body": { "type": "object" },
+          "headers": { "type": "object" },
+          "cmd": { "type": "string" }
         },
         "additionalProperties": false
       }

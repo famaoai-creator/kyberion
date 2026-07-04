@@ -36,9 +36,12 @@ import {
 describe('data-vault', () => {
   beforeEach(() => {
     sharedBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-vault-test-'));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-04T00:00:00.000Z'));
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     fs.rmSync(sharedBase, { recursive: true, force: true });
     vi.clearAllMocks();
   });
@@ -92,8 +95,7 @@ describe('data-vault', () => {
         ttlMs: 1,
       });
 
-      // Wait for TTL to pass
-      await new Promise(r => setTimeout(r, 5));
+      vi.setSystemTime(new Date('2026-07-04T00:00:00.010Z'));
 
       const fetchFn2 = vi.fn().mockResolvedValue({ v: 2 });
       const result = await fetchWithVaultCache('web', 'url:example', fetchFn2, {
@@ -156,7 +158,7 @@ describe('data-vault', () => {
         projectId: 'proj-d',
         ttlMs: 1,
       });
-      await new Promise(r => setTimeout(r, 5));
+      vi.setSystemTime(new Date('2026-07-04T00:00:00.010Z'));
 
       const entry = getVaultEntry('notion', 'expired-key', 'proj-d');
       expect(entry).toBeNull();
@@ -205,43 +207,67 @@ describe('data-vault', () => {
     });
 
     it('lists all stored entries', async () => {
-      await fetchWithVaultCache('confluence', 'page:1', vi.fn().mockResolvedValue({ a: 1 }), { projectId: 'p1', ttlMs: 60_000 });
-      await fetchWithVaultCache('gdrive', 'file:2', vi.fn().mockResolvedValue({ b: 2 }), { projectId: 'p1', ttlMs: 60_000 });
+      await fetchWithVaultCache('confluence', 'page:1', vi.fn().mockResolvedValue({ a: 1 }), {
+        projectId: 'p1',
+        ttlMs: 60_000,
+      });
+      await fetchWithVaultCache('gdrive', 'file:2', vi.fn().mockResolvedValue({ b: 2 }), {
+        projectId: 'p1',
+        ttlMs: 60_000,
+      });
 
       const entries = listVaultEntries();
       expect(entries.length).toBeGreaterThanOrEqual(2);
     });
 
     it('filters by sourceType', async () => {
-      await fetchWithVaultCache('confluence', 'page:10', vi.fn().mockResolvedValue({}), { projectId: 'px', ttlMs: 60_000 });
-      await fetchWithVaultCache('notion', 'doc:10', vi.fn().mockResolvedValue({}), { projectId: 'px', ttlMs: 60_000 });
+      await fetchWithVaultCache('confluence', 'page:10', vi.fn().mockResolvedValue({}), {
+        projectId: 'px',
+        ttlMs: 60_000,
+      });
+      await fetchWithVaultCache('notion', 'doc:10', vi.fn().mockResolvedValue({}), {
+        projectId: 'px',
+        ttlMs: 60_000,
+      });
 
       const confluenceEntries = listVaultEntries({ sourceType: 'confluence', projectId: 'px' });
-      expect(confluenceEntries.every(e => e.sourceType === 'confluence')).toBe(true);
+      expect(confluenceEntries.every((e) => e.sourceType === 'confluence')).toBe(true);
     });
 
     it('filters by projectId', async () => {
-      await fetchWithVaultCache('web', 'url:a', vi.fn().mockResolvedValue({}), { projectId: 'proj-list', ttlMs: 60_000 });
-      await fetchWithVaultCache('web', 'url:b', vi.fn().mockResolvedValue({}), { projectId: 'other-proj', ttlMs: 60_000 });
+      await fetchWithVaultCache('web', 'url:a', vi.fn().mockResolvedValue({}), {
+        projectId: 'proj-list',
+        ttlMs: 60_000,
+      });
+      await fetchWithVaultCache('web', 'url:b', vi.fn().mockResolvedValue({}), {
+        projectId: 'other-proj',
+        ttlMs: 60_000,
+      });
 
       const entries = listVaultEntries({ projectId: 'proj-list' });
-      expect(entries.every(e => e.projectId === 'proj-list')).toBe(true);
+      expect(entries.every((e) => e.projectId === 'proj-list')).toBe(true);
     });
 
     it('excludes expired entries by default', async () => {
-      await fetchWithVaultCache('slack', 'ch:expired', vi.fn().mockResolvedValue({}), { projectId: 'py', ttlMs: 1 });
-      await new Promise(r => setTimeout(r, 5));
+      await fetchWithVaultCache('slack', 'ch:expired', vi.fn().mockResolvedValue({}), {
+        projectId: 'py',
+        ttlMs: 1,
+      });
+      vi.setSystemTime(new Date('2026-07-04T00:00:00.010Z'));
 
       const entries = listVaultEntries({ projectId: 'py' });
-      expect(entries.filter(e => e.key === 'ch:expired')).toHaveLength(0);
+      expect(entries.filter((e) => e.key === 'ch:expired')).toHaveLength(0);
     });
 
     it('includes expired entries when includeExpired=true', async () => {
-      await fetchWithVaultCache('slack', 'ch:will-expire', vi.fn().mockResolvedValue({}), { projectId: 'pz', ttlMs: 1 });
-      await new Promise(r => setTimeout(r, 5));
+      await fetchWithVaultCache('slack', 'ch:will-expire', vi.fn().mockResolvedValue({}), {
+        projectId: 'pz',
+        ttlMs: 1,
+      });
+      vi.setSystemTime(new Date('2026-07-04T00:00:00.010Z'));
 
       const entries = listVaultEntries({ projectId: 'pz', includeExpired: true });
-      expect(entries.filter(e => e.key === 'ch:will-expire')).toHaveLength(1);
+      expect(entries.filter((e) => e.key === 'ch:will-expire')).toHaveLength(1);
     });
   });
 });

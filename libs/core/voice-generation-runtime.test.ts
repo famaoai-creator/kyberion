@@ -54,12 +54,12 @@ describe('voice generation runtime', () => {
       },
     });
 
-    await waitFor(() => executionOrder.includes('job-1:start'));
+    await waitForPacket(runtime, 'job-1', (packet) => packet.status === 'generating');
     expect(executionOrder).toEqual(['job-1:start']);
 
     releaseFirst();
 
-    await waitFor(() => runtime.getPacket('job-2')?.status === 'completed');
+    await waitForPacket(runtime, 'job-2', (packet) => packet.status === 'completed');
     expect(executionOrder).toEqual(['job-1:start', 'job-1:end', 'job-2:start', 'job-2:end']);
   });
 
@@ -109,17 +109,25 @@ describe('voice generation runtime', () => {
     expect(runtime.cancel('job-2')).toBe('queued');
     releaseFirst();
 
-    await waitFor(() => runtime.getPacket('job-1')?.status === 'completed');
+    await waitForPacket(runtime, 'job-1', (packet) => packet.status === 'completed');
     expect(runtime.getPacket('job-2')?.status).toBe('cancelled');
   });
 });
 
-async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
-  const startedAt = Date.now();
-  while (!predicate()) {
-    if (Date.now() - startedAt > timeoutMs) {
-      throw new Error('waitFor timeout');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
+async function waitForPacket(
+  runtime: VoiceGenerationRuntime,
+  jobId: string,
+  predicate: (packet: NonNullable<ReturnType<VoiceGenerationRuntime['getPacket']>>) => boolean
+) {
+  const current = runtime.getPacket(jobId);
+  if (current && predicate(current)) return current;
+
+  return await new Promise((resolve) => {
+    let unsubscribe = () => {};
+    unsubscribe = runtime.subscribe((packet) => {
+      if (packet.job_id !== jobId || !predicate(packet)) return;
+      unsubscribe();
+      resolve(packet);
+    });
+  });
 }

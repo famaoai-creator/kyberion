@@ -1,3 +1,4 @@
+import { logger } from './core.js';
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
 import type { MeetingOperationsBrief } from './src/types/meeting-operations-brief.js';
 import { resolveMeetingEnvironment } from './meeting-environment-policy.js';
@@ -68,9 +69,19 @@ export function selectMeetingBriefQuestionSet(
 
 export function getMeetingBriefQuestions(
   profile: MeetingOperationsProfile,
-  purpose?: MeetingPurpose | string | null
-): string[] {
-  return selectMeetingBriefQuestionSet(profile, purpose)?.questions || [];
+  purpose?: MeetingPurpose | string | null,
+  maxQuestions?: number
+): { questions: string[]; omitted_count: number } {
+  const questions = selectMeetingBriefQuestionSet(profile, purpose)?.questions || [];
+  const limit = Math.max(1, (maxQuestions ?? questions.length) || 1);
+  const selected = questions.slice(0, limit);
+  const omittedCount = Math.max(0, questions.length - selected.length);
+  if (omittedCount > 0) {
+    logger.info?.(
+      `[meeting-operations-profile] omitted ${omittedCount} brief question(s) for purpose=${purpose || 'default'}`
+    );
+  }
+  return { questions: selected, omitted_count: omittedCount };
 }
 
 export function selectMeetingRoleSet(
@@ -93,10 +104,11 @@ export function buildMeetingOperationsBrief(
   const purpose = (input.purpose ? String(input.purpose) : 'default') as MeetingPurpose;
   const primaryRole = roleSet?.primary_role || 'facilitator';
   const supportRoles = roleSet?.support_roles || ['planner', 'scribe', 'tracker'];
-  const desiredOutcomes = (input.desired_outcomes?.length ? input.desired_outcomes : [
-    'Clarify the purpose of the meeting',
-    'Track action items and owners',
-  ]).map((item) => String(item));
+  const desiredOutcomes = (
+    input.desired_outcomes?.length
+      ? input.desired_outcomes
+      : ['Clarify the purpose of the meeting', 'Track action items and owners']
+  ).map((item) => String(item));
   const exitConditions = [
     'Agenda is complete',
     'Action items are recorded',

@@ -4,7 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdmZip from 'adm-zip';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile, saveProjectRecord, saveServiceBindingRecord } from '@agent/core';
+import {
+  compileSchemaFromPath,
+  rootDir,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+  saveProjectRecord,
+  saveServiceBindingRecord,
+  withExecutionContext,
+} from '@agent/core';
+
+const ROOT = rootDir();
 
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
@@ -37,36 +50,58 @@ function extractPptxSlideText(pptxPath: string, slideName: string): string {
   const entry = zip.getEntry(slideName);
   if (!entry) throw new Error(`Missing PPTX entry: ${slideName}`);
   const xml = entry.getData().toString('utf8');
-  const texts = [...xml.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)].map((match) => decodeXmlEntities(match[1] || ''));
+  const texts = [...xml.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)].map((match) =>
+    decodeXmlEntities(match[1] || '')
+  );
   return texts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 describe('media-actuator pdf to pptx bridge', () => {
   let prevPersona: string | undefined;
-  const tenantOverrideRoot = path.resolve(process.cwd(), 'knowledge/confidential/__test/client-a/design');
+  const tenantOverrideRoot = path.resolve(ROOT, 'knowledge/confidential/client-a/design');
   const tenantOverridePath = path.join(tenantOverrideRoot, 'tenant-override.json');
   beforeEach(() => {
     vi.clearAllMocks();
     prevPersona = process.env.KYBERION_PERSONA;
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     safeMkdir(tenantOverrideRoot, { recursive: true });
-    safeWriteFile(tenantOverridePath, JSON.stringify({
-      tenant_id: 'client-a',
-      brand_name: 'Aster Bank',
-      matchers: ['aster bank', 'client-a'],
-      design_system_id: 'client-a',
-      layout_template_id: 'executive-neutral',
-      theme: 'client-a',
-      branding: {
-        brand_name: 'Aster Bank',
-        logo_url: '/vault/tenants/client-a/logo.png',
-        tone: 'corporate',
-      },
-    }, null, 2));
+    safeWriteFile(
+      tenantOverridePath,
+      JSON.stringify(
+        {
+          tenant_id: 'client-a',
+          brand_name: 'Aster Bank',
+          matchers: ['aster bank', 'client-a'],
+          design_system_id: 'client-a',
+          layout_template_id: 'executive-neutral',
+          theme: 'client-a',
+          branding: {
+            brand_name: 'Aster Bank',
+            logo_url: '/vault/tenants/client-a/logo.png',
+            tone: 'corporate',
+          },
+        },
+        null,
+        2
+      )
+    );
   });
   afterEach(() => {
     if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = prevPersona;
+    withExecutionContext('mission_controller', () => {
+      const previousSudo = process.env.KYBERION_SUDO;
+      process.env.KYBERION_SUDO = 'true';
+      try {
+        safeRmSync(path.resolve(ROOT, 'knowledge/confidential/client-a'), {
+          recursive: true,
+          force: true,
+        });
+      } finally {
+        if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
+        else process.env.KYBERION_SUDO = previousSudo;
+      }
+    });
   });
 
   it('resolves tenant branding from project and service binding metadata', async () => {
@@ -132,7 +167,7 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect.objectContaining({
         brand_name: 'Aster Bank',
         tone: 'corporate',
-      }),
+      })
     );
   });
 
@@ -169,23 +204,21 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.document_outline.branding).toEqual(
       expect.objectContaining({
         brand_name: 'Apple',
-      }),
+      })
     );
     expect(result.context.document_outline.prompt_guide).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('Primary CTA'),
-      ]),
+      expect.arrayContaining([expect.stringContaining('Primary CTA')])
     );
     expect(result.context.document_outline.source_design).toEqual(
       expect.objectContaining({
         source_type: 'design-md',
         slug: 'apple',
-      }),
+      })
     );
   });
 
   it('reads plain text documents through document_digest', async () => {
-    const tmpDir = path.resolve(process.cwd(), 'active/shared/tmp/media-document-digest-tests');
+    const tmpDir = path.resolve(ROOT, 'active/shared/tmp/media-document-digest-tests');
     const mdPath = path.join(tmpDir, 'sample.md');
     safeMkdir(tmpDir, { recursive: true });
     safeWriteFile(mdPath, '# Review me\n\nThis is a test document.');
@@ -275,12 +308,10 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.compiled_protocol.metadata.sourceDesign).toEqual(
       expect.objectContaining({
         slug: 'vercel',
-      }),
+      })
     );
     expect(result.context.compiled_protocol.metadata.promptGuide).toEqual(
-      expect.arrayContaining([
-        expect.any(String),
-      ]),
+      expect.arrayContaining([expect.any(String)])
     );
   });
 
@@ -294,9 +325,11 @@ describe('media-actuator pdf to pptx bridge', () => {
           render_target: 'pptx',
           locale: 'en-US',
           title: 'Frontend Deployment Platform Launch',
-          objective: 'Prepare a polished launch proposal for a frontend deployment platform with developer infrastructure emphasis.',
+          objective:
+            'Prepare a polished launch proposal for a frontend deployment platform with developer infrastructure emphasis.',
           story: {
-            core_message: 'The experience should feel precise, technical, and product-led for frontend platform teams.',
+            core_message:
+              'The experience should feel precise, technical, and product-led for frontend platform teams.',
             closing_cta: 'Approve the rollout.',
           },
         },
@@ -322,14 +355,14 @@ describe('media-actuator pdf to pptx bridge', () => {
         expect.objectContaining({
           design_system_id: 'designmd-vercel',
         }),
-      ]),
+      ])
     );
     expect(result.context.compiled_protocol.metadata.designRecommendations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           design_system_id: 'designmd-vercel',
         }),
-      ]),
+      ])
     );
   });
 
@@ -363,7 +396,7 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect.arrayContaining([
         expect.objectContaining({ title: 'Vendor Profile and Criticality' }),
         expect.objectContaining({ title: 'Recommendation and Conditions' }),
-      ]),
+      ])
     );
   });
 
@@ -401,7 +434,7 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.document_outline.document_profile).toBe('executive-proposal');
     expect(result.context.document_outline.generation_boundary.rule).toContain('sections-first');
     expect(result.context.compiled_protocol.metadata.generationBoundary.llm_zone.forbidden).toEqual(
-      expect.arrayContaining(['invent_layout_coordinates']),
+      expect.arrayContaining(['invent_layout_coordinates'])
     );
   });
 
@@ -454,49 +487,58 @@ describe('media-actuator pdf to pptx bridge', () => {
         dk2: 'f59e0b',
         lt1: '101827',
         accent1: 'ff3366',
-      }),
+      })
     );
   });
 
   it('loads confidential pptx theme packs with heritage when applying a registered theme', async () => {
     const tenantSlug = '__pptx_theme_pack_test';
-    const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
+    const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
     const themePackPath = path.join(confDir, 'theme.json');
     const themeName = `${tenantSlug}-imported`;
     safeMkdir(confDir, { recursive: true });
-    safeWriteFile(themePackPath, JSON.stringify({
-      kind: 'pptx-theme-pack',
-      version: '1.0.0',
-      theme_id: themeName,
-      brand_name: 'Deck Studio',
-      tenant_slug: tenantSlug,
-      design_system_id: 'executive-standard',
-      theme: {
-        name: 'Deck Studio',
-        colors: {
-          primary: '#10203A',
-          secondary: '#31415B',
-          accent: '#D97706',
-          background: '#F8FAFC',
-          text: '#0F172A',
+    safeWriteFile(
+      themePackPath,
+      JSON.stringify(
+        {
+          kind: 'pptx-theme-pack',
+          version: '1.0.0',
+          theme_id: themeName,
+          brand_name: 'Deck Studio',
+          tenant_slug: tenantSlug,
+          design_system_id: 'executive-standard',
+          theme: {
+            name: 'Deck Studio',
+            colors: {
+              primary: '#10203A',
+              secondary: '#31415B',
+              accent: '#D97706',
+              background: '#F8FAFC',
+              text: '#0F172A',
+            },
+            fonts: {
+              heading: 'Aptos Display, sans-serif',
+              body: 'Aptos, sans-serif',
+            },
+            assets: {
+              logo_url: '/assets/logos/kyberion-logo.png',
+            },
+          },
+          pptx: {
+            canvas: { w: 13.333, h: 7.5 },
+            master: {
+              elements: [
+                { type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 13.333, h: 0.25 } },
+              ],
+              bgXml: '<p:bg><a:solidFill><a:srgbClr val="F8FAFC"/></a:solidFill></p:bg>',
+            },
+          },
+          layout_template_id: 'corporate-standard',
         },
-        fonts: {
-          heading: 'Aptos Display, sans-serif',
-          body: 'Aptos, sans-serif',
-        },
-        assets: {
-          logo_url: '/assets/logos/kyberion-logo.png',
-        },
-      },
-      pptx: {
-        canvas: { w: 13.333, h: 7.5 },
-        master: {
-          elements: [{ type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 13.333, h: 0.25 } }],
-          bgXml: '<p:bg><a:solidFill><a:srgbClr val="F8FAFC"/></a:solidFill></p:bg>',
-        },
-      },
-      layout_template_id: 'corporate-standard',
-    }, null, 2));
+        null,
+        2
+      )
+    );
 
     try {
       const result = await handleAction({
@@ -526,22 +568,30 @@ describe('media-actuator pdf to pptx bridge', () => {
 
       expect(result.status).toBe('succeeded');
       expect(result.context.active_theme_name).toBe(themeName);
-      expect(result.context.active_theme_pack).toEqual(expect.objectContaining({
-        kind: 'pptx-theme-pack',
-        theme_id: themeName,
-      }));
+      expect(result.context.active_theme_pack).toEqual(
+        expect.objectContaining({
+          kind: 'pptx-theme-pack',
+          theme_id: themeName,
+        })
+      );
       expect(result.context.active_canvas).toEqual({ w: 13.333, h: 7.5 });
       expect(result.context.active_pptx_master.elements).toHaveLength(1);
       expect(result.context.active_pptx_master.bgXml).toContain('F8FAFC');
     } finally {
-      safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+      safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
   it('persists pptx brand registration when save_brand_to_confidential runs as a sink step', async () => {
     const tenantSlug = '__pptx_sink_persist_test';
-    const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
-    safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+    const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
+    safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
+      recursive: true,
+      force: true,
+    });
 
     try {
       const result = await handleAction({
@@ -607,18 +657,26 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect(safeExistsSync(path.join(confDir, 'theme.json'))).toBe(true);
       expect(safeExistsSync(path.join(confDir, 'layout-templates.json'))).toBe(true);
       expect(safeExistsSync(path.join(confDir, 'tenant-override.json'))).toBe(true);
-      expect(safeExistsSync(path.resolve(process.cwd(), 'knowledge/confidential/tenants/index.json'))).toBe(true);
+      expect(safeExistsSync(path.resolve(ROOT, 'knowledge/confidential/tenants/index.json'))).toBe(
+        true
+      );
     } finally {
-      safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+      safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
   it('persists web brand registration as a web theme pack', async () => {
     const tenantSlug = '__web_theme_pack_test';
-    const confDir = path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}/design`);
+    const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
     const prevPersona = process.env.KYBERION_PERSONA;
     process.env.KYBERION_PERSONA = 'sovereign';
-    safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+    safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
+      recursive: true,
+      force: true,
+    });
 
     try {
       const result = await handleAction({
@@ -717,12 +775,22 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect(themePack.web?.source_url).toBe('https://www.example.com');
       expect(themePack.web?.hero?.title).toBe('Build faster');
       expect(themePack.layout_templates?.default).toBe('web-studio-extracted');
-      expect(themePack.layout_templates?.templates?.['web-studio-extracted']?.hero?.headline_max_width).toBe('720px');
-      expect(themePack.layout_templates?.templates?.['web-studio-extracted']?.body_zones?.single_column?.gap).toBe('24px');
-      expect(safeExistsSync(path.resolve(process.cwd(), 'knowledge/confidential/tenants/index.json'))).toBe(true);
+      expect(
+        themePack.layout_templates?.templates?.['web-studio-extracted']?.hero?.headline_max_width
+      ).toBe('720px');
+      expect(
+        themePack.layout_templates?.templates?.['web-studio-extracted']?.body_zones?.single_column
+          ?.gap
+      ).toBe('24px');
+      expect(safeExistsSync(path.resolve(ROOT, 'knowledge/confidential/tenants/index.json'))).toBe(
+        true
+      );
     } finally {
       process.env.KYBERION_PERSONA = prevPersona;
-      safeRmSync(path.resolve(process.cwd(), `knowledge/confidential/${tenantSlug}`), { recursive: true, force: true });
+      safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -1026,8 +1094,13 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(result.context.document_outline.toc.map((entry: any) => entry.section_id)).toContain('contents');
-    expect(result.context.document_outline.toc.find((entry: any) => entry.section_id === 'contents')?.body?.[0]).toContain('Findings');
+    expect(result.context.document_outline.toc.map((entry: any) => entry.section_id)).toContain(
+      'contents'
+    );
+    expect(
+      result.context.document_outline.toc.find((entry: any) => entry.section_id === 'contents')
+        ?.body?.[0]
+    ).toContain('Findings');
   });
 
   it('generates a tracker binary directly from a unified document request', async () => {
@@ -1054,9 +1127,7 @@ describe('media-actuator pdf to pptx bridge', () => {
                   { key: 'owner', label: 'Owner' },
                   { key: 'status', label: 'Status' },
                 ],
-                rows: [
-                  { task: 'Close incident actions', owner: 'Ops', status: 'In Progress' },
-                ],
+                rows: [{ task: 'Close incident actions', owner: 'Ops', status: 'In Progress' }],
               },
             },
           },
@@ -1087,7 +1158,7 @@ describe('media-actuator pdf to pptx bridge', () => {
               '主要な機能要求を整理する。',
               '品質・性能・統制要件を定義する。',
               '情報資産と責任境界を定義する。',
-              '要求からテストまでの対応を明示する。'
+              '要求からテストまでの対応を明示する。',
             ],
           },
           evidence: [
@@ -1115,14 +1186,20 @@ describe('media-actuator pdf to pptx bridge', () => {
         expect.objectContaining({ section_id: 'scope', title: 'Scope and Objectives' }),
         expect.objectContaining({ section_id: 'functional', title: 'Functional Requirements' }),
         expect.objectContaining({ section_id: 'traceability', title: 'Traceability Matrix' }),
-      ]),
+      ])
     );
     expect(result.context.compiled_protocol.slides).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ metadata: expect.objectContaining({ layoutKey: 'doc-summary' }) }),
-        expect.objectContaining({ metadata: expect.objectContaining({ layoutKey: 'doc-sections' }) }),
-        expect.objectContaining({ metadata: expect.objectContaining({ layoutKey: 'sheet-main-table' }) }),
-      ]),
+        expect.objectContaining({
+          metadata: expect.objectContaining({ layoutKey: 'doc-summary' }),
+        }),
+        expect.objectContaining({
+          metadata: expect.objectContaining({ layoutKey: 'doc-sections' }),
+        }),
+        expect.objectContaining({
+          metadata: expect.objectContaining({ layoutKey: 'sheet-main-table' }),
+        }),
+      ])
     );
   });
 
@@ -1154,9 +1231,7 @@ describe('media-actuator pdf to pptx bridge', () => {
                     { id: 'intent', type: 'generic', label: 'Intent' },
                     { id: 'work', type: 'generic', label: 'Work Loop' },
                   ],
-                  edges: [
-                    { id: 'edge-1', from: 'intent', to: 'work', label: 'resolves to' },
-                  ],
+                  edges: [{ id: 'edge-1', from: 'intent', to: 'work', label: 'resolves to' }],
                 },
               },
             },
@@ -1186,18 +1261,32 @@ describe('media-actuator pdf to pptx bridge', () => {
           locale: 'en-US',
           title: 'Digital Onboarding Transformation Proposal',
           client: 'Aster Bank',
-          objective: 'Redesign onboarding and approval journeys to improve conversion and operational efficiency.',
+          objective:
+            'Redesign onboarding and approval journeys to improve conversion and operational efficiency.',
           audience: ['Executive Sponsor', 'Digital Channel Lead', 'Operations Manager'],
           story: {
-            core_message: 'A lighter, guided onboarding experience reduces drop-off while preserving governance.',
+            core_message:
+              'A lighter, guided onboarding experience reduces drop-off while preserving governance.',
             tone: 'executive and evidence-based',
             closing_cta: 'Approve the discovery and pilot phase.',
           },
           evidence: [
-            { title: 'Current pain points', point: 'Existing onboarding creates avoidable abandonment.' },
-            { title: 'Future-state journey', point: 'A guided journey aligns intent, verification, and support.' },
-            { title: 'Governance design', point: 'Controls are embedded without exposing back-office complexity.' },
-            { title: 'Pilot roadmap', point: 'A phased rollout de-risks delivery while creating wins.' }
+            {
+              title: 'Current pain points',
+              point: 'Existing onboarding creates avoidable abandonment.',
+            },
+            {
+              title: 'Future-state journey',
+              point: 'A guided journey aligns intent, verification, and support.',
+            },
+            {
+              title: 'Governance design',
+              point: 'Controls are embedded without exposing back-office complexity.',
+            },
+            {
+              title: 'Pilot roadmap',
+              point: 'A phased rollout de-risks delivery while creating wins.',
+            },
           ],
           slide_pattern_selection_policy: {
             pack_id: 'slide-md-core',
@@ -1232,21 +1321,25 @@ describe('media-actuator pdf to pptx bridge', () => {
         narrative_pattern_id: 'problem-solution-executive',
         recommended_theme: 'client-a',
         recommended_layout_template_id: 'executive-neutral',
-      }),
+      })
     );
     expect(result.context.document_outline.branding).toEqual(
       expect.objectContaining({
         brand_name: 'Aster Bank',
         logo_url: '/vault/tenants/client-a/logo.png',
         tone: 'corporate',
-      }),
+      })
     );
     expect(result.context.document_outline.toc.length).toBeGreaterThanOrEqual(6);
     expect(result.context.document_outline.toc).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ section_id: 'executive-summary', layout_key: 'decision-cta', pattern_id: 'key-message-single' }),
+        expect.objectContaining({
+          section_id: 'executive-summary',
+          layout_key: 'decision-cta',
+          pattern_id: 'key-message-single',
+        }),
         expect.objectContaining({ section_id: 'governance', media_kind: 'controls' }),
-      ]),
+      ])
     );
   });
 
@@ -1262,18 +1355,32 @@ describe('media-actuator pdf to pptx bridge', () => {
           locale: 'en-US',
           title: 'Digital Onboarding Transformation Proposal',
           client: 'Aster Bank',
-          objective: 'Redesign onboarding and approval journeys to improve conversion and operational efficiency.',
+          objective:
+            'Redesign onboarding and approval journeys to improve conversion and operational efficiency.',
           audience: ['Executive Sponsor', 'Digital Channel Lead', 'Operations Manager'],
           story: {
-            core_message: 'A lighter, guided onboarding experience reduces drop-off while preserving governance.',
+            core_message:
+              'A lighter, guided onboarding experience reduces drop-off while preserving governance.',
             tone: 'executive and evidence-based',
             closing_cta: 'Approve the discovery and pilot phase.',
           },
           evidence: [
-            { title: 'Current pain points', point: 'Existing onboarding creates avoidable abandonment.' },
-            { title: 'Future-state journey', point: 'A guided journey aligns intent, verification, and support.' },
-            { title: 'Governance design', point: 'Controls are embedded without exposing back-office complexity.' },
-            { title: 'Pilot roadmap', point: 'A phased rollout de-risks delivery while creating wins.' }
+            {
+              title: 'Current pain points',
+              point: 'Existing onboarding creates avoidable abandonment.',
+            },
+            {
+              title: 'Future-state journey',
+              point: 'A guided journey aligns intent, verification, and support.',
+            },
+            {
+              title: 'Governance design',
+              point: 'Controls are embedded without exposing back-office complexity.',
+            },
+            {
+              title: 'Pilot roadmap',
+              point: 'A phased rollout de-risks delivery while creating wins.',
+            },
           ],
           slide_pattern_selection_policy: {
             pack_id: 'slide-md-core',
@@ -1300,29 +1407,46 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(result.context.proposal_storyline.narrative_pattern_id).toBe('problem-solution-executive');
+    expect(result.context.proposal_storyline.narrative_pattern_id).toBe(
+      'problem-solution-executive'
+    );
     expect(result.context.proposal_storyline.design_system_id).toBe('executive-standard');
     expect(result.context.proposal_storyline.branding.brand_name).toBe('Aster Bank');
     expect(result.context.proposal_storyline.slides.length).toBeGreaterThanOrEqual(6);
     expect(result.context.proposal_storyline.slides).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'cover', pattern_id: 'cover-title-center' }),
-        expect.objectContaining({ id: 'why-change', layout_key: 'evidence-callout', pattern_id: 'problem-solution' }),
-        expect.objectContaining({ id: 'delivery-plan', media_kind: 'timeline', pattern_id: 'milestone-timeline' }),
-        expect.objectContaining({ id: 'decision', layout_key: 'decision-cta', pattern_id: 'action-items-list' }),
-      ]),
+        expect.objectContaining({
+          id: 'why-change',
+          layout_key: 'evidence-callout',
+          pattern_id: 'problem-solution',
+        }),
+        expect.objectContaining({
+          id: 'delivery-plan',
+          media_kind: 'timeline',
+          pattern_id: 'milestone-timeline',
+        }),
+        expect.objectContaining({
+          id: 'decision',
+          layout_key: 'decision-cta',
+          pattern_id: 'action-items-list',
+        }),
+      ])
     );
     expect(result.context.proposal_storyline.slides[0].design_system_id).toBe('executive-standard');
     expect(result.context.proposal_storyline.slides[0].branding.brand_name).toBe('Aster Bank');
     expect(result.context.proposal_storyline.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'generic-layouts' })]),
+      expect.arrayContaining([expect.objectContaining({ code: 'generic-layouts' })])
     );
   });
 
   it('emits proposal storyline adfs that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/proposal-storyline-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(ROOT, 'knowledge/product/schemas/proposal-storyline-adf.schema.json')
+    );
 
     expect(
       validate({
@@ -1352,21 +1476,24 @@ describe('media-actuator pdf to pptx bridge', () => {
           },
         ],
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects malformed proposal storyline adfs', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/proposal-storyline-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(ROOT, 'knowledge/product/schemas/proposal-storyline-adf.schema.json')
+    );
 
     expect(
       validate({
         kind: 'proposal-storyline-adf',
         client: 'Aster Bank',
         slides: [],
-      }),
+      })
     ).toBe(false);
   });
 
@@ -1419,21 +1546,43 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const evidenceSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'slide-evidence');
-    const timelineSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'slide-timeline');
-    const evidenceBody = evidenceSlide.elements.find((element: any) => element.placeholderType === 'body');
-    const timelineBody = timelineSlide.elements.find((element: any) => element.placeholderType === 'body');
+    const evidenceSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'slide-evidence'
+    );
+    const timelineSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'slide-timeline'
+    );
+    const evidenceBody = evidenceSlide.elements.find(
+      (element: any) => element.placeholderType === 'body'
+    );
+    const timelineBody = timelineSlide.elements.find(
+      (element: any) => element.placeholderType === 'body'
+    );
 
     expect(evidenceSlide.metadata.layoutKey).toBe('evidence-callout');
     expect(evidenceSlide.metadata.semanticType).toBe('evidence');
     expect(timelineSlide.metadata.layoutKey).toBe('timeline-roadmap');
     expect(timelineSlide.metadata.semanticType).toBe('roadmap');
     expect(evidenceBody.pos.w).not.toBe(timelineBody.pos.w);
-    expect(evidenceSlide.elements.find((element: any) => String(element.text || '').includes('Pain point evidence'))?.pos.w).not.toBe(
-      timelineSlide.elements.find((element: any) => String(element.text || '').includes('Roadmap / milestones'))?.pos.w,
+    expect(
+      evidenceSlide.elements.find((element: any) =>
+        String(element.text || '').includes('Pain point evidence')
+      )?.pos.w
+    ).not.toBe(
+      timelineSlide.elements.find((element: any) =>
+        String(element.text || '').includes('Roadmap / milestones')
+      )?.pos.w
     );
-    expect(evidenceSlide.elements.find((element: any) => String(element.text || '').includes('Pain point evidence'))?.style.fill).toBe('2563eb');
-    expect(timelineSlide.elements.find((element: any) => String(element.text || '').includes('Roadmap / milestones'))?.style.fill).toBe('DCFCE7');
+    expect(
+      evidenceSlide.elements.find((element: any) =>
+        String(element.text || '').includes('Pain point evidence')
+      )?.style.fill
+    ).toBe('2563eb');
+    expect(
+      timelineSlide.elements.find((element: any) =>
+        String(element.text || '').includes('Roadmap / milestones')
+      )?.style.fill
+    ).toBe('DCFCE7');
   });
 
   it('applies the recommended document theme to report design output', async () => {
@@ -1478,7 +1627,7 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect.objectContaining({
         dk1: '0f172a',
         accent1: '38bdf8',
-      }),
+      })
     );
     expect(result.context.report_design.theme.minorFont).toContain('System-ui');
   });
@@ -1499,7 +1648,10 @@ describe('media-actuator pdf to pptx bridge', () => {
             summary: 'Quarterly review of delivery and incident posture.',
             sections: [
               { heading: 'Delivery Overview', body: ['Delivery stabilized across the quarter.'] },
-              { heading: 'Appendix A: Incident Timeline', body: ['Detailed incident timeline and actions.'] },
+              {
+                heading: 'Appendix A: Incident Timeline',
+                body: ['Detailed incident timeline and actions.'],
+              },
             ],
           },
         },
@@ -1519,15 +1671,24 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.document_outline.toc).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ section_id: 'appendix-a-incident-timeline', layout_key: 'doc-appendix', media_kind: 'appendix' }),
-      ]),
+        expect.objectContaining({
+          section_id: 'appendix-a-incident-timeline',
+          layout_key: 'doc-appendix',
+          media_kind: 'appendix',
+        }),
+      ])
     );
-    expect(result.context.report_design.metadata.composition.document_profile).toBe('summary-report');
+    expect(result.context.report_design.metadata.composition.document_profile).toBe(
+      'summary-report'
+    );
     expect(result.context.report_design.metadata.sectionSemantics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ section_id: 'summary', semantic_type: 'summary' }),
-        expect.objectContaining({ section_id: 'appendix-a-incident-timeline', semantic_type: 'appendix' }),
-      ]),
+        expect.objectContaining({
+          section_id: 'appendix-a-incident-timeline',
+          semantic_type: 'appendix',
+        }),
+      ])
     );
     expect(result.context.report_design.styles.definitions).toEqual(
       expect.arrayContaining([
@@ -1535,10 +1696,18 @@ describe('media-actuator pdf to pptx bridge', () => {
         expect.objectContaining({ styleId: 'CalloutBody' }),
         expect.objectContaining({ styleId: 'TableCaption' }),
         expect.objectContaining({ styleId: 'AppendixBody' }),
-      ]),
+      ])
     );
-    expect(result.context.report_design.styles.definitions.find((style: any) => style.styleId === 'CalloutTitle')?.rPr.color.val).toBe('38bdf8');
-    expect(result.context.report_design.styles.definitions.find((style: any) => style.styleId === 'AppendixBody')?.rPr.color.val).toBe('334155');
+    expect(
+      result.context.report_design.styles.definitions.find(
+        (style: any) => style.styleId === 'CalloutTitle'
+      )?.rPr.color.val
+    ).toBe('38bdf8');
+    expect(
+      result.context.report_design.styles.definitions.find(
+        (style: any) => style.styleId === 'AppendixBody'
+      )?.rPr.color.val
+    ).toBe('334155');
   });
 
   it('applies the recommended document theme to tracker spreadsheet design output', async () => {
@@ -1555,20 +1724,14 @@ describe('media-actuator pdf to pptx bridge', () => {
           payload: {
             title: 'Execution Tracker',
             summary_cards: [{ label: 'Open risks', value: '4', tone: 'warning' }],
-            risks: [
-              { title: 'Vendor dependency slippage', owner: 'PMO', severity: 'warning' },
-            ],
-            incidents: [
-              { title: 'Payment timeout spike', owner: 'Platform', severity: 'danger' },
-            ],
+            risks: [{ title: 'Vendor dependency slippage', owner: 'PMO', severity: 'warning' }],
+            incidents: [{ title: 'Payment timeout spike', owner: 'Platform', severity: 'danger' }],
             columns: [
               { key: 'task', label: 'Task' },
               { key: 'owner', label: 'Owner' },
               { key: 'status', label: 'Status' },
             ],
-            rows: [
-              { task: 'Close incident actions', owner: 'Ops', status: 'In Progress' },
-            ],
+            rows: [{ task: 'Close incident actions', owner: 'Ops', status: 'In Progress' }],
           },
         },
       },
@@ -1590,7 +1753,7 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect.objectContaining({
         dk1: '0f172a',
         accent1: '38bdf8',
-      }),
+      })
     );
     expect(result.context.tracker_design.styles.fills[2].fgColor.rgb).toBe('#0f172a');
     expect(result.context.tracker_design.metadata.sheetRoles).toEqual(
@@ -1598,28 +1761,42 @@ describe('media-actuator pdf to pptx bridge', () => {
         expect.objectContaining({ role: 'overview', title: 'Overview' }),
         expect.objectContaining({ role: 'execution-board', title: 'Execution Board' }),
         expect.objectContaining({ role: 'signals', title: 'Signals and Risks' }),
-      ]),
+      ])
     );
     expect(result.context.tracker_design.metadata.sheetSemantics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ role: 'overview', semantic_type: 'summary' }),
         expect.objectContaining({ role: 'execution-board', semantic_type: 'execution' }),
         expect.objectContaining({ role: 'signals', semantic_type: 'signals' }),
-      ]),
+      ])
     );
-    expect(result.context.tracker_design.sheets.find((sheet: any) => sheet.id === 'sheet1')?.name).toBe('Execution Board');
+    expect(
+      result.context.tracker_design.sheets.find((sheet: any) => sheet.id === 'sheet1')?.name
+    ).toBe('Execution Board');
     expect(result.context.tracker_design.sheets.map((sheet: any) => sheet.name)).toEqual(
-      expect.arrayContaining(['Overview', 'Execution Board', 'Signals and Risks']),
+      expect.arrayContaining(['Overview', 'Execution Board', 'Signals and Risks'])
     );
-    const signalsSheet = result.context.tracker_design.sheets.find((sheet: any) => sheet.id === 'sheet-signals');
-    expect(signalsSheet.rows.find((row: any) => row.index === 1)?.cells.find((cell: any) => cell.ref === 'A1')?.value).toBe('Signals and Risks');
-    expect(signalsSheet.rows.find((row: any) => row.index === 3)?.cells.map((cell: any) => cell.value)).toEqual([
-      'Task',
-      'Owner',
-      'Status',
-    ]);
-    expect(signalsSheet.rows.some((row: any) => row.cells.some((cell: any) => cell.value === 'Vendor dependency slippage'))).toBe(true);
-    expect(signalsSheet.rows.some((row: any) => row.cells.some((cell: any) => cell.value === 'Payment timeout spike'))).toBe(true);
+    const signalsSheet = result.context.tracker_design.sheets.find(
+      (sheet: any) => sheet.id === 'sheet-signals'
+    );
+    expect(
+      signalsSheet.rows
+        .find((row: any) => row.index === 1)
+        ?.cells.find((cell: any) => cell.ref === 'A1')?.value
+    ).toBe('Signals and Risks');
+    expect(
+      signalsSheet.rows.find((row: any) => row.index === 3)?.cells.map((cell: any) => cell.value)
+    ).toEqual(['Task', 'Owner', 'Status']);
+    expect(
+      signalsSheet.rows.some((row: any) =>
+        row.cells.some((cell: any) => cell.value === 'Vendor dependency slippage')
+      )
+    ).toBe(true);
+    expect(
+      signalsSheet.rows.some((row: any) =>
+        row.cells.some((cell: any) => cell.value === 'Payment timeout spike')
+      )
+    ).toBe(true);
     const signalTaskRows = signalsSheet.rows
       .filter((row: any) => row.index >= 4)
       .map((row: any) => row.cells.find((cell: any) => String(cell.ref).startsWith('A'))?.value)
@@ -1661,8 +1838,14 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const overviewSheet = result.context.tracker_design.sheets.find((sheet: any) => sheet.id === 'sheet-overview');
-    expect(overviewSheet.rows.some((row: any) => row.cells.some((cell: any) => cell.value === 'No summary cards provided.'))).toBe(true);
+    const overviewSheet = result.context.tracker_design.sheets.find(
+      (sheet: any) => sheet.id === 'sheet-overview'
+    );
+    expect(
+      overviewSheet.rows.some((row: any) =>
+        row.cells.some((cell: any) => cell.value === 'No summary cards provided.')
+      )
+    ).toBe(true);
   });
 
   it('bridges pdf design into pptx design before render', async () => {
@@ -1675,9 +1858,7 @@ describe('media-actuator pdf to pptx bridge', () => {
           source: { format: 'markdown', body: '', title: 'Dummy PDF file' },
           content: {
             text: 'First line\nSecond line',
-            pages: [
-              { pageNumber: 1, width: 612, height: 792, text: 'Page one summary\nDetail A' },
-            ],
+            pages: [{ pageNumber: 1, width: 612, height: 792, text: 'Page one summary\nDetail A' }],
           },
           metadata: { title: 'Dummy PDF file', pageCount: 1 },
         },
@@ -1701,7 +1882,7 @@ describe('media-actuator pdf to pptx bridge', () => {
           expect.objectContaining({ id: 'pdf-title' }),
           expect.objectContaining({ id: 'pdf-page-1' }),
         ]),
-      }),
+      })
     );
   });
 
@@ -1722,10 +1903,34 @@ describe('media-actuator pdf to pptx bridge', () => {
                 height: 800,
                 text: '',
                 elements: [
-                  { type: 'text', x: 25, y: 40, width: 80, height: 12, text: 'G=G{GGG9G', fontSize: 10 },
+                  {
+                    type: 'text',
+                    x: 25,
+                    y: 40,
+                    width: 80,
+                    height: 12,
+                    text: 'G=G{GGG9G',
+                    fontSize: 10,
+                  },
                   { type: 'text', x: 40, y: 60, width: 120, height: 12, text: '', fontSize: 10 },
-                  { type: 'text', x: 58, y: 60, width: 280, height: 12, text: 'p.4\\2267', fontSize: 10 },
-                  { type: 'text', x: 58, y: 60, width: 280, height: 12, text: '実施概要', fontSize: 10 },
+                  {
+                    type: 'text',
+                    x: 58,
+                    y: 60,
+                    width: 280,
+                    height: 12,
+                    text: 'p.4\\2267',
+                    fontSize: 10,
+                  },
+                  {
+                    type: 'text',
+                    x: 58,
+                    y: 60,
+                    width: 280,
+                    height: 12,
+                    text: '実施概要',
+                    fontSize: 10,
+                  },
                 ],
               },
             ],
@@ -1747,10 +1952,25 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
-    expect(pageSlide.elements.some((element: any) => typeof element.text === 'string' && element.text.includes('• p.4–7 実施概要'))).toBe(true);
-    expect(pageSlide.elements.some((element: any) => typeof element.text === 'string' && element.text.includes('G=G{GGG9G'))).toBe(false);
-    expect(pageSlide.elements.filter((element: any) => typeof element.text === 'string' && element.text.includes('自由回答')).length).toBeLessThanOrEqual(1);
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
+    expect(
+      pageSlide.elements.some(
+        (element: any) =>
+          typeof element.text === 'string' && element.text.includes('• p.4–7 実施概要')
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => typeof element.text === 'string' && element.text.includes('G=G{GGG9G')
+      )
+    ).toBe(false);
+    expect(
+      pageSlide.elements.filter(
+        (element: any) => typeof element.text === 'string' && element.text.includes('自由回答')
+      ).length
+    ).toBeLessThanOrEqual(1);
   });
 
   it('falls back to summary mode for grid-like pptx-exported pdf pages', async () => {
@@ -1808,10 +2028,16 @@ describe('media-actuator pdf to pptx bridge', () => {
       ],
     } as any);
 
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
     expect(pageSlide.elements[0].text).toBe('Page 1');
-    expect(pageSlide.elements[1].text).toContain('本日のスキルインプットセッションの満足度はどの程度ですか');
-    expect(pageSlide.elements[1].text).toContain('本日のセッションで学んだ内容は今後のキャリアに活かせそうですか');
+    expect(pageSlide.elements[1].text).toContain(
+      '本日のスキルインプットセッションの満足度はどの程度ですか'
+    );
+    expect(pageSlide.elements[1].text).toContain(
+      '本日のセッションで学んだ内容は今後のキャリアに活かせそうですか'
+    );
   });
 
   it('maps pdf clip regions to pptx image crop when an image is partially clipped', async () => {
@@ -1830,11 +2056,18 @@ describe('media-actuator pdf to pptx bridge', () => {
                 width: 200,
                 height: 100,
                 text: '',
-                images: [
-                  { path: '/tmp/mock-image.png', x: 20, y: 10, width: 120, height: 60 },
-                ],
+                images: [{ path: '/tmp/mock-image.png', x: 20, y: 10, width: 120, height: 60 }],
                 elements: [
-                  { type: 'clip', x: 50, y: 20, width: 60, height: 30, text: '', fontSize: 0, fontName: '' },
+                  {
+                    type: 'clip',
+                    x: 50,
+                    y: 20,
+                    width: 60,
+                    height: 30,
+                    text: '',
+                    fontSize: 0,
+                    fontName: '',
+                  },
                 ],
               },
             ],
@@ -1856,7 +2089,9 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
     const image = pageSlide.elements.find((element: any) => element.type === 'image');
     expect(image.crop).toEqual({
       left: 25000,
@@ -1870,7 +2105,7 @@ describe('media-actuator pdf to pptx bridge', () => {
         y: expect.any(Number),
         w: expect.any(Number),
         h: expect.any(Number),
-      }),
+      })
     );
   });
 
@@ -1891,11 +2126,53 @@ describe('media-actuator pdf to pptx bridge', () => {
                 height: 100,
                 text: '',
                 elements: [
-                  { type: 'clip', x: 20, y: 10, width: 100, height: 50, text: '', fontSize: 0, fontName: '' },
-                  { type: 'rect', x: 18, y: 8, width: 104, height: 54, fillColor: '#DDEEFF', strokeColor: '#112233', opacity: 0.35 },
-                  { type: 'border', x: 20, y: 10, width: 100, height: 1, strokeColor: '#445566', lineWidth: 2 },
-                  { type: 'text', x: 30, y: 20, width: 60, height: 10, text: 'Inside block', fontSize: 12 },
-                  { type: 'text', x: 150, y: 20, width: 35, height: 10, text: 'Outside block', fontSize: 12 },
+                  {
+                    type: 'clip',
+                    x: 20,
+                    y: 10,
+                    width: 100,
+                    height: 50,
+                    text: '',
+                    fontSize: 0,
+                    fontName: '',
+                  },
+                  {
+                    type: 'rect',
+                    x: 18,
+                    y: 8,
+                    width: 104,
+                    height: 54,
+                    fillColor: '#DDEEFF',
+                    strokeColor: '#112233',
+                    opacity: 0.35,
+                  },
+                  {
+                    type: 'border',
+                    x: 20,
+                    y: 10,
+                    width: 100,
+                    height: 1,
+                    strokeColor: '#445566',
+                    lineWidth: 2,
+                  },
+                  {
+                    type: 'text',
+                    x: 30,
+                    y: 20,
+                    width: 60,
+                    height: 10,
+                    text: 'Inside block',
+                    fontSize: 12,
+                  },
+                  {
+                    type: 'text',
+                    x: 150,
+                    y: 20,
+                    width: 35,
+                    height: 10,
+                    text: 'Outside block',
+                    fontSize: 12,
+                  },
                 ],
               },
             ],
@@ -1917,17 +2194,31 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
-    const clipShape = pageSlide.elements.find((element: any) => element.type === 'shape' && element.id.startsWith('pdf-clip-'));
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
+    const clipShape = pageSlide.elements.find(
+      (element: any) => element.type === 'shape' && element.id.startsWith('pdf-clip-')
+    );
     expect(clipShape).toBeTruthy();
-    expect(clipShape.style).toEqual(expect.objectContaining({
-      fill: 'DDEEFF',
-      line: '445566',
-      lineWidth: 2,
-      opacity: 35,
-    }));
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'Inside block')).toBe(true);
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'Outside block')).toBe(false);
+    expect(clipShape.style).toEqual(
+      expect.objectContaining({
+        fill: 'DDEEFF',
+        line: '445566',
+        lineWidth: 2,
+        opacity: 35,
+      })
+    );
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === 'Inside block'
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === 'Outside block'
+      )
+    ).toBe(false);
   });
 
   it('can enable full-page image overlay through pdf-to-pptx hints', async () => {
@@ -1951,12 +2242,47 @@ describe('media-actuator pdf to pptx bridge', () => {
                   { path: '/tmp/inner.png', x: 50, y: 20, width: 40, height: 20 },
                 ],
                 elements: [
-                  { type: 'clip', x: 10, y: 10, width: 180, height: 70, text: '', fontSize: 0, fontName: '' },
-                  { type: 'text', x: 20, y: 18, width: 60, height: 12, text: 'Short', fontSize: 12 },
-                  { type: 'heading', x: 20, y: 36, width: 120, height: 18, text: 'Large overlay title', fontSize: 20 },
+                  {
+                    type: 'clip',
+                    x: 10,
+                    y: 10,
+                    width: 180,
+                    height: 70,
+                    text: '',
+                    fontSize: 0,
+                    fontName: '',
+                  },
+                  {
+                    type: 'text',
+                    x: 20,
+                    y: 18,
+                    width: 60,
+                    height: 12,
+                    text: 'Short',
+                    fontSize: 12,
+                  },
+                  {
+                    type: 'heading',
+                    x: 20,
+                    y: 36,
+                    width: 120,
+                    height: 18,
+                    text: 'Large overlay title',
+                    fontSize: 20,
+                  },
                 ],
                 ocrLines: [
-                  { id: 'ocr-1', type: 'heading', x: 18, y: 34, width: 120, height: 18, text: 'OCR Overlay Title', fontSize: 20, confidence: 92 },
+                  {
+                    id: 'ocr-1',
+                    type: 'heading',
+                    x: 18,
+                    y: 34,
+                    width: 120,
+                    height: 18,
+                    text: 'OCR Overlay Title',
+                    fontSize: 20,
+                    confidence: 92,
+                  },
                 ],
               },
             ],
@@ -1984,12 +2310,33 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
-    expect(pageSlide.elements.some((element: any) => element.id === 'pdf-page-bg-1' && element.imagePath === '/tmp/full-page.png')).toBe(true);
-    expect(pageSlide.elements.some((element: any) => element.type === 'image' && element.imagePath === '/tmp/inner.png')).toBe(true);
-    expect(pageSlide.elements.some((element: any) => element.type === 'shape' && element.id.startsWith('pdf-clip-'))).toBe(false);
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'OCR Overlay Title')).toBe(true);
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'Short')).toBe(false);
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
+    expect(
+      pageSlide.elements.some(
+        (element: any) =>
+          element.id === 'pdf-page-bg-1' && element.imagePath === '/tmp/full-page.png'
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'image' && element.imagePath === '/tmp/inner.png'
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'shape' && element.id.startsWith('pdf-clip-')
+      )
+    ).toBe(false);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === 'OCR Overlay Title'
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'Short')
+    ).toBe(false);
   });
 
   it('runs OCR overlay for full-page image pages when extracted pdf text is mostly unreliable', async () => {
@@ -2031,9 +2378,7 @@ describe('media-actuator pdf to pptx bridge', () => {
                 width: 200,
                 height: 100,
                 text: '',
-                images: [
-                  { path: '/tmp/full-page.png', x: 0, y: 0, width: 200, height: 100 },
-                ],
+                images: [{ path: '/tmp/full-page.png', x: 0, y: 0, width: 200, height: 100 }],
                 elements: unreliableElements,
               },
             ],
@@ -2065,9 +2410,19 @@ describe('media-actuator pdf to pptx bridge', () => {
 
     expect(result.status).toBe('succeeded');
     expect(mocks.recognize).toHaveBeenCalledWith('/tmp/full-page.png', 'jpn');
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'OCR Restored Title')).toBe(true);
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'G9GTGBGx')).toBe(false);
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === 'OCR Restored Title'
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === 'G9GTGBGx'
+      )
+    ).toBe(false);
   });
 
   it('falls back to OCR text blocks when tesseract returns text without line boxes', async () => {
@@ -2094,9 +2449,7 @@ describe('media-actuator pdf to pptx bridge', () => {
                 width: 200,
                 height: 100,
                 text: '',
-                images: [
-                  { path: '/tmp/full-page.png', x: 0, y: 0, width: 200, height: 100 },
-                ],
+                images: [{ path: '/tmp/full-page.png', x: 0, y: 0, width: 200, height: 100 }],
                 elements: [],
               },
             ],
@@ -2127,9 +2480,19 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    const pageSlide = result.context.last_pptx_design.slides.find((slide: any) => slide.id === 'pdf-page-1');
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === '最終報告書')).toBe(true);
-    expect(pageSlide.elements.some((element: any) => element.type === 'text' && element.text === 'クロスカンパニーメンタリング')).toBe(true);
+    const pageSlide = result.context.last_pptx_design.slides.find(
+      (slide: any) => slide.id === 'pdf-page-1'
+    );
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === '最終報告書'
+      )
+    ).toBe(true);
+    expect(
+      pageSlide.elements.some(
+        (element: any) => element.type === 'text' && element.text === 'クロスカンパニーメンタリング'
+      )
+    ).toBe(true);
   });
 
   it('bridges pdf design into xlsx design with merge and style hints', async () => {
@@ -2185,7 +2548,7 @@ describe('media-actuator pdf to pptx bridge', () => {
     const sheet = result.context.last_xlsx_design.sheets[0];
     expect(sheet.mergeCells.length).toBeGreaterThan(0);
     expect(sheet.rows[0].cells.find((cell: any) => cell.ref === 'A1')).toEqual(
-      expect.objectContaining({ value: 'Team A' }),
+      expect.objectContaining({ value: 'Team A' })
     );
     expect(result.context.last_xlsx_design.styles.cellXfs.length).toBeGreaterThan(1);
   });
@@ -2193,7 +2556,10 @@ describe('media-actuator pdf to pptx bridge', () => {
   it('emits document briefs that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/document-brief.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(ROOT, 'knowledge/product/schemas/document-brief.schema.json')
+    );
 
     expect(
       validate({
@@ -2215,14 +2581,17 @@ describe('media-actuator pdf to pptx bridge', () => {
           ],
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('emits proposal briefs that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/proposal-brief.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(ROOT, 'knowledge/product/schemas/proposal-brief.schema.json')
+    );
 
     expect(
       validate({
@@ -2246,10 +2615,9 @@ describe('media-actuator pdf to pptx bridge', () => {
         ],
         required_sections: ['Summary', 'Evidence'],
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
-
 });
 
 describe('media-actuator pdf_split (pypdf bridge)', () => {
@@ -2265,7 +2633,7 @@ describe('media-actuator pdf_split (pypdf bridge)', () => {
     }
   })();
 
-  const testRoot = path.resolve(process.cwd(), 'active/shared/tmp/__pdf_split_test');
+  const testRoot = path.resolve(ROOT, 'active/shared/tmp/__pdf_split_test');
   const fixturePath = path.join(testRoot, 'enc.pdf');
   const PASSWORD = 's3cret-pw';
 
@@ -2274,14 +2642,23 @@ describe('media-actuator pdf_split (pypdf bridge)', () => {
     safeRmSync(testRoot, { recursive: true, force: true });
     safeMkdir(testRoot, { recursive: true });
     // Build a 3-page password-protected PDF fixture with pypdf.
-    const build = spawnSync(pythonBin, ['-c', [
-      'import sys',
-      'from pypdf import PdfWriter',
-      'w = PdfWriter()',
-      '[w.add_blank_page(width=200, height=200) for _ in range(3)]',
-      'w.encrypt(sys.argv[2])',
-      'w.write(sys.argv[1])',
-    ].join('\n'), fixturePath, PASSWORD], { timeout: 30000 });
+    const build = spawnSync(
+      pythonBin,
+      [
+        '-c',
+        [
+          'import sys',
+          'from pypdf import PdfWriter',
+          'w = PdfWriter()',
+          '[w.add_blank_page(width=200, height=200) for _ in range(3)]',
+          'w.encrypt(sys.argv[2])',
+          'w.write(sys.argv[1])',
+        ].join('\n'),
+        fixturePath,
+        PASSWORD,
+      ],
+      { timeout: 30000 }
+    );
     expect(build.status, build.stderr?.toString()).toBe(0);
     expect(safeExistsSync(fixturePath)).toBe(true);
   });
@@ -2293,13 +2670,19 @@ describe('media-actuator pdf_split (pypdf bridge)', () => {
   it.runIf(pypdfAvailable)('splits a password-protected PDF into one file per page', async () => {
     const result = await handleAction({
       action: 'pipeline',
-      steps: [{ type: 'capture', op: 'pdf_split', params: {
-        path: 'active/shared/tmp/__pdf_split_test/enc.pdf',
-        password: PASSWORD,
-        out_dir: 'active/shared/tmp/__pdf_split_test/pages',
-        prefix: 'enc',
-        export_as: 'pdf_pages',
-      } }],
+      steps: [
+        {
+          type: 'capture',
+          op: 'pdf_split',
+          params: {
+            path: 'active/shared/tmp/__pdf_split_test/enc.pdf',
+            password: PASSWORD,
+            out_dir: 'active/shared/tmp/__pdf_split_test/pages',
+            prefix: 'enc',
+            export_as: 'pdf_pages',
+          },
+        },
+      ],
     } as any);
 
     expect(result.status).toBe('succeeded');
@@ -2313,19 +2696,25 @@ describe('media-actuator pdf_split (pypdf bridge)', () => {
       'active/shared/tmp/__pdf_split_test/pages/enc-003.pdf',
     ]);
     for (const rel of out.pages) {
-      expect(safeExistsSync(path.resolve(process.cwd(), rel))).toBe(true);
+      expect(safeExistsSync(path.resolve(ROOT, rel))).toBe(true);
     }
   });
 
   it.runIf(pypdfAvailable)('fails clearly on an incorrect password', async () => {
     const result = await handleAction({
       action: 'pipeline',
-      steps: [{ type: 'capture', op: 'pdf_split', params: {
-        path: 'active/shared/tmp/__pdf_split_test/enc.pdf',
-        password: 'wrong-password',
-        out_dir: 'active/shared/tmp/__pdf_split_test/pages',
-        export_as: 'pdf_pages',
-      } }],
+      steps: [
+        {
+          type: 'capture',
+          op: 'pdf_split',
+          params: {
+            path: 'active/shared/tmp/__pdf_split_test/enc.pdf',
+            password: 'wrong-password',
+            out_dir: 'active/shared/tmp/__pdf_split_test/pages',
+            export_as: 'pdf_pages',
+          },
+        },
+      ],
     } as any);
 
     expect(result.status).toBe('failed');
@@ -2334,10 +2723,16 @@ describe('media-actuator pdf_split (pypdf bridge)', () => {
   it('rejects a missing input PDF before invoking the bridge', async () => {
     const result = await handleAction({
       action: 'pipeline',
-      steps: [{ type: 'capture', op: 'pdf_split', params: {
-        path: 'active/shared/tmp/__pdf_split_test/does-not-exist.pdf',
-        export_as: 'pdf_pages',
-      } }],
+      steps: [
+        {
+          type: 'capture',
+          op: 'pdf_split',
+          params: {
+            path: 'active/shared/tmp/__pdf_split_test/does-not-exist.pdf',
+            export_as: 'pdf_pages',
+          },
+        },
+      ],
     } as any);
 
     expect(result.status).toBe('failed');
@@ -2347,13 +2742,16 @@ describe('media-actuator pdf_split (pypdf bridge)', () => {
 describe('media-actuator PDF page ops (pypdf bridge)', () => {
   const pythonBin = process.env.KYBERION_PYTHON || 'python3';
   const probe = (code: string) => {
-    try { return spawnSync(pythonBin, ['-c', code], { timeout: 15000 }).status === 0; }
-    catch { return false; }
+    try {
+      return spawnSync(pythonBin, ['-c', code], { timeout: 15000 }).status === 0;
+    } catch {
+      return false;
+    }
   };
   const pypdfAvailable = probe('import pypdf');
   const cryptoAvailable = probe('import cryptography');
 
-  const testRoot = path.resolve(process.cwd(), 'active/shared/tmp/__pdf_ops_test');
+  const testRoot = path.resolve(ROOT, 'active/shared/tmp/__pdf_ops_test');
   const rel = (name: string) => `active/shared/tmp/__pdf_ops_test/${name}`;
   const abs = (name: string) => path.join(testRoot, name);
 
@@ -2361,14 +2759,23 @@ describe('media-actuator PDF page ops (pypdf bridge)', () => {
     if (!pypdfAvailable) return;
     safeRmSync(testRoot, { recursive: true, force: true });
     safeMkdir(testRoot, { recursive: true });
-    const build = spawnSync(pythonBin, ['-c', [
-      'import sys',
-      'from pypdf import PdfWriter',
-      'w = PdfWriter()',
-      '[w.add_blank_page(width=200, height=200) for _ in range(5)]',
-      'w.write(sys.argv[1])',
-      's = PdfWriter(); s.add_blank_page(width=200, height=200); s.write(sys.argv[2])',
-    ].join('\n'), abs('five.pdf'), abs('stamp.pdf')], { timeout: 30000 });
+    const build = spawnSync(
+      pythonBin,
+      [
+        '-c',
+        [
+          'import sys',
+          'from pypdf import PdfWriter',
+          'w = PdfWriter()',
+          '[w.add_blank_page(width=200, height=200) for _ in range(5)]',
+          'w.write(sys.argv[1])',
+          's = PdfWriter(); s.add_blank_page(width=200, height=200); s.write(sys.argv[2])',
+        ].join('\n'),
+        abs('five.pdf'),
+        abs('stamp.pdf'),
+      ],
+      { timeout: 30000 }
+    );
     expect(build.status, build.stderr?.toString()).toBe(0);
   });
 
@@ -2376,46 +2783,79 @@ describe('media-actuator PDF page ops (pypdf bridge)', () => {
     safeRmSync(testRoot, { recursive: true, force: true });
   });
 
-  const runOp = (op: string, params: Record<string, unknown>, type: 'capture' | 'transform' = 'capture') => handleAction({
-    action: 'pipeline',
-    steps: [{ type, op, params: { export_as: 'r', ...params } }],
-  } as any);
+  const runOp = (
+    op: string,
+    params: Record<string, unknown>,
+    type: 'capture' | 'transform' = 'capture'
+  ) =>
+    handleAction({
+      action: 'pipeline',
+      steps: [{ type, op, params: { export_as: 'r', ...params } }],
+    } as any);
 
   it.runIf(pypdfAvailable)('pdf_extract_range keeps only the selected pages', async () => {
-    const res = await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '2-4', out: rel('range.pdf') });
+    const res = await runOp('pdf_extract_range', {
+      path: rel('five.pdf'),
+      pages: '2-4',
+      out: rel('range.pdf'),
+    });
     expect(res.status).toBe('succeeded');
     expect(res.context.r).toMatchObject({ count: 3, out: rel('range.pdf'), pages: [2, 3, 4] });
     expect(safeExistsSync(abs('range.pdf'))).toBe(true);
   });
 
   it.runIf(pypdfAvailable)('pdf_delete_pages drops the selected pages', async () => {
-    const res = await runOp('pdf_delete_pages', { path: rel('five.pdf'), delete: '1,5', out: rel('del.pdf') });
+    const res = await runOp('pdf_delete_pages', {
+      path: rel('five.pdf'),
+      delete: '1,5',
+      out: rel('del.pdf'),
+    });
     expect(res.status).toBe('succeeded');
     expect(res.context.r).toMatchObject({ count: 3, deleted: [1, 5] });
   });
 
   it.runIf(pypdfAvailable)('pdf_reorder rewrites pages in the given order', async () => {
-    const res = await runOp('pdf_reorder', { path: rel('five.pdf'), order: '5,4,3,2,1', out: rel('rev.pdf') });
+    const res = await runOp('pdf_reorder', {
+      path: rel('five.pdf'),
+      order: '5,4,3,2,1',
+      out: rel('rev.pdf'),
+    });
     expect(res.status).toBe('succeeded');
     expect(res.context.r).toMatchObject({ count: 5, order: [5, 4, 3, 2, 1] });
   });
 
   it.runIf(pypdfAvailable)('pdf_rotate rotates the selected pages', async () => {
-    const res = await runOp('pdf_rotate', { path: rel('five.pdf'), pages: '1-2', angle: 90, out: rel('rot.pdf') });
+    const res = await runOp('pdf_rotate', {
+      path: rel('five.pdf'),
+      pages: '1-2',
+      angle: 90,
+      out: rel('rot.pdf'),
+    });
     expect(res.status).toBe('succeeded');
     expect(res.context.r).toMatchObject({ count: 5, rotated: [1, 2], angle: 90 });
   });
 
-  it.runIf(pypdfAvailable)('pdf_merge concatenates multiple PDFs from a transform step', async () => {
-    await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '1-2', out: rel('a.pdf') });
-    await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '3-5', out: rel('b.pdf') });
-    const res = await runOp('pdf_merge', { inputs: [rel('a.pdf'), rel('b.pdf')], out: rel('merged.pdf') }, 'transform');
-    expect(res.status).toBe('succeeded');
-    expect(res.context.r).toMatchObject({ count: 5, out: rel('merged.pdf') });
-  });
+  it.runIf(pypdfAvailable)(
+    'pdf_merge concatenates multiple PDFs from a transform step',
+    async () => {
+      await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '1-2', out: rel('a.pdf') });
+      await runOp('pdf_extract_range', { path: rel('five.pdf'), pages: '3-5', out: rel('b.pdf') });
+      const res = await runOp(
+        'pdf_merge',
+        { inputs: [rel('a.pdf'), rel('b.pdf')], out: rel('merged.pdf') },
+        'transform'
+      );
+      expect(res.status).toBe('succeeded');
+      expect(res.context.r).toMatchObject({ count: 5, out: rel('merged.pdf') });
+    }
+  );
 
   it.runIf(pypdfAvailable)('pdf_metadata writes then reads back metadata', async () => {
-    const write = await runOp('pdf_metadata', { path: rel('five.pdf'), set: { Title: 'Hello', Author: 'Kyberion' }, out: rel('meta.pdf') });
+    const write = await runOp('pdf_metadata', {
+      path: rel('five.pdf'),
+      set: { Title: 'Hello', Author: 'Kyberion' },
+      out: rel('meta.pdf'),
+    });
     expect(write.status).toBe('succeeded');
     const read = await runOp('pdf_metadata', { path: rel('meta.pdf') });
     expect(read.status).toBe('succeeded');
@@ -2424,18 +2864,35 @@ describe('media-actuator PDF page ops (pypdf bridge)', () => {
   });
 
   it.runIf(pypdfAvailable)('pdf_stamp overlays a stamp onto the selected pages', async () => {
-    const res = await runOp('pdf_stamp', { path: rel('five.pdf'), stamp: rel('stamp.pdf'), pages: 'all', out: rel('stamped.pdf') });
+    const res = await runOp('pdf_stamp', {
+      path: rel('five.pdf'),
+      stamp: rel('stamp.pdf'),
+      pages: 'all',
+      out: rel('stamped.pdf'),
+    });
     expect(res.status).toBe('succeeded');
     expect(res.context.r).toMatchObject({ count: 5, stamped: [1, 2, 3, 4, 5] });
   });
 
-  it.runIf(pypdfAvailable && cryptoAvailable)('pdf_encrypt then pdf_remove_password round-trips', async () => {
-    const enc = await runOp('pdf_encrypt', { path: rel('five.pdf'), user_password: 'u1', owner_password: 'o1', out: rel('enc.pdf') });
-    expect(enc.status).toBe('succeeded');
-    const dec = await runOp('pdf_remove_password', { path: rel('enc.pdf'), password: 'u1', out: rel('dec.pdf') });
-    expect(dec.status).toBe('succeeded');
-    expect((dec.context.r as any).count).toBe(5);
-  });
+  it.runIf(pypdfAvailable && cryptoAvailable)(
+    'pdf_encrypt then pdf_remove_password round-trips',
+    async () => {
+      const enc = await runOp('pdf_encrypt', {
+        path: rel('five.pdf'),
+        user_password: 'u1',
+        owner_password: 'o1',
+        out: rel('enc.pdf'),
+      });
+      expect(enc.status).toBe('succeeded');
+      const dec = await runOp('pdf_remove_password', {
+        path: rel('enc.pdf'),
+        password: 'u1',
+        out: rel('dec.pdf'),
+      });
+      expect(dec.status).toBe('succeeded');
+      expect((dec.context.r as any).count).toBe(5);
+    }
+  );
 
   it.runIf(pypdfAvailable)('pdf_merge rejects fewer than two inputs', async () => {
     const res = await runOp('pdf_merge', { inputs: [rel('five.pdf')], out: rel('x.pdf') });
@@ -2443,7 +2900,11 @@ describe('media-actuator PDF page ops (pypdf bridge)', () => {
   });
 
   it('rejects a missing input before invoking the bridge', async () => {
-    const res = await runOp('pdf_extract_range', { path: rel('nope.pdf'), pages: '1', out: rel('x.pdf') });
+    const res = await runOp('pdf_extract_range', {
+      path: rel('nope.pdf'),
+      pages: '1',
+      out: rel('x.pdf'),
+    });
     expect(res.status).toBe('failed');
   });
 

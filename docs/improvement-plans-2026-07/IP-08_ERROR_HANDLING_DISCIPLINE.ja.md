@@ -60,3 +60,7 @@
 
 - **fail-open → fail-closed の変更は絶対に本 IP で行わない**。ポリシーゲートを fail-closed にすると正常運用が突然止まり得る。本 IP は「見える化」まで。fail-closed 化は警告ログの観測結果を持って別途判断する。
 - console → logger 置換で出力先が変わるため、ログを文字列パースしている呼び出し元(pipelines の shell ステップ)が無いか、置換対象ごとに grep で確認する。
+
+## 実装メモ
+
+- `scripts/run_super_pipeline.ts` のトップレベル `main().catch(...)` にエラーメッセージの正規化を入れ、`trace.addEvent('super_pipeline.failed', ...)` も `err.message` 依存のまま落ちないようにした。

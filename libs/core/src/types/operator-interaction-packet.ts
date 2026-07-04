@@ -13,6 +13,8 @@ export interface OperatorInteractionPacket {
   summary: string;
   readiness?: string;
   confidence?: number;
+  missing_inputs?: string[];
+  omitted_question_count?: number;
   questions?: {
     id: string;
     question: string;

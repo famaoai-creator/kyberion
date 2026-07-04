@@ -10,6 +10,7 @@ import {
   grantAccessGuarded,
   createActuatorTrace,
   finalizeActuatorTrace,
+  buildCompletionNextAction,
   ledger,
   logger,
   latestSnapshot,
@@ -91,6 +92,112 @@ function updateMissionMemorySidecar(mdPath: string, candidateId: string): void {
       2
     )
   );
+}
+
+function readMissionNextTasks(missionDir: string): Array<Record<string, unknown>> {
+  const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
+  if (!safeExistsSync(nextTasksPath)) return [];
+  try {
+    const parsed = JSON.parse(
+      safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string
+    ) as unknown;
+    return Array.isArray(parsed)
+      ? (parsed.filter((entry) => entry && typeof entry === 'object') as Array<
+          Record<string, unknown>
+        >)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMissionGateRecord(
+  missionDir: string,
+  gateId: string,
+  payload: Record<string, unknown>
+): string {
+  const gateDir = path.join(missionDir, 'gates');
+  if (!safeExistsSync(gateDir)) safeMkdir(gateDir, { recursive: true });
+  const gatePath = path.join(gateDir, `${gateId}-${Date.now().toString(36)}.json`);
+  safeWriteFile(gatePath, JSON.stringify(payload, null, 2));
+  return gatePath;
+}
+
+function evaluateMissionFinishExitGate(missionDir: string): {
+  ok: boolean;
+  reason?: string;
+  pendingTasks: string[];
+} {
+  const nextTasks = readMissionNextTasks(missionDir);
+  const pendingTasks = nextTasks
+    .filter((task) => {
+      const status = String(task.status || 'planned').toLowerCase();
+      return !['done', 'completed', 'accepted', 'reviewed'].includes(status);
+    })
+    .map((task) => String(task.task_id || task.description || 'unknown-task'));
+
+  if (pendingTasks.length > 0) {
+    return {
+      ok: false,
+      reason: `Pending tasks remain: ${pendingTasks.join(', ')}`,
+      pendingTasks,
+    };
+  }
+
+  return { ok: true, pendingTasks: [] };
+}
+
+function recordMissionFinishGateFailure(input: {
+  missionId: string;
+  state: any;
+  missionDir: string;
+  gateId: string;
+  reason: string;
+  agentRuntimeEventPath: string;
+}): string {
+  const now = new Date().toISOString();
+  const context = input.state.context || {};
+  const failureCount = Number(context.mission_finish_gate_failure_count || 0) + 1;
+  const shouldRealign = failureCount >= 2 && input.state.status === 'validating';
+  const nextStatus = shouldRealign ? 'active' : 'validating';
+
+  input.state.context = {
+    ...context,
+    mission_finish_gate_failure_count: failureCount,
+    mission_finish_gate_last_reason: input.reason,
+    mission_finish_gate_last_checked_at: now,
+  };
+  input.state.status = nextStatus;
+  input.state.history.push({
+    ts: now,
+    event: shouldRealign ? 'REALIGN' : 'EXIT_GATE_FAIL',
+    note: shouldRealign
+      ? `Finish gate failed ${failureCount} times; realigning to active. Reason: ${input.reason}`
+      : `Finish gate failed. Reason: ${input.reason}`,
+  });
+  recordAgentRuntimeEvent(input.agentRuntimeEventPath, {
+    event: shouldRealign ? 'MISSION_REALIGN_REQUESTED' : 'MISSION_FINISH_GATE_FAILED',
+    mission_id: input.missionId,
+    gate_id: input.gateId,
+    failure_count: failureCount,
+    reason: input.reason,
+    next_status: input.state.status,
+  });
+  const gatePath = writeMissionGateRecord(input.missionDir, input.gateId, {
+    mission_id: input.missionId,
+    gate_id: input.gateId,
+    verdict: 'fail',
+    reason: input.reason,
+    failure_count: failureCount,
+    next_status: input.state.status,
+    should_realign: shouldRealign,
+    checked_at: now,
+  });
+  input.state.context = {
+    ...(input.state.context || {}),
+    mission_finish_gate_last_path: gatePath,
+  };
+  return gatePath;
 }
 
 function maybeRunVolatileGc(
@@ -301,11 +408,15 @@ export async function finishMission(
     logger.info(`Mission ${upperId} is already archived.`);
     return;
   }
-  if (preState.status !== 'completed' && preState.status !== 'distilling') {
+  if (
+    preState.status !== 'completed' &&
+    preState.status !== 'distilling' &&
+    preState.status !== 'validating'
+  ) {
     const steps: Record<string, string> = {
       planned: 'Run "start" to activate the mission first.',
       active: 'Run "verify" → "distill" to complete the mission lifecycle first.',
-      validating: 'Run "distill" to extract knowledge before finishing.',
+      validating: 'Re-run finish after addressing the validation gap.',
       paused: 'Run "start" to resume, then complete the lifecycle.',
       failed: 'Run "start" to retry, then complete the lifecycle.',
     };
@@ -321,19 +432,84 @@ export async function finishMission(
     text: latestSnapshot(upperId)?.intent.goal || `Mission ${upperId} progressing through learn`,
     source: 'mission_state',
   });
+  const missionDir = findMissionPath(upperId);
+  if (!missionDir) return;
   const driftSummary = evaluateMissionIntentDrift(upperId);
   if (driftSummary && !driftSummary.passed) {
     logger.error(`❌ [INTENT_DRIFT] Mission ${upperId} blocked: ${driftSummary.message}`);
+    const state = loadState(upperId);
+    if (state) {
+      recordMissionFinishGateFailure({
+        missionId: upperId,
+        state,
+        missionDir,
+        gateId: 'intent-drift',
+        reason: driftSummary.message,
+        agentRuntimeEventPath: args.agentRuntimeEventPath,
+      });
+      await saveState(upperId, state);
+    }
     return;
   }
+  writeMissionGateRecord(missionDir, 'intent-drift', {
+    mission_id: upperId,
+    gate_id: 'intent-drift',
+    verdict: 'pass',
+    checked_at: new Date().toISOString(),
+    reason: driftSummary?.message || 'intent drift gate passed',
+  });
+
+  const exitGate = evaluateMissionFinishExitGate(missionDir);
+  if (!exitGate.ok) {
+    logger.error(`❌ [EXIT_GATE] Mission ${upperId} blocked: ${exitGate.reason}`);
+    const state = loadState(upperId);
+    if (state) {
+      recordMissionFinishGateFailure({
+        missionId: upperId,
+        state,
+        missionDir,
+        gateId: 'finish-exit',
+        reason: exitGate.reason || 'exit gate blocked',
+        agentRuntimeEventPath: args.agentRuntimeEventPath,
+      });
+      await saveState(upperId, state);
+    }
+    return;
+  }
+  writeMissionGateRecord(missionDir, 'finish-exit', {
+    mission_id: upperId,
+    gate_id: 'finish-exit',
+    verdict: 'pass',
+    checked_at: new Date().toISOString(),
+    reason: 'No pending tasks remain',
+  });
 
   const quality = await validateMissionQuality(upperId);
   if (!quality.ok) {
     logger.error(
       `❌ [QUALITY_REJECTION] Mission ${upperId} does not meet governance requirements: ${quality.reason}`
     );
+    const state = loadState(upperId);
+    if (state) {
+      recordMissionFinishGateFailure({
+        missionId: upperId,
+        state,
+        missionDir,
+        gateId: 'finish-quality',
+        reason: quality.reason || 'quality gate blocked',
+        agentRuntimeEventPath: args.agentRuntimeEventPath,
+      });
+      await saveState(upperId, state);
+    }
     return;
   }
+  writeMissionGateRecord(missionDir, 'finish-quality', {
+    mission_id: upperId,
+    gate_id: 'finish-quality',
+    verdict: 'pass',
+    checked_at: new Date().toISOString(),
+    reason: 'Mission quality validation passed',
+  });
 
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} not found.`);
@@ -344,9 +520,23 @@ export async function finishMission(
     };
   }
 
-  const missionDir = findMissionPath(upperId);
-  if (!missionDir) return;
   const evidenceRefs = collectMissionEvidenceRefs(missionDir);
+  const completionNextAction = buildCompletionNextAction({
+    goal: {
+      summary: state.outcome_contract?.requested_result || `Mission ${upperId}`,
+      success_condition:
+        state.outcome_contract?.success_criteria?.join('; ') ||
+        state.outcome_contract?.requested_result ||
+        `Mission ${upperId}`,
+    },
+    reconciliation: {
+      satisfied: evidenceRefs.length > 0,
+      delivered: evidenceRefs,
+      gaps: evidenceRefs.length > 0 ? [] : ['No mission evidence refs were collected.'],
+      confidence: evidenceRefs.length > 0 ? 0.9 : 0.35,
+      evidence_refs: evidenceRefs,
+    },
+  });
   const traceCtx = createActuatorTrace('mission-controller', 'finish', {
     pipelineId: upperId,
     missionId: upperId,
@@ -476,6 +666,15 @@ export async function finishMission(
   const traceResult = finalizeActuatorTrace(traceCtx);
   state.context = {
     ...(state.context || {}),
+    mission_completion_next_action: completionNextAction,
+    mission_completion_summary: {
+      requested_result: completionNextAction.request,
+      satisfied: completionNextAction.satisfied,
+      delivered: completionNextAction.delivered,
+      gaps: completionNextAction.gaps,
+      next_step: completionNextAction.next_step,
+      confidence: completionNextAction.confidence,
+    },
     mission_finish_trace_summary: traceResult.trace_summary,
     mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
   };

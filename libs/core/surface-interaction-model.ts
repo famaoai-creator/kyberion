@@ -11,6 +11,7 @@ import {
   enqueueSurfaceOutboxMessage,
   enqueueSurfaceNotification,
 } from './surface-coordination-store.js';
+import { renderStatus } from './ux-vocabulary.js';
 
 import type {
   SlackSurfaceMetadata,
@@ -74,6 +75,7 @@ export interface SurfaceSpaceContext {
   correlationId: string;
   capabilities: SurfaceCapabilityContract;
   actorId?: string;
+  locale?: string;
 }
 
 export interface SurfaceMessageContext {
@@ -96,12 +98,13 @@ export interface SurfaceSpace extends SurfaceSpaceContext {
     operation: () => Promise<T> | T,
     options?: {
       title?: string;
+      progress?: boolean;
       startedText?: string;
       completedText?: string;
       failedText?: string;
       sourceAgentId?: string;
       requestId?: string;
-    },
+    }
   ) => Promise<T>;
 }
 
@@ -147,7 +150,9 @@ export function registerSurfaceProvider(definition: SurfaceProviderDefinition): 
   _surfaceProviderRegistry.set(definition.id, definition);
 }
 
-export function getSurfaceProviderDefinition(surface: SurfaceProviderId): SurfaceProviderDefinition {
+export function getSurfaceProviderDefinition(
+  surface: SurfaceProviderId
+): SurfaceProviderDefinition {
   const definition = _surfaceProviderRegistry.get(surface);
   if (!definition) {
     throw new Error(`Surface provider '${surface}' not found in registry.`);
@@ -159,13 +164,19 @@ export function getSurfaceCapabilities(surface: SurfaceProviderId): SurfaceCapab
   return getSurfaceProviderDefinition(surface).capabilities;
 }
 
-function ensureCapability(surface: SurfaceProviderId, capabilities: SurfaceCapabilityContract, action: keyof SurfaceCapabilityContract): void {
+function ensureCapability(
+  surface: SurfaceProviderId,
+  capabilities: SurfaceCapabilityContract,
+  action: keyof SurfaceCapabilityContract
+): void {
   if (!capabilities[action]) {
     throw new SurfaceUnsupportedActionError(surface, action);
   }
 }
 
-function createReplyHandler(space: SurfaceSpaceContext): (input: SurfaceSpaceReplyInput) => SurfaceReplyReceipt {
+function createReplyHandler(
+  space: SurfaceSpaceContext
+): (input: SurfaceSpaceReplyInput) => SurfaceReplyReceipt {
   return (input) => {
     ensureCapability(space.surface, space.capabilities, 'reply');
     const manifest = getSurfaceProviderManifest(space.surface);
@@ -214,7 +225,9 @@ function defaultNotificationSourceAgentId(space: SurfaceSpaceContext): string {
   return manifest.agentId || `${space.surface}-surface-agent`;
 }
 
-function createNotifyHandler(space: SurfaceSpaceContext): (input: SurfaceSpaceNotificationInput) => SurfaceNotificationRecord {
+function createNotifyHandler(
+  space: SurfaceSpaceContext
+): (input: SurfaceSpaceNotificationInput) => SurfaceNotificationRecord {
   return (input) => {
     ensureCapability(space.surface, space.capabilities, 'notify');
     return enqueueSurfaceNotification({
@@ -230,7 +243,9 @@ function createNotifyHandler(space: SurfaceSpaceContext): (input: SurfaceSpaceNo
   };
 }
 
-function createAsyncRequestHandler(space: SurfaceSpaceContext): (input: SurfaceAsyncRequestInput) => SurfaceAsyncRequestRecord {
+function createAsyncRequestHandler(
+  space: SurfaceSpaceContext
+): (input: SurfaceAsyncRequestInput) => SurfaceAsyncRequestRecord {
   return (input) => {
     ensureCapability(space.surface, space.capabilities, 'asyncRequest');
     return createSurfaceAsyncRequest({
@@ -250,10 +265,14 @@ function createAsyncRequestHandler(space: SurfaceSpaceContext): (input: SurfaceA
 function createRespondingHandler(space: SurfaceSpace): SurfaceSpace['responding'] {
   return async (operation, options) => {
     ensureCapability(space.surface, space.capabilities, 'responding');
-    if (options?.startedText) {
+    const shouldNotifyProgress = options?.progress !== false;
+    const workingText = renderStatus('progress', 'working', space.locale);
+    const completedText = renderStatus('progress', 'completed', space.locale);
+    const failedText = renderStatus('progress', 'failed', space.locale);
+    if (shouldNotifyProgress) {
       space.notify({
-        title: options.title || 'Working',
-        text: options.startedText,
+        title: options.title || workingText,
+        text: options.startedText || workingText,
         status: 'info',
         requestId: options.requestId,
         sourceAgentId: options.sourceAgentId,
@@ -261,10 +280,10 @@ function createRespondingHandler(space: SurfaceSpace): SurfaceSpace['responding'
     }
     try {
       const result = await operation();
-      if (options?.completedText) {
+      if (shouldNotifyProgress) {
         space.notify({
-          title: options.title || 'Completed',
-          text: options.completedText,
+          title: options.title || completedText,
+          text: options.completedText || completedText,
           status: 'success',
           requestId: options.requestId,
           sourceAgentId: options.sourceAgentId,
@@ -272,10 +291,10 @@ function createRespondingHandler(space: SurfaceSpace): SurfaceSpace['responding'
       }
       return result;
     } catch (error: any) {
-      if (options?.failedText) {
+      if (shouldNotifyProgress) {
         space.notify({
-          title: options.title || 'Failed',
-          text: options.failedText,
+          title: options.title || failedText,
+          text: options.failedText || failedText,
           status: 'error',
           requestId: options.requestId,
           sourceAgentId: options.sourceAgentId,
@@ -286,7 +305,9 @@ function createRespondingHandler(space: SurfaceSpace): SurfaceSpace['responding'
   };
 }
 
-export function createSurfaceSpace(context: Omit<SurfaceSpaceContext, 'capabilities'>): SurfaceSpace {
+export function createSurfaceSpace(
+  context: Omit<SurfaceSpaceContext, 'capabilities'>
+): SurfaceSpace {
   const capabilities = getSurfaceCapabilities(context.surface);
   const base: SurfaceSpaceContext = {
     ...context,
@@ -305,7 +326,9 @@ export function createSurfaceSpace(context: Omit<SurfaceSpaceContext, 'capabilit
   return space;
 }
 
-export function createSurfaceMessage(context: Omit<SurfaceMessageContext, 'capabilities'>): SurfaceMessage {
+export function createSurfaceMessage(
+  context: Omit<SurfaceMessageContext, 'capabilities'>
+): SurfaceMessage {
   const space = createSurfaceSpace({
     surface: context.surface,
     channel: context.channel,
@@ -325,42 +348,84 @@ export function createSurfaceMessage(context: Omit<SurfaceMessageContext, 'capab
 
 export const slackSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'slack',
-  capabilities: { reply: true, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
+  capabilities: {
+    reply: true,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const chronosSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'chronos',
-  capabilities: { reply: true, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
+  capabilities: {
+    reply: true,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const presenceSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'presence',
-  capabilities: { reply: false, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
+  capabilities: {
+    reply: false,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const imessageSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'imessage',
-  capabilities: { reply: true, edit: false, react: false, notify: true, asyncRequest: true, responding: true },
+  capabilities: {
+    reply: true,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const discordSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'discord',
-  capabilities: { reply: true, edit: true, react: true, notify: true, asyncRequest: true, responding: true },
+  capabilities: {
+    reply: true,
+    edit: true,
+    react: true,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
 
 export const telegramSurfaceProviderDefinition: SurfaceProviderDefinition = {
   id: 'telegram',
-  capabilities: { reply: true, edit: true, react: false, notify: true, asyncRequest: true, responding: true },
+  capabilities: {
+    reply: true,
+    edit: true,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
   createSpace: createSurfaceSpace,
   createMessage: createSurfaceMessage,
 };
@@ -373,8 +438,9 @@ registerSurfaceProvider(imessageSurfaceProviderDefinition);
 registerSurfaceProvider(discordSurfaceProviderDefinition);
 registerSurfaceProvider(telegramSurfaceProviderDefinition);
 
-
-export function createSlackSurfaceSpace(input: SlackSurfaceInput & { correlationId?: string }): SurfaceSpace {
+export function createSlackSurfaceSpace(
+  input: SlackSurfaceInput & { correlationId?: string }
+): SurfaceSpace {
   return createSurfaceSpace({
     surface: 'slack',
     channel: input.channel,
@@ -384,7 +450,9 @@ export function createSlackSurfaceSpace(input: SlackSurfaceInput & { correlation
   });
 }
 
-export function createSlackSurfaceMessage(input: SlackSurfaceInput & { correlationId?: string; messageId?: string }): SurfaceMessage {
+export function createSlackSurfaceMessage(
+  input: SlackSurfaceInput & { correlationId?: string; messageId?: string }
+): SurfaceMessage {
   return createSurfaceMessage(buildSlackSurfaceIngressEnvelope(input));
 }
 
@@ -407,7 +475,7 @@ export function createPresenceSurfaceMessage(input: {
   correlationId?: string;
   messageId?: string;
   receivedAt?: string;
-  }): SurfaceMessage {
+}): SurfaceMessage {
   return createSurfaceMessage(buildPresenceSurfaceIngressEnvelope(input));
 }
 
@@ -453,7 +521,10 @@ export function createDiscordSurfaceMessage(input: {
   });
 }
 
-function buildSlackSurfaceConversationQuery(message: SurfaceMessage, options: BuildSurfaceConversationInputOptions): string {
+function buildSlackSurfaceConversationQuery(
+  message: SurfaceMessage,
+  options: BuildSurfaceConversationInputOptions
+): string {
   const metadataLines = [
     'Surface: slack',
     `Channel: ${message.channel}`,
@@ -461,21 +532,17 @@ function buildSlackSurfaceConversationQuery(message: SurfaceMessage, options: Bu
     `User: ${options.slack?.user || 'unknown'}`,
     `Channel type: ${options.slack?.channelType || 'unknown'}`,
   ];
-  return [
-    ...metadataLines,
-    '',
-    'User message:',
-    message.text,
-  ].join('\n');
+  return [...metadataLines, '', 'User message:', message.text].join('\n');
 }
 
 export function buildSurfaceConversationInputFromMessage(
   message: SurfaceMessage,
-  options: BuildSurfaceConversationInputOptions,
+  options: BuildSurfaceConversationInputOptions
 ): SurfaceConversationInput {
-  const query = message.surface === 'slack'
-    ? buildSlackSurfaceConversationQuery(message, options)
-    : message.text;
+  const query =
+    message.surface === 'slack'
+      ? buildSlackSurfaceConversationQuery(message, options)
+      : message.text;
   return {
     agentId: options.agentId,
     query,
@@ -483,21 +550,22 @@ export function buildSurfaceConversationInputFromMessage(
     surface: message.surface,
     surfaceText: message.text,
     threadContext: options.threadContext,
-    surfaceMetadata: message.surface === 'slack'
-      ? {
-        surface: 'slack',
-        user: options.slack?.user,
-        team: options.slack?.team,
-        channelType: options.slack?.channelType,
-        threadTs: message.threadTs,
-        channel: message.channel,
-      } satisfies SlackSurfaceMetadata
-      : {
-        surface: message.surface,
-        actorId: message.actorId,
-        threadTs: message.threadTs,
-        channel: message.channel,
-      } satisfies SurfaceConversationMetadata,
+    surfaceMetadata:
+      message.surface === 'slack'
+        ? ({
+            surface: 'slack',
+            user: options.slack?.user,
+            team: options.slack?.team,
+            channelType: options.slack?.channelType,
+            threadTs: message.threadTs,
+            channel: message.channel,
+          } satisfies SlackSurfaceMetadata)
+        : ({
+            surface: message.surface,
+            actorId: message.actorId,
+            threadTs: message.threadTs,
+            channel: message.channel,
+          } satisfies SurfaceConversationMetadata),
     cwd: options.cwd,
     forcedReceiver: options.forcedReceiver,
     missionId: options.missionId,
@@ -506,7 +574,9 @@ export function buildSurfaceConversationInputFromMessage(
   };
 }
 
-export function createSurfaceMessageFromConversationInput(input: SurfaceConversationMessageInput): SurfaceMessage {
+export function createSurfaceMessageFromConversationInput(
+  input: SurfaceConversationMessageInput
+): SurfaceMessage {
   const channel = input.channel?.trim() || 'unknown';
   const threadTs = input.threadTs?.trim() || input.receivedAt || new Date().toISOString();
   const correlationId = input.correlationId || randomUUID();
@@ -547,25 +617,28 @@ export function createSurfaceMessageFromConversationInput(input: SurfaceConversa
   });
 }
 
-export function buildSurfaceConversationInput(input: SurfaceConversationMessageInput): SurfaceConversationInput {
+export function buildSurfaceConversationInput(
+  input: SurfaceConversationMessageInput
+): SurfaceConversationInput {
   const message = createSurfaceMessageFromConversationInput(input);
   const manifest = getSurfaceProviderManifest(input.surface);
   const baseInput = buildSurfaceConversationInputFromMessage(message, {
-      agentId: input.agentId || manifest.agentId,
-      senderAgentId: input.senderAgentId,
-      cwd: input.cwd,
-      threadContext: input.threadContext,
-      forcedReceiver: input.forcedReceiver,
-      missionId: input.missionId,
-      teamRole: input.teamRole,
-      delegationSummaryInstruction: input.delegationSummaryInstruction,
-    slack: input.surface === 'slack'
-      ? {
-        user: input.metadata?.user || input.actorId,
-        team: input.metadata?.team,
-        channelType: input.metadata?.channelType,
-      }
-      : undefined,
+    agentId: input.agentId || manifest.agentId,
+    senderAgentId: input.senderAgentId,
+    cwd: input.cwd,
+    threadContext: input.threadContext,
+    forcedReceiver: input.forcedReceiver,
+    missionId: input.missionId,
+    teamRole: input.teamRole,
+    delegationSummaryInstruction: input.delegationSummaryInstruction,
+    slack:
+      input.surface === 'slack'
+        ? {
+            user: input.metadata?.user || input.actorId,
+            team: input.metadata?.team,
+            channelType: input.metadata?.channelType,
+          }
+        : undefined,
   });
   if (typeof input.surfaceText === 'string') {
     baseInput.surfaceText = input.surfaceText;

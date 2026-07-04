@@ -3,15 +3,13 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './android-runtime-helpers.js';
+import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-  const inputPath = path.resolve(pathResolver.rootDir(), argv.input as string);
-  const content = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(content));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'android-actuator',
+    handleAction,
+  });
 };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
