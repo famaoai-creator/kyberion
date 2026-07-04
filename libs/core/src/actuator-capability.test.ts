@@ -113,6 +113,27 @@ describe('actuator-capability', () => {
       expect(byOp.wrong_platform.reason).toContain('requires platform');
       expect(byOp.no_prerequisites.available).toBe(true);
     });
+
+    it('reports implemented:false capabilities as unavailable with not_implemented reason', async () => {
+      const manifest = {
+        actuator_id: 'stub-test-actuator',
+        version: '1.0.0',
+        capabilities: [
+          { op: 'real_op', platforms: ['darwin', 'linux', 'win32'] },
+          { op: 'ghost_op', platforms: ['darwin', 'linux', 'win32'], implemented: false },
+        ],
+      };
+      fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
+
+      const status = await checkActuatorCapabilities('stub-test-actuator', TMP_MANIFEST);
+      const byOp = Object.fromEntries(
+        status.capabilities.map((capability) => [capability.op, capability])
+      );
+
+      expect(byOp.real_op.available).toBe(true);
+      expect(byOp.ghost_op.available).toBe(false);
+      expect(byOp.ghost_op.reason).toContain('not_implemented');
+    });
   });
 
   describe('registerCapabilityProbe', () => {

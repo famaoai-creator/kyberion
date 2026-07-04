@@ -2,8 +2,8 @@ import { createRequire } from 'node:module';
 import { validatePhysicalDependencies } from './PhysicalLayer.js';
 import { loadServiceEndpointsCatalog } from '../../service-binding.js';
 import {
+  collectServicePresetAlternatives,
   collectServicePresetCliFallbacks,
-  getServicePresetOperationMap,
   getServicePresetPolicy,
 } from '../../service-preset-policy.js';
 import { safeReadFile, safeExistsSync, safeExec } from '../../secure-io.js';
@@ -50,7 +50,7 @@ export async function validateService(req: ServiceRequirements): Promise<Service
   const failedTiers: Tier[] = [];
   const details = {
     cliMissing: [] as string[],
-    sdkMissing: [] as string[]
+    sdkMissing: [] as string[],
   };
 
   // 1. L0 (CLI Layer)
@@ -89,7 +89,7 @@ export async function validateService(req: ServiceRequirements): Promise<Service
   return {
     valid: failedTiers.length === 0,
     failedTiers,
-    details
+    details,
   };
 }
 
@@ -106,11 +106,12 @@ function checkModule(moduleName: string): boolean {
  * High-level validation for services based on preset definitions.
  * Checks both API tokens in Vault and CLI-based authentication health.
  */
-export async function validateServiceAuth(serviceId: string, presetPath?: string): Promise<{ valid: boolean; reason?: string }> {
+export async function validateServiceAuth(
+  serviceId: string,
+  presetPath?: string
+): Promise<{ valid: boolean; reason?: string }> {
   const inspection = inspectServiceAuth(serviceId, presetPath);
-  return inspection.valid
-    ? { valid: true }
-    : { valid: false, reason: inspection.reason };
+  return inspection.valid ? { valid: true } : { valid: false, reason: inspection.reason };
 }
 
 export function inspectServiceAuth(serviceId: string, presetPath?: string): ServiceAuthInspection {
@@ -134,16 +135,15 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
     const preset = JSON.parse(presetRaw);
     const presetPolicy = getServicePresetPolicy(preset);
     const strategy = (presetPolicy.auth_strategy || 'none').toLowerCase();
-    const presetSetupHint = typeof presetPolicy.setup_hint === 'string' && presetPolicy.setup_hint.trim().length > 0
-      ? presetPolicy.setup_hint.trim()
-      : undefined;
+    const presetSetupHint =
+      typeof presetPolicy.setup_hint === 'string' && presetPolicy.setup_hint.trim().length > 0
+        ? presetPolicy.setup_hint.trim()
+        : undefined;
     const endpoint = loadServiceEndpointsCatalog().services[serviceId];
     const suffixes = endpoint?.credential_suffixes || {};
     const requiredSecretNames = unique(
       strategy === 'bearer'
-        ? [
-            ...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN']),
-          ]
+        ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
         : strategy === 'basic'
           ? [
               ...(suffixes.clientId || ['CLIENT_ID']),
@@ -157,9 +157,11 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
               ...(suffixes.clientId || []),
               ...(suffixes.clientSecret || []),
               ...(suffixes.redirectUri || []),
-            ],
+            ]
     ).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
-    const foundSecrets = requiredSecretNames.filter((envName) => Boolean(secretGuard.getSecret(envName)));
+    const foundSecrets = requiredSecretNames.filter((envName) =>
+      Boolean(secretGuard.getSecret(envName))
+    );
     const missingSecrets = requiredSecretNames.filter((envName) => !foundSecrets.includes(envName));
     const cliFallbacks = collectServicePresetCliFallbacks(preset);
 
@@ -173,9 +175,11 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
         foundSecrets: [],
         missingSecrets: [],
         cliFallbacks,
-        setupHint: presetSetupHint || (cliFallbacks.length > 0
-          ? `No secrets needed; CLI fallback available: ${cliFallbacks.join(', ')}`
-          : 'No secrets needed for this preset.'),
+        setupHint:
+          presetSetupHint ||
+          (cliFallbacks.length > 0
+            ? `No secrets needed; CLI fallback available: ${cliFallbacks.join(', ')}`
+            : 'No secrets needed for this preset.'),
       };
     }
 
@@ -194,36 +198,31 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       };
     }
 
-    // 2. CLI Auth fallback check via health_check commands
-    for (const op of Object.values(getServicePresetOperationMap(preset))) {
-      const record = op as Record<string, unknown>;
-      const alternatives = Array.isArray(record.alternatives)
-        ? record.alternatives
-        : [{ ...record, type: record.type || 'api' }];
-      for (const alt of alternatives) {
-        const alternative = alt as Record<string, unknown>;
-        if (alternative.type !== 'cli' || !alternative.health_check) continue;
-        try {
-          const parts = String(alternative.health_check).trim().split(/\s+/);
-          const bin = parts[0];
-          const args = parts.slice(1);
-          safeExec(bin, args);
-          return {
-            serviceId,
-            presetPath: resolvedPresetPath,
-            authStrategy: strategy,
-            valid: true,
-            requiredSecrets: requiredSecretNames,
-            foundSecrets,
-            missingSecrets,
-            cliFallbacks,
-            setupHint: `CLI fallback available via ${bin}.`,
-          };
-        } catch (err) {}
-      }
+    // 2. CLI Auth fallback check via health_check commands.
+    // Alternatives may be declared per-operation or at the preset top level
+    // (auth-level fallback that is not tied to a single operation).
+    for (const alternative of collectServicePresetAlternatives(preset)) {
+      if (alternative.type !== 'cli' || !alternative.health_check) continue;
+      try {
+        const parts = String(alternative.health_check).trim().split(/\s+/);
+        const bin = parts[0];
+        const args = parts.slice(1);
+        safeExec(bin, args);
+        return {
+          serviceId,
+          presetPath: resolvedPresetPath,
+          authStrategy: strategy,
+          valid: true,
+          requiredSecrets: requiredSecretNames,
+          foundSecrets,
+          missingSecrets,
+          cliFallbacks,
+          setupHint: `CLI fallback available via ${bin}.`,
+        };
+      } catch (err) {}
     }
 
-    return { 
+    return {
       serviceId,
       presetPath: resolvedPresetPath,
       authStrategy: strategy,
@@ -233,9 +232,11 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
       foundSecrets,
       missingSecrets,
       cliFallbacks,
-      setupHint: presetSetupHint || (requiredSecretNames.length > 0
-        ? `Set one of: ${requiredSecretNames.join(', ')}`
-        : 'Add a service preset with either bearer/basic credentials or a CLI fallback.'),
+      setupHint:
+        presetSetupHint ||
+        (requiredSecretNames.length > 0
+          ? `Set one of: ${requiredSecretNames.join(', ')}`
+          : 'Add a service preset with either bearer/basic credentials or a CLI fallback.'),
     };
   } catch (err: any) {
     return {
@@ -260,5 +261,5 @@ function unique(values: string[]): string[] {
 // Legacy class export for compatibility if needed, but functions are preferred
 export const ServiceValidator = {
   validate: validateService,
-  validateAuth: validateServiceAuth
+  validateAuth: validateServiceAuth,
 };

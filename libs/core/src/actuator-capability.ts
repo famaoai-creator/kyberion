@@ -101,6 +101,16 @@ function prerequisiteInstallHints(capability: ManifestCapability): string[] {
 }
 
 function evaluateManifestCapability(capability: ManifestCapability): ActuatorCapability {
+  if (capability.implemented === false) {
+    return {
+      op: capability.op,
+      available: false,
+      reason:
+        'not_implemented: declared in the manifest but the dispatch has no implementation yet',
+      prerequisites: ['Track implementation or removal via AC-06 stub capability triage.'],
+      cost: 'free',
+    };
+  }
   const platformRequirements = capability.prerequisites?.platforms || capability.platforms || [];
   const binaryRequirements = [
     ...(capability.prerequisites?.binaries || []),
