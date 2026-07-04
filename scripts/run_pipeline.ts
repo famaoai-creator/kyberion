@@ -231,7 +231,7 @@ export function validateFlow(
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readValidatedPipelineAdf } from './refactor/adf-input.js';
+import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
 
 type DispatchFunc = (
@@ -913,7 +913,10 @@ export async function runSteps(
           const exportKey = resolveExportKey(step, 'last_accumulate');
           const originalItemValue = ctx[itemName];
           const originalSharedCtx = { ...ctx };
-          const targetCount = coercePositiveInt(params.target_count ?? params.targetCount, items.length);
+          const targetCount = coercePositiveInt(
+            params.target_count ?? params.targetCount,
+            items.length
+          );
           const maxIterations = coercePositiveInt(
             params.max_iterations ?? params.maxIterations,
             items.length
@@ -1200,7 +1203,9 @@ export async function runSteps(
             logger.warn(
               `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
             );
-            logger.info(`  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`);
+            logger.info(
+              `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
+            );
           }
           const repaired = await attemptAutonomousRepair(
             step,
@@ -1218,7 +1223,7 @@ export async function runSteps(
 
             try {
               // Reload fully from disk to get the REPAIRED definition
-              const refreshedPipeline = readValidatedPipelineAdf(opts.pipelinePath!);
+              const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!);
               const refreshedStep = refreshedPipeline.steps?.find(
                 (s: any) => s.id === step.id || s.op === step.op
               );
@@ -1311,7 +1316,7 @@ async function attemptAutonomousRepair(
     if (requiresApproval) {
       logger.warn(
         `  [SYS_PIPELINE:REPAIR] Repair category "${failure.category}" involves .env/auth/config changes ` +
-        `— autonomous mutation of sensitive paths is prohibited (AO-03 §4). Escalating to operator.`
+          `— autonomous mutation of sensitive paths is prohibited (AO-03 §4). Escalating to operator.`
       );
       // Escalate via ops-alert so the operator is notified even in unattended runs.
       if (typeof sendOpsAlert === 'function') {
@@ -1362,7 +1367,7 @@ Once finished, provide a brief summary of the changes you applied to fix the pip
 
     // Confirm the ADF is actually valid after the repair attempt before signalling success.
     try {
-      readValidatedPipelineAdf(pipelinePath);
+      await readValidatedWorkflowAdf(pipelinePath);
     } catch (validationErr: any) {
       logger.warn(
         `  [SYS_PIPELINE:REPAIR] Sub-agent finished but ADF is still invalid: ${validationErr.message}`
@@ -1406,7 +1411,7 @@ export async function main() {
     })
     .parseSync();
 
-  const pipeline = readValidatedPipelineAdf(argv.input as string);
+  const pipeline = await readValidatedWorkflowAdf(argv.input as string);
 
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;
   let overrideContext: Record<string, unknown> = {};
@@ -1465,7 +1470,9 @@ export async function main() {
   }
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
 
-  logger.info(`🚀 [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
+  logger.info(
+    `🚀 [PIPELINE] Running ${argv.input.match(/\.(ts|js|mjs|cjs)$/u) ? 'workflow module' : 'ADF pipeline'}: ${pipeline.name || argv.input}`
+  );
   logger.info(`   [PIPELINE] Mission ID: ${missionId || 'NONE'}`);
   logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
 
