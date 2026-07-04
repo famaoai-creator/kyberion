@@ -10,6 +10,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
+import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
 
 export type WorkItemStatus =
   | 'backlog'
@@ -252,6 +253,8 @@ export interface HandoffWorkItemInput {
   expectedVersion?: number;
   idempotencyKey?: string;
   traceId?: string;
+  correlationId?: string;
+  handoffPacket?: HandoffPacket;
   metadata?: Record<string, unknown>;
 }
 
@@ -1189,14 +1192,34 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
   fromLease: WorkLease;
   toLease: WorkLease;
 } {
+  const current = currentWorkItem(input.itemId);
+  const packet =
+    input.handoffPacket ??
+    buildWorkItemHandoffPacket({
+      itemId: input.itemId,
+      itemTitle: current?.title ?? input.itemId,
+      purpose: input.purpose,
+      fromPeerId: input.fromPeerId,
+      toPeerId: input.toPeerId,
+      correlationId: input.correlationId ?? input.traceId ?? input.idempotencyKey ?? input.itemId,
+      metadata: {
+        ...(current?.metadata || {}),
+        ...(input.metadata || {}),
+      },
+    });
+  const nextMetadata = {
+    ...(input.metadata || {}),
+    handoff_packet: packet,
+  };
   const released = releaseWorkItem({
     itemId: input.itemId,
     leaseId: input.fromLeaseId,
     actorPeerId: input.fromPeerId,
     expectedVersion: input.expectedVersion,
     nextStatus: 'ready',
+    summary: packet.outgoing_summary,
     traceId: input.traceId,
-    metadata: input.metadata,
+    metadata: nextMetadata,
   });
   const claimed = claimWorkItem({
     itemId: input.itemId,
@@ -1207,7 +1230,7 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
     expectedVersion: released.item.version,
     idempotencyKey: input.idempotencyKey,
     traceId: input.traceId,
-    metadata: input.metadata,
+    metadata: nextMetadata,
   });
   appendEvent({
     eventType: 'item_handed_off',
@@ -1219,6 +1242,7 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
       from_lease_id: input.fromLeaseId,
       to_lease_id: claimed.lease.lease_id,
       purpose: input.purpose,
+      handoff_packet: packet,
     },
   });
   return { item: claimed.item, fromLease: released.lease, toLease: claimed.lease };
