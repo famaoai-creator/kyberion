@@ -4,18 +4,18 @@
  * Compensating control for the period before tier-guard tenant enforcement
  * is fully wired. Walks confidential tier paths, infers each path's
  * "expected" tenant from its prefix, and reports any file whose mission-
- * state declares a different tenant_slug. Designed to run on cron (e.g.
- * every 15 minutes) and write an alert digest that an audit-forwarder
- * shell sink can ship to chat.
+ * state declares a different tenant_slug. Designed to run on cron and,
+ * when --alert is supplied, record/dispatch an ops alert through the
+ * repository-managed alert sink.
  *
  * Usage:
  *   node dist/scripts/watch_tenant_drift.js
  *   node dist/scripts/watch_tenant_drift.js --json
  *   node dist/scripts/watch_tenant_drift.js --quiet  # exit 1 only on drift
+ *   node dist/scripts/watch_tenant_drift.js --quiet --alert
  *
  * Cron example:
- *   *\/15 * * * * cd /opt/kyberion && node dist/scripts/watch_tenant_drift.js \
- *      --quiet || /opt/kyberion/scripts/notify-slack.sh tenant-drift
+ *   *\/15 * * * * cd /opt/kyberion && node dist/scripts/watch_tenant_drift.js --quiet --alert
  *
  * The watchdog is intentionally read-only and never mutates anything.
  */
@@ -25,6 +25,8 @@ import {
   logger,
   pathResolver,
   safeExistsSync,
+  sendOpsAlert,
+  type OpsAlertInput,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core';
@@ -46,6 +48,26 @@ interface DriftReport {
   findings: DriftFinding[];
 }
 
+function buildTenantDriftAlert(report: DriftReport): OpsAlertInput {
+  return {
+    severity: 'critical',
+    title: 'Tenant drift detected in confidential mission state',
+    context: {
+      finding_count: report.findings.length,
+      scanned_paths: report.scanned_paths,
+      timestamp: report.timestamp,
+    },
+    recommendation:
+      'Stop unattended processing for the affected tenant scope, inspect the confidential mission state paths locally, and repair the tenant_slug metadata before resuming.',
+    options: [
+      'Run pnpm watch:tenant-drift -- --json on the host to inspect full findings',
+      'Repair or quarantine the affected mission directories under active/missions/confidential',
+      'Escalate if the finding crosses tenant boundaries or cannot be repaired immediately',
+    ],
+    dedupe_key: 'tenant-drift',
+  };
+}
+
 function detectExpectedTenantFromPath(relPath: string): string | null {
   const segments = relPath.split('/');
   const idx = segments.indexOf('confidential');
@@ -55,7 +77,9 @@ function detectExpectedTenantFromPath(relPath: string): string | null {
   return TENANT_SLUG_RE.test(candidate) ? candidate : null;
 }
 
-function readMissionState(missionDirRel: string): { tenant_slug?: string; mission_id?: string } | null {
+function readMissionState(
+  missionDirRel: string
+): { tenant_slug?: string; mission_id?: string } | null {
   const statePath = pathResolver.rootResolve(`${missionDirRel}/mission-state.json`);
   if (!safeExistsSync(statePath)) return null;
   try {
@@ -119,6 +143,7 @@ function main(): number {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
   const quiet = args.includes('--quiet');
+  const alert = args.includes('--alert');
   const report = scan();
 
   if (json) {
@@ -149,6 +174,14 @@ function main(): number {
     } catch (err) {
       logger.warn(`[tenant-drift] failed to append audit entry: ${(err as Error).message ?? err}`);
     }
+    if (alert) {
+      const receipt = sendOpsAlert(buildTenantDriftAlert(report));
+      if (!quiet) {
+        logger.warn(
+          `[tenant-drift] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
+        );
+      }
+    }
     return 1;
   }
   return 0;
@@ -159,5 +192,5 @@ if (isDirect) {
   process.exit(main());
 }
 
-export { scan as scanTenantDrift };
+export { buildTenantDriftAlert, scan as scanTenantDrift };
 export type { DriftFinding, DriftReport };

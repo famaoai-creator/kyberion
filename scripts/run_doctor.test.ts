@@ -146,4 +146,42 @@ describe('run_doctor', () => {
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
+
+  it('routes missing reasoning backend setup to reasoning:setup instead of env bootstrap', async () => {
+    mocks.loadEnvironmentManifest.mockReturnValue({
+      manifest_id: 'reasoning-backend',
+      version: '2026-04-29',
+      capabilities: [
+        {
+          capability_id: 'reasoning-backend.any-real',
+          optional: false,
+          required_for: ['wisdom-actuator', 'intent-extractor'],
+          install: { instruction: 'Configure a real backend' },
+        },
+      ],
+    });
+    mocks.probeManifest.mockResolvedValue([
+      {
+        capability_id: 'reasoning-backend.any-real',
+        satisfied: false,
+        reason: 'no real backend',
+      },
+    ]);
+
+    const { runDoctor } = await import('./run_doctor.js');
+
+    await runDoctor();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Next step: run `pnpm reasoning:setup`')
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Next Action: Configure reasoning backend')
+    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm reasoning:setup'));
+    expect(logSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('pnpm env:bootstrap --manifest reasoning-backend --apply')
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
 });

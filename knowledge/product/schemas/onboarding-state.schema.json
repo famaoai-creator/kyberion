@@ -4,7 +4,14 @@
   "title": "Onboarding State",
   "description": "Persistent state for the phased Kyberion onboarding wizard.",
   "type": "object",
-  "required": ["version", "status", "current_phase", "completed_phases", "created_at", "updated_at"],
+  "required": [
+    "version",
+    "status",
+    "current_phase",
+    "completed_phases",
+    "created_at",
+    "updated_at"
+  ],
   "properties": {
     "version": {
       "type": "string",
@@ -16,13 +23,13 @@
     },
     "current_phase": {
       "type": "string",
-      "enum": ["identity", "services", "tenants", "tutorial", "summary"]
+      "enum": ["identity", "reasoning", "services", "tenants", "tutorial", "summary"]
     },
     "completed_phases": {
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["identity", "services", "tenants", "tutorial", "summary"]
+        "enum": ["identity", "reasoning", "services", "tenants", "tutorial", "summary"]
       }
     },
     "created_at": {
@@ -74,6 +81,21 @@
             "additionalProperties": false
           }
         }
+      },
+      "additionalProperties": false
+    },
+    "reasoning": {
+      "type": "object",
+      "required": ["mode", "backend_hint", "available", "checked_at"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["real_backend_detected", "stub_explicit", "stub_acknowledged", "missing"]
+        },
+        "backend_hint": { "type": "string" },
+        "available": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "checked_at": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false
     },

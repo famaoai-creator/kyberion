@@ -32,6 +32,14 @@ vi.mock('./secure-io.js', async () => {
     safeReaddir: (p: string) => actualFs.readdirSync(p),
     safeMkdir: (p: string, opts: any) => actualFs.mkdirSync(p, opts),
     safeReadFile: (p: string, opts: any) => actualFs.readFileSync(p, opts),
+    safeCreateExclusiveFileSync: (p: string, data: string) => {
+      actualFs.mkdirSync(path.dirname(p), { recursive: true });
+      actualFs.writeFileSync(p, data, { flag: 'wx' });
+    },
+    safeWriteFile: (p: string, data: string) => {
+      actualFs.mkdirSync(path.dirname(p), { recursive: true });
+      actualFs.writeFileSync(p, data);
+    },
   };
 });
 

@@ -18,6 +18,17 @@
 3. **実アラート sink**: 運用問題(repair 失敗・デーモン死・disk/SLO 閾値・CVE 緊急・予算危険)を Slack/email/webhook で人間に通知する経路が実在する(`notify-slack.sh` の欠落解消)。判断基準 §5 のリッチ framing(材料付き)。
 4. **自己修復の承認ゲート化**: `attemptAutonomousRepair` の `.env`/authority/config 書き換えを SA-05 の承認ゲート下に置く。安全な cleanup/restart は AO-01 のポリシーで自動、config/secret 変更は承認必須(判断基準 §2 の境界を正す)。
 
+## 実装状況 (2026-07-04)
+
+- **着手済み(Task 2)**: `libs/core/daemon-heartbeat.ts` を追加し、daemon が `active/shared/runtime/heartbeats/<daemon>.json` に PID・状態・timestamp・詳細を書けるようにした。stale/missing/malformed 判定と一覧取得も実装。
+- **着手済み(Task 2)**: `chronos_daemon` と `agent_runtime_supervisor_daemon` に heartbeat 書き込みを配線した。起動中/稼働中/停止中/エラー状態を記録する。
+- **着手済み(Task 3)**: `libs/core/ops-alert.ts` を追加し、運用アラートを `active/shared/observability/ops-alerts.jsonl` に必ず記録する sink を実装。`KYBERION_OPS_ALERT_WEBHOOK_URL` が明示された場合のみ webhook 送信を試み、同一問題の短時間重複を抑制する。
+- **着手済み(Task 3)**: chronos の scheduled pipeline 失敗、chronos fatal、agent runtime supervisor daemon の error/fatal を ops alert に配線した。
+- **実装済み(Task 1)**: `docs/operator/macos/` に agent-runtime-supervisor / chronos の launchd plist を追加し、`docs/operator/systemd/` に agent-runtime-supervisor / chronos の systemd unit を追加した。`DEPLOYMENT.md` の launchd TODO は実テンプレート参照へ置換済み。
+- **実装済み(Task 2)**: `scripts/daemon_watchdog.ts` と `pnpm daemon:watchdog` を追加し、`chronos-daemon` / `agent-runtime-supervisor-daemon` の heartbeat stale/missing/malformed を検知して ops alert に記録できるようにした。Linux では `kyberion-daemon-watchdog.timer` テンプレートで 1 分ごとの監視を提供する。
+- **実装済み(Task 3)**: `watch_tenant_drift.ts` の cron 例から存在しない `notify-slack.sh` 依存を除去し、`--alert` 指定時に `ops-alert.ts` sink へ confidential path を本文に含めない要約アラートを出すようにした。
+- **未実装**: 自己修復の承認ゲート化は未完。OP-04/AO-02/OP-01 からの追加アラート配線は各計画の実装時に AO-03 sink へ接続する。
+
 ## 実装タスク
 
 ### Task 1: デーモンの常駐設定完備 — `claude-sonnet-4`

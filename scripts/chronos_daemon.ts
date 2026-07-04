@@ -8,7 +8,15 @@
  */
 
 import * as path from 'node:path';
-import { logger, pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
+import {
+  logger,
+  pathResolver,
+  recordDaemonHeartbeat,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+  sendOpsAlert,
+} from '@agent/core';
 import {
   registerScheduledPipeline,
   getSchedulesDueNow,
@@ -84,6 +92,10 @@ function syncSchedulesFromAdf(): void {
 // ---------------------------------------------------------------------------
 
 async function tick(): Promise<void> {
+  recordDaemonHeartbeat('chronos-daemon', {
+    status: 'running',
+    details: { phase: 'tick' },
+  });
   const due = getSchedulesDueNow();
   if (due.length === 0) return;
 
@@ -120,6 +132,18 @@ async function tick(): Promise<void> {
       saveScheduleRegistry(registry2);
 
       logger.error(`[CHRONOS] ✗ ${scheduled.id}: ${err.message}`);
+      sendOpsAlert({
+        severity: 'warning',
+        title: 'Scheduled pipeline failed',
+        context: {
+          daemon_id: 'chronos-daemon',
+          schedule_id: scheduled.id,
+          pipeline_path: scheduled.pipelinePath,
+          error: err?.message ?? String(err),
+        },
+        recommendation: 'Inspect the pipeline trace and rerun the failed scheduled pipeline.',
+        dedupe_key: `chronos:${scheduled.id}:failed`,
+      });
     }
   }
 }
@@ -130,6 +154,10 @@ async function tick(): Promise<void> {
 
 async function main(): Promise<void> {
   logger.info('[CHRONOS] Kyberion Pipeline Scheduler starting...');
+  recordDaemonHeartbeat('chronos-daemon', {
+    status: 'starting',
+    details: { tick_interval_ms: TICK_INTERVAL_MS },
+  });
 
   syncSchedulesFromAdf();
 
@@ -145,10 +173,25 @@ async function main(): Promise<void> {
     }
   }, TICK_INTERVAL_MS);
 
+  recordDaemonHeartbeat('chronos-daemon', {
+    status: 'running',
+    details: { tick_interval_ms: TICK_INTERVAL_MS },
+  });
   logger.info(`[CHRONOS] Running. Tick interval: ${TICK_INTERVAL_MS / 1000}s`);
 }
 
 main().catch((err) => {
   logger.error(`[CHRONOS] Fatal: ${err.message}`);
+  recordDaemonHeartbeat('chronos-daemon', {
+    status: 'error',
+    details: { error: err?.message ?? String(err) },
+  });
+  sendOpsAlert({
+    severity: 'critical',
+    title: 'Chronos daemon fatal error',
+    context: { daemon_id: 'chronos-daemon', error: err?.message ?? String(err) },
+    recommendation: 'Restart chronos and inspect active/shared/logs/traces for the last failure.',
+    dedupe_key: 'chronos-daemon:fatal',
+  });
   process.exit(1);
 });

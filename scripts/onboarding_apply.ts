@@ -17,6 +17,11 @@ import {
   withExecutionContext,
   withLock,
 } from '@agent/core';
+import {
+  evaluateReasoningBackend,
+  formatReasoningSummary,
+  type OnboardingReasoningState,
+} from './onboarding_reasoning.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -222,16 +227,18 @@ export function buildState(
   input: ApplyInput,
   now: string,
   tenantEntries: Array<Record<string, unknown>>,
-  tutorial: { mode: string; summary: string; plan_path: string }
+  tutorial: { mode: string; summary: string; plan_path: string },
+  reasoning: OnboardingReasoningState
 ) {
   return {
     version: '1.0.0' as const,
     status: 'complete' as const,
     current_phase: 'summary' as const,
-    completed_phases: ['identity', 'services', 'tenants', 'tutorial', 'summary'],
+    completed_phases: ['identity', 'reasoning', 'services', 'tenants', 'tutorial', 'summary'],
     created_at: now,
     updated_at: now,
     identity: input.identity,
+    reasoning,
     services: { candidates: [] },
     tenants: { entries: tenantEntries },
     tutorial,
@@ -241,7 +248,8 @@ export function buildState(
 export function buildSummary(
   input: ApplyInput,
   tenantEntries: Array<Record<string, unknown>>,
-  tutorial: { mode: string; summary: string }
+  tutorial: { mode: string; summary: string },
+  reasoning?: OnboardingReasoningState
 ) {
   const id = input.identity;
   const summaryPolicy = resolveOnboardingSummaryPolicy();
@@ -255,6 +263,9 @@ export function buildSummary(
     `- Domain: ${id.primary_domain}`,
     `- Vision: ${id.vision}`,
     `- Agent ID: ${id.agent_id}`,
+    '',
+    '## Reasoning Backend',
+    ...formatReasoningSummary(reasoning),
     '',
     `## ${summaryPolicy.sections.services}`,
     `- ${summaryPolicy.empty_states.services}`,
@@ -280,6 +291,7 @@ export function buildApplySummary(
   input: ApplyInput,
   tenantEntries: Array<Record<string, unknown>>,
   tutorial: { mode: string; summary: string },
+  reasoning: OnboardingReasoningState,
   paths: { statePath: string; summaryPath: string }
 ): string {
   const lines = [
@@ -287,6 +299,7 @@ export function buildApplySummary(
     `Identity: ${input.identity.name} (${input.identity.agent_id})`,
     `Tenants: ${tenantEntries.length}`,
     `Tutorial: ${tutorial.mode}`,
+    `Reasoning: ${reasoning.mode}`,
     `State: ${paths.statePath}`,
     `Summary: ${paths.summaryPath}`,
     '',
@@ -335,14 +348,15 @@ export async function main() {
   await applyIdentity(input, now);
   const tenantEntries = await applyTenants(input, now);
   const tutorial = await applyTutorial(input, now);
-  const state = buildState(input, now, tenantEntries, tutorial);
+  const reasoning = await evaluateReasoningBackend(new Date(now));
+  const state = buildState(input, now, tenantEntries, tutorial, reasoning);
   if (!validateState(state)) {
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
   await writeJson(statePath(), state, 'onboarding-state');
   await writeText(
     summaryPath(),
-    buildSummary(input, tenantEntries, tutorial),
+    buildSummary(input, tenantEntries, tutorial, reasoning),
     'onboarding-summary'
   );
 
@@ -351,6 +365,7 @@ export async function main() {
     identity_name: input.identity.name,
     agent_id: input.identity.agent_id,
     tenants: tenantEntries.length,
+    reasoning,
     state_path: statePath(),
     summary_path: summaryPath(),
   };
@@ -359,7 +374,7 @@ export async function main() {
     return;
   }
   console.log(
-    buildApplySummary(input, tenantEntries, tutorial, {
+    buildApplySummary(input, tenantEntries, tutorial, reasoning, {
       statePath: statePath(),
       summaryPath: summaryPath(),
     })

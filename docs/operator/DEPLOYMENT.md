@@ -100,6 +100,7 @@ For background services:
 
 ```bash
 pnpm agent-runtime:supervisor   # in one terminal (or use a launchd plist)
+pnpm chronos                    # optional scheduled pipeline daemon
 pnpm mission:orchestrator       # in another
 ```
 
@@ -108,11 +109,28 @@ pnpm mission:orchestrator       # in another
 If Kyberion should auto-start on login, install a launchd plist:
 
 ```bash
-# Sample plist lives at:
-#   docs/operator/macos/com.kyberion.supervisor.plist (TODO: ship this template)
-# After copying to ~/Library/LaunchAgents/ and editing paths:
-launchctl load -w ~/Library/LaunchAgents/com.kyberion.supervisor.plist
+# Templates live at:
+#   docs/operator/macos/com.kyberion.agent-runtime-supervisor.plist
+#   docs/operator/macos/com.kyberion.chronos.plist
+#
+# Copy them to ~/Library/LaunchAgents/, then edit:
+#   - WorkingDirectory
+#   - ProgramArguments[0] if pnpm is not /opt/homebrew/bin/pnpm
+#   - KYBERION_CUSTOMER
+#   - log paths
+cp docs/operator/macos/com.kyberion.agent-runtime-supervisor.plist ~/Library/LaunchAgents/
+cp docs/operator/macos/com.kyberion.chronos.plist ~/Library/LaunchAgents/
+launchctl load -w ~/Library/LaunchAgents/com.kyberion.agent-runtime-supervisor.plist
+launchctl load -w ~/Library/LaunchAgents/com.kyberion.chronos.plist
+launchctl kickstart -k gui/$UID/com.kyberion.agent-runtime-supervisor
+launchctl kickstart -k gui/$UID/com.kyberion.chronos
+pnpm daemon:watchdog -- --json
 ```
+
+The watchdog reads daemon heartbeats from `active/shared/runtime/heartbeats/` and records
+an ops alert to `active/shared/observability/ops-alerts.jsonl` when a configured daemon is
+missing, stale, or malformed. If `KYBERION_OPS_ALERT_WEBHOOK_URL` is set, the same alert is
+also delivered to that webhook.
 
 ---
 
@@ -158,36 +176,30 @@ Linux has no built-in OS keychain equivalent to macOS Keychain. Use one of:
 
 For production, prefer option 1 or 2.
 
-### 2.4 systemd unit
+### 2.4 systemd units
 
-Create `/etc/systemd/system/kyberion-supervisor.service`:
+Templates live under `docs/operator/systemd/`:
 
-```ini
-[Unit]
-Description=Kyberion Agent Runtime Supervisor
-After=network.target
-
-[Service]
-Type=simple
-User=kyberion
-WorkingDirectory=/home/kyberion/kyberion
-Environment=NODE_ENV=production
-Environment=KYBERION_CUSTOMER=customer-slug
-EnvironmentFile=-/etc/kyberion/env
-ExecStart=/usr/bin/pnpm agent-runtime:supervisor
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
+```bash
+sudo cp docs/operator/systemd/kyberion-agent-runtime-supervisor.service /etc/systemd/system/
+sudo cp docs/operator/systemd/kyberion-chronos.service /etc/systemd/system/
+sudo cp docs/operator/systemd/kyberion-daemon-watchdog.service /etc/systemd/system/
+sudo cp docs/operator/systemd/kyberion-daemon-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kyberion-agent-runtime-supervisor
+sudo systemctl enable --now kyberion-chronos
+sudo systemctl enable --now kyberion-daemon-watchdog.timer
 ```
 
 ```bash
-sudo systemctl enable --now kyberion-supervisor
-sudo journalctl -u kyberion-supervisor -f
+sudo journalctl -u kyberion-agent-runtime-supervisor -f
+sudo journalctl -u kyberion-chronos -f
+sudo systemctl status kyberion-daemon-watchdog.timer
 ```
 
-Repeat for `mission:orchestrator` if needed.
+Edit `User`, `WorkingDirectory`, `KYBERION_CUSTOMER`, `EnvironmentFile`, and the `pnpm`
+path before installing if the defaults do not match the target host. Repeat the same
+pattern for `mission:orchestrator` if needed.
 
 ### 2.5 Verify
 
@@ -214,6 +226,7 @@ docker run --rm -it \
 ```
 
 This brings up a slim image with:
+
 - Node 24 + pnpm
 - Core actuators (file, network, system, secret, wisdom, orchestrator, agent)
 - Cloud voice path (no Playwright, no Style-Bert-VITS2)
@@ -241,10 +254,10 @@ See `docker-compose.yml` at the repo root.
 
 Mount these volumes if you want state to survive container restarts:
 
-| Container path | Purpose |
-|---|---|
-| `/app/active` | Mission state, traces, audit |
-| `/app/customer` | Customer overlay (FDE mode, preferred) |
+| Container path            | Purpose                                |
+| ------------------------- | -------------------------------------- |
+| `/app/active`             | Mission state, traces, audit           |
+| `/app/customer`           | Customer overlay (FDE mode, preferred) |
 | `/app/knowledge/personal` | Identity fallback for single-user mode |
 
 ### 3.5 Production Docker (FDE)
@@ -322,14 +335,14 @@ Mission state is forward-compatible by design (additive fields only). If a major
 
 ## 7. Troubleshooting
 
-| Symptom | Likely cause | Action |
-|---|---|---|
-| `pnpm doctor` reports Playwright missing | browser-actuator dependency | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force` |
-| `pnpm onboard` says "no reasoning backend" | No CLI/API key configured | Set `ANTHROPIC_API_KEY`, `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
-| Mission stuck in `active` after process crash | Stale lock | Lock has PID-based stale detection; next command auto-recovers |
-| `Trace persisted path` empty in pipeline output | Persistence policy denied | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars |
-| Customer overlay not picked up | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug |
-| Voice surface silent | OS TTS not installed | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI) |
+| Symptom                                         | Likely cause                     | Action                                                                                                      |
+| ----------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm doctor` reports Playwright missing        | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                               |
+| `pnpm onboard` says "no reasoning backend"      | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
+| Mission stuck in `active` after process crash   | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                              |
+| `Trace persisted path` empty in pipeline output | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                        |
+| Customer overlay not picked up                  | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                             |
+| Voice surface silent                            | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                             |
 
 ---
 
@@ -341,14 +354,45 @@ sudo systemctl stop kyberion-supervisor   # Linux
 launchctl unload ~/Library/LaunchAgents/com.kyberion.supervisor.plist   # macOS
 
 # If FDE engagement is ending, export customer data first:
-pnpm tsx scripts/tenant_export.ts --customer customer-slug --out /path/to/export.tar.gz
-# (TODO: this script is a Phase C-5 deliverable from the SaaS roadmap, repurposed for FDE handoff.)
+KYBERION_BACKUP_PASSPHRASE='store-outside-the-archive' \
+  pnpm backup create --scope tenant --tenant customer-slug --out /path/to/export.tar.gz.enc --encrypt
+# Compatibility entrypoint:
+KYBERION_BACKUP_PASSPHRASE='store-outside-the-archive' \
+  node --import ./scripts/ts-loader.mjs scripts/tenant_export.ts --customer customer-slug --out /path/to/export.tar.gz.enc
 
 # Remove state:
 rm -rf active/ knowledge/personal/ customer/customer-slug/
 # Or, more conservatively:
-mv active/ /backup/kyberion-active-$(date +%F).tar.gz
+tar czf /backup/kyberion-active-$(date +%F).tar.gz active/
 ```
+
+## 9. Backup and Disaster Recovery
+
+Kyberion state that is intentionally outside git must be backed up before
+decommissioning, host migration, or dependency patch automation:
+
+```bash
+KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
+  pnpm backup create --scope all --out /Volumes/backup/kyberion-$(date +%F).tar.gz.enc --encrypt
+```
+
+Use an external volume or remote destination for real DR. A path under the same
+disk is acceptable for local restore drills only; the command warns when source
+and destination appear to share a device.
+
+Restore into a clean Kyberion checkout or staging root:
+
+```bash
+KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
+  pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /path/to/clean/kyberion --verify-baseline
+```
+
+Backups containing `vault/`, `knowledge/confidential/`, or confidential
+mission/project state must remain encrypted. Do not store
+`KYBERION_BACKUP_PASSPHRASE`, audit-chain keys, or SaaS auth encryption keys in
+the archive itself; keep those in the operator password manager or hardware key
+escrow. The scheduled job definition is `pipelines/backup-daily.json` and uses
+the same `pnpm backup create --scope all --encrypt` command.
 
 ---
 

@@ -1,13 +1,19 @@
-import {
-  loadEnvironmentManifest,
-  logger,
-  probeManifest,
-} from '@agent/core';
+import { loadEnvironmentManifest, logger, probeManifest } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 import { formatSetupSummaryLine } from './setup-report.js';
 
 import '@agent/core/environment-capability-probes';
+
+const REASONING_SETUP_GUIDANCE = [
+  'Reasoning backend is required for real work. Configure one of:',
+  '  - Codex CLI: authenticate `codex`, then set `KYBERION_REASONING_BACKEND=codex-cli`',
+  '  - Gemini CLI: authenticate `gemini`, then set `KYBERION_REASONING_BACKEND=gemini-cli`',
+  '  - AGY CLI: authenticate `agy`, then set `KYBERION_REASONING_BACKEND=agy-cli`',
+  '  - Anthropic API: set `ANTHROPIC_API_KEY`, then set `KYBERION_REASONING_BACKEND=anthropic`',
+  '  - OpenAI-compatible local/Nemotron: set `KYBERION_LOCAL_LLM_URL` or `KYBERION_NEMOTRON_URL`',
+  'Use `KYBERION_REASONING_BACKEND=stub` only when you intentionally want offline deterministic placeholders.',
+];
 
 export async function runReasoningSetup(): Promise<{ must: number; should: number; nice: number }> {
   const manifest = loadEnvironmentManifest('reasoning-backend');
@@ -15,13 +21,21 @@ export async function runReasoningSetup(): Promise<{ must: number; should: numbe
   const summary = summarizeManifestDoctor(manifest, probeStatuses);
 
   logger.info('');
-  logger.info(formatSetupSummaryLine([
-    ['must', summary.counts.must],
-    ['should', summary.counts.should],
-    ['nice', summary.counts.nice],
-  ]));
+  logger.info(
+    formatSetupSummaryLine([
+      ['must', summary.counts.must],
+      ['should', summary.counts.should],
+      ['nice', summary.counts.nice],
+    ])
+  );
   for (const line of formatDoctorSummary(summary)) {
     logger.info(line);
+  }
+  if (summary.counts.must > 0) {
+    logger.info('');
+    for (const line of REASONING_SETUP_GUIDANCE) {
+      logger.info(line);
+    }
   }
   logger.info('');
 

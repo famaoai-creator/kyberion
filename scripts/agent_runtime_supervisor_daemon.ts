@@ -11,6 +11,7 @@ import {
   listAgentRuntimeSnapshots,
   logger,
   pathResolver,
+  recordDaemonHeartbeat,
   refreshAgentRuntime,
   restartAgentRuntime,
   rootDir,
@@ -21,6 +22,7 @@ import {
   safeStat,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
+  sendOpsAlert,
   stopAgentRuntime,
 } from '@agent/core';
 import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
@@ -371,6 +373,9 @@ export async function startAgentRuntimeSupervisorDaemon(
   options: AgentRuntimeSupervisorDaemonOptions = {}
 ): Promise<AgentRuntimeSupervisorDaemonInstance> {
   process.env.MISSION_ROLE ||= 'surface_runtime';
+  recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+    status: 'starting',
+  });
   const transport = resolveTransport(options);
   const socketPath = resolveSocketPath(options);
   const lockPath = resolveLockPath(options);
@@ -503,6 +508,20 @@ export async function startAgentRuntimeSupervisorDaemon(
       return;
     }
     logger.error(`[agent-runtime-supervisor-daemon] ${error?.message || error}`);
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'error',
+      details: { error: error?.message || String(error) },
+    });
+    sendOpsAlert({
+      severity: 'critical',
+      title: 'Agent runtime supervisor daemon error',
+      context: {
+        daemon_id: 'agent-runtime-supervisor-daemon',
+        error: error?.message || String(error),
+      },
+      recommendation: 'Restart the supervisor daemon and inspect the runtime supervisor log.',
+      dedupe_key: 'agent-runtime-supervisor-daemon:error',
+    });
     if (options.exitOnFatalError !== false) process.exit(1);
   });
 
@@ -518,6 +537,10 @@ export async function startAgentRuntimeSupervisorDaemon(
         pid: process.pid,
         socket_path: socketLabel || socketPath,
       });
+      recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+        status: 'running',
+        details: { socket_path: socketLabel || socketPath, transport },
+      });
       logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
     });
     const timeout = setTimeout(
@@ -528,6 +551,9 @@ export async function startAgentRuntimeSupervisorDaemon(
   });
 
   const cleanup = () => {
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'stopping',
+    });
     try {
       if (transport === 'unix' && safeExistsSync(socketPath)) safeUnlinkSync(socketPath);
     } catch (error: any) {
@@ -566,6 +592,11 @@ export async function startAgentRuntimeSupervisorDaemon(
 
 async function main() {
   await startAgentRuntimeSupervisorDaemon();
+  setInterval(() => {
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'running',
+    });
+  }, 30_000).unref?.();
 }
 
 const isDirect =
@@ -573,6 +604,20 @@ const isDirect =
 if (isDirect) {
   main().catch((error: any) => {
     logger.error(error?.message || String(error));
+    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+      status: 'error',
+      details: { error: error?.message || String(error) },
+    });
+    sendOpsAlert({
+      severity: 'critical',
+      title: 'Agent runtime supervisor daemon fatal error',
+      context: {
+        daemon_id: 'agent-runtime-supervisor-daemon',
+        error: error?.message || String(error),
+      },
+      recommendation: 'Restart the supervisor daemon and inspect startup configuration.',
+      dedupe_key: 'agent-runtime-supervisor-daemon:fatal',
+    });
     process.exit(1);
   });
 }
