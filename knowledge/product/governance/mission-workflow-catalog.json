@@ -21,6 +21,9 @@
     },
     "capability_lifecycle_procedure": {
       "description": "Discover, normalize, register, reconcile, activate, observe, refresh, and retire governed capabilities under a shared lifecycle skeleton."
+    },
+    "aidlc_code_change": {
+      "description": "AI-DLC gated SDLC for code changes: alignment before edits, execution with immediate test, self-review, then verification and delivery (AI_DLC_PLAYBOOK Phase 0-4)."
     }
   },
   "templates": [
@@ -32,7 +35,16 @@
         "risk_profiles": ["high_stakes", "approval_required"],
         "execution_shapes": ["mission", "project_bootstrap"]
       },
-      "phases": ["intake", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
+      "phases": [
+        "intake",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery",
+        "retrospective"
+      ]
     },
     {
       "id": "explore-then-govern",
@@ -41,17 +53,38 @@
       "match": {
         "delivery_shapes": ["interactive_exploration"]
       },
-      "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "execution",
+        "verification",
+        "delivery"
+      ]
     },
     {
       "id": "crystallize-then-freeze",
       "pattern": "pipeline_crystallization_loop",
       "description": "Convert an exploratory mission into a stable pipeline artifact, then freeze the stable execution shape.",
       "match": {
-        "mission_classes": ["decision_support", "research_and_absorption", "operations_and_release"],
+        "mission_classes": [
+          "decision_support",
+          "research_and_absorption",
+          "operations_and_release"
+        ],
         "delivery_shapes": ["interactive_exploration", "multi_artifact_pipeline"]
       },
-      "phases": ["intake", "classification", "planning", "normalization", "contract_authoring", "verification", "freeze", "delivery"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "normalization",
+        "contract_authoring",
+        "verification",
+        "freeze",
+        "delivery"
+      ]
     },
     {
       "id": "capability-reconcile-and-refresh",
@@ -62,7 +95,20 @@
         "delivery_shapes": ["multi_artifact_pipeline", "task_session"],
         "risk_profiles": ["review_required", "approval_required", "high_stakes"]
       },
-      "phases": ["intake", "classification", "planning", "discovery", "normalization", "registration", "reconciliation", "activation", "observation", "refresh", "retirement", "delivery"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "discovery",
+        "normalization",
+        "registration",
+        "reconciliation",
+        "activation",
+        "observation",
+        "refresh",
+        "retirement",
+        "delivery"
+      ]
     },
     {
       "id": "platform-onboarding-stage-gated",
@@ -71,7 +117,17 @@
       "match": {
         "mission_classes": ["platform_onboarding"]
       },
-      "phases": ["intake", "classification", "planning", "contract_authoring", "preflight", "execution", "verification", "delivery", "retrospective"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery",
+        "retrospective"
+      ]
     },
     {
       "id": "coordinated-multi-track",
@@ -81,7 +137,15 @@
         "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
         "execution_shapes": ["mission", "project_bootstrap", "task_session"]
       },
-      "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "execution",
+        "verification",
+        "delivery"
+      ]
     },
     {
       "id": "decision-support-exploratory",
@@ -90,7 +154,15 @@
       "match": {
         "mission_classes": ["decision_support"]
       },
-      "phases": ["intake", "classification", "planning", "execution", "verification", "delivery", "retrospective"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "execution",
+        "verification",
+        "delivery",
+        "retrospective"
+      ]
     },
     {
       "id": "customer-engagement-stage-gated",
@@ -99,7 +171,16 @@
       "match": {
         "mission_classes": ["customer_engagement"]
       },
-      "phases": ["intake", "classification", "planning", "contract_authoring", "execution", "verification", "delivery", "retrospective"]
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "execution",
+        "verification",
+        "delivery",
+        "retrospective"
+      ]
     },
     {
       "id": "deterministic-patrol-aggregation",
@@ -132,7 +213,14 @@
         "delivery_shapes": ["cross_system_change"],
         "risk_profiles": ["high_stakes", "approval_required"]
       },
-      "phases": ["triage", "evidence_collection", "approval_gate", "containment", "audit_finalization", "delivery"]
+      "phases": [
+        "triage",
+        "evidence_collection",
+        "approval_gate",
+        "containment",
+        "audit_finalization",
+        "delivery"
+      ]
     },
     {
       "id": "loyalty-mediated-purchase",
@@ -143,7 +231,15 @@
         "delivery_shapes": ["single_artifact"],
         "risk_profiles": ["approval_required"]
       },
-      "phases": ["intake", "point_site_hop", "item_selection", "checkout_preflight", "approval_gate", "payment", "delivery"]
+      "phases": [
+        "intake",
+        "point_site_hop",
+        "item_selection",
+        "checkout_preflight",
+        "approval_gate",
+        "payment",
+        "delivery"
+      ]
     },
     {
       "id": "travel-booking-end-to-end",
@@ -154,7 +250,15 @@
         "delivery_shapes": ["single_artifact"],
         "risk_profiles": ["approval_required"]
       },
-      "phases": ["intake", "search_options", "selection_recommendation", "checkout_preflight", "approval_gate", "payment", "delivery"]
+      "phases": [
+        "intake",
+        "search_options",
+        "selection_recommendation",
+        "checkout_preflight",
+        "approval_gate",
+        "payment",
+        "delivery"
+      ]
     },
     {
       "id": "meeting-proxy-live-participation",
@@ -166,7 +270,16 @@
         "risk_profiles": ["approval_required", "high_stakes"],
         "intent_ids": ["meeting-operations"]
       },
-      "phases": ["intake", "briefing", "environment_bootstrap", "voice_consent", "browser_participation", "transcript_capture", "postprocess", "delivery"]
+      "phases": [
+        "intake",
+        "briefing",
+        "environment_bootstrap",
+        "voice_consent",
+        "browser_participation",
+        "transcript_capture",
+        "postprocess",
+        "delivery"
+      ]
     },
     {
       "id": "ai-meeting-facilitator-followup",
@@ -178,7 +291,15 @@
         "intent_ids": ["meeting-operations"],
         "task_types": ["meeting_operations"]
       },
-      "phases": ["intake", "agenda_and_role_boundary", "live_facilitation", "postprocess", "self_execution", "team_tracking", "delivery"]
+      "phases": [
+        "intake",
+        "agenda_and_role_boundary",
+        "live_facilitation",
+        "postprocess",
+        "self_execution",
+        "team_tracking",
+        "delivery"
+      ]
     },
     {
       "id": "action-item-tracking-followup",
@@ -189,7 +310,35 @@
         "delivery_shapes": ["single_artifact", "long_running_job"],
         "risk_profiles": ["review_required"]
       },
-      "phases": ["load_pending_items", "policy_filter", "reminder_generation", "append_reminder_receipts", "delivery"]
+      "phases": [
+        "load_pending_items",
+        "policy_filter",
+        "reminder_generation",
+        "append_reminder_receipts",
+        "delivery"
+      ]
+    },
+    {
+      "id": "code-change-aidlc",
+      "pattern": "aidlc_code_change",
+      "description": "Code-change missions follow the AI-DLC phase structure; circuit-breaker/gate enforcement lands with MO-02.",
+      "match": {
+        "mission_classes": ["code_change"],
+        "execution_shapes": ["mission"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "alignment",
+        "planning",
+        "contract_authoring",
+        "execution",
+        "test",
+        "self_review",
+        "verification",
+        "delivery",
+        "retrospective"
+      ]
     },
     {
       "id": "single-track-default",
