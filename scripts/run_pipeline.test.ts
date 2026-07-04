@@ -1,5 +1,8 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TraceContext } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 
 const {
   normalizePipelineOp,
@@ -137,6 +140,24 @@ describe('run_pipeline compatibility', () => {
     expect(result.context.legacy_key).toBe('legacy');
   });
 
+  it('blocks steps whose manifest capability is unavailable before dispatch (AC-01)', async () => {
+    // blockchain:verify_anchor is declared with implemented:false, so the
+    // capability gate must stop the step pre-execution with a teachable error.
+    const result = await runSteps([
+      {
+        op: 'blockchain:verify_anchor',
+        params: {},
+      },
+    ]);
+
+    expect(result.status).toBe('failed');
+    const failed = result.results.find(
+      (entry: { status: string; error?: string }) => entry.status === 'failed'
+    );
+    expect(failed?.error).toContain('capability blockchain:verify_anchor unavailable');
+    expect(failed?.error).toContain('not_implemented');
+  }, 30000);
+
   it('runs storage janitor through the core op in dry-run mode', async () => {
     const result = await runSteps([
       {
@@ -225,8 +246,7 @@ describe('run_pipeline compatibility', () => {
     expect(result.status).toBe('succeeded');
     expect(result.context.accumulated.collected).toHaveLength(2);
     expect(result.context.accumulated.collected.map((entry: any) => entry.value.seen)).toEqual([
-      1,
-      2,
+      1, 2,
     ]);
     expect(result.context.accumulated.iterations).toBe(3);
   });
@@ -285,8 +305,7 @@ describe('run_pipeline compatibility', () => {
                 op: 'core:transform',
                 params: {
                   input: '{{quality_count}}',
-                  script:
-                    'const count = Number(input || 0); return count >= 2 ? "ok" : "pending";',
+                  script: 'const count = Number(input || 0); return count >= 2 ? "ok" : "pending";',
                   export_as: 'verdict',
                 },
               },
@@ -529,5 +548,22 @@ describe('Typed Flow role resolution', () => {
       error_rule_id: expect.any(String),
     });
     expect(typeof failed?.attributes?.duration_ms).toBe('number');
+  });
+
+  it('loads and executes the checked-in workflow-as-code module', async () => {
+    const workflowPath = path.resolve(
+      pathResolver.rootDir(),
+      'scripts/demos/workflow-as-code-example.ts'
+    );
+    const workflow = await readValidatedWorkflowAdf(workflowPath);
+    const result = await runSteps(workflow.steps, workflow.context ?? {});
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.workflow_state).toEqual({
+      status: 'ok',
+      note: 'workflow-as-code example',
+    });
+    expect(result.context.parallel_items).toHaveLength(2);
+    expect(result.context.accumulated_items.collected).toHaveLength(2);
   });
 });
