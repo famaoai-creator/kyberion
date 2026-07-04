@@ -100,6 +100,13 @@
 - [x] **IP-03**: CI Test Gates (`IP-03_CI_TEST_GATES.ja.md`) — integration シャード必須化済み
 - [x] **KM-01**: Volatile Memory Activation (`KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md`) — Task 4(1週間試行評価)のみ日程待ち
 - [x] **UX-01**: Error Presentation (`UX-01_ERROR_PRESENTATION.ja.md`)
+- [x] **AC-01**: Capability Truthfulness (`AC-01_CAPABILITY_TRUTHFULNESS.ja.md`) — services 到達性プローブは AC-04/AC-06 へ
+- [x] **MO-01**: Mission Type Effectiveness (`MO-01_MISSION_TYPE_EFFECTIVENESS.ja.md`) — worker のフェーズ駆動差し替えは MO-02 へ委譲
+- [x] **ONB-02**: Canonical Coldstart (`ONB-02_CANONICAL_COLDSTART.ja.md`) — クリーンクローン実走検証のみ未実施
+- [x] **SA-02**: ADF/Shell Guardrails (`SA-02_ADF_SHELL_GUARDRAILS.ja.md`) — 承認ルーティングの対話接続は SA-05 側で
+- [x] **IL-01**: Goal Threading (`IL-01_GOAL_THREADING.ja.md`) — E2E 実走検証は IL-04 と併せて
+- [x] **IP-07**: Critical Path Tests (`IP-07_CRITICAL_PATH_TESTS.ja.md`) — orchestrator 追加特性化は IP-10 前に
+- [x] **AA-02**: Mesh Hub Delivery Driver (`AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md`) — 2プロセス実HTTP E2E は E3 パイロットで
 
 ## 2. 使い方
 

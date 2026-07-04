@@ -1,0 +1,20 @@
+{
+  "pipeline_id": "mesh-delivery",
+  "description": "AA-02: drive queued Mesh Hub deliveries (claim → HTTP dispatch → ack/retry/dead-letter). Single pass; requires KYBERION_MESH_PEER_ID.",
+  "schedule": {
+    "id": "mesh-delivery-5min",
+    "cron": "*/5 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "op": "system:exec",
+      "params": {
+        "command": "node",
+        "args": ["dist/scripts/mesh_delivery_driver.js", "--json"],
+        "export_as": "mesh_delivery_report"
+      }
+    }
+  ]
+}
