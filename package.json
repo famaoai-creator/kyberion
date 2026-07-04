@@ -83,6 +83,7 @@
     "smoke:intent": "node dist/scripts/intent_smoke.js",
     "watch:tenant-drift": "node dist/scripts/watch_tenant_drift.js",
     "daemon:watchdog": "node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts",
+    "mesh:deliver": "node --import ./scripts/ts-loader.mjs scripts/mesh_delivery_driver.ts",
     "audit:verify": "node --import ./scripts/ts-loader.mjs scripts/audit_verify.ts",
     "generate:knowledge-index": "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
     "mesh-hub:inspect": "node --import ./scripts/ts-loader.mjs scripts/mesh_hub_inspect.ts",
