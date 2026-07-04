@@ -37,7 +37,12 @@ async function handleSend(request: IMessageSendRequest) {
   return sendIMessage(request);
 }
 
-function buildThreadContext(message: { id: string; chatId: string; sender: string; text: string }): string {
+function buildThreadContext(message: {
+  id: string;
+  chatId: string;
+  sender: string;
+  text: string;
+}): string {
   const currentId = Number(message.id);
   if (!Number.isFinite(currentId)) return '';
   const history = getIMessageHistory(message.chatId, 8)
@@ -47,7 +52,9 @@ function buildThreadContext(message: { id: string; chatId: string; sender: strin
 
   return [
     'Recent iMessage thread context:',
-    ...history.map((entry) => `${entry.isFromMe ? 'Assistant' : `User (${entry.sender})`}: ${entry.text}`),
+    ...history.map(
+      (entry) => `${entry.isFromMe ? 'Assistant' : `User (${entry.sender})`}: ${entry.text}`
+    ),
     '',
     `Current incoming message: ${message.text}`,
   ].join('\n');
@@ -59,9 +66,9 @@ async function pollIMessages() {
     for (const msg of newMessages) {
       const msgId = Number(msg.id);
       if (msgId <= lastSeenRowId) continue;
-      
+
       lastSeenRowId = msgId;
-      
+
       if (msg.isFromMe) continue;
 
       logger.info(`📥 [iMessageBridge] Message from ${msg.sender}: ${msg.text}`);
@@ -80,14 +87,14 @@ async function pollIMessages() {
           agentId: IMESSAGE_SURFACE_AGENT_ID,
           threadContext: threadContext || undefined,
           delegationSummaryInstruction:
-            'Produce a concise iMessage reply in the user language. Do not use A2A blocks.'
+            'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
         } as any);
 
         if (conversation.text) {
           logger.info(`📤 [iMessageBridge] Replying to ${msg.sender}: ${conversation.text}`);
           await sendIMessage({
             recipient: msg.sender,
-            text: conversation.text
+            text: conversation.text,
           });
         } else {
           // UX-01: an empty agent reply must not read as silence.
@@ -96,8 +103,9 @@ async function pollIMessages() {
             text: buildBridgeEmptyReplyText({ locale: 'ja' }),
           });
         }
-      } catch (err: any) {
-        logger.error(`❌ [iMessageBridge] Conversation failed for ${msg.sender}: ${err.message}`);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        logger.error(`❌ [iMessageBridge] Conversation failed for ${msg.sender}: ${detail}`);
         // UX-01: surface a vocabulary-based error to the user (rate-limited per chat).
         await postBridgeError({
           conversationKey: `imessage:${msg.chatId}`,
@@ -117,7 +125,11 @@ async function main() {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string' })
     .option('port', { type: 'number', default: Number(process.env.IMESSAGE_BRIDGE_PORT || '3034') })
-    .option('poll', { type: 'boolean', default: true, description: 'Enable background message polling' })
+    .option('poll', {
+      type: 'boolean',
+      default: true,
+      description: 'Enable background message polling',
+    })
     .parseSync();
 
   if (argv.input) {
@@ -135,13 +147,15 @@ async function main() {
   }
 
   if (!isDarwin()) {
-    logger.warn('iMessage bridge is macOS-only. Health endpoints remain available, but send operations will fail until launched on Darwin.');
+    logger.warn(
+      'iMessage bridge is macOS-only. Health endpoints remain available, but send operations will fail until launched on Darwin.'
+    );
   }
 
   if (isDarwin()) {
     const existing = getRecentIMessages(0);
     if (existing.length > 0) {
-      lastSeenRowId = Math.max(...existing.map(m => Number(m.id)));
+      lastSeenRowId = Math.max(...existing.map((m) => Number(m.id)));
       logger.info(`🚀 [iMessageBridge] Initialized. Last message ID: ${lastSeenRowId}`);
     }
 
