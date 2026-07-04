@@ -1,18 +1,18 @@
 {
   "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
   "manifest_id": "kyberion-runtime-baseline",
-  "version": "2026-04-29",
+  "version": "2026-07-05",
   "description": "The minimum host requirements for *anything* in Kyberion to run: Node, pnpm, git, and a built workspace. Every other manifest implicitly depends on this one being satisfied first.",
   "capabilities": [
     {
       "capability_id": "node-runtime",
       "kind": "binary",
-      "description": "Node.js v22+ on PATH (the only runtime Kyberion targets). Older versions miss native fetch+stream APIs the reasoning backends rely on.",
+      "description": "Node.js v24+ on PATH (the only runtime Kyberion targets; must satisfy package.json engines). Older versions miss native fetch+stream APIs the reasoning backends rely on.",
       "required_for": ["all-of-kyberion"],
-      "probe": { "kind": "command", "command": "node", "args": ["--version"] },
+      "probe": { "kind": "probe", "probe_id": "node-version.floor" },
       "install": {
         "operator_confirmed": true,
-        "instruction": "Install Node.js 22+ via your version manager: `nvm install 22 && nvm use 22` or `mise install node@22`. Operator-confirmed because the version manager change can affect other projects.",
+        "instruction": "Install Node.js 24+ via your version manager: `nvm install 24 && nvm use 24` or `mise install node@24` (matches `.nvmrc` and package.json engines). Operator-confirmed because the version manager change can affect other projects.",
         "docs_url": "https://nodejs.org/en/download"
       }
     },
