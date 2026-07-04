@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { z } from 'zod';
 import { logger } from './core.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
@@ -21,16 +20,6 @@ const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
  * an arbitrary file in the repo.
  */
 const RECORDINGS_STORE = pathResolver.shared('runtime/recordings');
-
-const procedureCandidateSchema = z.object({
-  procedure_id: z.string().min(1),
-  confidence: z.number().min(0).max(1),
-  reason: z.string().min(1),
-});
-
-const procedureRankingSchema = z.object({
-  candidates: z.array(procedureCandidateSchema),
-});
 
 let catalogCache: ProcedureEntry[] | null = null;
 
@@ -246,7 +235,7 @@ export async function resolveProcedure(
           `sorted by confidence descending. confidence range: 0..1.`,
           `Assign >= ${autoExecute} only when the intent clearly matches. Return {"candidates": []} if none match.`,
         ].join('\n'),
-        procedureRankingSchema,
+        'procedure_ranking',
         { context: `intent-resolution: "${intent}"` }
       );
       // LLM explicitly returned no matches → override Stage 1

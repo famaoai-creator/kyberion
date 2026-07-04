@@ -173,11 +173,15 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
     ps.description += ` (loop body: ${children.length} steps, max ${step.params.max_iterations || '\u221e'} iterations)`;
   }
 
-  // Control flow children: parallel foreach
-  if (step.op === 'parallel_foreach' && step.params?.do) {
+  // Control flow children: parallel foreach / accumulate
+  if ((step.op === 'parallel_foreach' || step.op === 'accumulate') && step.params?.do) {
     const children = step.params.do.map((s: any, j: number) => previewStep(s, j, ctx));
     ps.children = children;
-    ps.description += ` (parallel body: ${children.length} steps, concurrency ${step.params.concurrency || step.params.parallelism || 2})`;
+    if (step.op === 'parallel_foreach') {
+      ps.description += ` (parallel body: ${children.length} steps, concurrency ${step.params.concurrency || step.params.parallelism || 2})`;
+    } else {
+      ps.description += ` (accumulate body: ${children.length} steps, target ${step.params.target_count || step.params.targetCount || '?'} items, dry streak ${step.params.dry_streak_limit || step.params.dryStreakLimit || 2})`;
+    }
   }
 
   // Control flow children: if
@@ -225,6 +229,8 @@ function describeStep(step: any): string {
       return `Retry until quality ${step.params?.condition?.from || step.params?.quality_condition?.from || '?'} ${step.params?.condition?.operator || step.params?.quality_condition?.operator || '?'} ${step.params?.condition?.value || step.params?.quality_condition?.value || '?'}`;
     case 'parallel_foreach':
       return `Parallel foreach over ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s)`;
+    case 'accumulate':
+      return `Accumulate ${Array.isArray(step.params?.items) ? step.params.items.length : '?'} item(s) toward ${step.params?.target_count || step.params?.targetCount || '?'} target`;
     case 'pptx_extract':
       return `Extract PPTX design from ${step.params?.path || '?'} (raw-preserving)`;
     case 'xlsx_extract':

@@ -178,6 +178,27 @@ class KillSwitchImpl {
     });
 
     if (severity >= 3) {
+      // 承認/オペレータ確認必須、自動 kill は既定オフ
+      logger.error(`[KILL_SWITCH] Anomaly critical for ${agentId}. Requesting kill approval.`);
+      const { enforceApprovalGate } = await import('./approval-gate.js');
+      const approval = enforceApprovalGate({
+        operationId: 'agent:kill',
+        agentId: 'system',
+        correlationId: `kill:${agentId}:${Date.now()}`,
+        channel: 'system',
+        draft: {
+          title: `Kill Switch Triggered: ${agentId}`,
+          summary: `Anomalies detected: ${anomalies.join(', ')}`,
+          severity: 'high',
+        },
+      });
+
+      if (!approval.allowed) {
+        logger.warn(`[KILL_SWITCH] Kill pending approval for ${agentId}. Isolating in the meantime.`);
+        trustEngine.recordEvent(agentId, 'securityPosture', -50, `isolated_pending_kill: ${anomalies[0]}`);
+        return 'isolated';
+      }
+
       // Kill
       logger.error(`[KILL_SWITCH] Terminating ${agentId}: ${anomalies.join(', ')}`);
       try {
@@ -234,3 +255,15 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new KillSwitchImpl();
 }
 export const killSwitch: KillSwitchImpl = (globalThis as any)[GLOBAL_KEY];
+
+/**
+ * Common governance hook for logging actions to the kill switch.
+ */
+export function recordGovernanceAction(
+  agentId: string,
+  operation: string,
+  reason: string,
+  policyViolation = false
+): void {
+  killSwitch.logAction(agentId, `${operation}:${reason}`, policyViolation);
+}

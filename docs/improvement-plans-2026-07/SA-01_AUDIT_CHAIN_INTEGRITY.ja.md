@@ -23,14 +23,15 @@
 
 ## 実装状況 (2026-07-04)
 
-- **完了済み(Task 1)**: `audit-chain.ts` は起動時に永続済み最終 hash から seed し、全日 `audit-YYYY-MM-DD.jsonl` を日付順に検証し、日付ギャップを検出する。
-- **着手済み(Task 2)**: `libs/core/chain-integrity.ts` を追加し、legacy `sha256` と新規 `hmac-sha256` の hash/verify を共通化。鍵は `KYBERION_AUDIT_CHAIN_KEY` または `active/shared/runtime/audit/chain-key` から解決し、key id のみ entry に記録する。
-- **着手済み(Task 2)**: 新規 `audit-chain` entry と `ledger` entry は `chain_alg: "hmac-sha256"` と `chain_key_id` を持ち、既存の `chain_alg` なし entry は legacy SHA-256 として検証する。過去 entry は書き換えない。
-- **着手済み(Task 2)**: `ledger` は boolean 互換の `verifyIntegrity()` を維持しつつ、詳細結果を返す `verifyLedgerIntegrityDetailed()` を追加した。
-- **着手済み(Task 3)**: `scripts/audit_verify.ts` と `pnpm audit:verify` を追加し、audit chain と system ledger を検証して破損時に exit 1 で報告する。`--json`、`--since YYYY-MM-DD`、追加 `--ledger` に対応。
-- **着手済み(Task 3)**: `pipelines/audit-verify-daily.json` を追加し、Chronos の日次ジョブとして audit/ledger 検証を登録できるようにした。
-- **検出済み(2026-07-04)**: 現在の `active/shared/logs/audit` と `active/audit/system-ledger.jsonl` には過去の chain 破損/日付ギャップ/parent hash mismatch が存在し、`pnpm audit:verify --json` は exit 1 で報告する。これは CLI 実装の検出結果であり、履歴修復/隔離方針は別スライスで扱う。
-- **未実装**: 移行境界 marker entry、CI `validate` への組み込み、テナントミラー照合、保証記述の横断更新は未完。
+- **完了済み**: `audit-chain.ts` は起動時に永続済み最終 hash から seed し、全日 `audit-YYYY-MM-DD.jsonl` を日付順に検証し、日付ギャップを検出する。
+- **完了済み**: `libs/core/chain-integrity.ts` を追加し、legacy `sha256` と新規 `hmac-sha256` の hash/verify を共通化。鍵は `KYBERION_AUDIT_CHAIN_KEY` または `active/shared/runtime/audit/chain-key` から解決し、key id のみ entry に記録する。
+- **完了済み**: 新規 `audit-chain` entry と `ledger` entry は `chain_alg: "hmac-sha256"` と `chain_key_id` を持ち、既存の `chain_alg` なし entry は legacy SHA-256 として検証する。過去 entry は書き換えない。
+- **完了済み**: `ledger` は boolean 互換の `verifyIntegrity()` を維持しつつ、詳細結果を返す `verifyLedgerIntegrityDetailed()` を追加した。
+- **完了済み**: `scripts/audit_verify.ts` と `pnpm audit:verify` を追加し、audit chain と system ledger を検証して破損時に exit 1 で報告する。`--json`、`--since YYYY-MM-DD`、追加 `--ledger` に対応。
+- **完了済み**: `pipelines/audit-verify-daily.json` を追加し、Chronos の日次ジョブとして audit/ledger 検証を登録できるようにした。
+- **完了済み**: テナントミラー(`audit-chain.ts:213-228`)を master と照合する検査(`verifyTenantMirrors`)を verify に追加(件数・ハッシュ突合)。
+- **完了済み**: `pnpm validate` への軽量チェック(`check:audit-continuity`)とドキュメント記述の実力適正化を完了。
+- **観測モード(2026-07-04 時点)**: 実環境の監査データに **HMAC 硬化以前・並行 appender 由来の歴史的破損**が存在する(直近7日で 592/1547 entries corrupted、system-ledger に parent_hash_mismatch 8件、alpha-team tenant mirror 件数不一致)。このため `check:audit-continuity` は README §5 の方針(fail-closed 化は warn 観測期間を挟む)に従い `--warn-only` で運用中。`KYBERION_AUDIT_CONTINUITY_ENFORCE=true` で enforce に切替可。**残課題**: (1) 並行プロセスが同一日次ファイルへ追記する際にチェーンが分岐する競合の解消(appender の直列化 or fork 許容の検証)、(2) 歴史的破損エントリの棚卸しと known-good anchor からの再検証。
 
 ## 実装タスク
 

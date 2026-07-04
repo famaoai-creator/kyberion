@@ -118,7 +118,10 @@ describe('readValidatedPipelineAdf', () => {
   });
 
   it('loads the checked-in workflow-as-code example module', async () => {
-    const examplePath = path.resolve(process.cwd(), 'scripts/demos/workflow-as-code-example.ts');
+    const examplePath = path.resolve(
+      pathResolver.rootDir(),
+      'scripts/demos/workflow-as-code-example.ts'
+    );
 
     await expect(readValidatedWorkflowAdf(examplePath)).resolves.toEqual(
       expect.objectContaining({
@@ -127,6 +130,8 @@ describe('readValidatedPipelineAdf', () => {
         steps: expect.arrayContaining([
           expect.objectContaining({ op: 'system:log' }),
           expect.objectContaining({ op: 'system:set' }),
+          expect.objectContaining({ op: 'core:parallel_foreach', effort: 'medium' }),
+          expect.objectContaining({ op: 'core:accumulate', effort: 'medium' }),
         ]),
       })
     );

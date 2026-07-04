@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { getTenantScope } from '@/lib/data';
+import './globals.css';
 
 export const metadata = {
   title: 'Kyberion Operator Surface',
@@ -16,19 +17,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body
         style={{
-          fontFamily:
-            'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          fontFamily: 'var(--kb-font-sans)',
           margin: 0,
           padding: 0,
-          background: '#0c0d10',
-          color: '#e4e6eb',
+          background: 'var(--kb-bg-main)',
+          color: 'var(--kb-text-primary)',
         }}
       >
         <header
           style={{
             padding: '12px 24px',
-            background: '#15171c',
-            borderBottom: '1px solid #2a2c33',
+            background: 'var(--kb-panel-bg)',
+            borderBottom: '1px solid var(--kb-border, #2a2c33)',
             display: 'flex',
             gap: '24px',
             alignItems: 'baseline',
@@ -36,15 +36,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <strong>Kyberion · Operator Surface</strong>
           <nav style={{ display: 'flex', gap: '16px', fontSize: '14px' }}>
-            <a href="/" style={{ color: '#8ec3ff' }}>Missions</a>
-            <a href="/audit" style={{ color: '#8ec3ff' }}>Audit</a>
-            <a href="/health" style={{ color: '#8ec3ff' }}>Health</a>
-            <a href="/surfaces" style={{ color: '#8ec3ff' }}>Surfaces</a>
-            <a href="/intent-snapshots" style={{ color: '#8ec3ff' }}>Intent Snapshots</a>
-            <a href="/knowledge" style={{ color: '#8ec3ff' }}>Knowledge</a>
+            <a href="/" style={{ color: 'var(--kb-accent)' }}>Missions</a>
+            <a href="/audit" style={{ color: 'var(--kb-accent)' }}>Audit</a>
+            <a href="/health" style={{ color: 'var(--kb-accent)' }}>Health</a>
+            <a href="/surfaces" style={{ color: 'var(--kb-accent)' }}>Surfaces</a>
+            <a href="/intent-snapshots" style={{ color: 'var(--kb-accent)' }}>Intent Snapshots</a>
+            <a href="/knowledge" style={{ color: 'var(--kb-accent)' }}>Knowledge</a>
           </nav>
-          <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#9aa0aa' }}>
-            tenant: <code style={{ color: scope ? '#9be3a8' : '#9aa0aa' }}>{scope ?? 'agnostic'}</code>
+          <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--kb-text-secondary)' }}>
+            tenant: <code style={{ color: scope ? '#9be3a8' : 'var(--kb-text-secondary)' }}>{scope ?? 'agnostic'}</code>
             {' · read-only'}
           </span>
         </header>

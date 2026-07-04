@@ -1,16 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
-import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { PlanningPacketSchema, formatZodIssues } from './structured-output-contracts.js';
 import type { PlanningPacket } from './channel-surface-types.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const PLANNING_PACKET_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/planning-packet.schema.json'
-);
-
-let planningPacketValidateFn: ValidateFunction | null = null;
 
 export interface PlanningPacketValidationResult {
   valid: boolean;
@@ -24,25 +13,12 @@ export interface ExtractPlanningPacketBlocksResult {
   planningPacketErrors: string[];
 }
 
-function ensurePlanningPacketValidator(): ValidateFunction {
-  if (planningPacketValidateFn) return planningPacketValidateFn;
-  planningPacketValidateFn = compileSchemaFromPath(ajv, PLANNING_PACKET_SCHEMA_PATH);
-  return planningPacketValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
 function validateParsedPlanningPacket(value: unknown): PlanningPacketValidationResult {
-  const validate = ensurePlanningPacketValidator();
-  const valid = validate(value);
+  const result = PlanningPacketSchema.safeParse(value);
   return {
-    valid: Boolean(valid),
-    errors: valid ? [] : errorsFrom(validate),
-    value: valid ? (value as PlanningPacket) : undefined,
+    valid: result.success,
+    errors: result.success ? [] : formatZodIssues(result.error),
+    value: result.success ? result.data : undefined,
   };
 }
 

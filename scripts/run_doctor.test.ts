@@ -89,6 +89,7 @@ describe('run_doctor', () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('pnpm setup:report --persona first-time-user')
     );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Maintenance: janitor'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
   });
 

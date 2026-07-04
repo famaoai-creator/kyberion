@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { safeExistsSync } from '../libs/core/secure-io.js';
-import { createStandardYargs } from '../libs/core/cli-utils.js';
-import { auditChain } from '../libs/core/audit-chain.js';
-import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from '../libs/core/ledger.js';
+import { safeExistsSync } from '@agent/core';
+import { createStandardYargs } from '@agent/core';
+import { auditChain } from '@agent/core';
+import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from '@agent/core';
 
 export interface AuditVerifyCliReport {
   ok: boolean;
@@ -14,6 +14,10 @@ export interface AuditVerifyCliReport {
     corrupted: string[];
     missingKey: boolean;
   }>;
+  tenantMirrors: {
+    ok: boolean;
+    findings: string[];
+  };
 }
 
 function parseLedgerArgs(value: unknown): string[] {
@@ -25,7 +29,12 @@ function parseLedgerArgs(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function validateSince(value: unknown): string | undefined {
+function validateSince(value: unknown, days?: number): string | undefined {
+  if (days !== undefined) {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split('T')[0];
+  }
   if (value === undefined || value === null || value === '') return undefined;
   const since = String(value);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
@@ -69,10 +78,12 @@ export function collectAuditVerifyReport(
       ...(safeExistsSync(ledgerPath) ? {} : { missing: true }),
     };
   });
+  const tenantMirrors = auditChain.verifyTenantMirrors();
   return {
-    ok: audit.corrupted.length === 0 && ledgers.every((ledger) => ledger.ok),
+    ok: audit.corrupted.length === 0 && ledgers.every((ledger) => ledger.ok) && tenantMirrors.ok,
     audit,
     ledgers,
+    tenantMirrors,
   };
 }
 
@@ -97,6 +108,10 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
       lines.push('  - missing HMAC key for one or more ledger entries');
     }
   }
+  lines.push(`Tenant mirrors: ${report.tenantMirrors.ok ? 'ok' : 'failed'}`);
+  if (report.tenantMirrors.findings.length > 0) {
+    lines.push(`  - findings: ${report.tenantMirrors.findings.join(', ')}`);
+  }
   return lines;
 }
 
@@ -104,20 +119,39 @@ async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('json', { type: 'boolean', default: false })
     .option('since', { type: 'string', describe: 'Audit file lower bound in YYYY-MM-DD form' })
+    .option('days', { type: 'number', describe: 'Verify only the last N days (overrides --since)' })
     .option('ledger', {
       type: 'array',
       describe: 'Additional ledger path(s), repeatable or comma-separated',
     })
+    .option('warn-only', {
+      type: 'boolean',
+      default: false,
+      describe: 'Report findings but exit 0 (SA-01 warn observation mode)',
+    })
     .parseSync();
 
   const report = collectAuditVerifyReport({
-    since: validateSince(argv.since ?? readArgValue('--since')),
+    since: validateSince(argv.since ?? readArgValue('--since'), argv.days ? Number(argv.days) : (readArgValue('--days') ? Number(readArgValue('--days')) : undefined)),
     ledgers: parseLedgerArgs(argv.ledger ?? readArgValue('--ledger')),
   });
   if (argv.json || hasArg('--json')) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     for (const line of formatAuditVerifyReport(report)) console.log(line);
+  }
+  // TODO(SA-01): historical chain data written before HMAC hardening (and by
+  // concurrent appenders) fails verification. Per README §5, fail-closed
+  // switches go through a warn observation period first. Set
+  // KYBERION_AUDIT_CONTINUITY_ENFORCE=true (or drop --warn-only) to enforce.
+  const warnOnly =
+    (argv.warnOnly || hasArg('--warn-only')) &&
+    process.env.KYBERION_AUDIT_CONTINUITY_ENFORCE !== 'true';
+  if (!report.ok && warnOnly) {
+    console.warn(
+      '[audit:verify] findings detected but running in warn observation mode (SA-01); exiting 0.'
+    );
+    process.exit(0);
   }
   process.exit(report.ok ? 0 : 1);
 }

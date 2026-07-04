@@ -23,6 +23,7 @@ export default defineConfig({
       '**/active/**',
       '**/docs/**',
       '**/knowledge/**',
+      '**/.pnpm-store/**',
     ],
     threads: true,
     maxThreads: 4,
@@ -81,10 +82,7 @@ export default defineConfig({
         find: '@agent/shared-network',
         replacement: path.resolve(rootDir, './libs/shared-network/src/index.ts'),
       },
-      {
-        find: '@agent/shared-business',
-        replacement: path.resolve(rootDir, './libs/shared-business/src/index.ts'),
-      },
+
     ],
   },
 });

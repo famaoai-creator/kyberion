@@ -77,6 +77,30 @@
 - Meeting-Browser-Driver の dynamic path resolution
 - `baseline-check` と self-healing prompts
 
+### improvement-plans-2026-07
+
+完了済み:
+
+- [x] **SA-01**: Audit Chain Integrity (`SA-01_AUDIT_CHAIN_INTEGRITY.ja.md`)
+- [x] **AO-03**: Daemon Supervision & Escalation (`AO-03_DAEMON_SUPERVISION_ESCALATION.ja.md`)
+- [x] **ONB-01**: Reasoning Backend Onboarding (`ONB-01_REASONING_BACKEND_ONBOARDING.ja.md`)
+- [x] **KM-04**: Knowledge Store Hygiene (`KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md`)
+- [x] **IP-04**: Dead Reference Cleanup (`IP-04_DEAD_REFERENCE_CLEANUP.ja.md`)
+- [x] **IP-06**: Workspace Consistency (`IP-06_WORKSPACE_CONSISTENCY.ja.md`)
+- [x] **IP-13**: Model ID Centralization (`IP-13_MODEL_ID_CENTRALIZATION.ja.md`)
+- [x] **AC-03**: Deploy CI/CD Capability (`AC-03_DEPLOY_CICD_CAPABILITY.ja.md`)
+- [x] **MO-04**: Worker Context Economy (`MO-04_WORKER_CONTEXT_ECONOMY.ja.md`)
+- [x] **MO-05**: Task Model Effort Routing (`MO-05_MODEL_EFFORT_ROUTING.ja.md`)
+- [x] **IP-01**: ESLint Governance Enforcement (`IP-01_ESLINT_GOVERNANCE_ENFORCEMENT.ja.md`)
+- [x] **IP-02**: Native Engine secure-io Migration (`IP-02_NATIVE_ENGINE_SECURE_IO.ja.md`) — 残余の child_process disable は IP-08 スコープ
+- [x] **AA-01**: Agent Runtime Resilience (`AA-01_RUNTIME_RESILIENCE.ja.md`)
+- [x] **UX-06**: Onboarding/Dashboard Integrity (`UX-06_ONBOARDING_DASHBOARD_INTEGRITY.ja.md`)
+- [x] **OP-02**: Backup & Recovery (`OP-02_BACKUP_RECOVERY.ja.md`) — 別ホストでの定期運用実績のみ未取得
+- [x] **DS-01**: Canonical Design Tokens (`DS-01_CANONICAL_DESIGN_TOKENS.ja.md`)
+- [x] **IP-03**: CI Test Gates (`IP-03_CI_TEST_GATES.ja.md`) — integration シャード必須化済み
+- [x] **KM-01**: Volatile Memory Activation (`KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md`) — Task 4(1週間試行評価)のみ日程待ち
+- [x] **UX-01**: Error Presentation (`UX-01_ERROR_PRESENTATION.ja.md`)
+
 ## 2. 使い方
 
 - 新しく完了した項目が出たら、まず該当 roadmap の原文を `done` / `✅` に更新する。

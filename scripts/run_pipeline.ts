@@ -251,6 +251,7 @@ interface RunStepsOptions {
   _includeStack?: ReadonlySet<string>;
   pipelinePath?: string;
   _retryCount?: number;
+  quiet?: boolean;
 }
 
 function resolveParamsRecursive(params: any, ctx: any): any {
@@ -450,6 +451,7 @@ export function normalizePipelineOp(op: string): string {
   if (op === 'while' || op === 'loop_until') return 'core:while';
   if (op === 'retry_until_quality') return 'core:retry_until_quality';
   if (op === 'parallel_foreach') return 'core:parallel_foreach';
+  if (op === 'accumulate') return 'core:accumulate';
   return `system:${op}`;
 }
 
@@ -598,6 +600,10 @@ export async function runSteps(
     });
     opts.trace?.addEvent('step.started', stepTraceBase);
 
+    if (!opts.quiet) {
+      logger.info(`[step ${results.length + 1}/${steps.length}] ${step.op} …`);
+    }
+
     let attempt = 0;
     let stepSucceeded = false;
     let lastError: any = null;
@@ -614,6 +620,12 @@ export async function runSteps(
         duration_ms: Date.now() - stepStartedAtMs,
         ...attributes,
       });
+
+      if (!opts.quiet && (status === 'success' || status === 'failed')) {
+        logger.info(
+          `[step ${results.length + 1}/${steps.length}] ${currentNormalizedOp} ${status} in ${Math.round((Date.now() - stepStartedAtMs) / 1000)}s`
+        );
+      }
     };
 
     // ── before hooks ──────────────────────────────────────────────
@@ -887,6 +899,93 @@ export async function runSteps(
               ctx = { ...ctx, ...perItemContexts[perItemContexts.length - 1] };
             }
           }
+        } else if (domain === 'core' && action === 'accumulate') {
+          const items = resolveVars(params.items, ctx);
+          const subSteps = params.do as PipelineAdfStep[];
+          if (!Array.isArray(items)) {
+            throw new Error('core:accumulate requires "items" to be an array');
+          }
+          if (!Array.isArray(subSteps)) {
+            throw new Error('core:accumulate requires "do" pipeline steps');
+          }
+          const itemName = (params.as as string) || 'item';
+          const collectKey = String(params.collect_as || params.export_as || 'result');
+          const exportKey = resolveExportKey(step, 'last_accumulate');
+          const originalItemValue = ctx[itemName];
+          const originalSharedCtx = { ...ctx };
+          const targetCount = coercePositiveInt(params.target_count ?? params.targetCount, items.length);
+          const maxIterations = coercePositiveInt(
+            params.max_iterations ?? params.maxIterations,
+            items.length
+          );
+          const dryStreakLimit = coercePositiveInt(
+            params.dry_streak_limit ?? params.dryStreakLimit,
+            2
+          );
+          const seen = new Set<string>();
+          const collected: Array<{
+            index: number;
+            item: unknown;
+            value: unknown;
+            context: Record<string, unknown>;
+            results: { op: string; status: 'success' | 'failed'; error?: string }[];
+          }> = [];
+          let dryStreak = 0;
+          let loopCount = 0;
+
+          for (const [index, item] of items.entries()) {
+            if (loopCount >= maxIterations) break;
+            if (collected.length >= targetCount) break;
+
+            const loopCtx = { ...originalSharedCtx, [itemName]: item };
+            const nested = await runSteps(subSteps, loopCtx, opts);
+            if (nested.status === 'failed') {
+              throw new Error(
+                `accumulate item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
+              );
+            }
+
+            const candidateValue =
+              (nested.context as Record<string, unknown>)[collectKey] ?? nested.context ?? item;
+            const fingerprint = (() => {
+              try {
+                return JSON.stringify(candidateValue);
+              } catch {
+                return String(candidateValue);
+              }
+            })();
+
+            loopCount += 1;
+            if (!seen.has(fingerprint)) {
+              seen.add(fingerprint);
+              collected.push({
+                index,
+                item,
+                value: candidateValue,
+                context: nested.context,
+                results: nested.results,
+              });
+              dryStreak = 0;
+            } else {
+              dryStreak += 1;
+            }
+
+            results.push(...nested.results);
+            if (dryStreak >= dryStreakLimit) break;
+          }
+
+          ctx = {
+            ...ctx,
+            [exportKey]: {
+              collected,
+              iterations: loopCount,
+              dry_streak: dryStreak,
+              target_count: targetCount,
+              final_context: ctx,
+            },
+          };
+          if (originalItemValue === undefined) delete ctx[itemName];
+          else ctx[itemName] = originalItemValue;
         } else if (domain === 'core' && action === 'include') {
           const fragmentRef = String(resolveVars(params.fragment || '', ctx));
           if (!fragmentRef) throw new Error('core:include requires "fragment" param');
@@ -1097,9 +1196,12 @@ export async function runSteps(
 
         // Don't repair if we already tried and the error message didn't change (prevents loops)
         if (attempt === 0 && failure.repairAction) {
-          logger.warn(
-            `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
-          );
+          if (!opts.quiet) {
+            logger.warn(
+              `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
+            );
+            logger.info(`  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`);
+          }
           const repaired = await attemptAutonomousRepair(
             step,
             failure,
@@ -1108,9 +1210,11 @@ export async function runSteps(
             stepPolicy
           );
           if (repaired) {
-            logger.success(
-              `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
-            );
+            if (!opts.quiet) {
+              logger.success(
+                `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
+              );
+            }
 
             try {
               // Reload fully from disk to get the REPAIRED definition
@@ -1190,12 +1294,43 @@ async function attemptAutonomousRepair(
   policy?: ReasoningStepPolicy
 ): Promise<boolean> {
   try {
-    const { getReasoningBackend } = await import('@agent/core');
+    const { getReasoningBackend, sendOpsAlert } = await import('@agent/core');
     const backend = getReasoningBackend();
 
     const repairHint =
       failure.repairAction ||
       'Investigate the error and the pipeline ADF structure to identify a potential fix.';
+
+    // AO-03 Task 4: classify the repair scope.
+    // Safe repairs (ADF structure, parameters) may proceed autonomously.
+    // Sensitive repairs (.env / authority / config / secrets) MUST NOT be attempted without
+    // operator approval. In unattended runs there is no approval channel, so we fail-closed.
+    const SENSITIVE_CATEGORIES = ['permission_error', 'auth_error', 'config_error', 'env_error'];
+    const requiresApproval = SENSITIVE_CATEGORIES.includes(failure.category);
+
+    if (requiresApproval) {
+      logger.warn(
+        `  [SYS_PIPELINE:REPAIR] Repair category "${failure.category}" involves .env/auth/config changes ` +
+        `— autonomous mutation of sensitive paths is prohibited (AO-03 §4). Escalating to operator.`
+      );
+      // Escalate via ops-alert so the operator is notified even in unattended runs.
+      if (typeof sendOpsAlert === 'function') {
+        sendOpsAlert({
+          severity: 'critical',
+          title: `Pipeline repair blocked: ${step.op}`,
+          context: {
+            step_op: step.op,
+            error_category: failure.category,
+            error_detail: failure.detail,
+            pipeline_path: pipelinePath,
+          },
+          recommendation:
+            'Manual operator intervention required. Review the error, update .env / authority roles as appropriate, then re-run the pipeline.',
+          dedupe_key: `pipeline-repair-blocked:${step.op}:${failure.category}`,
+        });
+      }
+      return false;
+    }
 
     const instruction = `
 The following pipeline step failed in Kyberion:
@@ -1209,8 +1344,9 @@ ${policy ? `Step Policy: ${JSON.stringify(policy)}` : ''}
 
 Repair Action Goal:
 1. ANALYZE the error and parameters.
-2. If it is a structural/parameter error, FIX the pipeline ADF at ${pipelinePath}.
-3. If it is an environment/permission error, suggest or apply changes to .env or authority roles if appropriate.
+2. FIX the pipeline ADF structure at ${pipelinePath} if it is a structural or parameter error.
+3. DO NOT modify .env files, authority roles, config secrets, or any file outside the pipeline ADF.
+   If the error requires such changes, output a description of what needs to be changed but do NOT apply it.
 4. Ensure the resulting ADF follows the required schema.
 
 Assume the persona of a "Sovereign System Recovery Agent".
@@ -1262,6 +1398,11 @@ export async function main() {
       alias: 'c',
       type: 'string',
       describe: 'JSON string merged into pipeline.context (overrides)',
+    })
+    .option('quiet', {
+      type: 'boolean',
+      default: false,
+      describe: 'Suppress step-by-step progress output',
     })
     .parseSync();
 
@@ -1356,6 +1497,7 @@ export async function main() {
     const result = await runSteps(stepsToRun, mergedContext, {
       trace,
       pipelinePath: argv.input as string,
+      quiet: argv.quiet as boolean,
     });
     const persisted = finalizeAndPersist(trace);
     result.context.trace_summary = persisted.trace.rootSpan.status;

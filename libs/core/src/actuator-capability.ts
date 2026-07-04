@@ -30,6 +30,8 @@ export interface ActuatorStatus {
 interface ManifestCapability {
   op: string;
   platforms?: string[];
+  /** false = declared but not implemented (AC-01 goal 4; triaged by AC-06). */
+  implemented?: boolean;
   requirements?: {
     bin?: string[];
     env?: string[];

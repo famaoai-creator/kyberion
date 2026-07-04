@@ -1626,10 +1626,10 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.report_design.theme.colors).toEqual(
       expect.objectContaining({
         dk1: '0f172a',
-        accent1: '38bdf8',
+        accent1: '0066cc',
       })
     );
-    expect(result.context.report_design.theme.minorFont).toContain('System-ui');
+    expect(result.context.report_design.theme.minorFont).toContain('Inter');
   });
 
   it('classifies appendix sections in report outlines and carries composition metadata', async () => {
@@ -1702,7 +1702,7 @@ describe('media-actuator pdf to pptx bridge', () => {
       result.context.report_design.styles.definitions.find(
         (style: any) => style.styleId === 'CalloutTitle'
       )?.rPr.color.val
-    ).toBe('38bdf8');
+    ).toBe('0066cc');
     expect(
       result.context.report_design.styles.definitions.find(
         (style: any) => style.styleId === 'AppendixBody'
@@ -1752,7 +1752,7 @@ describe('media-actuator pdf to pptx bridge', () => {
     expect(result.context.tracker_design.theme.colors).toEqual(
       expect.objectContaining({
         dk1: '0f172a',
-        accent1: '38bdf8',
+        accent1: '0066cc',
       })
     );
     expect(result.context.tracker_design.styles.fills[2].fgColor.rgb).toBe('#0f172a');

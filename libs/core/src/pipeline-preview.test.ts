@@ -131,6 +131,29 @@ describe('pipeline-preview', () => {
       expect(result.steps[1].description).toContain('concurrency 2');
     });
 
+    it('includes accumulate children in the preview', () => {
+      const pipeline = {
+        steps: [
+          {
+            id: 'accumulate-step',
+            type: 'control',
+            op: 'accumulate',
+            params: {
+              items: [1, 2, 3],
+              target_count: 2,
+              dry_streak_limit: 2,
+              do: [{ id: 'acc-child', type: 'apply', op: 'log', params: { message: 'item' } }],
+            },
+          },
+        ],
+      };
+
+      const result = previewPipeline(pipeline);
+
+      expect(result.steps[0].children).toHaveLength(1);
+      expect(result.steps[0].description).toContain('target 2 items');
+    });
+
     it('shows effort and budget policy in the preview description', () => {
       const pipeline = {
         steps: [

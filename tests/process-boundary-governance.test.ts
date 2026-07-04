@@ -15,6 +15,7 @@ const allowedManagedProcessConsumers = [
   'libs/core/agent-runtime-supervisor.ts',
   'libs/core/mission-orchestration-events.test.ts',
   'libs/core/mission-orchestration-events.ts',
+  'libs/core/mission-orchestration-worker.resume.test.ts',
   'scripts/surface_runtime.ts',
   'tests/managed-process.test.ts',
   'tests/surface-auth.test.ts',

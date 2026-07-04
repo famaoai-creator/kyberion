@@ -335,7 +335,7 @@ async function opControl(
       return ctx;
 
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 

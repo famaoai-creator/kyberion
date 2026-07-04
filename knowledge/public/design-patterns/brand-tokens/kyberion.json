@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "brand_name": "Kyberion",
+  "tokens": {
+    "colors": {
+      "light": {
+        "bg_main": "#ffffff",
+        "panel_bg": "rgba(15, 23, 42, 0.05)",
+        "primary": "#0f172a",
+        "secondary": "#334155",
+        "accent": "#0066cc",
+        "warning": "#eab308",
+        "text_primary": "#0f172a",
+        "text_secondary": "rgba(15, 23, 42, 0.62)"
+      },
+      "dark": {
+        "bg_main": "#020617",
+        "panel_bg": "rgba(10, 25, 47, 0.82)",
+        "primary": "#0A192F",
+        "secondary": "#31415B",
+        "accent": "#00F2FF",
+        "warning": "#f59e0b",
+        "text_primary": "#F8FAFC",
+        "text_secondary": "rgba(248, 250, 252, 0.62)"
+      }
+    },
+    "fonts": {
+      "sans": "Inter, 'Noto Sans JP', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    }
+  }
+}

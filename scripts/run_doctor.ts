@@ -5,6 +5,10 @@ import {
   loadEnvironmentManifest,
   getGovernanceControlSummary,
   probeManifest,
+  pathResolver,
+  readJanitorLastRunMs,
+  safeExistsSync,
+  safeReadFile,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -23,6 +27,8 @@ const RUNTIME_PRESETS: Record<string, string[]> = {
   browser: ['meeting-participation-runtime'],
   baseline: DEFAULT_MANIFESTS,
 };
+const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
+const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface DoctorRunReport {
   totalMissing: number;
@@ -32,6 +38,7 @@ export interface DoctorRunReport {
     counts: { must: number; should: number; nice: number };
   }>;
   scheduleLines: string[];
+  maintenanceLines: string[];
   governanceLines: string[];
   backupLines: string[];
 }
@@ -68,6 +75,40 @@ export function collectBackupDoctorLines(): string[] {
   const age = status.latestAgeHours?.toFixed(1) ?? 'unknown';
   return [
     `Backup status: ${status.status}; latest=${status.latestName}; age=${age}h; archives=${status.count}; dir=${status.backupDir}`,
+  ];
+}
+
+export function collectMaintenanceDoctorLines(): string[] {
+  const lastRunMs = readJanitorLastRunMs();
+  const submitPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
+  const submitPending = safeExistsSync(submitPath);
+  let lastSubmittedAt: number | null = null;
+  if (submitPending) {
+    try {
+      const raw = safeReadFile(submitPath, { encoding: 'utf8' }) as string;
+      const parsed = JSON.parse(raw) as { submitted_at?: string };
+      const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
+      lastSubmittedAt = Number.isFinite(submittedAt) ? submittedAt : null;
+    } catch {
+      lastSubmittedAt = null;
+    }
+  }
+
+  if (lastRunMs === null && !submitPending) {
+    return ['Maintenance: janitor idle; no last run marker'];
+  }
+
+  const ageHours =
+    lastRunMs !== null ? ((Date.now() - lastRunMs) / (60 * 60 * 1000)).toFixed(1) : 'unknown';
+  const pendingState =
+    submitPending && lastSubmittedAt !== null && Date.now() - lastSubmittedAt < JANITOR_MAINTENANCE_TTL_MS
+      ? 'pending'
+      : submitPending
+        ? 'submitted'
+        : 'idle';
+
+  return [
+    `Maintenance: janitor ${pendingState}; last_run=${lastRunMs === null ? 'never' : `${ageHours}h ago`}; submit_marker=${submitPending ? 'present' : 'absent'}`,
   ];
 }
 
@@ -140,6 +181,7 @@ export async function collectDoctorReport(argv: {
     totalMissing,
     summaries,
     scheduleLines: collectPipelineScheduleDoctorLines(),
+    maintenanceLines: collectMaintenanceDoctorLines(),
     governanceLines,
     backupLines: collectBackupDoctorLines(),
   };
@@ -165,6 +207,9 @@ async function main(): Promise<void> {
     console.log('');
   }
   for (const line of report.scheduleLines) {
+    console.log(line);
+  }
+  for (const line of report.maintenanceLines) {
     console.log(line);
   }
   for (const line of report.governanceLines) {

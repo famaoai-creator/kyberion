@@ -11,7 +11,8 @@ function read(relPath: string): string {
 describe('run_baseline_check customer overlay contract', () => {
   it('reads customer-aware profile paths for readiness checks', () => {
     const script = read('scripts/run_baseline_check.ts');
-    expect(script).toContain('customerResolver.customerRoot');
+    // The script uses resolveActiveProfileRoot() via profileRoot() helper
+    expect(script).toContain('resolveActiveProfileRoot');
     expect(script).toContain("profileRoot()");
     expect(script).toContain("path.join(profileRoot(), 'connections'");
     expect(script).toContain("path.join(profileRoot(), 'my-identity.json')");

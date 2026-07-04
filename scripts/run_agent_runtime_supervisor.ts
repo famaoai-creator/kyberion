@@ -1,4 +1,4 @@
-import { logger, processMissionTeamPrewarmRequest } from '@agent/core';
+import { logger, processMissionTeamPrewarmRequest, killSwitch } from '@agent/core';
 
 function parseRequestPath(argv: string[]): string {
   const index = argv.findIndex((arg) => arg === '--request');
@@ -9,6 +9,7 @@ function parseRequestPath(argv: string[]): string {
 }
 
 async function main() {
+  killSwitch.startMonitor();
   const requestPath = parseRequestPath(process.argv.slice(2));
   const result = await processMissionTeamPrewarmRequest(requestPath);
   logger.info(`[AGENT_RUNTIME_SUPERVISOR] Completed ${result.request_id} for ${result.mission_id}`);

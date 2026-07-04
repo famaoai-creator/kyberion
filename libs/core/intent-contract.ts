@@ -11,6 +11,7 @@ import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
+import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import {
   resolveCapabilityBundleForIntent,
   summarizeRelevantCapabilityBundlesForIntentIds,
@@ -29,8 +30,11 @@ import {
   type ReasoningLevelDecision,
 } from './reasoning-level-policy.js';
 import {
+  loadModelRegistry,
   resolveReasoningModelRoute,
+  resolveTaskModelHint,
   resolveRuntimeModelId,
+  type ModelRegistryFile,
   type ReasoningModelRoute,
 } from './reasoning-model-routing.js';
 import {
@@ -244,6 +248,12 @@ export interface IntentCompilerTarget {
   modelProvider?: string;
 }
 
+interface IntentCompilerTargetResolutionOptions extends Pick<LlmCompileOptions, 'provider' | 'model' | 'modelProvider'> {
+  selectedIntent?: StandardIntentDefinition;
+  discoveredProviders?: ProviderInfo[];
+  modelRegistry?: ModelRegistryFile;
+}
+
 let intentContractValidateFn: ValidateFunction | null = null;
 let workLoopValidateFn: ValidateFunction | null = null;
 let intentPolicyValidateFn: ValidateFunction | null = null;
@@ -356,6 +366,123 @@ function parseJsonObject<T>(text: string): T | null {
   } catch {
     return null;
   }
+}
+
+function providerToCompilerProvider(provider: string): IntentCompilerProvider | null {
+  const normalized = provider.trim().toLowerCase();
+  if (normalized === 'openai' || normalized === 'codex') return 'codex';
+  if (normalized === 'anthropic' || normalized === 'claude') return 'claude';
+  if (normalized === 'google' || normalized === 'gemini') return 'gemini';
+  return null;
+}
+
+function stripModelProviderPrefix(modelId: string): string {
+  const idx = modelId.indexOf(':');
+  return idx >= 0 ? modelId.slice(idx + 1) : modelId;
+}
+
+function inferCompilerPhaseKind(intent?: StandardIntentDefinition): 'plan' | 'implement' | 'review' | 'mechanical' {
+  const haystack = [
+    intent?.id,
+    intent?.category,
+    intent?.legacy_category,
+    intent?.description,
+    intent?.execution_shape,
+    intent?.resolution?.shape,
+    intent?.resolution?.task_kind,
+    intent?.mission_class,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (
+    intent?.risk_profile === 'approval_required' ||
+    intent?.risk_profile === 'high_stakes' ||
+    /\b(review|audit|analy|assess|compare|critique|verify|validate)\b/.test(haystack)
+  ) {
+    return 'review';
+  }
+
+  if (/\b(plan|design|strategy|architecture|roadmap|proposal)\b/.test(haystack)) {
+    return 'plan';
+  }
+
+  if (
+    intent?.execution_shape === 'direct_reply' ||
+    intent?.resolution?.shape === 'direct_reply' ||
+    /\b(reply|answer|greeting|clarify)\b/.test(haystack)
+  ) {
+    return 'mechanical';
+  }
+
+  if (intent?.execution_shape === 'task_session' || intent?.resolution?.shape === 'task_session') {
+    return 'implement';
+  }
+
+  return 'mechanical';
+}
+
+function inferCompilerScope(intent?: StandardIntentDefinition): 'S' | 'M' | 'L' {
+  if (
+    intent?.risk_profile === 'approval_required' ||
+    intent?.risk_profile === 'high_stakes' ||
+    intent?.mission_class === 'long_running_job'
+  ) {
+    return 'L';
+  }
+
+  if (intent?.execution_shape === 'task_session' || intent?.resolution?.shape === 'task_session') {
+    return 'M';
+  }
+
+  return 'S';
+}
+
+function resolveIntentAwareCompilerTarget(
+  options: IntentCompilerTargetResolutionOptions
+): IntentCompilerTarget | null {
+  const intent = options.selectedIntent;
+  if (!intent) return null;
+  const discoveredProviders = options.discoveredProviders ?? discoverProviders();
+  const availableProviders = new Set(
+    discoveredProviders
+      .filter((entry) => entry.installed && entry.healthy)
+      .map((entry) => providerToCompilerProvider(entry.provider))
+      .filter((provider): provider is IntentCompilerProvider => Boolean(provider))
+  );
+  if (availableProviders.size === 0) return null;
+
+  const registry = options.modelRegistry ?? loadModelRegistry();
+  const hintPhase = inferCompilerPhaseKind(intent);
+  const hintScope = inferCompilerScope(intent);
+  const taskHint = resolveTaskModelHint(
+    {
+      phase_kind: hintPhase,
+      risk: intent.risk_profile,
+      estimated_scope: hintScope,
+    },
+    { registry }
+  );
+
+  const candidate = registry.models.find((model) => model.model_id === taskHint.model_id);
+  if (!candidate) return null;
+
+  const compilerProvider = providerToCompilerProvider(candidate.provider);
+  if (
+    !compilerProvider ||
+    !availableProviders.has(compilerProvider) ||
+    candidate.status === 'blocked' ||
+    candidate.status === 'deprecated'
+  ) {
+    return null;
+  }
+
+  return {
+    provider: compilerProvider,
+    model: stripModelProviderPrefix(candidate.model_id),
+    modelProvider: candidate.provider,
+  };
 }
 
 export function summarizeRelevantIntents(
@@ -1002,8 +1129,13 @@ async function defaultAsk(prompt: string): Promise<string> {
 }
 
 export function resolveIntentCompilerTarget(
-  options: Pick<LlmCompileOptions, 'provider' | 'model' | 'modelProvider'> = {}
+  options: IntentCompilerTargetResolutionOptions = {}
 ): IntentCompilerTarget {
+  const intentAware = resolveIntentAwareCompilerTarget(options);
+  if (!options.provider && !options.model && !options.modelProvider && intentAware) {
+    return intentAware;
+  }
+
   const rawProvider = (
     options.provider ||
     process.env.KYBERION_INTENT_COMPILER_PROVIDER ||
@@ -1382,11 +1514,16 @@ export async function compileUserIntentFlow(
     ...input,
     resolutionPacket,
   };
-  const compilerTarget = resolveIntentCompilerTarget(options);
   const reasoningPolicy = loadReasoningLevelPolicy();
   const selectedIntent = resolutionPacket.selected_intent_id
     ? findStandardIntentById(resolutionPacket.selected_intent_id)
     : undefined;
+  const compilerTarget = resolveIntentCompilerTarget({
+    provider: options.provider,
+    model: options.model,
+    modelProvider: options.modelProvider,
+    selectedIntent,
+  });
   const reasoningDecision = resolveReasoningLevelDecision(
     {
       isSimpleGreeting: SIMPLE_GREETING_REGEX.test(input.text.trim()),

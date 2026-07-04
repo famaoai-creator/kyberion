@@ -296,9 +296,7 @@ describe('ios-actuator', () => {
         expect(result.context.my_var).toBe('my_value');
       });
 
-      it('未知のtransformオペレーターは警告を出してコンテキストを変更しない', async () => {
-        const { logger } = await import('@agent/core');
-
+      it('未知のtransformオペレーターはエラーで失敗する(silent no-op 禁止)', async () => {
         const result = await handleAction({
           action: 'pipeline',
           steps: [
@@ -310,8 +308,8 @@ describe('ios-actuator', () => {
           ],
         });
 
-        expect(result.status).toBe('succeeded');
-        expect(vi.mocked(logger.warn)).toHaveBeenCalled();
+        expect(result.status).toBe('failed');
+        expect(result.results[0]?.error).toContain('Unknown op');
       });
     });
 
@@ -354,9 +352,7 @@ describe('ios-actuator', () => {
         expect(result.context.json_data).toEqual({ ios_key: 'ios_value' });
       });
 
-      it('未知のcaptureオペレーターは警告を出してコンテキストを変更しない', async () => {
-        const { logger } = await import('@agent/core');
-
+      it('未知のcaptureオペレーターはエラーで失敗する(silent no-op 禁止)', async () => {
         const result = await handleAction({
           action: 'pipeline',
           steps: [
@@ -368,8 +364,8 @@ describe('ios-actuator', () => {
           ],
         });
 
-        expect(result.status).toBe('succeeded');
-        expect(vi.mocked(logger.warn)).toHaveBeenCalled();
+        expect(result.status).toBe('failed');
+        expect(result.results[0]?.error).toContain('Unknown op');
       });
     });
 
@@ -416,9 +412,7 @@ describe('ios-actuator', () => {
     });
 
     describe('未知のapplyオペレーター', () => {
-      it('未知のapplyオペレーターは警告を出してコンテキストを変更しない', async () => {
-        const { logger } = await import('@agent/core');
-
+      it('未知のapplyオペレーターはエラーで失敗する(silent no-op 禁止)', async () => {
         const result = await handleAction({
           action: 'pipeline',
           steps: [
@@ -430,8 +424,8 @@ describe('ios-actuator', () => {
           ],
         });
 
-        expect(result.status).toBe('succeeded');
-        expect(vi.mocked(logger.warn)).toHaveBeenCalled();
+        expect(result.status).toBe('failed');
+        expect(result.results[0]?.error).toContain('Unknown op');
       });
     });
 

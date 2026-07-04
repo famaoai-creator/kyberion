@@ -104,7 +104,7 @@ The `log-watcher.adf.json` sensor provides continuous monitoring:
 - Evidence is captured and staged for investigation
 
 ## 5. Compliance
-- All actions logged to audit-chain (tamper-evident hash chain)
+- All actions logged to audit-chain (keyed HMAC-SHA256 hash chain for tamper detection; off-box notarization not yet supported)
 - Evidence preserved in `active/evidence/incidents/`
 - Reports archived to `knowledge/confidential/` (tier-2 data isolation)
 - FISC compliance: incident handling per FISC安全対策基準

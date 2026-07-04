@@ -171,7 +171,7 @@ describe('mission orchestration dashboard contract', () => {
     expect(agentRoute).toContain('surfaces-setup');
     expect(agentRoute).toContain('services-setup');
     expect(agentRoute).toContain('reasoning-setup');
-    expect(agentRoute).toContain('import("@agent/core/core")');
+    expect(agentRoute).toContain("import('@agent/core/core')");
     expect(route).toContain("from '../../../lib/intelligence-primitives'");
     expect(route).toContain('emitMissionOrchestrationObservation');
   });
