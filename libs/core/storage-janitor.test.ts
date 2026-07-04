@@ -9,6 +9,7 @@ vi.mock('./secure-io.js', async () => {
   return {
     safeReaddir: (dir: string) => actual.readdirSync(dir),
     safeStat: (p: string) => actual.statSync(p),
+    safeLstat: (p: string) => actual.lstatSync(p),
     safeUnlinkSync: (p: string) => actual.unlinkSync(p),
     safeRmSync: (p: string, opts: any) => actual.rmSync(p, opts),
     safeExistsSync: (p: string) => actual.existsSync(p),
@@ -117,6 +118,22 @@ describe('storage-janitor', () => {
 
       const result = scanTmp({ dryRun: true });
       expect(result.expired).toContain(nested);
+    });
+
+    it('does not recurse into symlinked directories', () => {
+      const externalDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-janitor-external-'));
+      const externalFile = path.join(externalDir, 'outside.txt');
+      const linkedDir = path.join(tmpDir, 'linked-node_modules');
+      writeFile(externalFile);
+      setMtime(externalFile, DEFAULT_TMP_TTL_MS + 1000);
+      fs.symlinkSync(externalDir, linkedDir, 'dir');
+
+      const result = scanTmp({ dryRun: false });
+
+      expect(result.expired).not.toContain(externalFile);
+      expect(result.deleted).not.toContain(externalFile);
+      expect(fs.existsSync(externalFile)).toBe(true);
+      expect(fs.lstatSync(linkedDir).isSymbolicLink()).toBe(true);
     });
 
     it('respects custom ttlMs', () => {
