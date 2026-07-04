@@ -2,6 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeExec = vi.fn(() => '');
 const safeReadFile = vi.fn(() => '{}');
+const DEFAULT_MAX_PIPELINE_STEPS = 1000;
+const DEFAULT_PIPELINE_TIMEOUT_MS = 60_000;
+const DEFAULT_MAX_LOOP_ITERATIONS = 100;
+const assertExecutionBounds = vi.fn(
+  (
+    state: { stepCount: number; startTime: number },
+    options: { maxSteps?: number; timeoutMs?: number } = {}
+  ) => {
+    const maxSteps = options.maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS;
+    const timeoutMs = options.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS;
+    if (state.stepCount > maxSteps) {
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
+    }
+    if (Date.now() - state.startTime > timeoutMs) {
+      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
+    }
+  }
+);
+const withinLoopBounds = vi.fn(
+  (iteration: number, maxIterations?: number) =>
+    iteration < (maxIterations ?? DEFAULT_MAX_LOOP_ITERATIONS)
+);
 const safeWriteFile = vi.fn();
 const safeMkdir = vi.fn();
 const safeExistsSync = vi.fn(() => false);
@@ -690,6 +712,11 @@ vi.mock('@agent/core', () => ({
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  assertExecutionBounds,
+  withinLoopBounds,
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+  DEFAULT_MAX_LOOP_ITERATIONS,
   derivePipelineStatus,
   resolveVars,
   evaluateCondition,
