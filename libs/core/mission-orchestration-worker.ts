@@ -20,12 +20,18 @@ import {
   PlanningReviewVerdictSchema,
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
+import { evaluateMissionGate } from './mission-gate-engine.js';
 import {
   ensureMissionTeamRuntimeViaSupervisor,
   shutdownAllAgentRuntimes,
 } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
-import { claimWorkItem, importExternalWorkItem, updateWorkItem } from './work-coordination.js';
+import {
+  claimWorkItem,
+  importExternalWorkItem,
+  releaseWorkItem,
+  updateWorkItem,
+} from './work-coordination.js';
 import { logger } from './core.js';
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir } from './path-resolver.js';
@@ -153,6 +159,7 @@ interface SurfaceControlPayload {
 interface PlannedNextTask {
   task_id: string;
   status?: string;
+  rework_count?: number;
   assigned_to?: {
     role?: string;
     agent_id?: string;
@@ -374,6 +381,94 @@ function buildTaskClarificationPacket(input: {
     `Clarification needed for task ${input.task.task_id}`,
     'The task result still has unresolved needs_input and cannot be marked complete yet.'
   );
+}
+
+function looksLikePath(value: string): boolean {
+  return /[\\/]/u.test(value) || /\.[A-Za-z0-9]+$/u.test(value);
+}
+
+async function evaluateTaskAcceptanceGate(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  taskResult?: TaskResultBlock;
+  targetPath?: string;
+}): Promise<{ passed: boolean; reasons: string[]; recordPath?: string }> {
+  const missionPath = missionDir(input.missionId, 'public');
+  const evidencePaths = [
+    ...(input.task.target_path ? [input.task.target_path] : []),
+    ...(input.targetPath ? [input.targetPath] : []),
+    ...(input.taskResult?.artifacts || [])
+      .map((artifact) => String(artifact?.path || '').trim())
+      .filter(Boolean),
+    ...(input.task.deliverable && looksLikePath(input.task.deliverable)
+      ? [input.task.deliverable]
+      : []),
+  ]
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean)
+    .map((entry) => (nodePath.isAbsolute(entry) ? entry : nodePath.join(missionPath, entry)));
+  const acceptanceCriteria = Array.isArray(input.task.acceptance_criteria)
+    ? input.task.acceptance_criteria.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  const verificationNotes = input.taskResult?.verification_done || [];
+  const summary = String(input.taskResult?.summary || '').trim();
+  const reasons: string[] = [];
+  const criteriaMisses = acceptanceCriteria.filter(
+    (criterion) =>
+      ![summary, ...verificationNotes].some((note) =>
+        String(note || '')
+          .toLowerCase()
+          .includes(criterion.toLowerCase())
+      )
+  );
+  if (criteriaMisses.length > 0) {
+    reasons.push(`Missing acceptance evidence for: ${criteriaMisses.join(', ')}`);
+  }
+  if (!input.taskResult) {
+    reasons.push('Missing structured task result.');
+  }
+  if (input.taskResult && (input.taskResult.gaps || []).length > 0) {
+    reasons.push(`Task result reported gaps: ${input.taskResult.gaps.join('; ')}`);
+  }
+
+  const gate = await evaluateMissionGate({
+    missionId: input.missionId,
+    gate: {
+      id: `task-acceptance-${input.task.task_id}`,
+      title: `Task acceptance gate for ${input.task.task_id}`,
+      checks: [
+        {
+          kind: 'schema_valid',
+          params: {
+            schema: 'task_result',
+            value: input.taskResult,
+          },
+        },
+        {
+          kind: 'evidence_exists',
+          params: {
+            paths: evidencePaths,
+          },
+        },
+        {
+          kind: 'custom',
+          params: {
+            evaluate: () => ({
+              passed: reasons.length === 0,
+              reason: reasons.join('; '),
+            }),
+          },
+        },
+      ],
+    },
+    evidenceDir: `${missionDir(input.missionId, 'public')}/gates`,
+  });
+
+  return {
+    passed: gate.verdict === 'pass',
+    reasons: [...gate.reasons, ...reasons],
+    recordPath: gate.evidence_path,
+  };
 }
 
 async function buildTaskDispatchContext(input: {
@@ -683,6 +778,159 @@ async function dispatchPlannedMissionTask(input: {
     };
   }
 
+  const acceptance = await evaluateTaskAcceptanceGate({
+    missionId: input.missionId,
+    task: input.task,
+    taskResult: response.taskResult,
+  });
+
+  if (!acceptance.passed) {
+    const currentReworkCount = Number(input.task.rework_count || 0);
+    const nextReworkCount = currentReworkCount + 1;
+    const gateReason = acceptance.reasons.join('; ') || 'task acceptance gate failed';
+
+    if (currentReworkCount < 1) {
+      input.task.rework_count = nextReworkCount;
+      input.task.status = 'planned';
+      releaseWorkItem({
+        itemId: claimed.item.item_id,
+        expectedVersion: claimed.item.version,
+        leaseId: claimed.lease.lease_id,
+        actorPeerId: 'mission-orchestration-worker',
+        summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+        metadata: {
+          summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+          blocked_reason: gateReason,
+          mission_id: input.missionId,
+          task_id: input.task.task_id,
+          team_role: input.teamRole,
+          task_result_retried: response.retried,
+          rework_count: nextReworkCount,
+          rework_requested: true,
+        },
+      });
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        agent_id: input.assignment.agent_id,
+        team_role: input.teamRole,
+        decision: 'task_reviewed',
+        why: 'Task acceptance gate failed; rework requested once.',
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+        payload: {
+          description: input.task.description,
+          deliverable: input.task.deliverable,
+          task_model_hint: input.assignment.model_hint,
+          task_result: response.taskResult,
+          task_result_retried: response.retried,
+          gate_reasons: acceptance.reasons,
+          gate_record_path: acceptance.recordPath,
+          rework_count: nextReworkCount,
+          rework_requested: true,
+          ...taskResultObservability,
+        },
+      });
+      recordMissionContextTask(input.missionId, `Rework requested for ${input.task.task_id}`, {
+        next_step: 'retry the work item once after repairing the acceptance gaps',
+        work_item_id: input.task.task_id,
+        team_role: input.teamRole,
+        assignee_peer_id: input.assignment.agent_id,
+        execution_mode: response.executionMode,
+        context_pack_id: dispatchContext.missionContextPackId,
+        context_pack_path: dispatchContext.missionContextPackPath,
+        context_pack_summary: dispatchContext.missionContextPackSummary,
+        context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
+        gate_reasons: acceptance.reasons,
+        gate_record_path: acceptance.recordPath,
+        rework_count: nextReworkCount,
+        rework_requested: true,
+        ...taskResultObservability,
+      });
+      return {
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        agent_id: input.assignment.agent_id,
+        dispatched: false,
+        ...taskResultObservability,
+      };
+    }
+
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+        blocked_reason: gateReason,
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        task_result_retried: response.retried,
+        rework_count: nextReworkCount,
+      },
+    });
+    input.task.status = 'blocked';
+    input.task.rework_count = nextReworkCount;
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'Task acceptance gate failed after rework limit.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+      payload: {
+        description: input.task.description,
+        deliverable: input.task.deliverable,
+        task_model_hint: input.assignment.model_hint,
+        task_result: response.taskResult,
+        task_result_retried: response.retried,
+        gate_reasons: acceptance.reasons,
+        gate_record_path: acceptance.recordPath,
+        rework_count: nextReworkCount,
+        rework_requested: false,
+        ...taskResultObservability,
+      },
+    });
+    emitMissionOrchestrationObservation({
+      event_type: 'mission_owner_notified',
+      decision: 'mission_owner_notified',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      reason: 'Task acceptance gate failed after rework limit.',
+      gate_rework_count: nextReworkCount,
+      gate_reasons: acceptance.reasons,
+      gate_record_path: acceptance.recordPath,
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step: 'notify owner and request human intervention',
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+      execution_mode: response.executionMode,
+      context_pack_id: dispatchContext.missionContextPackId,
+      context_pack_path: dispatchContext.missionContextPackPath,
+      context_pack_summary: dispatchContext.missionContextPackSummary,
+      context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
+      gate_reasons: acceptance.reasons,
+      gate_record_path: acceptance.recordPath,
+      rework_count: nextReworkCount,
+      ...taskResultObservability,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...taskResultObservability,
+    };
+  }
+
   updateWorkItem({
     itemId: claimed.item.item_id,
     expectedVersion: claimed.item.version,
@@ -695,15 +943,15 @@ async function dispatchPlannedMissionTask(input: {
       task_result_retried: response.retried,
     },
   });
-  input.task.status = 'requested';
+  input.task.status = 'completed';
   emitMissionTaskEvent({
-    event_type: 'task_issued',
+    event_type: 'task_completed',
     mission_id: input.missionId,
     task_id: input.task.task_id,
     agent_id: input.assignment.agent_id,
     team_role: input.teamRole,
-    decision: 'task_issued',
-    why: 'Planner-produced follow-up task was delegated to the assigned mission team role.',
+    decision: 'task_completed',
+    why: 'Task acceptance gate passed.',
     policy_used: 'mission_orchestration_control_plane_v1',
     evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
     payload: {
@@ -717,11 +965,12 @@ async function dispatchPlannedMissionTask(input: {
       work_item_status: claimed.item.status,
       task_result: response.taskResult,
       task_result_retried: response.retried,
+      gate_record_path: acceptance.recordPath,
       ...taskResultObservability,
     },
   });
-  recordMissionContextTask(input.missionId, `Dispatched work item ${input.task.task_id}`, {
-    next_step: 'await the dispatched response and continue reconciliation',
+  recordMissionContextTask(input.missionId, `Completed work item ${input.task.task_id}`, {
+    next_step: 'continue reconciliation and update the task board',
     task_id: input.task.task_id,
     team_role: input.teamRole,
     assignee_peer_id: input.assignment.agent_id,
@@ -733,6 +982,7 @@ async function dispatchPlannedMissionTask(input: {
     work_item_id: claimed.item.item_id,
     work_item_lease_id: claimed.lease.lease_id,
     work_item_status: claimed.item.status,
+    gate_record_path: acceptance.recordPath,
     ...taskResultObservability,
   });
   return {
@@ -1284,156 +1534,145 @@ export async function dispatchMissionNextTasks(
   const plan = resolveMissionTeamPlan({ missionId });
   const maxParallelMembers = Math.max(1, plan.team_governance?.lifecycle.max_parallel_members || 3);
 
-  while (true) {
-    const remainingPlannedTasks = plannedTasks.filter(
-      (task) => (task.status || 'planned') === 'planned'
-    );
-    if (remainingPlannedTasks.length === 0) break;
+  const remainingPlannedTasks = plannedTasks.filter(
+    (task) => (task.status || 'planned') === 'planned'
+  );
+  const readyTasks = remainingPlannedTasks
+    .filter((task) => areTaskDependenciesSatisfied(task, allTasks))
+    .sort((left, right) => left.task_id.localeCompare(right.task_id));
 
-    const readyTasks = remainingPlannedTasks
-      .filter((task) => areTaskDependenciesSatisfied(task, allTasks))
-      .sort((left, right) => left.task_id.localeCompare(right.task_id));
-    if (readyTasks.length === 0) break;
-
-    const batch: Promise<DispatchMissionTaskOutcome | null>[] = [];
-    for (const task of readyTasks) {
-      if (batch.length >= maxParallelMembers) break;
-      const teamRole = task.assigned_to?.role;
-      if (!teamRole) {
-        task.status = 'blocked';
-        const summary = buildUnassignedRoleSummary(task);
-        emitMissionTaskEvent({
-          event_type: 'task_reviewed',
-          mission_id: missionId,
-          task_id: task.task_id,
-          agent_id: task.assigned_to?.agent_id || 'mission-orchestration-worker',
-          team_role: 'unassigned',
-          decision: 'task_reviewed',
-          why: summary,
-          policy_used: 'mission_orchestration_control_plane_v1',
-          evidence: task.deliverable ? [String(task.deliverable)] : [],
-          payload: {
-            description: task.description,
-            deliverable: task.deliverable,
-            reason: 'blocked(unassigned_role)',
-            summary,
-          },
-        });
-        recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
-          summary,
-          next_step: 'assign a team role before retrying the work item',
-          work_item_id: task.task_id,
-          team_role: 'unassigned',
-          assignee_peer_id: task.assigned_to?.agent_id,
-          reason: 'blocked(unassigned_role)',
-        });
-        continue;
-      }
-      const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
-      // Fill in a routed model hint only when the team plan did not already
-      // pin one — plan-level hints stay authoritative (MO-05 shadow routing).
-      if (assignment && !assignment.model_hint) {
-        const phaseKind: TaskModelPhaseKind =
-          teamRole === 'planner'
-            ? 'plan'
-            : teamRole === 'reviewer' || teamRole === 'qa'
-              ? 'review'
-              : teamRole === 'formatter' || teamRole === 'linter'
-                ? 'mechanical'
-                : 'implement';
-        assignment.model_hint = resolveTaskModelHint({
-          phase_kind: phaseKind,
-          risk: task.risk,
-          estimated_scope: task.estimated_scope,
-        });
-      }
-      if (!assignment?.agent_id) {
-        task.status = 'blocked';
-        const summary = buildUnassignedRoleSummary(task, teamRole);
-        emitMissionTaskEvent({
-          event_type: 'task_reviewed',
-          mission_id: missionId,
-          task_id: task.task_id,
-          agent_id: 'mission-orchestration-worker',
-          team_role: teamRole,
-          decision: 'task_reviewed',
-          why: summary,
-          policy_used: 'mission_orchestration_control_plane_v1',
-          evidence: task.deliverable ? [String(task.deliverable)] : [],
-          payload: {
-            description: task.description,
-            deliverable: task.deliverable,
-            reason: 'blocked(unassigned_role)',
-            team_role: teamRole,
-            summary,
-          },
-        });
-        recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
-          summary,
-          next_step: `assign an agent for role ${teamRole} before retrying the work item`,
-          work_item_id: task.task_id,
-          team_role: teamRole,
-          reason: 'blocked(unassigned_role)',
-        });
-        continue;
-      }
-      const preflight = validateDelegatedTaskPreflight({
-        task: {
-          task_id: task.task_id,
-          team_role: teamRole,
-          deliverable: task.deliverable,
-          target_path: task.target_path,
-        },
-        assignment,
-      });
-      emitMissionOrchestrationObservation({
-        decision: preflight.allowed
-          ? 'delegation_preflight_passed'
-          : 'delegation_preflight_blocked',
-        event_type: 'delegation_preflight_checked',
-        requested_by: 'mission_orchestration_worker',
+  const batch: Promise<DispatchMissionTaskOutcome | null>[] = [];
+  for (const task of readyTasks) {
+    if (batch.length >= maxParallelMembers) break;
+    const teamRole = task.assigned_to?.role;
+    if (!teamRole) {
+      task.status = 'blocked';
+      const summary = buildUnassignedRoleSummary(task);
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
         mission_id: missionId,
-        resource_id: task.task_id,
-        operation: preflight.allowed ? 'allow' : 'block',
-        why: preflight.reason,
-        evidence: preflight.target_path ? [preflight.target_path] : [],
+        task_id: task.task_id,
+        agent_id: task.assigned_to?.agent_id || 'mission-orchestration-worker',
+        team_role: 'unassigned',
+        decision: 'task_reviewed',
+        why: summary,
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: task.deliverable ? [String(task.deliverable)] : [],
         payload: {
-          team_role: teamRole,
-          target_path: preflight.target_path,
-          target_scope_class: preflight.target_scope_class,
-          warnings: preflight.warnings,
+          description: task.description,
+          deliverable: task.deliverable,
+          reason: 'blocked(unassigned_role)',
+          summary,
         },
       });
-      if (!preflight.allowed) {
-        task.status = 'blocked';
-        continue;
-      }
-
-      batch.push(
-        dispatchPlannedMissionTask({
-          missionId,
-          task,
-          teamRole,
-          assignment,
-        })
-      );
+      recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+        summary,
+        next_step: 'assign a team role before retrying the work item',
+        work_item_id: task.task_id,
+        team_role: 'unassigned',
+        assignee_peer_id: task.assigned_to?.agent_id,
+        reason: 'blocked(unassigned_role)',
+      });
+      continue;
     }
-
-    if (batch.length === 0) {
+    const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
+    // Fill in a routed model hint only when the team plan did not already
+    // pin one — plan-level hints stay authoritative (MO-05 shadow routing).
+    if (assignment && !assignment.model_hint) {
+      const phaseKind: TaskModelPhaseKind =
+        teamRole === 'planner'
+          ? 'plan'
+          : teamRole === 'reviewer' || teamRole === 'qa'
+            ? 'review'
+            : teamRole === 'formatter' || teamRole === 'linter'
+              ? 'mechanical'
+              : 'implement';
+      assignment.model_hint = resolveTaskModelHint({
+        phase_kind: phaseKind,
+        risk: task.risk,
+        estimated_scope: task.estimated_scope,
+      });
+    }
+    if (!assignment?.agent_id) {
+      task.status = 'blocked';
+      const summary = buildUnassignedRoleSummary(task, teamRole);
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
+        mission_id: missionId,
+        task_id: task.task_id,
+        agent_id: 'mission-orchestration-worker',
+        team_role: teamRole,
+        decision: 'task_reviewed',
+        why: summary,
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: task.deliverable ? [String(task.deliverable)] : [],
+        payload: {
+          description: task.description,
+          deliverable: task.deliverable,
+          reason: 'blocked(unassigned_role)',
+          team_role: teamRole,
+          summary,
+        },
+      });
+      recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+        summary,
+        next_step: `assign an agent for role ${teamRole} before retrying the work item`,
+        work_item_id: task.task_id,
+        team_role: teamRole,
+        reason: 'blocked(unassigned_role)',
+      });
+      continue;
+    }
+    const preflight = validateDelegatedTaskPreflight({
+      task: {
+        task_id: task.task_id,
+        team_role: teamRole,
+        deliverable: task.deliverable,
+        target_path: task.target_path,
+      },
+      assignment,
+    });
+    emitMissionOrchestrationObservation({
+      decision: preflight.allowed ? 'delegation_preflight_passed' : 'delegation_preflight_blocked',
+      event_type: 'delegation_preflight_checked',
+      requested_by: 'mission_orchestration_worker',
+      mission_id: missionId,
+      resource_id: task.task_id,
+      operation: preflight.allowed ? 'allow' : 'block',
+      why: preflight.reason,
+      evidence: preflight.target_path ? [preflight.target_path] : [],
+      payload: {
+        team_role: teamRole,
+        target_path: preflight.target_path,
+        target_scope_class: preflight.target_scope_class,
+        warnings: preflight.warnings,
+      },
+    });
+    if (!preflight.allowed) {
+      task.status = 'blocked';
       continue;
     }
 
-    const results = await Promise.all(batch);
-    for (const result of results) {
-      if (result) {
-        dispatchObservability.push(result);
-        if (result.dispatched) {
-          dispatched.push({
-            task_id: result.task_id,
-            team_role: result.team_role,
-            agent_id: result.agent_id,
-          });
-        }
+    batch.push(
+      dispatchPlannedMissionTask({
+        missionId,
+        task,
+        teamRole,
+        assignment,
+      })
+    );
+  }
+
+  const results = await Promise.all(batch);
+  for (const result of results) {
+    if (result) {
+      dispatchObservability.push(result);
+      if (result.dispatched || result.result_schema_ok) {
+        dispatched.push({
+          task_id: result.task_id,
+          team_role: result.team_role,
+          agent_id: result.agent_id,
+        });
       }
     }
   }
@@ -1614,6 +1853,83 @@ function packetRequiresIndependentReview(packet: PlanningPacket): boolean {
   );
 }
 
+async function recordPlanningPacketGate(input: {
+  missionId: string;
+  packet: PlanningPacket;
+  verdict: 'pass' | 'fail';
+  reason?: string;
+  reviewVerdict?: PlanningReviewVerdict;
+  plannerAgentId: string;
+  reviewerAgentId?: string;
+  reviewRound: 0 | 1 | 2;
+}): Promise<void> {
+  const requiresIndependentReview = packetRequiresIndependentReview(input.packet);
+  const reviewApproved =
+    !requiresIndependentReview || input.reviewVerdict?.approve === true || input.verdict === 'fail';
+  const evaluation = await evaluateMissionGate({
+    missionId: input.missionId,
+    gate: {
+      id: `planning-packet-${input.missionId}`,
+      title: `Planning packet gate for ${input.missionId}`,
+      checks: [
+        {
+          kind: 'schema_valid',
+          params: {
+            schema: 'planning_packet',
+            value: input.packet,
+          },
+        },
+        {
+          kind: 'custom',
+          params: {
+            evaluate: () => ({
+              passed: input.verdict === 'pass' && reviewApproved,
+              reason:
+                input.reason ||
+                (!reviewApproved
+                  ? input.reviewVerdict?.gaps.join('; ') ||
+                    input.reviewVerdict?.rationale ||
+                    'planning review rejected the packet'
+                  : undefined),
+            }),
+          },
+        },
+      ],
+    },
+    evidenceDir: `${missionDir(input.missionId, 'public')}/gates`,
+  });
+  if (evaluation.evidence_path) {
+    const current = JSON.parse(
+      safeReadFile(evaluation.evidence_path, { encoding: 'utf8' }) as string
+    ) as Record<string, unknown>;
+    safeWriteFile(
+      evaluation.evidence_path,
+      JSON.stringify(
+        {
+          ...current,
+          planner_agent_id: input.plannerAgentId,
+          ...(input.reviewerAgentId ? { reviewer_agent_id: input.reviewerAgentId } : {}),
+          review_round: input.reviewRound,
+          requires_independent_review: requiresIndependentReview,
+          ...(input.reviewVerdict
+            ? {
+                review_verdict: {
+                  approve: input.reviewVerdict.approve,
+                  gaps: input.reviewVerdict.gaps,
+                  ...(input.reviewVerdict.rationale
+                    ? { rationale: input.reviewVerdict.rationale }
+                    : {}),
+                },
+              }
+            : {}),
+        },
+        null,
+        2
+      )
+    );
+  }
+}
+
 function buildPlanningReviewPrompt(input: {
   missionId: string;
   plan: ReturnType<typeof resolveMissionTeamPlan>;
@@ -1735,6 +2051,7 @@ export async function resolveMissionPlanningPacket(
   );
   let kickoffBlocks = extractPlanningPacketBlocks(kickoffText);
   let planningPacket = kickoffBlocks.planningPackets[0];
+  let reviewVerdict: PlanningReviewVerdict | undefined;
 
   if (!planningPacket) {
     const retryPrompt = buildPlannerRetryPrompt(
@@ -1759,9 +2076,10 @@ export async function resolveMissionPlanningPacket(
     );
   }
 
+  let reviewerAgentId: string | undefined;
   if (packetRequiresIndependentReview(planningPacket)) {
     const reviewerAssignment = resolveMissionTeamReceiver({ missionId, teamRole: 'reviewer' });
-    const reviewerAgentId = reviewerAssignment?.agent_id || plannerAgentId;
+    reviewerAgentId = reviewerAssignment?.agent_id || plannerAgentId;
     let reviewText = await requestPlanningReviewText(
       missionId,
       payload,
@@ -1774,7 +2092,7 @@ export async function resolveMissionPlanningPacket(
         packet: planningPacket,
       })
     );
-    let reviewVerdict = parsePlanningReviewVerdict(reviewText);
+    reviewVerdict = parsePlanningReviewVerdict(reviewText);
     if (!reviewVerdict.approve) {
       const retryPrompt = buildPlannerRetryPrompt(
         missionId,
@@ -1816,6 +2134,19 @@ export async function resolveMissionPlanningPacket(
       );
       reviewVerdict = parsePlanningReviewVerdict(reviewText);
       if (!reviewVerdict.approve) {
+        await recordPlanningPacketGate({
+          missionId,
+          packet: planningPacket,
+          verdict: 'fail',
+          reason:
+            reviewVerdict.gaps.length > 0
+              ? reviewVerdict.gaps.join('; ')
+              : reviewVerdict.rationale || 'planning review rejected packet',
+          reviewVerdict,
+          plannerAgentId,
+          reviewerAgentId,
+          reviewRound: 2,
+        });
         throw new Error(
           `Planning review rejected packet for ${missionId}: ${
             reviewVerdict.gaps.length > 0
@@ -1826,6 +2157,16 @@ export async function resolveMissionPlanningPacket(
       }
     }
   }
+
+  await recordPlanningPacketGate({
+    missionId,
+    packet: planningPacket,
+    verdict: 'pass',
+    plannerAgentId,
+    reviewRound: packetRequiresIndependentReview(planningPacket) ? 2 : 1,
+    ...(reviewerAgentId ? { reviewerAgentId } : {}),
+    ...(reviewVerdict ? { reviewVerdict } : {}),
+  });
 
   return planningPacket;
 }

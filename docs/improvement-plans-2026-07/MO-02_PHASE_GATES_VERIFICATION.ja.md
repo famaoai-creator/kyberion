@@ -25,6 +25,15 @@
 
 ## 実装タスク
 
+### 実装メモ
+
+- `libs/core/mission-gate-engine.ts` を追加し、`evidence_exists` / `schema_valid` / `command_succeeds` / `reviewer_approved` / `human_override` / `custom` の評価と JSON レコード永続化を共通化した。
+- `mission-orchestration-worker.ts` のタスク受入経路で、`task_result` スキーマ・証跡・acceptance criteria の突合を gate 化し、合格時のみ `completed` に進める。
+- `mission-orchestration-worker.ts` の planning 経路で、planning_packet のスキーマ検証と独立レビュー結果を `gates/` に記録するようにした。
+- `mission-orchestration-worker.ts` の planning gate record には planner / reviewer / review round / review verdict を埋めるようにした。
+- `mission_controller` の `gate-pass` / `gate-fail` は、同形式の override レコードを gates 配下に残す実装へ寄せた。
+- `mission-lifecycle.ts` では finish 時に intent drift / exit / quality を判定し、失敗時は validating を維持して修復タスクを NEXT_TASKS.json に残す。
+
 ### Task 1: ゲート評価エンジン — `claude-sonnet-4`
 
 1. `libs/core/mission-gate-engine.ts` を新設: ゲート定義(`{ id, checks: [{ kind: 'evidence_exists' | 'schema_valid' | 'command_succeeds' | 'reviewer_approved' | 'human_override', params }] }`)を評価し、`{ verdict: pass|fail, reasons[], evidence_path }` を返す。`command_succeeds` は secure-io/safeExec 経由でテスト・lint 等を実行する(`validateMissionQuality` の既存チェック実装を可能な限り再利用)。
@@ -38,7 +47,7 @@
 
 ### Task 3: タスク受入ゲート — `claude-sonnet-4`
 
-1. dispatch 結果の受領時(`dispatchMissionNextTasks` の応答処理)に受入評価を追加: 成果物パスの存在、acceptance_criteria(MO-03 で契約に追加)ごとの確認、`code_change` では対象範囲のテスト実行。合格で `completed`、不合格は `rework` ステータス + 差し戻し理由付きで同一 worker に 1 回再依頼、それでも不合格なら `blocked` + owner 通知。
+1. dispatch 結果の受領時(`dispatchMissionNextTasks` の応答処理)に受入評価を追加: 成果物パスの存在、acceptance_criteria(MO-03 で契約に追加)ごとの確認、`code_change` では対象範囲のテスト実行。合格で `completed`、不合格は `rework_count` を 1 回だけ増やして同一 worker に再依頼し、2 回目でも不合格なら `blocked` + owner 通知。
 2. **独立レビュアー**: リスク高タスクでは、実装者と別のエージェント(team plan の reviewer ロール。未割当なら planner ロールで代替)に「反証を試みよ(このコードが受入条件を満たさないケースを探せ)」という敵対的プロンプトでレビューさせ、`{ refuted: boolean, findings[] }` を受入判定に合成する。
 3. `NEXT_TASKS.json` のステータス遷移を worker が一元管理し、外部書き込み前提を廃止する(`reconcileTaskOutcomeEvents` はゲート記録から集計する形に変更)。
 
@@ -55,5 +64,5 @@
 ## リスクと注意
 
 - ゲートはレイテンシとトークンを消費する。**リスク軸で強度を段階化**(low: スキーマのみ / review_required: 受入評価 / approval_required+: 独立レビュー)し、全ミッション一律の重装備にしない。
-- 敵対的レビューは false positive(正しい成果物への言いがかり)を出す。レビュー結果は自動棄却でなく rework 理由として実装者に渡し、2 者で収束しない場合のみ人間へ(自動の無限ループを作らない — rework 上限は必ず守る)。
+- 敵対的レビューは false positive(正しい成果物への言いがかり)を出す。レビュー結果は自動棄却でなく rework 理由として実装者に渡し、2 者で収束しない場合のみ人間へ(自動の無限ループを作らない — rework 上限 1 回を守る)。
 - stub reasoning backend ではレビューが形骸化するため、ゲートの E2E テストはレビュー応答を fixture で注入する。
